@@ -112,12 +112,12 @@ const ProjectionItem: React.FC<ProjectionItemProps> = ({ result, label, isCurren
         <div className="bg-white rounded-xl p-5 border border-slate-100 flex flex-col shadow-sm hover:shadow-md transition-shadow">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">{label}</span>
             <div className="flex flex-col">
-                <div className="text-3xl font-extrabold text-slate-800 tracking-tight" title="Projeção Mensal">
-                    {format(result.projected)}
+                <div className="text-3xl font-extrabold text-slate-800 tracking-tight" title="Valor Realizado (Atual)">
+                    {format(result.current)}
                 </div>
                 <div className="flex items-center gap-1.5 mt-1 text-sm font-medium text-slate-500">
-                    <span className="opacity-70">Atual:</span>
-                    <span className="text-slate-700">{format(result.current)}</span>
+                    <span className="opacity-70">Projeção:</span>
+                    <span className="text-slate-700 font-bold">{format(result.projected)}</span>
                 </div>
             </div>
 
