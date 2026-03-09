@@ -166,7 +166,7 @@ export const DataMigration = () => {
                     data: d.data, // YYYY-MM-DD
                     propostas_total: toNonNegativeInt(d.propostas_b2c_total),
                     emissoes_total: toNonNegativeInt(d.emissoes_b2c_total),
-                    percentual_conversao: toFiniteNumber(d.percentual_conversao_b2c),
+                    percentual_conversao: Math.round(toFiniteNumber(d.percentual_conversao_b2c)),
                     // cac_medio: ?? Not in B2CDataRow, likely calculated or null
                     observacoes: d.observacoes
                 }));

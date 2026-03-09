@@ -1,4 +1,4 @@
-
+﻿
 import { supabase } from './supabaseClient';
 import { Activity, FrameworkRow } from '../types/framework';
 import { DailyAdMetrics } from '../schemas/paid-media';
@@ -24,6 +24,8 @@ const toNonNegativeInt = (value: unknown): number => {
     if (num <= 0) return 0;
     return Math.round(num);
 };
+
+const previewRows = (rows: any[], limit = 3) => rows.slice(0, limit);
 
 // Helper to map SQL row to Activity
 export const mapSqlToActivity = (row: any): Activity => {
@@ -200,7 +202,7 @@ export const dataService = {
             data: m.data,
             propostas_total: toNonNegativeInt(m.propostas_b2c_total),
             emissoes_total: toNonNegativeInt(m.emissoes_b2c_total),
-            percentual_conversao: toFiniteNumber(m.percentual_conversao_b2c),
+            percentual_conversao: Math.round(toFiniteNumber(m.percentual_conversao_b2c)),
             observacoes: m.observacoes || null
         }));
 
@@ -210,7 +212,8 @@ export const dataService = {
 
         if (insertError) {
             console.error('❌ B2C Sync Error:', insertError);
-            throw new Error(`ENGINEERING_FIX_V2: ${insertError.message}`);
+            console.error('B2C payload preview:', previewRows(sqlBatch));
+            throw new Error(`ENGINEERING_FIX_V3: ${insertError.message}`);
         }
     },
 
@@ -253,14 +256,32 @@ export const dataService = {
 
         if (sqlBatch.length === 0) return;
 
+        const invalidIntRow = (sqlBatch as any[]).find((row) =>
+            !Number.isInteger(row.impressions) ||
+            !Number.isInteger(row.clicks) ||
+            !Number.isInteger(row.conversions)
+        );
+        if (invalidIntRow) {
+            console.error('Invalid integer payload before insert:', invalidIntRow);
+            throw new Error(
+                `ENGINEERING_FIX_V3_PRECHECK: integer fields invalid. ` +
+                JSON.stringify({
+                    impressions: invalidIntRow.impressions,
+                    clicks: invalidIntRow.clicks,
+                    conversions: invalidIntRow.conversions
+                })
+            );
+        }
+
         console.log(`✅ Inserindo ${sqlBatch.length} linhas em paid_media_metrics...`);
+        console.log('Paid payload preview:', previewRows(sqlBatch as any[]));
         const { error: insertError } = await supabase
             .from('paid_media_metrics')
             .insert(sqlBatch);
 
         if (insertError) {
             console.error('❌ Paid Media Sync Error:', insertError);
-            throw new Error(`ENGINEERING_FIX_V2: ${insertError.message}`);
+            throw new Error(`ENGINEERING_FIX_V3: ${insertError.message}`);
         }
     },
 

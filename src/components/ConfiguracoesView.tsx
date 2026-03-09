@@ -12,6 +12,8 @@ import { UserManagementPanel } from './admin/UserManagementPanel';
 import { activityService, versionService } from '../services/activityService';
 import { dataService } from '../services/dataService';
 
+const UPLOAD_FIX_VERSION = 'ENG_FIX_V3_2026-03-09';
+
 const VersionManager: React.FC = () => {
     const [versions, setVersions] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -257,7 +259,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
             }
 
             await loadFiles();
-            setMsg({ type: 'success', text: 'Dados sincronizados com o banco com sucesso!' });
+            setMsg({ type: 'success', text: `Dados sincronizados com o banco com sucesso! (${UPLOAD_FIX_VERSION})` });
         } catch (e: any) {
             console.error('❌ Erro durante upload:', e);
             setMsg({ type: 'error', text: 'Falha: ' + e.message });
@@ -337,7 +339,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                     />
                     <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed group-hover:scale-105">
                         {uploading ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-                        {uploading ? 'Enviando...' : 'Upload (Eng Fix)'}
+                        {uploading ? 'Enviando...' : `Upload (Eng Fix ${UPLOAD_FIX_VERSION})`}
                     </button>
                 </div>
             </div>
