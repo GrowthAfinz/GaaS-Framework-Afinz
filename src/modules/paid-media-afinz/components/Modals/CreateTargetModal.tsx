@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Target } from '../hooks/useTargets';
+import type { Target } from '../../hooks/useTargets';
 import { X, Save } from 'lucide-react';
 import { format } from 'date-fns';
 

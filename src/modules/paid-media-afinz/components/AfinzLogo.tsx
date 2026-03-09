@@ -7,46 +7,52 @@ interface AfinzLogoProps {
 
 /**
  * Afinz Logo — brand guide faithful.
- * "afinz" bold lowercase, "z" has a teal #00C6CC horizontal bar at mid-height.
+ * "afinz" bold, lowercase, NO italics.
+ * Double-story 'a' (using Arial Black).
+ * "z" has a teal #00C6CC bar positioned at the TOP of the letter's beginning.
  */
 export const AfinzLogo: React.FC<AfinzLogoProps> = ({ className = '', height = 32 }) => {
-    const fontSize = height * 0.9;
+    const fontSize = height * 0.95;
     const fontStyle: React.CSSProperties = {
-        fontFamily: "'Arial Black', 'Arial Bold', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Arial Black', 'Arial Bold', 'Helvetica Black', sans-serif",
         fontWeight: 900,
+        fontStyle: 'normal',
         fontSize,
         lineHeight: 1,
         letterSpacing: '-0.03em',
         color: 'currentColor',
+        display: 'inline-block'
     };
 
     return (
         <span
             className={`inline-flex items-end select-none ${className}`}
             aria-label="afinz"
-            style={{ lineHeight: 1 }}
+            style={{ height }}
         >
-            {/* "afin" — solid */}
+            {/* "afin" — Double-story 'a', bold, no italics */}
             <span style={fontStyle}>afin</span>
 
-            {/* "z" with teal bar at mid-height */}
-            <span style={{ position: 'relative', display: 'inline-block', ...fontStyle }}>
+            {/* "z" with teal bar crossing the TOP portion */}
+            <span style={{
+                position: 'relative',
+                display: 'inline-block',
+                ...fontStyle,
+                marginLeft: '-0.02em',
+                transform: 'translateY(1.5%)'
+            }}>
                 z
-                {/* 
-                    The bar sits at approx. 50% of the x-height of lowercase z.
-                    Arial Black x-height ≈ 55% of font-size.
-                    Middle of z from bottom ≈ 55%/2 = 27.5% of font-size = 28% from bottom.
-                */}
                 <span
                     style={{
                         position: 'absolute',
-                        left: '-8%',
-                        right: '-8%',
-                        bottom: `${fontSize * 0.28}px`,
-                        height: Math.max(2.5, fontSize * 0.11),
+                        left: '-5%',
+                        right: '-5%',
+                        // Positioned at the TOP of the lowercase 'z'
+                        top: '15%',
+                        height: Math.max(3, fontSize * 0.13),
                         backgroundColor: '#00C6CC',
-                        borderRadius: 1,
                         pointerEvents: 'none',
+                        zIndex: 1
                     }}
                 />
             </span>

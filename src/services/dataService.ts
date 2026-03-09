@@ -167,6 +167,16 @@ export const dataService = {
     },
 
     async upsertB2CMetrics(metrics: B2CDataRow[]) {
+        // ROBUST SYNC: Delete then Insert (same pattern as Framework)
+        // This avoids dependence on UNIQUE constraints that might be missing
+        const { error: deleteError } = await supabase
+            .from('b2c_daily_metrics')
+            .delete()
+            .gte('data', '2000-01-01'); // effectively wipes history
+
+        if (deleteError) throw deleteError;
+        if (metrics.length === 0) return;
+
         const sqlBatch = metrics.map(m => ({
             data: m.data,
             propostas_total: m.propostas_b2c_total || 0,
@@ -175,20 +185,30 @@ export const dataService = {
             observacoes: m.observacoes || null
         }));
 
-        const { error } = await supabase
+        const { error: insertError } = await supabase
             .from('b2c_daily_metrics')
-            .upsert(sqlBatch, { onConflict: 'data' });
+            .insert(sqlBatch);
 
-        if (error) throw error;
+        if (insertError) {
+            console.error('❌ B2C Sync Error:', insertError);
+            throw new Error(`ENGINEERING_FIX_V2: ${insertError.message}`);
+        }
     },
 
     async upsertPaidMedia(metrics: DailyAdMetrics[]) {
+        // ROBUST SYNC: Delete then Insert
+        const { error: deleteError } = await supabase
+            .from('paid_media_metrics')
+            .delete()
+            .gte('date', '2000-01-01');
+
+        if (deleteError) throw deleteError;
+
         const sqlBatch = metrics
             .filter(m => m.date && m.campaign) // skip rows without date or campaign
             .map(m => {
                 let dateStr: string;
                 try {
-                    // m.date is an ISO string from fileParser, parse it back to Date for format()
                     const d = new Date(m.date as unknown as string);
                     if (isNaN(d.getTime())) return null;
                     dateStr = format(d, 'yyyy-MM-dd');
@@ -210,19 +230,19 @@ export const dataService = {
                     cpa: m.cpa ?? 0,
                 };
             })
-            .filter(Boolean); // remove nulls from failed date parses
+            .filter(Boolean);
 
-        if (sqlBatch.length === 0) {
-            console.warn('⚠️ upsertPaidMedia: nenhuma linha válida para inserir.');
-            return;
-        }
+        if (sqlBatch.length === 0) return;
 
         console.log(`✅ Inserindo ${sqlBatch.length} linhas em paid_media_metrics...`);
-        const { error } = await supabase
+        const { error: insertError } = await supabase
             .from('paid_media_metrics')
-            .upsert(sqlBatch, { onConflict: 'date, channel, campaign' });
+            .insert(sqlBatch);
 
-        if (error) throw error;
+        if (insertError) {
+            console.error('❌ Paid Media Sync Error:', insertError);
+            throw new Error(`ENGINEERING_FIX_V2: ${insertError.message}`);
+        }
     },
 
     async fetchPaidMediaBudgets(): Promise<any[]> {
@@ -232,7 +252,8 @@ export const dataService = {
     },
 
     async upsertPaidMediaBudget(budget: any) {
-        const { error } = await supabase.from('paid_media_budgets').upsert(budget, { onConflict: 'month, channel, objective' });
+        // Upsert budget using id as the conflict column
+        const { error } = await supabase.from('paid_media_budgets').upsert(budget, { onConflict: 'id' });
         if (error) throw error;
     },
 
@@ -248,7 +269,8 @@ export const dataService = {
     },
 
     async upsertPaidMediaTarget(target: any) {
-        const { error } = await supabase.from('paid_media_targets').upsert(target, { onConflict: 'month, metric, channel, objective' });
+        // Upsert target using id as the conflict column
+        const { error } = await supabase.from('paid_media_targets').upsert(target, { onConflict: 'id' });
         if (error) throw error;
     },
 

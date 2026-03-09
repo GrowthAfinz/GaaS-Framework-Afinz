@@ -235,10 +235,15 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
         setUploading(true);
         setMsg(null);
         try {
-            // 1. Upload to Backup Bucket
-            await storageService.uploadFile(slot, file);
+            // 1. Try to upload to Backup Bucket (optional - Storage RLS may block anonymous users)
+            try {
+                await storageService.uploadFile(slot, file);
+            } catch (storageErr: any) {
+                console.warn('⚠️ Storage upload skipped (RLS ou bucket não acessível):', storageErr.message);
+                // Continue anyway — DB sync is the priority
+            }
 
-            // 2. Parse and Upsert to Database automatically
+            // 2. Parse and Upsert to Database (always required)
             if (slot === 'b2c') {
                 const { data } = await parseB2CCSV(file);
                 await dataService.upsertB2CMetrics(data);
@@ -250,7 +255,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
             }
 
             await loadFiles();
-            setMsg({ type: 'success', text: 'Upload realizado e banco atualizado com sucesso!' });
+            setMsg({ type: 'success', text: 'Dados sincronizados com o banco com sucesso!' });
         } catch (e: any) {
             console.error('❌ Erro durante upload:', e);
             setMsg({ type: 'error', text: 'Falha: ' + e.message });
@@ -330,7 +335,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                     />
                     <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed group-hover:scale-105">
                         {uploading ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-                        {uploading ? 'Enviando...' : 'Novo Upload'}
+                        {uploading ? 'Enviando...' : 'Upload (Eng Fix)'}
                     </button>
                 </div>
             </div>
@@ -407,7 +412,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
 };
 
 export const ConfiguracoesView: React.FC = () => {
-    const { user, signInWithEmail, signOut, loading } = useAuth();
+    const { user, signInWithEmail, signOut, signInAsDev, loading } = useAuth();
     const [emailInput, setEmailInput] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [sent, setSent] = useState(false);
@@ -435,7 +440,51 @@ export const ConfiguracoesView: React.FC = () => {
     // --- LOGGED OUT STATE ---
     // Should depend on App guard, but as fallback:
     if (!user) {
-        return <div className="p-8 text-center text-slate-500">Sessão expirada. Recarregue a página.</div>;
+        return (
+            <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
+                <div className="max-w-md w-full space-y-8 bg-slate-800/50 p-8 rounded-2xl border border-slate-700/50 backdrop-blur-sm shadow-2xl">
+                    <div className="text-center">
+                        <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 mx-auto mb-4">
+                            <ShieldCheck size={32} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-2">Acesso Restrito</h2>
+                        <p className="text-slate-400 text-sm">Sua sessão expirou ou você não está autenticado.</p>
+                    </div>
+
+                    <div className="space-y-4 pt-4">
+                        <button
+                            onClick={signInAsDev}
+                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-4 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/40 group active:scale-95"
+                        >
+                            <span className="group-hover:translate-x-1 transition-transform flex items-center gap-2">
+                                <Database size={18} />
+                                Entrar como Admin GaaS
+                            </span>
+                        </button>
+
+                        <p className="text-[10px] text-slate-500 text-center uppercase tracking-widest font-bold">Ou via E-mail (Supabase)</p>
+
+                        <form onSubmit={handleLogin} className="space-y-3">
+                            <input
+                                type="email"
+                                placeholder="Seu e-mail"
+                                value={emailInput}
+                                onChange={(e) => setEmailInput(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                required
+                            />
+                            <button
+                                type="submit"
+                                disabled={isSending}
+                                className="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
+                            >
+                                {isSending ? 'Enviando...' : 'Enviar Link Mágico'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     // --- LOGGED IN STATE ---

@@ -7,8 +7,8 @@ interface AuthContextType {
     session: Session | null;
     loading: boolean;
     signInWithEmail: (email: string) => Promise<void>;
+    signInWithPassword: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
-    signInAsDev: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,17 +19,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check active session
+        // Check for persisted Supabase session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
+            if (session) {
+                setSession(session);
+                setUser(session.user);
+            }
             setLoading(false);
         });
 
-        // Listen for changes
+        // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setUser(session?.user ?? null);
+            if (session) {
+                setSession(session);
+                setUser(session.user);
+            } else {
+                setSession(null);
+                setUser(null);
+            }
             setLoading(false);
         });
 
@@ -40,54 +47,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
-                // If using Magic Link, this redirects back to the app, preserving the subpath
                 emailRedirectTo: window.location.href,
             },
         });
         if (error) throw error;
     };
 
-    const signOut = async () => {
-        await supabase.auth.signOut();
-        // Clear dev user if any
-        if (user?.id === 'dev-user') {
-            setUser(null);
-            setSession(null);
-        }
+    const signInWithPassword = async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        if (error) throw error;
     };
 
-    const signInAsDev = async () => {
-        // Mock session for development
-        const devUser = {
-            id: 'dev-user',
-            aud: 'authenticated',
-            role: 'authenticated',
-            email: 'dev@local.host',
-            email_confirmed_at: new Date().toISOString(),
-            phone: '',
-            confirmed_at: new Date().toISOString(),
-            last_sign_in_at: new Date().toISOString(),
-            app_metadata: { provider: 'email', providers: ['email'] },
-            user_metadata: {},
-            identities: [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        } as User;
-
-        const devSession = {
-            access_token: 'mock-token',
-            token_type: 'bearer',
-            expires_in: 3600,
-            refresh_token: 'mock-refresh',
-            user: devUser,
-        } as Session;
-
-        setUser(devUser);
-        setSession(devSession);
+    const signOut = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, loading, signInWithEmail, signOut, signInAsDev }}>
+        <AuthContext.Provider value={{ user, session, loading, signInWithEmail, signInWithPassword, signOut }}>
             {children}
         </AuthContext.Provider>
     );

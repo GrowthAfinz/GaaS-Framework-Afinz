@@ -100,11 +100,16 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
     { id: 'budget', label: 'Orçamentos', icon: Wallet },
   ] as const;
 
+  const [isFilterHovered, setIsFilterHovered] = useState(false);
+
   return (
     // ── Dashboard (light) ──────────────────────────────────────────────
     <div className="fixed inset-0 z-50 bg-slate-50 text-slate-900 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-[60] shadow-sm">
+      <header
+        className="bg-white border-b border-slate-200 sticky top-0 z-[60] shadow-sm transition-all duration-300"
+        onMouseEnter={() => setIsFilterHovered(true)}
+      >
         <div className="px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {onBack && (
@@ -158,12 +163,24 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
             Novo Arquivo
           </button>
         </div>
-
-        {/* Global Filter Bar */}
-        <FilterBar />
       </header>
 
-      <main className="flex-1 overflow-y-auto">
+      <main
+        className="flex-1 overflow-y-auto relative"
+        onMouseEnter={() => setIsFilterHovered(false)}
+      >
+        {/* Animated Filter Bar — only shows when hovering the header or when explicitly needed */}
+        <div
+          className={`
+                sticky top-0 z-50 bg-white shadow-lg border-b border-slate-200 transition-all duration-300 ease-in-out transform origin-top
+                ${isFilterHovered ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none h-0'}
+            `}
+          onMouseEnter={() => setIsFilterHovered(true)}
+          onMouseLeave={() => setIsFilterHovered(false)}
+        >
+          <FilterBar />
+        </div>
+
         <div className="container mx-auto px-6 py-8 pb-32 max-w-[1600px] animate-fade-in">
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'monthly' && <MonthlyAnalysisTab />}

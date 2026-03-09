@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Budget } from '../hooks/useBudgets';
+import type { Budget } from '../../hooks/useBudgets';
 import { X, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
