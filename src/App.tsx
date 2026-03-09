@@ -147,8 +147,9 @@ function App() {
         >
           <div
             className={`
-              bg-white border-x border-b border-slate-200 shadow-sm transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-              ${isFilterDropOpen ? 'max-h-40 opacity-100 translate-y-0 overflow-visible' : 'max-h-0 opacity-0 -translate-y-2 overflow-hidden'}
+              bg-white border-x border-b border-slate-200 shadow-sm transform-gpu origin-top
+              transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
+              ${isFilterDropOpen ? 'max-h-40 opacity-100 translate-y-0 overflow-visible' : 'max-h-0 opacity-0 -translate-y-3 overflow-hidden'}
             `}
           >
             <div className="px-6 py-3">
@@ -165,9 +166,7 @@ function App() {
             </div>
           </div>
 
-          <div className="h-2 bg-gradient-to-b from-slate-200/90 to-transparent">
-            <div className="mx-auto h-full w-24 rounded-b-full bg-slate-200/70" />
-          </div>
+          <div className="h-2" />
         </div>
       )}
 

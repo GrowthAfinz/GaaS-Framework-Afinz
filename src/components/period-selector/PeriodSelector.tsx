@@ -39,11 +39,11 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({ compact = false 
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border shadow-sm transition-all ${isOpen
-                    ? 'bg-cyan-50 border-cyan-300 text-cyan-800'
+                    ? 'bg-slate-50 border-slate-300 text-slate-800'
                     : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     }`}
             >
-                <CalendarIcon size={16} className={isOpen ? 'text-cyan-600' : 'text-slate-400'} />
+                <CalendarIcon size={16} className={isOpen ? 'text-slate-600' : 'text-slate-400'} />
                 {compact && <span className="text-sm font-medium text-slate-600">Periodo</span>}
                 <span className="text-sm font-medium">
                     {format(startDate, "dd MMM, yyyy", { locale: ptBR })} - {format(endDate, "dd MMM, yyyy", { locale: ptBR })}

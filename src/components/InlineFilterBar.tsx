@@ -91,13 +91,13 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
         return (
             <div className="relative group">
                 <button className={`flex items-center gap-2 px-3 py-2 rounded-lg transition border shadow-sm ${isActive
-                    ? 'bg-cyan-50 border-cyan-300 text-cyan-700'
+                    ? 'bg-slate-50 border-slate-300 text-slate-700'
                     : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                     }`}>
-                    <Icon size={16} className={isActive ? 'text-cyan-600' : 'text-slate-400'} />
+                    <Icon size={16} className={isActive ? 'text-slate-600' : 'text-slate-400'} />
                     <span className="text-sm font-medium">{title}</span>
                     {isActive && (
-                        <span className="bg-cyan-100 text-cyan-700 text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-cyan-200">
+                        <span className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-slate-300">
                             {selectedCount}
                         </span>
                     )}
@@ -109,7 +109,7 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                         <span className="text-xs font-bold text-slate-500 uppercase">{title}</span>
                         <button
                             onClick={() => toggleAll(field, items)}
-                            className="text-[10px] text-cyan-700 hover:text-cyan-600 font-medium"
+                            className="text-[10px] text-slate-600 hover:text-slate-800 font-medium"
                         >
                             {isAllSelected ? 'Desmarcar Todos' : 'Selecionar Todos'}
                         </button>
@@ -125,7 +125,7 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                                 className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 rounded-lg transition group/item"
                             >
                                 <div className={`w-4 h-4 rounded border flex items-center justify-center transition ${(filters[field] as string[]).includes(item)
-                                    ? 'bg-cyan-600 border-cyan-600'
+                                    ? 'bg-slate-700 border-slate-700'
                                     : 'border-slate-300 group-hover/item:border-slate-400'
                                     }`}>
                                     {(filters[field] as string[]).includes(item) && <Check size={10} className="text-white" />}
