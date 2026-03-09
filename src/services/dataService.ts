@@ -203,5 +203,37 @@ export const dataService = {
             .upsert(sqlBatch, { onConflict: 'date, channel, campaign' });
 
         if (error) throw error;
+    },
+
+    async fetchPaidMediaBudgets(): Promise<any[]> {
+        const { data, error } = await supabase.from('paid_media_budgets').select('*');
+        if (error) throw error;
+        return data || [];
+    },
+
+    async upsertPaidMediaBudget(budget: any) {
+        const { error } = await supabase.from('paid_media_budgets').upsert(budget, { onConflict: 'month, channel, objective' });
+        if (error) throw error;
+    },
+
+    async deletePaidMediaBudget(id: string) {
+        const { error } = await supabase.from('paid_media_budgets').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async fetchPaidMediaTargets(): Promise<any[]> {
+        const { data, error } = await supabase.from('paid_media_targets').select('*');
+        if (error) throw error;
+        return data || [];
+    },
+
+    async upsertPaidMediaTarget(target: any) {
+        const { error } = await supabase.from('paid_media_targets').upsert(target, { onConflict: 'month, metric, channel, objective' });
+        if (error) throw error;
+    },
+
+    async deletePaidMediaTarget(id: string) {
+        const { error } = await supabase.from('paid_media_targets').delete().eq('id', id);
+        if (error) throw error;
     }
 };

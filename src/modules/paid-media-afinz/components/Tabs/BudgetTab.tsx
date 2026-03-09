@@ -6,7 +6,7 @@ import { CreateBudgetModal } from '../Modals/CreateBudgetModal';
 import { Plus, Wallet, TrendingUp, AlertTriangle, CheckCircle, TrendingDown } from 'lucide-react';
 import { parse, isSameMonth, startOfMonth, endOfMonth, eachDayOfInterval, format, isFuture, getDaysInMonth, differenceInCalendarDays, getDate } from 'date-fns';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import type { Budget } from '../../utils/budgetsManager';
+import type { Budget } from '../hooks/useBudgets';
 
 export const BudgetTab: React.FC = () => {
     const { budgets, add, update, remove } = useBudgets();

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Budget } from '../utils/budgetsManager';
+import type { Budget } from '../hooks/useBudgets';
 import type { DailyMetrics } from '../types';
 import { Edit2, Trash2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { isSameMonth, parse } from 'date-fns';
