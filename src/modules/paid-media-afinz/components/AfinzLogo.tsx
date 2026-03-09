@@ -42,7 +42,7 @@ export const AfinzLogo: React.FC<AfinzLogoProps> = ({ className = '', height = 3
                 letterSpacing="-1"
                 fill={textColor}
             >
-                afinz
+                Afinz
             </text>
 
             {/* 

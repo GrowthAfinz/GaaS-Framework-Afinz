@@ -35,31 +35,49 @@ const TAB_MAPPING = {
 const normalizeHeader = (header: string) => header.trim().toLowerCase();
 
 const parseDate = (dateVal: any): string | null => {
-    if (!dateVal) return null;
-    let date: Date;
+    if (dateVal === null || dateVal === undefined || dateVal === '') return null;
 
-    if (typeof dateVal === 'number') {
-        // Excel serial date
-        date = XLSX.SSF.parse_date_code(dateVal);
-        // @ts-expect-error XLSX SSF types might differ slightly in check
-        date = new Date(date.y, date.m - 1, date.d);
-    } else if (dateVal instanceof Date) {
-        date = dateVal;
-    } else {
-        // Try parsing string formats common in BR
-        const str = String(dateVal).trim();
-        if (str.includes('-')) {
-            date = new Date(str);
-        } else if (str.includes('/')) {
-            // Assume DD/MM/YYYY
-            date = parse(str, 'dd/MM/yyyy', new Date());
+    try {
+        let date: Date | null = null;
+
+        if (typeof dateVal === 'number') {
+            // Excel serial date (e.g. 45000)
+            if (!isFinite(dateVal) || dateVal <= 0) return null;
+            const parsed = XLSX.SSF.parse_date_code(dateVal);
+            if (!parsed || parsed.y == null || parsed.m == null || parsed.d == null) return null;
+            date = new Date(parsed.y, parsed.m - 1, parsed.d);
+        } else if (dateVal instanceof Date) {
+            date = dateVal;
         } else {
-            date = new Date(str);
-        }
-    }
+            const str = String(dateVal).trim();
+            if (!str) return null;
 
-    if (!isValid(date)) return null;
-    return date.toISOString();
+            if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+                // ISO format: 2026-03-09 or 2026-03-09T...
+                date = new Date(str);
+            } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+                // DD/MM/YYYY
+                date = parse(str, 'dd/MM/yyyy', new Date());
+            } else if (/^\d{2}\/\d{2}\/\d{2}$/.test(str)) {
+                // DD/MM/YY
+                date = parse(str, 'dd/MM/yy', new Date());
+            } else if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+                // DD-MM-YYYY
+                date = parse(str, 'dd-MM-yyyy', new Date());
+            } else {
+                // Last resort
+                date = new Date(str);
+            }
+        }
+
+        if (!date || !isValid(date)) return null;
+        // Sanity check: year should be reasonable (2000-2100)
+        const year = date.getFullYear();
+        if (year < 2000 || year > 2100) return null;
+        return date.toISOString();
+    } catch {
+        return null;
+    }
 };
 
 const determineObjective = (campaignName: string, _tabObjective: string | null): 'marca' | 'b2c' | 'plurix' => {
