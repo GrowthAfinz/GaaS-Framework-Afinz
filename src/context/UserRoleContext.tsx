@@ -8,9 +8,9 @@ export type BU = 'B2C' | 'B2B2C' | 'Plurix';
 export interface UserProfile {
   id: string;
   email: string;
-  nome: string;
+  full_name: string;
+  avatar_url?: string;
   role: Role;
-  ativo: boolean;
   created_at: string;
   updated_at?: string;
 }
