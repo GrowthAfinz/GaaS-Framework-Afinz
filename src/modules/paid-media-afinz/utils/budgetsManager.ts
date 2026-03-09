@@ -2,7 +2,7 @@ export interface Budget {
     id: string;
     month: string; // "MM/yyyy"
     channel: 'meta' | 'google';
-    objective: 'marca' | 'b2c';
+    objective: 'marca' | 'b2c' | 'plurix';
     value: number; // Budgeted Amount
     notes?: string;
 }

@@ -2,7 +2,7 @@ export interface DailyMetrics {
     date: string | Date; // Allow both for compatibility
     channel: 'meta' | 'google' | 'tiktok' | 'unknown'; // Expanded
     campaign: string;
-    objective?: 'marca' | 'b2c' | 'brand' | 'conversion' | 'unknown'; // Expanded compatibility
+    objective?: 'marca' | 'b2c' | 'brand' | 'conversion' | 'unknown' | 'plurix'; // Expanded compatibility
     spend: number;
     impressions: number;
     clicks: number;
@@ -31,7 +31,7 @@ export interface FilterState {
     dateRange: DateRange;
     timeRangeOption: TimeRangeOption;
     selectedChannels: ('meta' | 'google')[];
-    selectedObjectives: ('marca' | 'b2c')[];
+    selectedObjectives: ('marca' | 'b2c' | 'plurix')[];
     selectedCampaigns: string[];
     isCompareEnabled: boolean;
 }

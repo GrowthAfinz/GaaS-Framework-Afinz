@@ -4,7 +4,7 @@ export interface Target {
     metric: 'spend' | 'impressions' | 'clicks' | 'conversions' | 'cpm' | 'cpc' | 'ctr';
     value: number;
     channel?: 'meta' | 'google';
-    objective?: 'marca' | 'b2c';
+    objective?: 'marca' | 'b2c' | 'plurix';
     notes?: string;
 }
 

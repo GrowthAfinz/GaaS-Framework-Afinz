@@ -45,7 +45,7 @@ export const CampaignDetailModal: React.FC<CampaignDetailModalProps> = ({ campai
                         </span>
                         <h2 className="text-2xl font-bold text-slate-800 leading-tight">{campaign}</h2>
                         <p className="text-slate-500 text-sm mt-1">
-                            {campaignData[0]?.objective === 'b2c' ? 'Objetivo: Conversão/App' : 'Objetivo: Branding/Marca'}
+                            {campaignData[0]?.objective === 'b2c' ? 'Objetivo: Conversão/App' : campaignData[0]?.objective === 'plurix' ? 'Objetivo: Plurix' : 'Objetivo: Branding/Marca'}
                         </p>
                     </div>
                     <button

@@ -79,6 +79,7 @@ export const CreateBudgetModal: React.FC<CreateBudgetModalProps> = ({ existingBu
                             >
                                 <option value="marca">Branding</option>
                                 <option value="b2c">Conversão</option>
+                                <option value="plurix">Plurix</option>
                             </select>
                         </div>
                     </div>

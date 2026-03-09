@@ -14,6 +14,7 @@ import { MonthlyAnalysisTab } from './components/Tabs/MonthlyAnalysisTab';
 import { CampaignDetailsTab } from './components/Tabs/CampaignDetailsTab';
 import { BudgetTab } from './components/Tabs/BudgetTab';
 import { DailyAnalysisTab } from './components/Tabs/DailyAnalysisTab';
+import { AfinzLogo } from './components/AfinzLogo';
 import { LayoutDashboard, BarChart2, List, Wallet, UploadCloud, ArrowLeft, Calendar, Loader2 } from 'lucide-react'; // Added Loader2
 
 interface PaidMediaAfinzAppProps {
@@ -132,11 +133,10 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
                 <ArrowLeft size={20} />
               </button>
             )}
-            <div className="flex items-center gap-2">
-              <div className="bg-orange-500/10 p-2 rounded-lg">
-                <BarChart2 className="w-6 h-6 text-orange-500" />
-              </div>
-              <h1 className="font-bold text-xl text-slate-800 tracking-tight">Media <span className="text-orange-500 font-extrabold">Analytics</span></h1>
+            <div className="flex items-center gap-4">
+              <AfinzLogo height={32} className="text-slate-900" />
+              <div className="h-6 w-px bg-slate-300 mx-1"></div>
+              <h1 className="font-bold text-lg text-slate-700 tracking-tight">Media Analytics</h1>
             </div>
           </div>
 

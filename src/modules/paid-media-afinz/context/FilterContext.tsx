@@ -12,7 +12,7 @@ interface FilterContextType {
     setFilters: {
         setDateRange: (range: DateRange, option?: TimeRangeOption) => void;
         toggleChannel: (channel: 'meta' | 'google') => void;
-        toggleObjective: (obj: 'marca' | 'b2c') => void;
+        toggleObjective: (obj: 'marca' | 'b2c' | 'plurix') => void;
         toggleCampaign: (campaign: string) => void;
         setSelectedCampaigns: (campaigns: string[]) => void;
         setIsCompareEnabled: (enabled: boolean) => void;
@@ -37,7 +37,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
     const [timeRangeOption, setTimeRangeOption] = useState<TimeRangeOption>('this-month');
     const [selectedChannels, setSelectedChannels] = useState<('meta' | 'google')[]>(['meta', 'google']);
-    const [selectedObjectives, setSelectedObjectives] = useState<('marca' | 'b2c')[]>(['marca', 'b2c']);
+    const [selectedObjectives, setSelectedObjectives] = useState<('marca' | 'b2c' | 'plurix')[]>(['marca', 'b2c', 'plurix']);
     const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
     const [isCompareEnabled, setIsCompareEnabled] = useState(true);
 
@@ -79,7 +79,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (!inChannel) return false;
 
             // Objective Filter
-            if (item.objective && !selectedObjectives.includes(item.objective as 'marca' | 'b2c')) return false;
+            if (item.objective && !selectedObjectives.includes(item.objective as 'marca' | 'b2c' | 'plurix')) return false;
 
             // Campaign Filter
             if (selectedCampaigns.length > 0 && !selectedCampaigns.includes(item.campaign)) return false;
@@ -104,7 +104,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             const inChannel = selectedChannels.includes(item.channel as 'meta' | 'google');
             if (!inChannel) return false;
 
-            if (item.objective && !selectedObjectives.includes(item.objective as 'marca' | 'b2c')) return false;
+            if (item.objective && !selectedObjectives.includes(item.objective as 'marca' | 'b2c' | 'plurix')) return false;
 
             if (selectedCampaigns.length > 0 && !selectedCampaigns.includes(item.campaign)) return false;
 
@@ -139,7 +139,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         );
     };
 
-    const toggleObjective = (obj: 'marca' | 'b2c') => {
+    const toggleObjective = (obj: 'marca' | 'b2c' | 'plurix') => {
         setSelectedObjectives(prev =>
             prev.includes(obj) ? prev.filter(o => o !== obj) : [...prev, obj]
         );

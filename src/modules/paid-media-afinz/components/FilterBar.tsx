@@ -114,7 +114,7 @@ export const FilterBar: React.FC = () => {
                     <span className="text-xs font-semibold uppercase tracking-wider">Objetivo:</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    {['marca', 'b2c'].map((obj) => (
+                    {['marca', 'b2c', 'plurix'].map((obj) => (
                         <label key={obj} className={`
                             cursor-pointer select-none px-2.5 py-1 rounded-md border text-xs font-medium transition-all
                             ${filters.selectedObjectives.includes(obj as any)
@@ -127,7 +127,7 @@ export const FilterBar: React.FC = () => {
                                 checked={filters.selectedObjectives.includes(obj as any)}
                                 onChange={() => setFilters.toggleObjective(obj as any)}
                             />
-                            {obj === 'marca' ? 'Branding' : 'Performance (B2C)'}
+                            {obj === 'marca' ? 'Branding' : obj === 'b2c' ? 'Performance (B2C)' : 'Plurix'}
                         </label>
                     ))}
                 </div>

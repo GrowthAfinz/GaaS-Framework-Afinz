@@ -62,8 +62,9 @@ const parseDate = (dateVal: any): string | null => {
     return date.toISOString();
 };
 
-const determineObjective = (campaignName: string, _tabObjective: string | null): 'marca' | 'b2c' => {
+const determineObjective = (campaignName: string, _tabObjective: string | null): 'marca' | 'b2c' | 'plurix' => {
     const lower = campaignName.toLowerCase();
+    if (lower.includes('plurix')) return 'plurix';
     if (lower.includes('download') || lower.includes('app')) return 'b2c';
     return 'marca';
 };
@@ -99,7 +100,7 @@ export const parseXLSX = async (file: File): Promise<DailyMetrics[]> => {
                 let allData: DailyMetrics[] = [];
 
                 // 1. Ler e criar o Mapa De-Para
-                const deParaMap = new Map<string, 'marca' | 'b2c'>();
+                const deParaMap = new Map<string, 'marca' | 'b2c' | 'plurix'>();
                 const deParaTabName = workbook.SheetNames.find(n => n.toLowerCase().includes('de-para') || n.toLowerCase().includes('depara'));
 
                 if (deParaTabName) {
@@ -117,6 +118,8 @@ export const parseXLSX = async (file: File): Promise<DailyMetrics[]> => {
                                     deParaMap.set(campaignName, 'marca');
                                 } else if (objectiveRaw === 'b2c' || objectiveRaw === 'prafal' || objectiveRaw === 'performance') {
                                     deParaMap.set(campaignName, 'b2c');
+                                } else if (objectiveRaw === 'plurix') {
+                                    deParaMap.set(campaignName, 'plurix');
                                 }
                             }
                         }
@@ -171,7 +174,7 @@ export const parseXLSX = async (file: File): Promise<DailyMetrics[]> => {
                         // CONDITIONAL MAPPING
                         // Map 'Results' to 'Conversions' ONLY IF not 'marca' (Awareness)
                         if (normalizedRow.conversions === undefined && normalizedRow.results !== undefined) {
-                            if (normalizedRow.objective === 'b2c') {
+                            if (normalizedRow.objective === 'b2c' || normalizedRow.objective === 'plurix') {
                                 normalizedRow.conversions = normalizedRow.results;
                             } else {
                                 // For Marca: Results = Reach/Impressions. Do NOT map to conversions.
