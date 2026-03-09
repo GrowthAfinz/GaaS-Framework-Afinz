@@ -5,13 +5,16 @@ import './App.css'
 import { PeriodProvider } from './contexts/PeriodContext'
 import { BUProvider } from './contexts/BUContext'
 import { AuthProvider } from './context/AuthContext';
+import { UserRoleProvider } from './context/UserRoleContext';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <PeriodProvider>
       <BUProvider>
         <AuthProvider>
-          <App />
+          <UserRoleProvider>
+            <App />
+          </UserRoleProvider>
         </AuthProvider>
       </BUProvider>
     </PeriodProvider>

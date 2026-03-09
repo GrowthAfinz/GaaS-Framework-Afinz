@@ -9,6 +9,9 @@ interface AuthContextType {
     signInWithEmail: (email: string) => Promise<void>;
     signInWithPassword: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
+    resetPassword: (email: string) => Promise<void>;
+    updatePassword: (password: string) => Promise<void>;
+    inviteUser: (email: string, nome: string, role: 'admin' | 'growth_b2c' | 'analista_plurix') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,8 +70,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(null);
     };
 
+    const resetPassword = async (email: string) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/#type=recovery`,
+        });
+        if (error) throw error;
+    };
+
+    const updatePassword = async (password: string) => {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+    };
+
+    const inviteUser = async (email: string, nome: string, role: 'admin' | 'growth_b2c' | 'analista_plurix') => {
+        // Send magic link to invite the user
+        // Note: need to pass role via metadata so trigger can use it
+        const { error: otpError } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                emailRedirectTo: `${window.location.origin}/#type=invite`,
+                data: { role, nome }, // Pass custom data
+            },
+        });
+        if (otpError) throw otpError;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, session, loading, signInWithEmail, signInWithPassword, signOut }}>
+        <AuthContext.Provider value={{ user, session, loading, signInWithEmail, signInWithPassword, signOut, resetPassword, updatePassword, inviteUser }}>
             {children}
         </AuthContext.Provider>
     );

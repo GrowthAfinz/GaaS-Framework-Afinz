@@ -9,18 +9,21 @@ import {
     Lightbulb,
     PieChart,
     LayoutDashboard,
-    BookOpen
+    BookOpen,
+    Lock
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { NavDropdown } from './NavDropdown';
 import { useBU, BU } from '../../contexts/BUContext';
+import { useUserRole } from '../../context/UserRoleContext';
 
 export const GlobalHeader: React.FC = () => {
     const { setTab, viewSettings } = useAppStore();
     const activeTab = viewSettings.abaAtual;
-    const { toggleBU, isBUSelected } = useBU();
+    const { toggleBU, isBUSelected, isBULocked } = useBU();
+    const { canSeeTab } = useUserRole();
 
-    const navGroups = [
+    const allNavGroups = [
         {
             title: 'Planejamento',
             items: [
@@ -51,6 +54,12 @@ export const GlobalHeader: React.FC = () => {
             ]
         }
     ];
+
+    // Filter tabs based on user role
+    const navGroups = allNavGroups.map(group => ({
+        ...group,
+        items: group.items.filter(item => canSeeTab(item.id))
+    })).filter(group => group.items.length > 0);
 
     const buOptions: { id: BU; label: string; color: string }[] = [
         { id: 'B2C', label: 'B2C', color: 'bg-blue-500' },
@@ -97,20 +106,25 @@ export const GlobalHeader: React.FC = () => {
 
                 {/* BU Selector */}
                 <div className="flex items-center gap-2 px-2 border-r border-white/10 mr-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden xl:block">BU:</span>
+                    <div className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden xl:block">BU:</span>
+                        {isBULocked && <Lock size={12} className="text-amber-500" title="BU locked by your role" />}
+                    </div>
                     <div className="flex bg-white/5 rounded-lg p-1 gap-1">
                         {buOptions.map((bu) => (
                             <button
                                 key={bu.id}
                                 onClick={() => toggleBU(bu.id)}
+                                disabled={isBULocked}
                                 className={`
                                     px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5
+                                    ${isBULocked ? 'opacity-50 cursor-not-allowed' : ''}
                                     ${isBUSelected(bu.id)
                                         ? 'bg-slate-700 text-white shadow-sm'
                                         : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
                                     }
                                 `}
-                                title={`Filtrar por ${bu.label}`}
+                                title={isBULocked ? `BU locked to ${bu.label}` : `Filtrar por ${bu.label}`}
                             >
                                 <div className={`w-2 h-2 rounded-full ${bu.color} ${isBUSelected(bu.id) ? 'opacity-100 shadow-[0_0_4px_currentColor]' : 'opacity-40'}`} />
                                 <span className={!isBUSelected(bu.id) ? 'hidden xl:inline' : ''}>{bu.label}</span>

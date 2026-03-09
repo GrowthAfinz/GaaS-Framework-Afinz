@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 import { CSVUpload } from './components/CSVUpload';
 import { InlineFilterBar } from './components/InlineFilterBar';
 import { LoginView } from './components/LoginView'; // NEW
+import { SetPasswordView } from './components/SetPasswordView';
 
 import { ResultadosView } from './components/ResultadosView';
 import { JornadaDisparosView } from './components/JornadaDisparosView';
@@ -31,6 +32,16 @@ import { useAuth } from './context/AuthContext'; // NEW
 
 function App() {
   const { user, loading: authLoading } = useAuth(); // Auth check
+  const [urlHash, setUrlHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setUrlHash(window.location.hash);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const {
     viewSettings,
     updateActivity,
@@ -130,7 +141,14 @@ function App() {
   // 2. Not Logged In
   if (!user) return <LoginView />;
 
-  // 3. Paid Media Full Screen
+  // 3. Set Password Flow (after magic link or reset)
+  const hashParams = new URLSearchParams(urlHash.replace('#', ''));
+  const urlType = hashParams.get('type');
+  if (user && (urlType === 'recovery' || urlType === 'invite')) {
+    return <SetPasswordView />;
+  }
+
+  // 4. Paid Media Full Screen
   if (activeTab === 'midia-paga') {
     return <PaidMediaAfinzApp onBack={() => setTab('launch')} />;
   }
