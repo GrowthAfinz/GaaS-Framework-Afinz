@@ -71,14 +71,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const resetPassword = async (email: string) => {
-        // Get the current URL without hash and add recovery redirect
-        const redirectUrl = new URL(window.location.href);
-        redirectUrl.hash = 'type=recovery';
+        try {
+            console.log('resetPassword chamado para:', email);
+            // Get the current URL without hash and add recovery redirect
+            const redirectUrl = new URL(window.location.href);
+            redirectUrl.hash = 'type=recovery';
+            console.log('redirectUrl:', redirectUrl.toString());
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: redirectUrl.toString(),
-        });
-        if (error) throw error;
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: redirectUrl.toString(),
+            });
+
+            console.log('Supabase response - error:', error);
+            if (error) {
+                console.error('Supabase resetPasswordForEmail error:', error);
+                throw error;
+            }
+            console.log('resetPassword completado com sucesso');
+        } catch (err: any) {
+            console.error('Erro em resetPassword:', err);
+            throw err;
+        }
     };
 
     const updatePassword = async (password: string) => {

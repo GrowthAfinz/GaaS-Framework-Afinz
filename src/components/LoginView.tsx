@@ -29,9 +29,12 @@ export const LoginView: React.FC = () => {
         setIsResetting(true);
         setError(null);
         try {
+            console.log('Enviando reset para:', emailInput);
             await resetPassword(emailInput);
+            console.log('Reset enviado com sucesso');
             setResetSent(true);
         } catch (err: any) {
+            console.error('Erro ao enviar reset:', err);
             setError(err.message || 'Erro ao enviar reset');
         } finally {
             setIsResetting(false);
@@ -73,24 +76,27 @@ export const LoginView: React.FC = () => {
                         <div className="bg-emerald-500/10 text-emerald-400 p-6 rounded-xl text-sm border border-emerald-500/20 animate-fade-in text-left">
                             <div className="flex items-center gap-2 mb-2 font-bold text-emerald-300">
                                 <CheckCircle size={18} />
-                                <span>Email enviado!</span>
+                                <span>Email enviado com sucesso!</span>
                             </div>
-                            <p className="mb-2">Enviamos um link para resetar sua senha:</p>
-                            <code className="block bg-black/20 p-2 rounded text-emerald-200 mb-4 font-mono text-xs">{emailInput}</code>
+                            <p className="mb-2">Enviamos um link para resetar sua senha para:</p>
+                            <code className="block bg-black/20 p-2 rounded text-emerald-200 mb-4 font-mono text-xs break-all">{emailInput}</code>
                             <p className="text-xs opacity-80 mb-4">Verifique sua caixa de entrada e clique no link para definir uma nova senha.</p>
                             <button
                                 type="button"
                                 onClick={() => {
                                     setResetSent(false);
                                     setEmailInput('');
+                                    setIsResetting(false);
                                 }}
-                                className="text-xs text-emerald-300 hover:text-emerald-200 underline"
+                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg transition-all text-sm"
                             >
-                                Voltar para login
+                                Voltar para Login
                             </button>
                         </div>
                     ) : isResetting ? (
                         <form onSubmit={handleResetPassword} className="space-y-5">
+                            <h3 className="text-lg font-bold text-white mb-4">Recuperar Senha</h3>
+
                             <div className="text-left group">
                                 <label className="block text-xs font-bold text-blue-400 uppercase mb-2 tracking-wider ml-1">Email</label>
                                 <div className="relative">
@@ -98,7 +104,8 @@ export const LoginView: React.FC = () => {
                                     <input
                                         type="email"
                                         required
-                                        className="w-full bg-slate-900/50 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
+                                        disabled={isResetting}
+                                        className="w-full bg-slate-900/50 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 disabled:opacity-50"
                                         placeholder="seu.nome@afinz.com.br"
                                         value={emailInput}
                                         onChange={e => setEmailInput(e.target.value)}
@@ -115,10 +122,15 @@ export const LoginView: React.FC = () => {
 
                             <button
                                 type="submit"
-                                disabled={isResetting}
-                                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                                disabled={isResetting || !emailInput.trim()}
+                                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-slate-600 disabled:to-slate-600 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
                             >
-                                {isResetting ? <Loader2 className="animate-spin w-5 h-5" /> : (
+                                {isResetting ? (
+                                    <>
+                                        <Loader2 className="animate-spin w-5 h-5" />
+                                        Enviando...
+                                    </>
+                                ) : (
                                     <>
                                         Enviar Link de Reset
                                         <ArrowRight size={18} />
@@ -128,10 +140,14 @@ export const LoginView: React.FC = () => {
 
                             <button
                                 type="button"
-                                onClick={() => setIsResetting(false)}
-                                className="w-full text-xs text-slate-400 hover:text-blue-400 transition-colors"
+                                onClick={() => {
+                                    setIsResetting(false);
+                                    setEmailInput('');
+                                    setError(null);
+                                }}
+                                className="w-full text-xs text-slate-400 hover:text-slate-200 transition-colors py-2"
                             >
-                                Voltar
+                                ← Voltar para Login
                             </button>
                         </form>
                     ) : (
@@ -192,13 +208,18 @@ export const LoginView: React.FC = () => {
                                 )}
                             </button>
 
-                            <button
-                                type="button"
-                                onClick={() => setIsResetting(true)}
-                                className="w-full text-xs text-slate-400 hover:text-blue-400 transition-colors mt-2"
-                            >
-                                Esqueci minha senha
-                            </button>
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        console.log('Clique em "Esqueci minha senha"');
+                                        setIsResetting(true);
+                                    }}
+                                    className="flex-1 text-xs text-slate-400 hover:text-blue-400 hover:underline transition-colors py-2"
+                                >
+                                    Esqueci minha senha
+                                </button>
+                            </div>
                         </form>
                     )}
 
