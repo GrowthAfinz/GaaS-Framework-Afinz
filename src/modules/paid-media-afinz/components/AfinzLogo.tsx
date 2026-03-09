@@ -25,14 +25,14 @@ export const AfinzLogo: React.FC<AfinzLogoProps> = ({ className = '', height = 3
     };
 
     const zContainerStyle: React.CSSProperties = {
+        ...fontStyle,
         position: 'relative',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         width: '0.6em',
         height: '1em',
-        marginLeft: '-0.01em',
-        ...fontStyle
+        marginLeft: '-0.01em'
     };
 
     return (
@@ -50,10 +50,10 @@ export const AfinzLogo: React.FC<AfinzLogoProps> = ({ className = '', height = 3
                 <span
                     style={{
                         position: 'absolute',
-                        left: '-0.04em',
-                        right: '-0.04em',
-                        // Optical center of lowercase "z" in this type treatment.
-                        top: '0.62em',
+                        left: '0',
+                        right: '0',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
                         height: '0.12em',
                         backgroundColor: '#00C6CC',
                         borderRadius: '0.02em',
