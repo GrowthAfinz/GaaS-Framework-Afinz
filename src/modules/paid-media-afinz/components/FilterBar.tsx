@@ -54,15 +54,15 @@ export const FilterBar: React.FC = () => {
     };
 
     return (
-        <div className="absolute top-[calc(100%-1px)] left-0 w-full bg-slate-900 border-b border-slate-800 shadow-xl py-3 px-6 flex flex-wrap items-center gap-4 transition-all duration-300 ease-in-out transform -translate-y-full opacity-0 invisible group-hover:translate-y-0 group-hover:opacity-100 group-hover:visible z-40">
+        <div className="w-full bg-white border-b border-slate-100 py-2.5 px-6 flex flex-wrap items-center gap-4">
 
             {/* Range Selector */}
-            <div className="flex items-center gap-2 border border-slate-700 rounded-md px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 transition-colors">
+            <div className="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-1.5 bg-slate-50 hover:bg-white transition-colors">
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
                 <select
                     value={filters.timeRangeOption}
                     onChange={handleRangeChange}
-                    className="bg-transparent border-none text-xs font-semibold text-slate-200 focus:ring-0 cursor-pointer outline-none p-0 pr-2"
+                    className="bg-transparent border-none text-xs font-semibold text-slate-700 focus:ring-0 cursor-pointer outline-none p-0 pr-2"
                 >
                     <option value="this-month">Mês Atual</option>
                     <option value="last-month">Mês Passado</option>
@@ -72,26 +72,26 @@ export const FilterBar: React.FC = () => {
                     <option value="90d">Últimos 90 dias</option>
                     <option value="custom">Personalizado</option>
                 </select>
-                <span className="text-xs text-slate-500 border-l border-slate-700 pl-2">
+                <span className="text-xs text-slate-400 border-l border-slate-200 pl-2">
                     {format(filters.dateRange.from, 'dd/MM')} - {format(filters.dateRange.to, 'dd/MM')}
                 </span>
             </div>
 
-            <div className="h-6 w-px bg-slate-700 mx-2" />
+            <div className="h-5 w-px bg-slate-200 mx-1" />
 
             {/* Media Channels */}
             <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 text-slate-400">
                     <Share2 className="w-3.5 h-3.5" />
-                    <span className="text-xs font-semibold uppercase tracking-wider">Mídia:</span>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Mídia:</span>
                 </div>
                 <div className="flex items-center gap-2">
                     {['meta', 'google'].map((channel) => (
                         <label key={channel} className={`
                             cursor-pointer select-none px-2.5 py-1 rounded-md border text-xs font-medium transition-all
                             ${filters.selectedChannels.includes(channel as any)
-                                ? 'bg-[#00c6cc]/10 border-[#00c6cc]/40 text-[#00c6cc]'
-                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}
+                                ? 'bg-[#00C6CC]/10 border-[#00C6CC]/50 text-[#00798c]'
+                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}
                         `}>
                             <input
                                 type="checkbox"
@@ -105,7 +105,7 @@ export const FilterBar: React.FC = () => {
                 </div>
             </div>
 
-            <div className="h-6 w-px bg-slate-700 mx-2" />
+            <div className="h-5 w-px bg-slate-200 mx-1" />
 
             {/* Objectives */}
             <div className="flex items-center gap-3">
@@ -118,8 +118,8 @@ export const FilterBar: React.FC = () => {
                         <label key={obj} className={`
                             cursor-pointer select-none px-2.5 py-1 rounded-md border text-xs font-medium transition-all
                             ${filters.selectedObjectives.includes(obj as any)
-                                ? 'bg-[#00c6cc]/10 border-[#00c6cc]/40 text-[#00c6cc]'
-                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'}
+                                ? 'bg-[#00C6CC]/10 border-[#00C6CC]/50 text-[#00798c]'
+                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}
                         `}>
                             <input
                                 type="checkbox"
@@ -133,14 +133,14 @@ export const FilterBar: React.FC = () => {
                 </div>
             </div>
 
-            <div className="h-6 w-px bg-slate-700 mx-2" />
+            <div className="h-5 w-px bg-slate-200 mx-1" />
 
             {/* Campaign Select */}
             <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
                 <div className="relative w-full">
                     <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                     <select
-                        className="w-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 rounded-md py-1.5 pl-8 pr-8 focus:ring-1 focus:ring-[#00c6cc] outline-none appearance-none hover:border-slate-600 transition-colors"
+                        className="w-full bg-white border border-slate-200 text-xs font-medium text-slate-700 rounded-md py-1.5 pl-8 pr-8 focus:ring-1 focus:ring-[#00C6CC] outline-none appearance-none hover:border-slate-300 transition-colors"
                         value={filters.selectedCampaigns.length === 1 ? filters.selectedCampaigns[0] : ""}
                         onChange={(e) => {
                             if (e.target.value === "") {
@@ -163,8 +163,8 @@ export const FilterBar: React.FC = () => {
             <label className={`
                 flex items-center gap-2 cursor-pointer ml-auto border rounded-md px-3 py-1.5 transition-all
                 ${filters.isCompareEnabled
-                    ? 'bg-[#00c6cc]/10 border-[#00c6cc]/40'
-                    : 'bg-slate-800 border-slate-700 hover:border-slate-600'}
+                    ? 'bg-[#00C6CC]/10 border-[#00C6CC]/40'
+                    : 'bg-white border-slate-200 hover:border-slate-300'}
             `}>
                 <input
                     type="checkbox"
@@ -172,7 +172,7 @@ export const FilterBar: React.FC = () => {
                     onChange={() => setFilters.setIsCompareEnabled(!filters.isCompareEnabled)}
                     className="rounded w-3.5 h-3.5 accent-[#00c6cc]"
                 />
-                <span className={`text-xs font-medium ${filters.isCompareEnabled ? 'text-[#00c6cc]' : 'text-slate-400'}`}>
+                <span className={`text-xs font-medium ${filters.isCompareEnabled ? 'text-[#00798c]' : 'text-slate-500'}`}>
                     Comparar período anterior
                 </span>
             </label>

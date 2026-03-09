@@ -5,7 +5,6 @@ import { KPICard } from '../KPICard';
 import { DollarSign, Eye, MousePointer, Target } from 'lucide-react';
 import { ChannelComparisonMatrix } from '../ChannelComparisonMatrix';
 import { PeriodComparisonChart } from '../PeriodComparisonChart';
-import { WeeklyHeatmap } from '../WeeklyHeatmap';
 import type { DailyMetrics } from '../../types';
 import { subDays, isSameDay } from 'date-fns';
 
@@ -148,10 +147,6 @@ export const OverviewTab: React.FC = () => {
                 <ChannelComparisonMatrix data={filteredData} />
             </div>
 
-            {/* Weekly Heatmap */}
-            <div className="w-full">
-                <WeeklyHeatmap data={filteredData} />
-            </div>
         </div>
     );
 };

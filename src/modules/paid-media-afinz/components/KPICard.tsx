@@ -51,15 +51,15 @@ export const KPICard: React.FC<KPICardProps> = ({
     const statusColor = status === 'success' ? 'text-green-500' : status === 'warning' ? 'text-yellow-500' : 'text-red-500';
 
     return (
-        <div className="bg-slate-900 rounded-xl p-5 border border-slate-800 hover:border-[#00c6cc]/40 transition-colors relative overflow-hidden">
+        <div className="bg-white rounded-xl p-5 border border-slate-200 hover:border-[#00C6CC]/50 hover:shadow-md transition-all relative overflow-hidden">
             {/* Header */}
             <div className="flex justify-between items-start mb-2">
-                <p className="text-xs font-light text-slate-400 uppercase tracking-wider">{title}</p>
-                {icon && <div className="text-slate-500 opacity-80 scale-90">{icon}</div>}
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
+                {icon && <div className="text-slate-400 opacity-80 scale-90">{icon}</div>}
             </div>
 
             {/* Main Value */}
-            <h3 className="text-2xl font-black text-white tracking-tight mb-3">{value}</h3>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-3">{value}</h3>
 
             {/* Footer / Details */}
             <div className="flex flex-col gap-1 text-xs">
@@ -77,14 +77,14 @@ export const KPICard: React.FC<KPICardProps> = ({
 
                 {/* Row 2: Context + Status */}
                 {(contextValue || status) && (
-                    <div className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-800">
+                    <div className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-100">
                         {contextValue && (
-                            <span className="text-slate-400 font-light">
+                            <span className="text-slate-500 font-light">
                                 {contextValue}
                             </span>
                         )}
 
-                        {contextValue && status && <span className="text-slate-700">|</span>}
+                        {contextValue && status && <span className="text-slate-300">|</span>}
 
                         {status && (
                             <div className={`flex items-center gap-1 ${statusColor}`}>
