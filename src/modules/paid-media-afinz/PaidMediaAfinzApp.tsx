@@ -173,8 +173,9 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
         {/* Animated Filter Bar — only shows when hovering the header or when explicitly needed */}
         <div
           className={`
-                sticky top-0 z-50 bg-white shadow-lg border-b border-slate-200 transition-all duration-300 ease-in-out transform origin-top
-                ${isFilterHovered ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none h-0'}
+                sticky top-0 z-50 bg-white shadow-lg border-b border-slate-200 overflow-hidden transform-gpu origin-top
+                transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
+                ${isFilterHovered ? 'max-h-40 translate-y-0 opacity-100' : 'max-h-0 -translate-y-3 opacity-0 pointer-events-none'}
             `}
           onMouseEnter={() => setIsFilterHovered(true)}
           onMouseLeave={() => setIsFilterHovered(false)}

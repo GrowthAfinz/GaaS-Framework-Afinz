@@ -4,6 +4,33 @@ import { Calendar, Filter, Share2, Target, ChevronDown } from 'lucide-react';
 import type { TimeRangeOption } from '../types';
 import { subDays, format, startOfMonth, endOfDay } from 'date-fns';
 
+const channelChipClass = (channel: 'meta' | 'google', active: boolean): string => {
+    if (channel === 'meta') {
+        return active
+            ? 'bg-blue-50 border-blue-400 text-blue-700 shadow-sm'
+            : 'bg-white border-blue-200/70 text-blue-600 hover:border-blue-300';
+    }
+    return active
+        ? 'bg-emerald-50 border-emerald-400 text-emerald-700 shadow-sm'
+        : 'bg-white border-emerald-200/70 text-emerald-600 hover:border-emerald-300';
+};
+
+const objectiveChipClass = (objective: 'marca' | 'b2c' | 'plurix', active: boolean): string => {
+    if (objective === 'marca') {
+        return active
+            ? 'bg-fuchsia-50 border-fuchsia-400 text-fuchsia-700 shadow-sm'
+            : 'bg-white border-fuchsia-200/70 text-fuchsia-600 hover:border-fuchsia-300';
+    }
+    if (objective === 'b2c') {
+        return active
+            ? 'bg-orange-50 border-orange-400 text-orange-700 shadow-sm'
+            : 'bg-white border-orange-200/70 text-orange-600 hover:border-orange-300';
+    }
+    return active
+        ? 'bg-violet-50 border-violet-400 text-violet-700 shadow-sm'
+        : 'bg-white border-violet-200/70 text-violet-600 hover:border-violet-300';
+};
+
 export const FilterBar: React.FC = () => {
     const {
         filters,
@@ -89,9 +116,7 @@ export const FilterBar: React.FC = () => {
                     {['meta', 'google'].map((channel) => (
                         <label key={channel} className={`
                             cursor-pointer select-none px-2.5 py-1 rounded-md border text-xs font-medium transition-all
-                            ${filters.selectedChannels.includes(channel as any)
-                                ? 'bg-[#00C6CC]/10 border-[#00C6CC]/50 text-[#00798c]'
-                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}
+                            ${channelChipClass(channel as 'meta' | 'google', filters.selectedChannels.includes(channel as any))}
                         `}>
                             <input
                                 type="checkbox"
@@ -117,9 +142,7 @@ export const FilterBar: React.FC = () => {
                     {['marca', 'b2c', 'plurix'].map((obj) => (
                         <label key={obj} className={`
                             cursor-pointer select-none px-2.5 py-1 rounded-md border text-xs font-medium transition-all
-                            ${filters.selectedObjectives.includes(obj as any)
-                                ? 'bg-[#00C6CC]/10 border-[#00C6CC]/50 text-[#00798c]'
-                                : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}
+                            ${objectiveChipClass(obj as 'marca' | 'b2c' | 'plurix', filters.selectedObjectives.includes(obj as any))}
                         `}>
                             <input
                                 type="checkbox"
