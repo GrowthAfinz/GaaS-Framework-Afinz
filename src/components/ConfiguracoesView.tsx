@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useUserRole } from '../context/UserRoleContext';
 import { storageService, StorageFile } from '../services/storageService';
 import { useFrameworkData } from '../hooks/useFrameworkData';
 import { useCSVParser } from '../hooks/useCSVParser';
 import { useAppStore } from '../store/useAppStore';
 import { parseXLSX } from '../modules/paid-media-afinz/utils/fileParser';
 import { GoalsManager } from './admin/GoalsManager';
+import { UserManagementPanel } from './admin/UserManagementPanel';
 import { activityService, versionService } from '../services/activityService';
 import { dataService } from '../services/dataService';
 
@@ -413,11 +415,12 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
 
 export const ConfiguracoesView: React.FC = () => {
     const { user, signInWithEmail, signOut, signInAsDev, loading } = useAuth();
+    const { isAdmin } = useUserRole();
     const [emailInput, setEmailInput] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [sent, setSent] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'goals' | 'database'>('goals');
+    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'users'>('goals');
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -572,12 +575,30 @@ export const ConfiguracoesView: React.FC = () => {
                             >
                                 Gestão de Banco de Dados
                             </button>
+                            {isAdmin && (
+                                <button
+                                    onClick={() => setActiveTab('users')}
+                                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'users'
+                                        ? 'border-blue-500 text-blue-400'
+                                        : 'border-transparent text-slate-400 hover:text-slate-200'
+                                        }`}
+                                >
+                                    <Users size={16} />
+                                    Gerenciar Usuários
+                                </button>
+                            )}
                         </div>
 
                         {/* Tab Content */}
                         <div className="animate-fade-in">
                             {activeTab === 'goals' && (
                                 <GoalsManager />
+                            )}
+
+                            {activeTab === 'users' && (
+                                <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-8 shadow-xl backdrop-blur-sm">
+                                    <UserManagementPanel />
+                                </div>
                             )}
 
                             {activeTab === 'database' && (

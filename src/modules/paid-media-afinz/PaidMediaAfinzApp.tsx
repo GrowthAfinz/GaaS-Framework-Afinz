@@ -1,5 +1,6 @@
 import { dataService } from '../../services/dataService';
 import { useAppStore } from '../../store/useAppStore';
+import { useUserRole } from '../../context/UserRoleContext';
 
 import React, { useState, useEffect } from 'react';
 import { FilterProvider, useFilters } from './context/FilterContext';
@@ -19,6 +20,7 @@ interface PaidMediaAfinzAppProps {
 
 const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
   const { rawData, setRawData } = useFilters();
+  const { isPlurixAnalyst } = useUserRole();
   const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'campaigns' | 'budget' | 'daily'>('overview');
   const [isSyncing, setIsSyncing] = useState(true);
 
