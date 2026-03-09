@@ -9,14 +9,14 @@ import { UserRoleProvider } from './context/UserRoleContext';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <PeriodProvider>
-      <BUProvider>
-        <AuthProvider>
-          <UserRoleProvider>
+    <AuthProvider>
+      <UserRoleProvider>
+        <PeriodProvider>
+          <BUProvider>
             <App />
-          </UserRoleProvider>
-        </AuthProvider>
-      </BUProvider>
-    </PeriodProvider>
+          </BUProvider>
+        </PeriodProvider>
+      </UserRoleProvider>
+    </AuthProvider>
   </React.StrictMode>,
 )

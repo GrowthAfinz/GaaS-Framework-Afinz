@@ -71,8 +71,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const resetPassword = async (email: string) => {
+        // Get the current URL without hash and add recovery redirect
+        const redirectUrl = new URL(window.location.href);
+        redirectUrl.hash = 'type=recovery';
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/#type=recovery`,
+            redirectTo: redirectUrl.toString(),
         });
         if (error) throw error;
     };
@@ -83,11 +87,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const inviteUser = async (email: string, fullName: string, role: 'admin' | 'growth_b2c' | 'analista_plurix') => {
+        // Get the current URL and add invite redirect
+        const redirectUrl = new URL(window.location.href);
+        redirectUrl.hash = 'type=invite';
+
         // Send magic link to invite the user
         const { error: otpError } = await supabase.auth.signInWithOtp({
             email,
             options: {
-                emailRedirectTo: `${window.location.origin}/#type=invite`,
+                emailRedirectTo: redirectUrl.toString(),
             },
         });
         if (otpError) throw otpError;

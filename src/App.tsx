@@ -142,9 +142,11 @@ function App() {
   if (!user) return <LoginView />;
 
   // 3. Set Password Flow (after magic link or reset)
-  const hashParams = new URLSearchParams(urlHash.replace('#', ''));
-  const urlType = hashParams.get('type');
-  if (user && (urlType === 'recovery' || urlType === 'invite')) {
+  // Check if URL contains recovery or invite flow indicators
+  const isRecoveryFlow = urlHash.includes('type=recovery');
+  const isInviteFlow = urlHash.includes('type=invite');
+
+  if (user && (isRecoveryFlow || isInviteFlow)) {
     return <SetPasswordView />;
   }
 

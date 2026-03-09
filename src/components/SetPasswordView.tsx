@@ -37,13 +37,18 @@ export const SetPasswordView: React.FC<{ onPasswordSet?: () => void }> = ({ onPa
       await updatePassword(password);
       setSuccess(true);
 
-      // Redirect after 2 seconds
+      // Redirect after 2 seconds to let the auth state update
       setTimeout(() => {
+        // Clear the hash to go back to main app
         window.location.hash = '';
-        onPasswordSet?.();
+        // Small delay to ensure auth state is updated
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Erro ao atualizar senha');
+      console.error('Password update error:', err);
     } finally {
       setIsSubmitting(false);
     }
