@@ -1,9 +1,5 @@
-import { storageService } from '../../services/storageService';
-import { parseXLSX } from './utils/fileParser';
-import { useAppStore } from '../../store/useAppStore'; // For paidMediaData if needed, though useFilters seems to handle rawData here.
-// Actually, inspecting previous code, useFilters handles local state, but we might want to sync with useAppStore if that's the source of truth.
-// Looking at lines 17: const { rawData, setRawData } = useFilters();
-// I will stick to setting rawData provided by useFilters for now to avoid breaking changes, assuming FilterProvider manages it.
+import { dataService } from '../../services/dataService';
+import { useAppStore } from '../../store/useAppStore';
 
 import React, { useState, useEffect } from 'react';
 import { FilterProvider, useFilters } from './context/FilterContext';
@@ -26,45 +22,27 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'campaigns' | 'budget' | 'daily'>('overview');
   const [isSyncing, setIsSyncing] = useState(true);
 
-  // Auto-Sync Effect
+  // Auto-Sync Effect — reads directly from Supabase table instead of reparsing the Excel from bucket
   useEffect(() => {
     const syncWithCloud = async () => {
-      if (rawData.length > 0) {
-        setIsSyncing(false);
-        return;
-      }
-
       try {
-        console.log('Verificando dados na nuvem...');
-        const files = await storageService.listFiles('media');
-        if (files && files.length > 0) {
-          // Get latest file
-          const latestFile = files[0]; // storageService usually sorts by defaults or we take first. 
-          // Assuming listFiles returns ordered list or we pick first. Ideally we'd sort by created_at.
-
-          // Fetch content
-          const url = await storageService.getDownloadUrl('media/' + latestFile.name);
-          const resp = await fetch(url);
-          const blob = await resp.blob();
-          const file = new File([blob], latestFile.name, { type: blob.type });
-
-          // Parse
-          const data = await parseXLSX(file);
-          if (data && data.length > 0) {
-            setRawData(data);
-            // Optional: Notify success via toast?
-          }
+        console.log('📡 Buscando métricas de Mídia Paga do banco...');
+        const data = await dataService.fetchPaidMedia();
+        if (data && data.length > 0) {
+          setRawData(data as any);
+          console.log(`✅ ${data.length} linhas carregadas do banco.`);
+        } else {
+          console.log('ℹ️ Nenhum dado de Mídia Paga encontrado no banco.');
         }
       } catch (e) {
-        console.error('Erro ao sincronizar dados:', e);
-        // Fail silently and show upload screen
+        console.error('Erro ao buscar dados de Mídia Paga:', e);
       } finally {
         setIsSyncing(false);
       }
     };
 
     syncWithCloud();
-  }, []); // Run once on mount
+  }, []);
 
   if (isSyncing) {
     return (
