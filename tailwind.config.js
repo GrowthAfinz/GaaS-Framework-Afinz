@@ -10,6 +10,17 @@ export default {
         slate: {
           950: '#0f172a',
         },
+        // Afinz Brand Tokens (Manual de Marca)
+        afinz: {
+          teal: '#00c6cc',
+          'teal-dark': '#007c80',
+          orange: '#f8a538',
+          red: '#e74742',
+        },
+      },
+      fontFamily: {
+        // Lembra font family (Afinz brand) com fallbacks
+        lembra: ['Lembra', 'Arial', 'sans-serif'],
       },
     },
   },
