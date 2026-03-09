@@ -9,7 +9,7 @@ interface AfinzLogoProps {
  * Afinz Logo — brand guide faithful.
  * "afinz" bold, lowercase, NO italics.
  * Double-story 'a' (using Arial Black).
- * "z" has a teal #00C6CC bar positioned at the TOP of the letter's beginning.
+ * "z" has a teal #00C6CC bar centered on the letter for stable scaling.
  */
 export const AfinzLogo: React.FC<AfinzLogoProps> = ({ className = '', height = 32 }) => {
     const fontSize = height * 0.95;
@@ -24,6 +24,17 @@ export const AfinzLogo: React.FC<AfinzLogoProps> = ({ className = '', height = 3
         display: 'inline-block'
     };
 
+    const zContainerStyle: React.CSSProperties = {
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '0.6em',
+        height: '1em',
+        marginLeft: '-0.01em',
+        ...fontStyle
+    };
+
     return (
         <span
             className={`inline-flex items-end select-none ${className}`}
@@ -33,24 +44,19 @@ export const AfinzLogo: React.FC<AfinzLogoProps> = ({ className = '', height = 3
             {/* "afin" — Double-story 'a', bold, no italics */}
             <span style={fontStyle}>afin</span>
 
-            {/* "z" with teal bar crossing the TOP portion */}
-            <span style={{
-                position: 'relative',
-                display: 'inline-block',
-                ...fontStyle,
-                marginLeft: '-0.02em',
-                transform: 'translateY(1.5%)'
-            }}>
-                z
+            {/* "z" with centered teal bar */}
+            <span style={zContainerStyle}>
+                <span style={{ position: 'relative', zIndex: 2, lineHeight: 1 }}>z</span>
                 <span
                     style={{
                         position: 'absolute',
-                        left: '-5%',
-                        right: '-5%',
-                        // Positioned at the TOP of the lowercase 'z'
-                        top: '15%',
-                        height: Math.max(3, fontSize * 0.13),
+                        left: '-0.04em',
+                        right: '-0.04em',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        height: '0.12em',
                         backgroundColor: '#00C6CC',
+                        borderRadius: '0.02em',
                         pointerEvents: 'none',
                         zIndex: 1
                     }}
