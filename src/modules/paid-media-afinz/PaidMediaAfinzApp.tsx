@@ -47,7 +47,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
   // ── Loading Screen (light) ──────────────────────────────────────────────
   if (isSyncing) {
     return (
-      <div className="min-h-screen w-full bg-white flex flex-col items-center justify-center p-4 absolute top-0 left-0 z-50">
+      <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center">
           <AfinzLogo height={40} className="mb-8" />
           <div className="w-14 h-14 bg-[#00C6CC]/10 rounded-full flex items-center justify-center mb-4 border border-[#00C6CC]/30">
@@ -63,7 +63,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
   // ── No Data / Upload Screen (light) ────────────────────────────────────
   if (rawData.length === 0) {
     return (
-      <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4 absolute top-0 left-0 z-50">
+      <div className="fixed inset-0 z-50 bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-4">
         <div className="absolute top-4 left-4">
           <button
             onClick={onBack}
@@ -102,7 +102,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
 
   return (
     // ── Dashboard (light) ──────────────────────────────────────────────
-    <div className="min-h-screen w-full bg-slate-50 text-slate-900 flex flex-col absolute top-0 left-0 z-50">
+    <div className="fixed inset-0 z-50 bg-slate-50 text-slate-900 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-[60] shadow-sm">
         <div className="px-6 h-16 flex items-center justify-between">
@@ -163,13 +163,14 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
         <FilterBar />
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 container mx-auto px-6 py-8 pb-32 max-w-[1600px] animate-fade-in">
-        {activeTab === 'overview' && <OverviewTab />}
-        {activeTab === 'monthly' && <MonthlyAnalysisTab />}
-        {activeTab === 'daily' && <DailyAnalysisTab />}
-        {activeTab === 'campaigns' && <CampaignDetailsTab />}
-        {activeTab === 'budget' && <BudgetTab />}
+      <main className="flex-1 overflow-y-auto">
+        <div className="container mx-auto px-6 py-8 pb-32 max-w-[1600px] animate-fade-in">
+          {activeTab === 'overview' && <OverviewTab />}
+          {activeTab === 'monthly' && <MonthlyAnalysisTab />}
+          {activeTab === 'daily' && <DailyAnalysisTab />}
+          {activeTab === 'campaigns' && <CampaignDetailsTab />}
+          {activeTab === 'budget' && <BudgetTab />}
+        </div>
       </main>
     </div>
   );

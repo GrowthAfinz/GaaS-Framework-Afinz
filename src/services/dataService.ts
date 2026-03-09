@@ -183,21 +183,41 @@ export const dataService = {
     },
 
     async upsertPaidMedia(metrics: DailyAdMetrics[]) {
-        const sqlBatch = metrics.map(m => ({
-            date: format(m.date, 'yyyy-MM-dd'),
-            channel: m.channel,
-            campaign: m.campaign,
-            objective: m.objective,
-            spend: m.spend,
-            impressions: m.impressions,
-            clicks: m.clicks,
-            conversions: m.conversions,
-            ctr: m.ctr,
-            cpc: m.cpc,
-            cpm: m.cpm,
-            cpa: m.cpa
-        }));
+        const sqlBatch = metrics
+            .filter(m => m.date && m.campaign) // skip rows without date or campaign
+            .map(m => {
+                let dateStr: string;
+                try {
+                    // m.date is an ISO string from fileParser, parse it back to Date for format()
+                    const d = new Date(m.date as unknown as string);
+                    if (isNaN(d.getTime())) return null;
+                    dateStr = format(d, 'yyyy-MM-dd');
+                } catch {
+                    return null;
+                }
+                return {
+                    date: dateStr,
+                    channel: m.channel,
+                    campaign: m.campaign,
+                    objective: m.objective,
+                    spend: m.spend ?? 0,
+                    impressions: m.impressions ?? 0,
+                    clicks: m.clicks ?? 0,
+                    conversions: m.conversions ?? 0,
+                    ctr: m.ctr ?? 0,
+                    cpc: m.cpc ?? 0,
+                    cpm: m.cpm ?? 0,
+                    cpa: m.cpa ?? 0,
+                };
+            })
+            .filter(Boolean); // remove nulls from failed date parses
 
+        if (sqlBatch.length === 0) {
+            console.warn('⚠️ upsertPaidMedia: nenhuma linha válida para inserir.');
+            return;
+        }
+
+        console.log(`✅ Inserindo ${sqlBatch.length} linhas em paid_media_metrics...`);
         const { error } = await supabase
             .from('paid_media_metrics')
             .upsert(sqlBatch, { onConflict: 'date, channel, campaign' });
