@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { MessageCircle, Map, Users, HeartHandshake, ChevronDown, Check, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { FilterState } from '../types/framework';
@@ -90,26 +90,25 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
         return (
             <div className="relative group">
                 <button className={`flex items-center gap-2 px-3 py-2 rounded-lg transition border shadow-sm ${isActive
-                    ? 'bg-slate-800 border-slate-700 text-white'
-                    : 'bg-slate-900/50 border-transparent hover:bg-slate-800 text-slate-300'
+                    ? 'bg-cyan-50 border-cyan-300 text-cyan-700'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                     }`}>
-                    <Icon size={16} className={isActive ? 'text-blue-400' : 'text-slate-400'} />
+                    <Icon size={16} className={isActive ? 'text-cyan-600' : 'text-slate-400'} />
                     <span className="text-sm font-medium">{title}</span>
                     {isActive && (
-                        <span className="bg-slate-700 text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-slate-600">
+                        <span className="bg-cyan-100 text-cyan-700 text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-cyan-200">
                             {selectedCount}
                         </span>
                     )}
                     <ChevronDown size={14} className="opacity-50 group-hover:opacity-100 transition-opacity" />
                 </button>
 
-                {/* Dropdown - Visible on Hover */}
-                <div className={`absolute top-full mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 transform origin-top-left ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}>
-                    <div className="flex items-center justify-between px-2 py-1 mb-2 border-b border-slate-800">
+                <div className={`absolute top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-2xl p-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 transform origin-top-left ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}>
+                    <div className="flex items-center justify-between px-2 py-1 mb-2 border-b border-slate-100">
                         <span className="text-xs font-bold text-slate-500 uppercase">{title}</span>
                         <button
                             onClick={() => toggleAll(field, items)}
-                            className="text-[10px] text-blue-400 hover:text-blue-300 font-medium"
+                            className="text-[10px] text-cyan-700 hover:text-cyan-600 font-medium"
                         >
                             {isAllSelected ? 'Desmarcar Todos' : 'Selecionar Todos'}
                         </button>
@@ -119,19 +118,19 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                             <label
                                 key={item}
                                 onClick={(e) => {
-                                    e.preventDefault(); // Prevent double toggling if label triggers input (though no input here)
+                                    e.preventDefault();
                                     toggleItem(field, item);
                                 }}
-                                className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-800 rounded-lg transition group/item"
+                                className="flex items-center gap-3 cursor-pointer p-2 hover:bg-slate-50 rounded-lg transition group/item"
                             >
                                 <div className={`w-4 h-4 rounded border flex items-center justify-center transition ${(filters[field] as string[]).includes(item)
-                                    ? 'bg-slate-600 border-slate-500' // Minimalist check
-                                    : 'border-slate-600 group-hover/item:border-slate-500'
+                                    ? 'bg-cyan-600 border-cyan-600'
+                                    : 'border-slate-300 group-hover/item:border-slate-400'
                                     }`}>
                                     {(filters[field] as string[]).includes(item) && <Check size={10} className="text-white" />}
                                 </div>
-                                <span className="text-slate-300 text-sm truncate flex-1">{item}</span>
-                                <span className="text-slate-500 text-xs">({counts[item] || 0})</span>
+                                <span className="text-slate-700 text-sm truncate flex-1">{item}</span>
+                                <span className="text-slate-400 text-xs">({counts[item] || 0})</span>
                             </label>
                         ))}
                     </div>
@@ -173,13 +172,13 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
             />
 
             {hasActiveFilters && (
-                <div className="h-6 w-px bg-slate-700 mx-2" />
+                <div className="h-6 w-px bg-slate-200 mx-2" />
             )}
 
             {hasActiveFilters && (
                 <button
                     onClick={clearFilters}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
                 >
                     <X size={14} />
                     Limpar

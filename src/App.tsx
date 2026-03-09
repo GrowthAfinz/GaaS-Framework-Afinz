@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 import { CSVUpload } from './components/CSVUpload';
 import { InlineFilterBar } from './components/InlineFilterBar';
-import { LoginView } from './components/LoginView'; // NEW
+import { LoginView } from './components/LoginView';
 import { SetPasswordView } from './components/SetPasswordView';
 
 import { ResultadosView } from './components/ResultadosView';
@@ -21,18 +21,19 @@ import { useAppStore } from './store/useAppStore';
 import { usePeriod } from './contexts/PeriodContext';
 import { useBU } from './contexts/BUContext';
 import { format } from 'date-fns';
-import { MainLayout } from './components/layout/MainLayout'; // NEW
+import { MainLayout } from './components/layout/MainLayout';
 import { LaunchPlanner } from './components/launch-planner/LaunchPlanner';
 import { PageHeader } from './components/layout/PageHeader';
 import PaidMediaAfinzApp from './modules/paid-media-afinz/PaidMediaAfinzApp';
 import { AnimatePresence } from 'framer-motion';
-import { PageTransition } from './components/layout/PageTransition'; // NEW
+import { PageTransition } from './components/layout/PageTransition';
 import './App.css';
-import { useAuth } from './context/AuthContext'; // NEW
+import { useAuth } from './context/AuthContext';
 
 function App() {
-  const { user, loading: authLoading } = useAuth(); // Auth check
+  const { user, loading: authLoading } = useAuth();
   const [urlHash, setUrlHash] = useState(window.location.hash);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -55,7 +56,6 @@ function App() {
 
   const { data, loading, error, totalActivities, processCSV, loadSimulatedData } = useFrameworkData();
 
-  // Combine store filters with Context filters
   const filters = useMemo(() => ({
     ...storeFilters,
     dataInicio: format(startDate, 'yyyy-MM-dd'),
@@ -63,23 +63,27 @@ function App() {
     bu: selectedBUs
   }), [storeFilters, startDate, endDate, selectedBUs]);
 
-  // Optimize: Only run heavy filter logic if NOT in Framework View or other independent views
   const isFrameworkView = activeTab === 'framework';
   const isMidiaPaga = activeTab === 'midia-paga';
   const shouldRunFilters = !isFrameworkView && !isMidiaPaga;
 
-  // These hooks now use the new FilterState structure
-  // Conditional execution dummy for hooks to obey Rules of Hooks? No, hooks must run.
-  // We can pass empty data or memoize the result based on activeTab.
-
-  const { filteredData: advancedFilteredData, availableCanais, availableJornadas, availableSegmentos, availableParceiros, countByCanal, countByJornada, countBySegmento, countByParceiro } = useAdvancedFilters(
-    shouldRunFilters ? data : {}, // Pass empty object if not needed to skip processing
+  const {
+    filteredData: advancedFilteredData,
+    availableCanais,
+    availableJornadas,
+    availableSegmentos,
+    availableParceiros,
+    countByCanal,
+    countByJornada,
+    countBySegmento,
+    countByParceiro
+  } = useAdvancedFilters(
+    shouldRunFilters ? data : {},
     filters
   );
 
   const { filteredData } = useCalendarFilter(advancedFilteredData, filters);
 
-  // Calculate previous period filters for trend analysis
   const previousFilters = useMemo(() => {
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -97,7 +101,6 @@ function App() {
     };
   }, [filters, startDate, endDate]);
 
-  // Filters for Launch Planner (ignoring date range to allow local navigation)
   const launchPlannerFilters = useMemo(() => ({
     ...filters,
     dataInicio: '',
@@ -105,7 +108,7 @@ function App() {
   }), [filters]);
 
   const { filteredData: launchPlannerData } = useAdvancedFilters(
-    activeTab === 'launch' ? data : {}, // Only process for Launch Planner
+    activeTab === 'launch' ? data : {},
     launchPlannerFilters
   );
 
@@ -126,23 +129,19 @@ function App() {
       case 'orientador': return 'Orientador';
       case 'framework': return 'Explorador de Disparos';
       case 'explorador': return 'Explorador de Disparos';
-      case 'diario': return 'Diário de Bordo';
-      case 'configuracoes': return 'Configurações';
+      case 'diario': return 'Diario de Bordo';
+      case 'configuracoes': return 'Configuracoes';
       case 'midia-paga': return 'Media Analytics';
       default: return 'Dashboard';
     }
   };
 
-  // --- RENDERING ---
+  if (authLoading) {
+    return <div className="h-screen w-full bg-slate-50 text-slate-500 flex items-center justify-center">Carregando...</div>;
+  }
 
-  // 1. Auth Loading
-  if (authLoading) return <div className="h-screen w-full bg-slate-950 text-slate-500 flex items-center justify-center">Carregando...</div>;
-
-  // 2. Not Logged In
   if (!user) return <LoginView />;
 
-  // 3. Set Password Flow (after magic link or reset)
-  // Check if URL contains recovery or invite flow indicators
   const isRecoveryFlow = urlHash.includes('type=recovery');
   const isInviteFlow = urlHash.includes('type=invite');
 
@@ -150,54 +149,63 @@ function App() {
     return <SetPasswordView />;
   }
 
-  // 4. Paid Media Full Screen
   if (activeTab === 'midia-paga') {
     return <PaidMediaAfinzApp onBack={() => setTab('launch')} />;
   }
 
   return (
     <MainLayout>
-
       {hasData && (
-        <PageHeader title={getPageTitle(activeTab)}>
-          <div className="flex ml-auto">
-            <InlineFilterBar
-              availableCanais={availableCanais}
-              availableJornadas={availableJornadas}
-              availableSegmentos={availableSegmentos}
-              availableParceiros={availableParceiros}
-              countByCanal={countByCanal}
-              countByJornada={countByJornada}
-              countBySegmento={countBySegmento}
-              countByParceiro={countByParceiro}
-            />
+        <div
+          className="sticky top-0 z-30 bg-white shadow-sm border-b border-slate-200"
+          onMouseEnter={() => setIsHeaderHovered(true)}
+          onMouseLeave={() => setIsHeaderHovered(false)}
+        >
+          <PageHeader title={getPageTitle(activeTab)} />
+          <div
+            className={`
+              overflow-hidden transform-gpu origin-top border-t border-slate-100 bg-white
+              transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
+              ${isHeaderHovered ? 'max-h-40 translate-y-0 opacity-100' : 'max-h-0 -translate-y-2 opacity-0 pointer-events-none'}
+            `}
+          >
+            <div className="px-6 py-3">
+              <InlineFilterBar
+                availableCanais={availableCanais}
+                availableJornadas={availableJornadas}
+                availableSegmentos={availableSegmentos}
+                availableParceiros={availableParceiros}
+                countByCanal={countByCanal}
+                countByJornada={countByJornada}
+                countBySegmento={countBySegmento}
+                countByParceiro={countByParceiro}
+              />
+            </div>
           </div>
-        </PageHeader>
+        </div>
       )}
 
-      <div className="flex-1 pb-10">
-        {/* Show loading while checking Supabase */}
+      <div className="flex-1 pb-10" onMouseEnter={() => setIsHeaderHovered(false)}>
         {loading && !hasData && (
           <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
                 <Menu size={32} className="text-blue-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Verificando dados...</h2>
-              <p className="text-slate-400">Carregando informações do banco de dados</p>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Verificando dados...</h2>
+              <p className="text-slate-500">Carregando informacoes do banco de dados</p>
             </div>
           </div>
         )}
 
-        {/* Show upload screen only if finished loading AND no data */}
         {!loading && !hasData && (
           <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
-            <div className="max-w-md w-full bg-slate-800/50 p-8 rounded-2xl border border-slate-700 text-center">
+            <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-lg">
               <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Menu size={32} className="text-blue-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Bem-vindo ao GaaS</h2>
-              <p className="text-slate-400 mb-8">Faça upload do seu arquivo de dados para começar a análise.</p>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Bem-vindo ao GaaS</h2>
+              <p className="text-slate-500 mb-8">Faca upload do seu arquivo de dados para comecar a analise.</p>
               <CSVUpload
                 onFileSelect={processCSV}
                 onLoadSimulatedData={loadSimulatedData}
@@ -252,8 +260,6 @@ function App() {
                     onNavigateToFramework={(f) => {
                       setTab('framework');
                       if (f?.bu || f?.segmento || f?.jornada) {
-                        // Pre-apply filters via store when navigating to Framework
-                        // (framework view reads filtrosGlobais from store)
                         const patch: Record<string, string[]> = {};
                         if (f.bu) patch['bu'] = [f.bu];
                         if (f.segmento) patch['segmentos'] = [f.segmento];
@@ -283,9 +289,8 @@ function App() {
                   <ConfiguracoesView />
                 </PageTransition>
               )}
-              {/* midia-paga rendred above conditionally as full screen */}
               {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga'].includes(activeTab) && (
-                <div className="flex items-center justify-center h-full text-slate-400">
+                <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>
               )}

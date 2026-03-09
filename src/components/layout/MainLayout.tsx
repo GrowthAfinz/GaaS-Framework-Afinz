@@ -7,7 +7,7 @@ interface MainLayoutProps {
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     return (
-        <div className="flex flex-col min-h-screen bg-[#0F172A] text-slate-100 font-sans selection:bg-blue-500/30">
+        <div className="flex flex-col min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-cyan-200/60">
 
             {/* 1. Global App Header (Logo, Search, User, Nav) */}
             <GlobalHeader />

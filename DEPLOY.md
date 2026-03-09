@@ -79,3 +79,15 @@ Se você quer que outra pessoa possa ver os logs de deploy ou alterar configura�
 
 1.  No dashboard do Vercel, vá em **Settings** > **Members**.
 2.  Convide a pessoa por e-mail (note que dependendo do plano, pode haver custos ou limites para membros da equipe).
+
+## Regra Operacional: deploy sempre pela `main`
+
+Este sistema deve ser publicado sempre a partir da branch `main`, pois o banco e os fluxos de producao estao alinhados a ela.
+
+Fluxo recomendado:
+
+1. Desenvolver em branch de trabalho.
+2. Validar localmente (`npm run build`).
+3. Abrir PR para `main` e revisar.
+4. Fazer merge na `main`.
+5. Confirmar que o deploy puxou o commit mais recente da `main`.
