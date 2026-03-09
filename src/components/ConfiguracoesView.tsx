@@ -416,7 +416,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
 };
 
 export const ConfiguracoesView: React.FC = () => {
-    const { user, signInWithEmail, signOut, signInAsDev, loading } = useAuth();
+    const { user, signInWithEmail, signOut, loading } = useAuth();
     const { isAdmin } = useUserRole();
     const [emailInput, setEmailInput] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -456,36 +456,8 @@ export const ConfiguracoesView: React.FC = () => {
                         <p className="text-slate-400 text-sm">Sua sessão expirou ou você não está autenticado.</p>
                     </div>
 
-                    <div className="space-y-4 pt-4">
-                        <button
-                            onClick={signInAsDev}
-                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-4 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/40 group active:scale-95"
-                        >
-                            <span className="group-hover:translate-x-1 transition-transform flex items-center gap-2">
-                                <Database size={18} />
-                                Entrar como Admin GaaS
-                            </span>
-                        </button>
-
-                        <p className="text-[10px] text-slate-500 text-center uppercase tracking-widest font-bold">Ou via E-mail (Supabase)</p>
-
-                        <form onSubmit={handleLogin} className="space-y-3">
-                            <input
-                                type="email"
-                                placeholder="Seu e-mail"
-                                value={emailInput}
-                                onChange={(e) => setEmailInput(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                required
-                            />
-                            <button
-                                type="submit"
-                                disabled={isSending}
-                                className="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm font-bold transition-all disabled:opacity-50"
-                            >
-                                {isSending ? 'Enviando...' : 'Enviar Link Mágico'}
-                            </button>
-                        </form>
+                    <div className="mt-8 text-center text-sm text-slate-500">
+                        Por favor, recarregue a página ou faça login novamente para acessar as configurações.
                     </div>
                 </div>
             </div>

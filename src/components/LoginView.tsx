@@ -1,58 +1,50 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Mail, AlertCircle, Loader2, ArrowRight, ShieldCheck, CheckCircle } from 'lucide-react';
+import { Mail, Lock, CheckCircle, AlertCircle, Loader2, ArrowRight, ShieldCheck, KeyRound } from 'lucide-react';
+
+type AuthMode = 'login' | 'signup' | 'reset';
 
 export const LoginView: React.FC = () => {
-    const { signInWithPassword, resetPassword, loading } = useAuth();
-    const [emailInput, setEmailInput] = useState('');
-    const [passwordInput, setPasswordInput] = useState('');
-    const [isLoggingIn, setIsLoggingIn] = useState(false);
-    const [showResetForm, setShowResetForm] = useState(false);
-    const [isSending, setIsSending] = useState(false);
-    const [resetSent, setResetSent] = useState(false);
+    const { signInWithPassword, signUpEmail, resetPassword, loading } = useAuth();
+
+    const [mode, setMode] = useState<AuthMode>('login');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoggingIn(true);
+        setIsSubmitting(true);
         setError(null);
-        try {
-            await signInWithPassword(emailInput, passwordInput);
-        } catch (err: any) {
-            setError(err.message || 'Erro ao fazer login');
-        } finally {
-            setIsLoggingIn(false);
-        }
-    };
-
-    const handleResetPassword = async (e: React.FormEvent) => {
-        console.log('🚀 handleResetPassword INICIADO - evento:', e.type);
-        console.log('📧 Email atual:', emailInput);
-
-        e.preventDefault();
-        console.log('✋ preventDefault executado');
-
-        if (!emailInput.trim()) {
-            console.log('❌ Email vazio!');
-            setError('Por favor, digite um email válido');
-            return;
-        }
-
-        setIsSending(true);
-        setError(null);
+        setSuccessMsg(null);
 
         try {
-            console.log('🔐 Chamando resetPassword...');
-            await resetPassword(emailInput);
-            console.log('✅ resetPassword retornou com sucesso');
-            setResetSent(true);
+            if (mode === 'login') {
+                await signInWithPassword(email, password);
+                // Redirecionamento automático pelo AuthContext
+            } else if (mode === 'signup') {
+                if (password.length < 6) {
+                    throw new Error('A senha deve ter no mínimo 6 caracteres.');
+                }
+                await signUpEmail(email, password);
+                setSuccessMsg('Cadastro realizado! Verifique seu e-mail para confirmar a conta (pode cair no Spam).');
+            } else if (mode === 'reset') {
+                await resetPassword(email);
+                setSuccessMsg('As instruções de redefinição foram enviadas para seu e-mail.');
+            }
         } catch (err: any) {
-            console.error('❌ ERRO capturado:', err);
-            console.error('Mensagem:', err.message);
-            setError(err.message || 'Erro ao enviar reset');
+            if (err.message.includes('Invalid login credentials')) {
+                setError('E-mail ou senha incorretos.');
+            } else if (err.message.includes('User already registered')) {
+                setError('Este e-mail já está cadastrado.');
+            } else {
+                setError(err.message || 'Ocorreu um erro ao processar a solicitação.');
+            }
         } finally {
-            console.log('🏁 finally - setando isSending para false');
-            setIsSending(false);
+            setIsSubmitting(false);
         }
     };
 
@@ -61,18 +53,16 @@ export const LoginView: React.FC = () => {
     }
 
     return (
-        <div className="h-screen w-full flex items-center justify-center bg-slate-900 p-4">
-            <div className="w-full max-w-md bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+        <div className="min-h-screen w-full flex items-center justify-center bg-slate-900 p-4 font-sans">
+            <div className="w-full max-w-md bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
                 {/* Background decoration */}
-                <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
+                <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
 
                 <div className="relative z-10 text-center">
-
-                    {/* Modern CSS Logo */}
-                    {/* GaaS Brand - Refined */}
-                    <div className="mb-10 flex flex-col items-center justify-center animate-fade-in select-none">
-                        <div className="bg-black p-6 rounded-2xl border border-white/10 shadow-2xl flex flex-col items-center justify-center gap-1">
+                    {/* GaaS Brand */}
+                    <div className="mb-8 flex flex-col items-center justify-center animate-fade-in select-none">
+                        <div className="bg-black p-6 rounded-2xl border border-white/10 shadow-xl flex flex-col items-center justify-center gap-1">
                             <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent leading-none tracking-tight">
                                 GaaS
                             </h1>
@@ -82,165 +72,124 @@ export const LoginView: React.FC = () => {
                         </div>
                     </div>
 
-                    <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Login Corporativo</h2>
+                    <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">
+                        {mode === 'login' ? 'Acesso Seguro' : mode === 'signup' ? 'Novo Cadastro' : 'Redefinir Senha'}
+                    </h2>
                     <p className="text-slate-400 mb-8 text-sm leading-relaxed">
-                        Acesse a área segura para sincronizar dados e gerenciar arquivos na nuvem.
+                        {mode === 'login' && 'Autentique-se para gerenciar o painel de mídia e dashboards.'}
+                        {mode === 'signup' && 'Crie sua conta corporativa para acessar a nuvem.'}
+                        {mode === 'reset' && 'Enviaremos um link para você redefinir sua senha de acesso.'}
                     </p>
 
-                    {resetSent ? (
-                        <div className="bg-emerald-500/10 text-emerald-400 p-6 rounded-xl text-sm border border-emerald-500/20 animate-fade-in text-left">
+                    {successMsg ? (
+                        <div className="bg-emerald-500/10 text-emerald-400 p-6 rounded-2xl text-sm border border-emerald-500/20 text-left mb-6 animate-fade-in">
                             <div className="flex items-center gap-2 mb-2 font-bold text-emerald-300">
                                 <CheckCircle size={18} />
-                                <span>Email enviado com sucesso!</span>
+                                <span>Sucesso!</span>
                             </div>
-                            <p className="mb-2">Enviamos um link para resetar sua senha para:</p>
-                            <code className="block bg-black/20 p-2 rounded text-emerald-200 mb-4 font-mono text-xs break-all">{emailInput}</code>
-                            <p className="text-xs opacity-80 mb-4">Verifique sua caixa de entrada e clique no link para definir uma nova senha.</p>
+                            <p className="leading-relaxed">{successMsg}</p>
+
                             <button
-                                type="button"
-                                onClick={() => {
-                                    setResetSent(false);
-                                    setEmailInput('');
-                                    setShowResetForm(false);
-                                }}
-                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg transition-all text-sm"
+                                onClick={() => { setMode('login'); setSuccessMsg(null); }}
+                                className="mt-6 w-full bg-slate-900/80 hover:bg-slate-900 border border-slate-700 hover:border-slate-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg hover:shadow-xl"
                             >
-                                Voltar para Login
+                                Voltar para o Login
                             </button>
                         </div>
-                    ) : showResetForm ? (
-                        <form onSubmit={handleResetPassword} className="space-y-5" noValidate>
-                            <h3 className="text-lg font-bold text-white mb-4">Recuperar Senha</h3>
-
-                            <div className="text-left group">
-                                <label className="block text-xs font-bold text-blue-400 uppercase mb-2 tracking-wider ml-1">Email</label>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="space-y-4 text-left animate-fade-in">
+                            <div className="group">
+                                <label className="block text-[11px] font-bold text-blue-400/80 uppercase mb-2 tracking-widest ml-1">E-mail</label>
                                 <div className="relative">
-                                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-blue-400 transition-colors" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 group-focus-within:text-blue-400 transition-colors" />
                                     <input
                                         type="email"
-                                        disabled={isSending}
-                                        className="w-full bg-slate-900/50 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 disabled:opacity-50"
-                                        placeholder="seu.nome@afinz.com.br"
-                                        value={emailInput}
-                                        onChange={e => setEmailInput(e.target.value)}
-                                        autoFocus
+                                        required
+                                        className="w-full bg-slate-900/50 border border-slate-700/60 text-white pl-12 pr-4 py-3.5 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 font-medium"
+                                        placeholder="seu.email@afinz.com.br"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
                                     />
                                 </div>
                             </div>
 
+                            {mode !== 'reset' && (
+                                <div className="group">
+                                    <div className="flex justify-between items-end mb-2">
+                                        <label className="block text-[11px] font-bold text-blue-400/80 uppercase tracking-widest ml-1">Senha</label>
+                                        {mode === 'login' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setMode('reset')}
+                                                className="text-[11px] font-bold text-slate-400 hover:text-blue-400 transition-colors tracking-wide"
+                                            >
+                                                Esqueceu a senha?
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 group-focus-within:text-blue-400 transition-colors" />
+                                        <input
+                                            type="password"
+                                            required
+                                            className="w-full bg-slate-900/50 border border-slate-700/60 text-white pl-12 pr-4 py-3.5 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600 font-medium tracking-widest"
+                                            placeholder="••••••••"
+                                            value={password}
+                                            onChange={e => setPassword(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             {error && (
-                                <div className="text-xs text-red-200 bg-red-500/20 p-3 rounded-lg flex items-center gap-2 border border-red-500/30">
-                                    <AlertCircle size={14} />
-                                    {error}
+                                <div className="text-xs text-red-200 bg-red-950/40 p-3.5 rounded-xl flex items-start gap-2.5 border border-red-500/30 animate-shake">
+                                    <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-400" />
+                                    <span className="leading-relaxed font-medium">{error}</span>
                                 </div>
                             )}
 
                             <button
                                 type="submit"
-                                disabled={isSending || !emailInput.trim()}
-                                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-slate-600 disabled:to-slate-600 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                                disabled={isSubmitting}
+                                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
                             >
-                                {isSending ? (
+                                {isSubmitting ? <Loader2 className="animate-spin w-5 h-5" /> : (
                                     <>
-                                        <Loader2 className="animate-spin w-5 h-5" />
-                                        Enviando...
-                                    </>
-                                ) : (
-                                    <>
-                                        Enviar Link de Reset
+                                        {mode === 'login' ? 'Entrar no GaaS' : mode === 'signup' ? 'Cadastrar e Acessar' : 'Enviar Link de Recuperação'}
                                         <ArrowRight size={18} />
                                     </>
                                 )}
                             </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowResetForm(false);
-                                    setEmailInput('');
-                                    setError(null);
-                                }}
-                                className="w-full text-xs text-slate-400 hover:text-slate-200 transition-colors py-2"
-                            >
-                                ← Voltar para Login
-                            </button>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleLogin} className="space-y-5">
-                        <div className="text-left group">
-                            <label className="block text-xs font-bold text-blue-400 uppercase mb-2 tracking-wider ml-1">Email <span className="opacity-50">(@afinz.com.br)</span></label>
-                            <div className="relative">
-                                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-blue-400 transition-colors" />
-                                <input
-                                    type="email"
-                                    required
-                                    className="w-full bg-slate-900/50 border border-slate-700 text-white pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
-                                    placeholder="seu.nome@afinz.com.br"
-                                    value={emailInput}
-                                    onChange={e => setEmailInput(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="text-left group">
-                            <label className="block text-xs font-bold text-blue-400 uppercase mb-2 tracking-wider ml-1">Senha</label>
-                            <div className="relative">
-                                <input
-                                    type="password"
-                                    required
-                                    className="w-full bg-slate-900/50 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
-                                    placeholder="••••••••"
-                                    value={passwordInput}
-                                    onChange={e => setPasswordInput(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div className="text-xs text-red-200 bg-red-500/20 p-3 rounded-lg flex items-center gap-2 border border-red-500/30">
-                                <AlertCircle size={14} />
-                                {error}
-                            </div>
-                        )}
-
-                            {error && (
-                                <div className="text-xs text-red-200 bg-red-500/20 p-3 rounded-lg flex items-center gap-2 border border-red-500/30">
-                                    <AlertCircle size={14} />
-                                    {error}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={isLoggingIn}
-                                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
-                            >
-                                {isLoggingIn ? <Loader2 className="animate-spin w-5 h-5" /> : (
-                                    <>
-                                        Entrar
-                                        <ArrowRight size={18} />
-                                    </>
-                                )}
-                            </button>
-
-                            <div className="flex gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        console.log('Clique em "Esqueci minha senha"');
-                                        setShowResetForm(true);
-                                    }}
-                                    className="flex-1 text-xs text-slate-400 hover:text-blue-400 hover:underline transition-colors py-2"
-                                >
-                                    Esqueci minha senha
-                                </button>
-                            </div>
                         </form>
                     )}
 
-                    <p className="mt-8 text-xs text-slate-500 flex items-center justify-center gap-1.5 opacity-60">
-                        <ShieldCheck size={12} />
-                        Ambiente Seguro & Criptografado
+                    {/* Footer Links */}
+                    {!successMsg && (
+                        <div className="mt-8 pt-8 border-t border-slate-700/50 flex flex-col gap-3">
+                            {mode === 'login' ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('signup')}
+                                    className="text-xs font-bold text-slate-400 hover:text-white transition-colors tracking-wide flex items-center justify-center gap-2 mx-auto"
+                                >
+                                    Não possui conta? Cadastre-se agora
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setMode('login')}
+                                    className="text-xs font-bold text-slate-400 hover:text-white transition-colors tracking-wide flex items-center justify-center gap-2 mx-auto"
+                                >
+                                    <KeyRound size={14} />
+                                    Já possui cadastro? Fazer Login
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    <p className="mt-10 text-[10px] text-slate-500/60 flex items-center justify-center gap-1.5 uppercase tracking-widest font-bold">
+                        <ShieldCheck size={14} />
+                        Conexão Criptografada e Segura
                     </p>
                 </div>
             </div>

@@ -8,6 +8,7 @@ interface AuthContextType {
     loading: boolean;
     signInWithEmail: (email: string) => Promise<void>;
     signInWithPassword: (email: string, password: string) => Promise<void>;
+    signUpEmail: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
     updatePassword: (password: string) => Promise<void>;
@@ -60,6 +61,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { error } = await supabase.auth.signInWithPassword({
             email,
             password,
+        });
+        if (error) throw error;
+    };
+
+    const signUpEmail = async (email: string, password: string) => {
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                emailRedirectTo: window.location.origin
+            }
         });
         if (error) throw error;
     };
@@ -121,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, loading, signInWithEmail, signInWithPassword, signOut, resetPassword, updatePassword, inviteUser }}>
+        <AuthContext.Provider value={{ user, session, loading, signInWithEmail, signInWithPassword, signUpEmail, signOut, resetPassword, updatePassword, inviteUser }}>
             {children}
         </AuthContext.Provider>
     );
