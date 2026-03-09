@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight, ArrowDownRight, Minus, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 
 interface KPICardProps {
     title: string;
@@ -46,8 +46,7 @@ export const KPICard: React.FC<KPICardProps> = ({
         }
     }
 
-    // Status Logic
-    const StatusIcon = status === 'success' ? CheckCircle : status === 'warning' ? AlertTriangle : XCircle;
+    // Status Logic (used only for the bottom decorator line now)
     const statusColor = status === 'success' ? 'text-green-500' : status === 'warning' ? 'text-yellow-500' : 'text-red-500';
 
     return (
@@ -75,23 +74,12 @@ export const KPICard: React.FC<KPICardProps> = ({
                     </div>
                 )}
 
-                {/* Row 2: Context + Status */}
-                {(contextValue || status) && (
+                {/* Row 2: Context */}
+                {contextValue && (
                     <div className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-100">
-                        {contextValue && (
-                            <span className="text-slate-500 font-light">
-                                {contextValue}
-                            </span>
-                        )}
-
-                        {contextValue && status && <span className="text-slate-300">|</span>}
-
-                        {status && (
-                            <div className={`flex items-center gap-1 ${statusColor}`}>
-                                <span>Status:</span>
-                                <StatusIcon className="w-3.5 h-3.5" />
-                            </div>
-                        )}
+                        <span className="text-slate-500 font-light">
+                            {contextValue}
+                        </span>
                     </div>
                 )}
             </div>
