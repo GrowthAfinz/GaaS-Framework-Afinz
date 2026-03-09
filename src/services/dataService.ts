@@ -6,6 +6,25 @@ import { B2CDataRow } from '../types/b2c';
 import { parseDate } from '../utils/formatters';
 import { format } from 'date-fns';
 
+const toFiniteNumber = (value: unknown): number => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (value === null || value === undefined) return 0;
+
+    const cleaned = String(value)
+        .replace(/[R$\s%]/g, '')
+        .replace(/\.(?=\d{3}(\D|$))/g, '')
+        .replace(',', '.');
+
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const toNonNegativeInt = (value: unknown): number => {
+    const num = toFiniteNumber(value);
+    if (num <= 0) return 0;
+    return Math.round(num);
+};
+
 // Helper to map SQL row to Activity
 export const mapSqlToActivity = (row: any): Activity => {
     // Reconstruct Raw Object (for compatibility)
@@ -179,9 +198,9 @@ export const dataService = {
 
         const sqlBatch = metrics.map(m => ({
             data: m.data,
-            propostas_total: m.propostas_b2c_total || 0,
-            emissoes_total: m.emissoes_b2c_total || 0,
-            percentual_conversao: m.percentual_conversao_b2c || 0,
+            propostas_total: toNonNegativeInt(m.propostas_b2c_total),
+            emissoes_total: toNonNegativeInt(m.emissoes_b2c_total),
+            percentual_conversao: toFiniteNumber(m.percentual_conversao_b2c),
             observacoes: m.observacoes || null
         }));
 
@@ -220,14 +239,14 @@ export const dataService = {
                     channel: m.channel,
                     campaign: m.campaign,
                     objective: m.objective,
-                    spend: m.spend ?? 0,
-                    impressions: m.impressions ?? 0,
-                    clicks: m.clicks ?? 0,
-                    conversions: m.conversions ?? 0,
-                    ctr: m.ctr ?? 0,
-                    cpc: m.cpc ?? 0,
-                    cpm: m.cpm ?? 0,
-                    cpa: m.cpa ?? 0,
+                    spend: toFiniteNumber(m.spend),
+                    impressions: toNonNegativeInt(m.impressions),
+                    clicks: toNonNegativeInt(m.clicks),
+                    conversions: toNonNegativeInt(m.conversions),
+                    ctr: toFiniteNumber(m.ctr),
+                    cpc: toFiniteNumber(m.cpc),
+                    cpm: toFiniteNumber(m.cpm),
+                    cpa: toFiniteNumber(m.cpa),
                 };
             })
             .filter(Boolean);

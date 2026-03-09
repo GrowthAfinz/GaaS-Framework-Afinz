@@ -3,6 +3,25 @@ import { useAppStore } from '../../store/useAppStore';
 import { supabase } from '../../services/supabaseClient';
 import { Database, UploadCloud, CheckCircle, AlertTriangle, AlertOctagon, ArrowRight } from 'lucide-react';
 
+const toFiniteNumber = (value: unknown): number => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (value === null || value === undefined) return 0;
+
+    const cleaned = String(value)
+        .replace(/[R$\s%]/g, '')
+        .replace(/\.(?=\d{3}(\D|$))/g, '')
+        .replace(',', '.');
+
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const toNonNegativeInt = (value: unknown): number => {
+    const num = toFiniteNumber(value);
+    if (num <= 0) return 0;
+    return Math.round(num);
+};
+
 export const DataMigration = () => {
     const { activities, b2cData, paidMediaData } = useAppStore();
     const [status, setStatus] = useState<'idle' | 'migrating' | 'done' | 'error'>('idle');
@@ -145,9 +164,9 @@ export const DataMigration = () => {
                 addLog(`Migrando ${b2cData.length} registros B2C...`);
                 const b2cBatch = b2cData.map(d => ({
                     data: d.data, // YYYY-MM-DD
-                    propostas_total: d.propostas_b2c_total,
-                    emissoes_total: d.emissoes_b2c_total,
-                    percentual_conversao: d.percentual_conversao_b2c,
+                    propostas_total: toNonNegativeInt(d.propostas_b2c_total),
+                    emissoes_total: toNonNegativeInt(d.emissoes_b2c_total),
+                    percentual_conversao: toFiniteNumber(d.percentual_conversao_b2c),
                     // cac_medio: ?? Not in B2CDataRow, likely calculated or null
                     observacoes: d.observacoes
                 }));
@@ -165,14 +184,14 @@ export const DataMigration = () => {
                     channel: d.channel,
                     campaign: d.campaign,
                     objective: d.objective,
-                    spend: d.spend,
-                    impressions: d.impressions,
-                    clicks: d.clicks,
-                    conversions: d.conversions,
-                    ctr: d.ctr,
-                    cpc: d.cpc,
-                    cpm: d.cpm,
-                    cpa: d.cpa
+                    spend: toFiniteNumber(d.spend),
+                    impressions: toNonNegativeInt(d.impressions),
+                    clicks: toNonNegativeInt(d.clicks),
+                    conversions: toNonNegativeInt(d.conversions),
+                    ctr: toFiniteNumber(d.ctr),
+                    cpc: toFiniteNumber(d.cpc),
+                    cpm: toFiniteNumber(d.cpm),
+                    cpa: toFiniteNumber(d.cpa)
                 }));
 
                 const { error: paidError } = await supabase.from('paid_media_metrics').insert(paidBatch);
