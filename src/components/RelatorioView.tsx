@@ -565,6 +565,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                 <tr style={{ background: '#1E293B' }} className="text-white">
                   <th className="text-left px-4 py-3 font-semibold whitespace-nowrap w-20">Data</th>
                   <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[260px]">Campanha (Jornada · Activity Name)</th>
+                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[120px]">Segmento</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
                     style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
@@ -617,6 +618,15 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {row.segmento ? (
+                          <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${color?.bg ?? 'bg-slate-100'} ${color?.text ?? 'text-slate-600'} border ${color?.border ? 'border-current' : 'border-slate-200'}`}>
+                            {row.segmento}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
                       </td>
                       <td
                         className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
