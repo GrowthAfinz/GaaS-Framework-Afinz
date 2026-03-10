@@ -147,9 +147,9 @@ function App() {
         >
           <div
             className={`
-              bg-white border-x border-b border-slate-200 shadow-sm transform-gpu origin-top
+              bg-white border-b border-slate-200 shadow-sm transform-gpu origin-top
               transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-              ${isFilterDropOpen ? 'max-h-40 opacity-100 translate-y-0 overflow-visible' : 'max-h-0 opacity-0 -translate-y-3 overflow-hidden'}
+              ${isFilterDropOpen ? 'max-h-44 opacity-100 translate-y-0 overflow-visible' : 'max-h-0 opacity-0 -translate-y-3 overflow-hidden pointer-events-none'}
             `}
           >
             <div className="px-6 py-3">
@@ -166,7 +166,12 @@ function App() {
             </div>
           </div>
 
-          <div className="h-2" />
+          <button
+            type="button"
+            aria-label="Abrir filtros"
+            className="block w-full h-7 bg-transparent cursor-default"
+            onFocus={() => setIsFilterDropOpen(true)}
+          />
         </div>
       )}
 

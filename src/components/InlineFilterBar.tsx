@@ -91,20 +91,21 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
         return (
             <div className="relative group">
                 <button className={`flex items-center gap-2 px-3 py-2 rounded-lg transition border shadow-sm ${isActive
-                    ? 'bg-slate-50 border-slate-300 text-slate-700'
-                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                    ? 'bg-white border-slate-400 text-slate-800'
+                    : 'bg-slate-50 border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600'
                     }`}>
                     <Icon size={16} className={isActive ? 'text-slate-600' : 'text-slate-400'} />
                     <span className="text-sm font-medium">{title}</span>
                     {isActive && (
-                        <span className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-slate-300">
+                        <span className="bg-slate-100 text-slate-700 text-[10px] px-1.5 py-0.5 rounded-full ml-1 border border-slate-300">
                             {selectedCount}
                         </span>
                     )}
                     <ChevronDown size={14} className="opacity-50 group-hover:opacity-100 transition-opacity" />
                 </button>
 
-                <div className={`absolute top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-2xl p-2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 transform origin-top-left ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}>
+                <div className={`absolute top-full pt-2 w-64 bg-transparent z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 transform origin-top-left ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}>
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-2xl p-2">
                     <div className="flex items-center justify-between px-2 py-1 mb-2 border-b border-slate-100">
                         <span className="text-xs font-bold text-slate-500 uppercase">{title}</span>
                         <button
@@ -134,6 +135,7 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                                 <span className="text-slate-400 text-xs">({counts[item] || 0})</span>
                             </label>
                         ))}
+                    </div>
                     </div>
                 </div>
             </div>
