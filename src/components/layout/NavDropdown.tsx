@@ -10,12 +10,11 @@ interface NavItem {
 
 interface NavDropdownProps {
     title: string;
-    icon?: React.ElementType;
     items: NavItem[];
     isActive?: boolean;
 }
 
-export const NavDropdown: React.FC<NavDropdownProps> = ({ title, icon: TitleIcon, items, isActive }) => {
+export const NavDropdown: React.FC<NavDropdownProps> = ({ title, items, isActive }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -46,7 +45,6 @@ export const NavDropdown: React.FC<NavDropdownProps> = ({ title, icon: TitleIcon
                     }
                 `}
             >
-                {TitleIcon && <TitleIcon size={15} />}
                 {title}
             </button>
 

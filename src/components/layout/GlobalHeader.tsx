@@ -31,7 +31,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
     const allNavGroups = [
         {
             title: 'Planejamento',
-            icon: Calendar,
             items: [
                 { id: 'launch', label: 'Launch Planner', icon: Calendar, onClick: () => setTab('launch') },
                 { id: 'diario', label: 'Diario de Bordo', icon: BookOpen, onClick: () => setTab('diario') },
@@ -39,7 +38,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
         },
         {
             title: 'Analise',
-            icon: TrendingUp,
             items: [
                 { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => setTab('jornada') },
                 { id: 'resultados', label: 'Resultados', icon: BarChart3, onClick: () => setTab('resultados') },
@@ -49,7 +47,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
         },
         {
             title: 'Framework',
-            icon: LayoutDashboard,
             items: [
                 { id: 'framework', label: 'Explorador de Disparos', icon: LayoutDashboard, onClick: () => setTab('framework') },
                 { id: 'explorador', label: 'Explorador Avancado', icon: LayoutDashboard, onClick: () => setTab('explorador') },
@@ -57,7 +54,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
         },
         {
             title: 'Midia Paga',
-            icon: PieChart,
             items: [
                 { id: 'midia-paga', label: 'Media Analytics', icon: undefined, onClick: () => setTab('midia-paga') },
             ]
@@ -103,7 +99,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
                         <NavDropdown
                             key={group.title}
                             title={group.title}
-                            icon={group.icon}
                             items={group.items.map(item => ({
                                 ...item,
                                 isActive: activeTab === item.id
