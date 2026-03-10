@@ -44,9 +44,21 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
           if (parsed && !isNaN(parsed.getTime())) {
             dateStr = formatDateKey(parsed);
           } else if (typeof rawDate === 'string') {
-            dateStr = rawDate.includes('/')
-              ? rawDate.split(' ')[0].split('/').reverse().join('-')
-              : rawDate.substring(0, 10);
+            // Se falhou todos os parses estruturados, tentamos uma limpeza final na string
+            // Esperamos que retorne ou YYYY-MM-DD ou DD-MM-YYYY, se for DD no ínicio arrumamos
+            let cleanStr = rawDate.split(' ')[0].replace(/\//g, '-');
+            const parts = cleanStr.split('-');
+            if (parts.length === 3) {
+              // Se primeiro valor for dia (ex: 15-03-2026) inverte para YYYY-MM-DD. 
+              // Assumindo que anos sempre tem 4 digitos
+              if (parts[0].length <= 2 && parts[2].length === 4) {
+                dateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+              } else {
+                dateStr = cleanStr; // Se já começa com ano grande, assume ok
+              }
+            } else {
+              dateStr = cleanStr.substring(0, 10);
+            }
           }
         }
       } catch (e) {
