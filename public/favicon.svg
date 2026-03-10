@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" height="32" width="120" viewBox="0 0 120 32" aria-label="afinz">
+  <!-- Texto "afinz" em Calibri Bold -->
+  <text
+    x="0"
+    y="26"
+    font-family="Calibri, 'Trebuchet MS', sans-serif"
+    font-weight="700"
+    font-size="28"
+    fill="#ffffff"
+    stroke="#ffffff"
+    stroke-width="0.4"
+    stroke-linejoin="round"
+    letter-spacing="-0.01em"
+  >afinz</text>
+
+  <!-- Barra teal centralizada horizontalmente no "z" -->
+  <!-- O "z" começa aproximadamente em x=81, largura ≈ 18px -->
+  <rect x="82" y="13" width="18" height="3.6" fill="#00C6CC" rx="0.5" />
+</svg>
