@@ -95,12 +95,14 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
   const {
     filters,
     metric,
+    temporalMetric,
     searchQuery,
     selectedNodeIds,
     comparisonFocusNodeId,
     detailsPaneNodeId,
     setFilters,
     setMetric,
+    setTemporalMetric,
     setSearchQuery,
     setSelectedNodeIds,
     setComparisonFocusNode,
@@ -136,6 +138,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
     selectedNodeIds,
     nodeMap,
     metric,
+    temporalMetric,
     allActivities: activities,
     filters,
     comparisonFocusNodeId,
@@ -270,7 +273,9 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
             dailyStackedData={dailyStackedData}
             stackedKeys={stackedKeys}
             metric={metric}
+            temporalMetric={temporalMetric}
             onMetricChange={setMetric}
+            onTemporalMetricChange={setTemporalMetric}
             onBarClick={(focusId) => {
               if (!focusId) return;
               setComparisonFocusNode(focusId);

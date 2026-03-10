@@ -6,7 +6,7 @@ import { ActivityRow } from './activity';
 
 export type NodeType = 'bu' | 'segmento' | 'jornada' | 'canal';
 
-export type ExplorerMetric = 'volume' | 'cartoes' | 'cac' | 'custo';
+export type ExplorerMetric = 'volume' | 'cartoes' | 'cac' | 'custo' | 'disparos';
 export type DistributionLevel = 'bu' | 'segmento' | 'canal' | 'disparo';
 export type TemporalViewMode = 'simple' | 'stacked';
 

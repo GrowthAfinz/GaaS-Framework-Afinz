@@ -24,6 +24,7 @@ interface ExplorerStore {
   comparisonFocusNodeId: string | null;
   detailsPaneNodeId: string | null;
   metric: ExplorerMetric;
+  temporalMetric: ExplorerMetric;
 
   // Filters
   filters: ExplorerFilters;
@@ -45,6 +46,7 @@ interface ExplorerStore {
 
   setDetailsPaneNode: (nodeId: string | null) => void;
   setMetric: (metric: ExplorerMetric) => void;
+  setTemporalMetric: (metric: ExplorerMetric) => void;
   setFilters: (filters: Partial<ExplorerFilters>) => void;
   setSearchQuery: (query: string) => void;
 }
@@ -57,6 +59,7 @@ export const useExplorerStore = create<ExplorerStore>()(
       comparisonFocusNodeId: null,
       detailsPaneNodeId: null,
       metric: 'cartoes',
+      temporalMetric: 'disparos',
       filters: defaultFilters,
       searchQuery: '',
 
@@ -125,6 +128,9 @@ export const useExplorerStore = create<ExplorerStore>()(
       setMetric: (metric) =>
         set({ metric }),
 
+      setTemporalMetric: (metric) =>
+        set({ temporalMetric: metric }),
+
       setFilters: (partial) =>
         set((state) => ({
           filters: { ...state.filters, ...partial },
@@ -139,6 +145,7 @@ export const useExplorerStore = create<ExplorerStore>()(
         expandedNodeIds: state.expandedNodeIds,
         comparisonFocusNodeId: state.comparisonFocusNodeId,
         metric: state.metric,
+        temporalMetric: state.temporalMetric,
         filters: state.filters,
       }),
     }

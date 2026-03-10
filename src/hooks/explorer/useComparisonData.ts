@@ -48,12 +48,15 @@ const getMetricValueFromActivity = (a: ActivityRow, metric: ExplorerMetric): num
       return a.CAC ?? 0;
     case 'custo':
       return a['Custo Total Campanha'] ?? 0;
+    case 'disparos':
+      return 1; // each activity counts as 1 disparo
     default:
       return 0;
   }
 };
 
 const getMetricValueFromRows = (rows: ActivityRow[], metric: ExplorerMetric): number => {
+  if (metric === 'disparos') return rows.length;
   if (metric === 'cac') {
     const vals = rows.map(r => r.CAC ?? 0).filter(v => v > 0);
     if (vals.length === 0) return 0;
@@ -96,6 +99,8 @@ export function formatMetricValue(value: number, metric: ExplorerMetric): string
       return `R$ ${value.toFixed(2)}`;
     case 'custo':
       return value >= 1000 ? `R$ ${(value / 1000).toFixed(1)}k` : `R$ ${value.toFixed(2)}`;
+    case 'disparos':
+      return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(Math.round(value));
     default:
       return String(value);
   }
@@ -105,6 +110,7 @@ interface UseComparisonDataProps {
   selectedNodeIds: string[];
   nodeMap: Map<string, TreeNode>;
   metric: ExplorerMetric;
+  temporalMetric: ExplorerMetric;
   allActivities: ActivityRow[];
   filters: ExplorerFilters;
   comparisonFocusNodeId: string | null;
@@ -124,6 +130,7 @@ export function useComparisonData({
   selectedNodeIds,
   nodeMap,
   metric,
+  temporalMetric,
   allActivities,
   filters,
   comparisonFocusNodeId,
@@ -188,6 +195,7 @@ export function useComparisonData({
       groups.get(key)!.push(a);
     });
 
+    // Bar chart uses main `metric`
     const barChartData: BarChartDataPoint[] = Array.from(groups.entries()).map(([label, rows], idx) => {
       const value = getMetricValueFromRows(rows, metric);
       let nextFocusId: string | null = null;
@@ -219,6 +227,7 @@ export function useComparisonData({
       };
     }).sort((a, b) => b.value - a.value);
 
+    // Daily chart uses `temporalMetric` (independent from bar chart metric)
     const days = eachDayOfInterval({
       start: new Date(`${periodStart}T00:00:00`),
       end: new Date(`${periodEnd}T00:00:00`)
@@ -243,9 +252,9 @@ export function useComparisonData({
       const d = toDay(a['Data de Disparo']);
       const point = dayMap.get(d);
       if (!point) return;
-      const v = getMetricValueFromActivity(a, metric);
+      const v = getMetricValueFromActivity(a, temporalMetric);
       point.total = (point.total as number) + v;
-      const rawKey = (a as any)[stackDimension] || a.id;
+      const rawKey = (a as unknown as Record<string, unknown>)[stackDimension] || a.id;
       const stackKey = String(rawKey);
       point[stackKey] = Number(point[stackKey] ?? 0) + v;
       stackTotals.set(stackKey, (stackTotals.get(stackKey) ?? 0) + v);
@@ -279,7 +288,7 @@ export function useComparisonData({
       stackedKeys,
       focusNodeIdResolved: focusId ?? null
     };
-  }, [allActivities, filters, selectedNodeIds, nodeMap, metric, comparisonFocusNodeId]);
+  }, [allActivities, filters, selectedNodeIds, nodeMap, metric, temporalMetric, comparisonFocusNodeId]);
 }
 
 export const explorerFocus = {

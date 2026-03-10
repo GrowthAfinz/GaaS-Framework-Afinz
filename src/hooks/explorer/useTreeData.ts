@@ -163,7 +163,8 @@ export function useTreeData({ activities, filters }: UseTreeDataProps): UseTreeD
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([bu, rows]) => {
         const color = BU_COLORS[bu] ?? '#94A3B8';
-        const children = buildChildren(rows, levels, 0, bu, color, getLevelKey);
+        const buId = slugify(bu);
+        const children = buildChildren(rows, levels, 0, buId, color, getLevelKey);
 
         return {
           id: slugify(bu),
