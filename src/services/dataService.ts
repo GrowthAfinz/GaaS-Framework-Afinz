@@ -6,6 +6,8 @@ import { B2CDataRow } from '../types/b2c';
 import { parseDate } from '../utils/formatters';
 import { format } from 'date-fns';
 
+const PAGE_SIZE = 1000;
+
 const toFiniteNumber = (value: unknown): number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (value === null || value === undefined) return 0;
@@ -27,8 +29,30 @@ const toNonNegativeInt = (value: unknown): number => {
 
 const previewRows = (rows: any[], limit = 3) => rows.slice(0, limit);
 
+const normalizeText = (value: unknown): string => {
+    if (typeof value !== 'string') return value == null ? '' : String(value);
+    return value.trim();
+};
+
+const normalizeBU = (value: unknown): string => {
+    const raw = normalizeText(value);
+    const normalized = raw.toUpperCase().replace(/\s+/g, '');
+    if (normalized === 'B2C') return 'B2C';
+    if (normalized === 'B2B2C') return 'B2B2C';
+    if (normalized === 'PLURIX') return 'Plurix';
+    return raw;
+};
+
 // Helper to map SQL row to Activity
 export const mapSqlToActivity = (row: any): Activity => {
+    const bu = normalizeBU(row['BU']);
+    const canal = normalizeText(row['Canal']);
+    const segmento = normalizeText(row['Segmento']);
+    const parceiro = normalizeText(row['Parceiro']);
+    const jornada = normalizeText(row['jornada']);
+    const oferta = normalizeText(row['Oferta']);
+    const promocional = normalizeText(row['Promocional']);
+
     // Reconstruct Raw Object (for compatibility)
     // The DB returns keys exactly as defined in the CREATE TABLE (Human Readable)
     const raw: FrameworkRow = {
@@ -36,13 +60,13 @@ export const mapSqlToActivity = (row: any): Activity => {
         'Activity name / Taxonomia': row['Activity name / Taxonomia'],
         'Data de Disparo': row['Data de Disparo'],
         'Data Fim': row['Data Fim'],
-        'BU': row['BU'],
-        'Canal': row['Canal'],
+        'BU': bu,
+        'Canal': canal,
         // Jornada e Siglas que mudam de nome
-        'Jornada': row['jornada'],
-        'Parceiro': row['Parceiro'],
+        'Jornada': jornada,
+        'Parceiro': parceiro,
         'SIGLA': row['SIGLA_Parceiro'],
-        'Segmento': row['Segmento'],
+        'Segmento': segmento,
         'SIGLA.1': row['SIGLA_Segmento'],
         'Subgrupos': row['Subgrupos'],
         'Etapa de aquisição': row['Etapa de aquisição'],
@@ -50,10 +74,10 @@ export const mapSqlToActivity = (row: any): Activity => {
         'Safra': row['Safra'],
         'Perfil de Crédito': row['Perfil de Crédito'],
         'Produto': row['Produto'],
-        'Oferta': row['Oferta'],
+        'Oferta': oferta,
         'SIGLA.2': row['SIGLA_Oferta'],
         'Oferta 2': row['Oferta 2'],
-        'Promocional': row['Promocional'],
+        'Promocional': promocional,
         'Promocional 2': row['Promocional 2'],
         'Disparado?': row['status'] === 'Realizado' ? 'Sim' : 'Não', // Infer or use if column existed
         'Base Total': row['Base Total'],
@@ -84,14 +108,14 @@ export const mapSqlToActivity = (row: any): Activity => {
     return {
         id: row['Activity name / Taxonomia'] || row.id,
         dataDisparo: parseDate(row['Data de Disparo']) || new Date(row['Data de Disparo']), // Fallback to standard if parse fail
-        canal: row['Canal'],
-        bu: row['BU'],
-        segmento: row['Segmento'],
-        parceiro: row['Parceiro'],
-        jornada: row['jornada'],
+        canal,
+        bu,
+        segmento,
+        parceiro,
+        jornada,
         ordemDisparo: Number(row['Ordem de disparo']) || undefined,
-        oferta: row['Oferta'],
-        promocional: row['Promocional'],
+        oferta,
+        promocional,
         safraKey: row['Safra'],
         status: row['status'] as any, // Cast to ActivityStatus
         kpis: {
@@ -116,17 +140,30 @@ export const mapSqlToActivity = (row: any): Activity => {
 
 export const dataService = {
     async fetchActivities(): Promise<Activity[]> {
-        // Order by date desc
-        // Use quotes to support columns with spaces
-        const { data, error } = await supabase
-            .from('activities')
-            .select('*')
-            //.eq('filename', 'migration_v3_full') // Optional: constrain to latest? Or just take all?
-            // User might want to append new data later.
-            .order('"Data de Disparo"', { ascending: false });
+        // Fetch all rows in pages because Supabase/PostgREST can truncate default responses.
+        const allRows: any[] = [];
+        let from = 0;
 
-        if (error) throw error;
-        return (data || []).map(mapSqlToActivity);
+        while (true) {
+            const to = from + PAGE_SIZE - 1;
+            const { data, error } = await supabase
+                .from('activities')
+                .select('*')
+                .order('Data de Disparo', { ascending: false })
+                .range(from, to);
+
+            if (error) throw error;
+
+            const page = data || [];
+            if (page.length === 0) break;
+
+            allRows.push(...page);
+
+            if (page.length < PAGE_SIZE) break;
+            from += PAGE_SIZE;
+        }
+
+        return allRows.map(mapSqlToActivity);
     },
 
     async fetchB2CMetrics(): Promise<B2CDataRow[]> {

@@ -128,10 +128,17 @@ function App() {
   }, [filters, startDate, endDate]);
 
   const launchPlannerFilters = useMemo(() => ({
-    ...filters,
+    ...storeFilters,
+    bu: selectedBUs,
+    canais: [],
+    jornadas: [],
+    segmentos: [],
+    parceiros: [],
+    ofertas: [],
+    disparado: 'Todos' as const,
     dataInicio: '',
     dataFim: ''
-  }), [filters]);
+  }), [storeFilters, selectedBUs]);
 
   const { filteredData: launchPlannerData } = useAdvancedFilters(
     activeTab === 'launch' ? data : {},
