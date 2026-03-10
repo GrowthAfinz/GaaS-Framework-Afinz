@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Map, Users, HeartHandshake, ChevronDown, Check, X } from 'lucide-react';
+import { MessageCircle, Map, Users, HeartHandshake, ChevronDown, Check, X, Search } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { FilterState } from '../types/framework';
 import { PeriodSelector } from './period-selector/PeriodSelector';
@@ -13,6 +13,7 @@ interface InlineFilterBarProps {
     countByJornada?: { [jornada: string]: number };
     countBySegmento?: { [segmento: string]: number };
     countByParceiro?: { [parceiro: string]: number };
+    totalRemainingDisparos?: number;
 }
 
 interface FilterDropdownProps {
@@ -22,15 +23,34 @@ interface FilterDropdownProps {
     field: keyof FilterState;
     counts: Record<string, number>;
     align?: 'left' | 'right';
+    searchable?: boolean;
+    searchPlaceholder?: string;
 }
 
-const FilterDropdown: React.FC<FilterDropdownProps> = ({ title, icon: Icon, items, field, counts, align = 'left' }) => {
+const FilterDropdown: React.FC<FilterDropdownProps> = ({
+    title,
+    icon: Icon,
+    items,
+    field,
+    counts,
+    align = 'left',
+    searchable = false,
+    searchPlaceholder = 'Buscar...'
+}) => {
     const { viewSettings, setGlobalFilters } = useAppStore();
     const filters = viewSettings.filtrosGlobais;
     const [isOpen, setIsOpen] = React.useState(false);
+    const [searchTerm, setSearchTerm] = React.useState('');
     const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
     if (items.length === 0) return null;
+
+    const visibleItems = React.useMemo(() => {
+        if (!searchable) return items;
+        const q = searchTerm.trim().toLowerCase();
+        if (!q) return items;
+        return items.filter(item => item.toLowerCase().includes(q));
+    }, [items, searchable, searchTerm]);
 
     const toggleItem = (value: string) => {
         const currentList = filters[field] as string[];
@@ -42,17 +62,18 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({ title, icon: Icon, item
 
     const toggleAll = () => {
         const currentList = filters[field] as string[];
-        const allSelected = items.length > 0 && items.every(i => currentList.includes(i));
+        const targetItems = visibleItems;
+        const allSelected = targetItems.length > 0 && targetItems.every(i => currentList.includes(i));
         if (allSelected) {
-            const newList = currentList.filter(i => !items.includes(i));
+            const newList = currentList.filter(i => !targetItems.includes(i));
             setGlobalFilters({ [field]: newList });
         } else {
-            const toAdd = items.filter(i => !currentList.includes(i));
+            const toAdd = targetItems.filter(i => !currentList.includes(i));
             setGlobalFilters({ [field]: [...currentList, ...toAdd] });
         }
     };
 
-    const isAllSelected = items.length > 0 && items.every(i => (filters[field] as string[]).includes(i));
+    const isAllSelected = visibleItems.length > 0 && visibleItems.every(i => (filters[field] as string[]).includes(i));
     const selectedCount = (filters[field] as string[]).length;
     const isActive = selectedCount > 0;
 
@@ -64,6 +85,7 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({ title, icon: Icon, item
     const handleMouseLeave = () => {
         timeoutRef.current = setTimeout(() => {
             setIsOpen(false);
+            setSearchTerm('');
         }, 300); // 300ms hover delay bridge
     };
 
@@ -103,11 +125,32 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({ title, icon: Icon, item
                             onClick={toggleAll}
                             className="text-[10px] text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wider transition-colors"
                         >
-                            {isAllSelected ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                            {isAllSelected
+                                ? (searchTerm ? 'Desmarcar Visiveis' : 'Desmarcar Todos')
+                                : (searchTerm ? 'Selecionar Visiveis' : 'Selecionar Todos')}
                         </button>
                     </div>
+                    {searchable && (
+                        <div className="px-2 pb-2">
+                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+                                <Search size={13} className="text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder={searchPlaceholder}
+                                    className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+                                />
+                            </div>
+                        </div>
+                    )}
                     <div className="max-h-80 overflow-y-auto space-y-0.5 custom-scrollbar py-1">
-                        {items.map(item => {
+                        {visibleItems.length === 0 && (
+                            <div className="px-2 py-4 text-center text-xs text-slate-400">
+                                Nenhum resultado para "{searchTerm}".
+                            </div>
+                        )}
+                        {visibleItems.map(item => {
                             const selected = (filters[field] as string[]).includes(item);
                             return (
                                 <label
@@ -144,7 +187,8 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
     countByCanal = {},
     countByJornada = {},
     countBySegmento = {},
-    countByParceiro = {}
+    countByParceiro = {},
+    totalRemainingDisparos = 0
 }) => {
     const { viewSettings, setGlobalFilters } = useAppStore();
     const filters = viewSettings.filtrosGlobais;
@@ -152,6 +196,7 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
     const clearFilters = () => {
         setGlobalFilters({
             canais: [],
+            jornadas: [],
             segmentos: [],
             parceiros: [],
             ofertas: [],
@@ -177,6 +222,8 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                 items={availableJornadas}
                 field="jornadas"
                 counts={countByJornada}
+                searchable
+                searchPlaceholder="Buscar jornada..."
             />
             <FilterDropdown
                 title="Segmentos"
@@ -207,6 +254,10 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                     Limpar
                 </button>
             )}
+
+            <div className="ml-1 px-2.5 py-1 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-full tabular-nums">
+                {totalRemainingDisparos} disparos
+            </div>
         </div>
     );
 };

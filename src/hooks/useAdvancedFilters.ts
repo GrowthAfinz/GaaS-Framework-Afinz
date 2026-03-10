@@ -2,6 +2,20 @@ import { useMemo } from 'react';
 import { CalendarData, FilterState, Activity } from '../types/framework';
 
 type FilterKey = 'canais' | 'jornadas' | 'segmentos' | 'parceiros';
+const FILTER_KEYS: FilterKey[] = ['canais', 'jornadas', 'segmentos', 'parceiros'];
+
+const getFilterValue = (activity: Activity, key: FilterKey): string => {
+  switch (key) {
+    case 'canais':
+      return activity.canal;
+    case 'jornadas':
+      return activity.jornada;
+    case 'segmentos':
+      return activity.segmento;
+    case 'parceiros':
+      return activity.parceiro;
+  }
+};
 
 const normalizeDayStart = (date: Date) => {
   const d = new Date(date);
@@ -79,87 +93,78 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
     }
   }, [data, filters]);
 
-  const availableCanais = useMemo(() => {
-    const canais = new Set<string>();
-    allActivities.forEach(activity => {
-      if (activity.canal) canais.add(activity.canal);
+  // Faceted filter orchestrator:
+  // Computes remaining possibilities in the chain by dimension (exclude-self semantics)
+  // and keeps available options constrained by static context (BU + period).
+  const orchestrator = useMemo(() => {
+    const countByCanal: { [canal: string]: number } = {};
+    const countByJornada: { [jornada: string]: number } = {};
+    const countBySegmento: { [segmento: string]: number } = {};
+    const countByParceiro: { [parceiro: string]: number } = {};
+
+    const available = {
+      canais: new Set<string>(),
+      jornadas: new Set<string>(),
+      segmentos: new Set<string>(),
+      parceiros: new Set<string>()
+    };
+
+    const staticMatched = allActivities.filter(activity =>
+      matchActivity(activity, ['canais', 'jornadas', 'segmentos', 'parceiros'])
+    );
+
+    staticMatched.forEach(activity => {
+      if (activity.canal) available.canais.add(activity.canal);
+      if (activity.jornada) available.jornadas.add(activity.jornada);
+      if (activity.segmento) available.segmentos.add(activity.segmento);
+      if (activity.parceiro) available.parceiros.add(activity.parceiro);
     });
-    return Array.from(canais).sort();
-  }, [allActivities]);
 
-  const availableJornadas = useMemo(() => {
-    const jornadas = new Set<string>();
-    allActivities.forEach(activity => {
-      if (activity.jornada) jornadas.add(activity.jornada);
+    const countMaps: Record<FilterKey, Record<string, number>> = {
+      canais: countByCanal,
+      jornadas: countByJornada,
+      segmentos: countBySegmento,
+      parceiros: countByParceiro
+    };
+
+    const otherKeys = (key: FilterKey) => FILTER_KEYS.filter(k => k !== key);
+
+    staticMatched.forEach(activity => {
+      FILTER_KEYS.forEach(key => {
+        if (matchActivity(activity, otherKeys(key))) {
+          const value = getFilterValue(activity, key);
+          if (value) {
+            countMaps[key][value] = (countMaps[key][value] || 0) + 1;
+          }
+        }
+      });
     });
-    return Array.from(jornadas).sort();
-  }, [allActivities]);
 
-  const availableSegmentos = useMemo(() => {
-    const segmentos = new Set<string>();
-    allActivities.forEach(activity => {
-      if (activity.segmento) segmentos.add(activity.segmento);
-    });
-    return Array.from(segmentos).sort();
-  }, [allActivities]);
+    const totalRemainingDisparos = Object.values(filteredData).reduce((acc, list) => acc + list.length, 0);
 
-  const availableParceiros = useMemo(() => {
-    const parceiros = new Set<string>();
-    allActivities.forEach(activity => {
-      if (activity.parceiro) parceiros.add(activity.parceiro);
-    });
-    return Array.from(parceiros).sort();
-  }, [allActivities]);
-
-  const countByCanal = useMemo(() => {
-    const counts: { [canal: string]: number } = {};
-    allActivities
-      .filter(activity => matchActivity(activity, ['canais']))
-      .forEach(activity => {
-        counts[activity.canal] = (counts[activity.canal] || 0) + 1;
-      });
-    return counts;
-  }, [allActivities, filters]);
-
-  const countByJornada = useMemo(() => {
-    const counts: { [jornada: string]: number } = {};
-    allActivities
-      .filter(activity => matchActivity(activity, ['jornadas']))
-      .forEach(activity => {
-        counts[activity.jornada] = (counts[activity.jornada] || 0) + 1;
-      });
-    return counts;
-  }, [allActivities, filters]);
-
-  const countBySegmento = useMemo(() => {
-    const counts: { [segmento: string]: number } = {};
-    allActivities
-      .filter(activity => matchActivity(activity, ['segmentos']))
-      .forEach(activity => {
-        counts[activity.segmento] = (counts[activity.segmento] || 0) + 1;
-      });
-    return counts;
-  }, [allActivities, filters]);
-
-  const countByParceiro = useMemo(() => {
-    const counts: { [parceiro: string]: number } = {};
-    allActivities
-      .filter(activity => matchActivity(activity, ['parceiros']))
-      .forEach(activity => {
-        counts[activity.parceiro] = (counts[activity.parceiro] || 0) + 1;
-      });
-    return counts;
-  }, [allActivities, filters]);
+    return {
+      availableCanais: Array.from(available.canais).sort(),
+      availableJornadas: Array.from(available.jornadas).sort(),
+      availableSegmentos: Array.from(available.segmentos).sort(),
+      availableParceiros: Array.from(available.parceiros).sort(),
+      countByCanal,
+      countByJornada,
+      countBySegmento,
+      countByParceiro,
+      totalRemainingDisparos
+    };
+  }, [allActivities, filters, filteredData]);
 
   return {
     filteredData,
-    availableCanais,
-    availableJornadas,
-    availableSegmentos,
-    availableParceiros,
-    countByCanal,
-    countByJornada,
-    countBySegmento,
-    countByParceiro
+    availableCanais: orchestrator.availableCanais,
+    availableJornadas: orchestrator.availableJornadas,
+    availableSegmentos: orchestrator.availableSegmentos,
+    availableParceiros: orchestrator.availableParceiros,
+    countByCanal: orchestrator.countByCanal,
+    countByJornada: orchestrator.countByJornada,
+    countBySegmento: orchestrator.countBySegmento,
+    countByParceiro: orchestrator.countByParceiro,
+    totalRemainingDisparos: orchestrator.totalRemainingDisparos
   };
 };

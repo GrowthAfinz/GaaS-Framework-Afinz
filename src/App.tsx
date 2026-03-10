@@ -6,6 +6,7 @@ import { LoginView } from './components/LoginView';
 import { SetPasswordView } from './components/SetPasswordView';
 
 import { ResultadosView } from './components/ResultadosView';
+import { RelatorioView } from './components/RelatorioView';
 import { JornadaDisparosView } from './components/JornadaDisparosView';
 import { DiarioBordo } from './components/DiarioBordo';
 import { FrameworkView } from './components/FrameworkView';
@@ -50,7 +51,7 @@ function App() {
     filterCloseTimeoutRef.current = setTimeout(() => {
       setIsFilterDropOpen(false);
       filterCloseTimeoutRef.current = null;
-    }, 140);
+    }, 260);
   };
 
   useEffect(() => {
@@ -102,7 +103,8 @@ function App() {
     countByCanal,
     countByJornada,
     countBySegmento,
-    countByParceiro
+    countByParceiro,
+    totalRemainingDisparos
   } = useAdvancedFilters(
     shouldRunFilters ? data : {},
     filters
@@ -185,6 +187,7 @@ function App() {
               ${isFilterDropOpen ? 'max-h-44 opacity-100 translate-y-0 overflow-visible' : 'max-h-0 opacity-0 -translate-y-3 overflow-hidden pointer-events-none'}
             `}
             onMouseEnter={openFilterDrop}
+            onMouseMove={openFilterDrop}
             onMouseLeave={scheduleCloseFilterDrop}
           >
             <div className="px-6 py-3">
@@ -197,6 +200,7 @@ function App() {
                 countByJornada={countByJornada}
                 countBySegmento={countBySegmento}
                 countByParceiro={countByParceiro}
+                totalRemainingDisparos={totalRemainingDisparos}
               />
             </div>
           </div>
@@ -303,6 +307,14 @@ function App() {
                   <FrameworkView />
                 </PageTransition>
               )}
+              {activeTab === 'relatorio' && (
+                <PageTransition>
+                  <RelatorioView
+                    data={filteredData}
+                    selectedBU={selectedBUs.length === 1 ? selectedBUs[0] : undefined}
+                  />
+                </PageTransition>
+              )}
               {activeTab === 'orientador' && (
                 <PageTransition>
                   <OrientadorView />
@@ -318,7 +330,7 @@ function App() {
                   <ConfiguracoesView />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga'].includes(activeTab) && (
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga', 'relatorio'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>
