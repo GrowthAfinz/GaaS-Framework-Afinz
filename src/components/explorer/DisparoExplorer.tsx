@@ -27,7 +27,27 @@ interface DisparoExplorerProps {
 export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFramework }) => {
   // ── Dados ──────────────────────────────────────────────────────────────────
   // Usa as atividades já carregadas no store global; faz fetch só se vazio
-  const storeActivities = useAppStore((state) => state.activities) as unknown as ActivityRow[];
+  const storeActivitiesRaw = useAppStore((state) => state.activities);
+  const storeActivities = React.useMemo(() => {
+    return storeActivitiesRaw.map(a => {
+      let dateStr = '';
+      if (a.dataDisparo) {
+        dateStr = format(new Date(a.dataDisparo), 'yyyy-MM-dd');
+      } else if (a.raw['Data de Disparo']) {
+        const rawDate = a.raw['Data de Disparo'];
+        dateStr = typeof rawDate === 'string' ? rawDate.substring(0, 10) : format(new Date(rawDate), 'yyyy-MM-dd');
+      }
+      return {
+        id: a.id,
+        ...a.raw,
+        BU: a.bu || a.raw.BU,
+        Segmento: a.segmento || a.raw.Segmento,
+        jornada: a.jornada || a.raw.jornada || a.raw.Jornada,
+        Canal: a.canal || a.raw.Canal,
+        'Data de Disparo': dateStr
+      } as unknown as ActivityRow;
+    });
+  }, [storeActivitiesRaw]);
   const [fetchedActivities, setFetchedActivities] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,11 +165,11 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
       <aside className="w-72 shrink-0 flex flex-col gap-3 overflow-hidden">
 
         {/* Period label — lido do PeriodContext global */}
-        <div className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2">
-          <span className="text-xs font-medium text-slate-400">
+        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+          <span className="text-xs font-semibold text-slate-600">
             {format(startDate, 'dd MMM', { locale: ptBR })} – {format(endDate, 'dd MMM yyyy', { locale: ptBR })}
           </span>
-          <span className="text-xs text-slate-600">{activities.length.toLocaleString('pt-BR')} disparos</span>
+          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{activities.length.toLocaleString('pt-BR')} disparos</span>
         </div>
 
         {/* Search */}
@@ -165,7 +185,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         />
 
         {/* Tree */}
-        <div className="flex-1 overflow-y-auto bg-slate-800/30 rounded-xl border border-slate-700/40 p-2">
+        <div className="flex-1 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-sm p-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
           <TreeView
             rootNodes={rootNodes}
             onToggle={handleToggle}
@@ -177,15 +197,15 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         </div>
 
         {/* Stats footer — mostra contagem no período ativo */}
-        <div className="text-xs text-slate-600 text-center">
+        <div className="text-[11px] font-medium text-slate-500 text-center uppercase tracking-widest mt-1">
           {rootNodes.length} BUs · {rootNodes.reduce((s, n) => s + n.count, 0).toLocaleString('pt-BR')} disparos no período
         </div>
       </aside>
 
       {/* CENTER + RIGHT — Main Content */}
-      <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden bg-slate-50/50 rounded-2xl p-4 border border-slate-200/60 shadow-inner">
         {/* Top: Comparison Panel */}
-        <div className="flex-1 min-h-0 overflow-y-auto bg-slate-800/20 rounded-xl border border-slate-700/30 p-4">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-sm p-4 relative">
           <ComparisonPanel
             barChartData={barChartData}
             heatmapData={heatmapData}

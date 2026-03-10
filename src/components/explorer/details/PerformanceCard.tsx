@@ -8,10 +8,10 @@ interface MetricItemProps {
 }
 
 const MetricItem: React.FC<MetricItemProps> = ({ label, value, sub }) => (
-  <div className="bg-slate-700/40 rounded-lg p-3 flex flex-col gap-0.5">
-    <span className="text-xs text-slate-500">{label}</span>
-    <span className="text-lg font-semibold font-mono text-white tabular-nums">{value}</span>
-    {sub && <span className="text-xs text-slate-500">{sub}</span>}
+  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col gap-0.5 shadow-sm">
+    <span className="text-xs font-medium text-slate-500">{label}</span>
+    <span className="text-lg font-bold font-mono text-slate-700 tabular-nums">{value}</span>
+    {sub && <span className="text-[10px] text-slate-400 uppercase tracking-widest">{sub}</span>}
   </div>
 );
 
@@ -40,7 +40,7 @@ interface PerformanceCardProps {
 
 export const PerformanceCard: React.FC<PerformanceCardProps> = ({ metrics, count }) => (
   <div className="flex flex-col gap-2">
-    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Performance</p>
+    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Performance</p>
     <div className="grid grid-cols-2 gap-2">
       <MetricItem label="Disparos" value={String(count)} />
       <MetricItem label="Cartões" value={fmtNum(metrics.cartoes)} />

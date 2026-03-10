@@ -22,12 +22,12 @@ const CustomTooltip = ({ active, payload, metric }: { active?: boolean; payload?
   if (!active || !payload?.length) return null;
   const d: BarChartDataPoint = payload[0].payload;
   return (
-    <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 text-xs shadow-xl">
-      <p className="font-semibold text-white mb-1">{d.label}</p>
-      <p className="text-slate-300">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 text-xs shadow-lg">
+      <p className="font-semibold text-slate-800 mb-1">{d.label}</p>
+      <p className="text-slate-600">
         {formatMetricValue(d.value, metric)}
       </p>
-      <p className="text-slate-500">{d.count} disparos</p>
+      <p className="text-slate-400">{d.count} disparos</p>
     </div>
   );
 };
@@ -53,7 +53,7 @@ export const SegmentBarChart: React.FC<SegmentBarChartProps> = ({ data, metric, 
           }
         }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
         <XAxis
           type="number"
           tick={{ fill: '#94A3B8', fontSize: 10 }}
@@ -64,12 +64,12 @@ export const SegmentBarChart: React.FC<SegmentBarChartProps> = ({ data, metric, 
         <YAxis
           type="category"
           dataKey="label"
-          tick={{ fill: '#CBD5E1', fontSize: 11 }}
+          tick={{ fill: '#475569', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
           width={90}
         />
-        <Tooltip content={<CustomTooltip metric={metric} />} cursor={{ fill: 'rgba(148,163,184,0.05)' }} />
+        <Tooltip content={<CustomTooltip metric={metric} />} cursor={{ fill: 'rgba(226,232,240,0.5)' }} />
         <Bar dataKey="value" radius={[0, 4, 4, 0]} cursor="pointer" maxBarSize={24}>
           {data.map((entry) => (
             <Cell key={entry.id} fill={entry.color} fillOpacity={0.85} />

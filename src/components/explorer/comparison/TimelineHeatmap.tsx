@@ -59,7 +59,7 @@ export const TimelineHeatmap: React.FC<TimelineHeatmapProps> = ({ cells, weekLab
 
             return (
               <tr key={rowId}>
-                <td className="text-slate-400 pr-3 py-0.5 truncate max-w-[96px]" title={firstCell.rowLabel}>
+                <td className="text-slate-600 font-medium pr-3 py-0.5 truncate max-w-[96px]" title={firstCell.rowLabel}>
                   {firstCell.rowLabel.length > 12
                     ? firstCell.rowLabel.slice(0, 12) + '…'
                     : firstCell.rowLabel}

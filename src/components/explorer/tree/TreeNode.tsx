@@ -50,14 +50,14 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
           'flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer select-none text-sm transition-colors',
           'focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500',
           isSelected
-            ? 'bg-blue-600/20 border-l-2 border-blue-500 text-white'
-            : 'text-slate-300 hover:bg-slate-700/50 border-l-2 border-transparent',
+            ? 'bg-blue-50 border-l-2 border-blue-500 text-blue-700 font-semibold'
+            : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent hover:text-slate-800',
         ].join(' ')}
         style={{ paddingLeft: `${paddingLeft + 8}px` }}
       >
         {/* Chevron */}
         <span
-          className="shrink-0 text-slate-500 hover:text-slate-300"
+          className="shrink-0 text-slate-400 hover:text-slate-600 transition-colors"
           onClick={handleChevronClick}
           style={{ width: 14 }}
         >
