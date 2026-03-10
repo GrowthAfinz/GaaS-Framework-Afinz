@@ -101,15 +101,15 @@ export const OriginacaoB2CView: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-950 p-6 overflow-hidden">
+        <div className="flex flex-col h-full bg-slate-50 p-6 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between mb-8 shrink-0">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                         <BarChart3 className="text-blue-500" />
                         Originação B2C
                     </h2>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <p className="text-slate-500 text-sm mt-1">
                         Análise de participação CRM na originação total B2C.
                     </p>
                 </div>
@@ -129,7 +129,7 @@ export const OriginacaoB2CView: React.FC = () => {
                             {/* ROW 1: Comparison Cards (Left 2/3) + Segment Pie (Right 1/3) */}
                             <div className="flex flex-col xl:flex-row gap-6 mb-8">
                                 <div className="xl:w-7/12">
-                                    <h3 className="text-lg font-bold text-slate-100 mb-4 opacity-90">Comparação B2C vs CRM</h3>
+                                    <h3 className="text-lg font-bold text-slate-900 mb-4 opacity-90">Comparação B2C vs CRM</h3>
                                     <OriginacaoKPIsComparison summary={summary} previousSummary={previousSummary} />
                                 </div>
                                 <div className="xl:w-5/12 flex flex-col">
@@ -142,7 +142,7 @@ export const OriginacaoB2CView: React.FC = () => {
 
                             {/* ROW 2: Performance KPIs */}
                             <div className="mb-8">
-                                <h3 className="text-lg font-bold text-slate-100 mb-4 opacity-90">Performance</h3>
+                                <h3 className="text-lg font-bold text-slate-900 mb-4 opacity-90">Performance</h3>
                                 <OriginacaoKPIsPerformance summary={summary} />
                             </div>
 
@@ -176,16 +176,16 @@ export const OriginacaoB2CView: React.FC = () => {
                             {/* <MediaCorrelationCharts /> */}
                         </>
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/50">
+                        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-200 rounded-xl bg-white">
                             {loading ? (
-                                <div className="flex flex-col items-center gap-3 text-slate-400">
+                                <div className="flex flex-col items-center gap-3 text-slate-500">
                                     <Loader2 className="animate-spin text-blue-500" size={32} />
                                     <p>Sincronizando dados...</p>
                                 </div>
                             ) : (
                                 <>
                                     <p className="text-slate-500 mb-2">Nenhum dado B2C carregado.</p>
-                                    <p className="text-xs text-slate-600">Faça upload do CSV diarizado para começar.</p>
+                                    <p className="text-xs text-slate-500">Faça upload do CSV diarizado para começar.</p>
                                 </>
                             )}
                         </div>

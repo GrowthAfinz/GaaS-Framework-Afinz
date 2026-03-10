@@ -57,21 +57,23 @@ export const LoginView: React.FC = () => {
             <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-lg">
                 <div className="text-center">
                     {/* Afinz Brand */}
-                    <div className="mb-8 flex flex-col items-center gap-3 select-none">
-                        <div className="flex items-center gap-3" style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}>
-                            <AfinzLogo height={32} />
-                            <div className="flex items-center gap-2">
-                                <div className="h-5 w-0.5 rounded-full bg-[#00C6CC]" />
-                                <span className="font-black text-2xl text-slate-800 tracking-tight">Growth as a Service</span>
+                    <div className="mb-8 flex flex-col items-center gap-4 select-none">
+                        <div className="flex items-center gap-4" style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}>
+                            <AfinzLogo height={48} />
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-1 rounded-full bg-[#00C6CC]" />
+                                <span className="font-black text-3xl text-slate-800 tracking-tight">Growth as a Service</span>
                             </div>
                         </div>
                     </div>
 
-                    <h2 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">
-                        {mode === 'login' ? 'Acesso Seguro' : mode === 'signup' ? 'Novo Cadastro' : 'Redefinir Senha'}
-                    </h2>
+                    {mode !== 'login' && (
+                        <h2 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">
+                            {mode === 'signup' ? 'Novo Cadastro' : 'Redefinir Senha'}
+                        </h2>
+                    )}
                     <p className="text-slate-500 mb-8 text-sm leading-relaxed">
-                        {mode === 'login' && 'Autentique-se para gerenciar o painel de mídia e dashboards.'}
+                        {mode === 'login' && 'Autentique-se para gerenciar o painel de performance e dashboards.'}
                         {mode === 'signup' && 'Crie sua conta corporativa para acessar a nuvem.'}
                         {mode === 'reset' && 'Enviaremos um link para você redefinir sua senha de acesso.'}
                     </p>

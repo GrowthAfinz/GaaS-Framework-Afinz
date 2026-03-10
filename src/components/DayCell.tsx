@@ -23,15 +23,15 @@ interface DayCellProps {
 }
 
 const BU_BG_COLORS: { [key: string]: string } = {
-  B2C: 'bg-blue-900 border-blue-700 hover:bg-blue-800',
-  B2B2C: 'bg-emerald-900 border-emerald-700 hover:bg-emerald-800',
-  Plurix: 'bg-purple-900 border-purple-700 hover:bg-purple-800'
+  B2C: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
+  B2B2C: 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100',
+  Plurix: 'bg-purple-50 border-purple-200 hover:bg-purple-100'
 };
 
 const BU_TEXT_COLORS: { [key: string]: string } = {
-  B2C: 'text-blue-200',
-  B2B2C: 'text-emerald-200',
-  Plurix: 'text-purple-200'
+  B2C: 'text-blue-600',
+  B2B2C: 'text-emerald-600',
+  Plurix: 'text-purple-600'
 };
 
 export const DayCell: React.FC<DayCellProps> = ({
@@ -79,7 +79,7 @@ export const DayCell: React.FC<DayCellProps> = ({
   };
 
   if (!day) {
-    return <div className={`aspect-square ${isWeekend ? 'bg-slate-800/40' : 'bg-slate-950'}`} />;
+    return <div className={`aspect-square ${isWeekend ? 'bg-slate-100' : 'bg-white'}`} />;
   }
 
   // Determinar se é dia futuro (D+1 em diante)
@@ -96,17 +96,17 @@ export const DayCell: React.FC<DayCellProps> = ({
   // Cores baseadas em atividades principais
   if (isFutureDay) {
     colorClass = isWeekend
-      ? 'bg-slate-600/40 border-slate-500 hover:bg-slate-600/50'
-      : 'bg-slate-700 border-slate-600 hover:bg-slate-600';
+      ? 'bg-slate-100 border-slate-200 hover:bg-slate-200'
+      : 'bg-slate-50 border-slate-200 hover:bg-slate-100';
   } else if (count > 0 && dominantBU && isCurrentMonth) {
     colorClass = BU_BG_COLORS[dominantBU];
   } else {
     colorClass = isWeekend
-      ? 'bg-slate-800/40 border-slate-600 hover:bg-slate-700/50'
-      : 'bg-slate-800 border-slate-700 hover:bg-slate-700';
+      ? 'bg-slate-100 border-slate-200 hover:bg-slate-200'
+      : 'bg-white border-slate-200 hover:bg-slate-100';
   }
 
-  const textClass = count > 0 && dominantBU && isCurrentMonth ? BU_TEXT_COLORS[dominantBU] : 'text-slate-400';
+  const textClass = count > 0 && dominantBU && isCurrentMonth ? BU_TEXT_COLORS[dominantBU] : 'text-slate-500';
 
   const droppableId = date ? `day-${date.toISOString().split('T')[0]}` : 'invalid-day';
 
@@ -124,7 +124,7 @@ export const DayCell: React.FC<DayCellProps> = ({
           onClick={handleClick}
         >
           {/* Day number */}
-          <span className={`text-xs font-bold ${isFutureDay ? 'text-slate-300' : 'text-slate-400'} absolute top-1 left-1`}>{day}</span>
+          <span className={`text-xs font-bold ${isFutureDay ? 'text-slate-400' : 'text-slate-500'} absolute top-1 left-1`}>{day}</span>
 
           {/* Indicator for notes (visible in normal mode too) */}
           {!kanbanMode && hasNotes && isCurrentMonth && (

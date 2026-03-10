@@ -16,10 +16,10 @@ const CustomTooltip = ({ active, payload }: any) => {
         if (pt.isRegression) return null;
 
         return (
-            <div className="bg-slate-800 border border-slate-700 p-2 rounded shadow-lg text-xs">
-                <p className="text-slate-400 mb-1">{pt.displayDate}</p>
-                <p className="text-slate-200">Spend: <strong>R$ {pt.spendTotal.toLocaleString('pt-BR')}</strong></p>
-                <p className="text-slate-200">Cartões: <strong>{pt.cards}</strong></p>
+            <div className="bg-white border border-slate-200 p-2 rounded shadow-lg text-xs">
+                <p className="text-slate-500 mb-1">{pt.displayDate}</p>
+                <p className="text-slate-900">Spend: <strong>R$ {pt.spendTotal.toLocaleString('pt-BR')}</strong></p>
+                <p className="text-slate-900">Cartões: <strong>{pt.cards}</strong></p>
             </div>
         );
     }
@@ -50,8 +50,8 @@ export const ScatterRegression: React.FC<Props> = ({ data, stats }) => {
     }, [data, stats]);
 
     return (
-        <div className="h-[350px] w-full bg-slate-900/50 p-4 rounded-xl border border-slate-800 relative">
-            <h4 className="text-slate-100 font-bold mb-4 text-sm">Dispersão + Regressão Linear</h4>
+        <div className="h-[350px] w-full bg-white p-4 rounded-xl border border-slate-200 relative">
+            <h4 className="text-slate-900 font-bold mb-4 text-sm">Dispersão + Regressão Linear</h4>
 
             {/* R^2 Display */}
             {stats && (
@@ -68,7 +68,7 @@ export const ScatterRegression: React.FC<Props> = ({ data, stats }) => {
 
             <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.3} />
                     <XAxis
                         dataKey="spendTotal"
                         type="number"
@@ -95,10 +95,10 @@ export const ScatterRegression: React.FC<Props> = ({ data, stats }) => {
                             if (active && payload && payload.length) {
                                 const data = payload[0].payload;
                                 return (
-                                    <div className="bg-slate-900 border border-slate-700 p-3 rounded shadow-lg text-xs">
-                                        <p className="border-b border-slate-700 pb-1 mb-1 font-bold text-slate-200">{data.date}</p>
-                                        <p className="text-blue-400">Spend: {data.x.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                                        <p className="text-green-400">Cartões B2C (Lag): {data.y}</p>
+                                    <div className="bg-white border border-slate-200 p-3 rounded shadow-lg text-xs">
+                                        <p className="border-b border-slate-200 pb-1 mb-1 font-bold text-slate-900">{data.date}</p>
+                                        <p className="text-blue-600">Spend: {data.x.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                        <p className="text-emerald-600">Cartões B2C (Lag): {data.y}</p>
                                         <p className="text-slate-500 italic mt-1 scale-90 origin-left">Resultados de {data.y} dias depois</p>
                                     </div>
                                 );

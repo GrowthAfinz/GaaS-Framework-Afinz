@@ -10,18 +10,18 @@ export const MediaCorrelationCharts: React.FC = () => {
     if (data.length === 0) {
         return (
             <div className="flex flex-col gap-6 mt-12 mb-12 animate-fade-in-up">
-                <div className="h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent w-full mb-4"></div>
+                <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent w-full mb-4"></div>
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                             <BarChart2 className="text-purple-500" />
                             Análise de Influência de Mídia
                         </h3>
                     </div>
                 </div>
-                <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-xl p-8 text-center h-40 flex flex-col items-center justify-center">
-                    <Info size={32} className="text-slate-600 mb-3" />
-                    <p className="text-slate-400 font-medium">Nenhum dado encontrado.</p>
+                <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-8 text-center h-40 flex flex-col items-center justify-center">
+                    <Info size={32} className="text-slate-400 mb-3" />
+                    <p className="text-slate-500 font-medium">Nenhum dado encontrado.</p>
                     <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                         Verifique se escolheu um período com dados de "Mídia Paga" e "B2C".
                     </p>
@@ -33,15 +33,15 @@ export const MediaCorrelationCharts: React.FC = () => {
     return (
         <div className="flex flex-col gap-6 mt-12 mb-12 animate-fade-in-up">
             {/* Divider */}
-            <div className="h-px bg-gradient-to-r from-transparent via-slate-700 to-transparent w-full mb-4"></div>
+            <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent w-full mb-4"></div>
 
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                    <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                         <BarChart2 className="text-purple-500" />
                         Media Analytics
                     </h3>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <p className="text-slate-500 text-sm mt-1">
                         Acompanhamento de ROI (CPA Efetivo) e eficiência de canais (Meta vs Google) com correção temporal (Lag).
                     </p>
                 </div>

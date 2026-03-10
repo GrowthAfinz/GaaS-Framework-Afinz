@@ -100,21 +100,21 @@ export const MediaKPIGrid: React.FC<MediaKPIGridProps> = ({ stats, data }) => {
         <div className="flex flex-col gap-4 mb-6">
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {cards.map((c, i) => (
-                    <div key={i} className="bg-slate-800/50 rounded-xl border border-slate-700 hover:border-indigo-500/30 transition-all relative group overflow-hidden h-32 flex flex-col justify-between">
+                    <div key={i} className="bg-white rounded-xl border border-slate-200 hover:border-indigo-500/30 transition-all relative group overflow-hidden h-32 flex flex-col justify-between">
                         <div className="flex justify-between items-start p-4 z-10 relative">
                             <div className="flex items-center gap-1.5">
                                 <c.icon size={16} style={{ color: c.color }} />
-                                <span className="text-slate-400 text-sm font-medium">{c.label}</span>
+                                <span className="text-slate-500 text-sm font-medium">{c.label}</span>
                                 <div className="group/tip relative">
-                                    <Info size={12} className="cursor-help opacity-40 hover:opacity-100 text-slate-300 transition-opacity" />
-                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tip:block bg-slate-900 border border-slate-700 text-xs text-slate-200 p-2 rounded w-48 shadow-xl z-50 pointer-events-none">
+                                    <Info size={12} className="cursor-help opacity-40 hover:opacity-100 text-slate-700 transition-opacity" />
+                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tip:block bg-white border border-slate-200 text-xs text-slate-900 p-2 rounded w-48 shadow-xl z-50 pointer-events-none">
                                         {c.tooltip}
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <div className="px-4 z-10 relative">
-                            <div className="text-2xl font-bold text-white mb-0.5" style={{ color: c.chartColor }}>{c.value}</div>
+                            <div className="text-2xl font-bold mb-0.5" style={{ color: c.chartColor }}>{c.value}</div>
                             <div className="text-[10px] text-slate-500">{c.sub}</div>
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 h-16 opacity-20 pointer-events-none z-0">
@@ -136,26 +136,26 @@ export const MediaKPIGrid: React.FC<MediaKPIGridProps> = ({ stats, data }) => {
 
             {/* Channel Efficiency Footer */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50 flex items-center justify-between px-4">
+                <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 flex items-center justify-between px-4">
                     <div className="flex items-center gap-2">
-                        <Smartphone size={16} className="text-indigo-400" />
-                        <span className="text-slate-300 font-medium">Meta Ads</span>
+                        <Smartphone size={16} className="text-indigo-600" />
+                        <span className="text-slate-700 font-medium">Meta Ads</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                         <span className="text-slate-500">CPA Pixel:</span>
-                        <span className={`font-bold ${cpaMetaPixel > 350 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        <span className={`font-bold ${cpaMetaPixel > 350 ? 'text-red-600' : 'text-emerald-600'}`}>
                             {cpaMetaPixel > 0 ? formatBRL(cpaMetaPixel) : 'N/A'}
                         </span>
                     </div>
                 </div>
-                <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700/50 flex items-center justify-between px-4">
+                <div className="bg-slate-100 p-3 rounded-lg border border-slate-200 flex items-center justify-between px-4">
                     <div className="flex items-center gap-2">
-                        <Search size={16} className="text-blue-400" />
-                        <span className="text-slate-300 font-medium">Google Ads</span>
+                        <Search size={16} className="text-blue-600" />
+                        <span className="text-slate-700 font-medium">Google Ads</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
                         <span className="text-slate-500">CPA Pixel:</span>
-                        <span className={`font-bold ${cpaGooglePixel > 350 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        <span className={`font-bold ${cpaGooglePixel > 350 ? 'text-red-600' : 'text-emerald-600'}`}>
                             {cpaGooglePixel > 0 ? formatBRL(cpaGooglePixel) : 'N/A'}
                         </span>
                     </div>

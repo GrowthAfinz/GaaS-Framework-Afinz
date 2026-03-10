@@ -12,8 +12,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         const cards = payload.find((p: any) => p.dataKey === 'cumulativeCards');
 
         return (
-            <div className="bg-slate-800 border border-slate-700 p-3 rounded-lg shadow-xl">
-                <p className="text-slate-300 text-xs mb-1">{label}</p>
+            <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-xl">
+                <p className="text-slate-700 text-xs mb-1">{label}</p>
                 {spend && (
                     <p className="text-[#0066CC] font-bold text-sm">
                         Spend: {spend.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -32,15 +32,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export const DualAxisTimeline: React.FC<Props> = ({ data }) => {
     return (
-        <div className="h-[350px] w-full bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-            <h4 className="text-slate-100 font-bold mb-4 text-sm flex items-center gap-2">
+        <div className="h-[350px] w-full bg-white p-4 rounded-xl border border-slate-200">
+            <h4 className="text-slate-900 font-bold mb-4 text-sm flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#0066CC]"></span> Spend Acumulado
                 <span className="text-slate-500">vs</span>
                 <span className="w-2 h-2 rounded-full bg-[#00AA44]"></span> Cartões Acumulados
             </h4>
             <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.3} vertical={false} />
                     <XAxis
                         dataKey="displayDate"
                         stroke="#64748b"

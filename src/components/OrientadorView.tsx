@@ -88,21 +88,21 @@ export const OrientadorView: React.FC = () => {
     }, [recommendations, viewSettings.filtrosGlobais, sortBy, selectedBUs]);
 
     return (
-        <div className="flex flex-col h-full bg-slate-950 p-6 overflow-hidden">
+        <div className="flex flex-col h-full bg-slate-50 p-6 overflow-hidden">
             <div className="flex items-center justify-between mb-6 shrink-0">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                         <Lightbulb className="text-amber-400" />
                         Orientador Estratégico
                     </h2>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <p className="text-slate-500 text-sm mt-1">
                         Recomendações baseadas no histórico de {filteredActivitiesCount} campanhas.
                     </p>
                 </div>
 
                 <div className="flex items-center gap-4">
                     {/* Sorting Controls */}
-                    <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200">
                         <span className="text-xs text-slate-500 px-2 flex items-center gap-1">
                             <ArrowUpDown size={12} /> Ordenar:
                         </span>
@@ -118,7 +118,7 @@ export const OrientadorView: React.FC = () => {
                                 onClick={() => setSortBy(opt.id as SortOption)}
                                 className={`px-3 py-1 text-xs font-medium rounded transition flex items-center gap-1 ${sortBy === opt.id
                                     ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                                     }`}
                             >
                                 {opt.label}
@@ -126,19 +126,19 @@ export const OrientadorView: React.FC = () => {
                                     <Tooltip
                                         content={
                                             <div className="w-48">
-                                                <p className="text-[10px] font-bold text-slate-300 mb-2 border-b border-slate-700 pb-1">Cálculo do Score</p>
-                                                <div className="space-y-1 text-[10px] text-slate-400">
+                                                <p className="text-[10px] font-bold text-slate-600 mb-2 border-b border-slate-200 pb-1">Cálculo do Score</p>
+                                                <div className="space-y-1 text-[10px] text-slate-500">
                                                     <div className="flex justify-between">
                                                         <span>💰 CAC</span>
-                                                        <span className="text-slate-200">40%</span>
+                                                        <span className="text-slate-700">40%</span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span>📈 Conversão</span>
-                                                        <span className="text-slate-200">40%</span>
+                                                        <span className="text-slate-700">40%</span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span>📊 Volume</span>
-                                                        <span className="text-slate-200">20%</span>
+                                                        <span className="text-slate-700">20%</span>
                                                     </div>
                                                 </div>
                                                 <p className="text-[9px] text-slate-500 mt-2 italic">
@@ -154,7 +154,7 @@ export const OrientadorView: React.FC = () => {
                         ))}
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-900 px-3 py-1.5 rounded border border-slate-800">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-white px-3 py-1.5 rounded border border-slate-200">
                         <Filter size={12} />
                         Filtros Globais Ativos
                     </div>

@@ -92,7 +92,7 @@ export const ProductOfferBlock: React.FC = () => {
                     </div>
 
                     {/* Divisor - OFERTAS */}
-                    <div className="border-t border-slate-700/50 pt-2 space-y-2">
+<div className="border-t border-slate-200 pt-2 space-y-2">
                         {/* Oferta Principal - Combobox */}
                         <div>
                             <Label label="Oferta" required tooltip="Estratégia principal de aquisição. Padrão (sem custo), Vibe (R$2), Limite (R$1), Anuidade (R$76,50)" />

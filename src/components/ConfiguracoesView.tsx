@@ -106,14 +106,14 @@ const VersionManager: React.FC = () => {
     };
 
     return (
-        <div className="border border-slate-700/50 bg-slate-800/30 rounded-lg overflow-hidden backdrop-blur-sm transition-all hover:border-blue-500/30">
-            <div className="bg-slate-800/50 p-4 flex justify-between items-center border-b border-slate-700/50">
+        <div className="border border-slate-200 bg-white rounded-lg overflow-hidden transition-all hover:border-blue-500/30">
+            <div className="bg-slate-50 p-4 flex justify-between items-center border-b border-slate-200">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-500">
                         <Database size={18} />
                     </div>
                     <div>
-                        <span className="font-semibold text-slate-200 text-sm block">Versões do Framework</span>
+                        <span className="font-semibold text-slate-700 text-sm block">Versões do Framework</span>
                         <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">CSV</span>
                     </div>
                 </div>
@@ -132,7 +132,7 @@ const VersionManager: React.FC = () => {
                 </div>
             </div>
 
-            <div className="p-2 max-h-64 overflow-y-auto min-h-[120px] scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+            <div className="p-2 max-h-64 overflow-y-auto min-h-[120px] scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
                 {loading && !versions.length ? (
                     <div className="flex flex-col items-center justify-center py-8 text-slate-500 gap-2">
                         <Loader2 className="animate-spin" />
@@ -143,21 +143,21 @@ const VersionManager: React.FC = () => {
                         <UploadCloud size={24} className="opacity-20" />
                         <p className="text-xs italic">Nenhuma versão encontrada.</p>
                         {msg?.type === 'error' && (
-                            <p className="text-[10px] text-red-400 bg-red-900/20 px-2 py-1 rounded max-w-[200px] text-center">{msg.text}</p>
+                            <p className="text-[10px] text-red-500 bg-red-500/10 px-2 py-1 rounded max-w-[200px] text-center">{msg.text}</p>
                         )}
                     </div>
                 ) : (
                     <div className="space-y-1">
                         {versions.map((v: any) => (
-                            <div key={v.id} className={`flex items-center justify-between p-3 rounded-lg group transition-colors border ${v.is_active ? 'bg-emerald-500/10 border-emerald-500/30' : 'hover:bg-slate-700/30 border-transparent hover:border-slate-700'}`}>
+                            <div key={v.id} className={`flex items-center justify-between p-3 rounded-lg group transition-colors border ${v.is_active ? 'bg-emerald-500/10 border-emerald-500/30' : 'hover:bg-slate-50 border-transparent hover:border-slate-200'}`}>
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                    <FileText size={16} className={`${v.is_active ? 'text-emerald-400' : 'text-slate-500'} flex-shrink-0`} />
+                                    <FileText size={16} className={`${v.is_active ? 'text-emerald-500' : 'text-slate-400'} flex-shrink-0`} />
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <p className={`text-sm font-medium truncate max-w-[220px] ${v.is_active ? 'text-emerald-300' : 'text-slate-300'}`} title={v.filename}>
+                                            <p className={`text-sm font-medium truncate max-w-[220px] ${v.is_active ? 'text-emerald-600' : 'text-slate-700'}`} title={v.filename}>
                                                 {v.filename}
                                             </p>
-                                            {v.is_active && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold uppercase">Ativo</span>}
+                                            {v.is_active && <span className="text-[10px] bg-emerald-500/20 text-emerald-600 px-1.5 py-0.5 rounded font-bold uppercase">Ativo</span>}
                                         </div>
                                         <div className="flex items-center gap-2 text-[10px] text-slate-500">
                                             <span>{new Date(v.created_at).toLocaleString('pt-BR')}</span>
@@ -171,14 +171,14 @@ const VersionManager: React.FC = () => {
                                         <button
                                             onClick={() => handleActivate(v)}
                                             disabled={activating === v.id}
-                                            className="px-2 py-1 text-[10px] bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded border border-blue-500/20 transition-colors uppercase font-bold tracking-wider"
+                                            className="px-2 py-1 text-[10px] bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white rounded border border-blue-500/20 transition-colors uppercase font-bold tracking-wider"
                                         >
                                             {activating === v.id ? 'Ativando...' : 'Ativar'}
                                         </button>
                                     )}
                                     <button
                                         onClick={() => handleDelete(v)}
-                                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
                                         title="Excluir"
                                     >
                                         <Trash2 size={14} />
@@ -190,7 +190,7 @@ const VersionManager: React.FC = () => {
                 )}
             </div>
             {msg && (
-                <div className={`${msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'} text-xs px-4 py-2 flex items-center gap-2 border-t`}>
+                <div className={`${msg.type === 'success' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'} text-xs px-4 py-2 flex items-center gap-2 border-t`}>
                     {msg.type === 'success' ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
                     {msg.text}
                 </div>
@@ -318,14 +318,14 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
     };
 
     return (
-        <div className="border border-slate-700/50 bg-slate-800/30 rounded-lg overflow-hidden backdrop-blur-sm transition-all hover:border-blue-500/30">
-            <div className="bg-slate-800/50 p-4 flex justify-between items-center border-b border-slate-700/50">
+        <div className="border border-slate-200 bg-white rounded-lg overflow-hidden transition-all hover:border-blue-500/30">
+            <div className="bg-slate-50 p-4 flex justify-between items-center border-b border-slate-200">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
+                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
                         <Database size={18} />
                     </div>
                     <div>
-                        <span className="font-semibold text-slate-200 text-sm block">{title}</span>
+                        <span className="font-semibold text-slate-700 text-sm block">{title}</span>
                         <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{accept.replace(/\./g, '').toUpperCase()}</span>
                     </div>
                 </div>
@@ -344,7 +344,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                 </div>
             </div>
 
-            <div className="p-2 max-h-56 overflow-y-auto min-h-[120px] scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+            <div className="p-2 max-h-56 overflow-y-auto min-h-[120px] scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
                 {loading && !files.length ? (
                     <div className="flex flex-col items-center justify-center py-8 text-slate-500 gap-2">
                         <Loader2 className="animate-spin" />
@@ -355,7 +355,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                         <UploadCloud size={24} className="opacity-20" />
                         <p className="text-xs italic">Nenhum arquivo na nuvem.</p>
                         {msg?.type === 'error' && (
-                            <p className="text-[10px] text-red-400 bg-red-900/20 px-2 py-1 rounded max-w-[200px] text-center">
+                            <p className="text-[10px] text-red-500 bg-red-500/10 px-2 py-1 rounded max-w-[200px] text-center">
                                 {msg.text}
                             </p>
                         )}
@@ -363,11 +363,11 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                 ) : (
                     <div className="space-y-1">
                         {files.map((f: any) => (
-                            <div key={f.id} className="flex items-center justify-between p-3 hover:bg-slate-700/30 rounded-lg group transition-colors border border-transparent hover:border-slate-700">
+                            <div key={f.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg group transition-colors border border-transparent hover:border-slate-200">
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                    <FileText size={16} className="text-slate-500 group-hover:text-blue-400 transition-colors flex-shrink-0" />
+                                    <FileText size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors flex-shrink-0" />
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium text-slate-300 truncate max-w-[220px] group-hover:text-white transition-colors" title={f.name}>
+                                        <p className="text-sm font-medium text-slate-700 truncate max-w-[220px] group-hover:text-slate-900 transition-colors" title={f.name}>
                                             {f.name}
                                         </p>
                                         <div className="flex items-center gap-2 text-[10px] text-slate-500">
@@ -381,7 +381,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                                     <button
                                         onClick={() => handleRestore(f.name)}
                                         disabled={restoring}
-                                        className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors tooltip-trigger"
+                                        className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors tooltip-trigger"
                                         title="Restaurar e Aplicar"
                                     >
                                         <RefreshCw size={16} className={restoring ? 'animate-spin' : ''} />
@@ -400,13 +400,13 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                 )}
             </div>
             {msg && msg.type === 'success' && (
-                <div className="bg-emerald-500/10 text-emerald-400 text-xs px-4 py-2 flex items-center gap-2 border-t border-emerald-500/20">
+                <div className="bg-emerald-500/10 text-emerald-600 text-xs px-4 py-2 flex items-center gap-2 border-t border-emerald-500/20">
                     <CheckCircle size={12} />
                     {msg.text}
                 </div>
             )}
             {msg && msg.type === 'error' && files.length > 0 && (
-                <div className="bg-red-500/10 text-red-400 text-xs px-4 py-2 flex items-center gap-2 border-t border-red-500/20">
+                <div className="bg-red-500/10 text-red-500 text-xs px-4 py-2 flex items-center gap-2 border-t border-red-500/20">
                     <AlertCircle size={12} />
                     {msg.text}
                 </div>
@@ -439,21 +439,21 @@ export const ConfiguracoesView: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="h-full w-full flex items-center justify-center bg-slate-900"><Loader2 className="animate-spin text-blue-500 w-8 h-8" /></div>;
+        return <div className="h-full w-full flex items-center justify-center bg-white"><Loader2 className="animate-spin text-blue-500 w-8 h-8" /></div>;
     }
 
     // --- LOGGED OUT STATE ---
     // Should depend on App guard, but as fallback:
     if (!user) {
         return (
-            <div className="min-h-full bg-slate-900 flex items-center justify-center p-4">
-                <div className="max-w-md w-full space-y-8 bg-slate-800/50 p-8 rounded-2xl border border-slate-700/50 backdrop-blur-sm shadow-2xl">
+            <div className="min-h-full bg-slate-50 flex items-center justify-center p-4">
+                <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl">
                     <div className="text-center">
-                        <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 mx-auto mb-4">
+                        <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-500 mx-auto mb-4">
                             <ShieldCheck size={32} />
                         </div>
-                        <h2 className="text-2xl font-bold text-white mb-2">Acesso Restrito</h2>
-                        <p className="text-slate-400 text-sm">Sua sessão expirou ou você não está autenticado.</p>
+                        <h2 className="text-2xl font-bold text-slate-900 mb-2">Acesso Restrito</h2>
+                        <p className="text-slate-500 text-sm">Sua sessão expirou ou você não está autenticado.</p>
                     </div>
 
                     <div className="mt-8 text-center text-sm text-slate-500">
@@ -466,13 +466,13 @@ export const ConfiguracoesView: React.FC = () => {
 
     // --- LOGGED IN STATE ---
     return (
-        <div className="min-h-full bg-slate-900 text-slate-200 p-8 space-y-8 animate-fade-in pb-24">
+        <div className="min-h-full bg-slate-50 text-slate-800 p-8 space-y-8 animate-fade-in pb-24">
             <div className="max-w-5xl mx-auto space-y-8">
 
-                <div className="flex justify-between items-end border-b border-slate-800 pb-6">
+                <div className="flex justify-between items-end border-b border-slate-200 pb-6">
                     <div>
-                        <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Configurações</h2>
-                        <p className="text-slate-400 text-lg">Central de controle e sincronização.</p>
+                        <h2 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">Configurações</h2>
+                        <p className="text-slate-500 text-lg">Central de controle e sincronização.</p>
                     </div>
 
                 </div>
@@ -481,21 +481,21 @@ export const ConfiguracoesView: React.FC = () => {
                     {/* Left Column: Profile & Settings */}
                     <div className="space-y-6">
                         {/* Profile Section */}
-                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 shadow-xl backdrop-blur-sm">
+                        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl">
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
                                     <User size={28} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-bold text-white truncate" title={user.email}>{user.email?.split('@')[0]}</h3>
-                                    <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                                    <h3 className="text-lg font-bold text-slate-900 truncate" title={user.email}>{user.email?.split('@')[0]}</h3>
+                                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
                                 </div>
                             </div>
 
                             <div className="space-y-3 mb-6">
-                                <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-700/50 flex justify-between items-center group">
+                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center group">
                                     <span className="text-xs font-bold text-slate-500 uppercase">ID</span>
-                                    <code className="text-xs text-slate-300 font-mono bg-black/20 px-2 py-0.5 rounded group-hover:text-white transition-colors">
+                                    <code className="text-xs text-slate-600 font-mono bg-slate-100 px-2 py-0.5 rounded group-hover:text-slate-900 transition-colors">
                                         {user.id.substring(0, 8)}...
                                     </code>
                                 </div>
@@ -503,7 +503,7 @@ export const ConfiguracoesView: React.FC = () => {
 
                             <button
                                 onClick={signOut}
-                                className="w-full flex items-center justify-center gap-2 text-red-400 hover:text-white hover:bg-red-500 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl transition-all text-sm font-bold"
+                                className="w-full flex items-center justify-center gap-2 text-red-500 hover:text-white hover:bg-red-500 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl transition-all text-sm font-bold"
                             >
                                 <LogOut size={16} />
                                 Desconectar
@@ -511,14 +511,14 @@ export const ConfiguracoesView: React.FC = () => {
                         </div>
 
                         {/* Visual Settings */}
-                        <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 shadow-xl opacity-60 pointer-events-none">
-                            <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 tracking-wider">Aparência</h3>
-                            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-slate-700/50">
+                        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl opacity-60 pointer-events-none">
+                            <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 tracking-wider">Aparência</h3>
+                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-500">
                                         <Moon size={18} />
                                     </div>
-                                    <span className="text-slate-300 font-medium text-sm">Modo Escuro</span>
+                                    <span className="text-slate-700 font-medium text-sm">Modo Escuro</span>
                                 </div>
                                 <div className="w-10 h-5 bg-blue-600 rounded-full relative">
                                     <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm" />
@@ -530,12 +530,12 @@ export const ConfiguracoesView: React.FC = () => {
                     {/* Right Column: Content Area (Spans 2 cols) */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Tabs Navigation */}
-                        <div className="flex items-center gap-2 border-b border-slate-700/50">
+                        <div className="flex items-center gap-2 border-b border-slate-200">
                             <button
                                 onClick={() => setActiveTab('goals')}
                                 className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'goals'
-                                    ? 'border-blue-500 text-blue-400'
-                                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                                    ? 'border-blue-500 text-blue-500'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
                                     }`}
                             >
                                 Gestão de Metas
@@ -543,8 +543,8 @@ export const ConfiguracoesView: React.FC = () => {
                             <button
                                 onClick={() => setActiveTab('database')}
                                 className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'database'
-                                    ? 'border-blue-500 text-blue-400'
-                                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                                    ? 'border-blue-500 text-blue-500'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
                                     }`}
                             >
                                 Gestão de Banco de Dados
@@ -553,8 +553,8 @@ export const ConfiguracoesView: React.FC = () => {
                                 <button
                                     onClick={() => setActiveTab('users')}
                                     className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'users'
-                                        ? 'border-blue-500 text-blue-400'
-                                        : 'border-transparent text-slate-400 hover:text-slate-200'
+                                        ? 'border-blue-500 text-blue-500'
+                                        : 'border-transparent text-slate-500 hover:text-slate-800'
                                         }`}
                                 >
                                     <Users size={16} />
@@ -570,24 +570,24 @@ export const ConfiguracoesView: React.FC = () => {
                             )}
 
                             {activeTab === 'users' && (
-                                <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-8 shadow-xl backdrop-blur-sm">
+                                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xl">
                                     <UserManagementPanel />
                                 </div>
                             )}
 
                             {activeTab === 'database' && (
-                                <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-8 shadow-xl backdrop-blur-sm relative overflow-hidden">
+                                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xl relative overflow-hidden">
                                     {/* Background subtle effect */}
                                     <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
 
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 relative z-10">
                                         <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-blue-500/20 rounded-xl text-blue-400 shadow-inner">
+                                            <div className="p-3 bg-blue-500/20 rounded-xl text-blue-500 shadow-inner">
                                                 <Database size={24} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-bold text-white">Banco de Dados & Arquivos</h3>
-                                                <p className="text-sm text-slate-400">Importação e sincronização das tabelas do sistema.</p>
+                                                <h3 className="text-xl font-bold text-slate-900">Banco de Dados & Arquivos</h3>
+                                                <p className="text-sm text-slate-500">Importação e sincronização das tabelas do sistema.</p>
                                             </div>
                                         </div>
                                     </div>

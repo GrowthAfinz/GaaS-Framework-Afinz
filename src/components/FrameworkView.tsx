@@ -16,9 +16,9 @@ import { VersionHistoryDrawer } from './VersionHistoryDrawer';
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const BU_CONFIG: Record<string, { dot: string; text: string; folder: string }> = {
-    'B2C': { dot: 'bg-blue-400', text: 'text-blue-300', folder: 'text-blue-400' },
-    'B2B2C': { dot: 'bg-emerald-400', text: 'text-emerald-300', folder: 'text-emerald-400' },
-    'Plurix': { dot: 'bg-purple-400', text: 'text-purple-300', folder: 'text-purple-400' },
+    'B2C': { dot: 'bg-blue-400', text: 'text-blue-600', folder: 'text-blue-500' },
+    'B2B2C': { dot: 'bg-emerald-400', text: 'text-emerald-600', folder: 'text-emerald-500' },
+    'Plurix': { dot: 'bg-purple-400', text: 'text-purple-600', folder: 'text-purple-500' },
 };
 
 const CANAL_EMOJI: Record<string, string> = {
@@ -95,7 +95,7 @@ function Highlight({ text, term }: { text: string; term: string }) {
     return (
         <>
             {str.slice(0, idx)}
-            <mark className="bg-amber-400/30 text-amber-200 rounded-sm">{str.slice(idx, idx + term.length)}</mark>
+            <mark className="bg-amber-400/30 text-amber-700 rounded-sm">{str.slice(idx, idx + term.length)}</mark>
             {str.slice(idx + term.length)}
         </>
     );
@@ -103,22 +103,22 @@ function Highlight({ text, term }: { text: string; term: string }) {
 
 function Cell({ value }: { value: any }) {
     if (value === undefined || value === null || value === '' || value === 'N/A') {
-        return <span className="text-slate-700 font-normal">—</span>;
+        return <span className="text-slate-300 font-normal">—</span>;
     }
-    return <span className="text-slate-300 font-normal">{value}</span>;
+    return <span className="text-slate-600 font-normal">{value}</span>;
 }
 
 function StatusBadge({ value }: { value: string }) {
     const v = String(value ?? '').toLowerCase().trim();
     if (v === 'sim' || v === 'enviado' || v === 'realizado')
-        return <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Enviado</span>;
+        return <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">Enviado</span>;
     if (v === 'não' || v === 'nao' || v === 'pendente' || v === 'scheduled')
-        return <span className="px-2 py-0.5 rounded-full text-xs bg-slate-700 text-slate-400 border border-slate-600">Pendente</span>;
+        return <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-500 border border-slate-200">Pendente</span>;
     if (v === 'rascunho')
-        return <span className="px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-300 border border-amber-500/30">Rascunho</span>;
+        return <span className="px-2 py-0.5 rounded-full text-xs bg-amber-500/15 text-amber-600 border border-amber-500/30">Rascunho</span>;
     if (v === 'em andamento')
-        return <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/15 text-blue-300 border border-blue-500/30">Em andamento</span>;
-    return <span className="text-slate-400 text-xs">{value || '—'}</span>;
+        return <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/15 text-blue-600 border border-blue-500/30">Em andamento</span>;
+    return <span className="text-slate-500 text-xs">{value || '—'}</span>;
 }
 
 interface SelectedNode { bu?: string; segmento?: string; canal?: string }
@@ -385,7 +385,7 @@ export const FrameworkView: React.FC = () => {
 
     if (frameworkData.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-3">
+            <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-3">
                 <AlertCircle size={48} className="opacity-40" />
                 <p className="text-sm">Nenhum dado carregado. Faça upload do CSV na tela inicial.</p>
             </div>
@@ -395,7 +395,7 @@ export const FrameworkView: React.FC = () => {
     // ─── Render ─────────────────────────────────────────────────────────────
 
     return (
-        <div className="flex flex-col h-full bg-slate-900 overflow-hidden">
+        <div className="flex flex-col h-full bg-white overflow-hidden">
             <SaveVersionModal
                 isOpen={isSaveModalOpen}
                 onClose={() => setIsSaveModalOpen(false)}
@@ -414,7 +414,7 @@ export const FrameworkView: React.FC = () => {
             />
 
             {/* ── Toolbar ───────────────────────────────────────────────── */}
-            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-700 bg-slate-800/60 shrink-0">
+            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-200 bg-white shrink-0">
                 {/* Search */}
                 <div className="relative flex-1 max-w-sm group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-blue-400 transition" />
@@ -423,11 +423,11 @@ export const FrameworkView: React.FC = () => {
                         placeholder="Buscar — abre no conteúdo certo..."
                         value={searchTerm}
                         onChange={e => { setSearchTerm(e.target.value); setSelected({}); }}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-8 py-1.5 text-sm text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-8 py-1.5 text-sm text-slate-800 focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400 outline-none transition"
                     />
                     {searchTerm && (
                         <button onClick={() => { setSearchTerm(''); setSelected({}); }}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                             <X size={13} />
                         </button>
                     )}
@@ -435,29 +435,29 @@ export const FrameworkView: React.FC = () => {
 
                 {/* Search hit count pill */}
                 {searchTerm && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/25 shrink-0">
+                    <span className="text-xs px-2 py-1 rounded-full bg-blue-500/15 text-blue-600 border border-blue-500/25 shrink-0">
                         {totalCount} resultado{totalCount !== 1 ? 's' : ''}
                     </span>
                 )}
 
                 <div className="flex items-center gap-2 ml-auto">
                     {currentVersion && (
-                        <span className="hidden md:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">
+                        <span className="hidden md:flex items-center gap-1.5 text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
                             <Archive size={11} />
                             <span className="max-w-[130px] truncate">{currentVersion.name}</span>
                         </span>
                     )}
                     <button onClick={() => setIsHistoryOpen(true)}
-                        className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-lg transition" title="Histórico de Versões">
+                        className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition" title="Histórico de Versões">
                         <History size={17} />
                     </button>
                     {Object.keys(edits).length > 0 && (
                         <>
-                            <span className="text-xs text-amber-400 bg-amber-900/25 border border-amber-500/30 px-2 py-1 rounded">
+                            <span className="text-xs text-amber-600 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded">
                                 {Object.keys(edits).length} edições
                             </span>
                             <button onClick={handleQuickSave}
-                                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition">
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition">
                                 Aplicar
                             </button>
                         </>
@@ -467,7 +467,7 @@ export const FrameworkView: React.FC = () => {
                         <Save size={14} /> Salvar Versão
                     </button>
                     <button onClick={handleExport}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition">
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition">
                         <Download size={14} /> Exportar
                     </button>
                 </div>
@@ -477,8 +477,8 @@ export const FrameworkView: React.FC = () => {
             <div className="flex flex-1 overflow-hidden">
 
                 {/* ── Left: Explorer Tree ───────────────────────────── */}
-                <aside className="w-60 shrink-0 border-r border-slate-700 bg-slate-900 flex flex-col overflow-hidden">
-                    <div className="px-3 py-2 border-b border-slate-800 flex items-center gap-2 text-xs text-slate-500 font-medium uppercase tracking-wider">
+                <aside className="w-60 shrink-0 border-r border-slate-200 bg-slate-50 flex flex-col overflow-hidden">
+                    <div className="px-3 py-2 border-b border-slate-200 flex items-center gap-2 text-xs text-slate-500 font-medium uppercase tracking-wider">
                         <Database size={12} />
                         Explorador
                     </div>
@@ -487,11 +487,11 @@ export const FrameworkView: React.FC = () => {
                         <button
                             onClick={() => { selectNode(); setSearchTerm(''); }}
                             className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition rounded-none ${!selected.bu && !searchTerm
-                                ? 'bg-blue-600/20 text-blue-200'
-                                : 'text-slate-300 hover:bg-slate-800'
+                                ? 'bg-blue-600/20 text-blue-700'
+                                : 'text-slate-600 hover:bg-slate-100'
                                 }`}
                         >
-                            <FolderOpen size={15} className="text-amber-400 shrink-0" />
+                            <FolderOpen size={15} className="text-amber-500 shrink-0" />
                             <span className="flex-1 text-left truncate font-medium">Todos os Disparos</span>
                             <span className="text-xs text-slate-500">{periodData.length}</span>
                         </button>
@@ -514,11 +514,11 @@ export const FrameworkView: React.FC = () => {
                                             if (searchTerm) setSearchTerm('');
                                         }}
                                         className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition ${selected.bu === bu && !selected.segmento
-                                            ? 'bg-blue-600/20 text-blue-200'
-                                            : 'text-slate-300 hover:bg-slate-800'
+                                            ? 'bg-blue-600/20 text-blue-700'
+                                            : 'text-slate-600 hover:bg-slate-100'
                                             }`}
                                     >
-                                        <span className="text-slate-500 shrink-0">
+                                        <span className="text-slate-400 shrink-0">
                                             {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                                         </span>
                                         {isExpanded
@@ -526,7 +526,7 @@ export const FrameworkView: React.FC = () => {
                                             : <Folder size={14} className={`${buCfg.folder} shrink-0`} />
                                         }
                                         <span className={`flex-1 text-left truncate font-semibold ${buCfg.text}`}>{bu}</span>
-                                        <span className={`text-xs ${searchTerm && hasMatch ? 'text-amber-400 font-semibold' : 'text-slate-500'}`}>{count}</span>
+                                        <span className={`text-xs ${searchTerm && hasMatch ? 'text-amber-500 font-semibold' : 'text-slate-400'}`}>{count}</span>
                                     </button>
 
                                     {/* Segmento children */}
@@ -544,17 +544,17 @@ export const FrameworkView: React.FC = () => {
                                                 <button
                                                     onClick={() => { selectNode(bu, seg, undefined); if (searchTerm) setSearchTerm(''); }}
                                                     className={`w-full flex items-center gap-2 pl-7 pr-3 py-1.5 text-xs transition ${isSegSelected
-                                                        ? 'bg-blue-600/20 text-blue-200'
-                                                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                                        ? 'bg-blue-600/20 text-blue-700'
+                                                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                                                         }`}
                                                 >
                                                     {multiCanal
-                                                        ? (isSegExpanded ? <ChevronDown size={11} className="shrink-0 text-slate-600" /> : <ChevronRight size={11} className="shrink-0 text-slate-600" />)
+                                                        ? (isSegExpanded ? <ChevronDown size={11} className="shrink-0 text-slate-400" /> : <ChevronRight size={11} className="shrink-0 text-slate-400" />)
                                                         : <span className="w-[11px] shrink-0" />
                                                     }
                                                     <FileText size={12} className="shrink-0 opacity-50" />
                                                     <span className="flex-1 text-left truncate">{seg}</span>
-                                                    <span className={`text-xs ${searchTerm && segHasMatch ? 'text-amber-400 font-semibold' : 'text-slate-600'}`}>{sCount}</span>
+                                                    <span className={`text-xs ${searchTerm && segHasMatch ? 'text-amber-500 font-semibold' : 'text-slate-400'}`}>{sCount}</span>
                                                 </button>
 
                                                 {/* Canal children (optional, shown when segmento expanded AND multi-canal) */}
@@ -566,15 +566,15 @@ export const FrameworkView: React.FC = () => {
                                                             key={canal}
                                                             onClick={() => { selectNode(bu, seg, canal); if (searchTerm) setSearchTerm(''); }}
                                                             className={`w-full flex items-center gap-2 pl-12 pr-3 py-1 text-xs transition ${isCanalSelected
-                                                                ? 'bg-blue-600/20 text-blue-200'
-                                                                : 'text-slate-500 hover:bg-slate-800 hover:text-slate-200'
+                                                                ? 'bg-blue-600/20 text-blue-700'
+                                                                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
                                                                 }`}
                                                         >
-                                                            <span className="text-slate-600">
+                                                            <span className="text-slate-400">
                                                                 {CANAL_EMOJI[canal] ?? '▸'}
                                                             </span>
                                                             <span className="flex-1 text-left truncate">{canal}</span>
-                                                            <span className="text-xs text-slate-700">{cCount}</span>
+                                                            <span className="text-xs text-slate-400">{cCount}</span>
                                                         </button>
                                                     );
                                                 })}
@@ -591,12 +591,12 @@ export const FrameworkView: React.FC = () => {
                 <div className="flex-1 flex flex-col overflow-hidden">
 
                     {/* Breadcrumb bar */}
-                    <div className="px-4 py-1.5 border-b border-slate-800 bg-slate-900/80 flex items-center gap-1 text-xs text-slate-500 shrink-0">
-                        <span className="hover:text-slate-300 cursor-pointer" onClick={() => { selectNode(); setSearchTerm(''); }}>Explorador</span>
+                    <div className="px-4 py-1.5 border-b border-slate-200 bg-white flex items-center gap-1 text-xs text-slate-500 shrink-0">
+                        <span className="hover:text-slate-700 cursor-pointer" onClick={() => { selectNode(); setSearchTerm(''); }}>Explorador</span>
                         {selected.bu && (
                             <>
                                 <ChevronRight size={11} />
-                                <span className={`${BU_CONFIG[selected.bu]?.text ?? 'text-slate-300'} font-medium cursor-pointer hover:opacity-80`}
+                                <span className={`${BU_CONFIG[selected.bu]?.text ?? 'text-slate-700'} font-medium cursor-pointer hover:opacity-80`}
                                     onClick={() => selectNode(selected.bu, undefined, undefined)}>
                                     {selected.bu}
                                 </span>
@@ -605,7 +605,7 @@ export const FrameworkView: React.FC = () => {
                         {selected.segmento && (
                             <>
                                 <ChevronRight size={11} />
-                                <span className="text-slate-300 font-medium cursor-pointer hover:opacity-80"
+                                <span className="text-slate-700 font-medium cursor-pointer hover:opacity-80"
                                     onClick={() => selectNode(selected.bu, selected.segmento, undefined)}>
                                     {selected.segmento}
                                 </span>
@@ -614,7 +614,7 @@ export const FrameworkView: React.FC = () => {
                         {selected.canal && (
                             <>
                                 <ChevronRight size={11} />
-                                <span className="text-slate-400">
+                                <span className="text-slate-500">
                                     {CANAL_EMOJI[selected.canal] ?? ''} {selected.canal}
                                 </span>
                             </>
@@ -622,10 +622,10 @@ export const FrameworkView: React.FC = () => {
                         {searchTerm && (
                             <>
                                 <ChevronRight size={11} />
-                                <span className="text-amber-300">"{searchTerm}"</span>
+                                <span className="text-amber-600">"{searchTerm}"</span>
                             </>
                         )}
-                        <span className="ml-auto text-slate-600">
+                        <span className="ml-auto text-slate-400">
                             {totalCount} {searchTerm ? 'resultado' : 'linha'}{totalCount !== 1 ? 's' : ''}
                         </span>
                     </div>
@@ -642,22 +642,22 @@ export const FrameworkView: React.FC = () => {
                                 searchGroups.map(group => {
                                     const buCfg = BU_CONFIG[group.bu] || BU_CONFIG['B2C'];
                                     return (
-                                        <div key={`${group.bu}-${group.segmento}-${group.canal}`} className="border-b border-slate-800">
+                                        <div key={`${group.bu}-${group.segmento}-${group.canal}`} className="border-b border-slate-200">
                                             {/* Group header — acts like a file path */}
-                                            <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 sticky top-0 z-10">
+                                            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 sticky top-0 z-10">
                                                 <span className={`w-2 h-2 rounded-full ${buCfg.dot} shrink-0`} />
                                                 <span className={`font-semibold text-xs ${buCfg.text}`}>{group.bu}</span>
-                                                <ChevronRight size={11} className="text-slate-600" />
-                                                <span className="text-xs text-slate-300 font-medium">{group.segmento}</span>
+                                                <ChevronRight size={11} className="text-slate-400" />
+                                                <span className="text-xs text-slate-700 font-medium">{group.segmento}</span>
                                                 {group.canal && group.canal !== 'N/A' && (
                                                     <>
-                                                        <ChevronRight size={11} className="text-slate-600" />
-                                                        <span className="text-xs text-slate-400">
+                                                        <ChevronRight size={11} className="text-slate-400" />
+                                                        <span className="text-xs text-slate-500">
                                                             {CANAL_EMOJI[group.canal] ?? ''} {group.canal}
                                                         </span>
                                                     </>
                                                 )}
-                                                <span className="ml-auto text-xs text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+                                                <span className="ml-auto text-xs text-amber-600 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
                                                     {group.rows.length} resultado{group.rows.length !== 1 ? 's' : ''}
                                                 </span>
                                             </div>
@@ -666,15 +666,15 @@ export const FrameworkView: React.FC = () => {
                                             {group.rows.map(row => {
                                                 const isExpanded = expandedRow === row._origIdx;
                                                 return (
-                                                    <div key={row._origIdx} className="border-b border-slate-800/50">
+                                                    <div key={row._origIdx} className="border-b border-slate-200">
                                                         {/* Summary row */}
                                                         <button
                                                             onClick={() => setExpandedRow(isExpanded ? null : row._origIdx)}
-                                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-800/60 transition text-left"
+                                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 transition text-left"
                                                         >
-                                                            <FileText size={13} className="text-slate-500 shrink-0 mt-0.5" />
+                                                            <FileText size={13} className="text-slate-400 shrink-0 mt-0.5" />
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-xs text-slate-200 font-mono truncate leading-relaxed">
+                                                                <p className="text-xs text-slate-800 font-mono truncate leading-relaxed">
                                                                     <Highlight text={String(row['Activity name / Taxonomia'] ?? '')} term={searchTerm} />
                                                                 </p>
                                                                 <div className="flex items-center gap-3 mt-0.5">
@@ -682,14 +682,14 @@ export const FrameworkView: React.FC = () => {
                                                                         <Highlight text={String(row['Segmento'] ?? '')} term={searchTerm} />
                                                                     </span>
                                                                     {row['Jornada'] && (
-                                                                        <span className="text-xs text-slate-600">
+                                                                        <span className="text-xs text-slate-400">
                                                                             <Highlight text={String(row['Jornada'] ?? '')} term={searchTerm} />
                                                                         </span>
                                                                     )}
-                                                                    <span className="text-xs text-slate-600">{row['Data de Disparo']}</span>
+                                                                    <span className="text-xs text-slate-400">{row['Data de Disparo']}</span>
                                                                 </div>
                                                             </div>
-                                                            <ChevronRight size={13} className={`text-slate-600 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                                            <ChevronRight size={13} className={`text-slate-400 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                                         </button>
 
                                                         {/* Expanded detail */}
@@ -709,13 +709,13 @@ export const FrameworkView: React.FC = () => {
                         /* ── TABLE VIEW (no search) ─────────────────────── */
                         <div className="flex-1 overflow-auto">
                             <table className="w-full border-collapse text-xs text-left">
-                                <thead className="bg-slate-800 text-slate-400 sticky top-0 z-20 shadow-sm">
+                                <thead className="bg-slate-50 text-slate-500 sticky top-0 z-20 shadow-sm">
                                     <tr>
-                                        <th className="px-3 py-2.5 border-b border-slate-700 w-8 text-center text-slate-600 sticky left-0 bg-slate-800 border-r border-slate-700">#</th>
+                                        <th className="px-3 py-2.5 border-b border-slate-200 w-8 text-center text-slate-400 sticky left-0 bg-slate-50 border-r border-slate-200">#</th>
                                         {DISPLAY_COLS.map(col => (
                                             <th key={col.key}
                                                 onClick={() => handleSort(col.key)}
-                                                className={`px-3 py-2.5 border-b border-slate-700 font-medium whitespace-nowrap cursor-pointer hover:bg-slate-700 hover:text-slate-200 transition select-none group ${col.cls}`}
+                                                className={`px-3 py-2.5 border-b border-slate-200 font-medium whitespace-nowrap cursor-pointer hover:bg-slate-100 hover:text-slate-800 transition select-none group ${col.cls}`}
                                             >
                                                 <div className="flex items-center gap-1.5">
                                                     {col.label}
@@ -726,17 +726,17 @@ export const FrameworkView: React.FC = () => {
                                                 </div>
                                             </th>
                                         ))}
-                                        <th className="px-3 py-2.5 border-b border-slate-700 w-8" />
+                                        <th className="px-3 py-2.5 border-b border-slate-200 w-8" />
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-800">
+                                <tbody className="divide-y divide-slate-100">
                                     {flatRows.map((row, i) => {
                                         const isExpanded = expandedRow === row._origIdx;
                                         const buCfg = BU_CONFIG[row.BU] || BU_CONFIG['B2C'];
                                         return (
                                             <React.Fragment key={row._origIdx}>
-                                                <tr className={`group transition hover:bg-slate-800/70 ${i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/20'}`}>
-                                                    <td className={`px-2 py-2 text-slate-600 text-center border-r border-slate-800 sticky left-0 ${i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-800/20'} group-hover:bg-slate-800/70 transition`}>
+                                                <tr className={`group transition hover:bg-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                                    <td className={`px-2 py-2 text-slate-400 text-center border-r border-slate-100 sticky left-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} group-hover:bg-slate-50 transition`}>
                                                         {i + 1}
                                                     </td>
                                                     {DISPLAY_COLS.map(col => {
@@ -755,13 +755,13 @@ export const FrameworkView: React.FC = () => {
                                                                 <td key={col.key} className="px-3 py-2">
                                                                     <div className="flex items-center gap-2">
                                                                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${buCfg.dot}`} />
-                                                                        <span className={`font-mono text-slate-200 truncate max-w-xs ${edited ? 'text-amber-200' : ''}`}>{val}</span>
+                                                                        <span className={`font-mono text-slate-800 truncate max-w-xs ${edited ? 'text-amber-600' : ''}`}>{val}</span>
                                                                     </div>
                                                                 </td>
                                                             );
                                                         }
                                                         return (
-                                                            <td key={col.key} className={`px-3 py-2 text-slate-400 ${edited ? 'text-amber-300 bg-amber-900/10' : ''}`}>
+                                                            <td key={col.key} className={`px-3 py-2 text-slate-500 ${edited ? 'text-amber-600 bg-amber-500/5' : ''}`}>
                                                                 {String(val || '—')}
                                                             </td>
                                                         );
@@ -769,7 +769,7 @@ export const FrameworkView: React.FC = () => {
                                                     <td className="px-2 py-2">
                                                         <button
                                                             onClick={() => setExpandedRow(isExpanded ? null : row._origIdx)}
-                                                            className="text-slate-600 hover:text-slate-300 transition"
+                                                            className="text-slate-400 hover:text-slate-600 transition"
                                                             title="Ver / editar todos os campos"
                                                         >
                                                             <ChevronRight size={13} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -778,7 +778,7 @@ export const FrameworkView: React.FC = () => {
                                                 </tr>
                                                 {isExpanded && (
                                                     <tr>
-                                                        <td colSpan={DISPLAY_COLS.length + 2} className="p-0 border-b border-slate-700">
+                                                        <td colSpan={DISPLAY_COLS.length + 2} className="p-0 border-b border-slate-200">
                                                             <RowDetail row={row} origIdx={row._origIdx} edits={edits} allColumns={allColumns} searchTerm="" onEdit={handleCellEdit} />
                                                         </td>
                                                     </tr>
@@ -798,9 +798,9 @@ export const FrameworkView: React.FC = () => {
                     )}
 
                     {/* ── Footer ──────────────────────────────────────────── */}
-                    <div className="bg-slate-800/60 border-t border-slate-700 px-4 py-1.5 text-xs text-slate-500 flex justify-between items-center shrink-0">
-                        <span>Total no framework: <strong className="text-slate-300">{frameworkData.length}</strong> linhas</span>
-                        <span>Visualizando: <strong className="text-slate-300">{totalCount}</strong> linhas</span>
+                    <div className="bg-white border-t border-slate-200 px-4 py-1.5 text-xs text-slate-500 flex justify-between items-center shrink-0">
+                        <span>Total no framework: <strong className="text-slate-700">{frameworkData.length}</strong> linhas</span>
+                        <span>Visualizando: <strong className="text-slate-700">{totalCount}</strong> linhas</span>
                     </div>
                 </div>
             </div>
@@ -823,20 +823,20 @@ const RowDetail: React.FC<RowDetailProps> = ({ row, origIdx, edits, allColumns, 
     const filteredCols = allColumns.filter(c => c !== '_origIdx');
 
     return (
-        <div className="bg-slate-900/80 border-t border-slate-700/50 px-6 py-4">
+        <div className="bg-slate-50 border-t border-slate-200 px-6 py-4">
             <p className="text-xs text-slate-500 font-medium mb-3 uppercase tracking-wider">Todos os campos — clique para editar</p>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {filteredCols.map(col => {
                     const val = (edits[origIdx] as any)?.[col] ?? (row as any)[col] ?? '';
                     const edited = (edits[origIdx] as any)?.[col] !== undefined;
                     return (
-                        <div key={col} className={`rounded-md p-2 border transition ${edited ? 'border-amber-500/40 bg-amber-900/10' : 'border-slate-700/50 bg-slate-800/40'}`}>
+                        <div key={col} className={`rounded-md p-2 border transition ${edited ? 'border-amber-500/40 bg-amber-500/5' : 'border-slate-200 bg-white'}`}>
                             <label className="block text-xs text-slate-500 mb-1 truncate" title={col}>{col}</label>
                             <input
                                 type="text"
                                 value={String(val)}
                                 onChange={e => onEdit(origIdx, col, e.target.value)}
-                                className={`w-full bg-transparent text-xs outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 py-0.5 transition ${edited ? 'text-amber-200 font-medium' : 'text-slate-300'}`}
+                                className={`w-full bg-transparent text-xs outline-none focus:ring-1 focus:ring-cyan-400 rounded px-1 py-0.5 transition ${edited ? 'text-amber-600 font-medium' : 'text-slate-700'}`}
                             />
                         </div>
                     );

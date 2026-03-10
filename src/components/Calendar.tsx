@@ -263,40 +263,40 @@ export const Calendar: React.FC<CalendarProps> = ({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex h-full bg-slate-950 overflow-hidden">
+      <div className="flex h-full bg-white overflow-hidden">
         {/* Calendário (esquerda) */}
-        <div className="flex flex-col w-2/5 bg-slate-950 border-r border-slate-700 p-4 overflow-hidden">
+        <div className="flex flex-col w-2/5 bg-white border-r border-slate-200 p-4 overflow-hidden">
           {/* Header com navegação */}
           <div className="mb-4 flex-shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrevMonth}
-                  className="p-1.5 hover:bg-slate-800 rounded transition"
+                  className="p-1.5 hover:bg-slate-100 rounded transition"
                   aria-label="Mês anterior"
                 >
-                  <ChevronLeft className="w-5 h-5 text-slate-400" />
+                  <ChevronLeft className="w-5 h-5 text-slate-500" />
                 </button>
-                <h2 className="text-lg font-bold text-slate-100 min-w-fit">
+                <h2 className="text-lg font-bold text-slate-900 min-w-fit">
                   {getMonthYear(new Date(year, month, 1))}
                 </h2>
                 <button
                   onClick={handleNextMonth}
-                  className="p-1.5 hover:bg-slate-800 rounded transition"
+                  className="p-1.5 hover:bg-slate-100 rounded transition"
                   aria-label="Próximo mês"
                 >
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                  <ChevronRight className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
             </div>
           </div>
 
           {/* Calendário Grid */}
-          <div className="bg-slate-800/30 border border-slate-600 rounded p-3 flex-shrink-0">
+          <div className="bg-slate-50 border border-slate-200 rounded p-3 flex-shrink-0">
             {/* Weekday headers */}
             <div className="grid grid-cols-7 gap-1 mb-2">
               {WEEKDAYS.map(day => (
-                <div key={day} className="text-center text-xs font-bold text-slate-500 py-1">
+                <div key={day} className="text-center text-xs font-bold text-slate-400 py-1">
                   {day.substring(0, 1)}
                 </div>
               ))}
@@ -353,7 +353,7 @@ export const Calendar: React.FC<CalendarProps> = ({
               onClick={() => setDiaryMode(!diaryMode)}
               className={`w-full py-2 px-3 rounded transition flex items-center justify-center gap-2 font-medium text-sm ${diaryMode
                 ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                 }`}
             >
               <BookOpen size={16} />
@@ -363,8 +363,8 @@ export const Calendar: React.FC<CalendarProps> = ({
 
           {/* Diary entries listing */}
           {diaryMode && (
-            <div className="flex-1 min-h-0 overflow-y-auto bg-slate-800/30 border border-slate-600 rounded p-4 mt-2">
-              <h3 className="text-xs font-bold text-slate-300 mb-3">Entrada do Diário</h3>
+            <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 border border-slate-200 rounded p-4 mt-2">
+              <h3 className="text-xs font-bold text-slate-700 mb-3">Entrada do Diário</h3>
               <div className="space-y-4">
                 {(() => {
                   // Get filtered anotações for diary display - respect BU checkbox selections
@@ -414,30 +414,30 @@ export const Calendar: React.FC<CalendarProps> = ({
                     });
 
                   return diaryEntries.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic">Nenhuma entrada no diário</p>
+                    <p className="text-xs text-slate-500 italic">Nenhuma entrada no diário</p>
                   ) : (
                     diaryEntries.map((entry) => (
                       <div key={entry.dateKey} className="border-l-2 border-amber-500 pl-3 pb-3">
-                        <div className="text-xs font-semibold text-slate-200 mb-2">
+                        <div className="text-xs font-semibold text-slate-900 mb-2">
                           {entry.date.toLocaleDateString('pt-BR')}
                         </div>
                         <div className="space-y-2">
                           {entry.anotacoes.map((anotacao) => {
                             const BU_BG: { [key: string]: string } = {
-                              B2C: 'bg-blue-500/30 text-blue-100 border-blue-500/50',
-                              B2B2C: 'bg-emerald-500/30 text-emerald-100 border-emerald-500/50',
-                              Plurix: 'bg-purple-500/30 text-purple-100 border-purple-500/50',
+                              B2C: 'bg-blue-50 text-blue-700 border-blue-200',
+                              B2B2C: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                              Plurix: 'bg-purple-50 text-purple-700 border-purple-200',
                             };
                             return (
                               <div
                                 key={anotacao.id}
-                                className={`p-2.5 rounded text-xs border ${BU_BG[anotacao.bu] || 'bg-slate-500/30 text-slate-100 border-slate-500/50'}`}
+                                className={`p-2.5 rounded text-xs border ${BU_BG[anotacao.bu] || 'bg-slate-100 text-slate-700 border-slate-200'}`}
                               >
                                 <div className="font-medium mb-1 flex justify-between items-start gap-2">
                                   <div className="flex items-center gap-1 flex-wrap">
                                     <span>• {anotacao.bu}</span>
                                     {anotacao.isTesteAB && (
-                                      <span className="flex items-center gap-0.5 text-[10px] bg-blue-500/20 text-blue-200 px-1 rounded border border-blue-500/30">
+                                      <span className="flex items-center gap-0.5 text-[10px] bg-blue-50 text-blue-600 px-1 rounded border border-blue-200">
                                         <Beaker size={8} /> AB
                                       </span>
                                     )}
@@ -476,10 +476,10 @@ export const Calendar: React.FC<CalendarProps> = ({
         </div>
 
         {/* Direita (KPIs + Funil) - flex column */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+        <div className="flex-1 flex flex-col overflow-hidden bg-white">
           {/* KPIs (cima) */}
           {showComparison && aggregatedComparison && (
-            <div className="flex-shrink-0 border-b border-slate-700 p-4 overflow-y-auto">
+            <div className="flex-shrink-0 border-b border-slate-200 p-4 overflow-y-auto">
               <StatsCard data={periodData} comparisonData={aggregatedComparison} />
             </div>
           )}
@@ -496,21 +496,21 @@ export const Calendar: React.FC<CalendarProps> = ({
           </div>
 
           {/* Export actions (rodapé) */}
-          <div className="flex-shrink-0 border-t border-slate-700 p-3 flex items-center justify-end gap-2">
+          <div className="flex-shrink-0 border-t border-slate-200 p-3 flex items-center justify-end gap-2">
             {(() => {
               const ym = `${year}-${String(month + 1).padStart(2, '0')}`;
               return (
                 <>
                   <button
                     onClick={() => exportJourneyCSV(periodData, `journey_${ym}.csv`)}
-                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-slate-700 bg-slate-900/50 hover:bg-slate-800 text-slate-300"
+                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700"
                     title="Exportar CSV consolidado por Jornada (Segmento)"
                   >
                     <Download size={14} /> CSV Jornada
                   </button>
                   <button
                     onClick={() => exportActivityCSV(periodData, `disparos_${ym}.csv`)}
-                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-slate-700 bg-slate-900/50 hover:bg-slate-800 text-slate-300"
+                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700"
                     title="Exportar CSV por Disparo (Activity)"
                   >
                     <Download size={14} /> CSV Disparos

@@ -180,26 +180,26 @@ const ModalContent: React.FC<{
     };
 
     return (
-        <div className="relative w-[95vw] max-w-[1820px] h-[85vh] max-h-[920px] flex flex-col bg-[#0f172a] rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-700/50 ring-1 ring-white/5">
+        <div className="relative w-[95vw] max-w-[1820px] h-[85vh] max-h-[920px] flex flex-col bg-white rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-200 ring-1 ring-slate-200">
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 bg-[#0f172a] border-b border-slate-800 shrink-0">
+            <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0">
                 <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${editingActivity ? 'bg-blue-500/10 text-blue-400' : 'bg-green-500/10 text-green-400'}`}>
+                    <div className={`p-1.5 rounded-lg ${editingActivity ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
                         {editingActivity ? <CheckCircle2 size={18} /> : <Calendar size={18} />}
                     </div>
                     <div>
-                        <h2 className="text-sm font-bold text-white tracking-tight">
+                        <h2 className="text-sm font-bold text-slate-900 tracking-tight">
                             {editingActivity ? 'Editar Disparo' : 'Novo Disparo'}
                         </h2>
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-[10px] text-slate-500">
                             {editingActivity ? 'Edite os parametros da atividade' : 'Layout compacto - Desktop 1920x1080'}
                         </p>
                     </div>
                 </div>
                 <button
                     onClick={onClose}
-                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
                 >
                     <X size={18} />
                 </button>
@@ -209,7 +209,7 @@ const ModalContent: React.FC<{
             <div className="flex-1 overflow-x-auto overflow-y-auto p-4">
 
                 {errors.form && (
-                    <div className="mb-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300 text-xs flex items-center gap-2">
+                    <div className="mb-4 p-3 bg-red-50 border border-red-500/30 rounded-lg text-red-600 text-xs flex items-center gap-2">
                         <AlertCircle size={16} />
                         {errors.form}
                     </div>
@@ -235,12 +235,12 @@ const ModalContent: React.FC<{
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 bg-[#0f172a] border-t border-slate-800 flex justify-between items-center shrink-0 shadow-lg z-10">
+            <div className="px-5 py-3 bg-white border-t border-slate-200 flex justify-between items-center shrink-0 shadow-lg z-10">
                 <div>
                     {editingActivity && (
                         <button
                             onClick={handleDelete}
-                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
                         >
                             <Trash2 size={14} />
                             <span>Excluir</span>
@@ -251,14 +251,14 @@ const ModalContent: React.FC<{
                 <div className="flex items-center gap-2">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-slate-400 hover:text-white font-medium text-xs transition-colors"
+                        className="px-4 py-2 text-slate-500 hover:text-slate-900 font-medium text-xs transition-colors"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={() => handleSubmit('Rascunho')}
                         disabled={loading}
-                        className="px-4 py-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-lg font-medium text-xs transition-all shadow-sm disabled:opacity-50"
+                        className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg font-medium text-xs transition-all shadow-sm disabled:opacity-50"
                     >
                         {loading ? '...' : 'Salvar Rascunho'}
                     </button>
@@ -295,7 +295,7 @@ export const ProgramarDisparoModal: React.FC<ProgramarDisparoModalProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity duration-300"
+                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity duration-300"
                 onClick={onClose}
             />
 

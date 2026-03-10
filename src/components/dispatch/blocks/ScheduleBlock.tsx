@@ -49,7 +49,7 @@ export const ScheduleBlock: React.FC = () => {
                     </div>
 
                     {/* Divisor */}
-                    <div className="border-t border-slate-700/50 pt-2">
+                    <div className="border-t border-slate-200 pt-2">
                         {/* Safra (readonly) e Ordem (EDITAVEL) */}
                         <div className="grid grid-cols-2 gap-1.5">
                             <ReadonlyField
@@ -62,7 +62,7 @@ export const ScheduleBlock: React.FC = () => {
                                     value={formData.ordemDisparo}
                                     onChange={(e) => handleChange('ordemDisparo', e.target.value)}
                                     placeholder="ex: 1 ou Pontual"
-                                    className="text-center font-bold text-blue-400"
+                                    className="text-center font-bold text-blue-600"
                                 />
                             </div>
                         </div>

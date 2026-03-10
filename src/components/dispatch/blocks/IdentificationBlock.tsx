@@ -69,7 +69,7 @@ export const IdentificationBlock: React.FC = () => {
                             value={formData.activityName}
                             onChange={(e) => handleChange('activityName', e.target.value)}
                             placeholder="auto: BU_CAMP_JORNADA_ORD_SAFRA"
-                            className="font-mono text-[9px] bg-slate-950/30 border-slate-800 text-slate-300"
+                            className="font-mono text-[9px] bg-slate-50 border-slate-200 text-slate-700"
                             error={errors.activityName}
                         />
                     </div>
@@ -99,7 +99,7 @@ export const IdentificationBlock: React.FC = () => {
                     </div>
 
                     {/* Divisor visual */}
-                    <div className="border-t border-slate-700/50 pt-2">
+                    <div className="border-t border-slate-200 pt-2">
                         {/* Parceiro e Subgrupo - Combobox com historico */}
                         <div className="grid grid-cols-2 gap-1.5">
                             <div>

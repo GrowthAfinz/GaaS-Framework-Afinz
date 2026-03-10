@@ -25,7 +25,7 @@ export const Label: React.FC<LabelProps> = ({ label, required, tooltip }) => (
         {label}
         {required && <span className="text-blue-500">*</span>}
         {tooltip && (
-            <span title={tooltip} className="text-slate-600 hover:text-slate-400 cursor-help transition-colors">
+            <span title={tooltip} className="text-slate-400 hover:text-slate-600 cursor-help transition-colors">
                 <Info size={9} />
             </span>
         )}
@@ -45,18 +45,18 @@ export const Input: React.FC<InputProps> = ({ className = '', error, ...props })
         <input
             className={`
                 w-full px-2 py-1.5
-                bg-slate-800/50 border rounded
-                text-[11px] font-medium text-slate-200
-                placeholder:text-slate-600
-                focus:outline-none focus:ring-1 focus:ring-blue-500/50
+                bg-white border rounded
+                text-[11px] font-medium text-slate-900
+                placeholder:text-slate-400
+                focus:outline-none focus:ring-1 focus:ring-cyan-400/30
                 transition-all
-                ${error ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'}
+                ${error ? 'border-red-500/50 focus:border-red-500' : 'border-slate-300 focus:border-cyan-400'}
                 ${className}
             `}
             {...props}
         />
         {error && (
-            <span className="absolute -bottom-3 left-0 text-[8px] text-red-400 font-medium truncate max-w-full">
+            <span className="absolute -bottom-3 left-0 text-[8px] text-red-600 font-medium truncate max-w-full">
                 {error}
             </span>
         )}
@@ -76,11 +76,11 @@ export const Select: React.FC<SelectProps> = ({ className = '', error, children,
         <select
             className={`
                 w-full px-2 py-1.5
-                bg-slate-800/50 border rounded
-                text-[11px] font-medium text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-blue-500/50
+                bg-white border rounded
+                text-[11px] font-medium text-slate-900
+                focus:outline-none focus:ring-1 focus:ring-cyan-400/30
                 transition-all appearance-none cursor-pointer
-                ${error ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'}
+                ${error ? 'border-red-500/50 focus:border-red-500' : 'border-slate-300 focus:border-cyan-400'}
                 ${className}
             `}
             {...props}
@@ -93,7 +93,7 @@ export const Select: React.FC<SelectProps> = ({ className = '', error, children,
             </svg>
         </div>
         {error && (
-            <span className="absolute -bottom-3 left-0 text-[8px] text-red-400 font-medium truncate max-w-full">
+            <span className="absolute -bottom-3 left-0 text-[8px] text-red-600 font-medium truncate max-w-full">
                 {error}
             </span>
         )}
@@ -116,17 +116,17 @@ export const SectionCard: React.FC<SectionCardProps> = ({
     title,
     icon,
     children,
-    headerClassName = 'text-slate-300',
+    headerClassName = 'text-slate-700',
     badge
 }) => (
-    <section className="bg-slate-800/40 p-3 rounded-lg border border-slate-700/50 flex flex-col gap-2 hover:border-slate-600/50 transition-colors duration-300 h-full">
-        <div className={`flex items-center justify-between pb-1.5 border-b border-slate-700/50 ${headerClassName}`}>
+    <section className="bg-white p-3 rounded-lg border border-slate-200 flex flex-col gap-2 hover:border-slate-300 transition-colors duration-300 h-full">
+        <div className={`flex items-center justify-between pb-1.5 border-b border-slate-200 ${headerClassName}`}>
             <div className="flex items-center gap-1.5">
-                <div className="opacity-70 text-slate-400">{icon}</div>
+                <div className="opacity-70 text-slate-500">{icon}</div>
                 <h3 className="text-[10px] font-bold uppercase tracking-wider">{title}</h3>
             </div>
             {badge && (
-                <span className="px-1 py-0.5 bg-slate-700/50 rounded text-[8px] text-slate-400 font-bold uppercase">
+                <span className="px-1 py-0.5 bg-slate-100 rounded text-[8px] text-slate-500 font-bold uppercase">
                     {badge}
                 </span>
             )}
@@ -161,14 +161,14 @@ export const MetricCard: React.FC<MetricCardProps> = ({
     compact = false
 }) => (
     <div className={`
-        bg-slate-900/50 border border-indigo-500/10 rounded
+        bg-indigo-50 border border-indigo-500/10 rounded
         ${compact ? 'p-1.5' : 'p-2'}
         flex flex-col items-center justify-center text-center
     `}>
-        <span className={`uppercase font-bold text-indigo-400 ${compact ? 'text-[7px]' : 'text-[8px]'}`}>
+        <span className={`uppercase font-bold text-indigo-600 ${compact ? 'text-[7px]' : 'text-[8px]'}`}>
             {label}
         </span>
-        <div className={`font-bold text-indigo-200 ${compact ? 'text-xs' : 'text-sm'}`}>
+        <div className={`font-bold text-indigo-700 ${compact ? 'text-xs' : 'text-sm'}`}>
             {value !== undefined ? (
                 <>
                     <span className="text-[9px] text-indigo-500 mr-0.5">{prefix}</span>
@@ -176,11 +176,11 @@ export const MetricCard: React.FC<MetricCardProps> = ({
                     <span className="text-[9px] text-indigo-500 ml-0.5">{suffix}</span>
                 </>
             ) : (
-                <span className="text-slate-500">-</span>
+                <span className="text-slate-400">-</span>
             )}
         </div>
         {confidence !== undefined && confidence > 0 && (
-            <div className="w-full mt-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div className="w-full mt-1 h-1 bg-slate-200 rounded-full overflow-hidden">
                 <div
                     className="h-full bg-indigo-500/50 rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(100, confidence)}%` }}
@@ -201,9 +201,9 @@ interface ReadonlyFieldProps {
 }
 
 export const ReadonlyField: React.FC<ReadonlyFieldProps> = ({ label, value, className = '' }) => (
-    <div className={`bg-slate-900/40 p-1.5 rounded border border-slate-700/50 ${className}`}>
+    <div className={`bg-slate-50 p-1.5 rounded border border-slate-200 ${className}`}>
         <Label label={label} />
-        <div className="text-[11px] text-slate-300 font-mono text-center">
+        <div className="text-[11px] text-slate-700 font-mono text-center">
             {value || '-'}
         </div>
     </div>
@@ -409,12 +409,12 @@ export const Combobox: React.FC<ComboboxProps> = ({
                     placeholder={placeholder}
                     className={`
                         w-full px-2 py-1.5 pr-12
-                        bg-slate-800/50 border rounded
-                        text-[11px] font-medium text-slate-200
-                        placeholder:text-slate-600
-                        focus:outline-none focus:ring-1 focus:ring-blue-500/50
+                        bg-white border rounded
+                        text-[11px] font-medium text-slate-900
+                        placeholder:text-slate-400
+                        focus:outline-none focus:ring-1 focus:ring-cyan-400/30
                         transition-all
-                        ${error ? 'border-red-500/50 focus:border-red-500' : 'border-slate-700 focus:border-blue-500'}
+                        ${error ? 'border-red-500/50 focus:border-red-500' : 'border-slate-300 focus:border-cyan-400'}
                         ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                         ${className}
                     `}
@@ -427,7 +427,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
                         <button
                             type="button"
                             onClick={handleClear}
-                            className="p-0.5 text-slate-500 hover:text-slate-300 transition-colors"
+                            className="p-0.5 text-slate-400 hover:text-slate-600 transition-colors"
                             tabIndex={-1}
                         >
                             <X size={10} />
@@ -438,7 +438,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
                     <button
                         type="button"
                         onClick={() => !disabled && setIsOpen(!isOpen)}
-                        className="p-0.5 text-slate-500 hover:text-slate-300 transition-colors"
+                        className="p-0.5 text-slate-400 hover:text-slate-600 transition-colors"
                         tabIndex={-1}
                     >
                         <ChevronDown
@@ -454,8 +454,8 @@ export const Combobox: React.FC<ComboboxProps> = ({
                 <div
                     ref={dropdownRef}
                     className="absolute z-[100] w-full mt-0.5 py-0.5 max-h-40 overflow-auto
-                               bg-slate-800 border border-slate-600 rounded shadow-lg
-                               scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
+                               bg-white border border-slate-200 rounded shadow-lg
+                               scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-50"
                 >
                     {filteredOptions.map((option, index) => (
                         <div
@@ -465,7 +465,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
                                 px-2 py-1 text-[11px] cursor-pointer flex justify-between items-center
                                 ${highlightedIndex === index
                                     ? 'bg-blue-600 text-white'
-                                    : 'text-slate-200 hover:bg-slate-700'
+                                    : 'text-slate-900 hover:bg-slate-100'
                                 }
                                 ${option.value === value ? 'font-semibold' : ''}
                             `}
@@ -478,7 +478,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
                                     text-[9px] ml-1 px-1 rounded
                                     ${highlightedIndex === index
                                         ? 'bg-blue-500 text-blue-100'
-                                        : 'bg-slate-700 text-slate-400'
+                                        : 'bg-slate-100 text-slate-500'
                                     }
                                 `}>
                                     {option.count}x
@@ -492,17 +492,17 @@ export const Combobox: React.FC<ComboboxProps> = ({
             {/* Mensagem quando nao ha opcoes */}
             {isOpen && filteredOptions.length === 0 && inputValue && (
                 <div className="absolute z-50 w-full mt-0.5 py-2 px-2
-                               bg-slate-800 border border-slate-600 rounded shadow-lg
-                               text-[10px] text-slate-400 text-center">
+                               bg-white border border-slate-200 rounded shadow-lg
+                               text-[10px] text-slate-500 text-center">
                     Novo valor: "{inputValue}"
                     <br />
-                    <span className="text-[9px] text-slate-500">Pressione Enter para confirmar</span>
+                    <span className="text-[9px] text-slate-400">Pressione Enter para confirmar</span>
                 </div>
             )}
 
             {/* Erro */}
             {error && (
-                <span className="absolute -bottom-3 left-0 text-[8px] text-red-400 font-medium truncate max-w-full">
+                <span className="absolute -bottom-3 left-0 text-[8px] text-red-600 font-medium truncate max-w-full">
                     {error}
                 </span>
             )}

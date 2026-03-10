@@ -60,12 +60,12 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-2 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 mb-2 flex items-center gap-2">
             Jornada & Disparos
             <Tooltip content="Visão geral do funil de conversão, do disparo até emissão, com identificação automática de gargalos e anomalias." />
           </h1>
-          <p className="text-sm text-slate-400">Análise profunda de conversão e identificação de gargalos</p>
-          <p className="text-xs text-slate-600 mt-1">
+          <p className="text-sm text-slate-500">Análise profunda de conversão e identificação de gargalos</p>
+          <p className="text-xs text-slate-500 mt-1">
             Total Activities: {Object.values(data).reduce((acc, curr) => acc + curr.length, 0)}
           </p>
         </div>
@@ -73,7 +73,7 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
         <div className="flex items-center gap-4">
           {chartMode === 'anomalies' && (
             <div className="flex items-center gap-2">
-              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700 gap-1">
+              <div className="flex bg-white rounded-lg p-1 border border-slate-200 gap-1">
                 {[
                   { id: 'pending', label: 'Pendente' },
                   { id: 'no_sent', label: 'Sem Envio' },
@@ -85,7 +85,7 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
                     onClick={() => toggleAnomalyFilter(filter.id as AnomalyType)}
                     className={`px-3 py-1 text-xs font-medium rounded transition ${selectedAnomalyFilters.includes(filter.id as AnomalyType)
                       ? 'bg-amber-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                       }`}
                   >
                     {filter.label}
@@ -94,7 +94,7 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
                 {selectedAnomalyFilters.length > 0 && (
                   <button
                     onClick={() => setSelectedAnomalyFilters([])}
-                    className="px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-300 border-l border-slate-700 ml-1 pl-2"
+                    className="px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-700 border-l border-slate-200 ml-1 pl-2"
                   >
                     Limpar
                   </button>
@@ -105,12 +105,12 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
           )}
 
           <div className="flex items-center gap-2">
-            <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+            <div className="flex bg-white rounded-lg p-1 border border-slate-200">
               <button
                 onClick={() => setChartMode('performance')}
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition ${chartMode === 'performance'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                   }`}
               >
                 <BarChart2 size={16} />
@@ -120,7 +120,7 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
                 onClick={() => setChartMode('anomalies')}
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition ${chartMode === 'anomalies'
                   ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                   }`}
               >
                 <AlertTriangle size={16} />

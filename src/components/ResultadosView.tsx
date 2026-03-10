@@ -67,7 +67,7 @@ export const ResultadosView: React.FC<ResultadosViewProps> = ({ resultados, data
 
   if (Object.keys(resultados).length === 0) {
     return (
-      <div className="text-center py-12 text-slate-400">
+      <div className="text-center py-12 text-slate-500">
         Nenhum resultado registrado
       </div>
     );
@@ -91,9 +91,9 @@ export const ResultadosView: React.FC<ResultadosViewProps> = ({ resultados, data
 
       {/* 3. Meta vs Realizado | Comparativo de Canais */}
       <div className="grid grid-cols-1 gap-6">
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div className="bg-white border border-slate-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <Target size={20} className="text-blue-400" />
               Meta vs. Realizado <span className="text-slate-500 text-sm font-normal">({selectedBU || 'Global'})</span>
             </h2>
