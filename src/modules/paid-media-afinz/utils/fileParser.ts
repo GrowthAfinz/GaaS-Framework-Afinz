@@ -53,8 +53,9 @@ const parseDate = (dateVal: any): string | null => {
             if (!str) return null;
 
             if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
-                // ISO format: 2026-03-09 or 2026-03-09T...
-                date = new Date(str);
+                // Date-only ISO can shift day because `new Date("YYYY-MM-DD")` is parsed in UTC.
+                // Parse only the calendar day in local time to keep day-level integrity.
+                date = parse(str.slice(0, 10), 'yyyy-MM-dd', new Date());
             } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
                 // DD/MM/YYYY
                 date = parse(str, 'dd/MM/yyyy', new Date());

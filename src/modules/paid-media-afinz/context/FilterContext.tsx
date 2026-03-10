@@ -54,7 +54,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
             setDateRangeState({
                 from: startOfDay(fromDate),
-                to: startOfDay(maxDate) // Ensure full coverage of the last day
+                to: endOfDay(maxDate) // Include the entire latest available day
             });
 
             // Set to custom so it doesn't snap back to "Today - 30d" logic if user interacts
