@@ -23,7 +23,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check for persisted Supabase session
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) {
                 setSession(session);
@@ -32,7 +31,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
         });
 
-        // Listen for auth state changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session) {
                 setSession(session);
@@ -47,11 +45,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return () => subscription.unsubscribe();
     }, []);
 
+    const getBaseAppUrl = () => {
+        const configuredUrl = import.meta.env.VITE_PUBLIC_APP_URL as string | undefined;
+        if (configuredUrl && configuredUrl.trim().length > 0) {
+            return configuredUrl.trim();
+        }
+
+        const isGithubPagesHost = window.location.hostname.endsWith('github.io');
+        const isRootPath = window.location.pathname === '/' || window.location.pathname === '';
+
+        if (isGithubPagesHost && isRootPath) {
+            return `${window.location.origin}/GaaS-Framework-Afinz/`;
+        }
+
+        return `${window.location.origin}${window.location.pathname}`;
+    };
+
+    const getAuthRedirectUrl = (flow: 'recovery' | 'invite' | 'signin') => {
+        const baseUrl = getBaseAppUrl();
+        return `${baseUrl}#type=${flow}`;
+    };
+
     const signInWithEmail = async (email: string) => {
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
-                emailRedirectTo: window.location.href,
+                emailRedirectTo: getAuthRedirectUrl('signin'),
             },
         });
         if (error) throw error;
@@ -70,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email,
             password,
             options: {
-                emailRedirectTo: `${window.location.origin}${window.location.pathname}`
+                emailRedirectTo: getBaseAppUrl()
             }
         });
         if (error) throw error;
@@ -83,24 +102,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const resetPassword = async (email: string) => {
-        console.log('🔐 resetPassword INICIADO para:', email);
-
-        const baseUrl = `${window.location.origin}${window.location.pathname}`;
-        const redirectUrl = `${baseUrl}#type=recovery`;
-        console.log('🔗 Redirect URL:', redirectUrl);
+        const redirectUrl = getAuthRedirectUrl('recovery');
 
         const result = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: redirectUrl,
         });
 
-        console.log('📨 Resposta Supabase:', result);
-
         if (result.error) {
-            console.error('❌ Erro do Supabase:', result.error.message);
             throw result.error;
         }
-
-        console.log('✅ resetPassword SUCESSO');
     };
 
     const updatePassword = async (password: string) => {
@@ -109,11 +119,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const inviteUser = async (email: string, fullName: string, role: 'admin' | 'growth_b2c' | 'analista_plurix') => {
-        console.log('👤 inviteUser INICIADO para:', email, 'role:', role);
+        void fullName;
+        void role;
 
-        const baseUrl = `${window.location.origin}${window.location.pathname}`;
-        const redirectUrl = `${baseUrl}#type=invite`;
-        console.log('🔗 Redirect URL:', redirectUrl);
+        const redirectUrl = getAuthRedirectUrl('invite');
 
         const result = await supabase.auth.signInWithOtp({
             email,
@@ -122,14 +131,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             },
         });
 
-        console.log('📨 Resposta Supabase:', result);
-
         if (result.error) {
-            console.error('❌ Erro do Supabase:', result.error.message);
             throw result.error;
         }
-
-        console.log('✅ inviteUser SUCESSO');
     };
 
     return (
