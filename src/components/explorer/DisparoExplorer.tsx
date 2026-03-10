@@ -225,7 +225,9 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
           <span className="text-xs font-semibold text-slate-600">
             {format(startDate, 'dd MMM', { locale: ptBR })} - {format(endDate, 'dd MMM yyyy', { locale: ptBR })}
           </span>
-          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{activities.length.toLocaleString('pt-BR')} disparos</span>
+          <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+            {rootNodes.reduce((s, n) => s + n.count, 0).toLocaleString('pt-BR')} disparos
+          </span>
         </div>
 
         <QuickSearch
