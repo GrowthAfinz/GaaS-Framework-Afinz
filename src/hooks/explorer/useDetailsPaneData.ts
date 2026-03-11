@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { TreeNode, DetailsPaneData, ChannelDistributionItem, TopOfferItem } from '../../types/explorer';
+import { TreeNode, DetailsPaneData, ChannelDistributionItem, TopOfferItem, NodeMetrics } from '../../types/explorer';
 import { ActivityRow } from '../../types/activity';
-import { format } from 'date-fns';
+import { format, subDays, differenceInDays } from 'date-fns';
 
 const CANAL_COLORS: Record<string, string> = {
   Email: '#60A5FA',
@@ -10,11 +10,15 @@ const CANAL_COLORS: Record<string, string> = {
   Push: '#FBBF24',
 };
 
+const toDay = (v?: string) => (v || '').slice(0, 10);
+const isInPeriod = (date: string, start: string, end: string) => date >= start && date <= end;
+
 export function useDetailsPaneData(
   nodeId: string | null,
   nodeMap: Map<string, TreeNode>,
   allActivities: ActivityRow[],
-  filters: { inicio: string; fim: string }
+  filters: { inicio: string; fim: string },
+  compareEnabled: boolean = false
 ): DetailsPaneData | null {
   return useMemo(() => {
     if (!nodeId) return null;
@@ -65,6 +69,66 @@ export function useDetailsPaneData(
     // Period label
     const period = `${format(new Date(filters.inicio + 'T00:00:00'), 'MMM yyyy')} – ${format(new Date(filters.fim + 'T00:00:00'), 'MMM yyyy')}`;
 
-    return { node, period, channelDistribution, topOffers, activities };
-  }, [nodeId, nodeMap, allActivities, filters]);
+    let prevMetrics: NodeMetrics | undefined = undefined;
+
+    if (compareEnabled) {
+      const sDate = new Date(`${filters.inicio}T00:00:00`);
+      const eDate = new Date(`${filters.fim}T00:00:00`);
+      const diff = differenceInDays(eDate, sDate) + 1;
+      const prevEnd = format(subDays(sDate, 1), 'yyyy-MM-dd');
+      const prevStart = format(subDays(sDate, diff), 'yyyy-MM-dd');
+
+      // Filter all activities that match the node's scope but for the previous period
+      // Since `node.activityIds` only contains IDs for the *current* period (from TreeData),
+      // we must filter by the node's path logic, OR simplify by using the Tree hierarchy.
+      // Easiest is to filter allActivities by prevStart/prevEnd and then by the node's labels.
+
+      const prevActs = allActivities.filter((a) => {
+        const d = toDay(a['Data de Disparo']);
+        if (!d || !isInPeriod(d, prevStart, prevEnd)) return false;
+
+        // Same filtering logic to get activities belonging to this `nodeId` in the previous period
+        if (node.type === 'bu' && a.BU !== node.label) return false;
+        if (node.type === 'segmento') {
+          const parentBu = nodeMap.get(node.parentId!)?.label;
+          if (a.BU !== parentBu || a.Segmento !== node.label) return false;
+        }
+        if (node.type === 'canal') {
+          const pSeg = nodeMap.get(node.parentId!);
+          const pBu = nodeMap.get(pSeg?.parentId!);
+          if (a.BU !== pBu?.label || a.Segmento !== pSeg?.label || a.Canal !== node.label) return false;
+        }
+        if (node.type === 'disparo') {
+          // For leaf node, we compare by Activity name or just id if same? Usually comparing by taxonomy / same template name might make more sense, but let's compare by same BU/Segment/Canal/Template? If we just use ID, it won't exist in prev period.
+          // We can skip prevMetrics for individual disparos, or match by taxonomy.
+          return false; // Skip for now at disparo level as it's a specific instance
+        }
+        return true;
+      });
+
+      let cartoes = 0, propostas = 0, aprovados = 0, custoTotal = 0, cacSum = 0, cacCount = 0;
+      for (const p of prevActs) {
+        cartoes += (p['Cartões Gerados'] ?? 0);
+        propostas += (p.Propostas ?? 0);
+        aprovados += (p.Aprovados ?? 0);
+        custoTotal += (p['Custo Total Campanha'] ?? 0);
+        if (p.CAC && p.CAC > 0) {
+          cacSum += p.CAC;
+          cacCount++;
+        }
+      }
+
+      prevMetrics = {
+        baseTotal: prevActs.length, // total activities
+        cartoes,
+        propostas,
+        aprovados,
+        custoTotal,
+        cac: cacCount > 0 ? cacSum / cacCount : 0,
+        taxaConversao: propostas > 0 ? (aprovados / propostas) * 100 : 0
+      };
+    }
+
+    return { node, period, channelDistribution, topOffers, activities, prevMetrics };
+  }, [nodeId, nodeMap, allActivities, filters, compareEnabled]);
 }

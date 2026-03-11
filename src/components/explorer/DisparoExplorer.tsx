@@ -24,12 +24,14 @@ import { DisparoDetailModal } from './disparo/DisparoDetailModal';
 
 interface DisparoExplorerProps {
   onNavigateToFramework?: (filters?: { bu?: string; segmento?: string; jornada?: string }) => void;
+  filteredActivities?: import('../../types/framework').Activity[];
 }
 
-export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFramework }) => {
+export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFramework, filteredActivities }) => {
   const storeActivitiesRaw = useAppStore((state) => state.activities);
   const storeActivities = React.useMemo(() => {
-    return storeActivitiesRaw.map((a) => {
+    const sourceActivities = filteredActivities || storeActivitiesRaw;
+    return sourceActivities.map((a) => {
       let dateStr = '';
       try {
         if (a.dataDisparo) {
@@ -70,7 +72,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         'Data de Disparo': dateStr
       } as unknown as ActivityRow;
     });
-  }, [storeActivitiesRaw]);
+  }, [storeActivitiesRaw, filteredActivities]);
 
   const [fetchedActivities, setFetchedActivities] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(false);

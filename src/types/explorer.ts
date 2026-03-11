@@ -48,6 +48,7 @@ export interface BarChartDataPoint {
   id: string;
   label: string;
   value: number;
+  prevValue?: number;
   color: string;
   count: number;
   nodeType: NodeType;
@@ -97,4 +98,5 @@ export interface DetailsPaneData {
   channelDistribution: ChannelDistributionItem[];
   topOffers: TopOfferItem[];
   activities: ActivityRow[];
+  prevMetrics?: NodeMetrics;
 }

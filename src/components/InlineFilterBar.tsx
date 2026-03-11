@@ -157,13 +157,14 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={selectAllVisible}
-                                    className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-slate-800 hover:bg-slate-700 rounded transition-colors"
+                                    className="text-[10px] uppercase font-bold text-[#00c6cc] hover:text-[#00a1a6] transition-colors"
                                 >
                                     Todos
                                 </button>
+                                <span className="text-[10px] text-slate-300">|</span>
                                 <button
                                     onClick={clearAllVisible}
-                                    className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-200 hover:bg-slate-300 rounded transition-colors"
+                                    className="text-[10px] uppercase font-bold text-slate-400 hover:text-slate-600 transition-colors"
                                 >
                                     Limpar
                                 </button>

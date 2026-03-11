@@ -46,7 +46,7 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
-        <PerformanceCard metrics={node.metrics} count={node.count} />
+        <PerformanceCard metrics={node.metrics} count={node.count} prevMetrics={data.prevMetrics} />
         <div className="border-t border-slate-100" />
         <ChannelDistribution items={channelDistribution} />
         <div className="border-t border-slate-100" />

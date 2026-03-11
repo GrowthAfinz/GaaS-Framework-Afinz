@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { eachDayOfInterval, format } from 'date-fns';
+import { eachDayOfInterval, format, subDays, differenceInDays } from 'date-fns';
 import {
   BarChartDataPoint,
   DailyTowerPoint,
@@ -43,7 +43,7 @@ const getMetricValueFromActivity = (a: ActivityRow, metric: ExplorerMetric): num
     case 'volume':
       return a['Base Total'] ?? 0;
     case 'cartoes':
-      return (a['Cartões Gerados'] ?? (a as Record<string, number>)['CartÃµes Gerados']) ?? 0;
+      return (a['Cartões Gerados'] ?? (a as unknown as Record<string, number>)['CartÃµes Gerados']) ?? 0;
     case 'cac':
       return a.CAC ?? 0;
     case 'custo':
@@ -114,6 +114,7 @@ interface UseComparisonDataProps {
   allActivities: ActivityRow[];
   filters: ExplorerFilters;
   comparisonFocusNodeId: string | null;
+  compareEnabled?: boolean;
 }
 
 interface UseComparisonDataReturn {
@@ -134,6 +135,7 @@ export function useComparisonData({
   allActivities,
   filters,
   comparisonFocusNodeId,
+  compareEnabled = false,
 }: UseComparisonDataProps): UseComparisonDataReturn {
   return useMemo(() => {
     const periodStart = filters.periodo.inicio;
@@ -195,9 +197,51 @@ export function useComparisonData({
       groups.get(key)!.push(a);
     });
 
+    // Previous period data calculation
+    const prevGroups = new Map<string, ActivityRow[]>();
+    if (compareEnabled) {
+      const sDate = new Date(`${periodStart}T00:00:00`);
+      const eDate = new Date(`${periodEnd}T00:00:00`);
+      const diff = differenceInDays(eDate, sDate) + 1;
+      const prevEnd = format(subDays(sDate, 1), 'yyyy-MM-dd');
+      const prevStart = format(subDays(sDate, diff), 'yyyy-MM-dd');
+
+      const prevActivities = allActivities.filter((a) => {
+        const d = toDay(a['Data de Disparo']);
+        if (!d || !isInPeriod(d, prevStart, prevEnd)) return false;
+        if (filters.bus.length > 0 && !filters.bus.includes(a.BU)) return false;
+        if (filters.segmentos.length > 0 && !filters.segmentos.includes(a.Segmento)) return false;
+        if (filters.jornadas.length > 0 && !filters.jornadas.includes(a.jornada)) return false;
+        if (filters.canais.length > 0 && a.Canal && !filters.canais.includes(a.Canal)) return false;
+        if (filters.status.length > 0 && a.status && !filters.status.includes(a.status)) return false;
+        if (focus.disparoId && a.id !== focus.disparoId) return false;
+        if (focus.bu && a.BU !== focus.bu) return false;
+        if (focus.segmento && a.Segmento !== focus.segmento) return false;
+        if (focus.canal && a.Canal !== focus.canal) return false;
+        return true;
+      });
+
+      prevActivities.forEach((a) => {
+        let key = '';
+        if (distributionLevel === 'bu') key = a.BU || '(sem BU)';
+        if (distributionLevel === 'segmento') key = a.Segmento || '(sem segmento)';
+        if (distributionLevel === 'canal') key = a.Canal || '(sem canal)';
+        if (distributionLevel === 'disparo') key = a['Activity name / Taxonomia'] || a.id;
+        if (!prevGroups.has(key)) prevGroups.set(key, []);
+        prevGroups.get(key)!.push(a);
+      });
+    }
+
     // Bar chart uses main `metric`
     const barChartData: BarChartDataPoint[] = Array.from(groups.entries()).map(([label, rows], idx) => {
       const value = getMetricValueFromRows(rows, metric);
+      let prevValue: number | undefined = undefined;
+      if (compareEnabled && prevGroups.has(label)) {
+        prevValue = getMetricValueFromRows(prevGroups.get(label)!, metric);
+      } else if (compareEnabled) {
+        prevValue = 0; // If it existed in period but not in prev, it's 0.
+      }
+
       let nextFocusId: string | null = null;
       let color = '#3B82F6';
 
@@ -220,6 +264,7 @@ export function useComparisonData({
         id: `${distributionLevel}-${idx}`,
         label,
         value,
+        prevValue,
         color,
         count: rows.length,
         nodeType: distributionLevel === 'disparo' ? 'canal' : distributionLevel,

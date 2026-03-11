@@ -89,7 +89,12 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 <div className="flex items-center justify-between mb-4">
                     {position === 'left' ? (
                         <button
-                            onClick={() => setViewDate(subMonths(viewDate, 1))}
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setViewDate(subMonths(viewDate, 1));
+                            }}
                             className="p-1 hover:bg-slate-100 rounded-full text-slate-500"
                         >
                             <ChevronLeft size={20} />
@@ -102,7 +107,12 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                     </span>
                     {position === 'right' ? (
                         <button
-                            onClick={() => setViewDate(addMonths(viewDate, 1))}
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setViewDate(addMonths(viewDate, 1));
+                            }}
                             className="p-1 hover:bg-slate-100 rounded-full text-slate-500"
                         >
                             <ChevronRight size={20} />

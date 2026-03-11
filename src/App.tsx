@@ -312,6 +312,7 @@ function App() {
               {activeTab === 'explorador' && (
                 <PageTransition>
                   <DisparoExplorer
+                    filteredActivities={Object.values(advancedFilteredData).flat()}
                     onNavigateToFramework={(f) => {
                       setTab('framework');
                       if (f?.bu || f?.segmento || f?.jornada) {
