@@ -17,8 +17,8 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
     return (
       <div className="bg-slate-50 rounded-xl p-5 flex items-center justify-center h-full border border-dashed border-slate-300">
         <div className="text-center text-slate-500">
-          <p className="text-sm font-medium">Selecione um item na árvore</p>
-          <p className="text-xs mt-1">para ver detalhes e métricas</p>
+          <p className="text-sm font-medium">Selecione um item no Explorador de disparos</p>
+          <p className="text-xs mt-1">para ver a análise</p>
         </div>
       </div>
     );
@@ -53,16 +53,7 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
         <TopOffersTable items={topOffers} />
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 shrink-0">
-        <button
-          onClick={onViewAll}
-          className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 transition-colors font-bold uppercase tracking-wider"
-        >
-          Ver todos os disparos
-          <ExternalLink size={13} />
-        </button>
-      </div>
+      {/* Footer removido pedido pelo usuário */}
     </div>
   );
 };
