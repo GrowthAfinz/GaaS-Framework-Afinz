@@ -43,7 +43,9 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
     const { viewSettings, setGlobalFilters } = useAppStore();
     const filters = viewSettings.filtrosGlobais;
     const [isOpen, setIsOpen] = React.useState(false);
+    const [isPinnedOpen, setIsPinnedOpen] = React.useState(false);
     const [searchTerm, setSearchTerm] = React.useState('');
+    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
     const containerRef = React.useRef<HTMLDivElement | null>(null);
 
     if (items.length === 0) return null;
@@ -68,20 +70,19 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
         setGlobalFilters({ [field]: Array.from(nextSet) });
     };
 
-    const toggleAll = () => {
-        const targetItems = visibleItems;
-        const allSelected = targetItems.length > 0 && targetItems.every(i => selectedSet.has(i));
+    const selectAllVisible = () => {
         const nextSet = new Set(selectedSet);
+        visibleItems.forEach(item => nextSet.add(item));
+        setGlobalFilters({ [field]: Array.from(nextSet) });
+    };
 
-        if (allSelected) {
-            targetItems.forEach(item => nextSet.delete(item));
-        } else {
-            targetItems.forEach(item => nextSet.add(item));
-        }
-
-        // Avoid no-op updates when nothing effectively changes
-        if (nextSet.size !== selectedSet.size || Array.from(nextSet).some(item => !selectedSet.has(item))) {
+    const clearAllVisible = () => {
+        if (searchTerm) {
+            const nextSet = new Set(selectedSet);
+            visibleItems.forEach(item => nextSet.delete(item));
             setGlobalFilters({ [field]: Array.from(nextSet) });
+        } else {
+            setGlobalFilters({ [field]: [] });
         }
     };
 
@@ -107,13 +108,40 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
             }
         };
 
+        const handleMouseLeave = () => {
+            if (isPinnedOpen) return;
+            timeoutRef.current = setTimeout(() => {
+                setIsOpen(false);
+                setSearchTerm('');
+            }, 500); // 500ms hover delay bridge (zona de calor estendida)
+        };
+
+        const handleMouseEnter = () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+            }
+        };
+
         document.addEventListener('mousedown', handleOutsideClick);
         document.addEventListener('keydown', handleEscape);
+        if (containerRef.current) {
+            containerRef.current.addEventListener('mouseleave', handleMouseLeave);
+            containerRef.current.addEventListener('mouseenter', handleMouseEnter);
+        }
+
         return () => {
             document.removeEventListener('mousedown', handleOutsideClick);
             document.removeEventListener('keydown', handleEscape);
+            if (containerRef.current) {
+                containerRef.current.removeEventListener('mouseleave', handleMouseLeave);
+                containerRef.current.removeEventListener('mouseenter', handleMouseEnter);
+            }
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
         };
-    }, [isOpen]);
+    }, [isOpen, isPinnedOpen]);
 
     React.useEffect(() => {
         onOpenChange?.(isOpen);
@@ -126,8 +154,15 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
         >
             <button
                 onClick={() => {
-                    setIsOpen(!isOpen);
-                    if (isOpen) setSearchTerm('');
+                    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                    if (isPinnedOpen) {
+                        setIsPinnedOpen(false);
+                        setIsOpen(false);
+                        setSearchTerm('');
+                    } else {
+                        setIsPinnedOpen(true);
+                        setIsOpen(true);
+                    }
                 }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg transition border shadow-sm ${isActive || isOpen
                     ? 'bg-white border-slate-400 text-slate-800'
@@ -146,27 +181,40 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
 
             <div className={`absolute top-full pt-1.5 min-w-64 max-w-sm z-50 transition-all duration-200 transform origin-top-left ${isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-1 pointer-events-none'
                 } ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}>
+                {/* INVISIBLE BRIDGE to prevent mouse slip (zona de calor estendida) */}
+                <div
+                    className="absolute -inset-x-24 -top-8 -bottom-32 bg-transparent -z-10"
+                    aria-hidden="true"
+                />
 
                 <div className="bg-white border border-slate-200 rounded-xl shadow-[0_12px_45px_-8px_rgba(0,0,0,0.2)] p-2 relative overflow-hidden ring-1 ring-slate-900/5">
                     <div className="flex items-center justify-between px-3 py-2.5 mb-1 border-b border-slate-100 bg-slate-50/80 -mx-2 -mt-2">
                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{title}</span>
-                        <button
-                            onClick={toggleAll}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wider transition-colors"
-                        >
-                            {isAllSelected
-                                ? (searchTerm ? 'Desmarcar Visiveis' : 'Desmarcar Todos')
-                                : (searchTerm ? `Selecionar Visiveis (${visibleItems.length})` : `Selecionar Todos (${items.length})`)}
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={selectAllVisible}
+                                className="text-[10px] text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wider transition-colors"
+                            >
+                                {searchTerm ? 'Todos Result.' : 'Todos'}
+                            </button>
+                            <span className="text-slate-300">|</span>
+                            <button
+                                onClick={clearAllVisible}
+                                className="text-[10px] text-slate-500 hover:text-red-500 font-bold uppercase tracking-wider transition-colors"
+                            >
+                                Limpar
+                            </button>
+                        </div>
                     </div>
                     {searchable && (
                         <div className="px-2 pb-2">
-                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 focus-within:ring-1 focus-within:ring-[#00c6cc] focus-within:border-[#00c6cc] transition-all">
                                 <Search size={13} className="text-slate-400" />
                                 <input
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
+                                    onFocus={() => setIsPinnedOpen(true)}
                                     placeholder={searchPlaceholder}
                                     className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
                                 />
