@@ -64,6 +64,28 @@ function buildNodeId(parts: string[]): string {
   return parts.map(slugify).join('-');
 }
 
+function buildDisparoNodes(rows: ActivityRow[], parentId: string, parentColor: string): TreeNode[] {
+  return rows.map((activity): TreeNode => ({
+    id: `disparo-${activity.id}`,
+    label: activity['Activity name / Taxonomia'] || activity.id,
+    type: 'disparo',
+    count: 1,
+    parentId,
+    metrics: {
+      baseTotal: activity['Base Total'] ?? 0,
+      cartoes: activity['Cartões Gerados'] ?? 0,
+      propostas: activity['Propostas'] ?? 0,
+      aprovados: activity['Aprovados'] ?? 0,
+      custoTotal: activity['Custo Total Campanha'] ?? 0,
+      cac: activity['CAC'] ?? 0,
+      taxaConversao: activity['Taxa de Conversão'] ?? 0,
+    },
+    children: [],
+    activityIds: [activity.id],
+    color: parentColor,
+  }));
+}
+
 function buildChildren(
   activities: ActivityRow[],
   levels: NodeType[],
@@ -72,7 +94,8 @@ function buildChildren(
   parentColor: string,
   getKey: (a: ActivityRow, level: NodeType) => string
 ): TreeNode[] {
-  if (levelIndex >= levels.length) return [];
+  // Leaf level: create individual disparo nodes
+  if (levelIndex >= levels.length) return buildDisparoNodes(activities, parentId, parentColor);
 
   const level = levels[levelIndex];
   const groups = new Map<string, ActivityRow[]>();

@@ -20,6 +20,7 @@ import { TreeView } from './tree/TreeView';
 import { ComparisonPanel } from './comparison/ComparisonPanel';
 import { DetailsPane } from './details/DetailsPane';
 import { QuickSearch } from './search/QuickSearch';
+import { DisparoDetailModal } from './disparo/DisparoDetailModal';
 
 interface DisparoExplorerProps {
   onNavigateToFramework?: (filters?: { bu?: string; segmento?: string; jornada?: string }) => void;
@@ -74,6 +75,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
   const [fetchedActivities, setFetchedActivities] = useState<ActivityRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [disparoModalActivity, setDisparoModalActivity] = useState<ActivityRow | null>(null);
 
   useEffect(() => {
     if (storeActivities.length > 0) return;
@@ -249,6 +251,14 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
             rootNodes={rootNodes}
             onToggle={handleToggle}
             onSelect={(nodeId, multiSelect) => {
+              // Nós folha (disparo) abrem o modal — não afetam o ComparisonPanel
+              const clickedNode = nodeMap.get(nodeId);
+              if (clickedNode?.type === 'disparo') {
+                const actId = clickedNode.activityIds[0];
+                const act = activities.find((a) => a.id === actId);
+                if (act) setDisparoModalActivity(act);
+                return;
+              }
               handleSelect(nodeId, multiSelect);
               const focusId = toFocusFromNode(nodeId);
               setComparisonFocusNode(focusId);
@@ -295,6 +305,15 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
           onViewAll={handleViewAll}
         />
       </aside>
+
+      {/* Modal de detalhe do disparo individual */}
+      {disparoModalActivity && (
+        <DisparoDetailModal
+          activity={disparoModalActivity}
+          onClose={() => setDisparoModalActivity(null)}
+          onSaved={() => setDisparoModalActivity(null)}
+        />
+      )}
     </div>
   );
 };

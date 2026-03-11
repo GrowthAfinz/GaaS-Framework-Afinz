@@ -4,7 +4,7 @@
 
 import { ActivityRow } from './activity';
 
-export type NodeType = 'bu' | 'segmento' | 'jornada' | 'canal';
+export type NodeType = 'bu' | 'segmento' | 'jornada' | 'canal' | 'disparo';
 
 export type ExplorerMetric = 'volume' | 'cartoes' | 'cac' | 'custo' | 'disparos';
 export type DistributionLevel = 'bu' | 'segmento' | 'canal' | 'disparo';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Folder, GitBranch, Mail, MessageSquare, Smartphone, Bell } from 'lucide-react';
+import { BarChart3, Folder, GitBranch, Mail, MessageSquare, Smartphone, Bell, Send } from 'lucide-react';
 import { NodeType } from '../../../types/explorer';
 
 interface TreeNodeIconProps {
@@ -23,6 +23,7 @@ export const TreeNodeIcon: React.FC<TreeNodeIconProps> = ({ type, label, color, 
     case 'bu': return <BarChart3 size={size} style={{ color }} />;
     case 'segmento': return <Folder size={size} style={{ color }} />;
     case 'jornada': return <GitBranch size={size} style={{ color }} />;
+    case 'disparo': return <Send size={size - 1} style={{ color }} />;
     default: return <Folder size={size} style={{ color }} />;
   }
 };

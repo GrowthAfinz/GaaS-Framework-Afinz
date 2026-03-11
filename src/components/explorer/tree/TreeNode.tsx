@@ -28,6 +28,7 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
   const ref = useRef<HTMLDivElement>(null);
   const hasChildren = node.children.length > 0;
   const paddingLeft = level * LEVEL_INDENT;
+  const isDisparo = node.type === 'disparo';
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -39,6 +40,41 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
     if (hasChildren) onToggle(node.id);
   };
 
+  // ── Nó folha: disparo individual ───────────────────────────────────────
+  if (isDisparo) {
+    return (
+      <div role="treeitem" aria-selected={isSelected}>
+        <div
+          ref={ref}
+          tabIndex={0}
+          onClick={handleClick}
+          onKeyDown={(e) => onKeyDown(e, node.id)}
+          title={node.label}
+          className={[
+            'flex items-center gap-1.5 px-2 py-0.5 rounded cursor-pointer select-none transition-colors',
+            'focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500',
+            isSelected
+              ? 'bg-blue-50 border-l-2 border-blue-400 text-blue-700'
+              : 'text-slate-500 hover:bg-slate-50 border-l-2 border-transparent hover:text-slate-700',
+          ].join(' ')}
+          style={{ paddingLeft: `${paddingLeft + 8}px` }}
+        >
+          {/* Espaço alinhado ao chevron dos pais */}
+          <span className="shrink-0" style={{ width: 14 }} />
+
+          {/* Ícone Send */}
+          <TreeNodeIcon type="disparo" label={node.label} color={node.color || '#94A3B8'} size={12} />
+
+          {/* Taxonomia em mono, truncada */}
+          <span className="truncate flex-1 font-mono text-[10.5px] leading-relaxed opacity-80">
+            {node.label}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Nó regular: bu / segmento / canal ──────────────────────────────────
   return (
     <div role="treeitem" aria-expanded={hasChildren ? isExpanded : undefined} aria-selected={isSelected}>
       <div
