@@ -162,7 +162,7 @@ export const LoginView: React.FC = () => {
                     {!successMsg && (
                         <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col gap-3">
                             {mode === 'login' ? (
-                                <p className="text-xs font-bold text-slate-500 tracking-wide text-center mx-auto cursor-default">
+                                <p className="text-xs text-slate-500 tracking-wide text-center mx-auto cursor-default">
                                     Não possui conta? Entre em contato com o administrador do sistema.
                                 </p>
                             ) : (
