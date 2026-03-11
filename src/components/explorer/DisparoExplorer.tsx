@@ -29,6 +29,7 @@ interface DisparoExplorerProps {
 
 export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFramework, filteredActivities }) => {
   const storeActivitiesRaw = useAppStore((state) => state.activities);
+  const filtrosGlobais = useAppStore((state) => state.viewSettings.filtrosGlobais);
   const storeActivities = React.useMemo(() => {
     const sourceActivities = filteredActivities || storeActivitiesRaw;
     return sourceActivities.map((a) => {
@@ -119,6 +120,16 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
     setFilters({ periodo: { inicio: periodInicio, fim: periodFim } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodInicio, periodFim]);
+
+  // Sync global InlineFilterBar filters → explorerStore so the tree reflects top-bar selections
+  useEffect(() => {
+    setFilters({
+      canais: filtrosGlobais.canais ?? [],
+      segmentos: filtrosGlobais.segmentos ?? [],
+      jornadas: filtrosGlobais.jornadas ?? [],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtrosGlobais.canais, filtrosGlobais.segmentos, filtrosGlobais.jornadas]);
 
   const { rootNodes, nodeMap } = useTreeData({ activities, filters });
 

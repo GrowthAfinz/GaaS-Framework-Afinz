@@ -156,10 +156,6 @@ function App() {
   const launchPlannerFilters = useMemo(() => ({
     ...storeFilters,
     bu: selectedBUs,
-    canais: [],
-    jornadas: [],
-    segmentos: [],
-    parceiros: [],
     ofertas: [],
     disparado: 'Todos' as const,
     dataInicio: '',
