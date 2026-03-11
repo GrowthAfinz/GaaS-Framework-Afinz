@@ -73,7 +73,7 @@ export const LoginView: React.FC = () => {
                         </h2>
                     )}
                     <p className="text-slate-500 mb-8 text-sm leading-relaxed">
-                        {mode === 'login' && 'Autentique-se para gerenciar o painel de performance e dashboards.'}
+                        {mode === 'login' && 'Autentique-se para gerenciar o painel de performance, dashboards e ferramentas do sistema GaaS.'}
                         {mode === 'signup' && 'Crie sua conta corporativa para acessar a nuvem.'}
                         {mode === 'reset' && 'Enviaremos um link para você redefinir sua senha de acesso.'}
                     </p>
