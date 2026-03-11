@@ -87,9 +87,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
             onMouseEnter={onMouseEnter}
         >
             {/* ── LEFT: Brand ────────────────────────────────────────── */}
-            <div
-                className="shrink-0 flex items-center gap-3"
+            <button
+                onClick={() => setTab('launch')}
+                className="shrink-0 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                 style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}
+                title="Voltar para Launch Planner"
             >
                 <AfinzLogo height={28} />
                 <div className="flex items-center gap-2">
@@ -101,7 +103,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
                         Growth as a Service
                     </h1>
                 </div>
-            </div>
+            </button>
 
             {/* ── CENTER: Navigation ─────────────────────────────────── */}
             <div className="flex-1 flex justify-center">
