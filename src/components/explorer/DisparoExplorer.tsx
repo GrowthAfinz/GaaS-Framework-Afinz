@@ -220,6 +220,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
 
   return (
     <div className="flex h-full gap-4 p-4 overflow-hidden">
+      {/* 1. Left Column: TreeView */}
       <aside className="w-72 shrink-0 flex flex-col gap-3 overflow-hidden">
         <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
           <span className="text-xs font-semibold text-slate-600">
@@ -265,35 +266,35 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden bg-slate-50/50 rounded-2xl p-4 border border-slate-200/60 shadow-inner">
-        <div className="h-[60%] min-h-[320px] overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-sm p-4 relative">
-          <ComparisonPanel
-            barChartData={barChartData}
-            distributionLevel={distributionLevel}
-            drillPath={drillPath}
-            dailySimpleData={dailySimpleData}
-            dailyStackedData={dailyStackedData}
-            stackedKeys={stackedKeys}
-            metric={metric}
-            temporalMetric={temporalMetric}
-            onMetricChange={setMetric}
-            onTemporalMetricChange={setTemporalMetric}
-            onBarClick={(focusId) => {
-              if (!focusId) return;
-              setComparisonFocusNode(focusId);
-              setDetailsPaneNode(null);
-            }}
-          />
-        </div>
-
-        <div className="h-[40%] min-h-[280px] shrink-0">
-          <DetailsPane
-            data={detailsData}
-            onClose={() => { deselectAll(); setDetailsPaneNode(null); }}
-            onViewAll={handleViewAll}
-          />
-        </div>
+      {/* 2. Center Column: Comparison Panel */}
+      <div className="flex-1 min-w-0 overflow-y-auto bg-white rounded-xl border border-slate-200 shadow-sm p-4 relative">
+        <ComparisonPanel
+          barChartData={barChartData}
+          distributionLevel={distributionLevel}
+          drillPath={drillPath}
+          dailySimpleData={dailySimpleData}
+          dailyStackedData={dailyStackedData}
+          stackedKeys={stackedKeys}
+          metric={metric}
+          temporalMetric={temporalMetric}
+          onMetricChange={setMetric}
+          onTemporalMetricChange={setTemporalMetric}
+          onBarClick={(focusId) => {
+            if (!focusId) return;
+            setComparisonFocusNode(focusId);
+            setDetailsPaneNode(null);
+          }}
+        />
       </div>
+
+      {/* 3. Right Column: Details Pane */}
+      <aside className="w-80 shrink-0 flex flex-col gap-3 overflow-hidden h-full">
+        <DetailsPane
+          data={detailsData}
+          onClose={() => { deselectAll(); setDetailsPaneNode(null); }}
+          onViewAll={handleViewAll}
+        />
+      </aside>
     </div>
   );
 };
