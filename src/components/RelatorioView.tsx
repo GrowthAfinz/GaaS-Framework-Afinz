@@ -36,11 +36,13 @@ interface DetailRow {
   custoTotal: number;
   baseEnviada: number;
   baseEntregue: number;
+  taxaEntrega: number;
   taxaProposta: number;
   taxaAprovacao: number;
   taxaFinalizacao: number;
   custoPorCartao: number;
   taxaConversaoBase: number;
+  aguardando: boolean; // true when baseEnviada is 0 AND date is within d-3
 }
 
 function computeRow(activities: Activity[], label: string): AggregatedRow {
@@ -150,6 +152,14 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   const canalTotal = useMemo(() => computeRow(allActivities, 'Total Geral'), [allActivities]);
   const totalCanalEmissoes = canalTotal.emissoes;
 
+  // d-3 cutoff: dates from today minus 3 days may still be consolidating
+  const d3Cutoff = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 3);
+    return d;
+  }, []);
+
   const detailRows = useMemo((): DetailRow[] => {
     return allActivities
       .map(a => {
@@ -159,6 +169,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
         const aprovados = a.kpis.aprovados ?? 0;
         const emissoes = (a.kpis.emissoes ?? a.kpis.cartoes) ?? 0;
         const custoTotal = a.kpis.custoTotal ?? 0;
+        // Aguardando: sem envios E data dentro do janela d-3 (pode ainda consolidar)
+        const dispDate = new Date(a.dataDisparo);
+        dispDate.setHours(0, 0, 0, 0);
+        const aguardando = baseEnviada === 0 && dispDate >= d3Cutoff;
         return {
           date: a.dataDisparo,
           jornada: a.jornada || '',
@@ -171,15 +185,17 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
           custoTotal,
           baseEnviada,
           baseEntregue,
+          taxaEntrega: baseEnviada > 0 ? baseEntregue / baseEnviada : 0,
           taxaProposta: baseEntregue > 0 ? propostas / baseEntregue : 0,
           taxaAprovacao: propostas > 0 ? aprovados / propostas : 0,
           taxaFinalizacao: baseEntregue > 0 ? emissoes / baseEntregue : 0,
           custoPorCartao: emissoes > 0 ? custoTotal / emissoes : 0,
           taxaConversaoBase: baseEnviada > 0 ? emissoes / baseEnviada : 0,
+          aguardando,
         };
       })
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [allActivities]);
+  }, [allActivities, d3Cutoff]);
 
   const segmentColorMap = useMemo(() => {
     const map = new Map<string, (typeof SEGMENT_PALETTE)[0]>();
@@ -211,9 +227,12 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   }, [canalRows, canalTotal, totalCanalEmissoes]);
 
   const exportDetail = useCallback(() => {
-    const headers = ['Data', 'Jornada', 'Activity Name', 'Segmento', 'Canal', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base'];
+    const headers = ['Data', 'Jornada', 'Activity Name', 'Segmento', 'Canal', 'Envios', 'Entregas', '% Entrega', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base'];
     const rows = detailRows.map(r => [
       format(r.date, 'dd/MM/yyyy'), r.jornada, r.activityName, r.segmento, r.canal,
+      r.aguardando ? 'Aguardando' : fmtN(r.baseEnviada),
+      r.aguardando ? 'Aguardando' : fmtN(r.baseEntregue),
+      r.aguardando ? 'Aguardando' : fmtPct(r.taxaEntrega),
       fmtN(r.propostas), fmtPct(r.taxaProposta), fmtN(r.aprovados), fmtPct(r.taxaAprovacao),
       fmtN(r.emissoes), fmtPct(r.taxaFinalizacao), fmtBRL(r.custoPorCartao), fmtBRL(r.custoTotal), fmtPct4(r.taxaConversaoBase),
     ]);
@@ -245,11 +264,18 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
     ];
 
     // ── Section 3: Detalhamento por Disparo ───────────────────────────────
-    const detailHeaders = ['Data', 'Jornada', 'Activity Name', 'Segmento', 'Canal', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base'];
+    const detailHeaders = ['Data', 'Jornada', 'Activity Name', 'Segmento', 'Canal', 'Envios', 'Entregas', '% Entrega', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base'];
     const detailLines = [
       toLine(['=== DETALHAMENTO POR DISPARO ===']),
       toLine(detailHeaders),
-      ...detailRows.map(r => toLine([format(r.date, 'dd/MM/yyyy'), r.jornada, r.activityName, r.segmento, r.canal, fmtN(r.propostas), fmtPct(r.taxaProposta), fmtN(r.aprovados), fmtPct(r.taxaAprovacao), fmtN(r.emissoes), fmtPct(r.taxaFinalizacao), fmtBRL(r.custoPorCartao), fmtBRL(r.custoTotal), fmtPct4(r.taxaConversaoBase)])),
+      ...detailRows.map(r => toLine([
+        format(r.date, 'dd/MM/yyyy'), r.jornada, r.activityName, r.segmento, r.canal,
+        r.aguardando ? 'Aguardando' : fmtN(r.baseEnviada),
+        r.aguardando ? 'Aguardando' : fmtN(r.baseEntregue),
+        r.aguardando ? 'Aguardando' : fmtPct(r.taxaEntrega),
+        fmtN(r.propostas), fmtPct(r.taxaProposta), fmtN(r.aprovados), fmtPct(r.taxaAprovacao),
+        fmtN(r.emissoes), fmtPct(r.taxaFinalizacao), fmtBRL(r.custoPorCartao), fmtBRL(r.custoTotal), fmtPct4(r.taxaConversaoBase),
+      ])),
     ];
 
     // ── Combine all sections with blank separators ─────────────────────────
@@ -604,6 +630,9 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   <th className="text-left px-4 py-3 font-semibold whitespace-nowrap w-20">Data</th>
                   <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[260px]">Campanha (Jornada · Activity Name)</th>
                   <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[120px]">Segmento</th>
+                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Envios</th>
+                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Entregas</th>
+                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Entrega</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
                     style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
@@ -665,6 +694,27 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                         ) : (
                           <span className="text-slate-400 text-xs">—</span>
                         )}
+                      </td>
+                      {/* Envios */}
+                      <td className="text-right px-4 py-2.5">
+                        {row.aguardando
+                          ? <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
+                          : <span className="text-slate-600">{fmtN(row.baseEnviada)}</span>
+                        }
+                      </td>
+                      {/* Entregas */}
+                      <td className="text-right px-4 py-2.5">
+                        {row.aguardando
+                          ? <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
+                          : <span className="text-slate-600">{fmtN(row.baseEntregue)}</span>
+                        }
+                      </td>
+                      {/* % Entrega */}
+                      <td className="text-right px-4 py-2.5">
+                        {row.aguardando
+                          ? <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
+                          : <span className="text-slate-600">{fmtPct(row.taxaEntrega)}</span>
+                        }
                       </td>
                       <td
                         className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
