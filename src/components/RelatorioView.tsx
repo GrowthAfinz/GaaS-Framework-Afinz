@@ -1,9 +1,10 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Download, FileSpreadsheet, FileText, Save } from 'lucide-react';
-import { CalendarData, Activity, FrameworkRow } from '../types/framework';
+import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
-import { DetailPanel } from './framework/FrameworkDetailPanel';
+import { DisparoDetailModal } from './explorer/disparo/DisparoDetailModal';
+import { ActivityRow } from '../types/activity';
 
 interface RelatorioViewProps {
   data: CalendarData;
@@ -129,13 +130,46 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [editingDescs, setEditingDescs] = useState<Record<string, string>>({});
   const [savingDesc, setSavingDesc] = useState<Set<string>>(new Set());
-  const [detailPanelRow, setDetailPanelRow] = useState<(FrameworkRow & { _origIdx: number }) | null>(null);
+  const [selectedActivityRow, setSelectedActivityRow] = useState<ActivityRow | null>(null);
 
-  const allColumns = useMemo(() => {
-    const keys = new Set<string>();
-    allActivities.forEach(a => Object.keys(a.raw ?? {}).forEach(k => keys.add(k)));
-    return Array.from(keys);
-  }, [allActivities]);
+  // Mapeia Activity → ActivityRow para o DisparoDetailModal
+  const toActivityRow = (a: Activity): ActivityRow => ({
+    id: a.id,
+    prog_gaas: false,
+    status: (a.status as ActivityRow['status']) ?? 'Enviado',
+    created_at: '',
+    updated_at: '',
+    BU: a.bu as ActivityRow['BU'],
+    jornada: a.jornada ?? '',
+    'Activity name / Taxonomia': a.id,
+    Canal: a.canal,
+    'Data de Disparo': a.dataDisparo ? format(a.dataDisparo, 'yyyy-MM-dd') : '',
+    'Data Fim': '',
+    Segmento: a.segmento ?? '',
+    Parceiro: a.parceiro,
+    Oferta: a.oferta,
+    Promocional: a.promocional,
+    Produto: (a.raw as Record<string, unknown>)?.['Produto'] as string | undefined,
+    'Oferta 2': (a.raw as Record<string, unknown>)?.['Oferta 2'] as string | undefined,
+    'Promocional 2': (a.raw as Record<string, unknown>)?.['Promocional 2'] as string | undefined,
+    'Etapa de aquisição': (a.raw as Record<string, unknown>)?.['Etapa de aquisição'] as string | undefined,
+    'Perfil de Crédito': (a.raw as Record<string, unknown>)?.['Perfil de Crédito'] as string | undefined,
+    'Ordem de disparo': a.ordemDisparo,
+    'Horário de Disparo': (a.raw as Record<string, unknown>)?.['Horário de Disparo'] as string | undefined,
+    'Base Total': a.kpis.baseEnviada,
+    'Base Acionável': a.kpis.baseEntregue,
+    'Taxa de Entrega': a.kpis.taxaEntrega,
+    'Taxa de Proposta': a.kpis.taxaPropostas,
+    'Taxa de Aprovação': a.kpis.taxaAprovacao,
+    'Taxa de Finalização': a.kpis.taxaFinalizacao,
+    'Taxa de Conversão': a.kpis.taxaConversao,
+    'Taxa de Abertura': a.kpis.taxaAbertura,
+    Propostas: a.kpis.propostas,
+    Aprovados: a.kpis.aprovados,
+    'Cartões Gerados': a.kpis.cartoes ?? a.kpis.emissoes,
+    CAC: a.kpis.cac,
+    'Custo Total Campanha': a.kpis.custoTotal,
+  });
 
   const segmentoRows = useMemo(() => {
     const groups = new Map<string, Activity[]>();
@@ -705,22 +739,17 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                 {detailRows.map((row, idx) => {
                   const color = segmentColorMap.get(row.segmento);
                   const isBanded = idx % 2 !== 0;
-                  const campanhaLabel = row.jornada
-                    ? `${row.jornada} · ${row.activityName}`
-                    : row.activityName;
                   return (
                     <tr
                       key={`${row.date.toISOString()}-${row.activityName}`}
-                      className={`border-t border-slate-100 hover:brightness-95 transition-all ${color?.bg ?? (isBanded ? 'bg-slate-50' : 'bg-white')}`}
+                      className={`border-t border-slate-100 hover:brightness-95 transition-all cursor-pointer ${color?.bg ?? (isBanded ? 'bg-slate-50' : 'bg-white')}`}
+                      onClick={() => {
+                        const act = allActivities.find((a: Activity) => a.id === row.activityName);
+                        if (act) setSelectedActivityRow(toActivityRow(act));
+                      }}
+                      title="Clique para ver detalhes do disparo"
                     >
-                      <td
-                        className={`px-4 py-2.5 font-medium whitespace-nowrap tabular-nums text-xs cursor-pointer hover:text-cyan-600 hover:underline transition-colors ${color?.border ?? ''} text-slate-500`}
-                        onClick={() => {
-                          const act = allActivities.find((a: Activity) => a.id === row.activityName);
-                          if (act?.raw) setDetailPanelRow({ ...act.raw, _origIdx: 0 });
-                        }}
-                        title="Ver detalhes do disparo"
-                      >
+                      <td className={`px-4 py-2.5 font-medium whitespace-nowrap tabular-nums text-xs text-slate-500 ${color?.border ?? ''}`}>
                         {format(row.date, 'dd/MM')}
                       </td>
                       <td className="px-4 py-2.5" style={{ minWidth: 180, maxWidth: 220 }}>
@@ -749,7 +778,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                         <span className="text-[11px] font-medium text-slate-600">{row.canal || '—'}</span>
                       </td>
                       {/* Descrição */}
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
                         <div className="flex items-start gap-1.5">
                           <textarea
                             className="flex-1 text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-cyan-400 min-w-[160px]"
@@ -805,23 +834,12 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
 
     </div>
 
-    {/* DetailPanel overlay — abre ao clicar na data */}
-    {detailPanelRow && (
-      <div
-        className="fixed inset-0 z-50 flex items-start justify-end bg-slate-900/40 backdrop-blur-sm"
-        onClick={() => setDetailPanelRow(null)}
-      >
-        <div
-          className="w-[360px] h-full bg-white shadow-2xl overflow-y-auto flex flex-col"
-          onClick={e => e.stopPropagation()}
-        >
-          <DetailPanel
-            row={detailPanelRow}
-            allColumns={allColumns}
-            onClose={() => setDetailPanelRow(null)}
-          />
-        </div>
-      </div>
+    {/* DisparoDetailModal — abre ao clicar na linha */}
+    {selectedActivityRow && (
+      <DisparoDetailModal
+        activity={selectedActivityRow}
+        onClose={() => setSelectedActivityRow(null)}
+      />
     )}
     </>
   );
