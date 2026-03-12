@@ -1,8 +1,9 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Download, FileSpreadsheet, FileText, Save } from 'lucide-react';
-import { CalendarData, Activity } from '../types/framework';
+import { CalendarData, Activity, FrameworkRow } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
+import { DetailPanel } from './framework/FrameworkDetailPanel';
 
 interface RelatorioViewProps {
   data: CalendarData;
@@ -128,6 +129,13 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [editingDescs, setEditingDescs] = useState<Record<string, string>>({});
   const [savingDesc, setSavingDesc] = useState<Set<string>>(new Set());
+  const [detailPanelRow, setDetailPanelRow] = useState<(FrameworkRow & { _origIdx: number }) | null>(null);
+
+  const allColumns = useMemo(() => {
+    const keys = new Set<string>();
+    allActivities.forEach(a => Object.keys(a.raw ?? {}).forEach(k => keys.add(k)));
+    return Array.from(keys);
+  }, [allActivities]);
 
   const segmentoRows = useMemo(() => {
     const groups = new Map<string, Activity[]>();
@@ -329,6 +337,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   }
 
   return (
+    <>
     <div className="p-6 space-y-8 max-w-full">
 
       {/* ── PAGE HEADER ── */}
@@ -661,13 +670,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr style={{ background: '#1E293B' }} className="text-white">
-                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap w-20">Data</th>
-                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[160px]">Campanha</th>
-                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[120px]">Segmento</th>
+                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap w-16">Data</th>
+                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap" style={{ minWidth: 180, maxWidth: 220 }}>Campanha</th>
+                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[110px]">Segmento</th>
+                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap w-20">Canal</th>
                   <th className="text-left px-3 py-3 font-semibold whitespace-nowrap min-w-[200px]">Descrição</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Envios</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Entregas</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Entrega</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
                     style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
@@ -706,19 +713,26 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                       key={`${row.date.toISOString()}-${row.activityName}`}
                       className={`border-t border-slate-100 hover:brightness-95 transition-all ${color?.bg ?? (isBanded ? 'bg-slate-50' : 'bg-white')}`}
                     >
-                      <td className={`px-4 py-2.5 font-medium text-slate-500 whitespace-nowrap tabular-nums text-xs ${color?.border ?? ''}`}>
+                      <td
+                        className={`px-4 py-2.5 font-medium whitespace-nowrap tabular-nums text-xs cursor-pointer hover:text-cyan-600 hover:underline transition-colors ${color?.border ?? ''} text-slate-500`}
+                        onClick={() => {
+                          const act = allActivities.find((a: Activity) => a.id === row.activityName);
+                          if (act?.raw) setDetailPanelRow({ ...act.raw, _origIdx: 0 });
+                        }}
+                        title="Ver detalhes do disparo"
+                      >
                         {format(row.date, 'dd/MM')}
                       </td>
-                      <td className="px-4 py-2.5 min-w-0">
+                      <td className="px-4 py-2.5" style={{ minWidth: 180, maxWidth: 220 }}>
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-medium text-slate-800 text-[11px] leading-tight truncate max-w-[140px]" title={row.activityName}>
-                            {row.activityName}
-                          </span>
                           {row.jornada && (
-                            <span className={`text-[11px] font-medium ${color?.text ?? 'text-slate-500'}`}>
+                            <span className={`text-[11px] font-semibold truncate ${color?.text ?? 'text-slate-600'}`} style={{ maxWidth: 180 }} title={row.jornada}>
                               {row.jornada}
                             </span>
                           )}
+                          <span className="text-[10px] font-mono text-slate-400 break-all leading-tight" title={row.activityName}>
+                            {row.activityName}
+                          </span>
                         </div>
                       </td>
                       <td className="px-4 py-2.5">
@@ -729,6 +743,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                         ) : (
                           <span className="text-slate-400 text-xs">—</span>
                         )}
+                      </td>
+                      {/* Canal */}
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <span className="text-[11px] font-medium text-slate-600">{row.canal || '—'}</span>
                       </td>
                       {/* Descrição */}
                       <td className="px-3 py-1.5">
@@ -751,27 +769,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                             </button>
                           )}
                         </div>
-                      </td>
-                      {/* Envios */}
-                      <td className="text-right px-4 py-2.5">
-                        {row.aguardando
-                          ? <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
-                          : <span className="text-slate-600">{fmtN(row.baseEnviada)}</span>
-                        }
-                      </td>
-                      {/* Entregas */}
-                      <td className="text-right px-4 py-2.5">
-                        {row.aguardando
-                          ? <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
-                          : <span className="text-slate-600">{fmtN(row.baseEntregue)}</span>
-                        }
-                      </td>
-                      {/* % Entrega */}
-                      <td className="text-right px-4 py-2.5">
-                        {row.aguardando
-                          ? <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
-                          : <span className="text-slate-600">{fmtPct(row.taxaEntrega)}</span>
-                        }
                       </td>
                       <td
                         className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
@@ -807,5 +804,25 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
       </section>
 
     </div>
+
+    {/* DetailPanel overlay — abre ao clicar na data */}
+    {detailPanelRow && (
+      <div
+        className="fixed inset-0 z-50 flex items-start justify-end bg-slate-900/40 backdrop-blur-sm"
+        onClick={() => setDetailPanelRow(null)}
+      >
+        <div
+          className="w-[360px] h-full bg-white shadow-2xl overflow-y-auto flex flex-col"
+          onClick={e => e.stopPropagation()}
+        >
+          <DetailPanel
+            row={detailPanelRow}
+            allColumns={allColumns}
+            onClose={() => setDetailPanelRow(null)}
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 };
