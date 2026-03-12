@@ -172,6 +172,26 @@ export const parseDate = (dateString: string | number): Date | null => {
         if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
           return date;
         }
+      } else if (parts.length === 2) {
+        // Tenta: DD/MM (assume current year)
+        const p0 = parseInt(parts[0], 10);
+        const p1 = parseInt(parts[1], 10);
+        const year = new Date().getFullYear();
+
+        let day = p0;
+        let month = p1;
+        let date = new Date(year, month - 1, day);
+        if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+          return date;
+        }
+
+        // Fallback MM/DD
+        day = p1;
+        month = p0;
+        date = new Date(year, month - 1, day);
+        if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+          return date;
+        }
       }
     }
 

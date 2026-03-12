@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "calendar-estrategico",
-      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm.cmd",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
     }

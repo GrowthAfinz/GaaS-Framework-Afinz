@@ -832,7 +832,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   <th className="text-left px-4 py-3 font-semibold whitespace-nowrap">Parceiro</th>
                   <th className="text-left px-4 py-3 font-semibold whitespace-nowrap w-20">Canal</th>
                   <th className="text-left px-3 py-3 font-semibold whitespace-nowrap min-w-[200px]">Descrição</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Entregas</th>
+                  <th className="text-center px-4 py-3 font-semibold whitespace-nowrap">Entregas</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
                     style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
@@ -899,11 +899,15 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                       </td>
                       {/* Parceiro */}
                       <td className="px-4 py-2.5 whitespace-nowrap">
-                        <span className="text-[11px] font-medium text-slate-600">{row.parceiro}</span>
+                        <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-slate-100 text-slate-600 border border-slate-200">
+                          {row.parceiro}
+                        </span>
                       </td>
                       {/* Canal */}
                       <td className="px-4 py-2.5 whitespace-nowrap">
-                        <span className="text-[11px] font-medium text-slate-600">{row.canal || '—'}</span>
+                        <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-slate-100 text-slate-600 border border-slate-200">
+                          {row.canal || '—'}
+                        </span>
                       </td>
                       {/* Descrição */}
                       <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
@@ -928,7 +932,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                         </div>
                       </td>
                       {/* Entregas */}
-                      <td className="text-right px-4 py-2.5">
+                      <td className="text-center px-4 py-2.5">
                         {row.aguardando
                           ? <span className="text-xs font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
                           : <span className="text-slate-600">{fmtN(row.baseEntregue)}</span>
