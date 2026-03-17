@@ -809,12 +809,12 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                     ? 'Top Conversores'
                     : destaqueFilter === 'aguardando'
                     ? 'Aguardando'
-                    : 'Filtros Destaque'}
+                    : 'Filtros'}
                   {destaqueFilter && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />}
                 </button>
                 {showDestaqueMenu && (
                   <div className="absolute right-0 top-8 z-20 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 min-w-[200px]">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 pt-1 pb-1.5">Filtros Destaque</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-3 pt-1 pb-1.5">Filtros</p>
                     {([
                       { key: 'top-conversores' as const, label: '🏆 Top Conversores', desc: 'Top 20% por taxa de conversão' },
                       { key: 'aguardando' as const, label: '⏳ Aguardando Resultado', desc: 'Disparos em janela D-3' },
