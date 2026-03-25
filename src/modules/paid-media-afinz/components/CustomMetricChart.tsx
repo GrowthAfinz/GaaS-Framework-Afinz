@@ -66,6 +66,12 @@ export const CustomMetricChart: React.FC<CustomMetricChartProps> = ({
             // Campaigns
             if (filters.selectedCampaigns.length > 0 && !filters.selectedCampaigns.includes(d.campaign)) return false;
 
+            // Adsets
+            if (filters.selectedAdsets.length > 0 && (!d.adset_name || !filters.selectedAdsets.includes(d.adset_name))) return false;
+
+            // Ads
+            if (filters.selectedAds.length > 0 && (!d.ad_name || !filters.selectedAds.includes(d.ad_name))) return false;
+
             // Date Range (Local or Global)
             const range = useCustomDate ? {
                 start: startOfDay(parseISO(customDateRange.from)),
