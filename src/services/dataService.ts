@@ -354,7 +354,13 @@ export const dataService = {
             .order('generated_at', { ascending: false });
 
         if (filters?.channel) query = query.eq('channel', filters.channel);
-        if (filters?.status) query = query.eq('status', filters.status);
+        if (filters?.status) {
+            if (filters.status === 'active') {
+                query = query.in('status', ['active', 'ativo']);
+            } else {
+                query = query.eq('status', filters.status);
+            }
+        }
         if (filters?.minScore) query = query.gte('score', filters.minScore);
         if (filters?.limit) query = query.limit(filters.limit);
 

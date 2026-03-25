@@ -58,6 +58,6 @@ export interface MediaInsight {
     causa: string;
     acoes: string[];
     evidencias: Record<string, number | string>;
-    status: 'active' | 'dismissed' | 'done';
+    status: 'active' | 'ativo' | 'dismissed' | 'done';
     created_at: string;
 }
