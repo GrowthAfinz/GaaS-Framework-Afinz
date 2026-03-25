@@ -11,8 +11,9 @@ import { MonthlyAnalysisTab } from './components/Tabs/MonthlyAnalysisTab';
 import { CampaignDetailsTab } from './components/Tabs/CampaignDetailsTab';
 import { BudgetTab } from './components/Tabs/BudgetTab';
 import { DailyAnalysisTab } from './components/Tabs/DailyAnalysisTab';
+import { CampaignMapperModal } from './components/Modals/CampaignMapperModal';
 import { AfinzLogo } from './components/AfinzLogo';
-import { LayoutDashboard, BarChart2, List, Wallet, UploadCloud, ArrowLeft, Calendar, Loader2 } from 'lucide-react';
+import { LayoutDashboard, BarChart2, List, Wallet, UploadCloud, ArrowLeft, Calendar, Loader2, Settings2 } from 'lucide-react';
 
 interface PaidMediaAfinzAppProps {
   onBack?: () => void;
@@ -24,6 +25,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'campaigns' | 'budget' | 'daily'>('overview');
   const [isSyncing, setIsSyncing] = useState(true);
   const [isFilterHovered, setIsFilterHovered] = useState(false);
+  const [isMapperOpen, setIsMapperOpen] = useState(false);
 
   // Auto-Sync — reads directly from Supabase table
   useEffect(() => {
@@ -155,13 +157,23 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
             })}
           </nav>
 
-          <button
-            onClick={() => setRawData([])}
-            className="text-sm font-medium text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors px-3 py-1.5 hover:bg-red-50 rounded-lg"
-          >
-            <UploadCloud size={16} />
-            Novo Arquivo
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMapperOpen(true)}
+              className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+              title="Mapeamento de Campanhas"
+            >
+              <Settings2 size={18} />
+            </button>
+            <div className="w-px h-6 bg-slate-200 mx-1"></div>
+            <button
+              onClick={() => setRawData([])}
+              className="text-sm font-medium text-slate-500 hover:text-red-500 flex items-center gap-1.5 transition-colors px-3 py-1.5 hover:bg-red-50 rounded-lg"
+            >
+              <UploadCloud size={16} />
+              Novo Arquivo
+            </button>
+          </div>
         </div>
       </header>
 
@@ -190,6 +202,11 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
           {activeTab === 'budget' && <BudgetTab />}
         </div>
       </main>
+
+      <CampaignMapperModal 
+        isOpen={isMapperOpen} 
+        onClose={() => setIsMapperOpen(false)} 
+      />
     </div>
   );
 };

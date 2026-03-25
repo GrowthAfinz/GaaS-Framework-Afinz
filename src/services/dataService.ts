@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { Activity, FrameworkRow } from '../types/framework';
-import { DailyAdMetrics, MediaInsight } from '../schemas/paid-media';
+import { DailyAdMetrics, MediaInsight, CampaignMapping } from '../schemas/paid-media';
 import { B2CDataRow } from '../types/b2c';
 import { parseDate } from '../utils/formatters';
 import { format } from 'date-fns';
@@ -182,12 +182,20 @@ export const dataService = {
     },
 
     async fetchPaidMedia(): Promise<DailyAdMetrics[]> {
-        const { data, error } = await supabase
-            .from('paid_media_metrics')
-            .select('*')
-            .order('date', { ascending: false });
+        const [{ data, error }, mappings] = await Promise.all([
+            supabase
+                .from('paid_media_metrics')
+                .select('*')
+                .order('date', { ascending: false }),
+            dataService.fetchCampaignMappings()
+        ]);
 
         if (error) throw error;
+
+        const mappingDict = mappings.reduce((acc, m) => {
+            acc[m.campaign_name] = m.objective;
+            return acc;
+        }, {} as Record<string, string>);
 
         // Group by date + channel + campaign + objective
         const grouped = (data || []).reduce((acc: any, row: any) => {
@@ -225,7 +233,7 @@ export const dataService = {
             const conversions = group.conversions;
             const reach = group.reach;
 
-            let mappedObjective = group.objective;
+            let mappedObjective = mappingDict[group.campaign] || group.objective;
             if (mappedObjective === 'conversion') mappedObjective = 'b2c';
             if (mappedObjective === 'brand') mappedObjective = 'marca';
 
@@ -249,15 +257,23 @@ export const dataService = {
     },
 
     async fetchPaidMediaByAd(): Promise<DailyAdMetrics[]> {
-        const { data, error } = await supabase
-            .from('paid_media_metrics')
-            .select('*')
-            .order('date', { ascending: false });
+        const [{ data, error }, mappings] = await Promise.all([
+            supabase
+                .from('paid_media_metrics')
+                .select('*')
+                .order('date', { ascending: false }),
+            dataService.fetchCampaignMappings()
+        ]);
 
         if (error) throw error;
 
+        const mappingDict = mappings.reduce((acc, m) => {
+            acc[m.campaign_name] = m.objective;
+            return acc;
+        }, {} as Record<string, string>);
+
         return (data || []).map((row: any) => {
-            let mappedObjective = row.objective;
+            let mappedObjective = mappingDict[row.campaign] || row.objective;
             if (mappedObjective === 'conversion') mappedObjective = 'b2c';
             if (mappedObjective === 'brand') mappedObjective = 'marca';
             
@@ -285,12 +301,20 @@ export const dataService = {
     },
 
     async fetchPaidMediaByAdset(): Promise<DailyAdMetrics[]> {
-        const { data, error } = await supabase
-            .from('paid_media_metrics')
-            .select('*')
-            .order('date', { ascending: false });
+        const [{ data, error }, mappings] = await Promise.all([
+            supabase
+                .from('paid_media_metrics')
+                .select('*')
+                .order('date', { ascending: false }),
+            dataService.fetchCampaignMappings()
+        ]);
 
         if (error) throw error;
+
+        const mappingDict = mappings.reduce((acc, m) => {
+            acc[m.campaign_name] = m.objective;
+            return acc;
+        }, {} as Record<string, string>);
 
         // Group by date + channel + campaign + adset_name
         const grouped = (data || []).reduce((acc: any, row: any) => {
@@ -330,7 +354,7 @@ export const dataService = {
             const conversions = group.conversions;
             const reach = group.reach;
 
-            let mappedObjective = group.objective;
+            let mappedObjective = mappingDict[group.campaign] || group.objective;
             if (mappedObjective === 'conversion') mappedObjective = 'b2c';
             if (mappedObjective === 'brand') mappedObjective = 'marca';
 
@@ -545,6 +569,19 @@ export const dataService = {
 
     async deletePaidMediaTarget(id: string) {
         const { error } = await supabase.from('paid_media_targets').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async fetchCampaignMappings(): Promise<CampaignMapping[]> {
+        const { data, error } = await supabase.from('paid_media_campaign_mappings').select('*');
+        if (error) throw error;
+        return data || [];
+    },
+
+    async upsertCampaignMapping(mapping: Partial<CampaignMapping>) {
+        const { error } = await supabase
+            .from('paid_media_campaign_mappings')
+            .upsert(mapping, { onConflict: 'campaign_name' });
         if (error) throw error;
     }
 };
