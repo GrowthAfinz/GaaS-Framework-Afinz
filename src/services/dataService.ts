@@ -225,11 +225,15 @@ export const dataService = {
             const conversions = group.conversions;
             const reach = group.reach;
 
+            let mappedObjective = group.objective;
+            if (mappedObjective === 'conversion') mappedObjective = 'b2c';
+            if (mappedObjective === 'brand') mappedObjective = 'marca';
+
             return {
                 date: group.date,
                 channel: group.channel,
                 campaign: group.campaign,
-                objective: group.objective,
+                objective: mappedObjective,
                 spend,
                 impressions,
                 clicks,
@@ -252,26 +256,32 @@ export const dataService = {
 
         if (error) throw error;
 
-        return (data || []).map((row: any) => ({
-            date: new Date(row.date),
-            channel: row.channel,
-            campaign: row.campaign,
-            objective: row.objective,
-            ad_id: row.ad_id,
-            ad_name: row.ad_name,
-            adset_id: row.adset_id,
-            adset_name: row.adset_name,
-            spend: Number(row.spend) || 0,
-            impressions: Number(row.impressions) || 0,
-            clicks: Number(row.clicks) || 0,
-            conversions: Number(row.conversions) || 0,
-            reach: Number(row.reach) || undefined,
-            frequency: Number(row.frequency) || undefined,
-            ctr: Number(row.ctr) || 0,
-            cpc: Number(row.cpc) || 0,
-            cpm: Number(row.cpm) || 0,
-            cpa: Number(row.cpa) || 0
-        }));
+        return (data || []).map((row: any) => {
+            let mappedObjective = row.objective;
+            if (mappedObjective === 'conversion') mappedObjective = 'b2c';
+            if (mappedObjective === 'brand') mappedObjective = 'marca';
+            
+            return {
+                date: new Date(row.date),
+                channel: row.channel,
+                campaign: row.campaign,
+                objective: mappedObjective,
+                ad_id: row.ad_id,
+                ad_name: row.ad_name,
+                adset_id: row.adset_id,
+                adset_name: row.adset_name,
+                spend: Number(row.spend) || 0,
+                impressions: Number(row.impressions) || 0,
+                clicks: Number(row.clicks) || 0,
+                conversions: Number(row.conversions) || 0,
+                reach: Number(row.reach) || undefined,
+                frequency: Number(row.frequency) || undefined,
+                ctr: Number(row.ctr) || 0,
+                cpc: Number(row.cpc) || 0,
+                cpm: Number(row.cpm) || 0,
+                cpa: Number(row.cpa) || 0
+            };
+        });
     },
 
     async fetchPaidMediaByAdset(): Promise<DailyAdMetrics[]> {
@@ -320,11 +330,15 @@ export const dataService = {
             const conversions = group.conversions;
             const reach = group.reach;
 
+            let mappedObjective = group.objective;
+            if (mappedObjective === 'conversion') mappedObjective = 'b2c';
+            if (mappedObjective === 'brand') mappedObjective = 'marca';
+
             return {
                 date: group.date,
                 channel: group.channel,
                 campaign: group.campaign,
-                objective: group.objective,
+                objective: mappedObjective,
                 adset_name: group.adset_name,
                 adset_id: group.adset_id,
                 spend,
