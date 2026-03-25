@@ -248,7 +248,7 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
                         </button>
 
                         {isColumnsMenuOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 p-2 z-10 animate-fade-in-down">
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 p-2 z-10 animate-fade-in-down max-h-72 overflow-y-auto">
                                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Métricas</div>
                                 {Object.keys(visibleColumns).map(col => (
                                     <label key={col} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer">

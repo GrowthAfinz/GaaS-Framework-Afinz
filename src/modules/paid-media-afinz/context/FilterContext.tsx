@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { DailyMetrics, FilterState } from '../types';
 import { endOfDay, startOfDay } from 'date-fns';
 import { usePeriod } from '../../../contexts/PeriodContext';
+import { dataService } from '../../../services/dataService';
 
 interface FilterContextType {
     rawData: DailyMetrics[];
@@ -44,6 +45,13 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
     const [selectedAdsets, setSelectedAdsets] = useState<string[]>([]);
     const [selectedAds, setSelectedAds] = useState<string[]>([]);
+
+    // Hierarchy data for filter dropdowns (lightweight: only campaign/adset/ad names)
+    const [adHierarchy, setAdHierarchy] = useState<Array<{ campaign: string; adset_name: string | null; ad_name: string | null }>>([]);
+
+    useEffect(() => {
+        dataService.fetchAdHierarchy().then(setAdHierarchy).catch(console.error);
+    }, []);
 
     // Derived Data
     const filteredData = useMemo(() => {
@@ -112,32 +120,26 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return Array.from(campaigns).sort();
     }, [rawData, dateFrom, dateTo]);
 
-    // Adsets available given the current campaign selection + date range
+    // Adsets available given the current campaign selection (from hierarchy, no date dependency)
     const availableAdsets = useMemo(() => {
         const adsets = new Set<string>();
-        rawData.forEach(item => {
-            const itemDate = new Date(item.date);
-            const inDateRange = itemDate >= dateFrom && itemDate <= dateTo;
-            if (!inDateRange) return;
-            if (selectedCampaigns.length > 0 && !selectedCampaigns.includes(item.campaign)) return;
-            if (item.adset_name) adsets.add(item.adset_name);
+        adHierarchy.forEach(row => {
+            if (selectedCampaigns.length > 0 && !selectedCampaigns.includes(row.campaign)) return;
+            if (row.adset_name) adsets.add(row.adset_name);
         });
         return Array.from(adsets).sort();
-    }, [rawData, dateFrom, dateTo, selectedCampaigns]);
+    }, [adHierarchy, selectedCampaigns]);
 
-    // Ads available given the current campaign + adset selection + date range
+    // Ads available given the current campaign + adset selection (from hierarchy)
     const availableAds = useMemo(() => {
         const ads = new Set<string>();
-        rawData.forEach(item => {
-            const itemDate = new Date(item.date);
-            const inDateRange = itemDate >= dateFrom && itemDate <= dateTo;
-            if (!inDateRange) return;
-            if (selectedCampaigns.length > 0 && !selectedCampaigns.includes(item.campaign)) return;
-            if (selectedAdsets.length > 0 && (!item.adset_name || !selectedAdsets.includes(item.adset_name))) return;
-            if (item.ad_name) ads.add(item.ad_name);
+        adHierarchy.forEach(row => {
+            if (selectedCampaigns.length > 0 && !selectedCampaigns.includes(row.campaign)) return;
+            if (selectedAdsets.length > 0 && (!row.adset_name || !selectedAdsets.includes(row.adset_name))) return;
+            if (row.ad_name) ads.add(row.ad_name);
         });
         return Array.from(ads).sort();
-    }, [rawData, dateFrom, dateTo, selectedCampaigns, selectedAdsets]);
+    }, [adHierarchy, selectedCampaigns, selectedAdsets]);
 
     // Handlers
     const toggleChannel = (channel: 'meta' | 'google') => {

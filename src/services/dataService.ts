@@ -379,6 +379,18 @@ export const dataService = {
         });
     },
 
+    /** Lightweight fetch: only campaign / adset_name / ad_name for filter dropdowns */
+    async fetchAdHierarchy(): Promise<Array<{ campaign: string; adset_name: string | null; ad_name: string | null }>> {
+        const { data, error } = await supabase
+            .from('paid_media_metrics')
+            .select('campaign, adset_name, ad_name');
+        if (error) {
+            console.error('fetchAdHierarchy error:', error);
+            return [];
+        }
+        return (data || []) as Array<{ campaign: string; adset_name: string | null; ad_name: string | null }>;
+    },
+
     async fetchDrilldownData(campaign: string, fromDateStr: string, toDateStr: string): Promise<any[]> {
         // As datas devem chegar no formato YYYY-MM-DD
         const [{ data, error }, mappings] = await Promise.all([
