@@ -113,7 +113,7 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
         </span>
 
         {/* Badge */}
-        <TreeNodeBadge count={node.count} />
+        <TreeNodeBadge node={node} />
       </div>
 
       {/* Children */}

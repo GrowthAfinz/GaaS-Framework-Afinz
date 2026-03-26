@@ -29,7 +29,7 @@ function emptyMetrics(): NodeMetrics {
 
 function aggregateMetrics(rows: ActivityRow[]): NodeMetrics {
   const total = emptyMetrics();
-  let cacSum = 0, cacCount = 0, convSum = 0, convCount = 0;
+  let convSum = 0, convCount = 0;
 
   for (const r of rows) {
     total.baseTotal += r['Base Total'] ?? 0;
@@ -38,17 +38,13 @@ function aggregateMetrics(rows: ActivityRow[]): NodeMetrics {
     total.aprovados += r['Aprovados'] ?? 0;
     total.custoTotal += r['Custo Total Campanha'] ?? 0;
 
-    if (r['CAC'] != null && r['CAC'] > 0) {
-      cacSum += r['CAC'];
-      cacCount++;
-    }
     if (r['Taxa de Conversão'] != null && r['Taxa de Conversão'] > 0) {
       convSum += r['Taxa de Conversão'];
       convCount++;
     }
   }
 
-  total.cac = cacCount > 0 ? cacSum / cacCount : 0;
+  total.cac = total.cartoes > 0 ? total.custoTotal / total.cartoes : 0;
   total.taxaConversao = convCount > 0 ? convSum / convCount : 0;
 
   return total;
