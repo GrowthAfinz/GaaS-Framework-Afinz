@@ -3,7 +3,7 @@ import { useFilters } from '../../context/FilterContext';
 import {
     Search, TrendingUp, TrendingDown, Award,
     MoreHorizontal, ThumbsUp, MessageCircle, Share2, Play,
-    BarChart2, Info, RefreshCw, Loader2
+    BarChart2, Info, RefreshCw, Loader2, Image, Film
 } from 'lucide-react';
 import {
     ResponsiveContainer, ScatterChart, Scatter, ZAxis,
@@ -27,6 +27,19 @@ const fmtNum = (v: number) =>
     : String(Math.round(v));
 const fmtPct = (v: number) => `${v.toFixed(2)}%`;
 
+// ── Placement Summary (per-format breakdown) ─────────────────────────────────
+export interface PlacementSummary {
+    adId: string;
+    adName: string;
+    placementType: 'Feed' | 'Story' | 'Reels' | 'Desconhecido';
+    spend: number;
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    ctr: number;
+    cpa: number;
+}
+
 // ── Ad Summary ────────────────────────────────────────────────────────────────
 interface AdSummary {
     adId: string;
@@ -44,11 +57,15 @@ interface AdSummary {
     reach?: number;
     frequency?: number;
     thumbnail_url?: string;
+    mediaType: 'image' | 'video';
+    isStory: boolean;
     // Creative enrichment
     body?: string;
     title?: string;
     ctaLabel?: string;
     creative?: AdCreative;
+    // Placement breakdown (deduped ads grouped by image_hash)
+    placements: PlacementSummary[];
 }
 
 // ── CTA Mapping ──────────────────────────────────────────────────────────────
@@ -159,19 +176,15 @@ const MetaAdCard: React.FC<{
 
             {/* Meta-style Header */}
             <div className="px-3 pt-3 pb-2 flex items-start justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black flex-shrink-0 ${avatarColor(ad.campaign)}`}>
                         {brandInitial}
                     </div>
-                    <div>
-                        <p className="text-[13px] font-semibold text-slate-900 leading-tight truncate max-w-[140px]" title={ad.campaign}>
-                            {ad.campaign.length > 22 ? ad.campaign.slice(0, 22) + '...' : ad.campaign}
+                    <div className="min-w-0">
+                        <p className="text-[12px] font-semibold text-slate-900 leading-tight truncate max-w-[150px]" title={ad.adName}>
+                            {ad.adName.length > 24 ? ad.adName.slice(0, 24) + '…' : ad.adName}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[11px] text-slate-400">Patrocinado</span>
-                            <span className="text-slate-200">·</span>
-                            <span className="text-[11px] text-slate-400">{channelLabel}</span>
-                        </div>
+                        <span className="text-[11px] text-slate-400">Patrocinado</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -260,9 +273,14 @@ const MetaAdCard: React.FC<{
     );
 };
 
+// ── Story/Vertical format detection ──────────────────────────────────────────
+const isStoryFormat = (adName: string, adset?: string): boolean =>
+    /story|stories|reels?|9x16|9[_:]16|vertical|story_|_st_/i.test((adName + ' ' + (adset || '')));
+
 // ── Sort / Filter Types ───────────────────────────────────────────────────────
 type SortKey = 'cpa' | 'spend' | 'ctr' | 'conversions';
 type StatusFilter = 'all' | 'VENCEDOR' | 'EXCELENTE' | 'BOM' | 'ATENCAO' | 'FADIGA';
+type MediaFilter = 'all' | 'image' | 'video';
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export const AdsTab: React.FC = () => {
@@ -272,6 +290,7 @@ export const AdsTab: React.FC = () => {
     const [search, setSearch] = useState('');
     const [channelFilter, setChannelFilter] = useState<'all' | 'meta' | 'google'>('all');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+    const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all');
     const [sortKey, setSortKey] = useState<SortKey>('conversions');
     const [selectedAd, setSelectedAd] = useState<AdSummary | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -286,52 +305,92 @@ export const AdsTab: React.FC = () => {
 
     // ── Aggregate by ad + enrich with creatives ─────────────────────────────
     const allAds = useMemo<AdSummary[]>(() => {
-        const map = new Map<string, AdSummary & { freqCount: number; freqSum: number }>();
+        // ── Pass 1: aggregate daily rows → one entry per ad_id ──────────────
+        const raw = new Map<string, AdSummary & { freqCount: number; freqSum: number }>();
 
         filteredData.forEach(d => {
             const key = d.ad_id || d.ad_name || `${d.campaign}__${d.adset_name}`;
-            if (!map.has(key)) {
+            if (!raw.has(key)) {
                 const creative = creativeMap.get(d.ad_id || '');
                 const thumbnailPath = creative?.thumbnail_path;
                 const thumbnailUrl = thumbnailPath
-                    ? `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${thumbnailPath}`
+                    ? thumbnailPath.startsWith('https://')
+                        ? thumbnailPath
+                        : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${thumbnailPath}`
                     : undefined;
-
-                map.set(key, {
-                    adId: key,
-                    adName: d.ad_name || d.ad_id || d.campaign,
-                    campaign: d.campaign,
-                    adset: d.adset_name,
-                    channel: d.channel,
+                const mediaType: 'image' | 'video' = creative?.image_hash ? 'image' : 'video';
+                const adNameRaw = d.ad_name || d.ad_id || d.campaign;
+                const isStory = isStoryFormat(adNameRaw, d.adset_name);
+                raw.set(key, {
+                    adId: key, adName: adNameRaw, campaign: d.campaign,
+                    adset: d.adset_name, channel: d.channel,
                     spend: 0, impressions: 0, clicks: 0, conversions: 0,
-                    ctr: 0, cpa: 0, cpm: 0,
-                    reach: 0, frequency: 0,
+                    ctr: 0, cpa: 0, cpm: 0, reach: 0, frequency: 0,
                     freqCount: 0, freqSum: 0,
-                    thumbnail_url: thumbnailUrl,
-                    body: creative?.body,
-                    title: creative?.title,
+                    thumbnail_url: thumbnailUrl, mediaType, isStory,
+                    body: creative?.body, title: creative?.title,
                     ctaLabel: creative?.call_to_action_type
-                        ? CTA_MAP[creative.call_to_action_type] || 'Saiba mais'
-                        : undefined,
-                    creative,
+                        ? CTA_MAP[creative.call_to_action_type] || 'Saiba mais' : undefined,
+                    creative, placements: [],
                 });
             }
-            const r = map.get(key)!;
-            r.spend += d.spend;
-            r.impressions += d.impressions;
-            r.clicks += d.clicks;
-            r.conversions += d.conversions;
+            const r = raw.get(key)!;
+            r.spend += d.spend; r.impressions += d.impressions;
+            r.clicks += d.clicks; r.conversions += d.conversions;
             if (d.reach) r.reach = (r.reach || 0) + d.reach;
             if (d.frequency) { r.freqSum += d.frequency; r.freqCount++; }
         });
 
-        return Array.from(map.values()).map(r => ({
+        const finalized = Array.from(raw.values()).map(r => ({
             ...r,
             ctr: r.impressions > 0 ? (r.clicks / r.impressions) * 100 : 0,
             cpa: r.conversions > 0 ? r.spend / r.conversions : 0,
             cpm: r.impressions > 0 ? (r.spend / r.impressions) * 1000 : 0,
             frequency: r.freqCount > 0 ? r.freqSum / r.freqCount : undefined,
         }));
+
+        // ── Pass 2: deduplicate by image_hash → 1 card per creative ────────
+        const hashGroups = new Map<string, typeof finalized[0][]>();
+        finalized.forEach(ad => {
+            const hash = ad.creative?.image_hash;
+            const gKey = hash ? `hash:${hash}` : `unique:${ad.adId}`;
+            if (!hashGroups.has(gKey)) hashGroups.set(gKey, []);
+            hashGroups.get(gKey)!.push(ad);
+        });
+
+        return Array.from(hashGroups.values()).map(group => {
+            // Single ad — no dedup needed
+            if (group.length === 1) return { ...group[0], placements: [] };
+
+            // Representative: prefer non-story (better thumbnail)
+            const rep = group.find(a => !a.isStory) || group[0];
+            const spend = group.reduce((s, a) => s + a.spend, 0);
+            const impressions = group.reduce((s, a) => s + a.impressions, 0);
+            const clicks = group.reduce((s, a) => s + a.clicks, 0);
+            const conversions = group.reduce((s, a) => s + a.conversions, 0);
+            const reach = group.reduce((s, a) => s + (a.reach || 0), 0);
+            const freqVals = group.filter(a => a.frequency != null).map(a => a.frequency!);
+            const frequency = freqVals.length > 0
+                ? freqVals.reduce((s, v) => s + v, 0) / freqVals.length : undefined;
+
+            const placements: PlacementSummary[] = group.map(a => {
+                const pType: PlacementSummary['placementType'] =
+                    /reels?/i.test(a.adName + ' ' + (a.adset || '')) ? 'Reels'
+                    : a.isStory ? 'Story' : 'Feed';
+                return { adId: a.adId, adName: a.adName, placementType: pType,
+                    spend: a.spend, impressions: a.impressions, clicks: a.clicks,
+                    conversions: a.conversions, ctr: a.ctr, cpa: a.cpa };
+            });
+
+            return {
+                ...rep, spend, impressions, clicks, conversions, reach, frequency,
+                ctr: impressions > 0 ? (clicks / impressions) * 100 : 0,
+                cpa: conversions > 0 ? spend / conversions : 0,
+                cpm: impressions > 0 ? (spend / impressions) * 1000 : 0,
+                isStory: false,
+                placements,
+            };
+        });
     }, [filteredData, creativeMap]);
 
     const avgCpa = useMemo(() => {
@@ -371,7 +430,10 @@ export const AdsTab: React.FC = () => {
     const displayAds = useMemo(() => {
         return allAds
             .filter(a => {
+                // Stories (9:16) quebram o layout — ocultos por default
+                if (a.isStory) return false;
                 if (channelFilter !== 'all' && a.channel !== channelFilter) return false;
+                if (mediaFilter !== 'all' && a.mediaType !== mediaFilter) return false;
                 if (search) {
                     const q = search.toLowerCase();
                     if (!a.adName.toLowerCase().includes(q) && !a.campaign.toLowerCase().includes(q)
@@ -419,11 +481,15 @@ export const AdsTab: React.FC = () => {
         }
     };
 
-    // ── Daily data for selected ad (modal) ──────────────────────────────────
+    // ── Daily data for selected ad — includes all grouped placement IDs ────
     const selectedAdDailyData = useMemo(() => {
         if (!selectedAd) return [];
+        const ids = new Set([
+            selectedAd.adId,
+            ...selectedAd.placements.map(p => p.adId),
+        ]);
         return filteredData.filter(d =>
-            (d.ad_id || d.ad_name || `${d.campaign}__${d.adset_name}`) === selectedAd.adId
+            ids.has(d.ad_id || d.ad_name || `${d.campaign}__${d.adset_name}`)
         );
     }, [filteredData, selectedAd]);
 
@@ -449,6 +515,22 @@ export const AdsTab: React.FC = () => {
                             {ch === 'all' ? 'Todos' : ch === 'meta' ? 'Meta' : 'Google'}
                         </button>
                     ))}
+                </div>
+
+                {/* Media type filter */}
+                <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg">
+                    <button onClick={() => setMediaFilter('all')}
+                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${mediaFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
+                        Todos
+                    </button>
+                    <button onClick={() => setMediaFilter('image')}
+                        className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-all ${mediaFilter === 'image' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
+                        <Image size={11} /> Imagem
+                    </button>
+                    <button onClick={() => setMediaFilter('video')}
+                        className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-all ${mediaFilter === 'video' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
+                        <Film size={11} /> Vídeo
+                    </button>
                 </div>
 
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as StatusFilter)}

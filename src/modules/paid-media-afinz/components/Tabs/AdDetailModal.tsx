@@ -1,14 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     X, ThumbsUp, MessageCircle, Share2, Play,
     TrendingUp, TrendingDown, BarChart2, Layers, Target,
-    Eye, MousePointer, DollarSign, Users, Repeat, Activity
+    Eye, MousePointer, DollarSign, Users, Repeat, Activity,
+    ChevronDown, LayoutGrid, Smartphone, Film
 } from 'lucide-react';
 import {
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
     CartesianGrid, Tooltip as RechartsTooltip
 } from 'recharts';
 import type { AdCreative, AssetInsight, DailyMetrics } from '../../types';
+import type { PlacementSummary } from './AdsTab';
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmtBRL = (v: number) =>
@@ -63,6 +65,7 @@ interface AdData {
     cpm: number;
     reach?: number;
     frequency?: number;
+    placements: PlacementSummary[];
 }
 
 interface Props {
@@ -71,6 +74,69 @@ interface Props {
     dailyData: DailyMetrics[];
     onClose: () => void;
 }
+
+// ── Placements Breakdown (collapsible) ──────────────────────────────────────
+const PLACEMENT_ICON: Record<PlacementSummary['placementType'], React.ReactNode> = {
+    Feed: <LayoutGrid size={12} />,
+    Story: <Smartphone size={12} />,
+    Reels: <Film size={12} />,
+    Desconhecido: <BarChart2 size={12} />,
+};
+
+const PlacementsBreakdown: React.FC<{ placements: PlacementSummary[] }> = ({ placements }) => {
+    const [open, setOpen] = useState(false);
+    if (placements.length < 2) return null;
+
+    return (
+        <div className="border-t border-slate-100 pt-4">
+            <button onClick={() => setOpen(o => !o)}
+                className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider hover:text-slate-700 transition-colors w-full">
+                <Layers size={13} />
+                <span>Resultados por Posicionamento</span>
+                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-bold">{placements.length}</span>
+                <ChevronDown size={12} className={`ml-auto transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+            </button>
+
+            {open && (
+                <div className="mt-3 border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="bg-slate-50 text-slate-500">
+                                <th className="px-3 py-2 text-left font-semibold">Posicionamento</th>
+                                <th className="px-3 py-2 text-right font-semibold">Impr.</th>
+                                <th className="px-3 py-2 text-right font-semibold">CTR</th>
+                                <th className="px-3 py-2 text-right font-semibold">Conv.</th>
+                                <th className="px-3 py-2 text-right font-semibold">CPA</th>
+                                <th className="px-3 py-2 text-right font-semibold">Invest.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {[...placements].sort((a, b) => b.impressions - a.impressions).map((p, i) => (
+                                <tr key={i} className="border-t border-slate-100 hover:bg-slate-50">
+                                    <td className="px-3 py-2.5">
+                                        <div className="flex items-center gap-1.5 text-slate-700">
+                                            <span className="text-slate-400">{PLACEMENT_ICON[p.placementType]}</span>
+                                            <span className="font-medium">{p.placementType}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right text-slate-600">{fmtNum(p.impressions)}</td>
+                                    <td className="px-3 py-2.5 text-right">
+                                        <span className={`font-semibold ${p.ctr >= 1 ? 'text-emerald-600' : p.ctr >= 0.5 ? 'text-amber-600' : 'text-red-500'}`}>
+                                            {fmtPct(p.ctr)}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-right text-slate-600">{fmtNum(p.conversions)}</td>
+                                    <td className="px-3 py-2.5 text-right text-slate-600">{p.cpa > 0 ? fmtBRLDec(p.cpa) : '—'}</td>
+                                    <td className="px-3 py-2.5 text-right text-slate-600">{fmtBRL(p.spend)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
 
 // ── Asset Insights Table ────────────────────────────────────────────────────
 const AssetTable: React.FC<{ title: string; insights: AssetInsight[] }> = ({ title, insights }) => {
@@ -124,7 +190,9 @@ const AssetTable: React.FC<{ title: string; insights: AssetInsight[] }> = ({ tit
 // ── Main Modal ──────────────────────────────────────────────────────────────
 export const AdDetailModal: React.FC<Props> = ({ ad, creative, dailyData, onClose }) => {
     const thumbnailUrl = creative?.thumbnail_path
-        ? `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${creative.thumbnail_path}`
+        ? creative.thumbnail_path.startsWith('https://')
+            ? creative.thumbnail_path
+            : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${creative.thumbnail_path}`
         : null;
 
     const gradient = GRADIENTS[hashStr(ad.adId) % GRADIENTS.length];
@@ -288,6 +356,9 @@ export const AdDetailModal: React.FC<Props> = ({ ad, creative, dailyData, onClos
                                 </div>
                             </div>
                         </div>
+
+                        {/* Placements breakdown */}
+                        <PlacementsBreakdown placements={ad.placements || []} />
                     </div>
                 </div>
 
