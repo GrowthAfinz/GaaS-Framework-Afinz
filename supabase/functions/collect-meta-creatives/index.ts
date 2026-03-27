@@ -3,17 +3,14 @@
 //
 // Strategy:
 // 1. Fetch ads with creative fields INLINE (single API call).
-//    Fields: id, image_hash, image_url, video_id, thumbnail_url, picture
-//    - image_url    = direct URL to the full-resolution creative image (image ads)
-//    - image_hash   = used to fetch url_1080 from /adimages (highest res, if available)
-//    - picture      = high-res image URL for ad types that don't return image_hash/image_url
-//                     (catalog ads, DPA, carousel first frame, link ads, etc.)
+//    Fields: id, image_hash, image_url, video_id, thumbnail_url
+//    - image_url  = direct URL to the full-resolution creative image (image ads)
+//    - image_hash = used to fetch url_1080 from /adimages (highest res, if available)
 //    - thumbnail_url = low-res preview thumbnail (signed, stp-restricted) — fallback only
 // 2. For IMAGE ads:
 //    a. Best:  url_1080 via /adimages?hashes= (1080px, server-accessible)
 //    b. Good:  creative.image_url (full-res direct URL, server-accessible)
-//    c. Good:  creative.picture (high-res URL for catalog/DPA/link/carousel ads)
-//    d. Last:  source-only — browser loads thumbnail_url directly from Meta CDN
+//    c. Fallback: source-only — browser loads thumbnail_url directly from Meta CDN
 // 3. For VIDEO ads: always source-only — Meta CDN requires browser session for thumbnails.
 // 4. thumbnail_url: signed CDN URL with stp=p64x64 — DO NOT modify (stp is in the signature).
 //    Used only as browser-side fallback for video/source-only ads.
@@ -150,14 +147,14 @@ async function hostCreativeAsset(
 ): Promise<HostedAssetResult> {
   const { sourceUrl, mediaType, creativeId, assetKey, width, height } = params;
 
-  // VIDEO: High-res thumbnails from the /thumbnails edge are server-accessible.
-  // We no longer skip them. If sourceUrl is missing, we fall back to source-only.
-  if (mediaType === 'video' && !sourceUrl) {
+  // VIDEO: Meta CDN thumbnail URLs require browser session — never host server-side.
+  // forceResetStorage clears any previously broken hosted files.
+  if (mediaType === 'video') {
     return {
       bucket: null, storagePath: null, publicUrl: null, sourceUrl, width, height, contentType: null,
       origin: 'meta-cdn',
-      syncStatus: 'sync-failed',
-      syncError: 'Missing video thumbnail URL',
+      syncStatus: 'source-only',
+      syncError: null,
       forceResetStorage: true,
     };
   }
@@ -216,7 +213,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  console.log('[collect-meta-creatives] v18 starting');
+  console.log('[collect-meta-creatives] v17 starting');
   const META_TOKEN = Deno.env.get('META_ACCESS_TOKEN');
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -240,9 +237,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // picture = high-res image URL returned for ad types that don't expose image_hash/image_url
-    // (catalog/DPA ads, carousel, link ads). Used as tertiary fallback after url_1080 and image_url.
-    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url,picture}';
+    // image_url = direct URL to the full-resolution image used in the creative.
+    // This is the key addition vs previous versions — avoids /adimages lookup for most image ads.
+    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url}';
     let allAds: any[] = [];
     let adsApiError: string | null = null;
     let nextUrl: string | null =
@@ -262,13 +259,13 @@ Deno.serve(async (req) => {
         status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
-    console.log(`[v18] Ads: ${allAds.length}`);
+    console.log(`[v17] Ads: ${allAds.length}`);
 
     const creativeDetailsMap = new Map<string, any>();
     for (const ad of allAds) {
       if (ad.creative?.id) creativeDetailsMap.set(ad.creative.id, ad.creative);
     }
-    console.log(`[v18] Unique creatives: ${creativeDetailsMap.size}`);
+    console.log(`[v17] Unique creatives: ${creativeDetailsMap.size}`);
 
     if (creativeDetailsMap.size === 0) {
       return new Response(JSON.stringify({ ok: false, warning: 'No creative data — upsert skipped', ads_found: allAds.length, upserted: 0 }), {
@@ -280,7 +277,7 @@ Deno.serve(async (req) => {
     // url_1080 is the highest quality (1080px) and is server-accessible.
     const imageHashes = [...new Set([...creativeDetailsMap.values()].map((c) => c.image_hash).filter(Boolean))];
     const imageDataMap = new Map<string, { url_1080: string | null; width: number | null; height: number | null }>();
-    console.log(`[v18] Hashes to resolve: ${imageHashes.length}`);
+    console.log(`[v17] Hashes to resolve: ${imageHashes.length}`);
 
     for (const batch of chunks(imageHashes, META_BATCH_SIZE)) {
       const hp = encodeURIComponent(JSON.stringify(batch));
@@ -295,7 +292,7 @@ Deno.serve(async (req) => {
       }
       await sleep(200);
     }
-    console.log(`[v18] url_1080 resolved: ${imageDataMap.size}`);
+    console.log(`[v17] url_1080 resolved: ${imageDataMap.size}`);
 
     // Fetch video dimensions AND high-res thumbnails (server-accessible via /thumbnails edge).
     const videoIds = [...new Set([...creativeDetailsMap.values()].map((c) => c.video_id).filter(Boolean))];
@@ -349,11 +346,10 @@ Deno.serve(async (req) => {
         const creative = creativeDetailsMap.get(ad.creative?.id);
 
         // Determine media type.
-        // video_id → video; image_hash / image_url / picture → image; else null.
-        // picture covers catalog/DPA/carousel/link ads that don't expose image_hash or image_url.
+        // video_id → video; image_hash or image_url → image; else null.
         const mediaType: MediaType =
           creative?.video_id ? 'video'
-          : (creative?.image_hash || creative?.image_url || creative?.picture) ? 'image'
+          : (creative?.image_hash || creative?.image_url) ? 'image'
           : null;
 
         const imageData = creative?.image_hash ? imageDataMap.get(creative.image_hash) : null;
@@ -361,9 +357,8 @@ Deno.serve(async (req) => {
         // Image source priority:
         // 1. url_1080 from /adimages (1080px, best quality, server-accessible)
         // 2. creative.image_url (full-res direct URL, server-accessible for most image ads)
-        // 3. creative.picture (high-res URL for catalog/DPA/carousel/link ads — no stp restriction)
-        // 4. If all null → source-only (browser loads thumbnail_url directly)
-        const imageUrl = imageData?.url_1080 || creative?.image_url || creative?.picture || null;
+        // 3. If both null → source-only (browser loads thumbnail_url directly)
+        const imageUrl = imageData?.url_1080 || creative?.image_url || null;
 
         const videoData = creative?.video_id ? videoDataMap.get(creative.video_id) : null;
         // thumbnail_url is kept only for browser-side fallback (never hosted in Storage).
@@ -444,10 +439,6 @@ Deno.serve(async (req) => {
     const videoAds = upsertRows.filter((r) => r.media_type === 'video');
     const nullTypeAds = upsertRows.filter((r) => !r.media_type);
     const withImageUrl = upsertRows.filter((r) => r.image_url).length;
-    // Count how many image ads resolved via picture field (no url_1080 or image_url, but picture helped)
-    const pictureResolved = [...creativeDetailsMap.values()].filter(
-      (c) => c.picture && !c.image_url && !c.video_id && !(c.image_hash && imageDataMap.has(c.image_hash))
-    ).length;
 
     return new Response(JSON.stringify({
       ok: true,
@@ -455,7 +446,6 @@ Deno.serve(async (req) => {
       creatives_fetched: creativeDetailsMap.size,
       url_1080_resolved: imageDataMap.size,
       image_url_from_inline: upsertRows.filter((r) => r.image_url && !imageDataMap.has(r.image_hash)).length,
-      picture_field_resolved: pictureResolved,
       upserted,
       hosted_assets: hostedCount,
       source_only: sourceOnlyCount,
