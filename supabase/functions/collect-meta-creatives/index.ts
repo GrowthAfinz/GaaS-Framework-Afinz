@@ -2,14 +2,26 @@
 // Meta Marketing API v25 | March 2026
 //
 // Strategy:
-// 1. Fetch ads with creative fields INLINE (single API call, no per-creative requests).
-// 2. Use image_hash to fetch url_1080 from /adimages (high-resolution).
-// 3. Download and persist assets in Supabase Storage with deterministic paths.
-// 4. Upsert ad_creatives with hosted URLs first, Meta URLs as fallback.
+// 1. Fetch ads with creative fields INLINE (single API call).
+//    Fields: id, image_hash, image_url, video_id, thumbnail_url, picture
+//    - image_url    = direct URL to the full-resolution creative image (image ads)
+//    - image_hash   = used to fetch url_1080 from /adimages (highest res, if available)
+//    - picture      = high-res image URL for ad types that don't return image_hash/image_url
+//                     (catalog ads, DPA, carousel first frame, link ads, etc.)
+//    - thumbnail_url = low-res preview thumbnail (signed, stp-restricted) — fallback only
+// 2. For IMAGE ads:
+//    a. Best:  url_1080 via /adimages?hashes= (1080px, server-accessible)
+//    b. Good:  creative.image_url (full-res direct URL, server-accessible)
+//    c. Good:  creative.picture (high-res URL for catalog/DPA/link/carousel ads)
+//    d. Last:  source-only — browser loads thumbnail_url directly from Meta CDN
+// 3. For VIDEO ads: always source-only — Meta CDN requires browser session for thumbnails.
+// 4. thumbnail_url: signed CDN URL with stp=p64x64 — DO NOT modify (stp is in the signature).
+//    Used only as browser-side fallback for video/source-only ads.
 //
 // Safety:
-// - Guard: abort upsert if no creative data returned (protects existing data).
-// - COALESCE: never overwrite existing non-null values with null.
+// - Guard: abort upsert if no creative data returned.
+// - COALESCE: never null-out good existing values, except storage fields for video/source-only.
+// - Min size check: reject downloads < 5KB (Meta returns ~2KB placeholder when blocked).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -17,6 +29,7 @@ const GRAPH_API_BASE = 'https://graph.facebook.com/v25.0';
 const CREATIVE_BUCKET = 'ad-creatives';
 const META_BATCH_SIZE = 50;
 const ASSET_UPLOAD_CONCURRENCY = 8;
+const MIN_VALID_IMAGE_BYTES = 5000;
 
 type MediaType = 'image' | 'video' | null;
 
@@ -31,6 +44,7 @@ type HostedAssetResult = {
   origin: 'supabase-storage' | 'meta-cdn' | 'legacy';
   syncStatus: 'hosted' | 'source-only' | 'sync-failed';
   syncError: string | null;
+  forceResetStorage: boolean;
 };
 
 function sleep(ms: number) {
@@ -58,98 +72,67 @@ function buildPublicUrl(supabaseUrl: string, bucket: string, path: string) {
 }
 
 function inferExtension(contentType: string | null, sourceUrl: string | null) {
-  const contentTypeMap: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
+  const map: Record<string, string> = {
+    'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+    'image/webp': 'webp', 'image/gif': 'gif',
   };
-
-  if (contentType && contentTypeMap[contentType.toLowerCase()]) {
-    return contentTypeMap[contentType.toLowerCase()];
-  }
-
+  if (contentType && map[contentType.toLowerCase()]) return map[contentType.toLowerCase()];
   if (sourceUrl) {
     try {
-      const pathname = new URL(sourceUrl).pathname;
-      const lastSegment = pathname.split('/').pop() || '';
-      const match = lastSegment.match(/\.([a-zA-Z0-9]+)$/);
-      if (match) return match[1].toLowerCase();
-    } catch {
-      // Ignore malformed URLs and fallback to jpg.
-    }
+      const seg = new URL(sourceUrl).pathname.split('/').pop() || '';
+      const m = seg.match(/\.([a-zA-Z0-9]+)$/);
+      if (m) return m[1].toLowerCase();
+    } catch { /* ignore */ }
   }
-
   return 'jpg';
 }
 
 async function metaGet(path: string, token: string, retries = 3): Promise<any> {
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const response = await fetch(`${GRAPH_API_BASE}${path}`, {
+    const res = await fetch(`${GRAPH_API_BASE}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
-    if (response.status === 429 || response.status >= 500) {
-      const waitMs = attempt * 2000;
-      console.warn(`[Meta API] ${response.status} on ${path}, retrying in ${waitMs}ms`);
-      await sleep(waitMs);
-      continue;
-    }
-
-    const json = await response.json();
+    if (res.status === 429 || res.status >= 500) { await sleep(attempt * 2000); continue; }
+    const json = await res.json();
     if (json.error) {
       console.error(`[Meta API] Error on ${path}:`, JSON.stringify(json.error));
       return null;
     }
     return json;
   }
-
   return null;
 }
 
 async function downloadBinary(sourceUrl: string, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(sourceUrl, {
+      const res = await fetch(sourceUrl, {
         method: 'GET',
         redirect: 'follow',
         headers: {
-          Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-          'User-Agent': 'supabase-edge-function-collect-meta-creatives',
+          Accept: 'image/*,*/*;q=0.8',
+          'User-Agent': 'supabase-edge-fn-meta-creatives/1.0',
         },
       });
-
-      if (response.status === 429 || response.status >= 500) {
-        const waitMs = attempt * 1500;
-        console.warn(`[Asset Download] ${response.status} on ${sourceUrl}, retrying in ${waitMs}ms`);
-        await sleep(waitMs);
-        continue;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      const bytes = await response.arrayBuffer();
-
+      if (res.status === 429 || res.status >= 500) { await sleep(attempt * 1500); continue; }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const contentType = res.headers.get('content-type');
+      const bytes = await res.arrayBuffer();
       if (!contentType?.startsWith('image/')) {
-        throw new Error(`Unsupported content type: ${contentType || 'unknown'}`);
+        throw new Error(`Bad content-type: ${contentType}`);
       }
-
-      if (bytes.byteLength === 0) {
-        throw new Error('Empty payload');
+      if (bytes.byteLength === 0) throw new Error('Empty payload');
+      // Meta CDN returns ~2KB placeholder JPEG when blocking server-side requests.
+      if (bytes.byteLength < MIN_VALID_IMAGE_BYTES) {
+        throw new Error(`Payload too small (${bytes.byteLength}b) — CDN blocked server-side`);
       }
-
       return { bytes, contentType };
-    } catch (error) {
-      if (attempt === retries) throw error;
+    } catch (err) {
+      if (attempt === retries) throw err;
       await sleep(attempt * 1500);
     }
   }
-
-  throw new Error('Unreachable download state');
+  throw new Error('Unreachable');
 }
 
 async function hostCreativeAsset(
@@ -167,73 +150,57 @@ async function hostCreativeAsset(
 ): Promise<HostedAssetResult> {
   const { sourceUrl, mediaType, creativeId, assetKey, width, height } = params;
 
-  if (!sourceUrl || !mediaType || !creativeId) {
+  // VIDEO: High-res thumbnails from the /thumbnails edge are server-accessible.
+  // We no longer skip them. If sourceUrl is missing, we fall back to source-only.
+  if (mediaType === 'video' && !sourceUrl) {
     return {
-      bucket: null,
-      storagePath: null,
-      publicUrl: null,
-      sourceUrl,
-      width,
-      height,
-      contentType: null,
-      origin: sourceUrl ? 'meta-cdn' : 'legacy',
-      syncStatus: sourceUrl ? 'source-only' : 'sync-failed',
-      syncError: sourceUrl ? null : 'Missing source asset URL',
+      bucket: null, storagePath: null, publicUrl: null, sourceUrl, width, height, contentType: null,
+      origin: 'meta-cdn',
+      syncStatus: 'sync-failed',
+      syncError: 'Missing video thumbnail URL',
+      forceResetStorage: true,
     };
   }
 
-  const deterministicBase = `${mediaType}/${sanitizeSegment(creativeId)}/${sanitizeSegment(assetKey || creativeId)}`;
-  const cacheKey = `${deterministicBase}::${sourceUrl}`;
-
-  if (assetCache.has(cacheKey)) {
-    return assetCache.get(cacheKey)!;
+  // NULL mediaType or missing data: serve source-only from Meta CDN.
+  // Do NOT attempt to download thumbnail_url — it is always low-res.
+  if (!sourceUrl || !mediaType || !creativeId) {
+    return {
+      bucket: null, storagePath: null, publicUrl: null, sourceUrl, width, height, contentType: null,
+      origin: sourceUrl ? 'meta-cdn' : 'legacy',
+      syncStatus: sourceUrl ? 'source-only' : 'sync-failed',
+      syncError: sourceUrl ? null : 'Missing source asset URL',
+      forceResetStorage: true, // clear any previously hosted low-res thumbnail
+    };
   }
+
+  // IMAGE with a real high-res source URL: download and host in Storage.
+  const base = `${mediaType}/${sanitizeSegment(creativeId)}/${sanitizeSegment(assetKey || creativeId)}`;
+  const cacheKey = `${base}::${sourceUrl}`;
+  if (assetCache.has(cacheKey)) return assetCache.get(cacheKey)!;
 
   const promise = (async (): Promise<HostedAssetResult> => {
     try {
       const { bytes, contentType } = await downloadBinary(sourceUrl);
-      const extension = inferExtension(contentType, sourceUrl);
-      const storagePath = `${deterministicBase}.${extension}`;
-
-      const { error: uploadError } = await supabase.storage
+      const ext = inferExtension(contentType, sourceUrl);
+      const storagePath = `${base}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
         .from(CREATIVE_BUCKET)
-        .upload(storagePath, bytes, {
-          contentType,
-          cacheControl: '31536000',
-          upsert: true,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
+        .upload(storagePath, bytes, { contentType, cacheControl: '31536000', upsert: true });
+      if (uploadErr) throw uploadErr;
       return {
-        bucket: CREATIVE_BUCKET,
-        storagePath,
+        bucket: CREATIVE_BUCKET, storagePath,
         publicUrl: buildPublicUrl(supabaseUrl, CREATIVE_BUCKET, storagePath),
-        sourceUrl,
-        width,
-        height,
-        contentType,
-        origin: 'supabase-storage',
-        syncStatus: 'hosted',
-        syncError: null,
+        sourceUrl, width, height, contentType,
+        origin: 'supabase-storage', syncStatus: 'hosted', syncError: null, forceResetStorage: false,
       };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[Asset Host Error]', message, { creativeId, sourceUrl });
-
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[Asset Host Fallback]', msg, { creativeId, sourceUrl: sourceUrl?.slice(0, 80) });
+      // Download failed (CDN blocked or error) — serve source-only from Meta CDN.
       return {
-        bucket: null,
-        storagePath: null,
-        publicUrl: null,
-        sourceUrl,
-        width,
-        height,
-        contentType: null,
-        origin: 'meta-cdn',
-        syncStatus: 'sync-failed',
-        syncError: message,
+        bucket: null, storagePath: null, publicUrl: null, sourceUrl, width, height, contentType: null,
+        origin: 'meta-cdn', syncStatus: 'source-only', syncError: null, forceResetStorage: true,
       };
     }
   })();
@@ -245,74 +212,46 @@ async function hostCreativeAsset(
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, content-type',
-      },
+      headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' },
     });
   }
 
-  console.log('[collect-meta-creatives] Starting');
-
+  console.log('[collect-meta-creatives] v18 starting');
   const META_TOKEN = Deno.env.get('META_ACCESS_TOKEN');
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-  if (!META_TOKEN) {
-    return new Response(JSON.stringify({ error: 'Missing META_ACCESS_TOKEN' }), { status: 500 });
-  }
+  if (!META_TOKEN) return new Response(JSON.stringify({ error: 'Missing META_ACCESS_TOKEN' }), { status: 500 });
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const assetCache = new Map<string, Promise<HostedAssetResult>>();
-
   let AD_ACCOUNT_ID = Deno.env.get('META_AD_ACCOUNT_ID');
 
   if (!AD_ACCOUNT_ID) {
-    console.log('[collect-meta-creatives] META_AD_ACCOUNT_ID missing, trying auto-discovery');
-
-    const { data: sampleAd } = await supabase
-      .from('ad_creatives')
-      .select('ad_id')
-      .limit(1)
-      .maybeSingle();
-
+    const { data: sampleAd } = await supabase.from('ad_creatives').select('ad_id').limit(1).maybeSingle();
     if (sampleAd?.ad_id) {
-      const adInfo = await metaGet(`/${sampleAd.ad_id}?fields=account_id&access_token=${META_TOKEN}`, META_TOKEN);
-      if (adInfo?.account_id) {
-        AD_ACCOUNT_ID = `act_${adInfo.account_id}`;
-      }
+      const info = await metaGet(`/${sampleAd.ad_id}?fields=account_id&access_token=${META_TOKEN}`, META_TOKEN);
+      if (info?.account_id) AD_ACCOUNT_ID = `act_${info.account_id}`;
     }
-
     if (!AD_ACCOUNT_ID) {
-      const discovery = await metaGet(`/me/adaccounts?fields=id,name&access_token=${META_TOKEN}&limit=1`, META_TOKEN);
-      if (discovery?.data?.length) {
-        AD_ACCOUNT_ID = discovery.data[0].id;
-      }
+      const disc = await metaGet(`/me/adaccounts?fields=id,name&access_token=${META_TOKEN}&limit=1`, META_TOKEN);
+      if (disc?.data?.length) AD_ACCOUNT_ID = disc.data[0].id;
     }
-
-    if (!AD_ACCOUNT_ID) {
-      return new Response(JSON.stringify({ error: 'Ad account not found' }), { status: 500 });
-    }
+    if (!AD_ACCOUNT_ID) return new Response(JSON.stringify({ error: 'Ad account not found' }), { status: 500 });
   }
 
   try {
-    // Fetch ads with minimal safe creative fields INLINE.
-    // Only image_hash, video_id, thumbnail_url — sufficient for high-res resolution.
-    // body/title/description/object_story_spec require ads_management and are skipped here.
-    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,video_id,thumbnail_url}';
-
+    // picture = high-res image URL returned for ad types that don't expose image_hash/image_url
+    // (catalog/DPA ads, carousel, link ads). Used as tertiary fallback after url_1080 and image_url.
+    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url,picture}';
     let allAds: any[] = [];
     let adsApiError: string | null = null;
-    let nextUrl: string | null = `${GRAPH_API_BASE}/${AD_ACCOUNT_ID}/ads?fields=${encodeURIComponent(adsFields)}&limit=200&access_token=${META_TOKEN}`;
+    let nextUrl: string | null =
+      `${GRAPH_API_BASE}/${AD_ACCOUNT_ID}/ads?fields=${encodeURIComponent(adsFields)}&limit=200&access_token=${META_TOKEN}`;
 
     while (nextUrl) {
-      const response = await fetch(nextUrl);
-      const json = await response.json();
-      if (json.error) {
-        adsApiError = JSON.stringify(json.error);
-        console.error('[collect-meta-creatives] Ads fetch error:', adsApiError);
-        break;
-      }
+      const res = await fetch(nextUrl);
+      const json = await res.json();
+      if (json.error) { adsApiError = JSON.stringify(json.error); break; }
       allAds = allAds.concat(json.data || []);
       nextUrl = json.paging?.next || null;
       if (nextUrl) await sleep(300);
@@ -320,92 +259,65 @@ Deno.serve(async (req) => {
 
     if (allAds.length === 0 && adsApiError) {
       return new Response(JSON.stringify({ error: 'Meta API ads fetch failed', detail: adsApiError }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
+    console.log(`[v18] Ads: ${allAds.length}`);
 
-    console.log(`[collect-meta-creatives] Ads found: ${allAds.length}`);
-
-    // Build creativeDetailsMap directly from inline creative data — no extra API calls.
     const creativeDetailsMap = new Map<string, any>();
     for (const ad of allAds) {
-      if (ad.creative?.id) {
-        creativeDetailsMap.set(ad.creative.id, ad.creative);
-      }
+      if (ad.creative?.id) creativeDetailsMap.set(ad.creative.id, ad.creative);
     }
+    console.log(`[v18] Unique creatives: ${creativeDetailsMap.size}`);
 
-    console.log(`[collect-meta-creatives] Creatives from inline fields: ${creativeDetailsMap.size}`);
-
-    // GUARD: abort if no creative data to protect existing records.
     if (creativeDetailsMap.size === 0) {
-      console.warn('[collect-meta-creatives] GUARD: No creative data in ads response. Aborting upsert.');
-      return new Response(JSON.stringify({
-        ok: false,
-        warning: 'No creative data in Meta API response — upsert skipped to protect existing records.',
-        ads_found: allAds.length,
-        upserted: 0,
-      }), {
+      return new Response(JSON.stringify({ ok: false, warning: 'No creative data — upsert skipped', ads_found: allAds.length, upserted: 0 }), {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
 
-    // Fetch high-res image data from /adimages using collected hashes.
+    // Fetch url_1080 from /adimages for ads that have image_hash.
+    // url_1080 is the highest quality (1080px) and is server-accessible.
     const imageHashes = [...new Set([...creativeDetailsMap.values()].map((c) => c.image_hash).filter(Boolean))];
     const imageDataMap = new Map<string, { url_1080: string | null; width: number | null; height: number | null }>();
+    console.log(`[v18] Hashes to resolve: ${imageHashes.length}`);
 
-    console.log(`[collect-meta-creatives] Image hashes to resolve: ${imageHashes.length}`);
-
-    for (const hashBatch of chunks(imageHashes, META_BATCH_SIZE)) {
-      const hashParam = encodeURIComponent(JSON.stringify(hashBatch));
+    for (const batch of chunks(imageHashes, META_BATCH_SIZE)) {
+      const hp = encodeURIComponent(JSON.stringify(batch));
       const data = await metaGet(
-        `/${AD_ACCOUNT_ID}/adimages?hashes=${hashParam}&fields=hash,url_1080,width,height&access_token=${META_TOKEN}`,
+        `/${AD_ACCOUNT_ID}/adimages?hashes=${hp}&fields=hash,url_1080,width,height&access_token=${META_TOKEN}`,
         META_TOKEN,
       );
-
       if (data?.data) {
-        for (const image of data.data) {
-          if (image.hash) {
-            imageDataMap.set(image.hash, {
-              url_1080: image.url_1080 || null,
-              width: image.width || null,
-              height: image.height || null,
-            });
-          }
+        for (const img of data.data) {
+          if (img.hash) imageDataMap.set(img.hash, { url_1080: img.url_1080 || null, width: img.width || null, height: img.height || null });
         }
       }
-
       await sleep(200);
     }
+    console.log(`[v18] url_1080 resolved: ${imageDataMap.size}`);
 
-    console.log(`[collect-meta-creatives] High-res image data resolved: ${imageDataMap.size}`);
-
-    // Fetch high-res video thumbnails.
+    // Fetch video dimensions AND high-res thumbnails (server-accessible via /thumbnails edge).
     const videoIds = [...new Set([...creativeDetailsMap.values()].map((c) => c.video_id).filter(Boolean))];
-    const videoDataMap = new Map<string, { picture: string | null; width: number | null; height: number | null }>();
-
+    const videoDataMap = new Map<string, { width: number | null; height: number | null; highResThumb: string | null }>();
     for (const batch of chunks(videoIds, 10)) {
-      await Promise.all(batch.map(async (videoId) => {
-        const data = await metaGet(`/${videoId}?fields=picture,format&access_token=${META_TOKEN}`, META_TOKEN);
-        if (!data) return;
-
-        let bestWidth: number | null = null;
-        let bestHeight: number | null = null;
-        if (Array.isArray(data.format)) {
-          for (const variant of data.format) {
-            const width = variant.width || 0;
-            if (!bestWidth || width > bestWidth) {
-              bestWidth = variant.width || null;
-              bestHeight = variant.height || null;
-            }
+      await Promise.all(batch.map(async (vid) => {
+        const d = await metaGet(`/${vid}?fields=format,thumbnails{uri,width,height}&access_token=${META_TOKEN}`, META_TOKEN);
+        if (!d) return;
+        let bw: number | null = null, bh: number | null = null;
+        if (Array.isArray(d.format)) {
+          for (const v of d.format) {
+            if (!bw || (v.width || 0) > bw) { bw = v.width || null; bh = v.height || null; }
           }
         }
-
-        videoDataMap.set(videoId, {
-          picture: data.picture || null,
-          width: bestWidth,
-          height: bestHeight,
-        });
+        let bestThumb = null;
+        let maxW = 0;
+        if (d.thumbnails?.data) {
+          for (const t of d.thumbnails.data) {
+            if (t.width > maxW) { maxW = t.width; bestThumb = t.uri; }
+          }
+        }
+        videoDataMap.set(vid, { width: bw, height: bh, highResThumb: bestThumb });
       }));
       await sleep(300);
     }
@@ -413,134 +325,154 @@ Deno.serve(async (req) => {
     // Fetch adset names.
     const adsetIds = [...new Set(allAds.map((ad) => ad.adset_id).filter(Boolean))];
     const adsetMap = new Map<string, string>();
-
     for (const batch of chunks(adsetIds, 20)) {
-      await Promise.all(batch.map(async (adsetId) => {
-        const data = await metaGet(`/${adsetId}?fields=id,name&access_token=${META_TOKEN}`, META_TOKEN);
-        if (data?.name) adsetMap.set(adsetId, data.name);
+      await Promise.all(batch.map(async (id) => {
+        const d = await metaGet(`/${id}?fields=id,name&access_token=${META_TOKEN}`, META_TOKEN);
+        if (d?.name) adsetMap.set(id, d.name);
       }));
       await sleep(200);
     }
 
-    // Fetch existing rows for COALESCE protection.
+    // COALESCE: fetch existing rows to protect non-null values.
     const adIds = allAds.map((ad) => ad.id);
     const { data: existingRows } = await supabase
       .from('ad_creatives')
-      .select('ad_id,image_url,image_hash,video_id,media_type,thumbnail_path,creative_id,video_thumbnail_url,aspect_ratio,body,title,description,call_to_action_type,effective_status,adset_name,asset_public_url,asset_storage_path,asset_storage_bucket,asset_source_url,asset_width,asset_height,asset_content_type,asset_origin,asset_sync_status,asset_sync_error')
+      .select('ad_id,image_url,image_hash,video_id,media_type,thumbnail_path,creative_id,video_thumbnail_url,aspect_ratio,call_to_action_type,effective_status,adset_name,asset_public_url,asset_storage_path,asset_storage_bucket,asset_source_url,asset_width,asset_height,asset_content_type,asset_origin,asset_sync_status,asset_sync_error')
       .in('ad_id', adIds);
-
     const existingMap = new Map<string, any>((existingRows || []).map((r: any) => [r.ad_id, r]));
 
     const upsertRows: any[] = [];
 
     for (const batch of chunks(allAds, ASSET_UPLOAD_CONCURRENCY)) {
-      const resolvedRows = await Promise.all(batch.map(async (ad) => {
-        const existing = existingMap.get(ad.id) || {};
+      const rows = await Promise.all(batch.map(async (ad) => {
+        const ex = existingMap.get(ad.id) || {};
         const creative = creativeDetailsMap.get(ad.creative?.id);
-        const mediaType: MediaType = creative?.video_id ? 'video' : creative?.image_hash ? 'image' : null;
+
+        // Determine media type.
+        // video_id → video; image_hash / image_url / picture → image; else null.
+        // picture covers catalog/DPA/carousel/link ads that don't expose image_hash or image_url.
+        const mediaType: MediaType =
+          creative?.video_id ? 'video'
+          : (creative?.image_hash || creative?.image_url || creative?.picture) ? 'image'
+          : null;
 
         const imageData = creative?.image_hash ? imageDataMap.get(creative.image_hash) : null;
-        const imageUrl = imageData?.url_1080 || null;
+
+        // Image source priority:
+        // 1. url_1080 from /adimages (1080px, best quality, server-accessible)
+        // 2. creative.image_url (full-res direct URL, server-accessible for most image ads)
+        // 3. creative.picture (high-res URL for catalog/DPA/carousel/link ads — no stp restriction)
+        // 4. If all null → source-only (browser loads thumbnail_url directly)
+        const imageUrl = imageData?.url_1080 || creative?.image_url || creative?.picture || null;
+
         const videoData = creative?.video_id ? videoDataMap.get(creative.video_id) : null;
-        const videoThumbnailUrl = videoData?.picture || creative?.thumbnail_url || null;
+        // thumbnail_url is kept only for browser-side fallback (never hosted in Storage).
+        const videoThumbnailUrl = creative?.thumbnail_url || null;
 
-        let aspectRatio = null;
-        if (imageData?.width && imageData?.height) aspectRatio = imageData.width / imageData.height;
-        else if (videoData?.width && videoData?.height) aspectRatio = videoData.width / videoData.height;
+        let ar = null;
+        if (imageData?.width && imageData?.height) ar = imageData.width / imageData.height;
+        else if (videoData?.width && videoData?.height) ar = videoData.width / videoData.height;
 
-        let body = creative?.body || null;
-        let title = creative?.title || null;
-        let description = creative?.description || null;
+        // sourceUrl for hosting:
+        // - image: use imageUrl (url_1080 or image_url) — high-res, server-accessible
+        // - video: highResThumb from /thumbnails edge — highest res, server-accessible
+        // - null mediaType: no sourceUrl for hosting (source-only via thumbnail_url)
+        const sourceUrlForHosting = mediaType === 'image' ? imageUrl : mediaType === 'video' ? videoData?.highResThumb : null;
 
-        if (!body && creative?.object_story_spec) {
-          const spec = creative.object_story_spec;
-          const linkData = spec.link_data || spec.video_data?.call_to_action?.value || {};
-          body = linkData.message || body;
-          title = linkData.name || title;
-          description = linkData.description || description;
-        }
-
-        const sourceUrl = mediaType === 'image' ? imageUrl : videoThumbnailUrl;
-
-        const hostedAsset = await hostCreativeAsset(supabase, SUPABASE_URL, assetCache, {
-          sourceUrl,
+        const ha = await hostCreativeAsset(supabase, SUPABASE_URL, assetCache, {
+          sourceUrl: sourceUrlForHosting,
           mediaType,
           creativeId: creative?.id || null,
-          assetKey: mediaType === 'image' ? creative?.image_hash || null : creative?.video_id || null,
-          width: mediaType === 'image' ? imageData?.width || null : videoData?.width || null,
-          height: mediaType === 'image' ? imageData?.height || null : videoData?.height || null,
+          assetKey: mediaType === 'image' ? (creative?.image_hash || creative?.id || null) : creative?.video_id || null,
+          width: mediaType === 'image' ? (imageData?.width || null) : videoData?.width || null,
+          height: mediaType === 'image' ? (imageData?.height || null) : videoData?.height || null,
         });
 
-        // COALESCE: never overwrite non-null existing values with null.
+        // forceResetStorage: clear any previously hosted broken/low-res files.
+        const cs = ha.forceResetStorage;
+
+        // For source-only fallback display in browser: use thumbnail_url.
+        // This is what resolveCreativeAssetUrl uses when asset_public_url is null.
+        const browserFallbackUrl = videoThumbnailUrl || imageUrl || null;
+
         return {
           ad_id: ad.id,
           ad_name: ad.name,
-          adset_name: adsetMap.get(ad.adset_id) || existing.adset_name || null,
-          creative_id: creative?.id || existing.creative_id || null,
-          thumbnail_path: videoThumbnailUrl ?? existing.thumbnail_path ?? null,
-          image_url: imageUrl ?? existing.image_url ?? null,
-          video_thumbnail_url: videoThumbnailUrl ?? existing.video_thumbnail_url ?? null,
-          image_hash: creative?.image_hash || existing.image_hash || null,
-          video_id: creative?.video_id || existing.video_id || null,
-          media_type: mediaType ?? existing.media_type ?? null,
-          aspect_ratio: aspectRatio ?? existing.aspect_ratio ?? null,
-          body: body ?? existing.body ?? null,
-          title: title ?? existing.title ?? null,
-          description: description ?? existing.description ?? null,
-          call_to_action_type: creative?.call_to_action_type || existing.call_to_action_type || null,
-          effective_status: ad.effective_status || creative?.effective_status || existing.effective_status || null,
-          // Asset storage — COALESCE: keep existing hosted asset if new sync failed.
-          asset_storage_bucket: hostedAsset.bucket ?? existing.asset_storage_bucket ?? null,
-          asset_storage_path: hostedAsset.storagePath ?? existing.asset_storage_path ?? null,
-          asset_public_url: hostedAsset.publicUrl ?? existing.asset_public_url ?? null,
-          asset_source_url: hostedAsset.sourceUrl ?? existing.asset_source_url ?? null,
-          asset_width: hostedAsset.width ?? existing.asset_width ?? null,
-          asset_height: hostedAsset.height ?? existing.asset_height ?? null,
-          asset_content_type: hostedAsset.contentType ?? existing.asset_content_type ?? null,
-          asset_origin: hostedAsset.origin,
+          adset_name: adsetMap.get(ad.adset_id) || ex.adset_name || null,
+          creative_id: creative?.id || ex.creative_id || null,
+          thumbnail_path: browserFallbackUrl ?? ex.thumbnail_path ?? null,
+          image_url: imageUrl ?? ex.image_url ?? null,
+          video_thumbnail_url: browserFallbackUrl ?? ex.video_thumbnail_url ?? null,
+          image_hash: creative?.image_hash || ex.image_hash || null,
+          video_id: creative?.video_id || ex.video_id || null,
+          media_type: mediaType ?? ex.media_type ?? null,
+          aspect_ratio: ar ?? ex.aspect_ratio ?? null,
+          call_to_action_type: creative?.call_to_action_type || ex.call_to_action_type || null,
+          effective_status: ad.effective_status || ex.effective_status || null,
+          // Storage: clear if forceResetStorage, otherwise COALESCE.
+          asset_storage_bucket: cs ? null : (ha.bucket ?? ex.asset_storage_bucket ?? null),
+          asset_storage_path: cs ? null : (ha.storagePath ?? ex.asset_storage_path ?? null),
+          asset_public_url: cs ? null : (ha.publicUrl ?? ex.asset_public_url ?? null),
+          asset_source_url: ha.sourceUrl ?? ex.asset_source_url ?? null,
+          asset_width: ha.width ?? ex.asset_width ?? null,
+          asset_height: ha.height ?? ex.asset_height ?? null,
+          asset_content_type: cs ? null : (ha.contentType ?? ex.asset_content_type ?? null),
+          asset_origin: ha.origin,
           asset_last_synced_at: new Date().toISOString(),
-          asset_sync_status: hostedAsset.syncStatus,
-          asset_sync_error: hostedAsset.syncError,
+          asset_sync_status: ha.syncStatus,
+          asset_sync_error: ha.syncError,
           collected_at: new Date().toISOString(),
         };
       }));
 
-      upsertRows.push(...resolvedRows);
+      upsertRows.push(...rows);
     }
 
     let upserted = 0;
     for (const batch of chunks(upsertRows, 100)) {
       const { error } = await supabase.from('ad_creatives').upsert(batch, { onConflict: 'ad_id' });
-      if (error) {
-        console.error('[Upsert Error]', error.message);
-      } else {
-        upserted += batch.length;
-      }
+      if (error) console.error('[Upsert Error]', error.message);
+      else upserted += batch.length;
     }
 
-    const hostedCount = upsertRows.filter((row) => row.asset_sync_status === 'hosted').length;
-    const sourceOnlyCount = upsertRows.filter((row) => row.asset_sync_status === 'source-only').length;
-    const failedCount = upsertRows.filter((row) => row.asset_sync_status === 'sync-failed').length;
+    const hostedCount = upsertRows.filter((r) => r.asset_sync_status === 'hosted').length;
+    const sourceOnlyCount = upsertRows.filter((r) => r.asset_sync_status === 'source-only').length;
+    const failedCount = upsertRows.filter((r) => r.asset_sync_status === 'sync-failed').length;
+
+    // Breakdown for debugging
+    const imageAds = upsertRows.filter((r) => r.media_type === 'image');
+    const videoAds = upsertRows.filter((r) => r.media_type === 'video');
+    const nullTypeAds = upsertRows.filter((r) => !r.media_type);
+    const withImageUrl = upsertRows.filter((r) => r.image_url).length;
+    // Count how many image ads resolved via picture field (no url_1080 or image_url, but picture helped)
+    const pictureResolved = [...creativeDetailsMap.values()].filter(
+      (c) => c.picture && !c.image_url && !c.video_id && !(c.image_hash && imageDataMap.has(c.image_hash))
+    ).length;
 
     return new Response(JSON.stringify({
       ok: true,
       ads_found: allAds.length,
       creatives_fetched: creativeDetailsMap.size,
-      image_hashes_resolved: imageDataMap.size,
+      url_1080_resolved: imageDataMap.size,
+      image_url_from_inline: upsertRows.filter((r) => r.image_url && !imageDataMap.has(r.image_hash)).length,
+      picture_field_resolved: pictureResolved,
       upserted,
       hosted_assets: hostedCount,
       source_only: sourceOnlyCount,
       failed_assets: failedCount,
+      breakdown: {
+        image_ads: imageAds.length,
+        video_ads: videoAds.length,
+        unknown_type: nullTypeAds.length,
+        with_any_image_url: withImageUrl,
+      },
       bucket: CREATIVE_BUCKET,
     }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-      },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
-  } catch (error) {
-    console.error('[collect-meta-creatives] Fatal error', error);
-    const message = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: message }), { status: 500 });
+
+  } catch (err) {
+    console.error('[collect-meta-creatives] Fatal error', err);
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), { status: 500 });
   }
 });

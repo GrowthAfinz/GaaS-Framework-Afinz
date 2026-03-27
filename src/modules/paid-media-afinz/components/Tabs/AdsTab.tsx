@@ -217,14 +217,23 @@ const MetaAdCard: React.FC<{
             )}
 
             {/* Image / Media area */}
-            <div className={`relative w-full bg-gradient-to-br ${gradient} flex items-center justify-center`}
+            <div className={`relative w-full bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden`}
                  style={{ aspectRatio: '1 / 1' }}>
                 {ad.thumbnail_url ? (
                     <img src={ad.thumbnail_url} alt={ad.adName}
-                         className="w-full h-full object-cover" loading="lazy" />
+                         className="w-full h-full object-cover transition-opacity duration-300" 
+                         loading="lazy" 
+                         onLoad={(e) => (e.currentTarget.style.opacity = '1')}
+                         style={{ opacity: 0, imageRendering: 'auto' }} />
                 ) : (
                     <div className="flex flex-col items-center gap-2 opacity-30">
-                        <Play size={32} className="text-white" />
+                        {ad.mediaType === 'video' ? <Film size={32} className="text-white" /> : <Play size={32} className="text-white" />}
+                    </div>
+                )}
+                {/* Processing Overlay for low-res fallbacks */}
+                {ad.thumbnail_url && !ad.creative?.asset_public_url && (
+                    <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-md rounded-full px-2 py-0.5 border border-white/30">
+                        <span className="text-[8px] font-bold text-white tracking-widest uppercase">Processando Alta Res</span>
                     </div>
                 )}
             </div>
@@ -327,7 +336,7 @@ export const AdsTab: React.FC = () => {
             if (!raw.has(key)) {
                 const creative = creativeMap.get(d.ad_id || '');
 
-                const thumbnailUrl = resolveCreativeAssetUrl(creative) || undefined;
+                const thumbnailUrl = resolveCreativeAssetUrl(creative, { width: 400 }) || undefined;
 
                 // ── media_type: reliable source from Edge Function v25 ──
                 // When creative is undefined (join miss), use 'unknown' — DO NOT default to 'image'
