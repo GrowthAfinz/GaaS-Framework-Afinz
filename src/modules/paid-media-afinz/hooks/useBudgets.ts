@@ -31,14 +31,15 @@ export const useBudgets = () => {
     }, []);
 
     const add = async (b: Omit<Budget, 'id'>) => {
-        const optimisticId = crypto.randomUUID();
-        const optimisticBudget = { ...b, id: optimisticId };
+        const newId = crypto.randomUUID();
+        const optimisticBudget = { ...b, id: newId };
 
         // Optimistic UI update
         setBudgets(prev => [...prev, optimisticBudget]);
 
         try {
-            await dataService.upsertPaidMediaBudget(b);
+            // Include id so upsert (onConflict: 'id') can insert correctly
+            await dataService.upsertPaidMediaBudget({ ...b, id: newId });
             await load(); // re-sync
         } catch (err) {
             console.error('Failed to add budget:', err);

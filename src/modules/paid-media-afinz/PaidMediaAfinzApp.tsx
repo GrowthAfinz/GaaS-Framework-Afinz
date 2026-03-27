@@ -11,9 +11,10 @@ import { MonthlyAnalysisTab } from './components/Tabs/MonthlyAnalysisTab';
 import { CampaignDetailsTab } from './components/Tabs/CampaignDetailsTab';
 import { BudgetTab } from './components/Tabs/BudgetTab';
 import { DailyAnalysisTab } from './components/Tabs/DailyAnalysisTab';
+import { AdsTab } from './components/Tabs/AdsTab';
 import { CampaignMapperModal } from './components/Modals/CampaignMapperModal';
 import { AfinzLogo } from './components/AfinzLogo';
-import { LayoutDashboard, BarChart2, List, Wallet, UploadCloud, ArrowLeft, Calendar, Loader2, Settings2 } from 'lucide-react';
+import { LayoutDashboard, BarChart2, List, Wallet, UploadCloud, ArrowLeft, Calendar, Loader2, Settings2, Image } from 'lucide-react';
 
 interface PaidMediaAfinzAppProps {
   onBack?: () => void;
@@ -22,9 +23,8 @@ interface PaidMediaAfinzAppProps {
 const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
   const { rawData, setRawData } = useFilters();
   const { isPlurixAnalyst } = useUserRole();
-  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'campaigns' | 'budget' | 'daily'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'campaigns' | 'budget' | 'daily' | 'ads'>('overview');
   const [isSyncing, setIsSyncing] = useState(true);
-  const [isFilterHovered, setIsFilterHovered] = useState(false);
   const [isMapperOpen, setIsMapperOpen] = useState(false);
 
   // Auto-Sync — reads directly from Supabase table
@@ -103,6 +103,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
     { id: 'monthly', label: 'Análise Mensal', icon: BarChart2 },
     { id: 'daily', label: 'Análise Diária', icon: Calendar },
     { id: 'campaigns', label: 'Campanhas', icon: List },
+    { id: 'ads', label: 'Anúncios', icon: Image },
     { id: 'budget', label: 'Orçamentos', icon: Wallet },
   ] as const;
 
@@ -110,10 +111,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
     // ── Dashboard (light) ──────────────────────────────────────────────
     <div className="fixed inset-0 z-50 bg-slate-50 text-slate-900 flex flex-col overflow-hidden" style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}>
       {/* Header */}
-      <header
-        className="bg-white border-b border-slate-200 sticky top-0 z-[60] shadow-sm transition-all duration-300"
-        onMouseEnter={() => setIsFilterHovered(true)}
-      >
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-[60] shadow-sm">
         <div className="px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {onBack && (
@@ -147,7 +145,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
                     flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                     ${isActive
                       ? 'bg-white text-[#00C6CC] shadow-sm border border-slate-200'
-                      : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
+                      : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
                     }
                   `}
                 >
@@ -180,20 +178,9 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
 
       <main
         className="flex-1 overflow-y-auto relative"
-        onMouseEnter={() => setIsFilterHovered(false)}
       >
-        {/* Animated Filter Bar — slides down on header hover, overflow-visible when open so dropdowns escapem */}
-        <div
-          className={`
-            sticky top-0 z-50 bg-white shadow-lg border-b border-slate-200 transform-gpu origin-top
-            transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-            ${isFilterHovered
-              ? 'max-h-40 translate-y-0 opacity-100 overflow-visible'
-              : 'max-h-0 -translate-y-3 opacity-0 pointer-events-none overflow-hidden'}
-          `}
-          onMouseEnter={() => setIsFilterHovered(true)}
-          onMouseLeave={() => setIsFilterHovered(false)}
-        >
+        {/* Filter Bar — always visible so users always know which period they're viewing */}
+        <div className="sticky top-0 z-50 bg-white shadow-sm border-b border-slate-200 overflow-visible">
           <FilterBar />
         </div>
 
@@ -202,6 +189,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
           {activeTab === 'monthly' && <MonthlyAnalysisTab />}
           {activeTab === 'daily' && <DailyAnalysisTab />}
           {activeTab === 'campaigns' && <CampaignDetailsTab />}
+          {activeTab === 'ads' && <AdsTab />}
           {activeTab === 'budget' && <BudgetTab />}
         </div>
       </main>

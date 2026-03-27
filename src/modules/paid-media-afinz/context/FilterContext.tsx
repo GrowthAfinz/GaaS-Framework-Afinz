@@ -75,7 +75,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [rowsInPeriod, selectedCampaigns, selectedAdsets, selectedAds]);
 
     const previousPeriodData = useMemo(() => {
-        if (!compareEnabled) return [];
+        // Always calculate previous period (used for vs período anterior KPIs)
         const duration = dateTo.getTime() - dateFrom.getTime();
         const prevTo = new Date(dateFrom.getTime() - 86400000);
         const prevFrom = new Date(prevTo.getTime() - duration);
@@ -89,7 +89,7 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (selectedAds.length > 0 && (!item.ad_name || !selectedAds.includes(item.ad_name))) return false;
             return true;
         });
-    }, [rawData, dateFrom, dateTo, selectedChannels, selectedObjectives, selectedCampaigns, selectedAdsets, selectedAds, compareEnabled]);
+    }, [rawData, dateFrom, dateTo, selectedChannels, selectedObjectives, selectedCampaigns, selectedAdsets, selectedAds]);
 
     // --- Dropdown options ---
     // Campaigns: from rowsInPeriod (fast, already in memory)
