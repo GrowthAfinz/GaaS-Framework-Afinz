@@ -49,8 +49,15 @@ export interface AdCreative {
     ad_name?: string;
     campaign?: string;
     adset_name?: string;
-    thumbnail_path?: string;
+    // Image fields
+    thumbnail_path?: string;   // low-res fallback / video thumbnail
+    image_url?: string;        // high-res original image URL
     image_hash?: string;
+    // Creative intelligence fields (v2)
+    media_type?: 'image' | 'video';
+    video_id?: string;
+    aspect_ratio?: number;     // width/height: 1.0=square, 0.5625=portrait(9:16)
+    // Copy
     body?: string;
     title?: string;
     description?: string;

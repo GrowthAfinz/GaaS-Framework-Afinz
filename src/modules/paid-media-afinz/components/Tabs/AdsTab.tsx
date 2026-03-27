@@ -327,15 +327,30 @@ export const AdsTab: React.FC = () => {
             const key = d.ad_id || d.ad_name || `${d.campaign}__${d.adset_name}`;
             if (!raw.has(key)) {
                 const creative = creativeMap.get(d.ad_id || '');
-                const thumbnailPath = creative?.thumbnail_path;
-                const thumbnailUrl = thumbnailPath
-                    ? thumbnailPath.startsWith('https://')
-                        ? thumbnailPath
-                        : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${thumbnailPath}`
+
+                // Prefer image_url (high-res) over thumbnail_path (low-res)
+                const rawUrl = creative?.image_url || creative?.thumbnail_path;
+                const thumbnailUrl = rawUrl
+                    ? rawUrl.startsWith('https://')
+                        ? rawUrl
+                        : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${rawUrl}`
                     : undefined;
-                const mediaType: 'image' | 'video' = creative?.image_hash ? 'image' : 'video';
+
+                // media_type from v2 intelligence fields (reliable)
+                // Fallback: video_id presence, then image_hash heuristic
+                const mediaType: 'image' | 'video' =
+                    creative?.media_type === 'video' ? 'video'
+                    : creative?.media_type === 'image' ? 'image'
+                    : creative?.video_id ? 'video'
+                    : creative?.image_hash ? 'image'
+                    : 'image'; // default to image when unknown
+
                 const adNameRaw = d.ad_name || d.ad_id || d.campaign;
-                const isStory = isStoryFormat(adNameRaw, d.adset_name);
+                // aspect_ratio from v2: < 0.8 = portrait/story
+                // Fallback: name-based detection
+                const isStory = creative?.aspect_ratio != null
+                    ? creative.aspect_ratio < 0.8
+                    : isStoryFormat(adNameRaw, d.adset_name);
                 raw.set(key, {
                     adId: key, adName: adNameRaw, campaign: d.campaign,
                     adset: d.adset_name, channel: d.channel,

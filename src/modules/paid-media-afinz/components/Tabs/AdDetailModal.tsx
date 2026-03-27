@@ -189,10 +189,12 @@ const AssetTable: React.FC<{ title: string; insights: AssetInsight[] }> = ({ tit
 
 // ── Main Modal ──────────────────────────────────────────────────────────────
 export const AdDetailModal: React.FC<Props> = ({ ad, creative, dailyData, onClose }) => {
-    const thumbnailUrl = creative?.thumbnail_path
-        ? creative.thumbnail_path.startsWith('https://')
-            ? creative.thumbnail_path
-            : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${creative.thumbnail_path}`
+    // Prefer image_url (high-res) over thumbnail_path (low-res)
+    const rawUrl = creative?.image_url || creative?.thumbnail_path;
+    const thumbnailUrl = rawUrl
+        ? rawUrl.startsWith('https://')
+            ? rawUrl
+            : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${rawUrl}`
         : null;
 
     const gradient = GRADIENTS[hashStr(ad.adId) % GRADIENTS.length];
