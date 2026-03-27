@@ -349,11 +349,13 @@ export const AdsTab: React.FC = () => {
             frequency: r.freqCount > 0 ? r.freqSum / r.freqCount : undefined,
         }));
 
-        // ── Pass 2: deduplicate by image_hash → 1 card per creative ────────
+        // ── Pass 2: deduplicate by image_hash → thumbnail_path → unique ────
+        // Priority: image_hash > thumbnail_path > ad_id (each more specific)
         const hashGroups = new Map<string, typeof finalized[0][]>();
         finalized.forEach(ad => {
             const hash = ad.creative?.image_hash;
-            const gKey = hash ? `hash:${hash}` : `unique:${ad.adId}`;
+            const thumb = ad.thumbnail_url;
+            const gKey = hash ? `hash:${hash}` : thumb ? `thumb:${thumb}` : `unique:${ad.adId}`;
             if (!hashGroups.has(gKey)) hashGroups.set(gKey, []);
             hashGroups.get(gKey)!.push(ad);
         });
