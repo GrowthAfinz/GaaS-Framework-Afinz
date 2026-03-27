@@ -101,9 +101,10 @@ const SEGMENT_PALETTE = [
 ];
 
 const TEAL = '#00C6CC';
-const LIME_BORDER = '#8FD400';
-const LIME_BG = '#F5FFD0';
-const LIME_HEADER = '#CCFF33';
+const HIGHLIGHT_BORDER = '#7CD7DD';
+const HIGHLIGHT_BG = '#F4FBFC';
+const HIGHLIGHT_HEADER = '#DFF7F8';
+const HIGHLIGHT_TOTAL = '#C8F1F4';
 
 function buildCsvBlob(headers: string[], rows: string[][]): Blob {
   const lines = [headers, ...rows]
@@ -147,6 +148,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   // ── Filtros Destaque ──
   const [destaqueFilter, setDestaqueFilter] = useState<'top-conversores' | 'aguardando' | null>(null);
   const [showDestaqueMenu, setShowDestaqueMenu] = useState(false);
+  const [isDescriptionCollapsed, setIsDescriptionCollapsed] = useState(false);
 
   // ── Ordenação ──
   const [sortKey, setSortKey] = useState<keyof DetailRow | null>(null);
@@ -330,6 +332,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
       setSortDir('desc');
     }
   }, [sortKey]);
+
+  const detailLeadCellClass = (color?: { bg: string; border: string; text: string }, isBanded?: boolean) => (
+    `${color?.bg ?? (isBanded ? 'bg-slate-50' : 'bg-white')} ${color?.text ?? 'text-slate-700'}`
+  );
 
   useEffect(() => {
     if (detailRows.length === 0) return;
@@ -532,23 +538,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Entrega.</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >Propostas</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >% Proposta</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >Aprovados</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >% Aprovação</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >Emissões</th>
                   <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Finalização</th>
                   <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Custo / Cartão</th>
@@ -573,23 +579,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                       <td className="text-right px-4 py-2.5 text-slate-600">{fmtPct(row.taxaEntrega)}</td>
                       <td
                         className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtN(row.propostas)}</td>
                       <td
                         className="text-right px-3 py-2.5 text-slate-700"
-                        style={{ background: LIME_BG, borderRight: `2px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtPct(row.taxaProposta)}</td>
                       <td
                         className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtN(row.aprovados)}</td>
                       <td
                         className="text-right px-3 py-2.5 text-slate-700"
-                        style={{ background: LIME_BG, borderRight: `2px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtPct(row.taxaAprovacao)}</td>
                       <td
                         className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtN(row.emissoes)}</td>
                       <td className="text-right px-4 py-2.5 text-slate-600">{fmtPct(row.taxaFinalizacao)}</td>
                       <td className="text-right px-4 py-2.5 text-slate-600">{fmtBRL(row.custoPorCartao)}</td>
@@ -606,23 +612,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   <td className="text-right px-4 py-2.5 font-bold text-slate-900">{fmtPct(segmentoTotal.taxaEntrega)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtN(segmentoTotal.propostas)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtPct(segmentoTotal.taxaProposta)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtN(segmentoTotal.aprovados)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtPct(segmentoTotal.taxaAprovacao)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtN(segmentoTotal.emissoes)}</td>
                   <td className="text-right px-4 py-2.5 font-bold text-slate-900">{fmtPct(segmentoTotal.taxaFinalizacao)}</td>
                   <td className="text-right px-4 py-2.5 font-bold text-slate-900">{fmtBRL(segmentoTotal.custoPorCartao)}</td>
@@ -663,23 +669,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Entrega.</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >Propostas</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >% Proposta</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >Aprovados</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >% Aprovação</th>
                   <th
                     className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >Emissões</th>
                   <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Finalização</th>
                   <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Custo / Cartão</th>
@@ -703,23 +709,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                     <td className="text-right px-4 py-2.5 text-slate-600">{fmtPct(row.taxaEntrega)}</td>
                     <td
                       className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                      style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtN(row.propostas)}</td>
                     <td
                       className="text-right px-3 py-2.5 text-slate-700"
-                      style={{ background: LIME_BG, borderRight: `2px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtPct(row.taxaProposta)}</td>
                     <td
                       className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                      style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtN(row.aprovados)}</td>
                     <td
                       className="text-right px-3 py-2.5 text-slate-700"
-                      style={{ background: LIME_BG, borderRight: `2px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtPct(row.taxaAprovacao)}</td>
                     <td
                       className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                      style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtN(row.emissoes)}</td>
                     <td className="text-right px-4 py-2.5 text-slate-600">{fmtPct(row.taxaFinalizacao)}</td>
                     <td className="text-right px-4 py-2.5 text-slate-600">{fmtBRL(row.custoPorCartao)}</td>
@@ -738,23 +744,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   <td className="text-right px-4 py-2.5 font-bold text-slate-900">{fmtPct(canalTotal.taxaEntrega)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtN(canalTotal.propostas)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtPct(canalTotal.taxaProposta)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtN(canalTotal.aprovados)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtPct(canalTotal.taxaAprovacao)}</td>
                   <td
                     className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: '#F0F970', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                   >{fmtN(canalTotal.emissoes)}</td>
                   <td className="text-right px-4 py-2.5 font-bold text-slate-900">{fmtPct(canalTotal.taxaFinalizacao)}</td>
                   <td className="text-right px-4 py-2.5 font-bold text-slate-900">{fmtBRL(canalTotal.custoPorCartao)}</td>
@@ -958,7 +964,14 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
         {!selectedActivityRow && <div className="bg-white border border-slate-200 rounded-b-xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
-              <thead>
+              <thead onClick={(event) => {
+                const header = (event.target as HTMLElement).closest('th');
+                if (!header) return;
+                const label = header.textContent?.toLowerCase() ?? '';
+                if (label.includes('descri')) {
+                  setIsDescriptionCollapsed((value) => !value);
+                }
+              }}>
                 <tr style={{ background: '#1E293B' }} className="text-white">
                   <th
                     className="text-left px-2 py-2 font-semibold whitespace-nowrap w-12 cursor-pointer select-none group hover:bg-slate-700 transition-colors"
@@ -985,7 +998,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   </th>
                   <th
                     className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                     onClick={() => handleSort('propostas')}
                   >
                     <span className="flex items-center justify-center gap-1">
@@ -995,7 +1008,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   </th>
                   <th
                     className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: LIME_HEADER, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     onClick={() => handleSort('taxaProposta')}
                   >
                     <span className="flex items-center justify-center gap-1">
@@ -1005,7 +1018,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   </th>
                   <th
                     className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                     onClick={() => handleSort('aprovados')}
                   >
                     <span className="flex items-center justify-center gap-1">
@@ -1015,7 +1028,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   </th>
                   <th
                     className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: LIME_HEADER, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     onClick={() => handleSort('taxaAprovacao')}
                   >
                     <span className="flex items-center justify-center gap-1">
@@ -1025,7 +1038,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   </th>
                   <th
                     className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: LIME_HEADER, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     onClick={() => handleSort('emissoes')}
                   >
                     <span className="flex items-center justify-center gap-1">
@@ -1078,17 +1091,17 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                   return (
                     <tr
                       key={`${row.date.toISOString()}-${row.activityName}`}
-                      className={`border-t border-slate-100 hover:brightness-95 transition-all cursor-pointer ${color?.bg ?? (isBanded ? 'bg-slate-50' : 'bg-white')}`}
+                      className={`border-t border-slate-100 hover:bg-slate-50 transition-all cursor-pointer ${isBanded ? 'bg-slate-50/40' : 'bg-white'}`}
                       onClick={() => {
                         const act = allActivities.find((a: Activity) => a.id === row.activityName);
                         if (act) setSelectedActivityRow(toActivityRow(act));
                       }}
                       title="Clique para ver detalhes do disparo"
                     >
-                      <td className={`px-2 py-1.5 font-medium whitespace-nowrap tabular-nums text-xs text-slate-500 ${color?.border ?? ''}`}>
+                      <td className={`px-2 py-1.5 font-semibold whitespace-nowrap tabular-nums text-xs ${detailLeadCellClass(color, isBanded)} ${color?.border ?? ''}`}>
                         {format(row.date, 'dd/MM')}
                       </td>
-                      <td className="px-2 py-1.5" style={{ minWidth: 140, maxWidth: 180 }}>
+                      <td className={`px-2 py-1.5 ${detailLeadCellClass(color, isBanded)}`} style={{ minWidth: 140, maxWidth: 180 }}>
                         <div className="flex flex-col gap-0.5">
                           {row.jornada && (
                             <span className={`text-[11px] font-semibold truncate ${color?.text ?? 'text-slate-600'}`} style={{ maxWidth: 160 }} title={row.jornada}>
@@ -1100,7 +1113,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                           </span>
                         </div>
                       </td>
-                      <td className="px-2 py-1.5 text-center">
+                      <td className={`px-2 py-1.5 text-center ${detailLeadCellClass(color, isBanded)}`}>
                         {row.segmento ? (
                           <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${color?.bg ?? 'bg-slate-100'} ${color?.text ?? 'text-slate-600'} border ${color?.border ? 'border-current' : 'border-slate-200'}`}>
                             {row.segmento}
@@ -1110,19 +1123,19 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                         )}
                       </td>
                       {/* Parceiro */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      <td className="px-2 py-1.5 whitespace-nowrap text-center bg-white">
                         <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap border ${PARCEIRO_COLORS[row.parceiro] ?? 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                           {row.parceiro}
                         </span>
                       </td>
                       {/* Canal */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center">
+                      <td className="px-2 py-1.5 whitespace-nowrap text-center bg-white">
                         <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap border ${CANAL_COLORS[row.canal ?? ''] ?? 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                           {row.canal || '—'}
                         </span>
                       </td>
                       {/* Descrição */}
-                      <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
+                      {!isDescriptionCollapsed && <td className="px-2 py-1.5 bg-white" onClick={e => e.stopPropagation()}>
                         <div className="flex items-start gap-1.5">
                           <textarea
                             className="flex-1 text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-cyan-400 min-w-[120px]"
@@ -1142,7 +1155,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                             </button>
                           )}
                         </div>
-                      </td>
+                      </td>}
                       {/* Entregas */}
                       <td className="text-center px-2 py-1.5">
                         {row.aguardando
@@ -1152,23 +1165,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
                       </td>
                       <td
                         className={`text-center px-2 py-1.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtN(row.propostas)}</td>
                       <td
                         className="text-center px-2 py-1.5 text-slate-700"
-                        style={{ background: LIME_BG, borderRight: `2px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtPct(row.taxaProposta)}</td>
                       <td
                         className={`text-center px-2 py-1.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtN(row.aprovados)}</td>
                       <td
                         className="text-center px-2 py-1.5 text-slate-700"
-                        style={{ background: LIME_BG, borderRight: `2px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtPct(row.taxaAprovacao)}</td>
                       <td
                         className={`text-center px-2 py-1.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: LIME_BG, borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                       >{fmtN(row.emissoes)}</td>
                       <td className="text-center px-2 py-1.5 text-slate-600 text-xs tabular-nums">{fmtPct(row.taxaFinalizacao)}</td>
                       <td className="text-center px-2 py-1.5 text-slate-600 text-xs tabular-nums">{fmtBRL(row.custoPorCartao)}</td>
@@ -1181,30 +1194,30 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
               {displayRows.length > 0 && (
                 <tfoot>
                   <tr style={{ background: '#1E293B' }} className="text-white text-xs font-bold">
-                    <td colSpan={6} className="px-2 py-2 font-bold whitespace-nowrap">
+                    <td colSpan={isDescriptionCollapsed ? 5 : 6} className="px-2 py-2 font-bold whitespace-nowrap">
                       Totais · {displayRows.length} disparo{displayRows.length !== 1 ? 's' : ''}
                       {destaqueFilter && <span className="ml-1.5 text-amber-300 font-normal">(filtrado)</span>}
                     </td>
                     <td className="text-center px-2 py-2 tabular-nums">{fmtN(summaryRow.totalEntregas)}</td>
                     <td
                       className="text-center px-2 py-2 tabular-nums font-bold"
-                      style={{ background: '#8FD400', color: '#1a1a1a', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtN(summaryRow.totalPropostas)}</td>
                     <td
                       className="text-center px-2 py-2 tabular-nums"
-                      style={{ background: '#8FD400', color: '#1a1a1a', borderRight: `2px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtPct(summaryRow.taxaProposta)}</td>
                     <td
                       className="text-center px-2 py-2 tabular-nums font-bold"
-                      style={{ background: '#8FD400', color: '#1a1a1a', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `1px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtN(summaryRow.totalAprovados)}</td>
                     <td
                       className="text-center px-2 py-2 tabular-nums"
-                      style={{ background: '#8FD400', color: '#1a1a1a', borderRight: `2px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtPct(summaryRow.taxaAprovacao)}</td>
                     <td
                       className="text-center px-2 py-2 tabular-nums font-bold"
-                      style={{ background: '#8FD400', color: '#1a1a1a', borderLeft: `2px solid ${LIME_BORDER}`, borderRight: `2px solid ${LIME_BORDER}` }}
+                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
                     >{fmtN(summaryRow.totalEmissoes)}</td>
                     <td className="text-center px-2 py-2 tabular-nums">{fmtPct(summaryRow.taxaFinalizacao)}</td>
                     <td className="text-center px-2 py-2 tabular-nums">{fmtBRL(summaryRow.avgCustoCartao)}</td>
