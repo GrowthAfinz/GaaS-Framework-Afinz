@@ -73,16 +73,35 @@ Deno.serve(async (req) => {
 
   // ── Env vars ──
   const META_TOKEN = Deno.env.get('META_ACCESS_TOKEN');
-  const AD_ACCOUNT_ID = Deno.env.get('META_AD_ACCOUNT_ID'); // e.g. "act_123456789"
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  if (!META_TOKEN || !AD_ACCOUNT_ID) {
+  if (!META_TOKEN) {
     return new Response(
-      JSON.stringify({ error: 'Missing META_ACCESS_TOKEN or META_AD_ACCOUNT_ID env vars' }),
+      JSON.stringify({ error: 'Missing META_ACCESS_TOKEN env var' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
+
+  // ── Auto-discover Ad Account ID if not explicitly set ─────────────────────
+  let AD_ACCOUNT_ID = Deno.env.get('META_AD_ACCOUNT_ID');
+
+  if (!AD_ACCOUNT_ID) {
+    console.log('[collect-meta-creatives] META_AD_ACCOUNT_ID not set — auto-discovering via /me/adaccounts...');
+    const discovery = await metaGet(
+      `/me/adaccounts?fields=id,name,currency&access_token=${META_TOKEN}&limit=1`,
+      META_TOKEN
+    );
+    if (!discovery?.data?.length) {
+      return new Response(
+        JSON.stringify({ error: 'Could not auto-discover ad account. Set META_AD_ACCOUNT_ID manually.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    AD_ACCOUNT_ID = discovery.data[0].id; // e.g. "act_123456789"
+    console.log(`[collect-meta-creatives] Auto-discovered account: ${AD_ACCOUNT_ID} (${discovery.data[0].name})`);
+  }
+
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
