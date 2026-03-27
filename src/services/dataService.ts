@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, supabaseUrl, supabaseKey } from './supabaseClient';
 import { Activity, FrameworkRow } from '../types/framework';
 import { DailyAdMetrics, MediaInsight, CampaignMapping } from '../schemas/paid-media';
 import { B2CDataRow } from '../types/b2c';
@@ -651,5 +651,29 @@ export const dataService = {
             .from('paid_media_campaign_mappings')
             .upsert(mapping, { onConflict: 'campaign_name' });
         if (error) throw error;
+    },
+
+    async fetchAdCreatives(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('ad_creatives')
+            .select('*');
+        if (error) throw error;
+        return data || [];
+    },
+
+    async triggerCollectCreatives(): Promise<any> {
+        const resp = await fetch(
+            `${supabaseUrl}/functions/v1/collect-meta-creatives`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseKey}`,
+                },
+                body: JSON.stringify({}),
+            }
+        );
+        if (!resp.ok) throw new Error(`Edge function error: ${resp.status}`);
+        return resp.json();
     }
 };

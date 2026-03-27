@@ -1,15 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { useFilters } from '../../context/FilterContext';
 import {
-    Search, TrendingUp, TrendingDown, Award, AlertTriangle,
+    Search, TrendingUp, TrendingDown, Award,
     MoreHorizontal, ThumbsUp, MessageCircle, Share2, Play,
-    BarChart2, Filter, ChevronDown
+    BarChart2, Info, RefreshCw, Loader2
 } from 'lucide-react';
 import {
     ResponsiveContainer, ScatterChart, Scatter, ZAxis,
     XAxis, YAxis, CartesianGrid, Tooltip
 } from 'recharts';
-import type { DailyMetrics } from '../../types';
+import type { AdCreative } from '../../types';
+import { AdDetailModal } from './AdDetailModal';
+import { dataService } from '../../../../services/dataService';
+
+// ── Constants ────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://mipiwxadnpwtcgfcedym.supabase.co';
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 const fmtBRL = (v: number) =>
@@ -39,7 +44,20 @@ interface AdSummary {
     reach?: number;
     frequency?: number;
     thumbnail_url?: string;
+    // Creative enrichment
+    body?: string;
+    title?: string;
+    ctaLabel?: string;
+    creative?: AdCreative;
 }
+
+// ── CTA Mapping ──────────────────────────────────────────────────────────────
+const CTA_MAP: Record<string, string> = {
+    LEARN_MORE: 'Saiba mais', SIGN_UP: 'Cadastre-se', APPLY_NOW: 'Candidatar-se',
+    SHOP_NOW: 'Comprar agora', DOWNLOAD: 'Baixar', GET_OFFER: 'Obter oferta',
+    CONTACT_US: 'Fale conosco', SUBSCRIBE: 'Assinar', ORDER_NOW: 'Pedir agora',
+    OPEN_LINK: 'Abrir', WATCH_MORE: 'Assistir', BOOK_TRAVEL: 'Reservar',
+};
 
 // ── Compact KPI Bar ───────────────────────────────────────────────────────────
 const KPIBar: React.FC<{
@@ -54,10 +72,10 @@ const KPIBar: React.FC<{
 
     const items = [
         { label: 'Invest.', value: fmtBRL(curr.spend), d: delta('spend'), inverse: false },
-        { label: 'Conversões', value: fmtNum(curr.conversions), d: delta('conversions'), inverse: false },
-        { label: 'CPA Médio', value: curr.cpa > 0 ? fmtBRLDec(curr.cpa) : '—', d: delta('cpa'), inverse: true },
+        { label: 'Conversoes', value: fmtNum(curr.conversions), d: delta('conversions'), inverse: false },
+        { label: 'CPA Medio', value: curr.cpa > 0 ? fmtBRLDec(curr.cpa) : '—', d: delta('cpa'), inverse: true },
         { label: 'CTR', value: fmtPct(curr.ctr), d: delta('ctr'), inverse: false },
-        { label: 'Anúncios ativos', value: String(curr.activeAds), d: null, inverse: false },
+        { label: 'Anuncios ativos', value: String(curr.activeAds), d: null, inverse: false },
         { label: 'Em alerta', value: String(curr.alertAds), d: null, inverse: true },
     ];
 
@@ -88,58 +106,58 @@ const KPIBar: React.FC<{
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-// Gradient palette for placeholder images (varies by ad id hash)
 const GRADIENTS = [
-    'from-blue-400 to-indigo-600',
-    'from-rose-400 to-pink-600',
-    'from-amber-400 to-orange-600',
-    'from-teal-400 to-cyan-600',
-    'from-violet-400 to-purple-600',
-    'from-emerald-400 to-green-600',
-    'from-sky-400 to-blue-600',
-    'from-fuchsia-400 to-purple-600',
+    'from-blue-400 to-indigo-600', 'from-rose-400 to-pink-600',
+    'from-amber-400 to-orange-600', 'from-teal-400 to-cyan-600',
+    'from-violet-400 to-purple-600', 'from-emerald-400 to-green-600',
+    'from-sky-400 to-blue-600', 'from-fuchsia-400 to-purple-600',
 ];
 const hashStr = (s: string) => s.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
 
-// CTA label by channel/objective
-const ctaLabel = (ad: AdSummary) => {
-    if (ad.channel === 'google') return 'Saiba mais';
-    return 'Saiba mais';
-};
-
 // Status badge
-type StatusType = 'VENCEDOR' | 'FADIGA' | 'EXCELENTE' | 'BOM' | 'ATENÇÃO';
+type StatusType = 'VENCEDOR' | 'FADIGA' | 'EXCELENTE' | 'BOM' | 'ATENCAO';
 const getStatus = (ctr: number, cpa: number, avgCpa: number, freq?: number): StatusType => {
     if (freq && freq > 3.5) return 'FADIGA';
     if (cpa > 0 && avgCpa > 0 && cpa <= avgCpa * 0.7) return 'VENCEDOR';
     if (ctr >= 1) return 'EXCELENTE';
     if (ctr >= 0.5) return 'BOM';
-    return 'ATENÇÃO';
+    return 'ATENCAO';
 };
 const STATUS_STYLE: Record<StatusType, string> = {
     VENCEDOR: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     FADIGA:   'bg-orange-100 text-orange-700 border-orange-200',
     EXCELENTE:'bg-blue-100 text-blue-700 border-blue-200',
     BOM:      'bg-slate-100 text-slate-600 border-slate-200',
-    ATENÇÃO:  'bg-red-100 text-red-600 border-red-200',
+    ATENCAO:  'bg-red-100 text-red-600 border-red-200',
+};
+const STATUS_LABEL: Record<StatusType, string> = {
+    VENCEDOR: 'VENCEDOR', FADIGA: 'FADIGA', EXCELENTE: 'EXCELENTE',
+    BOM: 'BOM', ATENCAO: 'ATENCAO',
 };
 
-// Avatar letter + color
 const AVATAR_COLORS = ['bg-blue-500','bg-rose-500','bg-violet-500','bg-amber-500','bg-teal-500','bg-emerald-500'];
 const avatarColor = (name: string) => AVATAR_COLORS[hashStr(name) % AVATAR_COLORS.length];
 
 // ── Meta-style Ad Card ────────────────────────────────────────────────────────
-const MetaAdCard: React.FC<{ ad: AdSummary; avgCpa: number }> = ({ ad, avgCpa }) => {
+const MetaAdCard: React.FC<{
+    ad: AdSummary;
+    avgCpa: number;
+    onClick: () => void;
+}> = ({ ad, avgCpa, onClick }) => {
     const status = getStatus(ad.ctr, ad.cpa, avgCpa, ad.frequency);
     const gradient = GRADIENTS[hashStr(ad.adId) % GRADIENTS.length];
     const brandInitial = (ad.campaign || ad.adName).charAt(0).toUpperCase();
     const channelLabel = ad.channel === 'meta' ? 'Meta Ads' : ad.channel === 'google' ? 'Google Ads' : ad.channel;
     const ctrColor = ad.ctr >= 1 ? 'text-emerald-600' : ad.ctr >= 0.5 ? 'text-amber-600' : 'text-red-500';
+    const displayBody = ad.body || ad.adName;
+    const displayTitle = ad.title || ad.adName;
+    const cta = ad.ctaLabel || 'Saiba mais';
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow cursor-pointer"
+             onClick={onClick}>
 
-            {/* ── Meta-style Header ── */}
+            {/* Meta-style Header */}
             <div className="px-3 pt-3 pb-2 flex items-start justify-between">
                 <div className="flex items-center gap-2">
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black flex-shrink-0 ${avatarColor(ad.campaign)}`}>
@@ -147,7 +165,7 @@ const MetaAdCard: React.FC<{ ad: AdSummary; avgCpa: number }> = ({ ad, avgCpa })
                     </div>
                     <div>
                         <p className="text-[13px] font-semibold text-slate-900 leading-tight truncate max-w-[140px]" title={ad.campaign}>
-                            {ad.campaign.length > 22 ? ad.campaign.slice(0, 22) + '…' : ad.campaign}
+                            {ad.campaign.length > 22 ? ad.campaign.slice(0, 22) + '...' : ad.campaign}
                         </p>
                         <div className="flex items-center gap-1.5 mt-0.5">
                             <span className="text-[11px] text-slate-400">Patrocinado</span>
@@ -158,27 +176,24 @@ const MetaAdCard: React.FC<{ ad: AdSummary; avgCpa: number }> = ({ ad, avgCpa })
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[status]}`}>
-                        {status}
+                        {STATUS_LABEL[status]}
                     </span>
-                    <button className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
-                        <MoreHorizontal size={15} />
-                    </button>
                 </div>
             </div>
 
-            {/* ── Ad Copy (short text like feed) ── */}
-            {ad.adName && (
+            {/* Ad Copy */}
+            {displayBody && (
                 <div className="px-3 pb-2">
-                    <p className="text-[12px] text-slate-700 leading-snug line-clamp-2">{ad.adName}</p>
+                    <p className="text-[12px] text-slate-700 leading-snug line-clamp-2">{displayBody}</p>
                 </div>
             )}
 
-            {/* ── Image / Media area ── */}
+            {/* Image / Media area */}
             <div className={`relative w-full bg-gradient-to-br ${gradient} flex items-center justify-center`}
                  style={{ aspectRatio: '1 / 1' }}>
                 {ad.thumbnail_url ? (
                     <img src={ad.thumbnail_url} alt={ad.adName}
-                         className="w-full h-full object-cover" />
+                         className="w-full h-full object-cover" loading="lazy" />
                 ) : (
                     <div className="flex flex-col items-center gap-2 opacity-30">
                         <Play size={32} className="text-white" />
@@ -186,20 +201,20 @@ const MetaAdCard: React.FC<{ ad: AdSummary; avgCpa: number }> = ({ ad, avgCpa })
                 )}
             </div>
 
-            {/* ── Link preview (Meta's gray CTA section) ── */}
+            {/* Link preview (Meta's gray CTA section) */}
             <div className="bg-[#F0F2F5] px-3 py-2 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">afinz.com.br</p>
                     <p className="text-[12px] font-semibold text-slate-900 truncate leading-tight">
-                        {ad.adName.length > 30 ? ad.adName.slice(0, 30) + '…' : ad.adName}
+                        {displayTitle.length > 30 ? displayTitle.slice(0, 30) + '...' : displayTitle}
                     </p>
                 </div>
-                <button className="flex-shrink-0 px-3 py-1.5 bg-[#E4E6EB] hover:bg-[#D8DADF] text-slate-700 text-[12px] font-semibold rounded-md transition-colors">
-                    {ctaLabel(ad)}
-                </button>
+                <span className="flex-shrink-0 px-3 py-1.5 bg-[#E4E6EB] text-slate-700 text-[12px] font-semibold rounded-md">
+                    {cta}
+                </span>
             </div>
 
-            {/* ── Engagement bar (like Meta's) ── */}
+            {/* Engagement bar */}
             <div className="px-3 py-1.5 flex items-center gap-3 border-b border-slate-100">
                 <div className="flex items-center gap-1 text-slate-400 text-[11px]">
                     <ThumbsUp size={12} /> <span>{fmtNum(ad.clicks)}</span>
@@ -212,7 +227,7 @@ const MetaAdCard: React.FC<{ ad: AdSummary; avgCpa: number }> = ({ ad, avgCpa })
                 </div>
             </div>
 
-            {/* ── Performance Metrics (our layer) ── */}
+            {/* Performance Metrics */}
             <div className="px-3 py-2.5 grid grid-cols-3 gap-1.5">
                 <div className="text-center">
                     <div className="text-[9px] text-slate-400 uppercase tracking-wider">Impress.</div>
@@ -247,25 +262,41 @@ const MetaAdCard: React.FC<{ ad: AdSummary; avgCpa: number }> = ({ ad, avgCpa })
 
 // ── Sort / Filter Types ───────────────────────────────────────────────────────
 type SortKey = 'cpa' | 'spend' | 'ctr' | 'conversions';
-type StatusFilter = 'all' | 'VENCEDOR' | 'EXCELENTE' | 'BOM' | 'ATENÇÃO' | 'FADIGA';
+type StatusFilter = 'all' | 'VENCEDOR' | 'EXCELENTE' | 'BOM' | 'ATENCAO' | 'FADIGA';
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export const AdsTab: React.FC = () => {
-    const { filteredData, previousPeriodData, filters } = useFilters();
+    const { filteredData, previousPeriodData, filters, adCreatives, refreshCreatives } = useFilters();
     const showCompare = filters.isCompareEnabled;
 
     const [search, setSearch] = useState('');
     const [channelFilter, setChannelFilter] = useState<'all' | 'meta' | 'google'>('all');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [sortKey, setSortKey] = useState<SortKey>('conversions');
+    const [selectedAd, setSelectedAd] = useState<AdSummary | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [showScatterInfo, setShowScatterInfo] = useState(false);
 
-    // ── Aggregate by ad ──────────────────────────────────────────────────────
+    // Build creative lookup map
+    const creativeMap = useMemo(() => {
+        const map = new Map<string, AdCreative>();
+        adCreatives.forEach(c => map.set(c.ad_id, c));
+        return map;
+    }, [adCreatives]);
+
+    // ── Aggregate by ad + enrich with creatives ─────────────────────────────
     const allAds = useMemo<AdSummary[]>(() => {
         const map = new Map<string, AdSummary & { freqCount: number; freqSum: number }>();
 
         filteredData.forEach(d => {
             const key = d.ad_id || d.ad_name || `${d.campaign}__${d.adset_name}`;
             if (!map.has(key)) {
+                const creative = creativeMap.get(d.ad_id || '');
+                const thumbnailPath = creative?.thumbnail_path;
+                const thumbnailUrl = thumbnailPath
+                    ? `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${thumbnailPath}`
+                    : undefined;
+
                 map.set(key, {
                     adId: key,
                     adName: d.ad_name || d.ad_id || d.campaign,
@@ -276,6 +307,13 @@ export const AdsTab: React.FC = () => {
                     ctr: 0, cpa: 0, cpm: 0,
                     reach: 0, frequency: 0,
                     freqCount: 0, freqSum: 0,
+                    thumbnail_url: thumbnailUrl,
+                    body: creative?.body,
+                    title: creative?.title,
+                    ctaLabel: creative?.call_to_action_type
+                        ? CTA_MAP[creative.call_to_action_type] || 'Saiba mais'
+                        : undefined,
+                    creative,
                 });
             }
             const r = map.get(key)!;
@@ -294,14 +332,14 @@ export const AdsTab: React.FC = () => {
             cpm: r.impressions > 0 ? (r.spend / r.impressions) * 1000 : 0,
             frequency: r.freqCount > 0 ? r.freqSum / r.freqCount : undefined,
         }));
-    }, [filteredData]);
+    }, [filteredData, creativeMap]);
 
     const avgCpa = useMemo(() => {
         const withCpa = allAds.filter(a => a.cpa > 0);
         return withCpa.length > 0 ? withCpa.reduce((s, a) => s + a.cpa, 0) / withCpa.length : 0;
     }, [allAds]);
 
-    // ── Current period totals ────────────────────────────────────────────────
+    // ── Totals ──────────────────────────────────────────────────────────────
     const currTotals = useMemo(() => {
         const spend = filteredData.reduce((s, d) => s + d.spend, 0);
         const conversions = filteredData.reduce((s, d) => s + d.conversions, 0);
@@ -316,7 +354,6 @@ export const AdsTab: React.FC = () => {
         };
     }, [filteredData, allAds, avgCpa]);
 
-    // ── Previous period totals (only used when compareEnabled) ───────────────
     const prevTotals = useMemo(() => {
         if (!showCompare) return { spend: 0, conversions: 0, cpa: 0, ctr: 0 };
         const spend = previousPeriodData.reduce((s, d) => s + d.spend, 0);
@@ -330,14 +367,15 @@ export const AdsTab: React.FC = () => {
         };
     }, [previousPeriodData, showCompare]);
 
-    // ── Filtered + sorted ads ─────────────────────────────────────────────────
+    // ── Filtered + sorted ───────────────────────────────────────────────────
     const displayAds = useMemo(() => {
         return allAds
             .filter(a => {
                 if (channelFilter !== 'all' && a.channel !== channelFilter) return false;
                 if (search) {
                     const q = search.toLowerCase();
-                    if (!a.adName.toLowerCase().includes(q) && !a.campaign.toLowerCase().includes(q)) return false;
+                    if (!a.adName.toLowerCase().includes(q) && !a.campaign.toLowerCase().includes(q)
+                        && !(a.body || '').toLowerCase().includes(q)) return false;
                 }
                 if (statusFilter !== 'all') {
                     if (getStatus(a.ctr, a.cpa, avgCpa, a.frequency) !== statusFilter) return false;
@@ -354,13 +392,13 @@ export const AdsTab: React.FC = () => {
             });
     }, [allAds, channelFilter, search, statusFilter, sortKey, avgCpa]);
 
-    // ── Top 5 conversores ─────────────────────────────────────────────────────
+    // ── Top 5 ───────────────────────────────────────────────────────────────
     const top5 = useMemo(() =>
         [...allAds].filter(a => a.conversions > 0).sort((a, b) => b.conversions - a.conversions).slice(0, 5),
         [allAds]
     );
 
-    // ── Scatter CTR x CPA ─────────────────────────────────────────────────────
+    // ── Scatter ─────────────────────────────────────────────────────────────
     const scatterData = useMemo(() =>
         allAds.filter(a => a.ctr > 0 && a.cpa > 0).map(a => ({
             x: +a.ctr.toFixed(3), y: +a.cpa.toFixed(2), z: a.spend, name: a.adName
@@ -368,27 +406,42 @@ export const AdsTab: React.FC = () => {
         [allAds]
     );
 
+    // ── Refresh creatives handler ───────────────────────────────────────────
+    const handleRefreshCreatives = async () => {
+        setIsRefreshing(true);
+        try {
+            await dataService.triggerCollectCreatives();
+            await refreshCreatives();
+        } catch (err) {
+            console.error('Failed to refresh creatives:', err);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    // ── Daily data for selected ad (modal) ──────────────────────────────────
+    const selectedAdDailyData = useMemo(() => {
+        if (!selectedAd) return [];
+        return filteredData.filter(d =>
+            (d.ad_id || d.ad_name || `${d.campaign}__${d.adset_name}`) === selectedAd.adId
+        );
+    }, [filteredData, selectedAd]);
+
     return (
         <div className="space-y-5 animate-fade-in pb-10">
 
-            {/* ── Compact KPI bar ──────────────────────────────────────────── */}
+            {/* KPI bar */}
             <KPIBar curr={currTotals} prev={prevTotals} showCompare={showCompare} />
 
-            {/* ── Filter toolbar ───────────────────────────────────────────── */}
+            {/* Filter toolbar */}
             <div className="flex flex-wrap items-center gap-2">
-                {/* Search */}
                 <div className="relative flex-1 min-w-[200px]">
                     <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar anúncio ou campanha..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#00C6CC]/30"
-                    />
+                    <input type="text" placeholder="Buscar anuncio ou campanha..."
+                        value={search} onChange={e => setSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#00C6CC]/30" />
                 </div>
 
-                {/* Channel */}
                 <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg">
                     {(['all', 'meta', 'google'] as const).map(ch => (
                         <button key={ch} onClick={() => setChannelFilter(ch)}
@@ -398,54 +451,60 @@ export const AdsTab: React.FC = () => {
                     ))}
                 </div>
 
-                {/* Status */}
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as StatusFilter)}
                     className="px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none text-slate-700">
                     <option value="all">Todos os status</option>
                     <option value="VENCEDOR">Vencedor</option>
                     <option value="EXCELENTE">Excelente</option>
                     <option value="BOM">Bom</option>
-                    <option value="ATENÇÃO">Atenção</option>
+                    <option value="ATENCAO">Atencao</option>
                     <option value="FADIGA">Fadiga</option>
                 </select>
 
-                {/* Sort */}
                 <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}
                     className="px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none text-slate-700">
-                    <option value="conversions">↓ Conversões</option>
-                    <option value="cpa">↑ Menor CPA</option>
-                    <option value="spend">↓ Maior Spend</option>
-                    <option value="ctr">↓ Maior CTR</option>
+                    <option value="conversions">Conversoes</option>
+                    <option value="cpa">Menor CPA</option>
+                    <option value="spend">Maior Spend</option>
+                    <option value="ctr">Maior CTR</option>
                 </select>
 
-                <span className="text-xs text-slate-400 ml-auto">{displayAds.length} anúncios</span>
+                {/* Refresh Creatives button */}
+                <button onClick={handleRefreshCreatives} disabled={isRefreshing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-[#00C6CC]/30 text-[#00C6CC] rounded-lg hover:bg-[#00C6CC]/5 transition-colors disabled:opacity-50">
+                    {isRefreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                    {isRefreshing ? 'Atualizando...' : 'Atualizar Criativos'}
+                </button>
+
+                <span className="text-xs text-slate-400 ml-auto">{displayAds.length} anuncios</span>
             </div>
 
-            {/* ── Ad Feed Grid ──────────────────────────────────────────────── */}
+            {/* Ad Feed Grid */}
             {displayAds.length === 0 ? (
                 <div className="text-center py-20 text-slate-400">
                     <BarChart2 size={40} className="mx-auto mb-3 opacity-20" />
-                    <p className="text-sm">Nenhum anúncio encontrado.</p>
+                    <p className="text-sm">Nenhum anuncio encontrado.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {displayAds.map(ad => (
-                        <MetaAdCard key={ad.adId} ad={ad} avgCpa={avgCpa} />
+                        <MetaAdCard key={ad.adId} ad={ad} avgCpa={avgCpa}
+                            onClick={() => setSelectedAd(ad)} />
                     ))}
                 </div>
             )}
 
-            {/* ── Top 5 Conversores ─────────────────────────────────────────── */}
+            {/* ── Top 5 Conversores (LIGHT THEME) ──────────────────────────────── */}
             {top5.length > 0 && (
-                <div className="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
-                    <div className="px-6 py-3 border-b border-slate-700 flex items-center gap-2">
-                        <Award size={15} className="text-amber-400" />
-                        <h3 className="text-sm font-bold text-white">Top 5 Conversores</h3>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-2">
+                        <Award size={15} className="text-amber-500" />
+                        <h3 className="text-sm font-bold text-slate-800">Top 5 Conversores</h3>
                     </div>
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="text-slate-400 text-[10px] uppercase tracking-wider">
-                                <th className="px-5 py-2 text-left">Anúncio</th>
+                            <tr className="text-slate-400 text-[10px] uppercase tracking-wider bg-slate-50">
+                                <th className="px-5 py-2 text-left">Anuncio</th>
                                 <th className="px-3 py-2 text-right">CTR</th>
                                 <th className="px-3 py-2 text-right">CPA</th>
                                 <th className="px-3 py-2 text-right">Conv.</th>
@@ -454,30 +513,31 @@ export const AdsTab: React.FC = () => {
                         </thead>
                         <tbody>
                             {top5.map((ad, idx) => {
-                                const ctrBg = ad.ctr >= 1 ? 'bg-emerald-500/20 text-emerald-300' :
-                                    ad.ctr >= 0.5 ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300';
-                                const cpaBg = avgCpa > 0 && ad.cpa <= avgCpa * 0.8 ? 'bg-emerald-500/20 text-emerald-300' :
-                                    avgCpa > 0 && ad.cpa <= avgCpa * 1.2 ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300';
+                                const ctrBg = ad.ctr >= 1 ? 'bg-emerald-100 text-emerald-700' :
+                                    ad.ctr >= 0.5 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600';
+                                const cpaBg = avgCpa > 0 && ad.cpa <= avgCpa * 0.8 ? 'bg-emerald-100 text-emerald-700' :
+                                    avgCpa > 0 && ad.cpa <= avgCpa * 1.2 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600';
                                 return (
-                                    <tr key={ad.adId} className="border-t border-slate-800 hover:bg-slate-800/40 transition-colors">
+                                    <tr key={ad.adId} className="border-t border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                                        onClick={() => setSelectedAd(ad)}>
                                         <td className="px-5 py-2.5">
                                             <div className="flex items-center gap-2.5">
                                                 <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black flex-shrink-0
-                                                    ${idx === 0 ? 'bg-amber-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                                                    ${idx === 0 ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                                     {idx + 1}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-white font-medium text-xs truncate max-w-[160px]" title={ad.adName}>
+                                                        <span className="text-slate-800 font-medium text-xs truncate max-w-[160px]" title={ad.adName}>
                                                             {ad.adName}
                                                         </span>
                                                         {idx === 0 && (
-                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex-shrink-0">
+                                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 flex-shrink-0">
                                                                 VENCEDOR
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-slate-500 text-[10px] truncate max-w-[160px]">{ad.campaign}</div>
+                                                    <div className="text-slate-400 text-[10px] truncate max-w-[160px]">{ad.campaign}</div>
                                                 </div>
                                             </div>
                                         </td>
@@ -487,8 +547,8 @@ export const AdsTab: React.FC = () => {
                                         <td className="px-3 py-2.5 text-right">
                                             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${cpaBg}`}>{fmtBRL(ad.cpa)}</span>
                                         </td>
-                                        <td className="px-3 py-2.5 text-right text-white font-bold text-xs">{fmtNum(ad.conversions)}</td>
-                                        <td className="px-3 py-2.5 text-right text-slate-400 text-xs">{fmtBRL(ad.spend)}</td>
+                                        <td className="px-3 py-2.5 text-right text-slate-800 font-bold text-xs">{fmtNum(ad.conversions)}</td>
+                                        <td className="px-3 py-2.5 text-right text-slate-500 text-xs">{fmtBRL(ad.spend)}</td>
                                     </tr>
                                 );
                             })}
@@ -497,11 +557,32 @@ export const AdsTab: React.FC = () => {
                 </div>
             )}
 
-            {/* ── Scatter CTR × CPA ─────────────────────────────────────────── */}
+            {/* ── Scatter CTR x CPA ──────────────────────────────────────────────── */}
             {scatterData.length > 0 && (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-                    <h3 className="text-sm font-bold text-slate-700 mb-0.5">Scatter: CTR × CPA</h3>
-                    <p className="text-xs text-slate-400 mb-4">Tamanho = Invest. • Ideal: direita-baixo (alto CTR, baixo CPA)</p>
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <h3 className="text-sm font-bold text-slate-700">Scatter: CTR x CPA</h3>
+                        <div className="relative">
+                            <button onClick={() => setShowScatterInfo(!showScatterInfo)}
+                                className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                                <Info size={14} />
+                            </button>
+                            {showScatterInfo && (
+                                <div className="absolute left-0 top-8 z-20 bg-white border border-slate-200 rounded-lg p-3 shadow-lg w-72 text-xs text-slate-600 leading-relaxed">
+                                    <p className="font-semibold text-slate-700 mb-1">Como ler este grafico:</p>
+                                    <ul className="space-y-1 list-disc pl-3">
+                                        <li><b>Eixo X (horizontal):</b> CTR — quanto maior, melhor o engajamento</li>
+                                        <li><b>Eixo Y (vertical):</b> CPA — quanto menor, mais eficiente</li>
+                                        <li><b>Tamanho da bolha:</b> investimento total</li>
+                                        <li><b>Canto inferior direito</b> = melhor performance (alto CTR + baixo CPA)</li>
+                                    </ul>
+                                    <button onClick={() => setShowScatterInfo(false)}
+                                        className="mt-2 text-[#00C6CC] font-semibold hover:underline">Entendi</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-4">Tamanho = Invest. | Ideal: direita-baixo (alto CTR, baixo CPA)</p>
                     <div className="h-60">
                         <ResponsiveContainer width="100%" height="100%">
                             <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
@@ -519,7 +600,7 @@ export const AdsTab: React.FC = () => {
                                         const d = payload[0]?.payload;
                                         return (
                                             <div className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-lg text-xs">
-                                                <p className="font-semibold text-slate-700 mb-1 max-w-[160px] truncate">{d.name}</p>
+                                                <p className="font-semibold text-slate-700 mb-1 max-w-[200px] truncate">{d.name}</p>
                                                 <p className="text-slate-500">CTR: <b className="text-slate-700">{d.x?.toFixed(2)}%</b></p>
                                                 <p className="text-slate-500">CPA: <b className="text-slate-700">{fmtBRLDec(d.y)}</b></p>
                                                 <p className="text-slate-500">Invest.: <b className="text-slate-700">{fmtBRL(d.z)}</b></p>
@@ -532,6 +613,16 @@ export const AdsTab: React.FC = () => {
                         </ResponsiveContainer>
                     </div>
                 </div>
+            )}
+
+            {/* ── Ad Detail Modal ─────────────────────────────────────────────── */}
+            {selectedAd && (
+                <AdDetailModal
+                    ad={selectedAd}
+                    creative={selectedAd.creative}
+                    dailyData={selectedAdDailyData}
+                    onClose={() => setSelectedAd(null)}
+                />
             )}
         </div>
     );

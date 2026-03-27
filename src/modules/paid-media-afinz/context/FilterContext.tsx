@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { DailyMetrics, FilterState } from '../types';
+import type { DailyMetrics, FilterState, AdCreative } from '../types';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { usePeriod } from '../../../contexts/PeriodContext';
 import { dataService } from '../../../services/dataService';
@@ -22,6 +22,8 @@ interface FilterContextType {
     availableCampaigns: string[];
     availableAdsets: string[];
     availableAds: string[];
+    adCreatives: AdCreative[];
+    refreshCreatives: () => Promise<void>;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
@@ -47,11 +49,26 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     type HierarchyRow = { campaign: string; adset_name: string | null; ad_name: string | null };
     const [adHierarchy, setAdHierarchy] = useState<HierarchyRow[]>([]);
 
+    // Ad creatives (thumbnails, body, title from Meta API)
+    const [adCreatives, setAdCreatives] = useState<AdCreative[]>([]);
+
+    const refreshCreatives = async () => {
+        try {
+            const data = await dataService.fetchAdCreatives();
+            setAdCreatives(data as AdCreative[]);
+        } catch (err) {
+            console.error('Failed to fetch ad creatives:', err);
+        }
+    };
+
     useEffect(() => {
         const from = format(dateFrom, 'yyyy-MM-dd');
         const to = format(dateTo, 'yyyy-MM-dd');
         dataService.fetchAdHierarchy(from, to).then(setAdHierarchy).catch(console.error);
     }, [dateFrom.getTime(), dateTo.getTime()]);
+
+    // Fetch creatives once on mount
+    useEffect(() => { refreshCreatives(); }, []);
 
     // Rows in period — used as base for filteredData
     const rowsInPeriod = useMemo(() => {
@@ -152,7 +169,9 @@ export const FilterProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             },
             availableCampaigns,
             availableAdsets,
-            availableAds
+            availableAds,
+            adCreatives,
+            refreshCreatives
         }}>
             {children}
         </FilterContext.Provider>

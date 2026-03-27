@@ -31,6 +31,38 @@ export interface DateRange {
 
 export type TimeRangeOption = '7d' | '14d' | '30d' | '90d' | 'this-month' | 'last-month' | 'custom';
 
+// ── Ad Creative (from Meta API + Supabase) ─────────────────────────────────
+export interface AssetInsight {
+    text: string;
+    asset_id: string;
+    impressions: number;
+    clicks: number;
+    spend: number;
+    reach: number;
+    conversions: number;
+    ctr: number;
+    cpa: number;
+}
+
+export interface AdCreative {
+    ad_id: string;
+    ad_name?: string;
+    campaign?: string;
+    adset_name?: string;
+    thumbnail_path?: string;
+    image_hash?: string;
+    body?: string;
+    title?: string;
+    description?: string;
+    call_to_action_type?: string;
+    effective_status?: string;
+    body_variations?: string[];
+    title_variations?: string[];
+    description_variations?: string[];
+    body_asset_insights?: AssetInsight[];
+    title_asset_insights?: AssetInsight[];
+}
+
 export interface FilterState {
     dateRange: DateRange;
     timeRangeOption: TimeRangeOption;
