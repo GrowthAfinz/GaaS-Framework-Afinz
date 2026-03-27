@@ -432,15 +432,15 @@ export class InsightGenerator {
     let summary = '';
 
     if (critical.length > 0) {
-      summary += `🚨 ${critical.length} alerta(s) importante(s). `;
+      summary += `Prioridade imediata: ${critical.length} alerta(s) com risco real de performance. `;
     }
 
     if (opportunities.length > 0) {
-      summary += `💡 ${opportunities.length} oportunidade(s) de melhoria encontrada(s). `;
+      summary += `Alavancas de ganho: ${opportunities.length} oportunidade(s) com potencial de impacto. `;
     }
 
     if (critical.length === 0 && opportunities.length === 0) {
-      summary = '✅ Setup validado e pronto para disparo.';
+      summary = 'Setup validado, consistente e pronto para escalar com baixo atrito.';
     }
 
     return summary;

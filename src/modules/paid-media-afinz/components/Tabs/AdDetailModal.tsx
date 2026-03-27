@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import type { AdCreative, AssetInsight, DailyMetrics } from '../../types';
 import type { PlacementSummary } from './AdsTab';
+import { resolveCreativeAssetUrl } from '../../utils/creativeAssetUrl';
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmtBRL = (v: number) =>
@@ -22,8 +23,6 @@ const fmtNum = (v: number) =>
     : v >= 1_000 ? `${(v / 1_000).toFixed(1)}K`
     : String(Math.round(v));
 const fmtPct = (v: number) => `${v.toFixed(2)}%`;
-
-const SUPABASE_URL = 'https://mipiwxadnpwtcgfcedym.supabase.co';
 
 const CTA_MAP: Record<string, string> = {
     LEARN_MORE: 'Saiba mais',
@@ -189,13 +188,7 @@ const AssetTable: React.FC<{ title: string; insights: AssetInsight[] }> = ({ tit
 
 // ── Main Modal ──────────────────────────────────────────────────────────────
 export const AdDetailModal: React.FC<Props> = ({ ad, creative, dailyData, onClose }) => {
-    // Prefer image_url (high-res) over thumbnail_path (low-res)
-    const rawUrl = creative?.image_url || creative?.thumbnail_path;
-    const thumbnailUrl = rawUrl
-        ? rawUrl.startsWith('https://')
-            ? rawUrl
-            : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${rawUrl}`
-        : null;
+    const thumbnailUrl = resolveCreativeAssetUrl(creative);
 
     const gradient = GRADIENTS[hashStr(ad.adId) % GRADIENTS.length];
     const brandInitial = (ad.campaign || ad.adName).charAt(0).toUpperCase();

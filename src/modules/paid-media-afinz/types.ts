@@ -49,6 +49,17 @@ export interface AdCreative {
     ad_name?: string;
     campaign?: string;
     adset_name?: string;
+    asset_storage_bucket?: string;
+    asset_storage_path?: string;
+    asset_public_url?: string;
+    asset_source_url?: string;
+    asset_width?: number;
+    asset_height?: number;
+    asset_content_type?: string;
+    asset_origin?: 'supabase-storage' | 'meta-cdn' | 'legacy';
+    asset_last_synced_at?: string;
+    asset_sync_status?: 'hosted' | 'source-only' | 'sync-failed';
+    asset_sync_error?: string | null;
     // Image fields (priority: image_url > video_thumbnail_url > thumbnail_path)
     thumbnail_path?: string;        // low-res fallback / legacy field
     image_url?: string;             // HIGH-RES: url_1080 from /adimages (images)

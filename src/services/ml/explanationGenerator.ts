@@ -117,7 +117,7 @@ function generateSummary(
     const metricName = metricNames[metric];
 
     if (sampleSize === 0) {
-        return `Sem dados historicos para projetar ${metricName}.`;
+        return `Sem base historica suficiente para projetar ${metricName} com seguranca executiva.`;
     }
 
     const matchDescriptions: Record<MatchLevel, string> = {
@@ -137,7 +137,13 @@ function generateSummary(
     const matchDesc = matchDescriptions[matchLevel];
     const qualityDesc = qualityDescriptions[dataQuality];
 
-    return `${qualityDesc}: baseado em ${sampleSize} ${matchDesc}.`;
+    const confidenceHook: Record<DataQuality, string> = {
+        high: 'Leitura pronta para decisao',
+        medium: 'Leitura util para orientar priorizacao',
+        low: 'Leitura exploratoria, exige validacao adicional'
+    };
+
+    return `${qualityDesc}. ${confidenceHook[dataQuality]}. Projecao sustentada por ${sampleSize} ${matchDesc}.`;
 }
 
 /**

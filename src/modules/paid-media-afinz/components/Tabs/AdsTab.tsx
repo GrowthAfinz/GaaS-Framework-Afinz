@@ -12,10 +12,9 @@ import {
 import type { AdCreative } from '../../types';
 import { AdDetailModal } from './AdDetailModal';
 import { dataService } from '../../../../services/dataService';
+import { resolveCreativeAssetUrl } from '../../utils/creativeAssetUrl';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://mipiwxadnpwtcgfcedym.supabase.co';
-
 // ── Formatters ───────────────────────────────────────────────────────────────
 const fmtBRL = (v: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v);
@@ -328,16 +327,7 @@ export const AdsTab: React.FC = () => {
             if (!raw.has(key)) {
                 const creative = creativeMap.get(d.ad_id || '');
 
-                // ── Thumbnail URL: priority image_url (1080px) > video_thumbnail_url > thumbnail_path ──
-                const rawUrl =
-                    creative?.image_url           // HIGH-RES: url_1080 from /adimages
-                    || creative?.video_thumbnail_url // HIGH-RES: picture from /{video_id}
-                    || creative?.thumbnail_path;    // low-res fallback
-                const thumbnailUrl = rawUrl
-                    ? rawUrl.startsWith('https://')
-                        ? rawUrl
-                        : `${SUPABASE_URL}/storage/v1/object/public/ad-thumbnails/${rawUrl}`
-                    : undefined;
+                const thumbnailUrl = resolveCreativeAssetUrl(creative) || undefined;
 
                 // ── media_type: reliable source from Edge Function v25 ──
                 // When creative is undefined (join miss), use 'unknown' — DO NOT default to 'image'
