@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useUserRole } from '../context/UserRoleContext';
 
-export type BU = 'B2C' | 'B2B2C' | 'Plurix';
+export type BU = 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros';
 
 interface BUContextType {
     selectedBUs: BU[];
@@ -20,7 +20,7 @@ export const BUProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     const { isBULocked: isRoleLocked, lockedBUs } = useUserRole();
     const [selectedBUs, setSelectedBUs] = useState<BU[]>(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? JSON.parse(saved) : ['B2C', 'B2B2C', 'Plurix'];
+        return saved ? JSON.parse(saved) : ['B2C', 'B2B2C', 'Plurix', 'Seguros'];
     });
 
     useEffect(() => {
@@ -47,7 +47,7 @@ export const BUProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     const selectAll = () => {
         if (isRoleLocked) return;
-        setSelectedBUs(['B2C', 'B2B2C', 'Plurix']);
+        setSelectedBUs(['B2C', 'B2B2C', 'Plurix', 'Seguros']);
     };
 
     const deselectAll = () => {

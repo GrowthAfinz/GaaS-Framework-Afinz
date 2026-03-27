@@ -8,7 +8,7 @@ export interface DiaryEntry {
 
     // Contexto
     date: string;                    // Data de referência (não criação) YYYY-MM-DD
-    bu: 'B2C' | 'B2B2C' | 'Plurix';
+    bu: 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros';
 
     // Conteúdo
     title: string;                   // Título/anotação principal

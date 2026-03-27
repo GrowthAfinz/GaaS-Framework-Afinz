@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Download, BookOpen, Beaker } from 'lucide-react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
 import { DayCell } from './DayCell';
@@ -30,7 +30,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   activityCountByDay,
   getDominantBU,
   showComparison = true,
-  filters = { bu: ['B2C', 'B2B2C', 'Plurix'], canais: [], jornadas: [], segmentos: [], parceiros: [], ofertas: [], disparado: 'Todos' }
+  filters = { bu: ['B2C', 'B2B2C', 'Plurix', 'Seguros'], canais: [], jornadas: [], segmentos: [], parceiros: [], ofertas: [], disparado: 'Todos' }
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [diaryMode, setDiaryMode] = useState(false);
@@ -196,7 +196,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     }
   };
 
-  const handleSaveNote = (text: string, bu: 'B2C' | 'B2B2C' | 'Plurix', segmentos: string[], parceiros: string[], isTesteAB: boolean) => {
+  const handleSaveNote = (text: string, bu: 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros', segmentos: string[], parceiros: string[], isTesteAB: boolean) => {
     if (!editingNoteDate) return;
 
     const dateKey = formatDateKey(editingNoteDate);
@@ -427,6 +427,7 @@ export const Calendar: React.FC<CalendarProps> = ({
                               B2C: 'bg-blue-50 text-blue-700 border-blue-200',
                               B2B2C: 'bg-emerald-50 text-emerald-700 border-emerald-200',
                               Plurix: 'bg-purple-50 text-purple-700 border-purple-200',
+                              Seguros: 'bg-orange-50 text-orange-700 border-orange-200',
                             };
                             return (
                               <div

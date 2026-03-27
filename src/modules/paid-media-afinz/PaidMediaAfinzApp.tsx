@@ -144,8 +144,8 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
                   className={`
                     flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                     ${isActive
-                      ? 'bg-white text-[#00C6CC] shadow-sm border border-slate-200'
-                      : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+                      ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
                     }
                   `}
                 >

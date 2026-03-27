@@ -5,14 +5,14 @@ import { MultiSelectChips } from './diary/MultiSelectChips';
 interface NoteEditorModalProps {
   date: Date | null;
   initialText: string;
-  initialBU?: 'B2C' | 'B2B2C' | 'Plurix';
+  initialBU?: 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros';
   initialSegmentos?: string[];
   initialParceiros?: string[];
   initialIsTesteAB?: boolean;
   availableBUs: string[];
   availableSegmentos: string[];
   availableParceiros: string[];
-  onSave: (text: string, bu: 'B2C' | 'B2B2C' | 'Plurix', segmentos: string[], parceiros: string[], isTesteAB: boolean) => void;
+  onSave: (text: string, bu: 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros', segmentos: string[], parceiros: string[], isTesteAB: boolean) => void;
   onDelete?: () => void;
   onClose: () => void;
 }
@@ -32,7 +32,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   onClose,
 }) => {
   const [text, setText] = useState(initialText);
-  const [bu, setBU] = useState<'B2C' | 'B2B2C' | 'Plurix'>(initialBU);
+  const [bu, setBU] = useState<'B2C' | 'B2B2C' | 'Plurix' | 'Seguros'>(initialBU);
   const [segmentos, setSegmentos] = useState<string[]>(initialSegmentos);
   const [parceiros, setParceiros] = useState<string[]>(initialParceiros);
   const [isTesteAB, setIsTesteAB] = useState(initialIsTesteAB);
@@ -95,7 +95,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             <label className="block text-xs font-semibold text-slate-300 mb-2">BU</label>
             <select
               value={bu}
-              onChange={(e) => setBU(e.target.value as 'B2C' | 'B2B2C' | 'Plurix')}
+              onChange={(e) => setBU(e.target.value as 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros')}
               className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-xs text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
             >
               {availableBUs.map(b => (

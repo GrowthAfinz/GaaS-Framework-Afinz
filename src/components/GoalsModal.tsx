@@ -17,13 +17,14 @@ export const GoalsModal: React.FC<GoalsModalProps> = ({
     initialGoal,
     currentMonthLabel
 }) => {
-    const [activeTab, setActiveTab] = useState<'B2C' | 'B2B2C' | 'Plurix'>('B2C');
+    const [activeTab, setActiveTab] = useState<'B2C' | 'B2B2C' | 'Plurix' | 'Seguros'>('B2C');
 
     // BU States
     const [buGoals, setBuGoals] = useState<{ [key: string]: { cartoes: string; aprovacoes: string; cac: string } }>({
         B2C: { cartoes: '', aprovacoes: '', cac: '' },
         B2B2C: { cartoes: '', aprovacoes: '', cac: '' },
-        Plurix: { cartoes: '', aprovacoes: '', cac: '' }
+        Plurix: { cartoes: '', aprovacoes: '', cac: '' },
+        Seguros: { cartoes: '', aprovacoes: '', cac: '' }
     });
 
     useEffect(() => {
@@ -31,7 +32,8 @@ export const GoalsModal: React.FC<GoalsModalProps> = ({
             const newBuGoals = {
                 B2C: { cartoes: '', aprovacoes: '', cac: '' },
                 B2B2C: { cartoes: '', aprovacoes: '', cac: '' },
-                Plurix: { cartoes: '', aprovacoes: '', cac: '' }
+                Plurix: { cartoes: '', aprovacoes: '', cac: '' },
+                Seguros: { cartoes: '', aprovacoes: '', cac: '' }
             };
 
             if (initialGoal.bus) {
@@ -108,7 +110,7 @@ export const GoalsModal: React.FC<GoalsModalProps> = ({
                     </h2>
 
                     <div className="space-y-2 flex-1">
-                        {['B2C', 'B2B2C', 'Plurix'].map((tab) => (
+                        {['B2C', 'B2B2C', 'Plurix', 'Seguros'].map((tab) => (
                             <button
                                 key={tab}
                                 type="button"

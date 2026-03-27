@@ -35,7 +35,7 @@ export function useFrameworkOptions(): FrameworkOptions {
 
         // Add default values if empty (fallback)
         if (bus.size === 0) {
-            ['B2C', 'B2B2C', 'Plurix'].forEach(b => bus.add(b));
+            ['B2C', 'B2B2C', 'Plurix', 'Seguros'].forEach(b => bus.add(b));
         }
 
         return {

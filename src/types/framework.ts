@@ -67,7 +67,7 @@ export interface ComparationData {
 export interface MetaMensal {
   id: string;
   mes: string;           // "2025-11"
-  bu: 'B2C' | 'B2B2C' | 'Plurix';
+  bu: 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros';
   cartoes_meta: number;
   pedidos_meta: number;
   cac_max: number;

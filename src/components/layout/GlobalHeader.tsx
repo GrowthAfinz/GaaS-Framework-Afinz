@@ -75,6 +75,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
         { id: 'B2C', label: 'B2C', color: 'bg-blue-500' },
         { id: 'B2B2C', label: 'B2B2C', color: 'bg-emerald-500' },
         { id: 'Plurix', label: 'Plurix', color: 'bg-purple-500' },
+        { id: 'Seguros', label: 'Seguros', color: 'bg-orange-500' },
     ];
 
     const isGroupActive = (items: { id: string }[]) => {
