@@ -263,15 +263,22 @@ export const syncFrameworkActivities = async (
     });
 
     // 3. Insert Batch (Chunked to avoid size limits)
-    const CHUNK_SIZE = 500;
+    console.log(`🔃 Sincronizando ${sqlBatch.length} atividades com Supabase...`);
+    const CHUNK_SIZE = 100; // Smaller batches are MORE robust
     for (let i = 0; i < sqlBatch.length; i += CHUNK_SIZE) {
         const chunk = sqlBatch.slice(i, i + CHUNK_SIZE);
+        const currentBatch = i / CHUNK_SIZE + 1;
+        const totalBatches = Math.ceil(sqlBatch.length / CHUNK_SIZE);
+        
+        console.log(`📤 Enviando lote ${currentBatch} de ${totalBatches}... (${chunk.length} linhas)`);
+        
         const { error } = await supabase.from('activities').insert(chunk);
         if (error) {
-            console.error('Erro inserindo lote:', error);
-            throw new Error(`Erro ao sincronizar lote ${i / CHUNK_SIZE + 1}: ${error.message}`);
+            console.error(`❌ Erro no lote ${currentBatch}:`, error);
+            throw new Error(`Erro ao sincronizar lote ${currentBatch}: ${error.message}`);
         }
     }
+    console.log('✅ Sincronização concluída com sucesso!');
 };
 
 function tryParseInt(val: any): number | null {

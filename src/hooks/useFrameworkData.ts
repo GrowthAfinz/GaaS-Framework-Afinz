@@ -60,7 +60,16 @@ export const useFrameworkData = (): {
         reject(new Error(err));
       };
 
+      const timeoutId = setTimeout(() => {
+        console.error('❌ Worker Timeout: O processamento demorou mais que 30s.');
+        worker.terminate();
+        setLoading(false);
+        setError('O processamento do arquivo demorou demais. Tente um arquivo menor ou verifique o console.');
+        reject(new Error('Processamento expirou (Timeout)'));
+      }, 30000);
+
       worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        clearTimeout(timeoutId);
         const { type } = e.data;
 
         if (type === 'SUCCESS') {
