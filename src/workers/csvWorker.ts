@@ -31,7 +31,8 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
                 throw new Error(`Unknown message type: ${type}`);
         }
     } catch (err: any) {
-        self.postMessage({ type: 'ERROR', error: err.message });
+        console.error('Worker global catch:', err);
+        self.postMessage({ type: 'ERROR', error: (err && err.message) ? err.message : String(err) });
     }
 };
 
@@ -92,33 +93,33 @@ const handleFramework = (csvText: string) => {
                 };
 
                 // Mapping Logic (Copied from useFrameworkData)
-                columnMap['Activity name / Taxonomia'] = findCol('Activity name / Taxonomia')!;
-                columnMap['Data de Disparo'] = findCol('Data de Disparo')!;
-                columnMap['BU'] = findCol('BU')!;
-                columnMap['Canal'] = findCol('Canal')!;
-                columnMap['Segmento'] = findCol('Segmento')!;
-                columnMap['Jornada'] = findCol('Jornada')!;
-                columnMap['Parceiro'] = findCol('Parceiro')!;
-                columnMap['Safra'] = findCol('Safra', ['Ciclo', 'Mes', 'Mês'])!;
-                columnMap['Oferta'] = findCol('Oferta', ['Tipo de Oferta', 'Tipo Oferta'])!;
-                columnMap['Ordem de disparo'] = findCol('Ordem de disparo', ['Ordem', 'Step', 'Etapa'])!;
-                columnMap['Disparado?'] = findCol('Disparado?', ['Disparado', 'Status Disparo', 'Status', 'Envio', 'Enviado?', 'Foi disparado?', 'Disparo Realizado'])!;
-                columnMap['Perfil de Crédito'] = findCol('Perfil de Crédito', ['Perfil', 'Credit Profile'])!;
-                columnMap['Base Total'] = findCol('Base Total', ['Base Enviada', 'Enviados', 'Volume Enviado', 'Total Enviado'])!;
-                columnMap['Base Acionável'] = findCol('Base Acionável', ['Base Entregue', 'Base Acionavel', 'Volume Entregue', 'Vol. Entregas', 'Entregues', 'Total Entregue', 'Entregue'])!;
-                columnMap['Taxa de Entrega'] = findCol('Taxa de Entrega')!;
-                columnMap['Propostas'] = findCol('Propostas')!;
-                columnMap['Taxa de Proposta'] = findCol('Taxa de Proposta')!;
-                columnMap['Aprovados'] = findCol('Aprovados')!;
-                columnMap['Taxa de Aprovação'] = findCol('Taxa de Aprovação')!;
-                columnMap['Cartões Gerados'] = findCol('Cartões Gerados', ['Emissões', 'Cartoes Gerados', 'Cartões', 'Contas Abertas', 'Contas'])!;
-                columnMap['Taxa de Finalização'] = findCol('Taxa de Finalização')!;
-                columnMap['Taxa de Conversão'] = findCol('Taxa de Conversão')!;
-                columnMap['Taxa de Abertura'] = findCol('Taxa de Abertura')!;
-                columnMap['CAC'] = findCol('CAC')!;
-                columnMap['Custo Total Campanha'] = findCol('Custo Total Campanha')!;
-                columnMap['Emissões Independentes'] = findCol('Emissões Independentes')!;
-                columnMap['Emissões Assistidas'] = findCol('Emissões Assistidas')!;
+                columnMap['Activity name / Taxonomia'] = findCol('Activity name / Taxonomia') ?? 'Activity name / Taxonomia';
+                columnMap['Data de Disparo'] = findCol('Data de Disparo') ?? 'Data de Disparo';
+                columnMap['BU'] = findCol('BU') ?? 'BU';
+                columnMap['Canal'] = findCol('Canal') ?? 'Canal';
+                columnMap['Segmento'] = findCol('Segmento') ?? 'Segmento';
+                columnMap['Jornada'] = findCol('Jornada') ?? 'Jornada';
+                columnMap['Parceiro'] = findCol('Parceiro') ?? 'Parceiro';
+                columnMap['Safra'] = findCol('Safra', ['Ciclo', 'Mes', 'Mês']) ?? 'Safra';
+                columnMap['Oferta'] = findCol('Oferta', ['Tipo de Oferta', 'Tipo Oferta']) ?? 'Oferta';
+                columnMap['Ordem de disparo'] = findCol('Ordem de disparo', ['Ordem', 'Step', 'Etapa']) ?? 'Ordem de disparo';
+                columnMap['Disparado?'] = findCol('Disparado?', ['Disparado', 'Status Disparo', 'Status', 'Envio', 'Enviado?', 'Foi disparado?', 'Disparo Realizado']) ?? 'Disparado?';
+                columnMap['Perfil de Crédito'] = findCol('Perfil de Crédito', ['Perfil', 'Credit Profile']) ?? 'Perfil de Crédito';
+                columnMap['Base Total'] = findCol('Base Total', ['Base Enviada', 'Enviados', 'Volume Enviado', 'Total Enviado']) ?? 'Base Total';
+                columnMap['Base Acionável'] = findCol('Base Acionável', ['Base Entregue', 'Base Acionavel', 'Volume Entregue', 'Vol. Entregas', 'Entregues', 'Total Entregue', 'Entregue']) ?? 'Base Acionável';
+                columnMap['Taxa de Entrega'] = findCol('Taxa de Entrega') ?? 'Taxa de Entrega';
+                columnMap['Propostas'] = findCol('Propostas') ?? 'Propostas';
+                columnMap['Taxa de Proposta'] = findCol('Taxa de Proposta') ?? 'Taxa de Proposta';
+                columnMap['Aprovados'] = findCol('Aprovados') ?? 'Aprovados';
+                columnMap['Taxa de Aprovação'] = findCol('Taxa de Aprovação') ?? 'Taxa de Aprovação';
+                columnMap['Cartões Gerados'] = findCol('Cartões Gerados', ['Emissões', 'Cartoes Gerados', 'Cartões', 'Contas Abertas', 'Contas']) ?? 'Cartões Gerados';
+                columnMap['Taxa de Finalização'] = findCol('Taxa de Finalização') ?? 'Taxa de Finalização';
+                columnMap['Taxa de Conversão'] = findCol('Taxa de Conversão') ?? 'Taxa de Conversão';
+                columnMap['Taxa de Abertura'] = findCol('Taxa de Abertura') ?? 'Taxa de Abertura';
+                columnMap['CAC'] = findCol('CAC') ?? 'CAC';
+                columnMap['Custo Total Campanha'] = findCol('Custo Total Campanha') ?? 'Custo Total Campanha';
+                columnMap['Emissões Independentes'] = findCol('Emissões Independentes') ?? 'Emissões Independentes';
+                columnMap['Emissões Assistidas'] = findCol('Emissões Assistidas') ?? 'Emissões Assistidas';
 
                 const missing = requiredColumns.filter(col => !columnMap[col]);
                 if (missing.length > 0) {
@@ -214,11 +215,13 @@ const handleFramework = (csvText: string) => {
                 self.postMessage({ type: 'SUCCESS', data: { rows: processedRows, activities: newActivities }, warnings: errors });
 
             } catch (err: any) {
-                self.postMessage({ type: 'ERROR', error: err.message });
+                console.error('handleFramework error:', err);
+                self.postMessage({ type: 'ERROR', error: (err && err.message) ? err.message : String(err) });
             }
         },
         error: (err: any) => {
-            self.postMessage({ type: 'ERROR', error: err.message });
+            console.error('Papa.parse error callback:', err);
+            self.postMessage({ type: 'ERROR', error: (err && err.message) ? err.message : String(err) });
         }
     });
 };

@@ -100,8 +100,9 @@ export const useFrameworkData = (): {
         worker.terminate();
       };
 
-      worker.onerror = (err) => {
-        const errorMsg = 'Erro no Worker: ' + err.message;
+      worker.onerror = (err: any) => {
+        console.error('CRITICAL: Web Worker Error Event:', err);
+        const errorMsg = 'Erro no Worker: ' + (err.message || 'Falha de inicialização (Script error)');
         setError(errorMsg);
         setLoading(false);
         worker.terminate();
