@@ -48,7 +48,7 @@ const VersionManager: React.FC = () => {
         setMsg(null);
         try {
             // 1. Parse locally to validate and get row count
-            const data = await processCSV(file);
+            const data = await processCSV(file, { updateStore: false });
             const rowCount = data.length;
 
             // 2. Upload Version

@@ -12,7 +12,7 @@ export const useFrameworkData = (): {
   loading: boolean;
   error: string | null;
   totalActivities: number;
-  processCSV: (file: File) => Promise<any>;
+  processCSV: (file: File, options?: { updateStore?: boolean }) => Promise<any>;
   loadSimulatedData: () => void;
   debugHeaders: string[];
 } => {
@@ -36,8 +36,9 @@ export const useFrameworkData = (): {
     return grouped;
   }, [storeActivities]);
 
-  const processCSV = useCallback((file: File): Promise<any> => {
+  const processCSV = useCallback((file: File, options?: { updateStore?: boolean }): Promise<any> => {
     return new Promise((resolve, reject) => {
+      const shouldUpdateStore = options?.updateStore ?? true;
       console.log('🔄 Iniciando processamento do CSV (Worker):', file.name);
       setLoading(true);
       setError(null);
@@ -96,7 +97,9 @@ export const useFrameworkData = (): {
             alert(`⚠️ ATENÇÃO: ${warnings.length} alertas foram encontrados no processamento.\n\nDetalhes:\n${warnings.slice(0, 3).join('\n')}`);
           }
 
-          setFrameworkData(result.rows, hydratedActivities);
+          if (shouldUpdateStore) {
+            setFrameworkData(result.rows, hydratedActivities);
+          }
           setLoading(false);
           resolve(hydratedActivities);
         } else if (type === 'ERROR') {
