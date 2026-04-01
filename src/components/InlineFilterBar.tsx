@@ -71,8 +71,6 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
         return () => { cancelCloseTimer(); };
     }, []);
 
-    if (items.length === 0) return null;
-
     const visibleItems = React.useMemo(() => {
         if (!searchable) return items;
         const q = searchTerm.trim().toLowerCase();
@@ -146,6 +144,8 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
     React.useEffect(() => {
         onOpenChange?.(isOpen);
     }, [isOpen, onOpenChange]);
+
+    if (items.length === 0) return null;
 
     return (
         <div
