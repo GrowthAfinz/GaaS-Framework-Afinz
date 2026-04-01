@@ -1,19 +1,17 @@
-
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { FrameworkRowSchema } from '../schemas/frameworkSchema';
 import { parseDate, parseNumber, parseCurrency, parsePercentage, parseSafraToKey } from '../utils/formatters';
 import { Activity, FrameworkRow } from '../types/framework';
 
-// Define message types
 export type WorkerMessage =
     | { type: 'PARSE_B2C_CSV'; fileContent: string }
     | { type: 'PARSE_FRAMEWORK_CSV'; fileContent: string }
     | { type: 'PARSE_PAID_MEDIA_XLSX'; fileContent: ArrayBuffer };
 
 export type WorkerResponse =
-    | { type: 'SUCCESS'; data: { rows: FrameworkRow[]; activities: Activity[] }; warnings?: string[] } // Updated generic data
-    | { type: 'SUCCESS_B2C'; data: any; warnings?: string[] } // Kept for B2C backward compat
+    | { type: 'SUCCESS'; data: { rows: FrameworkRow[]; activities: Activity[] }; warnings?: string[] }
+    | { type: 'SUCCESS_B2C'; data: any; warnings?: string[] }
     | { type: 'ERROR'; error: string };
 
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
@@ -32,7 +30,7 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         }
     } catch (err: any) {
         console.error('Worker global catch:', err);
-        self.postMessage({ type: 'ERROR', error: (err && err.message) ? err.message : String(err) });
+        self.postMessage({ type: 'ERROR', error: err?.message ? err.message : String(err) });
     }
 };
 
@@ -47,7 +45,7 @@ const normalizeColumnName = (col: string): string => {
 
 const findColumnByNormalized = (headers: string[], pattern: string): string | null => {
     const normalized = normalizeColumnName(pattern);
-    return headers.find(h => normalizeColumnName(h) === normalized) || null;
+    return headers.find((header) => normalizeColumnName(header) === normalized) || null;
 };
 
 const normalizeBU = (value: unknown): string => {
@@ -60,8 +58,125 @@ const normalizeBU = (value: unknown): string => {
     return raw;
 };
 
+const FRAMEWORK_ALLOWED_HEADERS = new Set([
+    'Disparado?',
+    'Jornada',
+    'Activity name / Taxonomia',
+    'Canal',
+    'Data de Disparo',
+    'Data Fim',
+    'Safra',
+    'BU',
+    'Parceiro',
+    'SIGLA',
+    'Segmento',
+    'Subgrupos',
+    'Base Total',
+    'Base Acionável',
+    'Abertura',
+    'Cliques',
+    '% Otimização de base',
+    'Etapa de aquisição',
+    'Ordem de disparo',
+    'Perfil de Crédito',
+    'Produto',
+    'Oferta',
+    'Promocional',
+    'Oferta 2',
+    'Promocional 2',
+    'Custo Unitário Oferta',
+    'Custo Total da Oferta',
+    'Custo unitário do canal',
+    'Custo total canal',
+    'Taxa de Entrega',
+    'Taxa de Abertura',
+    'Taxa de Clique',
+    'Taxa de Proposta',
+    'Taxa de Aprovação',
+    'Taxa de Finalização',
+    'Taxa de Conversão',
+    'Custo Total Campanha',
+    'CAC',
+    'Cartões Gerados',
+    'Aprovados',
+    'Propostas',
+    'Emissões Independentes',
+    'Emissões Assistidas',
+].map(normalizeColumnName));
+
+const sanitizeFrameworkCsv = (csvText: string): { csvText: string; warnings: string[] } => {
+    const warnings: string[] = [];
+    const trimmedTrailingSeparators = csvText.replace(/;+(?=\r?\n|$)/g, '');
+
+    if (trimmedTrailingSeparators.length !== csvText.length) {
+        warnings.push('Staging: colunas vazias à direita foram removidas antes do processamento.');
+    }
+
+    const lines = trimmedTrailingSeparators.split(/\r?\n/);
+    if (lines.length === 0 || !lines[0]) {
+        return { csvText: trimmedTrailingSeparators, warnings };
+    }
+
+    const rawHeaders = lines[0]
+        .split(';')
+        .map((header) => header.replace(/^\uFEFF/, '').trim());
+
+    const selectedIndexes: number[] = [];
+    const selectedHeaders: string[] = [];
+    const ignoredHeaders = new Set<string>();
+    let siglaCount = 0;
+
+    rawHeaders.forEach((header, index) => {
+        if (!header) return;
+
+        const normalizedHeader = normalizeColumnName(header);
+        if (normalizedHeader === normalizeColumnName('SIGLA')) {
+            siglaCount += 1;
+            selectedIndexes.push(index);
+            selectedHeaders.push(siglaCount === 1 ? 'SIGLA' : `SIGLA.${siglaCount - 1}`);
+            return;
+        }
+
+        if (FRAMEWORK_ALLOWED_HEADERS.has(normalizedHeader)) {
+            selectedIndexes.push(index);
+            selectedHeaders.push(header);
+            return;
+        }
+
+        ignoredHeaders.add(header);
+    });
+
+    if (ignoredHeaders.size > 0) {
+        warnings.push(`Staging: ${ignoredHeaders.size} colunas fora do modelo foram ignoradas.`);
+    }
+
+    if (selectedIndexes.length === 0) {
+        return { csvText: trimmedTrailingSeparators, warnings };
+    }
+
+    const sanitizedLines = [selectedHeaders.join(';')];
+    for (let lineIndex = 1; lineIndex < lines.length; lineIndex += 1) {
+        const line = lines[lineIndex];
+        if (!line) {
+            sanitizedLines.push('');
+            continue;
+        }
+
+        const cells = line.split(';');
+        sanitizedLines.push(selectedIndexes.map((index) => cells[index] ?? '').join(';'));
+    }
+
+    return {
+        csvText: sanitizedLines.join('\n'),
+        warnings,
+    };
+};
+
 const handleFramework = (csvText: string) => {
-    Papa.parse(csvText, {
+    const { csvText: sanitizedCsvText, warnings: stagingWarnings } = sanitizeFrameworkCsv(csvText);
+
+    Papa.parse(sanitizedCsvText, {
+        delimiter: ';',
         header: true,
         skipEmptyLines: true,
         complete: (results: any) => {
@@ -85,14 +200,13 @@ const handleFramework = (csvText: string) => {
                 const findCol = (name: string, synonyms: string[] = []) => {
                     const found = findColumnByNormalized(headers, name);
                     if (found) return found;
-                    for (const syn of synonyms) {
-                        const foundSyn = findColumnByNormalized(headers, syn);
-                        if (foundSyn) return foundSyn;
+                    for (const synonym of synonyms) {
+                        const foundSynonym = findColumnByNormalized(headers, synonym);
+                        if (foundSynonym) return foundSynonym;
                     }
                     return null;
                 };
 
-                // Mapping Logic (Copied from useFrameworkData)
                 columnMap['Activity name / Taxonomia'] = findCol('Activity name / Taxonomia') ?? 'Activity name / Taxonomia';
                 columnMap['Data de Disparo'] = findCol('Data de Disparo') ?? 'Data de Disparo';
                 columnMap['BU'] = findCol('BU') ?? 'BU';
@@ -107,6 +221,8 @@ const handleFramework = (csvText: string) => {
                 columnMap['Perfil de Crédito'] = findCol('Perfil de Crédito', ['Perfil', 'Credit Profile']) ?? 'Perfil de Crédito';
                 columnMap['Base Total'] = findCol('Base Total', ['Base Enviada', 'Enviados', 'Volume Enviado', 'Total Enviado']) ?? 'Base Total';
                 columnMap['Base Acionável'] = findCol('Base Acionável', ['Base Entregue', 'Base Acionavel', 'Volume Entregue', 'Vol. Entregas', 'Entregues', 'Total Entregue', 'Entregue']) ?? 'Base Acionável';
+                columnMap['Abertura'] = findCol('Abertura', ['Aberturas', 'Volume de Abertura', 'Vol de Abertura']) ?? 'Abertura';
+                columnMap['Cliques'] = findCol('Cliques', ['Clicks', 'Volume de Cliques', 'Vol de Cliques']) ?? 'Cliques';
                 columnMap['Taxa de Entrega'] = findCol('Taxa de Entrega') ?? 'Taxa de Entrega';
                 columnMap['Propostas'] = findCol('Propostas') ?? 'Propostas';
                 columnMap['Taxa de Proposta'] = findCol('Taxa de Proposta') ?? 'Taxa de Proposta';
@@ -120,8 +236,7 @@ const handleFramework = (csvText: string) => {
                 columnMap['Custo Total Campanha'] = findCol('Custo Total Campanha') ?? 'Custo Total Campanha';
                 columnMap['Emissões Independentes'] = findCol('Emissões Independentes') ?? 'Emissões Independentes';
                 columnMap['Emissões Assistidas'] = findCol('Emissões Assistidas') ?? 'Emissões Assistidas';
-                
-                // Add columns used by activityService.ts but not in core Activity object
+
                 columnMap['Data Fim'] = findCol('Data Fim') ?? 'Data Fim';
                 columnMap['Produto'] = findCol('Produto') ?? 'Produto';
                 columnMap['Promocional'] = findCol('Promocional') ?? 'Promocional';
@@ -139,10 +254,10 @@ const handleFramework = (csvText: string) => {
                 columnMap['SIGLA.1'] = findCol('SIGLA.1') ?? 'SIGLA.1';
                 columnMap['SIGLA.2'] = findCol('SIGLA.2') ?? 'SIGLA.2';
 
-                const missing = requiredColumns.filter(col => !columnMap[col]);
+                const missing = requiredColumns.filter((column) => !columnMap[column]);
                 if (missing.length > 0) {
                     const critical = ['Activity name / Taxonomia', 'Data de Disparo', 'BU'];
-                    const missingCritical = critical.filter(c => missing.includes(c));
+                    const missingCritical = critical.filter((column) => missing.includes(column));
                     if (missingCritical.length > 0) {
                         throw new Error(`Colunas obrigatórias ausentes: ${missingCritical.join(', ')}`);
                     }
@@ -153,19 +268,16 @@ const handleFramework = (csvText: string) => {
                 let validCount = 0;
                 const errors: string[] = [];
 
-                // Pre-compute mapped keys and Sets outside the loop (CRITICAL Performance Fix)
                 const columnMapEntries = Object.entries(columnMap);
                 const standardMappedKeysSet = new Set(Object.values(columnMap));
-                
-                // Fields to always ignore in prunedRaw (Standard IDs)
+
                 standardMappedKeysSet.add('Activity name / Taxonomia');
                 standardMappedKeysSet.add('Data de Disparo');
                 standardMappedKeysSet.add('BU');
 
                 rawRows.forEach((row, idx) => {
                     const mappedRow: any = { ...row };
-                    
-                    // Efficient Mapping (O(C) where C is our standard map size)
+
                     columnMapEntries.forEach(([standardKey, csvKey]) => {
                         if (csvKey && standardKey !== csvKey) {
                             mappedRow[standardKey] = row[csvKey];
@@ -178,7 +290,7 @@ const handleFramework = (csvText: string) => {
                     if (validation.success) {
                         validRow = validation.data as FrameworkRow;
                     } else {
-                        const msg = `Linha ${idx + 2}: ${validation.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ')}`;
+                        const msg = `Linha ${idx + 2}: ${validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ')}`;
                         if (!mappedRow['Activity name / Taxonomia'] || !mappedRow['Data de Disparo']) {
                             if (errors.length < 5) errors.push(msg);
                             return;
@@ -201,12 +313,10 @@ const handleFramework = (csvText: string) => {
                         jornadaValue = 'Carrinho Abandonado';
                     }
 
-                    // Ultra-Fast Memory Pruning: use Set for O(1) lookup
                     const prunedRaw: any = {};
-                    Object.entries(validRow).forEach(([k, v]) => {
-                        // Skip if it's a standard/mapped column or empty noise
-                        if (!standardMappedKeysSet.has(k) && v !== null && v !== undefined && v !== '') {
-                            prunedRaw[k] = v;
+                    Object.entries(validRow).forEach(([key, value]) => {
+                        if (!standardMappedKeysSet.has(key) && value !== null && value !== undefined && value !== '') {
+                            prunedRaw[key] = value;
                         }
                     });
 
@@ -224,6 +334,8 @@ const handleFramework = (csvText: string) => {
                         kpis: {
                             baseEnviada: parseNumber(validRow['Base Total']),
                             baseEntregue: parseNumber(validRow['Base Acionável']),
+                            aberturas: parseNumber(validRow['Abertura']),
+                            cliques: parseNumber(validRow['Cliques']),
                             taxaEntrega: parsePercentage(validRow['Taxa de Entrega']),
                             propostas: parseNumber(validRow['Propostas']),
                             taxaPropostas: parsePercentage(validRow['Taxa de Proposta']),
@@ -239,27 +351,30 @@ const handleFramework = (csvText: string) => {
                             cac: parseCurrency(validRow['CAC']),
                             custoTotal: parseCurrency(validRow['Custo Total Campanha'])
                         },
-                        raw: prunedRaw // Now ultra efficient
+                        raw: prunedRaw
                     };
+
                     newActivities.push(activity);
-                    validCount++;
+                    validCount += 1;
                 });
 
                 if (validCount === 0) {
                     throw new Error(`Nenhuma linha válida encontrada. Erros: ${errors.join('; ')}`);
                 }
 
-                // Send back Success
-                self.postMessage({ type: 'SUCCESS', data: { rows: processedRows, activities: newActivities }, warnings: errors });
-
+                self.postMessage({
+                    type: 'SUCCESS',
+                    data: { rows: processedRows, activities: newActivities },
+                    warnings: [...stagingWarnings, ...errors]
+                });
             } catch (err: any) {
                 console.error('handleFramework error:', err);
-                self.postMessage({ type: 'ERROR', error: (err && err.message) ? err.message : String(err) });
+                self.postMessage({ type: 'ERROR', error: err?.message ? err.message : String(err) });
             }
         },
         error: (err: any) => {
             console.error('Papa.parse error callback:', err);
-            self.postMessage({ type: 'ERROR', error: (err && err.message) ? err.message : String(err) });
+            self.postMessage({ type: 'ERROR', error: err?.message ? err.message : String(err) });
         }
     });
 };
@@ -273,7 +388,7 @@ const handleB2C = (csvText: string) => {
             const warnings: string[] = [];
 
             if (results.errors.length > 0) {
-                results.errors.forEach((e: any) => warnings.push(`CSV Error: ${e.message}`));
+                results.errors.forEach((error: any) => warnings.push(`CSV Error: ${error.message}`));
             }
 
             if (!results.data || results.data.length === 0) {
@@ -283,25 +398,25 @@ const handleB2C = (csvText: string) => {
 
             results.data.forEach((row: any) => {
                 const rawDate = row.Data || row.data;
-                const d = parseDate(rawDate);
-                if (!d) return;
+                const parsedDate = parseDate(rawDate);
+                if (!parsedDate) return;
 
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                const dataStr = `${year}-${month}-${day}`;
+                const year = parsedDate.getFullYear();
+                const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                const day = String(parsedDate.getDate()).padStart(2, '0');
+                const data = `${year}-${month}-${day}`;
 
-                const safeParseFloat = (val: any) => {
-                    if (typeof val === 'number') return val;
-                    if (!val) return 0;
-                    let clean = val.replace(/[R$\s%]/g, '');
+                const safeParseFloat = (value: any) => {
+                    if (typeof value === 'number') return value;
+                    if (!value) return 0;
+                    let clean = value.replace(/[R$\s%]/g, '');
                     clean = clean.replace(/\./g, '');
                     clean = clean.replace(',', '.');
                     return parseFloat(clean) || 0;
                 };
 
                 parsedData.push({
-                    data: dataStr,
+                    data,
                     propostas_b2c_total: safeParseFloat(row.Propostas_B2C_Total || row.propostas_b2c_total),
                     emissoes_b2c_total: safeParseFloat(row.Emissoes_B2C_Total || row.emissoes_b2c_total),
                     percentual_conversao_b2c: safeParseFloat(row['%_Conversao_B2C'] || row.percentual_conversao_b2c || row['%_conversao_b2c']),
@@ -321,3 +436,5 @@ const handleB2C = (csvText: string) => {
         }
     });
 };
+
+void XLSX;

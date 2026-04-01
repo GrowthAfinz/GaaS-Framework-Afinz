@@ -44,6 +44,8 @@ export interface ActivityRow {
     // Métricas de Base
     'Base Total'?: number;
     'Base Acionável'?: number;
+    Abertura?: number;
+    Cliques?: number;
     '% Otimização de base'?: number;
 
     // Métricas Financeiras

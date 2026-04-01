@@ -62,6 +62,8 @@ export const FrameworkRowSchema = z.object({
     'Subgrupos': z.string().optional(),
     'Base Total': flexibleNumber,
     'Base Acionável': flexibleNumber,
+    'Abertura': flexibleNumber,
+    'Cliques': flexibleNumber,
     '% Otimização de base': flexibleNumber,
     'Etapa de aquisição': z.string().optional(),
     'Ordem de disparo': flexibleNumber,

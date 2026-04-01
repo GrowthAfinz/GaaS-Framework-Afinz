@@ -3,6 +3,8 @@ export type BU = 'B2C' | 'B2B2C' | 'Plurix' | string;
 export interface KPIs {
   baseEnviada: number | null;
   baseEntregue: number | null;
+  aberturas: number | null;
+  cliques: number | null;
   taxaEntrega: number | null;
   propostas: number | null;
   taxaPropostas: number | null;
@@ -128,6 +130,8 @@ export interface FrameworkRow {
   'Subgrupos': string;
   'Base Total': string | number;
   'Base Acionável': string | number;
+  'Abertura': string | number;
+  'Cliques': string | number;
   '% Otimização de base': string | number;
   'Etapa de aquisição': string;
   'Ordem de disparo': string | number;

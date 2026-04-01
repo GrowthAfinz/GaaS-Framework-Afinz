@@ -4,7 +4,7 @@ import { formatDateKey, parseDate } from '../utils/formatters';
 import { useAppStore } from '../store/useAppStore';
 import { generateSimulatedData } from '../utils/simulatedData';
 import { storageService } from '../services/storageService';
-import CsvWorker from '../workers/csvWorker?worker'; // Import Worker
+import CsvWorker from '../workers/csvWorker?worker';
 import { WorkerMessage, WorkerResponse } from '../workers/csvWorker';
 
 export const useFrameworkData = (): {
@@ -17,16 +17,16 @@ export const useFrameworkData = (): {
   debugHeaders: string[];
 } => {
   const { setFrameworkData, activities: storeActivities } = useAppStore();
-  const [loading, setLoading] = useState(true); // Start true to prevent flash
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debugHeaders, setDebugHeaders] = useState<string[]>([]);
-  const syncedRef = useRef(false); // Use ref instead of state to prevent re-renders
+  const syncedRef = useRef(false);
 
   const totalActivities = storeActivities.length;
 
   const data = useMemo(() => {
     const grouped: CalendarData = {};
-    storeActivities.forEach(activity => {
+    storeActivities.forEach((activity) => {
       const dateKey = formatDateKey(activity.dataDisparo);
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
@@ -46,72 +46,72 @@ export const useFrameworkData = (): {
       const worker = new CsvWorker();
       const reader = new FileReader();
 
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
         const msg: WorkerMessage = { type: 'PARSE_FRAMEWORK_CSV', fileContent: text };
         worker.postMessage(msg);
       };
 
       reader.onerror = () => {
-        const err = 'Erro ao ler arquivo.';
-        setError(err);
+        const readerError = 'Erro ao ler arquivo.';
+        setError(readerError);
         setLoading(false);
         worker.terminate();
-        reject(new Error(err));
+        reject(new Error(readerError));
       };
 
       const timeoutId = setTimeout(() => {
-        console.error('❌ Worker Timeout: O processamento demorou mais que 60s.');
+        console.error('❌ Worker Timeout: O processamento demorou mais que 180s.');
         worker.terminate();
         setLoading(false);
         setError('O processamento do arquivo demorou demais. Tente um arquivo menor ou verifique o console.');
         reject(new Error('Processamento expirou (Timeout)'));
-      }, 60000);
+      }, 180000);
 
-      worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+      worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         clearTimeout(timeoutId);
-        const { type } = e.data;
+        const { type } = event.data;
 
         if (type === 'SUCCESS') {
-          const result = (e.data as any).data; // { rows, activities }
+          const result = (event.data as any).data;
+          const warnings = (event.data as any).warnings || [];
           console.log(`✅ Worker Finalizado: ${result.activities.length} atividades`);
 
-          // Fix: Hydrate dates that are serialized as strings during worker transfer
-          const hydratedActivities = result.activities.map((a: any) => {
-            const d = (typeof a.dataDisparo === 'string' ? parseDate(a.dataDisparo) : a.dataDisparo) || new Date(a.dataDisparo);
+          const hydratedActivities = result.activities.map((activity: any) => {
+            const parsedDate = (typeof activity.dataDisparo === 'string' ? parseDate(activity.dataDisparo) : activity.dataDisparo) || new Date(activity.dataDisparo);
 
-            // Heuristic Fix for Timezone Shift
-            if (d instanceof Date && !isNaN(d.getTime()) && d.getHours() === 21) {
-              d.setDate(d.getDate() + 1);
-              d.setHours(0);
+            if (parsedDate instanceof Date && !Number.isNaN(parsedDate.getTime()) && parsedDate.getHours() === 21) {
+              parsedDate.setDate(parsedDate.getDate() + 1);
+              parsedDate.setHours(0);
             }
+
             return {
-              ...a,
-              dataDisparo: d
+              ...activity,
+              dataDisparo: parsedDate
             };
           });
 
-          if (result.warnings && result.warnings.length > 0) {
-            console.warn('Import Warnings:', result.warnings);
-            alert(`⚠️ ATENÇÃO: ${result.warnings.length} linhas foram ignoradas!\nProvável erro de data/formato.\n\nErros:\n${result.warnings.slice(0, 3).join('\n')}`);
+          if (warnings.length > 0) {
+            console.warn('Import Warnings:', warnings);
+            alert(`⚠️ ATENÇÃO: ${warnings.length} alertas foram encontrados no processamento.\n\nDetalhes:\n${warnings.slice(0, 3).join('\n')}`);
           }
 
           setFrameworkData(result.rows, hydratedActivities);
           setLoading(false);
-          resolve(hydratedActivities); // RESOLVE WITH DATA
-
+          resolve(hydratedActivities);
         } else if (type === 'ERROR') {
-          const err = (e.data as any).error;
-          setError(err);
+          const workerError = (event.data as any).error;
+          setError(workerError);
           setLoading(false);
-          reject(new Error(err));
+          reject(new Error(workerError));
         }
+
         worker.terminate();
       };
 
-      worker.onerror = (err: any) => {
-        console.error('CRITICAL: Web Worker Error Event:', err);
-        const errorMsg = 'Erro no Worker: ' + (err.message || 'Falha de inicialização (Script error)');
+      worker.onerror = (workerError: any) => {
+        console.error('CRITICAL: Web Worker Error Event:', workerError);
+        const errorMsg = 'Erro no Worker: ' + (workerError.message || 'Falha de inicialização (Script error)');
         setError(errorMsg);
         setLoading(false);
         worker.terminate();
@@ -122,29 +122,24 @@ export const useFrameworkData = (): {
     });
   }, [setFrameworkData]);
 
-  // CLOUD SYNC EFFECT (Refactored to Supabase)
   useEffect(() => {
-    // Prevent multiple executions using ref
     if (syncedRef.current) return;
 
     const loadFromSupabase = async () => {
-      syncedRef.current = true; // Mark as started immediately
+      syncedRef.current = true;
 
-      // 1. Wait for Persist Hydration (Fix Race Condition)
       if (useAppStore.persist && !useAppStore.persist.hasHydrated()) {
         console.log('⏳ Aguardando hidratação do storage...');
         await new Promise<void>((resolve) => {
-          const unsub = useAppStore.persist.onFinishHydration(() => {
+          useAppStore.persist.onFinishHydration(() => {
             resolve();
           });
         });
         console.log('💧 Storage hidratado.');
       }
 
-      const { activities, b2cData, setB2CData, setPaidMediaData } = useAppStore.getState();
+      const { activities, setB2CData, setPaidMediaData } = useAppStore.getState();
 
-      // Cache First + Stale-While-Revalidate Strategy
-      // If we have data, show it immediately (setLoading false), but CONTINUING to fetch fresh data
       if (activities.length > 0) {
         setLoading(false);
       }
@@ -161,8 +156,6 @@ export const useFrameworkData = (): {
 
           console.log(`✅ Dados Carregados: ${fetchedActivities.length} Atividades, ${fetchedB2C.length} B2C, ${fetchedPaid.length} Media, ${fetchedGoals.length} Metas.`);
 
-          // CRITICAL FIX: Only update activities from Supabase. 
-          // Do NOT overwrite frameworkData (the "Plan") with activities (the "History").
           const { activities: currentActivities, setActivities } = useAppStore.getState();
 
           if (fetchedActivities.length > 0) {
@@ -175,30 +168,31 @@ export const useFrameworkData = (): {
           }
 
           let finalB2C = fetchedB2C;
-          // FALLBACK: If Supabase B2C is empty, try Storage (Legacy)
           if (fetchedB2C.length === 0) {
             try {
               const files = await storageService.listFiles('b2c');
               if (files && files.length > 0) {
                 console.log('🔄 Fallback B2C: Found in Storage:', files[0].name);
                 const url = await storageService.getDownloadUrl('b2c/' + files[0].name);
-                const resp = await fetch(url);
-                const blob = await resp.blob();
+                const response = await fetch(url);
+                const blob = await response.blob();
                 const text = await blob.text();
 
-                // Parse with Worker
                 finalB2C = await new Promise<any[]>((resolve) => {
                   const worker = new CsvWorker();
                   worker.postMessage({ type: 'PARSE_B2C_CSV', fileContent: text } as WorkerMessage);
-                  worker.onmessage = (e) => {
-                    if (e.data.type === 'SUCCESS' || e.data.type === 'SUCCESS_B2C') {
-                      resolve(((e.data as any).data) || []);
+                  worker.onmessage = (event) => {
+                    if (event.data.type === 'SUCCESS' || event.data.type === 'SUCCESS_B2C') {
+                      resolve(((event.data as any).data) || []);
                     } else {
                       resolve([]);
                     }
                     worker.terminate();
                   };
-                  worker.onerror = () => { resolve([]); worker.terminate(); };
+                  worker.onerror = () => {
+                    resolve([]);
+                    worker.terminate();
+                  };
                 });
                 console.log(`✅ Fallback Loaded: ${finalB2C.length} B2C rows.`);
               }
@@ -207,28 +201,24 @@ export const useFrameworkData = (): {
             }
           }
 
-          // Always update B2C, Paid Media, and Goals
           setB2CData(finalB2C);
           setPaidMediaData(fetchedPaid);
-          useAppStore.getState().setGoals(fetchedGoals); // Sync goals
+          useAppStore.getState().setGoals(fetchedGoals);
           setLoading(false);
-        }).catch(err => {
-          console.error('Erro ao importar dataService:', err);
+        }).catch((importError) => {
+          console.error('Erro ao importar dataService:', importError);
           setError('Fail to load data service');
           setLoading(false);
         });
-
-      } catch (e: any) {
-        console.error('⚠️ Falha no Carregamento SQL:', e);
-        // Do not set error visibly if we just failed to fetch empty data?
-        // But if connection error, show it.
+      } catch (fetchError: any) {
+        console.error('⚠️ Falha no Carregamento SQL:', fetchError);
         setError('Erro de conexão com Banco de Dados.');
         setLoading(false);
       }
     };
 
     loadFromSupabase();
-  }, [setFrameworkData]); // Removed synced from dependencies
+  }, [setFrameworkData]);
 
   const loadSimulatedData = useCallback(() => {
     try {
@@ -236,8 +226,8 @@ export const useFrameworkData = (): {
       const { rows, activities } = generateSimulatedData();
       setFrameworkData(rows, activities);
       setLoading(false);
-    } catch (err: any) {
-      setError('Erro ao gerar dados: ' + err.message);
+    } catch (simulatedError: any) {
+      setError('Erro ao gerar dados: ' + simulatedError.message);
       setLoading(false);
     }
   }, [setFrameworkData]);
