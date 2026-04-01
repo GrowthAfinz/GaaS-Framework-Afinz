@@ -141,6 +141,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   const { viewSettings, setGlobalFilters } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
+  const reportActivities = useMemo(() => (
+    allActivities.filter((activity) => {
+      if (globalFilters.segmentos.length > 0 && !globalFilters.segmentos.includes(activity.segmento)) {
+        return false;
+      }
+      if (globalFilters.canais.length > 0 && !globalFilters.canais.includes(activity.canal)) {
+        return false;
+      }
+      if (globalFilters.jornadas.length > 0 && !globalFilters.jornadas.includes(activity.jornada)) {
+        return false;
+      }
+      if (globalFilters.parceiros.length > 0 && !globalFilters.parceiros.includes(activity.parceiro)) {
+        return false;
+      }
+      return true;
+    })
+  ), [allActivities, globalFilters.canais, globalFilters.jornadas, globalFilters.parceiros, globalFilters.segmentos]);
 
   // ── Descrições por disparo ──
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
@@ -211,7 +228,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
 
   const segmentoRows = useMemo(() => {
     const groups = new Map<string, Activity[]>();
-    allActivities.forEach(a => {
+    reportActivities.forEach(a => {
       const key = a.segmento || 'Sem Segmento';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(a);
@@ -219,13 +236,13 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
     const rows: AggregatedRow[] = [];
     groups.forEach((acts, label) => rows.push(computeRow(acts, label)));
     return rows.sort((a, b) => b.emissoes - a.emissoes);
-  }, [allActivities]);
+  }, [reportActivities]);
 
-  const segmentoTotal = useMemo(() => computeRow(allActivities, 'Total Geral'), [allActivities]);
+  const segmentoTotal = useMemo(() => computeRow(reportActivities, 'Total Geral'), [reportActivities]);
 
   const canalRows = useMemo(() => {
     const groups = new Map<string, Activity[]>();
-    allActivities.forEach(a => {
+    reportActivities.forEach(a => {
       const key = a.canal || 'Sem Canal';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(a);
@@ -233,9 +250,9 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
     const rows: AggregatedRow[] = [];
     groups.forEach((acts, label) => rows.push(computeRow(acts, label)));
     return rows.sort((a, b) => b.emissoes - a.emissoes);
-  }, [allActivities]);
+  }, [reportActivities]);
 
-  const canalTotal = useMemo(() => computeRow(allActivities, 'Total Geral'), [allActivities]);
+  const canalTotal = useMemo(() => computeRow(reportActivities, 'Total Geral'), [reportActivities]);
   const totalCanalEmissoes = canalTotal.emissoes;
 
   // d-3 cutoff: dates from today minus 3 days may still be consolidating
@@ -247,7 +264,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
   }, []);
 
   const detailRows = useMemo((): DetailRow[] => {
-    return allActivities
+    return reportActivities
       .filter(a => a.dataDisparo && !isNaN(a.dataDisparo.getTime()))
       .map(a => {
         const baseEnviada = a.kpis.baseEnviada ?? 0;
@@ -288,7 +305,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, selectedBU }
         };
       })
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [allActivities, d3Cutoff]);
+  }, [d3Cutoff, reportActivities]);
 
   // ── Filtro destaque sobre detailRows ──
   const filteredRows = useMemo((): DetailRow[] => {
