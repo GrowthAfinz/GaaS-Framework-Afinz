@@ -7,9 +7,9 @@ export function useCampaignMappings() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchMappings = async () => {
+    const fetchMappings = async (silent = false) => {
         try {
-            setIsLoading(true);
+            if (!silent) setIsLoading(true);
             const data = await dataService.fetchCampaignMappings();
             setMappings(data);
             setError(null);
@@ -17,7 +17,7 @@ export function useCampaignMappings() {
             console.error('Erro ao buscar deduplicações/mapeamentos de campanha:', err);
             setError(err.message || 'Erro desconhecido');
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
     };
 
@@ -26,25 +26,26 @@ export function useCampaignMappings() {
     }, []);
 
     const updateMapping = async (campaign_name: string, objective: 'marca' | 'b2c' | 'plurix' | 'seguros') => {
-        try {
-            // Optimistic update
-            setMappings(prev => {
-                const existing = prev.find(m => m.campaign_name === campaign_name);
-                if (existing) {
-                    return prev.map(m => m.campaign_name === campaign_name ? { ...m, objective } : m);
-                } else {
-                    return [...prev, { campaign_name, objective, created_at: new Date().toISOString() }];
-                }
-            });
+        // Optimistic update — apply immediately so UI is responsive
+        setMappings(prev => {
+            const existing = prev.find(m => m.campaign_name === campaign_name);
+            if (existing) {
+                return prev.map(m => m.campaign_name === campaign_name ? { ...m, objective } : m);
+            } else {
+                return [...prev, { campaign_name, objective, created_at: new Date().toISOString() }];
+            }
+        });
+        setError(null);
 
+        try {
             await dataService.upsertCampaignMapping({ campaign_name, objective });
-            // Re-fetch ensures ID is populated if newly created
-            await fetchMappings();
+            // Silent re-fetch to populate server-generated ID without showing a loading spinner
+            await fetchMappings(true);
         } catch (err: any) {
             console.error('Erro ao atualizar mapeamento:', err);
-            setError(err.message || 'Erro ao atualizar mapeamento');
-            // Re-fetch to rollback optimistic update on error
-            await fetchMappings();
+            setError(err.message || 'Erro ao salvar mapeamento. Verifique a conexão e tente novamente.');
+            // Silent rollback — revert optimistic update without hiding the table
+            await fetchMappings(true);
         }
     };
 

@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
-import { Label, Combobox, Select } from '../../blocks/shared';
-import { BU_SEGMENTO_MAP, CANAIS, generateSafra } from '../../../../constants/frameworkFields';
+import { Label, Combobox } from '../../blocks/shared';
+import { BU_SEGMENTO_MAP, generateSafra } from '../../../../constants/frameworkFields';
 import { useAppStore } from '../../../../store/useAppStore';
-import type { Canal } from '../../../../constants/frameworkFields';
 import type { WizardState, WizardBU } from '../types';
 
 interface Step2CampaignProps {
@@ -112,20 +111,6 @@ export const Step2Campaign: React.FC<Step2CampaignProps> = ({ state, onChange })
             Sugerir
           </button>
         </div>
-      </div>
-
-      {/* Canal Padrão */}
-      <div>
-        <Label label="Canal Padrão" required />
-        <Select
-          value={state.canalPadrao}
-          onChange={(e) => onChange({ canalPadrao: e.target.value as Canal })}
-        >
-          <option value="">Selecione...</option>
-          {CANAIS.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </Select>
       </div>
 
       {/* Nº de Disparos */}

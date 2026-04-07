@@ -21,12 +21,12 @@ export const Step4Dispatches: React.FC<Step4DispatchesProps> = ({ state, onChang
     <div className="flex flex-col gap-2 h-full overflow-y-auto pr-0.5">
       {/* Cabeçalho da tabela */}
       <div className="grid gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-200"
-        style={{ gridTemplateColumns: '36px 1fr 100px 118px 118px' }}>
+        style={{ gridTemplateColumns: '36px 1fr 80px 100px 118px 118px' }}>
         <span>#</span>
         <span>Activity Name / Taxonomia</span>
         <span>Canal</span>
-        <span>Data Início</span>
-        <span>Data Fim</span>
+        <span>Início</span>
+        <span>Fim</span>
       </div>
 
       {state.dispatches.map((d, i) => {
@@ -38,7 +38,7 @@ export const Step4Dispatches: React.FC<Step4DispatchesProps> = ({ state, onChang
               grid gap-2 items-start p-2 rounded-lg border transition-colors
               ${complete ? 'bg-white border-slate-200' : 'bg-amber-50 border-amber-300'}
             `}
-            style={{ gridTemplateColumns: '36px 1fr 100px 118px 118px' }}
+            style={{ gridTemplateColumns: '36px 1fr 80px 100px 118px 118px' }}
           >
             {/* Ordem */}
             <div className="flex items-center justify-center pt-1">

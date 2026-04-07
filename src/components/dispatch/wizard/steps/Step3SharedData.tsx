@@ -81,7 +81,7 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
 
   // --- IA Preview ---
   const projections = useMemo(() => {
-    if (!state.bu || !state.segmento || !state.canalPadrao) return null;
+    if (!state.bu || !state.segmento) return null;
     try {
       const activityRows = activities
         .filter((a: any) => a.raw != null)
@@ -108,7 +108,6 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
       const result = orchestrator.projectAllFields({
         bu: state.bu,
         segmento: state.segmento,
-        canal: state.canalPadrao,
         oferta: state.oferta || undefined,
         parceiro: state.parceiro || undefined,
         perfilCredito: state.perfilCredito || undefined,
@@ -118,7 +117,7 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
     } catch {
       return null;
     }
-  }, [activities, state.bu, state.segmento, state.canalPadrao, state.oferta, state.perfilCredito]);
+  }, [activities, state.bu, state.segmento, state.oferta, state.perfilCredito]);
 
   const taxaConv = (projections?.['taxaConversao'] as any)?.projectedValue;
   const cacValue = (projections?.['cac'] as any)?.projectedValue;
@@ -127,13 +126,7 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
   const propostas = (projections?.['propostas'] as any)?.projectedValue;
   const sampleSize = (projections?.['taxaConversao'] as any)?.explanation?.sampleSize ?? 0;
 
-  const cuCanal = state.canalPadrao ? (CUSTO_UNITARIO_CANAL[state.canalPadrao] ?? 0) : 0;
-  const custoJornada =
-    state.baseAcionavel > 0 && cuCanal > 0
-      ? state.baseAcionavel * cuCanal * state.nDisparos
-      : null;
-
-  const isIAReady = !!(state.bu && state.segmento && state.canalPadrao);
+  const isIAReady = !!(state.bu && state.segmento);
 
   return (
     <div className="flex gap-4 h-full">
@@ -230,16 +223,6 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
           </div>
         </div>
 
-        {/* Custo estimado em tempo real */}
-        {custoJornada !== null && (
-          <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-1.5">
-            Custo estimado da jornada ({state.nDisparos}x {state.canalPadrao}):{' '}
-            <span className="font-bold text-slate-700">
-              R${' '}
-              {custoJornada.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Coluna direita: painel IA */}
@@ -254,7 +237,7 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
           {!isIAReady ? (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-[10px] text-indigo-400 text-center leading-snug">
-                Preencha Campanha e Canal para ativar previsões
+                Preencha Campanha para ativar previsões
               </p>
             </div>
           ) : (

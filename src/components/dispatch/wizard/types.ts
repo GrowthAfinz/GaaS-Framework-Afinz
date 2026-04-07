@@ -18,7 +18,6 @@ export interface WizardState {
   // Step 2
   segmento: string;
   jornada: string;
-  canalPadrao: Canal | '';
   nDisparos: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   // Step 3
   ordemInicial: number;
@@ -43,7 +42,6 @@ export const INITIAL_WIZARD_STATE: WizardState = {
   bu: '',
   segmento: '',
   jornada: '',
-  canalPadrao: '',
   nDisparos: 1,
   ordemInicial: 1,
   parceiro: '',

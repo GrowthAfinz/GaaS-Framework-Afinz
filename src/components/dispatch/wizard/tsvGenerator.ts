@@ -118,7 +118,7 @@ export function generateTSV(state: WizardState): string {
       fmtPct(0),                      // Taxa de Conversão
       custoTotalCampanha > 0 ? fmtBRL(custoTotalCampanha) : 'R$ 0,00', // Custo Total Campanha
       'R$ 0,00',                      // CAC
-      '0',                            // Cartões Gerados
+      '(aguardando)',                 // Cartões Gerados
       '0',                            // Aprovados
       '0',                            // Propostas
       '0',                            // Emissões Independentes

@@ -20,12 +20,12 @@ type AnimState = 'entering' | 'active' | 'exiting';
 const STEP_LABELS = ['BU', 'Campanha', 'Dados', 'Disparos'];
 
 /**
- * Sincroniza state.dispatches quando nDisparos, ordemInicial ou canalPadrao mudam.
+ * Sincroniza state.dispatches quando nDisparos ou ordemInicial mudam.
  * Preserva dados existentes; adiciona/remove linhas conforme necessário.
  */
 function syncDispatches(state: WizardState): DispatchRow[] {
-  const { nDisparos, ordemInicial, canalPadrao, dispatches } = state;
-  const defaultCanal: Canal = (canalPadrao as Canal) || 'E-mail';
+  const { nDisparos, ordemInicial, dispatches } = state;
+  const defaultCanal: Canal = 'E-mail';
   const result: DispatchRow[] = [];
 
   for (let i = 0; i < nDisparos; i++) {
@@ -62,8 +62,7 @@ export const JornadaCreatorModal: React.FC<JornadaCreatorModalProps> = ({ isOpen
       // Resync dispatches quando campos relevantes mudam
       if (
         'nDisparos' in updates ||
-        'ordemInicial' in updates ||
-        'canalPadrao' in updates
+        'ordemInicial' in updates
       ) {
         next.dispatches = syncDispatches(next);
       }
@@ -111,9 +110,6 @@ export const JornadaCreatorModal: React.FC<JornadaCreatorModalProps> = ({ isOpen
 
   const canAdvanceStep2 = state.segmento.trim() !== '' && state.jornada.trim() !== '' && state.canalPadrao !== '';
 
-  const cuCanal = state.canalPadrao ? (CUSTO_UNITARIO_CANAL[state.canalPadrao as Canal] ?? 0) : 0;
-  const baseAcionavel = state.baseAcionavel > 0 ? state.baseAcionavel : state.baseTotal;
-  const custoTotalEstimado = baseAcionavel > 0 && cuCanal > 0 ? baseAcionavel * cuCanal * state.nDisparos : null;
 
   const getTransformStyle = (): React.CSSProperties => {
     if (animState === 'active') return { transform: 'translateX(0)', opacity: 1 };
@@ -205,18 +201,7 @@ export const JornadaCreatorModal: React.FC<JornadaCreatorModalProps> = ({ isOpen
         {/* Footer */}
         {state.step > 1 && (
           <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
-            {/* Custo estimado (step 4) */}
-            <div className="text-[11px] text-slate-500 flex-1">
-              {state.step === 4 && custoTotalEstimado !== null && (
-                <>
-                  Custo estimado:{' '}
-                  <span className="font-bold text-slate-700">
-                    R${' '}
-                    {custoTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </>
-              )}
-            </div>
+            <div className="text-[11px] text-slate-500 flex-1" />
 
             <div className="flex items-center gap-2">
               <button

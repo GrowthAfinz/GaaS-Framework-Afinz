@@ -10,7 +10,7 @@ interface CampaignMapperModalProps {
 
 export const CampaignMapperModal: React.FC<CampaignMapperModalProps> = ({ isOpen, onClose }) => {
     const { rawData } = useFilters();
-    const { mappings, isLoading, updateMapping } = useCampaignMappings();
+    const { mappings, isLoading, error, updateMapping } = useCampaignMappings();
     const [searchTerm, setSearchTerm] = useState('');
 
     // Extract all unique campaigns from the current loaded dataset
@@ -73,6 +73,14 @@ export const CampaignMapperModal: React.FC<CampaignMapperModalProps> = ({ isOpen
                         </div>
                     </div>
                 </div>
+
+                {/* Error Banner */}
+                {error && (
+                    <div className="px-6 py-3 bg-red-50 border-b border-red-100 flex items-center gap-2 text-sm text-red-700">
+                        <AlertCircle size={16} className="shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                )}
 
                 {/* Table Content */}
                 <div className="flex-1 overflow-auto bg-slate-50 relative p-6">
