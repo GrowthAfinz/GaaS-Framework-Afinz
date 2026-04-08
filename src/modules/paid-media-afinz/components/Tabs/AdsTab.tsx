@@ -2,8 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useFilters } from '../../context/FilterContext';
 import {
     Search, TrendingUp, TrendingDown, Award,
-    MoreHorizontal, ThumbsUp, MessageCircle, Share2, Play,
-    BarChart2, Info, RefreshCw, Loader2, Image, Film
+    MoreHorizontal, BarChart2, Info, RefreshCw, Loader2, Image, Film
 } from 'lucide-react';
 import {
     ResponsiveContainer, ScatterChart, Scatter, ZAxis,
@@ -168,6 +167,14 @@ const STATUS_LABEL: Record<StatusType, string> = {
 };
 
 
+// ── Metric cell helper ────────────────────────────────────────────────────────
+const MetricCell: React.FC<{ label: string; value: string; color?: string }> = ({ label, value, color = 'text-slate-800' }) => (
+    <div>
+        <div className="text-[9px] font-medium text-slate-400 uppercase tracking-wider leading-none mb-1">{label}</div>
+        <div className={`text-[12px] font-bold ${color} leading-none`}>{value}</div>
+    </div>
+);
+
 // ── Meta-style Ad Card ────────────────────────────────────────────────────────
 const MetaAdCard: React.FC<{
     ad: AdSummary;
@@ -178,122 +185,120 @@ const MetaAdCard: React.FC<{
     const gradient = GRADIENTS[hashStr(ad.adId) % GRADIENTS.length];
     const isPluriq = ad.bu === 'plurix';
     const avatarBg = ad.bu === 'seguros' ? 'bg-orange-600' : isPluriq ? 'bg-purple-600' : 'bg-blue-600';
+    const avatarLabel = isPluriq ? 'PLX' : ad.bu === 'seguros' ? 'SEG' : 'AFZ';
     const ctrColor = ad.ctr >= 1 ? 'text-emerald-600' : ad.ctr >= 0.5 ? 'text-amber-600' : 'text-red-500';
+    const freqColor = ad.frequency && ad.frequency > 3.5 ? 'text-orange-500' : 'text-slate-800';
     const displayBody = ad.body || '';
-    const displayTitle = ad.title || ad.adName;
+    const displayTitle = ad.title || '';
     const cta = ad.ctaLabel || 'Saiba mais';
 
-    return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow cursor-pointer"
-             onClick={onClick}>
+    // Shorten campaign name for display
+    const campaignShort = ad.campaign.length > 22 ? ad.campaign.slice(0, 22) + '…' : ad.campaign;
 
-            {/* Meta-style Header */}
-            <div className="px-3 pt-3 pb-2 flex items-start justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white flex-shrink-0 ${avatarBg}`}>
-                        <span className="text-[9px] font-black tracking-tight leading-none">
-                            {isPluriq ? 'PLX' : 'AFZ'}
-                        </span>
+    return (
+        <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+            onClick={onClick}
+        >
+            {/* ── HEADER ── */}
+            <div className="px-3.5 pt-3.5 pb-2.5 flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0 text-[9px] font-black tracking-tight shadow-sm ${avatarBg}`}>
+                        {avatarLabel}
                     </div>
                     <div className="min-w-0">
-                        <span className="text-[11px] text-slate-400">Patrocinado</span>
+                        <p className="text-[13px] font-bold text-slate-900 leading-tight truncate" title={ad.campaign}>
+                            {campaignShort}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[11px] text-slate-400">Patrocinado</span>
+                            <span className="text-slate-200">·</span>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
+                                ad.channel === 'meta' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-600'
+                            }`}>
+                                {ad.channel === 'meta' ? 'Meta' : 'Google'}
+                            </span>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[status]}`}>
-                        {STATUS_LABEL[status]}
-                    </span>
-                </div>
-            </div>
-
-            {/* Ad Copy */}
-            {displayBody && (
-                <div className="px-3 pb-2">
-                    <p className="text-[12px] text-slate-700 leading-snug line-clamp-2">{displayBody}</p>
-                </div>
-            )}
-
-            {/* Image / Media area */}
-            <div className={`relative w-full bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden`}
-                 style={{ aspectRatio: '1 / 1' }}>
-                {ad.thumbnail_url ? (
-                    <img src={ad.thumbnail_url} alt={ad.adName}
-                         className="w-full h-full object-cover transition-opacity duration-300" 
-                         loading="lazy" 
-                         onLoad={(e) => (e.currentTarget.style.opacity = '1')}
-                         style={{ opacity: 0, imageRendering: 'auto' }} />
-                ) : (
-                    <div className="flex flex-col items-center gap-2 opacity-30">
-                        {ad.mediaType === 'video' ? <Film size={32} className="text-white" /> : <Play size={32} className="text-white" />}
-                    </div>
-                )}
-                {/* Processing Overlay for low-res fallbacks */}
-                {ad.thumbnail_url && !ad.creative?.asset_public_url && (
-                    <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-md rounded-full px-2 py-0.5 border border-white/30">
-                        <span className="text-[8px] font-bold text-white tracking-widest uppercase">Processando Alta Res</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Link preview (Meta's gray CTA section) */}
-            <div className="bg-[#F0F2F5] px-3 py-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider truncate">afinz.com.br</p>
-                    <p className="text-[12px] font-semibold text-slate-900 truncate leading-tight">
-                        {displayTitle.length > 30 ? displayTitle.slice(0, 30) + '...' : displayTitle}
-                    </p>
-                </div>
-                <span className="flex-shrink-0 px-3 py-1.5 bg-[#E4E6EB] text-slate-700 text-[12px] font-semibold rounded-md">
-                    {cta}
+                <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border mt-0.5 ${STATUS_STYLE[status]}`}>
+                    {STATUS_LABEL[status]}
                 </span>
             </div>
 
-            {/* Engagement bar */}
-            <div className="px-3 py-1.5 flex items-center gap-3 border-b border-slate-100">
-                <div className="flex items-center gap-1 text-slate-400 text-[11px]">
-                    <ThumbsUp size={12} /> <span>{fmtNum(ad.clicks)}</span>
-                </div>
-                <div className="flex items-center gap-1 text-slate-400 text-[11px]">
-                    <MessageCircle size={12} /> <span>{fmtNum(Math.round(ad.impressions * 0.002))}</span>
-                </div>
-                <div className="ml-auto flex items-center gap-1 text-slate-400 text-[11px]">
-                    <Share2 size={12} />
-                </div>
+            {/* ── BODY COPY ── */}
+            <div className="px-3.5 pb-3">
+                {displayBody ? (
+                    <p className="text-[12.5px] text-slate-700 leading-relaxed line-clamp-3">{displayBody}</p>
+                ) : (
+                    <p className="text-[11px] text-slate-300 italic">— sem copy registrado —</p>
+                )}
             </div>
 
-            {/* Performance Metrics */}
-            <div className="px-3 py-2.5 grid grid-cols-3 gap-1.5">
-                <div className="text-center">
-                    <div className="text-[9px] text-slate-400 uppercase tracking-wider">Impress.</div>
-                    <div className="text-[11px] font-bold text-slate-700">{fmtNum(ad.impressions)}</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-[9px] text-slate-400 uppercase tracking-wider">CTR</div>
-                    <div className={`text-[11px] font-bold ${ctrColor}`}>{fmtPct(ad.ctr)}</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-[9px] text-slate-400 uppercase tracking-wider">CPA</div>
-                    <div className="text-[11px] font-bold text-slate-700">{ad.cpa > 0 ? fmtBRL(ad.cpa) : '—'}</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-[9px] text-slate-400 uppercase tracking-wider">Conv.</div>
-                    <div className="text-[11px] font-bold text-slate-700">{fmtNum(ad.conversions)}</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-[9px] text-slate-400 uppercase tracking-wider">Invest.</div>
-                    <div className="text-[11px] font-bold text-slate-700">{fmtBRL(ad.spend)}</div>
-                </div>
-                <div className="text-center">
-                    <div className="text-[9px] text-slate-400 uppercase tracking-wider">Freq.</div>
-                    <div className={`text-[11px] font-bold ${ad.frequency && ad.frequency > 3.5 ? 'text-orange-500' : 'text-slate-700'}`}>
-                        {ad.frequency ? ad.frequency.toFixed(1) : '—'}
+            {/* ── IMAGE / MEDIA ── */}
+            <div
+                className={`relative w-full bg-gradient-to-br ${gradient} overflow-hidden`}
+                style={{ aspectRatio: '1 / 1' }}
+            >
+                {ad.thumbnail_url ? (
+                    <img
+                        src={ad.thumbnail_url}
+                        alt={ad.adName}
+                        className="w-full h-full object-cover transition-opacity duration-300"
+                        loading="lazy"
+                        onLoad={(e) => (e.currentTarget.style.opacity = '1')}
+                        style={{ opacity: 0 }}
+                    />
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full gap-2 opacity-25">
+                        {ad.mediaType === 'video' ? <Film size={36} className="text-white" /> : <Image size={36} className="text-white" />}
                     </div>
-                </div>
+                )}
+                {/* Video badge */}
+                {ad.mediaType === 'video' && ad.thumbnail_url && (
+                    <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-md px-1.5 py-0.5">
+                        <Film size={10} className="text-white" />
+                        <span className="text-[9px] font-semibold text-white">Vídeo</span>
+                    </div>
+                )}
+                {/* High-res processing badge */}
+                {ad.thumbnail_url && !ad.creative?.asset_public_url && (
+                    <div className="absolute top-2 right-2 bg-black/30 backdrop-blur-md rounded-full px-2 py-0.5 border border-white/20">
+                        <span className="text-[8px] font-semibold text-white/80 tracking-widest uppercase">Alta Res</span>
+                    </div>
+                )}
             </div>
 
-            {/* Ad name footer — minimalist */}
-            <div className="px-3 py-1.5 border-t border-slate-50">
-                <p className="text-[9px] text-slate-400 truncate" title={ad.adName}>{ad.adName}</p>
+            {/* ── LINK PREVIEW ── */}
+            <div className="bg-[#F0F2F5] px-3.5 py-2.5 flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider truncate leading-none mb-0.5">afinz.com.br</p>
+                    {displayTitle ? (
+                        <p className="text-[12.5px] font-semibold text-slate-900 truncate leading-snug">
+                            {displayTitle.length > 34 ? displayTitle.slice(0, 34) + '…' : displayTitle}
+                        </p>
+                    ) : (
+                        <p className="text-[11px] text-slate-400 truncate italic">sem título</p>
+                    )}
+                </div>
+                <button className="flex-shrink-0 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-[11.5px] font-semibold rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
+                    {cta}
+                </button>
+            </div>
+
+            {/* ── PERFORMANCE METRICS ── */}
+            <div className="px-3.5 pt-3 pb-2.5 grid grid-cols-3 gap-x-3 gap-y-2.5">
+                <MetricCell label="CTR"     value={fmtPct(ad.ctr)}                                  color={ctrColor} />
+                <MetricCell label="Conv."   value={fmtNum(ad.conversions)} />
+                <MetricCell label="CPA"     value={ad.cpa > 0 ? fmtBRL(ad.cpa) : '—'} />
+                <MetricCell label="Invest." value={fmtBRL(ad.spend)} />
+                <MetricCell label="Impress."value={fmtNum(ad.impressions)} />
+                <MetricCell label="Freq."   value={ad.frequency ? ad.frequency.toFixed(1) : '—'}   color={freqColor} />
+            </div>
+
+            {/* ── AD NAME FOOTER ── */}
+            <div className="px-3.5 py-2 border-t border-slate-50">
+                <p className="text-[9px] text-slate-400 truncate font-mono" title={ad.adName}>{ad.adName}</p>
             </div>
         </div>
     );

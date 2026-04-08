@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
   try {
     // image_url = direct URL to the full-resolution image used in the creative.
     // This is the key addition vs previous versions — avoids /adimages lookup for most image ads.
-    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url,effective_object_story_id}';
+    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url,effective_object_story_id,body,title,description,call_to_action_type}';
     let allAds: any[] = [];
     let adsApiError: string | null = null;
     let nextUrl: string | null =
@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
     const adIds = allAds.map((ad) => ad.id);
     const { data: existingRows } = await supabase
       .from('ad_creatives')
-      .select('ad_id,image_url,image_hash,video_id,media_type,thumbnail_path,creative_id,video_thumbnail_url,aspect_ratio,call_to_action_type,effective_status,adset_name,asset_public_url,asset_storage_path,asset_storage_bucket,asset_source_url,asset_width,asset_height,asset_content_type,asset_origin,asset_sync_status,asset_sync_error,permalink_url')
+      .select('ad_id,image_url,image_hash,video_id,media_type,thumbnail_path,creative_id,video_thumbnail_url,aspect_ratio,call_to_action_type,effective_status,adset_name,body,title,description,asset_public_url,asset_storage_path,asset_storage_bucket,asset_source_url,asset_width,asset_height,asset_content_type,asset_origin,asset_sync_status,asset_sync_error,permalink_url')
       .in('ad_id', adIds);
     const existingMap = new Map<string, any>((existingRows || []).map((r: any) => [r.ad_id, r]));
 
@@ -409,6 +409,9 @@ Deno.serve(async (req) => {
           media_type: mediaType ?? ex.media_type ?? null,
           aspect_ratio: ar ?? ex.aspect_ratio ?? null,
           call_to_action_type: creative?.call_to_action_type || ex.call_to_action_type || null,
+          body: creative?.body || ex.body || null,
+          title: creative?.title || ex.title || null,
+          description: creative?.description || ex.description || null,
           effective_status: ad.effective_status || ex.effective_status || null,
           // Storage: clear if forceResetStorage, otherwise COALESCE.
           asset_storage_bucket: cs ? null : (ha.bucket ?? ex.asset_storage_bucket ?? null),
