@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
   try {
     // image_url = direct URL to the full-resolution image used in the creative.
     // This is the key addition vs previous versions — avoids /adimages lookup for most image ads.
-    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url}';
+    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url,effective_object_story_id}';
     let allAds: any[] = [];
     let adsApiError: string | null = null;
     let nextUrl: string | null =
@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
     const adIds = allAds.map((ad) => ad.id);
     const { data: existingRows } = await supabase
       .from('ad_creatives')
-      .select('ad_id,image_url,image_hash,video_id,media_type,thumbnail_path,creative_id,video_thumbnail_url,aspect_ratio,call_to_action_type,effective_status,adset_name,asset_public_url,asset_storage_path,asset_storage_bucket,asset_source_url,asset_width,asset_height,asset_content_type,asset_origin,asset_sync_status,asset_sync_error')
+      .select('ad_id,image_url,image_hash,video_id,media_type,thumbnail_path,creative_id,video_thumbnail_url,aspect_ratio,call_to_action_type,effective_status,adset_name,asset_public_url,asset_storage_path,asset_storage_bucket,asset_source_url,asset_width,asset_height,asset_content_type,asset_origin,asset_sync_status,asset_sync_error,permalink_url')
       .in('ad_id', adIds);
     const existingMap = new Map<string, any>((existingRows || []).map((r: any) => [r.ad_id, r]));
 
@@ -390,6 +390,12 @@ Deno.serve(async (req) => {
         // This is what resolveCreativeAssetUrl uses when asset_public_url is null.
         const browserFallbackUrl = videoThumbnailUrl || imageUrl || null;
 
+        // Build permalink from effective_object_story_id (format: "pageId_postId")
+        const storyId = creative?.effective_object_story_id as string | undefined;
+        const permalinkUrl = storyId && storyId.includes('_')
+          ? (() => { const idx = storyId.indexOf('_'); return `https://www.facebook.com/${storyId.slice(0, idx)}/posts/${storyId.slice(idx + 1)}`; })()
+          : (ex.permalink_url ?? null);
+
         return {
           ad_id: ad.id,
           ad_name: ad.name,
@@ -416,6 +422,7 @@ Deno.serve(async (req) => {
           asset_last_synced_at: new Date().toISOString(),
           asset_sync_status: ha.syncStatus,
           asset_sync_error: ha.syncError,
+          permalink_url: permalinkUrl,
           collected_at: new Date().toISOString(),
         };
       }));

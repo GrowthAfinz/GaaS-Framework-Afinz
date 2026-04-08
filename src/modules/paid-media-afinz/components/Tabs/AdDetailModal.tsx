@@ -3,7 +3,7 @@ import {
     X, ThumbsUp, MessageCircle, Share2, Play,
     TrendingUp, TrendingDown, BarChart2, Layers, Target,
     Eye, MousePointer, DollarSign, Users, Repeat, Activity,
-    ChevronDown, LayoutGrid, Smartphone, Film
+    ChevronDown, LayoutGrid, Smartphone, Film, ExternalLink
 } from 'lucide-react';
 import {
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -253,6 +253,7 @@ export const AdDetailModal: React.FC<Props> = ({ ad, creative, dailyData, onClos
                             </div>
                             <div>
                                 <p className="text-sm font-semibold text-slate-900">{ad.campaign}</p>
+                                <p className="text-[11px] text-slate-400 truncate max-w-[280px]" title={ad.adName}>{ad.adName}</p>
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-xs text-slate-400">Patrocinado</span>
                                     <span className="text-slate-300">·</span>
@@ -274,17 +275,36 @@ export const AdDetailModal: React.FC<Props> = ({ ad, creative, dailyData, onClos
                         {/* Body copy */}
                         <p className="text-sm text-slate-800 leading-relaxed mb-3 whitespace-pre-line">{bodyText}</p>
 
-                        {/* Image */}
-                        <div className={`relative w-full rounded-lg overflow-hidden bg-gradient-to-br ${gradient}`}
-                             style={{ aspectRatio: '16 / 9' }}>
-                            {thumbnailUrl ? (
-                                <img src={thumbnailUrl} alt={ad.adName} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full opacity-30">
-                                    <Play size={40} className="text-white" />
+                        {/* Image — clicável se permalink disponível */}
+                        {creative?.permalink_url ? (
+                            <a href={creative.permalink_url} target="_blank" rel="noopener noreferrer"
+                               className="block relative group">
+                                <div className={`relative w-full rounded-lg overflow-hidden bg-gradient-to-br ${gradient}`}
+                                     style={{ aspectRatio: '16 / 9' }}>
+                                    {thumbnailUrl ? (
+                                        <img src={thumbnailUrl} alt={ad.adName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center h-full opacity-30">
+                                            <Play size={40} className="text-white" />
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors rounded-lg flex items-center justify-center">
+                                        <ExternalLink size={28} className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                                    </div>
                                 </div>
-                            )}
-                        </div>
+                            </a>
+                        ) : (
+                            <div className={`relative w-full rounded-lg overflow-hidden bg-gradient-to-br ${gradient}`}
+                                 style={{ aspectRatio: '16 / 9' }}>
+                                {thumbnailUrl ? (
+                                    <img src={thumbnailUrl} alt={ad.adName} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full opacity-30">
+                                        <Play size={40} className="text-white" />
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Link preview */}
                         <div className="bg-[#F0F2F5] rounded-b-lg px-4 py-2.5 flex items-center justify-between -mt-1">

@@ -80,6 +80,7 @@ export interface AdCreative {
     description_variations?: string[];
     body_asset_insights?: AssetInsight[];
     title_asset_insights?: AssetInsight[];
+    permalink_url?: string; // Built from effective_object_story_id
 }
 
 export type PaidMediaObjective = 'marca' | 'b2c' | 'plurix' | 'seguros';

@@ -179,7 +179,7 @@ const MetaAdCard: React.FC<{
     const isPluriq = ad.bu === 'plurix';
     const avatarBg = ad.bu === 'seguros' ? 'bg-orange-600' : isPluriq ? 'bg-purple-600' : 'bg-blue-600';
     const ctrColor = ad.ctr >= 1 ? 'text-emerald-600' : ad.ctr >= 0.5 ? 'text-amber-600' : 'text-red-500';
-    const displayBody = ad.body || ad.adName;
+    const displayBody = ad.body || '';
     const displayTitle = ad.title || ad.adName;
     const cta = ad.ctaLabel || 'Saiba mais';
 
@@ -196,9 +196,6 @@ const MetaAdCard: React.FC<{
                         </span>
                     </div>
                     <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-slate-900 leading-tight truncate max-w-[150px]" title={ad.adName}>
-                            {ad.adName.length > 24 ? ad.adName.slice(0, 24) + '…' : ad.adName}
-                        </p>
                         <span className="text-[11px] text-slate-400">Patrocinado</span>
                     </div>
                 </div>
@@ -292,6 +289,11 @@ const MetaAdCard: React.FC<{
                         {ad.frequency ? ad.frequency.toFixed(1) : '—'}
                     </div>
                 </div>
+            </div>
+
+            {/* Ad name footer — minimalist */}
+            <div className="px-3 py-1.5 border-t border-slate-50">
+                <p className="text-[9px] text-slate-400 truncate" title={ad.adName}>{ad.adName}</p>
             </div>
         </div>
     );
