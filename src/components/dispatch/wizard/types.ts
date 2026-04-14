@@ -18,7 +18,7 @@ export interface WizardState {
   // Step 2
   segmento: string;
   jornada: string;
-  nDisparos: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  nDisparos: number;
   // Step 3
   ordemInicial: number;
   parceiro: string;

@@ -16,11 +16,13 @@ import { explorerFocus, useComparisonData } from '../../hooks/explorer/useCompar
 import { useDetailsPaneData } from '../../hooks/explorer/useDetailsPaneData';
 import { useExplorerSearch } from '../../hooks/explorer/useExplorerSearch';
 
+import { Activity } from '../../types/framework';
 import { TreeView } from './tree/TreeView';
 import { ComparisonPanel } from './comparison/ComparisonPanel';
 import { DetailsPane } from './details/DetailsPane';
 import { QuickSearch } from './search/QuickSearch';
 import { DisparoDetailModal } from './disparo/DisparoDetailModal';
+import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 
 interface DisparoExplorerProps {
   onNavigateToFramework?: (filters?: { bu?: string; segmento?: string; jornada?: string }) => void;
@@ -79,6 +81,8 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disparoModalActivity, setDisparoModalActivity] = useState<ActivityRow | null>(null);
+  const [selectedDayDate, setSelectedDayDate] = useState<Date | null>(null);
+  const [selectedDayActivities, setSelectedDayActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
     if (storeActivities.length > 0) return;
@@ -203,32 +207,38 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
     setDetailsPaneNode(null);
   }, [allBusSelected, allBuNodeIds, setSelectedNodeIds, resetComparisonFocus, setDetailsPaneNode]);
 
-  // Clique em um dia do gráfico temporal → abre o primeiro disparo daquele dia no escopo atual
+  // Clique em um dia do gráfico temporal → abre DailyDetailsModal com todos os disparos do dia
   const handleDayClick = React.useCallback((date: string) => {
-    // Respeita o escopo atual (foco/filtros) ao buscar atividades do dia
     const focusId = comparisonFocusNodeId;
-    const act = activities.find((a) => {
-      const actDate = (a['Data de Disparo'] as string | undefined)?.slice(0, 10);
+
+    // Filtra storeActivitiesRaw (Activity[]) para o dia e escopo selecionado
+    const dayActivities = storeActivitiesRaw.filter((a) => {
+      let actDate = '';
+      try { actDate = formatDateKey(a.dataDisparo); } catch { return false; }
       if (actDate !== date) return false;
-      // Aplica escopo se houver foco definido
+
       if (focusId) {
-        const parts = focusId.split(':');
-        const type = parts[0];
-        const payload = parts.slice(1).join(':');
-        if (type === 'bu' && a.BU !== payload) return false;
+        const colonIdx = focusId.indexOf(':');
+        const type = focusId.slice(0, colonIdx);
+        const payload = focusId.slice(colonIdx + 1);
+        if (type === 'bu' && a.bu !== payload) return false;
         if (type === 'segmento') {
           const [bu, seg] = payload.split('|');
-          if (a.BU !== bu || a.Segmento !== seg) return false;
+          if (a.bu !== bu || a.segmento !== seg) return false;
         }
         if (type === 'canal') {
           const [bu, seg, canal] = payload.split('|');
-          if (a.BU !== bu || a.Segmento !== seg || a.Canal !== canal) return false;
+          if (a.bu !== bu || a.segmento !== seg || a.canal !== canal) return false;
         }
       }
       return true;
     });
-    if (act) setDisparoModalActivity(act);
-  }, [activities, comparisonFocusNodeId]);
+
+    if (dayActivities.length > 0) {
+      setSelectedDayDate(new Date(`${date}T00:00:00`));
+      setSelectedDayActivities(dayActivities);
+    }
+  }, [storeActivitiesRaw, comparisonFocusNodeId]);
 
   const handleViewAll = () => {
     if (!detailsData || !onNavigateToFramework) return;
@@ -363,7 +373,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         />
       </aside>
 
-      {/* Modal de detalhe do disparo individual */}
+      {/* Modal de detalhe do disparo individual (clique no nó da árvore) */}
       {disparoModalActivity && (
         <DisparoDetailModal
           activity={disparoModalActivity}
@@ -371,6 +381,13 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
           onSaved={() => setDisparoModalActivity(null)}
         />
       )}
+
+      {/* Modal de detalhes do dia (clique na barra do gráfico temporal) */}
+      <DailyDetailsModal
+        date={selectedDayDate}
+        activities={selectedDayActivities}
+        onClose={() => { setSelectedDayDate(null); setSelectedDayActivities([]); }}
+      />
     </div>
   );
 };

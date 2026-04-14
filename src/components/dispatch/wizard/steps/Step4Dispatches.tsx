@@ -18,9 +18,9 @@ export const Step4Dispatches: React.FC<Step4DispatchesProps> = ({ state, onChang
     d.activityName.trim() !== '' && d.canal !== '' && d.dataInicio !== '' && d.dataFim !== '';
 
   return (
-    <div className="flex flex-col gap-2 h-full overflow-y-auto pr-0.5">
+    <div className="flex flex-col gap-2 h-full min-h-0 flex-1">
       {/* Cabeçalho da tabela */}
-      <div className="grid gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-200"
+      <div className="grid gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-200 flex-shrink-0"
         style={{ gridTemplateColumns: '36px 1fr 80px 100px 118px 118px' }}>
         <span>#</span>
         <span>Activity Name / Taxonomia</span>
@@ -29,6 +29,8 @@ export const Step4Dispatches: React.FC<Step4DispatchesProps> = ({ state, onChang
         <span>Fim</span>
       </div>
 
+      {/* Scrollable list */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pr-0.5 space-y-2">
       {state.dispatches.map((d, i) => {
         const complete = isRowComplete(d);
         return (
@@ -106,9 +108,10 @@ export const Step4Dispatches: React.FC<Step4DispatchesProps> = ({ state, onChang
           </div>
         );
       })}
+      </div>
 
       {state.dispatches.some((d) => !isRowComplete(d)) && (
-        <p className="text-[10px] text-amber-600 flex items-center gap-1">
+        <p className="text-[10px] text-amber-600 flex items-center gap-1 flex-shrink-0">
           <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
           Preencha Activity Name, Canal e Datas para habilitar o botão Copiar
         </p>

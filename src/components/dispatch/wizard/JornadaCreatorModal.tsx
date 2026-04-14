@@ -171,7 +171,7 @@ export const JornadaCreatorModal: React.FC<JornadaCreatorModalProps> = ({ isOpen
         </div>
 
         {/* Step content */}
-        <div className="flex-1 overflow-hidden relative px-5 py-4" style={{ minHeight: '400px' }}>
+        <div className="flex-1 overflow-hidden relative px-5 py-4" style={{ minHeight: '500px', maxHeight: '600px' }}>
           <div
             style={{
               ...getTransformStyle(),

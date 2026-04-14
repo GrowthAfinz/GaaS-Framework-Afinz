@@ -2,7 +2,7 @@ import { dataService } from '../../services/dataService';
 import { useAppStore } from '../../store/useAppStore';
 import { useUserRole } from '../../context/UserRoleContext';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FilterProvider, useFilters } from './context/FilterContext';
 import { FileUpload } from './components/FileUpload';
 import { FilterBar } from './components/FilterBar';
@@ -28,25 +28,24 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
   const [isMapperOpen, setIsMapperOpen] = useState(false);
 
   // Auto-Sync — reads directly from Supabase table
-  useEffect(() => {
-    const syncWithCloud = async () => {
-      try {
-        console.log('📡 Buscando métricas de Mídia Paga do banco...');
-        // Load at ad level so adset_name + ad_name are present for filters
-        const data = await dataService.fetchPaidMediaByAd();
-        if (data && data.length > 0) {
-          setRawData(data as any);
-          console.log(`✅ ${data.length} linhas carregadas do banco.`);
-        } else {
-          console.log('ℹ️ Nenhum dado de Mídia Paga encontrado no banco.');
-        }
-      } catch (e) {
-        console.error('Erro ao buscar dados de Mídia Paga:', e);
-      } finally {
-        setIsSyncing(false);
+  const syncWithCloud = useCallback(async () => {
+    try {
+      console.log('📡 Buscando métricas de Mídia Paga do banco...');
+      const data = await dataService.fetchPaidMediaByAd();
+      if (data && data.length > 0) {
+        setRawData(data as any);
+        console.log(`✅ ${data.length} linhas carregadas do banco.`);
+      } else {
+        console.log('ℹ️ Nenhum dado de Mídia Paga encontrado no banco.');
       }
-    };
+    } catch (e) {
+      console.error('Erro ao buscar dados de Mídia Paga:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [setRawData]);
 
+  useEffect(() => {
     syncWithCloud();
   }, []);
 
@@ -194,9 +193,9 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
         </div>
       </main>
 
-      <CampaignMapperModal 
-        isOpen={isMapperOpen} 
-        onClose={() => setIsMapperOpen(false)} 
+      <CampaignMapperModal
+        isOpen={isMapperOpen}
+        onClose={() => { setIsMapperOpen(false); syncWithCloud(); }}
       />
     </div>
   );

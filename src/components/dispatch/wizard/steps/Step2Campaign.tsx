@@ -10,7 +10,6 @@ interface Step2CampaignProps {
   onChange: (patch: Partial<WizardState>) => void;
 }
 
-const N_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 export const Step2Campaign: React.FC<Step2CampaignProps> = ({ state, onChange }) => {
   const activities = useAppStore((s) => s.activities) as any[];
@@ -116,23 +115,19 @@ export const Step2Campaign: React.FC<Step2CampaignProps> = ({ state, onChange })
       {/* Nº de Disparos */}
       <div>
         <Label label="Nº de Disparos na Jornada" required />
-        <div className="flex gap-1.5 flex-wrap mt-0.5">
-          {N_OPTIONS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => onChange({ nDisparos: n })}
-              className={`
-                w-8 h-8 rounded-full text-xs font-bold border transition-all
-                ${state.nDisparos === n
-                  ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-300 hover:border-cyan-400 hover:text-cyan-600'}
-              `}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
+        <input
+          type="number"
+          min={1}
+          max={500}
+          value={state.nDisparos}
+          onChange={(e) => {
+            const val = Math.max(1, Math.min(500, Number(e.target.value) || 1));
+            onChange({ nDisparos: val as any });
+          }}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 focus:border-cyan-400"
+          placeholder="Ex: 10, 50, 80..."
+        />
+        <p className="text-[10px] text-slate-500 mt-1">Digite o número de disparos (máximo: 500)</p>
       </div>
     </div>
   );

@@ -1,14 +1,11 @@
 import React, { useMemo } from 'react';
-import { TrendingUp, Sparkles } from 'lucide-react';
-import { Label, Combobox, Select, Input, MetricCard } from '../../blocks/shared';
+import { Label, Combobox, Select, Input } from '../../blocks/shared';
 import {
   ETAPAS_AQUISICAO,
   OFERTA_DETALHE_MAP,
   SEGMENTO_CONTEXT_MAP,
-  CUSTO_UNITARIO_CANAL,
 } from '../../../../constants/frameworkFields';
 import { useAppStore } from '../../../../store/useAppStore';
-import { getAIOrchestrator } from '../../../../services/ml/AIOrchestrator';
 import type { WizardState } from '../types';
 
 interface Step3SharedDataProps {
@@ -49,25 +46,39 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
     return [...smartObjs, ...rest].filter((o) => o.count > 0 || (o as any).isSmart);
   }, [filtered, state.segmento]);
 
+
+  const perfisOpts = useMemo(() => {
+    const opts = makeOptions((r) => r['Perfil de Crédito'] || r.perfilCredito);
+    return opts.length > 0 ? opts : [{ value: 'N/A', count: 0 }];
+  }, [filtered]);
+
+  const subgruposHist = useMemo(() => makeOptions((r) => r.Subgrupos || r.subgrupo), [filtered]);
   const subgruposOpts = useMemo(() => {
     const smart = SEGMENTO_CONTEXT_MAP[state.segmento]?.subgrupos ?? [];
-    const hist = makeOptions((r) => r.Subgrupos || r.subgrupo);
     const smartSet = new Set(smart);
-    const smartObjs = smart.map((v) => ({ value: v, count: hist.find((h) => h.value === v)?.count ?? 0, isSmart: true }));
-    const rest = hist.filter((h) => !smartSet.has(h.value));
-    return [...smartObjs, ...rest].filter((o) => o.count > 0 || (o as any).isSmart);
-  }, [filtered, state.segmento]);
+    const smartObjs = smart.map((v) => ({ value: v, count: subgruposHist.find((h) => h.value === v)?.count ?? 0, isSmart: true }));
+    const rest = subgruposHist.filter((h) => !smartSet.has(h.value));
+    const combined = [...smartObjs, ...rest].filter((o) => o.count > 0 || (o as any).isSmart);
+    return combined.length > 0 ? combined : [{ value: 'N/A', count: 0 }];
+  }, [filtered, state.segmento, subgruposHist]);
 
-  const perfisOpts = useMemo(() => makeOptions((r) => r['Perfil de Crédito'] || r.perfilCredito), [filtered]);
-  const ofertasOpts = useMemo(() => makeOptions((r) => r.Oferta), [filtered]);
-  const ofertasAll = useMemo(() => makeOptions((r) => r.Oferta), [filtered]);
+  const ofertasOpts = useMemo(() => {
+    const opts = makeOptions((r) => r.Oferta);
+    return opts.length > 0 ? opts : [{ value: 'N/A', count: 0 }];
+  }, [filtered]);
+
+  const ofertasAll = useMemo(() => {
+    const opts = makeOptions((r) => r.Oferta);
+    return opts.length > 0 ? opts : [{ value: 'N/A', count: 0 }];
+  }, [filtered]);
   const promoOpts = useMemo(() => {
     const smart = OFERTA_DETALHE_MAP[state.oferta] ?? [];
     const hist = makeOptions((r) => r.Promocional);
     const smartSet = new Set(smart);
     const smartObjs = smart.map((v) => ({ value: v, count: hist.find((h) => h.value === v)?.count ?? 0, isSmart: true }));
     const rest = hist.filter((h) => !smartSet.has(h.value));
-    return [...smartObjs, ...rest];
+    const combined = [...smartObjs, ...rest];
+    return combined.length > 0 ? combined : [{ value: 'N/A', count: 0 }];
   }, [filtered, state.oferta]);
 
   const promo2Opts = useMemo(() => {
@@ -76,61 +87,14 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
     const smartSet = new Set(smart);
     const smartObjs = smart.map((v) => ({ value: v, count: hist.find((h) => h.value === v)?.count ?? 0, isSmart: true }));
     const rest = hist.filter((h) => !smartSet.has(h.value));
-    return [...smartObjs, ...rest];
+    const combined = [...smartObjs, ...rest];
+    return combined.length > 0 ? combined : [{ value: 'N/A', count: 0 }];
   }, [filtered, state.oferta2]);
 
-  // --- IA Preview ---
-  const projections = useMemo(() => {
-    if (!state.bu || !state.segmento) return null;
-    try {
-      const activityRows = activities
-        .filter((a: any) => a.raw != null)
-        .map((a: any) => ({
-          ...a.raw,
-          'Data de Disparo': a.raw['Data de Disparo'] || '',
-          BU: a.raw.BU || a.bu,
-          Segmento: a.raw.Segmento || a.segmento,
-        } as any));
-      if (activityRows.length === 0) return null;
-
-      const orchestrator = getAIOrchestrator({
-        temporalWindow: 90,
-        similarityWeights: {
-          BU: 0.15, Segmento: 0.15, Canal: 0.12, Jornada: 0.10,
-          Perfil_Credito: 0.10, Oferta: 0.08, Promocional: 0.05,
-          Parceiro: 0.05, Subgrupo: 0.05, Etapa_Aquisicao: 0.05,
-          Produto: 0.05, Temporal: 0.05,
-        },
-        minSampleSize: 3,
-      });
-      orchestrator.initialize(activityRows);
-
-      const result = orchestrator.projectAllFields({
-        bu: state.bu,
-        segmento: state.segmento,
-        oferta: state.oferta || undefined,
-        parceiro: state.parceiro || undefined,
-        perfilCredito: state.perfilCredito || undefined,
-        produto: state.produto || undefined,
-      });
-      return result.projections || null;
-    } catch {
-      return null;
-    }
-  }, [activities, state.bu, state.segmento, state.oferta, state.perfilCredito]);
-
-  const taxaConv = (projections?.['taxaConversao'] as any)?.projectedValue;
-  const cacValue = (projections?.['cac'] as any)?.projectedValue;
-  const cartoesValue = (projections?.['cartoesGerados'] as any)?.projectedValue;
-  const taxaEntrega = (projections?.['taxaEntrega'] as any)?.projectedValue;
-  const propostas = (projections?.['propostas'] as any)?.projectedValue;
-  const sampleSize = (projections?.['taxaConversao'] as any)?.explanation?.sampleSize ?? 0;
-
-  const isIAReady = !!(state.bu && state.segmento);
 
   return (
     <div className="flex gap-4 h-full">
-      {/* Coluna esquerda: formulário */}
+      {/* Formulário */}
       <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-1 min-w-0">
         {/* Ordem inicial */}
         <div>
@@ -225,41 +189,6 @@ export const Step3SharedData: React.FC<Step3SharedDataProps> = ({ state, onChang
 
       </div>
 
-      {/* Coluna direita: painel IA */}
-      <div className="w-52 shrink-0 flex flex-col">
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex flex-col gap-2 h-full">
-          <div className="flex items-center gap-1.5 pb-1.5 border-b border-indigo-200">
-            <TrendingUp size={12} className="text-indigo-600" />
-            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wide">Previsão IA</span>
-            <Sparkles size={9} className="text-indigo-400/60 ml-auto" />
-          </div>
-
-          {!isIAReady ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-[10px] text-indigo-400 text-center leading-snug">
-                Preencha Campanha para ativar previsões
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-1.5 flex-1">
-                <MetricCard label="Tx Conv" value={taxaConv} suffix="%" compact />
-                <MetricCard label="CAC" value={cacValue} prefix="R$" compact />
-                <MetricCard label="Cartões" value={cartoesValue} isInt compact />
-                <MetricCard label="Tx Entrega" value={taxaEntrega} suffix="%" compact />
-                <MetricCard label="Propostas" value={propostas} isInt compact />
-              </div>
-              <div className="text-[9px] text-indigo-500 text-center border-t border-indigo-200 pt-1.5">
-                {sampleSize > 0 ? (
-                  <>Baseado em <span className="font-bold">{sampleSize}</span> disparos similares</>
-                ) : (
-                  'Calculando...'
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
     </div>
   );
 };
