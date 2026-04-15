@@ -172,6 +172,27 @@ export const dataService = {
     },
 
     async fetchB2CMetrics(): Promise<B2CDataRow[]> {
+        const { data: typedData, error: typedError } = await supabase
+            .from('b2c_daily')
+            .select('*')
+            .order('data', { ascending: false });
+
+        if (!typedError && typedData && typedData.length > 0) {
+            return typedData.map((row: any) => ({
+                id: row.id,
+                created_at: row.created_at,
+                data: row.data,
+                propostas_b2c_total: toNonNegativeInt(row.propostas_total),
+                emissoes_b2c_total: toNonNegativeInt(row.emissoes_total),
+                percentual_conversao_b2c: toFiniteNumber(row.percentual_conversao),
+                observacoes: row.observacoes || undefined,
+                tipo: normalizeText(row.tipo || 'total').toLowerCase(),
+                percentual_share: toFiniteNumber(row.percentual_share),
+                pct_conv_canal: toFiniteNumber(row.pct_conv_canal),
+                user_id: row.user_id || undefined
+            }));
+        }
+
         const { data, error } = await supabase
             .from('b2c_daily_metrics')
             .select('*')
@@ -180,11 +201,17 @@ export const dataService = {
         if (error) throw error;
 
         return (data || []).map((row: any) => ({
-            data: row.data, // YYYY-MM-DD
-            propostas_b2c_total: row.propostas_total,
-            emissoes_b2c_total: row.emissoes_total,
-            percentual_conversao_b2c: row.percentual_conversao,
-            observacoes: row.observacoes
+            id: row.id,
+            created_at: row.created_at,
+            data: row.data,
+            propostas_b2c_total: toNonNegativeInt(row.propostas_total),
+            emissoes_b2c_total: toNonNegativeInt(row.emissoes_total),
+            percentual_conversao_b2c: toFiniteNumber(row.percentual_conversao),
+            observacoes: row.observacoes || undefined,
+            tipo: 'total',
+            percentual_share: 0,
+            pct_conv_canal: 0,
+            user_id: row.user_id || undefined
         }));
     },
 

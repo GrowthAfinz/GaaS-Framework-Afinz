@@ -1,10 +1,16 @@
 
 export interface B2CDataRow {
+    id?: string;
+    created_at?: string;
     data: string; // YYYY-MM-DD
     propostas_b2c_total: number;
     emissoes_b2c_total: number;
     percentual_conversao_b2c: number;
     observacoes?: string;
+    tipo?: string;
+    percentual_share?: number;
+    pct_conv_canal?: number;
+    user_id?: string;
 }
 
 export interface DailyAnalysis {

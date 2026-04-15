@@ -1,240 +1,171 @@
 import React, { useState } from 'react';
-import { Target, Save, ChevronLeft, ChevronRight, Calculator } from 'lucide-react';
+import { Calculator, ChevronLeft, ChevronRight, Save, Target } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+
+type GoalFormState = {
+    cartoes_meta: string | number;
+    b2b2c_meta: string | number;
+    plurix_meta: string | number;
+    b2c_meta: string | number;
+};
+
+const inputBase =
+    'w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 font-mono text-slate-900 transition placeholder:text-slate-400 focus:border-blue-500 focus:outline-none';
+
+const goalFields: Array<{
+    key: keyof GoalFormState;
+    label: string;
+    hint: string;
+    accent: string;
+}> = [
+    { key: 'cartoes_meta', label: 'Dia', hint: 'Meta mensal de cartões', accent: 'text-blue-600' },
+    { key: 'b2b2c_meta', label: 'Bem Barato', hint: 'Meta mensal de cartões', accent: 'text-amber-600' },
+    { key: 'plurix_meta', label: 'Plurix', hint: 'Meta mensal de cartões', accent: 'text-violet-600' },
+    { key: 'b2c_meta', label: 'B2C', hint: 'Meta mensal de cartões', accent: 'text-emerald-600' }
+];
 
 export const GoalsManager: React.FC = () => {
     const { goals, setGoals } = useAppStore();
-    // Native start of month
     const [currentDate, setCurrentDate] = useState(() => {
-        const d = new Date();
-        return new Date(d.getFullYear(), d.getMonth(), 1);
+        const now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), 1);
     });
     const [loading, setLoading] = useState(false);
 
-    // Native helpers
     const getMonthKey = (date: Date) => {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         return `${year}-${month}`;
     };
 
-    const addMonth = (date: Date, amount: number) => {
-        return new Date(date.getFullYear(), date.getMonth() + amount, 1);
-    };
-
+    const addMonth = (date: Date, amount: number) => new Date(date.getFullYear(), date.getMonth() + amount, 1);
     const currentMonthKey = getMonthKey(currentDate);
 
-    // Initialize form state
-    // We use string | number to allow empty strings during typing
-    const [formState, setFormState] = useState<{
-        cartoes_meta: string | number;
-        b2c_meta: string | number;
-        plurix_meta: string | number;
-        b2b2c_meta: string | number;
-        cac_max: string | number;
-    }>({
+    const [formState, setFormState] = useState<GoalFormState>({
         cartoes_meta: 0,
-        b2c_meta: 0,
-        plurix_meta: 0,
         b2b2c_meta: 0,
-        cac_max: 0
+        plurix_meta: 0,
+        b2c_meta: 0
     });
 
-    // Update form when month or goals change
     React.useEffect(() => {
-        const goal = goals.find(g => g.mes === currentMonthKey);
+        const goal = goals.find((entry) => entry.mes === currentMonthKey);
         setFormState({
             cartoes_meta: goal?.cartoes_meta || 0,
-            b2c_meta: goal?.b2c_meta || 0,
-            plurix_meta: goal?.plurix_meta || 0,
             b2b2c_meta: goal?.b2b2c_meta || 0,
-            cac_max: goal?.cac_max || 0
+            plurix_meta: goal?.plurix_meta || 0,
+            b2c_meta: goal?.b2c_meta || 0
         });
     }, [currentMonthKey, goals]);
 
     const handleSave = async () => {
         setLoading(true);
         try {
-            const newGoalEntry = {
+            const currentGoal = goals.find((entry) => entry.mes === currentMonthKey);
+            const nextGoal = {
                 mes: currentMonthKey,
                 cartoes_meta: Number(formState.cartoes_meta) || 0,
-                b2c_meta: Number(formState.b2c_meta) || 0,
-                plurix_meta: Number(formState.plurix_meta) || 0,
                 b2b2c_meta: Number(formState.b2b2c_meta) || 0,
-                cac_max: Number(formState.cac_max) || 0
+                plurix_meta: Number(formState.plurix_meta) || 0,
+                b2c_meta: Number(formState.b2c_meta) || 0,
+                aprovacoes_meta: currentGoal?.aprovacoes_meta || 0,
+                cac_max: currentGoal?.cac_max || 0
             };
 
-            // 1. Update Local Store
-            const newGoals = [...goals.filter(g => g.mes !== currentMonthKey)];
-            newGoals.push(newGoalEntry);
-            setGoals(newGoals);
+            const nextGoals = [...goals.filter((goal) => goal.mes !== currentMonthKey), nextGoal];
+            setGoals(nextGoals);
 
-            // 2. Sync to Cloud
             const { dataService } = await import('../../services/dataService');
-            await dataService.upsertGoal(newGoalEntry);
-
-            alert('Meta salva com sucesso!');
-
+            await dataService.upsertGoal(nextGoal);
+            alert('Meta mensal salva com sucesso.');
         } catch (error: any) {
             console.error('Erro ao salvar meta:', error);
-            alert(`Erro ao salvar meta na nuvem: ${error.message || 'Erro desconhecido'}`);
+            alert(`Erro ao salvar meta: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-
-            <div className="flex items-center gap-3 mb-6 relative z-10">
-                <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 shadow-inner">
-                    <Target size={24} />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-slate-900">Gerenciador de Metas <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full ml-2 border border-emerald-200">v1.1 (Live)</span></h3>
-                    <p className="text-sm text-slate-500">Defina os objetivos mensais para os KPIs.</p>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
+                <div className="flex items-center gap-3">
+                    <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
+                        <Target size={22} />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-semibold text-slate-950">Meta central de cartões</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                            Fonte única para metas mensais consumidas pelas demais abas do sistema.
+                        </p>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 relative z-10">
-                {/* Month Navigation */}
-                <div className="flex items-center justify-between mb-6">
+            <div className="p-6">
+                <div className="mb-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <button
+                        type="button"
                         onClick={() => setCurrentDate(addMonth(currentDate, -1))}
-                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+                        className="rounded-lg p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
                     >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={18} />
                     </button>
                     <div className="text-center">
-                        <h4 className="text-lg font-bold text-slate-900 capitalize">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Competência</p>
+                        <h4 className="mt-1 text-lg font-semibold capitalize text-slate-900">
                             {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                         </h4>
                     </div>
                     <button
+                        type="button"
                         onClick={() => setCurrentDate(addMonth(currentDate, 1))}
-                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition-colors"
+                        className="rounded-lg p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
                     >
-                        <ChevronRight size={20} />
+                        <ChevronRight size={18} />
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Meta CRM */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                            Meta CRM (Cartões)
-                            <span className="bg-blue-50 text-blue-600 text-[9px] px-1.5 py-0.5 rounded border border-blue-200">CRM</span>
-                        </label>
-                        <div className="relative group">
-                            <Calculator size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                            <input
-                                type="number"
-                                value={formState.cartoes_meta}
-                                onChange={e => setFormState({ ...formState, cartoes_meta: e.target.value })}
-                                className="w-full bg-white border border-slate-300 rounded-lg py-2 pl-9 pr-4 text-slate-900 font-mono focus:outline-none focus:border-blue-500 transition-all placeholder-slate-400"
-                                placeholder="0"
-                            />
+                <div className="grid gap-4 md:grid-cols-2">
+                    {goalFields.map((field) => (
+                        <div key={field.key} className="rounded-2xl border border-slate-200 bg-white p-5">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                {field.label}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">{field.hint}</p>
+                            <div className="relative mt-4">
+                                <Calculator size={16} className={`absolute left-3 top-1/2 -translate-y-1/2 ${field.accent}`} />
+                                <input
+                                    type="number"
+                                    value={formState[field.key]}
+                                    onChange={(event) =>
+                                        setFormState((previous) => ({
+                                            ...previous,
+                                            [field.key]: event.target.value
+                                        }))
+                                    }
+                                    className={inputBase}
+                                    placeholder="0"
+                                />
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Meta B2C Total */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                            Meta B2C Total
-                            <span className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 py-0.5 rounded border border-emerald-200">Geral</span>
-                        </label>
-                        <div className="relative group">
-                            <Calculator size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                            <input
-                                type="number"
-                                value={formState.b2c_meta}
-                                onChange={e => setFormState({ ...formState, b2c_meta: e.target.value })}
-                                className="w-full bg-white border border-slate-300 rounded-lg py-2 pl-9 pr-4 text-slate-900 font-mono focus:outline-none focus:border-emerald-500 transition-all placeholder-slate-400"
-                                placeholder="0"
-                            />
-                        </div>
-                    </div>
-
-                    {/* CAC Max */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase">CAC Máximo (R$)</label>
-                        <div className="relative group">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-600 transition-colors text-xs font-bold">R$</span>
-                            <input
-                                type="number"
-                                value={formState.cac_max}
-                                onChange={e => setFormState({ ...formState, cac_max: e.target.value })}
-                                className="w-full bg-white border border-slate-300 rounded-lg py-2 pl-9 pr-4 text-slate-900 font-mono focus:outline-none focus:border-amber-500 transition-all placeholder-slate-400"
-                                placeholder="0.00"
-                                step="0.01"
-                            />
-                        </div>
-                    </div>
+                    ))}
                 </div>
 
-                {/* Meta Plurix */}
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                        Meta Plurix
-                        <span className="bg-purple-50 text-purple-600 text-[9px] px-1.5 py-0.5 rounded border border-purple-200">BU</span>
-                    </label>
-                    <div className="relative group">
-                        <Calculator size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-purple-600 transition-colors" />
-                        <input
-                            type="number"
-                            value={formState.plurix_meta}
-                            onChange={e => setFormState({ ...formState, plurix_meta: e.target.value })}
-                            className="w-full bg-white border border-slate-300 rounded-lg py-2 pl-9 pr-4 text-slate-900 font-mono focus:outline-none focus:border-purple-500 transition-all placeholder-slate-400"
-                            placeholder="0"
-                        />
-                    </div>
+                <div className="mt-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm text-slate-500">
+                        A aba de Originação B2C usa a meta de <strong className="text-slate-700">B2C</strong> como referência mensal.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={loading}
+                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <Save size={16} />
+                        {loading ? 'Salvando...' : 'Salvar metas'}
+                    </button>
                 </div>
-
-                {/* Meta B2B2C */}
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                        Meta B2B2C
-                        <span className="bg-emerald-50 text-emerald-600 text-[9px] px-1.5 py-0.5 rounded border border-emerald-200">BU</span>
-                    </label>
-                    <div className="relative group">
-                        <Calculator size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                        <input
-                            type="number"
-                            value={formState.b2b2c_meta}
-                            onChange={e => setFormState({ ...formState, b2b2c_meta: e.target.value })}
-                            className="w-full bg-white border border-slate-300 rounded-lg py-2 pl-9 pr-4 text-slate-900 font-mono focus:outline-none focus:border-emerald-500 transition-all placeholder-slate-400"
-                            placeholder="0"
-                        />
-                    </div>
-                </div>
-
-                {/* CAC Max */}
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">CAC Máximo (R$)</label>
-                    <div className="relative group">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-600 transition-colors text-xs font-bold">R$</span>
-                        <input
-                            type="number"
-                            value={formState.cac_max}
-                            onChange={e => setFormState({ ...formState, cac_max: e.target.value })}
-                            className="w-full bg-white border border-slate-300 rounded-lg py-2 pl-9 pr-4 text-slate-900 font-mono focus:outline-none focus:border-amber-500 transition-all placeholder-slate-400"
-                            placeholder="0.00"
-                            step="0.01"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-                <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Save size={16} />
-                    {loading ? 'Salvando...' : 'Salvar Metas'}
-                </button>
             </div>
         </div>
     );
