@@ -10,6 +10,7 @@ import { OverviewTab } from './components/Tabs/OverviewTab';
 import { MonthlyAnalysisTab } from './components/Tabs/MonthlyAnalysisTab';
 import { CampaignDetailsTab } from './components/Tabs/CampaignDetailsTab';
 import { BudgetTab } from './components/Tabs/BudgetTab';
+import { BudgetTabV2 } from './components/Tabs/BudgetTabV2';
 import { DailyAnalysisTab } from './components/Tabs/DailyAnalysisTab';
 import { AdsTab } from './components/Tabs/AdsTab';
 import { CampaignMapperModal } from './components/Modals/CampaignMapperModal';
@@ -189,7 +190,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
           {activeTab === 'daily' && <DailyAnalysisTab />}
           {activeTab === 'campaigns' && <CampaignDetailsTab />}
           {activeTab === 'ads' && <AdsTab />}
-          {activeTab === 'budget' && <BudgetTab />}
+          {activeTab === 'budget' && <BudgetTabV2 />}
         </div>
       </main>
 

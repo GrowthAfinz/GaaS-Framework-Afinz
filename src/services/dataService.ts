@@ -713,5 +713,53 @@ export const dataService = {
         );
         if (!resp.ok) throw new Error(`Edge function error: ${resp.status}`);
         return resp.json();
+    },
+
+    // ─── Campaign Budget Management ───────────────────────────────────────
+
+    async fetchCampaignBudgets(): Promise<any[]> {
+        const { data, error } = await supabase.from('campaign_budgets').select('*');
+        if (error) throw error;
+        return data || [];
+    },
+
+    async fetchCampaignBudgetsByObjective(objectiveBudgetId: string): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('campaign_budgets')
+            .select('*')
+            .eq('objective_budget_id', objectiveBudgetId);
+        if (error) throw error;
+        return data || [];
+    },
+
+    async fetchCampaignBudgetsByMonth(month: string): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('campaign_budgets')
+            .select('*')
+            .eq('month', month);
+        if (error) throw error;
+        return data || [];
+    },
+
+    async upsertCampaignBudget(budget: any) {
+        // Upsert campaign budget using id as the conflict column
+        const { error } = await supabase.from('campaign_budgets').upsert(budget, { onConflict: 'id' });
+        if (error) throw error;
+    },
+
+    async deleteCampaignBudget(id: string) {
+        const { error } = await supabase.from('campaign_budgets').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async updateCampaignBudgetAllocations(updates: Array<{ id: string; allocated_budget: number }>) {
+        // Batch update allocated budgets for multiple campaigns
+        for (const update of updates) {
+            const { error } = await supabase
+                .from('campaign_budgets')
+                .update({ allocated_budget: update.allocated_budget })
+                .eq('id', update.id);
+            if (error) throw error;
+        }
     }
 };
