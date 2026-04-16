@@ -420,7 +420,20 @@ const handleB2C = (csvText: string) => {
                     propostas_b2c_total: safeParseFloat(row.Propostas_B2C_Total || row.propostas_b2c_total),
                     emissoes_b2c_total: safeParseFloat(row.Emissoes_B2C_Total || row.emissoes_b2c_total),
                     percentual_conversao_b2c: safeParseFloat(row['%_Conversao_B2C'] || row.percentual_conversao_b2c || row['%_conversao_b2c']),
-                    observacoes: row.Observacoes || row.observacoes
+                    observacoes: row.Observacoes || row.observacoes,
+                    tipo: String(row.Tipo || row.tipo || row.TIPO || 'total').trim().toLowerCase(),
+                    percentual_share: safeParseFloat(
+                        row.Percentual_Share ||
+                        row.percentual_share ||
+                        row['%_Share'] ||
+                        row['% Share']
+                    ),
+                    pct_conv_canal: safeParseFloat(
+                        row.Pct_Conv_Canal ||
+                        row.pct_conv_canal ||
+                        row['%_Conv_Canal'] ||
+                        row['% Conv Canal']
+                    )
                 });
             });
 

@@ -33,6 +33,27 @@ const normalizeText = (value: unknown): string => {
     return value.trim();
 };
 
+const mapB2CMetricRow = (row: any): B2CDataRow => ({
+    id: row.id,
+    created_at: row.created_at,
+    data: row.data,
+    propostas_b2c_total: toNonNegativeInt(row.propostas_total),
+    emissoes_b2c_total: toNonNegativeInt(row.emissoes_total),
+    percentual_conversao_b2c: toFiniteNumber(row.percentual_conversao),
+    observacoes: row.observacoes || undefined,
+    tipo: normalizeText(row.tipo || 'total').toLowerCase(),
+    percentual_share: toFiniteNumber(row.percentual_share),
+    pct_conv_canal: toFiniteNumber(row.pct_conv_canal),
+    user_id: row.user_id || undefined
+});
+
+const scoreB2CDataset = (rows: B2CDataRow[]) =>
+    rows.reduce((score, row) => {
+        const hasBreakdown = Boolean(row.tipo && row.tipo !== 'total');
+        const hasChannelMetrics = (row.percentual_share || 0) > 0 || (row.pct_conv_canal || 0) > 0;
+        return score + (hasBreakdown ? 5 : 0) + (hasChannelMetrics ? 2 : 0);
+    }, 0);
+
 const normalizeBU = (value: unknown): string => {
     const raw = normalizeText(value);
     const normalized = raw.toUpperCase().replace(/\s+/g, '');
@@ -177,22 +198,6 @@ export const dataService = {
             .select('*')
             .order('data', { ascending: false });
 
-        if (!typedError && typedData && typedData.length > 0) {
-            return typedData.map((row: any) => ({
-                id: row.id,
-                created_at: row.created_at,
-                data: row.data,
-                propostas_b2c_total: toNonNegativeInt(row.propostas_total),
-                emissoes_b2c_total: toNonNegativeInt(row.emissoes_total),
-                percentual_conversao_b2c: toFiniteNumber(row.percentual_conversao),
-                observacoes: row.observacoes || undefined,
-                tipo: normalizeText(row.tipo || 'total').toLowerCase(),
-                percentual_share: toFiniteNumber(row.percentual_share),
-                pct_conv_canal: toFiniteNumber(row.pct_conv_canal),
-                user_id: row.user_id || undefined
-            }));
-        }
-
         const { data, error } = await supabase
             .from('b2c_daily_metrics')
             .select('*')
@@ -200,19 +205,15 @@ export const dataService = {
 
         if (error) throw error;
 
-        return (data || []).map((row: any) => ({
-            id: row.id,
-            created_at: row.created_at,
-            data: row.data,
-            propostas_b2c_total: toNonNegativeInt(row.propostas_total),
-            emissoes_b2c_total: toNonNegativeInt(row.emissoes_total),
-            percentual_conversao_b2c: toFiniteNumber(row.percentual_conversao),
-            observacoes: row.observacoes || undefined,
-            tipo: 'total',
-            percentual_share: 0,
-            pct_conv_canal: 0,
-            user_id: row.user_id || undefined
-        }));
+        const typedRows = !typedError && typedData ? typedData.map(mapB2CMetricRow) : [];
+        const legacyRows = (data || []).map(mapB2CMetricRow);
+
+        if (typedRows.length === 0) return legacyRows;
+        if (legacyRows.length === 0) return typedRows;
+
+        return scoreB2CDataset(legacyRows) > scoreB2CDataset(typedRows)
+            ? legacyRows
+            : typedRows;
     },
 
     async fetchPaidMedia(): Promise<DailyAdMetrics[]> {
@@ -547,6 +548,49 @@ export const dataService = {
     },
 
     async upsertB2CMetrics(metrics: B2CDataRow[]) {
+        const sqlBatchV4 = metrics.map(m => ({
+            data: m.data,
+            propostas_total: toNonNegativeInt(m.propostas_b2c_total),
+            emissoes_total: toNonNegativeInt(m.emissoes_b2c_total),
+            percentual_conversao: toFiniteNumber(m.percentual_conversao_b2c),
+            observacoes: m.observacoes || null,
+            tipo: normalizeText(m.tipo || 'total').toLowerCase(),
+            percentual_share: toFiniteNumber(m.percentual_share),
+            pct_conv_canal: toFiniteNumber(m.pct_conv_canal)
+        }));
+
+        const syncErrorsV4: string[] = [];
+
+        for (const tableName of ['b2c_daily', 'b2c_daily_metrics']) {
+            const { error: deleteError } = await supabase
+                .from(tableName)
+                .delete()
+                .gte('data', '2000-01-01');
+
+            if (deleteError) {
+                syncErrorsV4.push(`${tableName}: ${deleteError.message}`);
+                continue;
+            }
+
+            if (sqlBatchV4.length === 0) continue;
+
+            const { error: insertError } = await supabase
+                .from(tableName)
+                .insert(sqlBatchV4);
+
+            if (insertError) {
+                syncErrorsV4.push(`${tableName}: ${insertError.message}`);
+            }
+        }
+
+        if (syncErrorsV4.length === 2) {
+            console.error('❌ B2C Sync Error:', syncErrorsV4);
+            console.error('B2C payload preview:', previewRows(sqlBatchV4));
+            throw new Error(`ENGINEERING_FIX_V4: ${syncErrorsV4.join(' | ')}`);
+        }
+
+        return;
+
         // ROBUST SYNC: Delete then Insert (same pattern as Framework)
         // This avoids dependence on UNIQUE constraints that might be missing
         const { error: deleteError } = await supabase
