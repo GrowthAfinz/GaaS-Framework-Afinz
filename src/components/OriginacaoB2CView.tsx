@@ -528,6 +528,7 @@ export const OriginacaoB2CView: React.FC = () => {
 
                 <OriginacaoCharts
                     data={dailyAnalysis}
+                    dashboardRows={dashboardRows}
                     shareThreshold={alertConfig.share_crm_limiar}
                     viewMode={viewMode}
                     setViewMode={setViewMode}

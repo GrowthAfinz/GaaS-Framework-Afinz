@@ -78,6 +78,17 @@ const emptyAggregate = (): AggregatedB2C => ({
     channelConversion: 0
 });
 
+const normalizeB2CType = (value?: string) =>
+    String(value || 'total')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+const isSerasaType = (value?: string) => normalizeB2CType(value).includes('serasa');
+
 const groupActivitiesByDate = (activities: Activity[]): CalendarData => {
     const grouped: CalendarData = {};
     activities.forEach((activity) => {
@@ -112,8 +123,7 @@ const createDailyRows = (
 
     b2cRows.forEach((row) => {
         const dateKey = formatDateKey(row.data);
-        const normalizedType = String(row.tipo || 'total').toLowerCase();
-        const bucket = normalizedType === 'serasa_api' ? serasaByDate : totalByDate;
+        const bucket = isSerasaType(row.tipo) ? serasaByDate : totalByDate;
         const current = bucket.get(dateKey) || emptyAggregate();
 
         current.proposals += Number(row.propostas_b2c_total) || 0;

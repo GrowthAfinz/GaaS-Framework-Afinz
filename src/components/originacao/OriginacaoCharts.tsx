@@ -5,13 +5,15 @@ import {
     LineChart, Line
 } from 'recharts';
 import { DailyAnalysis } from '../../types/b2c';
-import { format } from 'date-fns';
+import { OriginacaoDashboardRow } from '../../hooks/useOriginacaoDashboard';
+import { format, startOfMonth, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { ViewMode } from '../../hooks/useB2CAnalysis';
 
 interface OriginacaoChartsProps {
     data: DailyAnalysis[];
+    dashboardRows: OriginacaoDashboardRow[];
     shareThreshold?: number;
     viewMode: ViewMode;
     setViewMode: (mode: ViewMode) => void;
@@ -28,7 +30,14 @@ const tooltipFormatter = (value: number, name: string) => {
     return [value, name];
 };
 
-export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({ data, shareThreshold = 15, viewMode, setViewMode, onPointClick }) => {
+export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({
+    data,
+    dashboardRows,
+    shareThreshold = 15,
+    viewMode,
+    setViewMode,
+    onPointClick
+}) => {
 
     const handleChartClick = (data: any) => {
         if (data && data.activePayload && data.activePayload.length > 0 && onPointClick) {
@@ -43,6 +52,21 @@ export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({ data, shareT
     const fmt = (val: number, isPercent = false) => {
         if (isPercent) return `${val.toFixed(1)}%`;
         return val.toLocaleString('pt-BR');
+    };
+
+    const getGroupKey = (dateKey: string) => {
+        const [y, m, d] = dateKey.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+
+        if (viewMode === 'weekly') {
+            return format(startOfWeek(dateObj, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        }
+
+        if (viewMode === 'monthly') {
+            return format(startOfMonth(dateObj), 'yyyy-MM-dd');
+        }
+
+        return dateKey;
     };
 
     // Prepare data for charts with derived fields
@@ -65,6 +89,53 @@ export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({ data, shareT
             };
         });
     }, [data]);
+
+    const volumeChartData = useMemo(() => {
+        const grouped = new Map<string, {
+            data: string;
+            crm_propostas: number;
+            serasa_propostas: number;
+            outros_propostas: number;
+            crm_emissoes: number;
+            serasa_emissoes: number;
+            outros_emissoes: number;
+        }>();
+
+        dashboardRows.forEach((row) => {
+            const key = getGroupKey(row.date);
+            const current = grouped.get(key) || {
+                data: key,
+                crm_propostas: 0,
+                serasa_propostas: 0,
+                outros_propostas: 0,
+                crm_emissoes: 0,
+                serasa_emissoes: 0,
+                outros_emissoes: 0
+            };
+
+            const otherProposals = Math.max(0, row.totalProposals - row.crmProposals - row.serasaProposals);
+            const otherCards = Math.max(0, row.totalCards - row.crmCards - row.serasaCards);
+
+            current.crm_propostas += row.crmProposals;
+            current.serasa_propostas += row.serasaProposals;
+            current.outros_propostas += otherProposals;
+            current.crm_emissoes += row.crmCards;
+            current.serasa_emissoes += row.serasaCards;
+            current.outros_emissoes += otherCards;
+
+            grouped.set(key, current);
+        });
+
+        return Array.from(grouped.values())
+            .sort((a, b) => a.data.localeCompare(b.data))
+            .map((row) => {
+                const [y, m, day] = row.data.split('-').map(Number);
+                return {
+                    ...row,
+                    displayDate: format(new Date(y, m - 1, day), 'dd/MM', { locale: ptBR })
+                };
+            });
+    }, [dashboardRows, viewMode]);
 
     // Aggregate data by Day of Week for the Share Chart
     const shareByDay = useMemo(() => {
@@ -122,7 +193,7 @@ export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({ data, shareT
                     <h3 className="text-sm font-bold text-slate-700 mb-4">Volume de Propostas: CRM vs B2C Total</h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} onClick={handleChartClick}>
+                            <BarChart data={volumeChartData} onClick={handleChartClick}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                                 <XAxis dataKey="displayDate" stroke="#64748b" tick={{ fontSize: 10 }} />
                                 <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
@@ -132,7 +203,8 @@ export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({ data, shareT
                                     formatter={tooltipFormatter}
                                 />
                                 <Legend />
-                                <Bar dataKey="propostas_crm" name="CRM" stackId="a" fill="#3b82f6" />
+                                <Bar dataKey="crm_propostas" name="CRM" stackId="a" fill="#14b8a6" />
+                                <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#2563eb" />
                                 <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#64748b" opacity={0.5} />
                             </BarChart>
                         </ResponsiveContainer>
@@ -202,7 +274,7 @@ export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({ data, shareT
                     <h3 className="text-sm font-bold text-slate-700 mb-4">Volume de Emissões: CRM vs B2C</h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} onClick={handleChartClick}>
+                            <BarChart data={volumeChartData} onClick={handleChartClick}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                                 <XAxis dataKey="displayDate" stroke="#64748b" tick={{ fontSize: 10 }} />
                                 <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
@@ -212,7 +284,8 @@ export const OriginacaoCharts: React.FC<OriginacaoChartsProps> = ({ data, shareT
                                     formatter={tooltipFormatter}
                                 />
                                 <Legend />
-                                <Bar dataKey="emissoes_crm" name="CRM" stackId="a" fill="#3b82f6" />
+                                <Bar dataKey="crm_emissoes" name="CRM" stackId="a" fill="#14b8a6" />
+                                <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#2563eb" />
                                 <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#64748b" opacity={0.5} />
                             </BarChart>
                         </ResponsiveContainer>
