@@ -634,8 +634,8 @@ export const BudgetTabV2: React.FC = () => {
   return (
     <div className="animate-fade-in space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-[260px]">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[240px] shrink-0">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <h2 className="text-xl font-bold text-slate-800">Orçamento</h2>
               <span className="text-sm font-medium text-slate-400">· {monthLabel} · Dia {daysPassed}/{daysInMonth}</span>
@@ -643,8 +643,7 @@ export const BudgetTabV2: React.FC = () => {
             <p className="mt-0.5 text-xs text-slate-500">Pacing, risco e eficiência por objetivo e campanha.</p>
           </div>
           <MonthStrip daysPassed={daysPassed} daysInMonth={daysInMonth} totalPlanned={totals.planned} />
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
+          <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           <button
             onClick={() => setCompareMode((current) => !current)}
             className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
@@ -682,6 +681,7 @@ export const BudgetTabV2: React.FC = () => {
             <Plus size={13} />
             Novo objetivo
           </button>
+          </div>
         </div>
       </div>
 
