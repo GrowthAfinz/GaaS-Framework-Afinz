@@ -39,6 +39,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     const [compareEnabled, setCompareEnabled] = useState(initialCompareEnabled);
 
     const [viewDate, setViewDate] = useState<Date>(endOfMonth(new Date()));
+    const today = React.useMemo(() => new Date(), []);
 
     const presets = [
         { label: 'Esta semana', getValue: () => [subDays(new Date(), new Date().getDay()), new Date()] as [Date, Date] },
@@ -142,6 +143,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                         });
 
                         const isPrevRange = prevStart && prevEnd && isWithinInterval(day, { start: prevStart, end: prevEnd });
+                        const isToday = isSameDay(day, today);
+                        const isSelected = isSelectedStart || isSelectedEnd;
 
                         return (
                             <button
@@ -157,10 +160,20 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                                     ${(isInRange || isHovered) && !isSelectedStart && !isSelectedEnd ? 'bg-cyan-100' : ''}
                                     ${isPrevRange && !isInRange && !isSelectedStart && !isSelectedEnd ? 'bg-orange-100 text-orange-700' : ''}
                                     ${isSelectedStart && isSelectedEnd ? 'rounded-full' : ''}
+                                    ${isToday && !isSelected ? 'font-bold' : ''}
                                     hover:bg-cyan-200 hover:text-slate-900 transition-colors
                                 `}
                             >
-                                {format(day, 'd')}
+                                <span className="relative inline-flex flex-col items-center leading-none">
+                                    {format(day, 'd')}
+                                    {isToday && (
+                                        <span
+                                            className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full ${
+                                                isSelected ? 'bg-white' : 'bg-cyan-500'
+                                            }`}
+                                        />
+                                    )}
+                                </span>
                             </button>
                         );
                     })}

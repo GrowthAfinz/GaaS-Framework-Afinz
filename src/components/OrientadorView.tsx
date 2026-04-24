@@ -106,13 +106,63 @@ export const OrientadorView: React.FC = () => {
                         <span className="text-xs text-slate-500 px-2 flex items-center gap-1">
                             <ArrowUpDown size={12} /> Ordenar:
                         </span>
-                        {[
-                            { id: 'score', label: 'Score' },
-                            { id: 'cac', label: 'Menor CAC' },
-                            { id: 'conversion', label: 'Maior Conv.' },
-                            { id: 'volume', label: 'Volume' },
-                            { id: 'recency', label: 'Recente' }
-                        ].map(opt => (
+                        {([
+                            {
+                                id: 'score',
+                                label: 'Score',
+                                tooltip: (
+                                    <div className="w-48">
+                                        <p className="text-[10px] font-bold mb-2 border-b border-slate-600 pb-1">Cálculo do Score</p>
+                                        <div className="space-y-1 text-[10px]">
+                                            <div className="flex justify-between"><span>💰 CAC</span><span>40%</span></div>
+                                            <div className="flex justify-between"><span>📈 Conversão</span><span>40%</span></div>
+                                            <div className="flex justify-between"><span>📊 Volume</span><span>20%</span></div>
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 mt-2 italic">Score 100 = melhor combinação do período (normalizado)</p>
+                                    </div>
+                                )
+                            },
+                            {
+                                id: 'cac',
+                                label: 'Menor CAC',
+                                tooltip: (
+                                    <div className="w-52">
+                                        <p className="text-[10px] font-bold mb-1">Ordenar por Menor CAC</p>
+                                        <p className="text-[10px] text-slate-400">Prioriza campanhas com menor custo por cartão emitido. Campanhas sem dados de CAC aparecem por último.</p>
+                                    </div>
+                                )
+                            },
+                            {
+                                id: 'conversion',
+                                label: 'Maior Conv.',
+                                tooltip: (
+                                    <div className="w-52">
+                                        <p className="text-[10px] font-bold mb-1">Ordenar por Maior Conversão</p>
+                                        <p className="text-[10px] text-slate-400">Ordena pelo maior % médio de conversão (cartões / propostas). Mais disparos no período = maior confiabilidade do número.</p>
+                                    </div>
+                                )
+                            },
+                            {
+                                id: 'volume',
+                                label: 'Volume',
+                                tooltip: (
+                                    <div className="w-52">
+                                        <p className="text-[10px] font-bold mb-1">Ordenar por Volume</p>
+                                        <p className="text-[10px] text-slate-400">Prioriza as campanhas com maior base enviada no período. Útil para focar nos canais e segmentos de maior escala.</p>
+                                    </div>
+                                )
+                            },
+                            {
+                                id: 'recency',
+                                label: 'Recente',
+                                tooltip: (
+                                    <div className="w-52">
+                                        <p className="text-[10px] font-bold mb-1">Ordenar por Mais Recente</p>
+                                        <p className="text-[10px] text-slate-400">Traz primeiro as campanhas disparadas mais recentemente. Ideal para retomar jornadas ativas com histórico fresco.</p>
+                                    </div>
+                                )
+                            }
+                        ] as const).map(opt => (
                             <button
                                 key={opt.id}
                                 onClick={() => setSortBy(opt.id as SortOption)}
@@ -122,34 +172,9 @@ export const OrientadorView: React.FC = () => {
                                     }`}
                             >
                                 {opt.label}
-                                {opt.id === 'score' && (
-                                    <Tooltip
-                                        content={
-                                            <div className="w-48">
-                                                <p className="text-[10px] font-bold text-slate-600 mb-2 border-b border-slate-200 pb-1">Cálculo do Score</p>
-                                                <div className="space-y-1 text-[10px] text-slate-500">
-                                                    <div className="flex justify-between">
-                                                        <span>💰 CAC</span>
-                                                        <span className="text-slate-700">40%</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>📈 Conversão</span>
-                                                        <span className="text-slate-700">40%</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>📊 Volume</span>
-                                                        <span className="text-slate-700">20%</span>
-                                                    </div>
-                                                </div>
-                                                <p className="text-[9px] text-slate-500 mt-2 italic">
-                                                    Score 100 = melhor combinação do período (Normalizado)
-                                                </p>
-                                            </div>
-                                        }
-                                    >
-                                        <Info size={12} className={sortBy === 'score' ? 'text-blue-200' : 'text-slate-500'} />
-                                    </Tooltip>
-                                )}
+                                <Tooltip content={opt.tooltip} side="bottom">
+                                    <Info size={12} className={sortBy === opt.id ? 'text-blue-200' : 'text-slate-400 hover:text-slate-600'} />
+                                </Tooltip>
                             </button>
                         ))}
                     </div>

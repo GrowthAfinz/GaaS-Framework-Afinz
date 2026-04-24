@@ -3,7 +3,6 @@ import { Activity, Goal } from '../../types/framework';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, CartesianGrid } from 'recharts';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
-import { useAppStore } from '../../store/useAppStore';
 import { Info } from 'lucide-react';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 
@@ -20,10 +19,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const { dailyAnalysis } = useB2CAnalysis();
     const { isBUSelected, selectedBUs } = useBU();
-    const { viewSettings } = useAppStore();
-    const perspective = viewSettings.perspective;
     const isOnlySeguros = selectedBUs.length === 1 && selectedBUs[0] === 'Seguros';
-    const comparableActivities = useMemo(() => activities.filter((activity) => activity.bu !== 'Seguros'), [activities]);
     const segurosActivities = useMemo(() => activities.filter((activity) => activity.bu === 'Seguros'), [activities]);
 
     const showCharts = !isOnlySeguros && selectedBUs.includes('B2C') && !isBUSelected('B2B2C') && !isBUSelected('Plurix');
@@ -56,44 +52,69 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     }, [selectedDate, activities]);
 
     const metrics = useMemo(() => {
-        let totalCards = 0;
-        let goalCards = 0;
-        let label = 'Meta';
         const currentGoal = goals.find(g => g.mes === currentMonth);
 
+        const isOnlyBU = (bu: string) => selectedBUs.length === 1 && selectedBUs[0] === bu;
+        // selectedBUs vazio = todas as BUs ativas
+        const hasBU = (bu: string) => selectedBUs.length === 0 || selectedBUs.includes(bu);
+        // BUs não-Seguros ativas
+        const activeCoreB2Us = ['B2C', 'B2B2C', 'Plurix'].filter(bu => hasBU(bu));
+
+        // ── Seguros isolado ──────────────────────────────────────────────────
         if (isOnlySeguros) {
-            totalCards = segurosActivities.reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-            goalCards = currentGoal?.bus?.Seguros?.cartoes || 0;
-            label = 'Meta (Seguros)';
-        } else if (perspective === 'b2c' || (perspective === 'total' && !isBUSelected('Plurix') && !isBUSelected('B2B2C'))) {
-            totalCards = dailyAnalysis.reduce((sum, d) => sum + d.emissoes_b2c_total, 0);
-            goalCards = currentGoal?.b2c_meta || 0;
-            label = 'Meta (Total B2C)';
-        } else {
-            if (isBUSelected('Plurix')) {
-                totalCards = comparableActivities.reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-                goalCards = currentGoal?.plurix_meta || 0;
-                label = 'Meta (Plurix)';
-            } else if (isBUSelected('B2B2C')) {
-                totalCards = comparableActivities.reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-                goalCards = currentGoal?.b2b2c_meta || 0;
-                label = 'Meta (B2B2C)';
-            } else {
-                totalCards = comparableActivities.reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-                goalCards = currentGoal?.cartoes_meta || 0;
-                label = 'Meta (CRM)';
-            }
+            const totalCards = segurosActivities.reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
+            const goalCards  = currentGoal?.bus?.Seguros?.cartoes || 0;
+            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (Seguros)' };
         }
 
-        const goalProgress = goalCards > 0 ? (totalCards / goalCards) * 100 : 0;
+        // ── B2C sozinho ou nenhuma BU especial filtrada (estado padrão) ─────
+        if (isOnlyBU('B2C') || activeCoreB2Us.every(bu => bu === 'B2C')) {
+            const totalCards = dailyAnalysis.reduce((sum, d) => sum + d.emissoes_b2c_total, 0);
+            const goalCards  = currentGoal?.b2c_meta || 0;
+            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (B2C)' };
+        }
 
-        return {
-            totalCards,
-            goalCards,
-            goalProgress,
-            label
-        };
-    }, [goals, currentMonth, dailyAnalysis, isBUSelected, perspective, isOnlySeguros, comparableActivities, segurosActivities]);
+        // ── B2B2C isolado ────────────────────────────────────────────────────
+        if (isOnlyBU('B2B2C')) {
+            const totalCards = activities.filter(a => a.bu === 'B2B2C').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
+            const goalCards  = currentGoal?.b2b2c_meta || 0;
+            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (B2B2C)' };
+        }
+
+        // ── Plurix isolado ───────────────────────────────────────────────────
+        if (isOnlyBU('Plurix')) {
+            const totalCards = activities.filter(a => a.bu === 'Plurix').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
+            const goalCards  = currentGoal?.plurix_meta || 0;
+            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (Plurix)' };
+        }
+
+        // ── Múltiplas BUs — soma proporcional ────────────────────────────────
+        let totalCards = 0;
+        let goalCards  = 0;
+        const labelParts: string[] = [];
+
+        if (hasBU('B2C')) {
+            totalCards += dailyAnalysis.reduce((sum, d) => sum + d.emissoes_b2c_total, 0);
+            const g = currentGoal?.b2c_meta || 0;
+            goalCards += g;
+            if (g > 0) labelParts.push('B2C');
+        }
+        if (hasBU('B2B2C')) {
+            totalCards += activities.filter(a => a.bu === 'B2B2C').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
+            const g = currentGoal?.b2b2c_meta || 0;
+            goalCards += g;
+            if (g > 0) labelParts.push('B2B2C');
+        }
+        if (hasBU('Plurix')) {
+            totalCards += activities.filter(a => a.bu === 'Plurix').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
+            const g = currentGoal?.plurix_meta || 0;
+            goalCards += g;
+            if (g > 0) labelParts.push('Plurix');
+        }
+
+        const label = labelParts.length > 0 ? `Meta (${labelParts.join(' + ')})` : 'Meta combinada';
+        return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label };
+    }, [goals, currentMonth, dailyAnalysis, selectedBUs, activities, isOnlySeguros, segurosActivities]);
 
     const metaChartData = [
         { name: 'Realizado', value: metrics.totalCards, color: '#3B82F6' },

@@ -2,7 +2,7 @@
   "name": "calendar-estrategico",
   "version": "1.0.0",
   "description": "Dashboard calendário estratégico de disparos Salesforce",
-  "homepage": "https://PablooPrado.github.io/GaaS-Framework-Afinz",
+  "homepage": "https://growthafinz.github.io/GaaS-Framework-Afinz",
   "type": "module",
   "scripts": {
     "dev": "vite",

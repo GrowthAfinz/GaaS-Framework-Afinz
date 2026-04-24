@@ -308,10 +308,32 @@ export const useOriginacaoDashboard = () => {
 
     const getActivitiesForDate = (dateKey: string) => filteredCrmAnalysis[dateKey] || [];
 
+    // Breakdown do CRM por segmento — top 8, ordenado por cartões desc
+    const crmSegmentBreakdown = useMemo(() => {
+        const segMap = new Map<string, number>();
+        Object.values(filteredCrmGoalMonth)
+            .flat()
+            .forEach((activity) => {
+                const seg = activity.segmento || 'Sem segmento';
+                const cards = activity.kpis.cartoes || activity.kpis.emissoes || 0;
+                segMap.set(seg, (segMap.get(seg) || 0) + cards);
+            });
+        const totalCrm = Array.from(segMap.values()).reduce((a, b) => a + b, 0);
+        return Array.from(segMap.entries())
+            .map(([segment, cards]) => ({
+                segment,
+                cards,
+                share: totalCrm > 0 ? (cards / totalCrm) * 100 : 0
+            }))
+            .sort((a, b) => b.cards - a.cards)
+            .slice(0, 8);
+    }, [filteredCrmGoalMonth]);
+
     return {
         analysisRows,
         summary,
         currentGoal,
-        getActivitiesForDate
+        getActivitiesForDate,
+        crmSegmentBreakdown
     };
 };

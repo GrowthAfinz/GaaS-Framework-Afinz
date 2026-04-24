@@ -37,6 +37,12 @@ export interface IntelligenceOpportunity {
   description: string;
 }
 
+export interface CrmSegmentBreakdownItem {
+  segment: string;
+  cards: number;
+  share: number;
+}
+
 export interface B2CIntelligenceResult {
   dashboardSummary: OriginacaoDashboardSummary;
   dashboardRows: OriginacaoDashboardRow[];
@@ -50,4 +56,5 @@ export interface B2CIntelligenceResult {
   reconciliation: ReconciliationSummary;
   headline: string;
   opportunities: IntelligenceOpportunity[];
+  crmSegmentBreakdown: CrmSegmentBreakdownItem[];
 }

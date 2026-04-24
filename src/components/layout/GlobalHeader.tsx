@@ -18,6 +18,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { NavDropdown } from './NavDropdown';
 import { useBU, BU } from '../../contexts/BUContext';
 import { useUserRole } from '../../context/UserRoleContext';
+import { FullscreenButton } from '../ui/FullscreenButton';
 
 interface GlobalHeaderProps {
     onMouseEnter?: () => void;
@@ -50,11 +51,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
             title: 'Análise',
             direct: false,
             items: [
-                { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => setTab('jornada') },
-                { id: 'resultados', label: 'Resultados', icon: BarChart3, onClick: () => setTab('resultados') },
+                { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => setTab('originacao-b2c') },
                 { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => setTab('relatorio') },
+                { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => setTab('jornada') },
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => setTab('orientador') },
-                { id: 'originacao-b2c', label: 'Originacao B2C', icon: PieChart, onClick: () => setTab('originacao-b2c') },
             ]
         },
         {
@@ -201,6 +201,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
                 >
                     <Settings size={18} />
                 </button>
+
+                {/* Fullscreen */}
+                <FullscreenButton />
 
                 {/* Avatar */}
                 <div className="flex items-center cursor-pointer hover:bg-slate-100 p-1 rounded-lg transition-all group">

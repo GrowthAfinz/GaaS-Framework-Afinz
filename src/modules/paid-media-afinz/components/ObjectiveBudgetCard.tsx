@@ -53,6 +53,10 @@ export const ObjectiveBudgetCard: React.FC<ObjectiveBudgetCardProps> = ({
   const dailyProjected = totalBudget / daysInMonth;
   const percentUsed = totalBudget > 0 ? Math.min((realizedSpend / totalBudget) * 100, 100) : 0;
 
+  // Orçamento ideal por dia para atingir a meta com o saldo restante
+  const budgetRemaining = Math.max(0, totalBudget - realizedSpend);
+  const idealDailyToGoal = daysRemaining > 0 ? budgetRemaining / daysRemaining : 0;
+
   // Progress bar color
   let progressColor = 'bg-emerald-500';
   if (localStatus === 'overspending' || localStatus === 'atrisk') progressColor = 'bg-red-500';
@@ -187,6 +191,14 @@ export const ObjectiveBudgetCard: React.FC<ObjectiveBudgetCardProps> = ({
             {localStatus === 'ontrack' && <CheckCircle size={14} className="text-emerald-500" />}
           </div>
           <p className="text-xs text-slate-400 mt-0.5">{daysRemaining} dias restantes</p>
+          {daysRemaining > 0 && idealDailyToGoal > 0 && (
+            <p className="text-xs font-semibold text-blue-600 mt-1">
+              {formatCurrency(idealDailyToGoal)}/dia p/ meta
+            </p>
+          )}
+          {daysRemaining > 0 && idealDailyToGoal === 0 && realizedSpend >= totalBudget && (
+            <p className="text-xs font-semibold text-emerald-600 mt-1">Meta atingida ✓</p>
+          )}
         </div>
       </div>
 

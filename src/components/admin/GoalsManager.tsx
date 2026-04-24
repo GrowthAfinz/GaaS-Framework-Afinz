@@ -68,7 +68,6 @@ export const GoalsManager: React.FC = () => {
                 b2b2c_meta: Number(formState.b2b2c_meta) || 0,
                 plurix_meta: Number(formState.plurix_meta) || 0,
                 b2c_meta: Number(formState.b2c_meta) || 0,
-                aprovacoes_meta: currentGoal?.aprovacoes_meta || 0,
                 cac_max: currentGoal?.cac_max || 0
             };
 

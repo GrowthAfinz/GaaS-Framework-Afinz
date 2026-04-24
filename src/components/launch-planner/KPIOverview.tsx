@@ -48,7 +48,7 @@ export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousAc
         const taxaEntrega = baseEnviada > 0 ? (baseEntregue / baseEnviada) * 100 : 0;
         const taxaPropostas = baseEntregue > 0 ? (propostas / baseEntregue) * 100 : 0;
         const taxaAprovacao = propostas > 0 ? (aprovados / propostas) * 100 : 0;
-        const taxaEmissao = aprovados > 0 ? (emissoes / aprovados) * 100 : 0;
+        const taxaEmissao = propostas > 0 ? (emissoes / propostas) * 100 : 0;
         const cac = cartoes > 0 ? custoTotal / cartoes : 0;
         const convBase = baseEnviada > 0 ? (cartoes / baseEnviada) * 100 : 0;
 

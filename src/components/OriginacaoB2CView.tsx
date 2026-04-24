@@ -19,10 +19,14 @@ import {
     BarChart3,
     CalendarClock,
     CheckCircle2,
+    ChevronDown,
+    ChevronUp,
+    FilterX,
     Flag,
     Gauge,
     Goal,
     Layers3,
+    Search,
     Table2,
     Target
 } from 'lucide-react';
@@ -166,13 +170,20 @@ export const OriginacaoB2CView: React.FC = () => {
         vectors,
         reconciliation,
         headline,
-        opportunities
+        opportunities,
+        crmSegmentBreakdown
     } = useB2CIntelligence();
     const { b2cData, setTab, alertConfig } = useAppStore();
     const [chartMode, setChartMode] = useState<ChartMode>('accumulated');
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedActivities, setSelectedActivities] = useState<Activity[]>([]);
     const [modalDate, setModalDate] = useState<Date | null>(null);
+    const [obsFilter, setObsFilter] = useState('');
+    const [validacaoFilter, setValidacaoFilter] = useState<'all' | 'ok' | 'divergente'>('all');
+    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('asc');
+    const [showValidacao, setShowValidacao] = useState(false);
+    const [showObservacoes, setShowObservacoes] = useState(false);
+    const [showCrmBreakdown, setShowCrmBreakdown] = useState(false);
 
     const compositionData = useMemo(
         () => [
@@ -183,10 +194,29 @@ export const OriginacaoB2CView: React.FC = () => {
         [vectors.crmCards, vectors.otherCards, vectors.serasaCards]
     );
 
-    const rowsDescending = useMemo(
-        () => [...dashboardRows].sort((a, b) => b.date.localeCompare(a.date)),
-        [dashboardRows]
-    );
+    const rowsFiltered = useMemo(() => {
+        const obsLower = obsFilter.toLowerCase().trim();
+        return [...dashboardRows]
+            .sort((a, b) =>
+                sortOrder === 'desc'
+                    ? b.date.localeCompare(a.date)
+                    : a.date.localeCompare(b.date)
+            )
+            .filter((row) => {
+                if (obsLower && !(row.observation ?? '').toLowerCase().includes(obsLower)) return false;
+                if (validacaoFilter !== 'all') {
+                    const isDivergent = row.totalCards < row.crmCards + row.serasaCards;
+                    if (validacaoFilter === 'ok' && isDivergent) return false;
+                    if (validacaoFilter === 'divergente' && !isDivergent) return false;
+                }
+                return true;
+            });
+    }, [dashboardRows, obsFilter, validacaoFilter, sortOrder]);
+
+    // keep old name as alias so exports/modal still work
+    const rowsDescending = rowsFiltered;
+
+    const hasActiveFilters = obsFilter !== '' || validacaoFilter !== 'all';
 
     const chartData = useMemo(
         () =>
@@ -287,31 +317,33 @@ export const OriginacaoB2CView: React.FC = () => {
         );
     }
 
+    const ptBrMonthLabel = useMemo(() => {
+        const [year, month] = dashboardSummary.monthKey.split('-').map(Number);
+        return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    }, [dashboardSummary.monthKey]);
+
     return (
         <div className="flex flex-col gap-6 bg-slate-50 p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <BarChart3 className="text-blue-600" size={24} />
-                        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Originação B2C</h1>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">
-                        Inteligência de originação com Total B2C como verdade absoluta e CRM, Serasa e Outros como vetores explicativos.
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1">Framework = CRM</span>
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1">Serasa marketplace = Serasa API</span>
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1">Total B2C = CRM + Serasa + Outros</span>
-                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 capitalize">
-                            Meta de referência: {dashboardSummary.monthLabel}
-                        </span>
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                    <BarChart3 className="text-blue-600 shrink-0" size={22} />
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Originação B2C</h1>
+                            <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 capitalize whitespace-nowrap">
+                                Meta: {ptBrMonthLabel}
+                            </span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500 truncate">
+                            Total B2C como verdade absoluta — CRM, Serasa e Outros como vetores explicativos.
+                        </p>
                     </div>
                 </div>
 
                 <button
                     type="button"
                     onClick={() => setTab('configuracoes')}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+                    className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
                 >
                     Editar meta central
                     <ArrowRight size={16} />
@@ -506,7 +538,70 @@ export const OriginacaoB2CView: React.FC = () => {
 
                     <div className="mt-2 space-y-3">
                         <CompositionLegend label="Serasa API" value={vectors.serasaCards} color={CHART_COLORS.total} share={vectors.serasaSharePct} />
-                        <CompositionLegend label="CRM" value={vectors.crmCards} color={CHART_COLORS.crm} share={vectors.crmSharePct} />
+
+                        {/* CRM com breakdown expansível */}
+                        <div className="rounded-xl border border-slate-200">
+                            <div className="flex items-center justify-between px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: CHART_COLORS.crm }} />
+                                    <span className="text-sm font-medium text-slate-700">CRM</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="text-right">
+                                        <p className="font-mono text-sm font-semibold text-slate-900">{formatInt(vectors.crmCards)}</p>
+                                        <p className="text-xs text-slate-500">{formatPct(vectors.crmSharePct)}</p>
+                                    </div>
+                                    {crmSegmentBreakdown.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCrmBreakdown((v) => !v)}
+                                            title={showCrmBreakdown ? 'Fechar breakdown' : 'Ver por segmento'}
+                                            className={`rounded-lg border p-1.5 transition ${
+                                                showCrmBreakdown
+                                                    ? 'border-teal-200 bg-teal-50 text-teal-600'
+                                                    : 'border-slate-200 bg-slate-50 text-slate-400 hover:text-slate-600'
+                                            }`}
+                                        >
+                                            {showCrmBreakdown ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Breakdown por segmento */}
+                            {showCrmBreakdown && crmSegmentBreakdown.length > 0 && (
+                                <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3 space-y-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                                        Por segmento — top {crmSegmentBreakdown.length}
+                                    </p>
+                                    {crmSegmentBreakdown.map((item) => (
+                                        <div key={item.segment} className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div
+                                                    className="h-1.5 rounded-full flex-shrink-0"
+                                                    style={{
+                                                        width: `${Math.max(4, item.share * 0.6)}px`,
+                                                        backgroundColor: CHART_COLORS.crm,
+                                                        opacity: 0.4 + item.share / 100
+                                                    }}
+                                                />
+                                                <span className="truncate text-xs text-slate-600">{item.segment}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                <span className="font-mono text-xs font-semibold text-slate-800">{item.cards}</span>
+                                                <span className="text-[10px] text-slate-400 w-10 text-right">{item.share.toFixed(1)}%</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {showCrmBreakdown && crmSegmentBreakdown.length === 0 && (
+                                <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-400">
+                                    Nenhum dado de segmento no período.
+                                </div>
+                            )}
+                        </div>
+
                         <CompositionLegend label="Mar Aberto / Outros" value={vectors.otherCards} color={CHART_COLORS.other} share={vectors.otherSharePct} />
                     </div>
                 </aside>
@@ -585,14 +680,15 @@ export const OriginacaoB2CView: React.FC = () => {
                                 <>
                                     <Bar
                                         yAxisId="left"
-                                        dataKey="serasaProposals"
-                                        name="Propostas Serasa API"
+                                        dataKey="totalProposals"
+                                        name="Propostas Total B2C"
                                         fill={CHART_COLORS.other}
                                         radius={[8, 8, 0, 0]}
                                         onClick={(state) => handleInspectDate(state.date)}
                                     />
-                                    <Line yAxisId="right" type="monotone" dataKey="serasaCards" name="Cartões Serasa API" stroke={CHART_COLORS.total} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
-                                    <Line yAxisId="right" type="monotone" dataKey="totalCards" name="Cartões Total B2C" stroke={CHART_COLORS.crm} strokeWidth={2.5} dot={false} />
+                                    <Line yAxisId="right" type="monotone" dataKey="totalCards" name="Cartões Total B2C" stroke={CHART_COLORS.crm} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} />
+                                    <Line yAxisId="right" type="monotone" dataKey="serasaCards" name="Cartões Serasa API" stroke={CHART_COLORS.total} strokeWidth={2} dot={false} strokeDasharray="4 3" />
+                                    <Line yAxisId="right" type="monotone" dataKey="crmCards" name="Cartões CRM" stroke="#0f172a" strokeWidth={2} dot={false} />
                                 </>
                             ) : (
                                 <>
@@ -613,22 +709,116 @@ export const OriginacaoB2CView: React.FC = () => {
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Tabela diária reconciliada</p>
                         <h2 className="mt-2 text-xl font-semibold text-slate-950">Diário operacional com validação contra o Total B2C</h2>
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleExport}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
-                    >
-                        <Table2 size={16} />
-                        Exportar diário
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {/* Toggle Validação */}
+                        <button
+                            type="button"
+                            onClick={() => setShowValidacao((v) => !v)}
+                            title={showValidacao ? 'Ocultar coluna de validação' : 'Mostrar coluna de validação'}
+                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                                showValidacao
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                    : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                            }`}
+                        >
+                            <CheckCircle2 size={13} />
+                            {showValidacao ? 'Ocultar validação' : 'Validação'}
+                        </button>
+                        {/* Toggle Observações */}
+                        <button
+                            type="button"
+                            onClick={() => setShowObservacoes((v) => !v)}
+                            title={showObservacoes ? 'Ocultar coluna de observações' : 'Mostrar coluna de observações'}
+                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                                showObservacoes
+                                    ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                    : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                            }`}
+                        >
+                            <Flag size={13} />
+                            {showObservacoes ? 'Ocultar obs.' : 'Observações'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleExport}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+                        >
+                            <Table2 size={16} />
+                            Exportar diário
+                        </button>
+                    </div>
+                </div>
+
+                {/* Barra de filtros */}
+                <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Busca em observações */}
+                        <div className="relative min-w-[220px] flex-1 max-w-sm">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                                type="text"
+                                value={obsFilter}
+                                onChange={(e) => setObsFilter(e.target.value)}
+                                placeholder="Buscar em observações..."
+                                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            />
+                        </div>
+                        {/* Filtro de validação */}
+                        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                            {(['all', 'ok', 'divergente'] as const).map((opt) => (
+                                <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => setValidacaoFilter(opt)}
+                                    className={`rounded-md px-3 py-1 text-[11px] font-semibold transition ${
+                                        validacaoFilter === opt
+                                            ? opt === 'ok'
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : opt === 'divergente'
+                                                    ? 'bg-red-100 text-red-700'
+                                                    : 'bg-slate-200 text-slate-700'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
+                                >
+                                    {opt === 'all' ? 'Todos' : opt === 'ok' ? '✓ OK' : '⚠ Divergente'}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Limpar filtros */}
+                        {hasActiveFilters && (
+                            <button
+                                type="button"
+                                onClick={() => { setObsFilter(''); setValidacaoFilter('all'); }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-white hover:text-slate-700"
+                            >
+                                <FilterX size={12} />
+                                Limpar
+                            </button>
+                        )}
+                        {/* Contador */}
+                        <span className="ml-auto text-[11px] text-slate-400">
+                            {rowsFiltered.length} de {dashboardRows.length} dias
+                        </span>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="min-w-full border-collapse text-sm">
                         <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                             <tr>
+                                {/* Data — clicável para ordenar */}
+                                <th
+                                    className="whitespace-nowrap border-b border-slate-200 px-4 py-3 cursor-pointer select-none hover:text-slate-800 group"
+                                    onClick={() => setSortOrder((prev) => prev === 'desc' ? 'asc' : 'desc')}
+                                >
+                                    <span className="inline-flex items-center gap-1.5">
+                                        Data
+                                        {sortOrder === 'desc'
+                                            ? <ChevronDown size={13} className="text-blue-500" />
+                                            : <ChevronUp size={13} className="text-blue-500" />}
+                                    </span>
+                                </th>
                                 {[
-                                    'Data',
                                     'Prop. Serasa',
                                     'Cartões Serasa',
                                     'Conv. canal',
@@ -638,11 +828,11 @@ export const OriginacaoB2CView: React.FC = () => {
                                     'Outros',
                                     'Cartões Total',
                                     'Conv. total',
-                                    'Validação',
-                                    'Observações'
                                 ].map((header) => (
                                     <th key={header} className="whitespace-nowrap border-b border-slate-200 px-4 py-3">{header}</th>
                                 ))}
+                                {showValidacao && <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3">Validação</th>}
+                                {showObservacoes && <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3">Observações</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -668,14 +858,18 @@ export const OriginacaoB2CView: React.FC = () => {
                                         <td className="px-4 py-3 font-mono text-slate-700">{formatCompact(otherCards)}</td>
                                         <td className="px-4 py-3 font-mono font-semibold text-slate-900">{formatCompact(row.totalCards)}</td>
                                         <td className="px-4 py-3 text-slate-700">{formatPct(row.totalConversion)}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${isDivergent ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                                                {isDivergent ? 'Divergente' : 'OK'}
-                                            </span>
-                                        </td>
-                                        <td className="max-w-[340px] px-4 py-3 text-slate-500">
-                                            <span className="line-clamp-2">{row.observation || '—'}</span>
-                                        </td>
+                                        {showValidacao && (
+                                            <td className="px-4 py-3">
+                                                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${isDivergent ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                                                    {isDivergent ? 'Divergente' : 'OK'}
+                                                </span>
+                                            </td>
+                                        )}
+                                        {showObservacoes && (
+                                            <td className="max-w-[340px] px-4 py-3 text-slate-500">
+                                                <span className="line-clamp-2">{row.observation || '—'}</span>
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}

@@ -88,7 +88,8 @@ export const useB2CIntelligence = (): B2CIntelligenceResult => {
   const {
     summary: dashboardSummary,
     analysisRows: dashboardRows,
-    getActivitiesForDate
+    getActivitiesForDate,
+    crmSegmentBreakdown
   } = useOriginacaoDashboard();
   const {
     dailyAnalysis,
@@ -116,7 +117,13 @@ export const useB2CIntelligence = (): B2CIntelligenceResult => {
   }, [dashboardSummary.crmCards, dashboardSummary.realizedCards, dashboardSummary.serasaCards]);
 
   const reconciliation = useMemo<ReconciliationSummary>(() => {
-    const days: ReconciliationDay[] = dashboardRows.map((row) => {
+    // Apenas dias que têm dados reais — exclui dias futuros (zeros) e evita
+    // contar falsamente como "consistentes" dias que ainda não foram preenchidos.
+    const daysWithData = dashboardRows.filter(
+      (row) => row.totalCards > 0 || row.serasaCards > 0 || row.crmCards > 0
+    );
+
+    const days: ReconciliationDay[] = daysWithData.map((row) => {
       const varianceCards = row.totalCards - row.crmCards - row.serasaCards;
       return {
         date: row.date,
@@ -177,6 +184,7 @@ export const useB2CIntelligence = (): B2CIntelligenceResult => {
     vectors,
     reconciliation,
     headline,
-    opportunities
+    opportunities,
+    crmSegmentBreakdown
   };
 };
