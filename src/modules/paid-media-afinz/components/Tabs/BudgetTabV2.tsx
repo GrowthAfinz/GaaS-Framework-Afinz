@@ -11,7 +11,6 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart3,
-  Bolt,
   Edit2,
   Loader2,
   Plus,
@@ -37,8 +36,6 @@ import {
 } from '../../types/budget';
 import type { DailyMetrics } from '../../types';
 
-type SortKey = 'budget' | 'pace' | 'delta' | 'cpa' | 'runway';
-
 type PaceBucket = {
   key: 'overspend' | 'over' | 'under' | 'slight_under' | 'onpace' | 'empty';
   label: string;
@@ -61,6 +58,7 @@ type CampaignView = CampaignBudget & {
   realized: number;
   projection: number;
   budget: number;
+  idealDailyBudget: number;
   pace: number;
   deltaBudget: number;
   cpa: number | null;
@@ -334,7 +332,6 @@ export const BudgetTabV2: React.FC = () => {
 
   const { objectives, campaigns, loading, error, refetch } = useBudgetHierarchy(currentMonth);
 
-  const [sortBy, setSortBy] = useState<SortKey>('budget');
   const [focusObjectiveId, setFocusObjectiveId] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [alertsExpanded, setAlertsExpanded] = useState(false);
@@ -424,6 +421,7 @@ export const BudgetTabV2: React.FC = () => {
           ...campaign,
           objectiveLabel: objective ? getObjectiveLabel(objective.objective) : getObjectiveLabel(campaign.objective),
           budget,
+          idealDailyBudget: daysInMonth > 0 ? budget / daysInMonth : 0,
           realized,
           projection,
           pace,
@@ -440,14 +438,8 @@ export const BudgetTabV2: React.FC = () => {
       ? allCampaignViews.filter((campaign) => campaign.objectiveBudgetId === focusObjectiveId)
       : allCampaignViews;
 
-    return [...scoped].sort((a, b) => {
-      if (sortBy === 'pace') return b.pace - a.pace;
-      if (sortBy === 'cpa') return (b.cpa || 0) - (a.cpa || 0);
-      if (sortBy === 'runway') return (a.runwayDays ?? Number.MAX_SAFE_INTEGER) - (b.runwayDays ?? Number.MAX_SAFE_INTEGER);
-      if (sortBy === 'delta') return b.deltaBudget - a.deltaBudget;
-      return b.budget - a.budget;
-    });
-  }, [allCampaignViews, focusObjectiveId, sortBy]);
+    return [...scoped].sort((a, b) => b.budget - a.budget);
+  }, [allCampaignViews, focusObjectiveId]);
 
   const campaignsForReallocation = useMemo(() => {
     if (!isReallocateOpen) return [];
@@ -644,32 +636,32 @@ export const BudgetTabV2: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-800">Gestão de Orçamento - {currentMonth}</h2>
           <p className="mt-0.5 text-sm text-slate-500">Acompanhe pacing, risco e eficiência em todos os objetivos.</p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <button
             onClick={() => setCompareMode((current) => !current)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
               compareMode
                 ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                : 'border-slate-200 bg-white/80 text-slate-600 hover:bg-white hover:text-slate-900'
             }`}
           >
-            <BarChart3 size={15} />
+            <BarChart3 size={13} />
             vs mês anterior
           </button>
           <button
             onClick={() => reallocationTargetId && setIsReallocateOpen(reallocationTargetId)}
             disabled={!canOpenReallocation}
             title={canOpenReallocation ? 'Realocar budget' : 'É preciso ter pelo menos duas campanhas no objetivo.'}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white/80 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Shuffle size={15} />
+            <Shuffle size={13} />
             Realocar budget
           </button>
           <button
             onClick={() => setIsMappingsModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white/80 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
           >
-            <Settings2 size={15} />
+            <Settings2 size={13} />
             Gerenciar
           </button>
           <button
@@ -677,86 +669,93 @@ export const BudgetTabV2: React.FC = () => {
               setEditingObjective(undefined);
               setIsObjectiveModalOpen(true);
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+            className="flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700"
           >
-            <Plus size={15} />
+            <Plus size={13} />
             Novo objetivo
           </button>
         </div>
       </div>
 
-      <div className="space-y-2">
-        {risks.length > 0 && (
-          <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5">
-            <AlertTriangle size={16} className="shrink-0 text-amber-600" />
-            <div className="flex-1 text-sm text-amber-900">
-              <span className="font-semibold">{risks.length} objetivo{risks.length > 1 ? 's' : ''} fora do ritmo:</span>{' '}
-              {risks.map((risk, index) => (
-                <span key={risk.id}>
-                  <button
-                    onClick={() => setFocusObjectiveId(risk.id)}
-                    className="font-semibold underline hover:text-amber-950"
-                  >
-                    {risk.label}
-                  </button>
-                  <span className="text-amber-700"> ({risk.pace.toFixed(2)}x, {risk.bucket.label.toLowerCase()})</span>
-                  {index < risks.length - 1 && <span className="text-amber-400">, </span>}
-                </span>
-              ))}
+      {(risks.length > 0 || topInsight) && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm">
+          {risks.length > 0 && (
+            <div className="flex min-w-0 flex-1 items-center gap-2 text-amber-800">
+              <AlertTriangle size={14} className="shrink-0 text-amber-500" />
+              <span className="shrink-0 font-semibold">{risks.length} fora do ritmo</span>
+              <span className="truncate text-amber-700">
+                {risks.slice(0, 3).map((risk, index) => (
+                  <span key={risk.id}>
+                    <button
+                      onClick={() => setFocusObjectiveId(risk.id)}
+                      className="font-medium underline decoration-amber-300 underline-offset-2 hover:text-amber-950"
+                    >
+                      {risk.label}
+                    </button>
+                    <span> {risk.pace.toFixed(2)}x</span>
+                    {index < Math.min(risks.length, 3) - 1 && <span className="text-amber-400"> · </span>}
+                  </span>
+                ))}
+                {risks.length > 3 && <span className="text-amber-500"> +{risks.length - 3}</span>}
+              </span>
             </div>
-            <button
-              onClick={() => setAlertsExpanded((current) => !current)}
-              className="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-950"
-            >
-              {alertsExpanded ? 'recolher' : 'ver sugestões'}
-            </button>
-          </div>
-        )}
+          )}
 
-        {alertsExpanded && (
-          <div className="grid gap-3 rounded-lg border border-amber-200 bg-white px-4 py-3 text-xs md:grid-cols-2">
-            {risks.map((risk) => {
-              const delta = risk.projection - risk.totalBudget;
-              const over = delta > 0;
-              return (
-                <div key={risk.id} className="flex items-start gap-2">
-                  <ObjDot objective={risk.objective} />
-                  <div>
-                    <div className="font-semibold text-slate-800">
-                      {risk.label} - {over ? `projeta estouro de ${fmtBRL(delta)}` : `subinvestindo ${fmtBRL(Math.abs(delta))}`}
-                    </div>
-                    <div className="mt-0.5 text-slate-500">
-                      {over
-                        ? 'Considere revisar campanhas com menor eficiência ou realocar saldo de objetivos abaixo do ritmo.'
-                        : 'Considere acelerar campanhas com bom CPA ou receber budget de objetivos acima do plano.'}
-                    </div>
+          {topInsight && (
+            <div className="flex min-w-[280px] flex-1 items-center gap-2 text-slate-600">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+              <span className="truncate">
+                <span className="font-semibold text-slate-800">{topInsight.label}</span>{' '}
+                <span className={topInsight.over ? 'text-red-600' : 'text-amber-600'}>
+                  {topInsight.over ? '+' : '-'}{fmtBRL(topInsight.delta)}
+                </span>{' '}
+                vs plano ({topInsight.pace.toFixed(2)}x)
+              </span>
+            </div>
+          )}
+
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            {risks.length > 0 && (
+              <button
+                onClick={() => setAlertsExpanded((current) => !current)}
+                className="font-medium text-slate-500 hover:text-slate-900"
+              >
+                {alertsExpanded ? 'ocultar' : 'detalhes'}
+              </button>
+            )}
+            {topInsight && (
+              <button
+                onClick={() => setFocusObjectiveId(topInsight.id)}
+                className="font-semibold text-blue-600 hover:text-blue-700"
+              >
+                focar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {alertsExpanded && (
+        <div className="grid gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs md:grid-cols-2">
+          {risks.map((risk) => {
+            const delta = risk.projection - risk.totalBudget;
+            const over = delta > 0;
+            return (
+              <div key={risk.id} className="flex items-start gap-2">
+                <ObjDot objective={risk.objective} />
+                <div>
+                  <div className="font-semibold text-slate-800">
+                    {risk.label} · {over ? `+${fmtBRL(delta)}` : `-${fmtBRL(Math.abs(delta))}`} vs plano
+                  </div>
+                  <div className="mt-0.5 text-slate-500">
+                    {over ? 'Revisar campanhas ineficientes ou realocar saldo.' : 'Acelerar campanhas eficientes ou receber budget.'}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {topInsight && (
-          <div className="flex items-center gap-3 rounded-lg bg-slate-900 px-4 py-2.5 text-white">
-            <Bolt size={16} className="shrink-0 text-blue-300" />
-            <div className="flex-1 text-sm">
-              <span className="text-slate-300">Insight:</span>{' '}
-              <span className="font-semibold">{topInsight.label}</span> vai{' '}
-              <span className={`font-semibold ${topInsight.over ? 'text-red-300' : 'text-amber-300'}`}>
-                {topInsight.over ? 'estourar' : 'fechar'} {fmtBRL(topInsight.delta)} {topInsight.over ? 'acima' : 'abaixo'} do plano
-              </span>{' '}
-              no ritmo atual ({topInsight.pace.toFixed(2)}x).
-            </div>
-            <button
-              onClick={() => setFocusObjectiveId(topInsight.id)}
-              className="shrink-0 text-xs font-semibold text-blue-300 hover:text-white"
-            >
-              focar →
-            </button>
-          </div>
-        )}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <MonthStrip daysPassed={daysPassed} daysInMonth={daysInMonth} totalPlanned={totals.planned} />
 
@@ -919,29 +918,6 @@ export const BudgetTabV2: React.FC = () => {
             )}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="flex flex-wrap items-center gap-1 text-xs">
-              <span className="mr-1 text-slate-500">Ordenar:</span>
-              {[
-                { key: 'budget' as const, label: 'Budget' },
-                { key: 'pace' as const, label: 'Ritmo' },
-                { key: 'delta' as const, label: 'Delta plano' },
-                { key: 'cpa' as const, label: 'CPA' },
-                { key: 'runway' as const, label: 'Runway' },
-              ].map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => setSortBy(item.key)}
-                  className={`rounded px-2 py-1 ${
-                    sortBy === item.key
-                      ? 'bg-slate-100 font-semibold text-slate-800'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="hidden h-4 w-px bg-slate-200 md:block" />
             <button
               onClick={() => {
                 const objectiveId = focusObjectiveId || objectiveViews[0]?.id;
@@ -967,13 +943,14 @@ export const BudgetTabV2: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-sm">
+            <table className="w-full min-w-[1260px] text-sm">
               <thead className="bg-slate-50/60">
                 <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-500">
                   <th className="px-4 py-2 text-left font-semibold">Campanha</th>
                   <th className="px-2 py-2 text-left font-semibold">Objetivo</th>
                   <th className="px-2 py-2 text-left font-semibold">Canal</th>
                   <th className="px-2 py-2 text-right font-semibold">Budget</th>
+                  <th className="px-2 py-2 text-right font-semibold">Ideal/dia</th>
                   <th className="px-2 py-2 text-right font-semibold">Realizado</th>
                   <th className="w-48 px-4 py-2 text-left font-semibold">Pacing</th>
                   <th className="px-2 py-2 text-right font-semibold">Proj.</th>
@@ -1000,6 +977,7 @@ export const BudgetTabV2: React.FC = () => {
                       </td>
                       <td className="px-2 py-2.5"><ChannelChip channel={campaign.channel} /></td>
                       <td className="px-2 py-2.5 text-right tabular-nums text-slate-700">{isUnbudgeted ? '—' : fmtBRL(campaign.budget)}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-slate-500">{isUnbudgeted ? '—' : fmtBRL(campaign.idealDailyBudget)}</td>
                       <td className="px-2 py-2.5 text-right tabular-nums text-slate-700">{fmtBRL(campaign.realized)}</td>
                       <td className="px-4 py-2.5">
                         <PaceBar
@@ -1068,6 +1046,9 @@ export const BudgetTabV2: React.FC = () => {
                   </td>
                   <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-800">
                     {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.budget, 0))}
+                  </td>
+                  <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-600">
+                    {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.idealDailyBudget, 0))}
                   </td>
                   <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-800">
                     {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.realized, 0))}
