@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { format, getDate, getDaysInMonth, isSameMonth, parseISO, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { dataService } from '../../../../services/dataService';
 import { useBudgetHierarchy } from '../../hooks/useBudgetHierarchy';
 import { useFilters } from '../../context/FilterContext';
@@ -277,10 +278,10 @@ const KPI: React.FC<{
   }[tone];
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="mb-1.5 text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`text-xl font-bold leading-tight tabular-nums ${toneClass}`}>{value}</p>
-      {sub && <p className="mt-1.5 text-xs leading-tight text-slate-500">{sub}</p>}
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <p className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`text-lg font-bold leading-tight tabular-nums ${toneClass}`}>{value}</p>
+      {sub && <p className="mt-1 text-[11px] leading-tight text-slate-500">{sub}</p>}
     </div>
   );
 };
@@ -296,14 +297,14 @@ const MonthStrip: React.FC<{
   const idealBurn = daysInMonth > 0 && totalPlanned > 0 ? totalPlanned / daysInMonth : 0;
 
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-      <div className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">
+    <div className="flex min-w-0 flex-[1_1_360px] items-center gap-3">
+      <div className="shrink-0 text-xs font-semibold tabular-nums text-slate-700">
         Dia {boundedDay}<span className="font-normal text-slate-400">/{daysInMonth}</span>
       </div>
-      <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
         <div className="absolute inset-y-0 left-0 rounded-full bg-slate-700" style={{ width: `${pctMonth}%` }} />
       </div>
-      <div className="flex shrink-0 items-center gap-3 text-sm text-slate-500">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-slate-500">
         <span className="font-semibold tabular-nums text-slate-700">{pctMonth}%</span>
         <span className="text-slate-300">·</span>
         <span><span className="font-medium text-slate-700">{daysRemaining}</span> dias restantes</span>
@@ -324,6 +325,7 @@ export const BudgetTabV2: React.FC = () => {
   const targetMonth = getTargetMonth(currentMonth);
   const [mm, yyyy] = currentMonth.split('/');
   const monthDate = parseISO(`${yyyy}-${mm}-01`);
+  const monthLabel = format(monthDate, 'MMMM yyyy', { locale: ptBR });
   const now = new Date();
   const isCurrentMonth = isSameMonth(now, monthDate);
   const daysInMonth = getDaysInMonth(monthDate);
@@ -630,13 +632,19 @@ export const BudgetTabV2: React.FC = () => {
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">Gestão de Orçamento - {currentMonth}</h2>
-          <p className="mt-0.5 text-sm text-slate-500">Acompanhe pacing, risco e eficiência em todos os objetivos.</p>
+    <div className="animate-fade-in space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-[260px]">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <h2 className="text-xl font-bold text-slate-800">Orçamento</h2>
+              <span className="text-sm font-medium text-slate-400">· {monthLabel} · Dia {daysPassed}/{daysInMonth}</span>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">Pacing, risco e eficiência por objetivo e campanha.</p>
+          </div>
+          <MonthStrip daysPassed={daysPassed} daysInMonth={daysInMonth} totalPlanned={totals.planned} />
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
           <button
             onClick={() => setCompareMode((current) => !current)}
             className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
@@ -756,8 +764,6 @@ export const BudgetTabV2: React.FC = () => {
           })}
         </div>
       )}
-
-      <MonthStrip daysPassed={daysPassed} daysInMonth={daysInMonth} totalPlanned={totals.planned} />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <KPI

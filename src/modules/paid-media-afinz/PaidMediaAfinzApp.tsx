@@ -184,7 +184,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
           <FilterBar />
         </div>
 
-        <div className="container mx-auto px-6 py-8 pb-32 max-w-[1600px] animate-fade-in">
+        <div className={`container mx-auto px-6 pb-32 max-w-[1600px] animate-fade-in ${activeTab === 'budget' ? 'py-4' : 'py-8'}`}>
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'monthly' && <MonthlyAnalysisTab />}
           {activeTab === 'daily' && <DailyAnalysisTab />}
