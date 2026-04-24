@@ -152,7 +152,6 @@ export const FilterBar: React.FC = () => {
                     setFilters.setSelectedAds([]);
                 }}
                 icon={<Filter className="w-3.5 h-3.5" />}
-                placeholder={`Todas (${availableCampaigns.length})`}
             />
 
             <MultiSelectDropdown
@@ -165,7 +164,7 @@ export const FilterBar: React.FC = () => {
                 }}
                 disabled={availableAdsets.length === 0}
                 icon={<Filter className="w-3.5 h-3.5" />}
-                placeholder={availableAdsets.length === 0 ? 'Sem grupos' : `Todos (${availableAdsets.length})`}
+                placeholder={availableAdsets.length === 0 ? 'Sem grupos' : undefined}
             />
 
             <MultiSelectDropdown
@@ -175,7 +174,7 @@ export const FilterBar: React.FC = () => {
                 onChange={setFilters.setSelectedAds}
                 disabled={availableAds.length === 0}
                 icon={<Filter className="w-3.5 h-3.5" />}
-                placeholder={availableAds.length === 0 ? 'Sem anúncios' : `Todos (${availableAds.length})`}
+                placeholder={availableAds.length === 0 ? 'Sem anúncios' : undefined}
             />
 
         </div>
