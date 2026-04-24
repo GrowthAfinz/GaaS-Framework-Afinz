@@ -59,6 +59,7 @@ type CampaignView = CampaignBudget & {
   realized: number;
   projection: number;
   budget: number;
+  average7dDailySpend: number;
   idealDailyBudget: number;
   pace: number;
   deltaBudget: number;
@@ -88,6 +89,11 @@ const fmtPct = (value: number) => `${Math.round((Number.isFinite(value) ? value 
 const getMonthKey = (date: string | Date) => {
   if (typeof date === 'string') return date.slice(0, 7);
   return format(date, 'yyyy-MM');
+};
+
+const getDayOfMonth = (date: string | Date) => {
+  if (typeof date === 'string') return Number(date.slice(8, 10));
+  return getDate(date);
 };
 
 const getTargetMonth = (month: string) => {
@@ -332,6 +338,8 @@ export const BudgetTabV2: React.FC = () => {
   const dataLagDays = 1;
   const daysPassed = isCurrentMonth ? Math.max(0, getDate(now) - dataLagDays) : now > monthDate ? daysInMonth : 0;
   const monthProgress = daysInMonth > 0 ? daysPassed / daysInMonth : 0;
+  const rollingWindowDays = Math.min(7, daysPassed);
+  const rollingWindowStartDay = Math.max(1, daysPassed - rollingWindowDays + 1);
 
   const { objectives, campaigns, loading, error, refetch } = useBudgetHierarchy(currentMonth);
 
@@ -418,12 +426,19 @@ export const BudgetTabV2: React.FC = () => {
         const objective = objectives.find((item) => item.id === campaign.objectiveBudgetId);
         const budget = campaign.allocatedBudget || 0;
         const realized = metric.spend;
+        const rollingSpend = rows
+          .filter((row) => {
+            const day = getDayOfMonth(row.date);
+            return day >= rollingWindowStartDay && day <= daysPassed;
+          })
+          .reduce((sum, row) => sum + (row.spend || 0), 0);
         const projection = daysPassed > 0 ? (realized / daysPassed) * daysInMonth : 0;
         const pace = budget > 0 ? safeDiv(projection, budget) : (campaign.paceIndex || 0);
         return {
           ...campaign,
           objectiveLabel: objective ? getObjectiveLabel(objective.objective) : getObjectiveLabel(campaign.objective),
           budget,
+          average7dDailySpend: rollingWindowDays > 0 ? rollingSpend / rollingWindowDays : 0,
           idealDailyBudget: daysInMonth > 0 ? budget / daysInMonth : 0,
           realized,
           projection,
@@ -434,7 +449,7 @@ export const BudgetTabV2: React.FC = () => {
           runwayDays: getRunwayDays(budget, realized, projection, daysInMonth),
         };
       });
-  }, [campaigns, visibleObjectiveIds, filters.selectedChannels, filters.selectedCampaigns, monthRows, objectives, daysPassed, daysInMonth]);
+  }, [campaigns, visibleObjectiveIds, filters.selectedChannels, filters.selectedCampaigns, monthRows, objectives, rollingWindowStartDay, rollingWindowDays, daysPassed, daysInMonth]);
 
   const visibleCampaigns = useMemo(() => {
     const scoped = focusObjectiveId
@@ -869,9 +884,6 @@ export const BudgetTabV2: React.FC = () => {
                       <span className="truncate font-semibold text-slate-800">{objective.label}</span>
                       <span className="shrink-0 text-xs text-slate-400">· {objective.campaignCount}</span>
                     </div>
-                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${toneClasses[bucket.tone].chip}`}>
-                      {bucket.label}
-                    </span>
                   </div>
                   <div className="mb-0.5 flex items-baseline gap-1.5">
                     <span className="text-xl font-bold tabular-nums text-slate-800">{fmtBRL(objective.realized)}</span>
@@ -950,15 +962,16 @@ export const BudgetTabV2: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1260px] text-sm">
+            <table className="w-full min-w-[1340px] text-sm">
               <thead className="bg-slate-50/60">
                 <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wide text-slate-500">
                   <th className="px-4 py-2 text-left font-semibold">Campanha</th>
                   <th className="px-2 py-2 text-left font-semibold">Objetivo</th>
                   <th className="px-2 py-2 text-left font-semibold">Canal</th>
                   <th className="px-2 py-2 text-right font-semibold">Budget</th>
-                  <th className="px-2 py-2 text-right font-semibold">Ideal/dia</th>
                   <th className="px-2 py-2 text-right font-semibold">Realizado</th>
+                  <th className="px-2 py-2 text-right font-semibold">Média 7d</th>
+                  <th className="px-2 py-2 text-right font-semibold">Ideal/dia</th>
                   <th className="w-48 px-4 py-2 text-left font-semibold">Pacing</th>
                   <th className="px-2 py-2 text-right font-semibold">Proj.</th>
                   <th className="px-2 py-2 text-right font-semibold">Delta plano</th>
@@ -984,8 +997,9 @@ export const BudgetTabV2: React.FC = () => {
                       </td>
                       <td className="px-2 py-2.5"><ChannelChip channel={campaign.channel} /></td>
                       <td className="px-2 py-2.5 text-right tabular-nums text-slate-700">{isUnbudgeted ? '—' : fmtBRL(campaign.budget)}</td>
-                      <td className="px-2 py-2.5 text-right tabular-nums text-slate-500">{isUnbudgeted ? '—' : fmtBRL(campaign.idealDailyBudget)}</td>
                       <td className="px-2 py-2.5 text-right tabular-nums text-slate-700">{fmtBRL(campaign.realized)}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-slate-600">{fmtBRL(campaign.average7dDailySpend)}</td>
+                      <td className="px-2 py-2.5 text-right tabular-nums text-slate-500">{isUnbudgeted ? '—' : fmtBRL(campaign.idealDailyBudget)}</td>
                       <td className="px-4 py-2.5">
                         <PaceBar
                           planned={campaign.budget}
@@ -1054,11 +1068,14 @@ export const BudgetTabV2: React.FC = () => {
                   <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-800">
                     {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.budget, 0))}
                   </td>
-                  <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-600">
-                    {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.idealDailyBudget, 0))}
-                  </td>
                   <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-800">
                     {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.realized, 0))}
+                  </td>
+                  <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-700">
+                    {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.average7dDailySpend, 0))}
+                  </td>
+                  <td className="px-2 py-2.5 text-right font-bold tabular-nums text-slate-600">
+                    {fmtBRL(visibleCampaigns.reduce((sum, campaign) => sum + campaign.idealDailyBudget, 0))}
                   </td>
                   <td className="px-4 py-2.5">
                     <PaceBar
