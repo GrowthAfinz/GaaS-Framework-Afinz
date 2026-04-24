@@ -55,19 +55,19 @@ export const BudgetTabV2: React.FC = () => {
     return (realizedTotal / daysPassed) * getDaysInMonth(monthDate);
   }, [realizedTotal, currentMonth]);
 
-  const totalPlanned = useMemo(
-    () => filteredObjectives.reduce((s, o) => s + o.totalBudget, 0),
-    [filteredObjectives]
-  );
-
-  const paceIndexTotal = totalPlanned > 0 ? projectionTotal / totalPlanned : 0;
-
   // Filter objectives by the global objective filter (Branding / B2C / Plurix / Seguros)
   const filteredObjectives = useMemo(() => {
     const selected = filters.selectedObjectives;
     if (!selected || selected.length === 0) return objectives;
     return objectives.filter((obj) => selected.includes(obj.objective as any));
   }, [objectives, filters.selectedObjectives]);
+
+  const totalPlanned = useMemo(
+    () => filteredObjectives.reduce((s, o) => s + o.totalBudget, 0),
+    [filteredObjectives]
+  );
+
+  const paceIndexTotal = totalPlanned > 0 ? projectionTotal / totalPlanned : 0;
 
   // Objective modal state
   const [editingObjective, setEditingObjective] = useState<ObjectiveBudget | undefined>();
