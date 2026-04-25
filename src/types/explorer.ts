@@ -92,11 +92,18 @@ export interface TopOfferItem {
   count: number; // number of activities
 }
 
+export interface TopPromocionalItem {
+  promocional: string;
+  cartoes: number;
+  count: number;
+}
+
 export interface DetailsPaneData {
   node: TreeNode;
   period: string;
   channelDistribution: ChannelDistributionItem[];
   topOffers: TopOfferItem[];
+  topPromocionais: TopPromocionalItem[];
   activities: ActivityRow[];
   prevMetrics?: NodeMetrics;
 }

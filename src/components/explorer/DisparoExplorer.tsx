@@ -168,8 +168,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
     detailsPaneNodeId,
     nodeMap,
     activities,
-    filters.periodo,
-    compareEnabled
+    filters.periodo
   );
 
   const searchResults = useExplorerSearch(nodeMap, searchQuery);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ExternalLink } from 'lucide-react';
+import { X } from 'lucide-react';
 import { DetailsPaneData } from '../../../types/explorer';
 import { TreeNodeIcon } from '../tree/TreeNodeIcon';
 import { PerformanceCard } from './PerformanceCard';
@@ -24,7 +24,10 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
     );
   }
 
-  const { node, period, channelDistribution, topOffers } = data;
+  const { node, period, channelDistribution, topOffers, topPromocionais } = data;
+
+  const offerItems = topOffers.map((o) => ({ label: o.oferta, cartoes: o.cartoes }));
+  const promoItems = topPromocionais.map((p) => ({ label: p.promocional, cartoes: p.cartoes }));
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-slate-200 flex flex-col h-full overflow-hidden">
@@ -50,10 +53,14 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
         <div className="border-t border-slate-100" />
         <ChannelDistribution items={channelDistribution} />
         <div className="border-t border-slate-100" />
-        <TopOffersTable items={topOffers} />
+        <TopOffersTable title="Top Ofertas" items={offerItems} />
+        {promoItems.length > 0 && (
+          <>
+            <div className="border-t border-slate-100" />
+            <TopOffersTable title="Top Promocionais" items={promoItems} />
+          </>
+        )}
       </div>
-
-      {/* Footer removido pedido pelo usuário */}
     </div>
   );
 };

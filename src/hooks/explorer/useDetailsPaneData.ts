@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { TreeNode, DetailsPaneData, ChannelDistributionItem, TopOfferItem, NodeMetrics } from '../../types/explorer';
+import { TreeNode, DetailsPaneData, ChannelDistributionItem, TopOfferItem, TopPromocionalItem, NodeMetrics } from '../../types/explorer';
 import { ActivityRow } from '../../types/activity';
 import { format, subDays, differenceInDays } from 'date-fns';
 
@@ -17,8 +17,7 @@ export function useDetailsPaneData(
   nodeId: string | null,
   nodeMap: Map<string, TreeNode>,
   allActivities: ActivityRow[],
-  filters: { inicio: string; fim: string },
-  compareEnabled: boolean = false
+  filters: { inicio: string; fim: string }
 ): DetailsPaneData | null {
   return useMemo(() => {
     if (!nodeId) return null;
@@ -66,12 +65,29 @@ export function useDetailsPaneData(
       .sort((a, b) => b.cartoes - a.cartoes)
       .slice(0, 3);
 
+    // Top promocionais by cartões
+    const promocionalCounts = new Map<string, { cartoes: number; count: number }>();
+    for (const a of activities) {
+      const promo = a.Promocional;
+      if (!promo) continue;
+      const existing = promocionalCounts.get(promo) ?? { cartoes: 0, count: 0 };
+      promocionalCounts.set(promo, {
+        cartoes: existing.cartoes + (a['Cartões Gerados'] ?? 0),
+        count: existing.count + 1,
+      });
+    }
+
+    const topPromocionais: TopPromocionalItem[] = Array.from(promocionalCounts.entries())
+      .map(([promocional, { cartoes, count }]) => ({ promocional, cartoes, count }))
+      .sort((a, b) => b.cartoes - a.cartoes)
+      .slice(0, 3);
+
     // Period label
     const period = `${format(new Date(filters.inicio + 'T00:00:00'), 'MMM yyyy')} – ${format(new Date(filters.fim + 'T00:00:00'), 'MMM yyyy')}`;
 
     let prevMetrics: NodeMetrics | undefined = undefined;
 
-    if (compareEnabled) {
+    {
       const sDate = new Date(`${filters.inicio}T00:00:00`);
       const eDate = new Date(`${filters.fim}T00:00:00`);
       const diff = differenceInDays(eDate, sDate) + 1;
@@ -129,6 +145,6 @@ export function useDetailsPaneData(
       };
     }
 
-    return { node, period, channelDistribution, topOffers, activities, prevMetrics };
-  }, [nodeId, nodeMap, allActivities, filters, compareEnabled]);
+    return { node, period, channelDistribution, topOffers, topPromocionais, activities, prevMetrics };
+  }, [nodeId, nodeMap, allActivities, filters]);
 }
