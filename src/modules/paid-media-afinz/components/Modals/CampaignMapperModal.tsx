@@ -3,6 +3,7 @@ import { X, Search, CheckCircle2, AlertCircle, Loader2, UploadCloud, Target, Lis
 import { useCampaignMappings } from '../../hooks/useCampaignMappings';
 import { useFilters } from '../../context/FilterContext';
 import { ObjectivesManager } from '../ObjectivesManager';
+import { getObjectiveColorClasses } from '../../types';
 
 interface CampaignMapperModalProps {
     isOpen: boolean;
@@ -150,6 +151,8 @@ export const CampaignMapperModal: React.FC<CampaignMapperModalProps> = ({ isOpen
                                                 const mappingEntry = mappings.find(m => m.campaign_name === campaignName);
                                                 const isMapped = !!mappingEntry;
                                                 const selectValue = isMapped ? mappingEntry.objective : '';
+                                                const matchedObj = objectives.find(o => o.key === selectValue);
+                                                const c = matchedObj ? getObjectiveColorClasses(matchedObj.color) : null;
 
                                                 return (
                                                     <tr key={campaignName} className="hover:bg-slate-50/50 transition-colors">
@@ -158,8 +161,10 @@ export const CampaignMapperModal: React.FC<CampaignMapperModalProps> = ({ isOpen
                                                         </td>
                                                         <td className="px-5 py-3">
                                                             {isMapped ? (
-                                                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-md">
-                                                                    <CheckCircle2 size={12} /> Mapeado
+                                                                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md
+                                                                    ${c ? c.chipActive : 'text-emerald-700 bg-emerald-100'}`}>
+                                                                    <CheckCircle2 size={12} />
+                                                                    {matchedObj?.label ?? selectValue}
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded-md">

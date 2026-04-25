@@ -1,65 +1,108 @@
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import { useFilters } from '../context/FilterContext';
 import { OBJECTIVE_COLORS, getObjectiveColorClasses } from '../types';
 import type { PaidMediaObjectiveEntry } from '../types';
 
-// ── Color picker ──────────────────────────────────────────────────────────────
-
-const ColorPicker: React.FC<{ value: string; onChange: (key: string) => void }> = ({ value, onChange }) => (
+// ── Color Picker ──────────────────────────────────────────────────────────────
+const ColorPicker: React.FC<{ value: string; onChange: (color: string) => void }> = ({ value, onChange }) => (
     <div className="flex flex-wrap gap-1.5">
         {OBJECTIVE_COLORS.map(c => (
             <button
                 key={c.key}
                 type="button"
-                onClick={() => onChange(c.key)}
                 title={c.label}
-                className={`w-5 h-5 rounded-full transition-all ${c.dot} ${value === c.key ? 'ring-2 ring-offset-1 ring-slate-400 scale-110' : 'opacity-60 hover:opacity-100'}`}
+                onClick={() => onChange(c.key)}
+                className={`w-6 h-6 rounded-full border-2 transition-all ${c.dot}
+                    ${value === c.key
+                        ? 'border-slate-700 scale-110 shadow-sm'
+                        : 'border-transparent hover:border-slate-300 hover:scale-105'
+                    }`}
             />
         ))}
     </div>
 );
 
-// ── Inline edit row ───────────────────────────────────────────────────────────
-
-const EditRow: React.FC<{
+// ── Inline edit / create row ──────────────────────────────────────────────────
+interface EditRowProps {
     initial: PaidMediaObjectiveEntry;
-    onSave: (updates: Omit<PaidMediaObjectiveEntry, 'key'>) => void;
+    isNew?: boolean;
+    onSave: (entry: PaidMediaObjectiveEntry) => void;
     onCancel: () => void;
-}> = ({ initial, onSave, onCancel }) => {
+    existingKeys: string[];
+}
+
+const EditRow: React.FC<EditRowProps> = ({ initial, isNew = false, onSave, onCancel, existingKeys }) => {
+    const [key, setKey] = useState(initial.key);
     const [label, setLabel] = useState(initial.label);
-    const [color, setColor] = useState(initial.color);
+    const [color, setColor] = useState(initial.color || 'teal');
+
+    const keySlug = key.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const isDuplicateKey = isNew && existingKeys.includes(keySlug);
+    const isValid = keySlug.length > 0 && label.trim().length > 0 && !isDuplicateKey;
 
     return (
-        <tr className="bg-blue-50/30">
-            <td className="px-4 py-2">
-                <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{initial.key}</span>
+        <tr className="bg-[#00C6CC]/5 border-b border-[#00C6CC]/20">
+            {/* Color dot preview */}
+            <td className="px-4 py-3 w-10">
+                <div className={`w-4 h-4 rounded-full ${getObjectiveColorClasses(color).dot}`} />
             </td>
-            <td className="px-4 py-2">
+
+            {/* Key — only editable when creating */}
+            <td className="px-4 py-3 w-36">
+                {isNew ? (
+                    <div>
+                        <input
+                            value={key}
+                            onChange={e => setKey(e.target.value)}
+                            placeholder="ex: conversao"
+                            className={`w-full text-xs font-mono border rounded-md px-2 py-1.5 outline-none focus:ring-1 focus:ring-[#00C6CC] transition-all
+                                ${isDuplicateKey ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}
+                        />
+                        {isDuplicateKey && (
+                            <p className="text-[10px] text-red-500 mt-0.5">Chave já existe</p>
+                        )}
+                    </div>
+                ) : (
+                    <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded select-all">
+                        {initial.key}
+                    </span>
+                )}
+            </td>
+
+            {/* Label */}
+            <td className="px-4 py-3">
                 <input
-                    autoFocus
                     value={label}
                     onChange={e => setLabel(e.target.value)}
-                    className="w-full text-sm border border-slate-200 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-[#00C6CC]/30 focus:border-[#00C6CC]"
+                    placeholder="Nome do objetivo"
+                    className="w-full text-sm border border-slate-200 rounded-md px-2 py-1.5 outline-none focus:ring-1 focus:ring-[#00C6CC] bg-white transition-all"
+                    autoFocus={isNew}
                 />
             </td>
-            <td className="px-4 py-2">
+
+            {/* Color picker */}
+            <td className="px-4 py-3">
                 <ColorPicker value={color} onChange={setColor} />
             </td>
-            <td className="px-4 py-2">
+
+            {/* Actions */}
+            <td className="px-4 py-3 w-24">
                 <div className="flex items-center gap-1.5">
                     <button
-                        type="button"
-                        onClick={() => { if (label.trim()) onSave({ label: label.trim(), color }); }}
-                        className="p-1.5 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                        onClick={() => isValid && onSave({ key: keySlug || initial.key, label: label.trim(), color })}
+                        disabled={!isValid}
+                        className={`p-1.5 rounded-md transition-colors
+                            ${isValid
+                                ? 'bg-[#00C6CC] text-white hover:bg-[#00B0B6] shadow-sm'
+                                : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}
                         title="Salvar"
                     >
                         <Check size={14} />
                     </button>
                     <button
-                        type="button"
                         onClick={onCancel}
-                        className="p-1.5 rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                        className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                         title="Cancelar"
                     >
                         <X size={14} />
@@ -70,159 +113,154 @@ const EditRow: React.FC<{
     );
 };
 
-// ── Add row ───────────────────────────────────────────────────────────────────
-
-const AddRow: React.FC<{ onAdd: (entry: PaidMediaObjectiveEntry) => void; existingKeys: string[] }> = ({ onAdd, existingKeys }) => {
-    const [key, setKey] = useState('');
-    const [label, setLabel] = useState('');
-    const [color, setColor] = useState('slate');
-    const [keyError, setKeyError] = useState('');
-
-    const handleAdd = () => {
-        const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        if (!cleanKey) { setKeyError('Chave obrigatória'); return; }
-        if (existingKeys.includes(cleanKey)) { setKeyError('Chave já existe'); return; }
-        if (!label.trim()) return;
-        onAdd({ key: cleanKey, label: label.trim(), color });
-        setKey(''); setLabel(''); setColor('slate'); setKeyError('');
-    };
-
-    return (
-        <tr className="bg-slate-50/60 border-t-2 border-dashed border-slate-200">
-            <td className="px-4 py-3">
-                <div>
-                    <input
-                        value={key}
-                        onChange={e => { setKey(e.target.value); setKeyError(''); }}
-                        placeholder="ex: retencao"
-                        className={`w-full text-xs font-mono border rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00C6CC]/30 focus:border-[#00C6CC] ${keyError ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}
-                    />
-                    {keyError && <p className="text-[10px] text-red-500 mt-0.5">{keyError}</p>}
-                </div>
-            </td>
-            <td className="px-4 py-3">
-                <input
-                    value={label}
-                    onChange={e => setLabel(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                    placeholder="Nome de exibição"
-                    className="w-full text-sm border border-slate-200 rounded-md px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-[#00C6CC]/30 focus:border-[#00C6CC]"
-                />
-            </td>
-            <td className="px-4 py-3">
-                <ColorPicker value={color} onChange={setColor} />
-            </td>
-            <td className="px-4 py-3">
-                <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={!key.trim() || !label.trim()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#00C6CC] text-white rounded-md text-xs font-semibold hover:bg-[#00B0B5] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                    <Plus size={13} />
-                    Adicionar
-                </button>
-            </td>
-        </tr>
-    );
-};
-
-// ── Main component ────────────────────────────────────────────────────────────
-
+// ── Main ObjectivesManager ────────────────────────────────────────────────────
 export const ObjectivesManager: React.FC = () => {
     const { objectives, addObjective, updateObjective, removeObjective } = useFilters();
     const [editingKey, setEditingKey] = useState<string | null>(null);
+    const [isAddingNew, setIsAddingNew] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+    const handleDelete = (key: string) => {
+        if (deleteConfirm === key) {
+            removeObjective(key);
+            setDeleteConfirm(null);
+        } else {
+            setDeleteConfirm(key);
+            setTimeout(() => setDeleteConfirm(prev => prev === key ? null : prev), 3000);
+        }
+    };
 
     return (
         <div className="flex flex-col gap-4">
-            <div>
-                <h3 className="text-sm font-semibold text-slate-700">Objetivos de Mídia Paga</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                    Cadastre os objetivos usados no mapeamento de campanhas. A chave (<code>key</code>) é o valor salvo no banco — não pode ser alterada após criação.
+            {/* Info */}
+            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                <AlertCircle size={15} className="text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-700 leading-relaxed">
+                    Os objetivos aqui cadastrados aparecem nos filtros do dashboard e no mapeamento de campanhas.
+                    A <strong>chave</strong> deve corresponder exatamente ao valor salvo no banco de dados
+                    (campo <code className="font-mono bg-amber-100 px-1 rounded">objective</code> da tabela de mapeamentos).
                 </p>
             </div>
 
+            {/* Table */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         <tr>
-                            <th className="px-4 py-2.5 w-36">Chave (BD)</th>
-                            <th className="px-4 py-2.5">Nome de Exibição</th>
-                            <th className="px-4 py-2.5 w-52">Cor</th>
-                            <th className="px-4 py-2.5 w-24">Ações</th>
+                            <th className="px-4 py-3 w-10" />
+                            <th className="px-4 py-3 w-36">Chave (slug)</th>
+                            <th className="px-4 py-3">Nome / Label</th>
+                            <th className="px-4 py-3 w-64">Cor</th>
+                            <th className="px-4 py-3 w-28">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
+
                         {objectives.map(obj => {
-                            const colors = getObjectiveColorClasses(obj.color);
+                            /* editing this row */
                             if (editingKey === obj.key) {
                                 return (
                                     <EditRow
                                         key={obj.key}
                                         initial={obj}
-                                        onSave={(updates) => {
-                                            updateObjective(obj.key, updates);
+                                        existingKeys={objectives.map(o => o.key).filter(k => k !== obj.key)}
+                                        onSave={updated => {
+                                            updateObjective(obj.key, { label: updated.label, color: updated.color });
                                             setEditingKey(null);
                                         }}
                                         onCancel={() => setEditingKey(null)}
                                     />
                                 );
                             }
+
+                            const c = getObjectiveColorClasses(obj.color);
+                            const isConfirming = deleteConfirm === obj.key;
+
                             return (
-                                <tr key={obj.key} className="hover:bg-slate-50/50 transition-colors">
+                                <tr key={obj.key} className="hover:bg-slate-50/50 transition-colors group">
+                                    {/* Color dot */}
                                     <td className="px-4 py-3">
-                                        <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{obj.key}</span>
+                                        <div className={`w-3 h-3 rounded-full ${c.dot}`} />
                                     </td>
+                                    {/* Key slug */}
                                     <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${colors.dot}`} />
-                                            <span className="text-sm font-medium text-slate-700">{obj.label}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${colors.chipActive}`}>
-                                            <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                                            {OBJECTIVE_COLORS.find(c => c.key === obj.color)?.label ?? obj.color}
+                                        <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                            {obj.key}
                                         </span>
                                     </td>
+                                    {/* Label */}
+                                    <td className="px-4 py-3 font-medium text-slate-700">{obj.label}</td>
+                                    {/* Color preview chip */}
                                     <td className="px-4 py-3">
-                                        <div className="flex items-center gap-1">
+                                        <span className={`inline-block px-2.5 py-1 rounded-md border text-xs font-medium ${c.chipActive}`}>
+                                            {OBJECTIVE_COLORS.find(x => x.key === obj.color)?.label ?? obj.color}
+                                        </span>
+                                    </td>
+                                    {/* Actions */}
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
-                                                type="button"
-                                                onClick={() => setEditingKey(obj.key)}
+                                                onClick={() => { setEditingKey(obj.key); setIsAddingNew(false); setDeleteConfirm(null); }}
                                                 className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                                                 title="Editar"
                                             >
                                                 <Pencil size={13} />
                                             </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    if (confirm(`Remover objetivo "${obj.label}"? Campanhas já mapeadas não serão afetadas.`))
-                                                        removeObjective(obj.key);
-                                                }}
-                                                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                title="Remover"
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => handleDelete(obj.key)}
+                                                    className={`p-1.5 rounded-md transition-colors
+                                                        ${isConfirming
+                                                            ? 'bg-red-100 text-red-600 hover:bg-red-200 ring-1 ring-red-200'
+                                                            : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+                                                    title={isConfirming ? 'Clique novamente para confirmar exclusão' : 'Excluir'}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                                {isConfirming && (
+                                                    <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] text-red-500 font-medium">
+                                                        confirmar?
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
                             );
                         })}
 
-                        <AddRow
-                            onAdd={addObjective}
-                            existingKeys={objectives.map(o => o.key)}
-                        />
+                        {/* New row */}
+                        {isAddingNew && (
+                            <EditRow
+                                initial={{ key: '', label: '', color: 'teal' }}
+                                isNew
+                                existingKeys={objectives.map(o => o.key)}
+                                onSave={entry => { addObjective(entry); setIsAddingNew(false); }}
+                                onCancel={() => setIsAddingNew(false)}
+                            />
+                        )}
+
+                        {objectives.length === 0 && !isAddingNew && (
+                            <tr>
+                                <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-400">
+                                    Nenhum objetivo cadastrado. Clique em "Novo Objetivo" abaixo para começar.
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
 
-            <p className="text-[11px] text-slate-400">
-                As alterações são salvas localmente no navegador e aplicadas imediatamente nos filtros.
-            </p>
+            {/* Add button */}
+            {!isAddingNew && (
+                <button
+                    onClick={() => { setIsAddingNew(true); setEditingKey(null); setDeleteConfirm(null); }}
+                    className="self-start flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#00C6CC] border border-[#00C6CC]/40 bg-[#00C6CC]/5 rounded-lg hover:bg-[#00C6CC]/10 hover:border-[#00C6CC]/60 transition-all"
+                >
+                    <Plus size={15} />
+                    Novo Objetivo
+                </button>
+            )}
         </div>
     );
 };
