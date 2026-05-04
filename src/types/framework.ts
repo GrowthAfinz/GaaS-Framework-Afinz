@@ -29,6 +29,7 @@ export interface Activity {
   segmento: string;
   parceiro: string;
   jornada: string; // Dimensão Jornada
+  subgrupo?: string;
   ordemDisparo?: number; // ordem de disparo dentro da jornada
   oferta?: string; // tipo de oferta
   promocional?: string; // variável promocional
@@ -55,6 +56,7 @@ export interface FilterState {
   jornadas: string[];
   segmentos: string[];
   parceiros: string[];
+  subgrupos: string[];
   ofertas: string[];
   disparado: 'Sim' | 'Não' | 'Todos';
   dataInicio?: string; // YYYY-MM-DD

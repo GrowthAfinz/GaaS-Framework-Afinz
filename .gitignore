@@ -119,3 +119,4 @@ out
 dist
 .vercel
 .env*.local
+.npm-cache/

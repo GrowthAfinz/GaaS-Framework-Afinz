@@ -162,10 +162,12 @@ function App() {
     availableJornadas,
     availableSegmentos,
     availableParceiros,
+    availableSubgrupos,
     countByCanal,
     countByJornada,
     countBySegmento,
     countByParceiro,
+    countBySubgrupo,
     totalRemainingDisparos
   } = useAdvancedFilters(
     shouldRunFilters ? data : {},
@@ -257,10 +259,12 @@ function App() {
                 availableJornadas={availableJornadas}
                 availableSegmentos={availableSegmentos}
                 availableParceiros={availableParceiros}
+                availableSubgrupos={availableSubgrupos}
                 countByCanal={countByCanal}
                 countByJornada={countByJornada}
                 countBySegmento={countBySegmento}
                 countByParceiro={countByParceiro}
+                countBySubgrupo={countBySubgrupo}
                 totalRemainingDisparos={totalRemainingDisparos}
                 onMenuLockChange={setIsFilterMenuLocked}
               />

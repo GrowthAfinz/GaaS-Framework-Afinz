@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Map, Users, HeartHandshake, ChevronDown, Check, X, Search } from 'lucide-react';
+import { MessageCircle, Map, Users, HeartHandshake, Layers, ChevronDown, Check, X, Search } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { FilterState } from '../types/framework';
 import { PeriodSelector } from './period-selector/PeriodSelector';
@@ -9,10 +9,12 @@ interface InlineFilterBarProps {
     availableJornadas?: string[];
     availableSegmentos?: string[];
     availableParceiros?: string[];
+    availableSubgrupos?: string[];
     countByCanal?: { [canal: string]: number };
     countByJornada?: { [jornada: string]: number };
     countBySegmento?: { [segmento: string]: number };
     countByParceiro?: { [parceiro: string]: number };
+    countBySubgrupo?: { [subgrupo: string]: number };
     totalRemainingDisparos?: number;
     onMenuLockChange?: (locked: boolean) => void;
 }
@@ -254,10 +256,12 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
     availableJornadas = [],
     availableSegmentos = [],
     availableParceiros = [],
+    availableSubgrupos = [],
     countByCanal = {},
     countByJornada = {},
     countBySegmento = {},
     countByParceiro = {},
+    countBySubgrupo = {},
     totalRemainingDisparos = 0,
     onMenuLockChange
 }) => {
@@ -270,12 +274,13 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
             jornadas: [],
             segmentos: [],
             parceiros: [],
+            subgrupos: [],
             ofertas: [],
             disparado: 'Todos'
         });
     };
 
-    const hasActiveFilters = filters.canais.length > 0 || filters.jornadas.length > 0 || filters.segmentos.length > 0 || filters.parceiros.length > 0;
+    const hasActiveFilters = filters.canais.length > 0 || filters.jornadas.length > 0 || filters.segmentos.length > 0 || filters.parceiros.length > 0 || filters.subgrupos.length > 0;
     const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
     const handleMenuOpenChange = React.useCallback((menuId: string, isOpen: boolean) => {
@@ -322,8 +327,18 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                 items={availableParceiros}
                 field="parceiros"
                 counts={countByParceiro}
-                align="right"
                 onOpenChange={(isOpen) => handleMenuOpenChange('parceiros', isOpen)}
+            />
+            <FilterDropdown
+                title="Subgrupos"
+                icon={Layers}
+                items={availableSubgrupos}
+                field="subgrupos"
+                counts={countBySubgrupo}
+                searchable
+                searchPlaceholder="Buscar subgrupo..."
+                align="right"
+                onOpenChange={(isOpen) => handleMenuOpenChange('subgrupos', isOpen)}
             />
 
             {hasActiveFilters && (

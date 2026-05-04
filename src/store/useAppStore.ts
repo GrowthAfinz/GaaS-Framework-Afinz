@@ -67,6 +67,7 @@ const INITIAL_FILTERS: FilterState = {
     jornadas: [],
     segmentos: [],
     parceiros: [],
+    subgrupos: [],
     ofertas: [],
     disparado: 'Todos',
     dataInicio: '',

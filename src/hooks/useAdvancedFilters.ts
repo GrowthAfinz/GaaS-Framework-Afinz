@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { CalendarData, FilterState, Activity } from '../types/framework';
 
-type FilterKey = 'canais' | 'jornadas' | 'segmentos' | 'parceiros';
-const FILTER_KEYS: FilterKey[] = ['canais', 'jornadas', 'segmentos', 'parceiros'];
+type FilterKey = 'canais' | 'jornadas' | 'segmentos' | 'parceiros' | 'subgrupos';
+const FILTER_KEYS: FilterKey[] = ['canais', 'jornadas', 'segmentos', 'parceiros', 'subgrupos'];
 
 const getFilterValue = (activity: Activity, key: FilterKey): string => {
   switch (key) {
@@ -14,6 +14,8 @@ const getFilterValue = (activity: Activity, key: FilterKey): string => {
       return activity.segmento;
     case 'parceiros':
       return activity.parceiro;
+    case 'subgrupos':
+      return activity.subgrupo ?? '';
   }
 };
 
@@ -53,6 +55,10 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
     }
 
     if (!omit.includes('parceiros') && filters.parceiros.length > 0 && !filters.parceiros.includes(activity.parceiro)) {
+      return false;
+    }
+
+    if (!omit.includes('subgrupos') && filters.subgrupos.length > 0 && !filters.subgrupos.includes(activity.subgrupo ?? '')) {
       return false;
     }
 
@@ -101,16 +107,18 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
     const countByJornada: { [jornada: string]: number } = {};
     const countBySegmento: { [segmento: string]: number } = {};
     const countByParceiro: { [parceiro: string]: number } = {};
+    const countBySubgrupo: { [subgrupo: string]: number } = {};
 
     const available = {
       canais: new Set<string>(),
       jornadas: new Set<string>(),
       segmentos: new Set<string>(),
-      parceiros: new Set<string>()
+      parceiros: new Set<string>(),
+      subgrupos: new Set<string>()
     };
 
     const staticMatched = allActivities.filter(activity =>
-      matchActivity(activity, ['canais', 'jornadas', 'segmentos', 'parceiros'])
+      matchActivity(activity, ['canais', 'jornadas', 'segmentos', 'parceiros', 'subgrupos'])
     );
 
     staticMatched.forEach(activity => {
@@ -118,13 +126,15 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
       if (activity.jornada) available.jornadas.add(activity.jornada);
       if (activity.segmento) available.segmentos.add(activity.segmento);
       if (activity.parceiro) available.parceiros.add(activity.parceiro);
+      if (activity.subgrupo) available.subgrupos.add(activity.subgrupo);
     });
 
     const countMaps: Record<FilterKey, Record<string, number>> = {
       canais: countByCanal,
       jornadas: countByJornada,
       segmentos: countBySegmento,
-      parceiros: countByParceiro
+      parceiros: countByParceiro,
+      subgrupos: countBySubgrupo
     };
 
     const otherKeys = (key: FilterKey) => FILTER_KEYS.filter(k => k !== key);
@@ -147,10 +157,12 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
       availableJornadas: Array.from(available.jornadas).sort(),
       availableSegmentos: Array.from(available.segmentos).sort(),
       availableParceiros: Array.from(available.parceiros).sort(),
+      availableSubgrupos: Array.from(available.subgrupos).sort(),
       countByCanal,
       countByJornada,
       countBySegmento,
       countByParceiro,
+      countBySubgrupo,
       totalRemainingDisparos
     };
   }, [allActivities, filters, filteredData]);
@@ -161,10 +173,12 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
     availableJornadas: orchestrator.availableJornadas,
     availableSegmentos: orchestrator.availableSegmentos,
     availableParceiros: orchestrator.availableParceiros,
+    availableSubgrupos: orchestrator.availableSubgrupos,
     countByCanal: orchestrator.countByCanal,
     countByJornada: orchestrator.countByJornada,
     countBySegmento: orchestrator.countBySegmento,
     countByParceiro: orchestrator.countByParceiro,
+    countBySubgrupo: orchestrator.countBySubgrupo,
     totalRemainingDisparos: orchestrator.totalRemainingDisparos
   };
 };

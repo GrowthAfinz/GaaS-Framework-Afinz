@@ -137,6 +137,7 @@ export const mapSqlToActivity = (row: any): Activity => {
         segmento,
         parceiro,
         jornada,
+        subgrupo: normalizeText(row['Subgrupos']),
         ordemDisparo: Number(row['Ordem de disparo']) || undefined,
         oferta,
         promocional,
