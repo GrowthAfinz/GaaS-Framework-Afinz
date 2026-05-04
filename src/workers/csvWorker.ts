@@ -328,7 +328,7 @@ const handleFramework = (csvText: string) => {
                         segmento: validRow['Segmento'] || 'Desconhecido',
                         jornada: jornadaValue,
                         parceiro: validRow['Parceiro'] || 'Desconhecido',
-                        subgrupo: (validRow['Subgrupos'] as string) || undefined,
+                        subgrupo: (validRow['Subgrupos'] as string) || 'N/A / Padrão',
                         ordemDisparo: typeof validRow['Ordem de disparo'] === 'number' ? validRow['Ordem de disparo'] : undefined,
                         oferta: validRow['Oferta'],
                         safraKey: parseSafraToKey(validRow['Safra']) || undefined,
