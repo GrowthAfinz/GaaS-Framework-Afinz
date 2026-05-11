@@ -204,21 +204,35 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
         });
       });
 
-    // APPLY SORTING
-    result.sort((a, b) => {
-      let aVal: any = a[sortKey as keyof MonthRow];
-      let bVal: any = b[sortKey as keyof MonthRow];
+    // NO SORTING - Maintain month grouping structure
+    // Months are already sorted chronologically from the Map iteration
+    // (Maps maintain insertion order in JavaScript)
+    // Sorting would break the header-objective grouping
+    const finalResult: MonthRow[] = [];
+    let monthHeaders: MonthRow[] = [];
+    let monthObjectives: MonthRow[] = [];
 
-      // Group headers sempre no topo
-      if (a.isGroupHeader && !b.isGroupHeader) return -1;
-      if (!a.isGroupHeader && b.isGroupHeader) return 1;
-
-      if (typeof aVal === 'string') {
-        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    result.forEach(row => {
+      if (row.isGroupHeader) {
+        // Flush previous month's data
+        if (monthHeaders.length > 0) {
+          finalResult.push(...monthHeaders);
+          finalResult.push(...monthObjectives);
+        }
+        monthHeaders = [row];
+        monthObjectives = [];
+      } else {
+        monthObjectives.push(row);
       }
-
-      return sortDir === 'asc' ? (aVal - bVal) : (bVal - aVal);
     });
+
+    // Flush last month
+    if (monthHeaders.length > 0) {
+      finalResult.push(...monthHeaders);
+      finalResult.push(...monthObjectives);
+    }
+
+    return finalResult;
 
     return result;
   }, [filteredRawData, sortKey, sortDir]);
