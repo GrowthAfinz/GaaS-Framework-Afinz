@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { DailyMetrics } from '../../types';
 import { FilterState } from '../../context/FilterContext';
 import { ChevronDown, ChevronUp, ArrowUp, ArrowDown, Eye, EyeOff } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, getDate } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface MonthRow {
@@ -32,17 +32,35 @@ interface DeltaMoMProps {
   curr: number;
   prev: number;
   inverse?: boolean;
+  currDay?: number;  // Current day of month (e.g., 11)
+  prevDay?: number;  // Previous month days (e.g., 30 for April)
 }
 
-const DeltaMoM: React.FC<DeltaMoMProps> = ({ curr, prev, inverse }) => {
+const DeltaMoM: React.FC<DeltaMoMProps> = ({ curr, prev, inverse, currDay, prevDay }) => {
   if (!prev) return null;
-  const pct = ((curr - prev) / prev) * 100;
+
+  // 🔥 PROPORTIONAL MoM: If in incomplete month, normalize by days
+  let currNormalized = curr;
+  let prevNormalized = prev;
+
+  if (currDay && prevDay && currDay < prevDay) {
+    // Current month is incomplete, normalize both sides by days
+    // Daily average: value / days completed
+    const currDailyAvg = curr / currDay;
+    const prevDailyAvg = prev / prevDay;
+
+    // Compare using daily averages (for fair comparison)
+    currNormalized = currDailyAvg;
+    prevNormalized = prevDailyAvg;
+  }
+
+  const pct = ((currNormalized - prevNormalized) / prevNormalized) * 100;
   const isGood = inverse ? pct < 0 : pct > 0;
   const color = pct === 0 ? 'text-slate-400' : isGood ? 'text-emerald-600' : 'text-red-500';
   const Icon = pct > 0 ? ArrowUp : pct < 0 ? ArrowDown : null;
 
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-bold ml-1.5 ${color}`}>
+    <span className={`inline-flex items-center gap-0.5 text-xs font-bold ml-1.5 ${color}`} title={currDay ? `Comparação proporcional: ${currDay} dias vs ${prevDay} dias` : ''}>
       {Icon && <Icon size={12} />}
       {Math.abs(pct).toFixed(0)}%
     </span>
@@ -95,13 +113,35 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
     });
   }, [rawData, filters]);
 
+  // 📊 Calculate days per month for MoM comparison (OUTSIDE useMemo for access in render)
+  const daysPerMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredRawData.forEach(d => {
+      const monthKey = format(new Date(d.date), 'yyyy-MM');
+      const dayOfMonth = getDate(new Date(d.date));
+      if (!map.has(monthKey) || dayOfMonth > map.get(monthKey)!) {
+        map.set(monthKey, dayOfMonth);
+      }
+    });
+    return map;
+  }, [filteredRawData]);
+
   // 📊 AGGREGATE BY MONTH AND OBJECTIVE
+  // WITH PROPORTIONAL MoM (respects incomplete months)
   const rows = useMemo<MonthRow[]>(() => {
     const monthMap = new Map<string, Map<string, any>>();
+    const today = new Date();
+    const currentDay = getDate(today);
+    const currentMonth = format(today, 'yyyy-MM');
 
     filteredRawData.forEach(d => {
       const key = format(new Date(d.date), 'yyyy-MM');
       const objective = d.objective || 'Sem Objetivo';
+      const dayOfMonth = getDate(new Date(d.date));
+
+      // IMPORTANT: For current month, only include data up to today
+      // For other months, include all data
+      if (key === currentMonth && dayOfMonth > currentDay) return;
 
       if (!monthMap.has(key)) monthMap.set(key, new Map());
       const objMap = monthMap.get(key)!;
@@ -316,7 +356,12 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                         >
                           {fmtPct(row.ctr)}
                           {prev && !prev.isGroupHeader && prev.objective === row.objective && (
-                            <DeltaMoM curr={row.ctr} prev={prev.ctr} />
+                            <DeltaMoM
+                              curr={row.ctr}
+                              prev={prev.ctr}
+                              currDay={daysPerMonth.get(row.key.split('-')[0])}
+                              prevDay={daysPerMonth.get(prev.key.split('-')[0])}
+                            />
                           )}
                         </span>
                       ) : col.key === 'cpa' ? (
@@ -330,7 +375,13 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                         >
                           {col.formatter(row.cpa)}
                           {prev && prev.cpa > 0 && row.cpa > 0 && !prev.isGroupHeader && prev.objective === row.objective && (
-                            <DeltaMoM curr={row.cpa} prev={prev.cpa} inverse />
+                            <DeltaMoM
+                              curr={row.cpa}
+                              prev={prev.cpa}
+                              inverse
+                              currDay={daysPerMonth.get(row.key.split('-')[0])}
+                              prevDay={daysPerMonth.get(prev.key.split('-')[0])}
+                            />
                           )}
                         </span>
                       ) : (
@@ -341,6 +392,8 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                               curr={row[col.key as keyof MonthRow] as number}
                               prev={prev[col.key as keyof MonthRow] as number}
                               inverse={col.inverse}
+                              currDay={daysPerMonth.get(row.key.split('-')[0])}
+                              prevDay={daysPerMonth.get(prev.key.split('-')[0])}
                             />
                           )}
                         </span>
