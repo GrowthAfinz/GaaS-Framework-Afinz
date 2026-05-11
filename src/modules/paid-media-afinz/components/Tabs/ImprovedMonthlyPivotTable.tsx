@@ -275,46 +275,29 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
 
   return (
     <div className="space-y-4">
-      {/* Column Visibility Controls */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Colunas:</span>
-        {allColumns.map(col => (
-          <button
-            key={col.key}
-            onClick={() => toggleColumn(col.key)}
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all ${
-              visibleColumns.has(col.key)
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-slate-100 text-slate-500 opacity-60'
-            }`}
-          >
-            {visibleColumns.has(col.key) ? <Eye size={14} /> : <EyeOff size={14} />}
-            {col.label}
-          </button>
-        ))}
-      </div>
-
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-        <table className="w-full text-sm border-collapse">
+      <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+        <table className="w-full text-sm border-collapse bg-white">
           <thead>
-            <tr className="bg-slate-50 border-b-2 border-slate-200">
+            <tr className="bg-gradient-to-b from-slate-100 to-slate-50 border-b border-slate-200">
               {visibleCols.map(col => (
                 <th
                   key={col.key}
                   onClick={() => !col.key.startsWith('label') && handleSort(col.key)}
-                  className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider ${
+                  className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider text-slate-700 ${
                     col.align === 'right' ? 'text-right' : 'text-left'
                   } ${
                     col.key !== 'label'
-                      ? 'cursor-pointer hover:bg-slate-100 transition-colors'
+                      ? 'cursor-pointer hover:bg-slate-200 transition-colors'
                       : ''
                   }`}
                 >
                   <div className="flex items-center gap-2 whitespace-nowrap">
                     {col.label}
                     {sortKey === col.key && (
-                      sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                      <span className="text-teal-600">
+                        {sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </span>
                     )}
                   </div>
                 </th>
@@ -331,10 +314,10 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                   key={row.key}
                   className={`border-b border-slate-100 transition-colors ${
                     row.isGroupHeader
-                      ? 'bg-slate-800 text-white font-bold hover:bg-slate-700'
+                      ? 'bg-slate-200 font-bold text-slate-800 hover:bg-slate-300'
                       : isObjectiveRow
-                      ? 'bg-slate-50 hover:bg-blue-50/60'
-                      : 'bg-white hover:bg-blue-50/40'
+                      ? 'bg-slate-50 text-slate-800 hover:bg-slate-100'
+                      : 'bg-white text-slate-800 hover:bg-slate-50'
                   }`}
                 >
                   {visibleCols.map(col => (
@@ -343,7 +326,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                       className={`px-4 py-2.5 ${col.align === 'right' ? 'text-right' : 'text-left'}`}
                     >
                       {col.key === 'label' ? (
-                        <span className={isObjectiveRow ? 'ml-6 text-xs font-medium' : 'font-semibold'}>
+                        <span className={isObjectiveRow ? 'ml-6 text-xs font-medium text-slate-600' : 'font-semibold text-slate-800'}>
                           {row.label}
                         </span>
                       ) : col.key === 'ctr' ? (
@@ -385,7 +368,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                           )}
                         </span>
                       ) : (
-                        <span className="font-mono">
+                        <span className="font-mono text-slate-700">
                           {col.formatter(row[col.key as keyof MonthRow] as any)}
                           {prev && !prev.isGroupHeader && prev.objective === row.objective && (
                             <DeltaMoM
@@ -405,7 +388,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
             })}
           </tbody>
           <tfoot>
-            <tr className="bg-slate-900 text-white font-bold">
+            <tr className="bg-slate-200 text-slate-800 font-bold border-t-2 border-slate-300">
               {visibleCols.map(col => (
                 <td key={col.key} className={`px-4 py-3 text-xs uppercase tracking-wider ${
                   col.align === 'right' ? 'text-right' : 'text-left'
@@ -416,6 +399,25 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      {/* Column Visibility Controls - Subtle Footer */}
+      <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
+        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Mostrar:</span>
+        {allColumns.map(col => (
+          <button
+            key={col.key}
+            onClick={() => toggleColumn(col.key)}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all ${
+              visibleColumns.has(col.key)
+                ? 'bg-slate-200 text-slate-700 border border-slate-300'
+                : 'bg-slate-100 text-slate-400 border border-slate-200 opacity-70'
+            }`}
+          >
+            {visibleColumns.has(col.key) ? <Eye size={12} /> : <EyeOff size={12} />}
+            {col.label}
+          </button>
+        ))}
       </div>
     </div>
   );
