@@ -34,7 +34,7 @@ interface ColumnConfig {
   key: keyof KPIs | 'label';
   label: string;
   formatter: (v: number) => string;
-  align: 'left' | 'right';
+  align: 'left' | 'right' | 'center';
   inverse?: boolean;
 }
 
@@ -126,16 +126,18 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
 
   const allColumns: ColumnConfig[] = useMemo(() => [
     { key: 'label',       label: 'Mês',         formatter: (v: any) => v,                                align: 'left'  },
-    { key: 'spend',       label: 'Investimento', formatter: fmtBRL,                                       align: 'right' },
-    { key: 'impressions', label: 'Impressões',   formatter: fmtNum,                                       align: 'right' },
-    { key: 'clicks',      label: 'Cliques',      formatter: fmtNum,                                       align: 'right' },
-    { key: 'conversions', label: 'Conversões',   formatter: fmtNum,                                       align: 'right' },
-    { key: 'ctr',         label: 'CTR',          formatter: fmtPct,                                       align: 'right' },
-    { key: 'cpa',         label: 'CPA',          formatter: (v: number) => v > 0 ? fmtBRL(v) : '—',      align: 'right', inverse: true },
-    { key: 'cpm',         label: 'CPM',          formatter: fmtBRL,                                       align: 'right', inverse: true },
+    { key: 'spend',       label: 'Investimento', formatter: fmtBRL,                                       align: 'center' },
+    { key: 'impressions', label: 'Impressões',   formatter: fmtNum,                                       align: 'center' },
+    { key: 'clicks',      label: 'Cliques',      formatter: fmtNum,                                       align: 'center' },
+    { key: 'conversions', label: 'Conversões',   formatter: fmtNum,                                       align: 'center' },
+    { key: 'ctr',         label: 'CTR',          formatter: fmtPct,                                       align: 'center' },
+    { key: 'cpa',         label: 'CPA',          formatter: (v: number) => v > 0 ? fmtBRL(v) : '—',      align: 'center', inverse: true },
+    { key: 'cpm',         label: 'CPM',          formatter: fmtBRL,                                       align: 'center', inverse: true },
   ], []);
 
-  const visibleCols = allColumns.filter(c => visibleColumns.has(c.key));
+  // 'label' (Mês) é sempre visível e não aparece nos controles de colunas
+  const toggleableColumns = allColumns.filter(c => c.key !== 'label');
+  const visibleCols = allColumns.filter(c => c.key === 'label' || visibleColumns.has(c.key));
 
   // 1. Filtros globais
   const filteredRawData = useMemo(() => {
@@ -270,7 +272,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                 <th
                   key={col.key}
                   className={`px-4 py-3 font-semibold text-xs uppercase tracking-wider text-slate-600 whitespace-nowrap ${
-                    col.align === 'right' ? 'text-right' : 'text-left'
+                    col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
                   }`}
                 >
                   {col.label}
@@ -296,7 +298,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                   {/* ── Header do Mês ── */}
                   <tr className="bg-slate-200 font-bold text-slate-800 border-b border-slate-300 hover:bg-slate-300 transition-colors">
                     {visibleCols.map(col => (
-                      <td key={col.key} className={`px-4 py-2.5 ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                      <td key={col.key} className={`px-4 py-2.5 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
                         {col.key === 'label'
                           ? <span className="font-semibold">{monthLabel}</span>
                           : renderCell(col, kpis, prevKPIs, currDay, prevDay)
@@ -314,7 +316,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
                     return (
                       <tr key={`${monthKey}-${objective}`} className="bg-white text-slate-700 border-b border-slate-100 hover:bg-slate-50 transition-colors">
                         {visibleCols.map(col => (
-                          <td key={col.key} className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                          <td key={col.key} className={`px-4 py-2 ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
                             {col.key === 'label'
                               ? <span className="ml-6 text-xs font-medium text-slate-500">{objective}</span>
                               : renderCell(col, objKPIs, prevObjKPIs, currDay, prevDay)
@@ -333,7 +335,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
           <tfoot>
             <tr className="bg-slate-100 text-slate-800 font-bold border-t-2 border-slate-300">
               {visibleCols.map(col => (
-                <td key={col.key} className={`px-4 py-3 text-xs uppercase tracking-wider ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                <td key={col.key} className={`px-4 py-3 text-xs uppercase tracking-wider ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
                   {col.key === 'label' ? (
                     'TOTAL GERAL'
                   ) : col.key === 'ctr' ? (
@@ -350,10 +352,10 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
         </table>
       </div>
 
-      {/* Controles de visibilidade de colunas */}
+      {/* Controles de visibilidade de colunas (sem o Mês, que é sempre fixo) */}
       <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Colunas:</span>
-        {allColumns.map(col => (
+        {toggleableColumns.map(col => (
           <button
             key={col.key}
             onClick={() => toggleColumn(col.key)}
