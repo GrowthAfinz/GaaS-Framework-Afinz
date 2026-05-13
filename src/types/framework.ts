@@ -33,6 +33,11 @@ export interface Activity {
   ordemDisparo?: number; // ordem de disparo dentro da jornada
   oferta?: string; // tipo de oferta
   promocional?: string; // variável promocional
+  oferta2?: string;
+  promocional2?: string;
+  produto?: string;
+  etapaAquisicao?: string;
+  perfilCredito?: string;
   // Safra/coorte do registro (normalizada como YYYY-MM)
   safraKey?: string;
   status?: 'Rascunho' | 'Scheduled' | 'Enviado' | 'Realizado'; // Adicionado para controle visual no calendário

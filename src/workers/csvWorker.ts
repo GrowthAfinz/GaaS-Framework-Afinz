@@ -331,6 +331,12 @@ const handleFramework = (csvText: string) => {
                         subgrupo: (validRow['Subgrupos'] as string) || 'N/A / Padrão',
                         ordemDisparo: typeof validRow['Ordem de disparo'] === 'number' ? validRow['Ordem de disparo'] : undefined,
                         oferta: validRow['Oferta'],
+                        promocional: validRow['Promocional'],
+                        oferta2: validRow['Oferta 2'],
+                        promocional2: validRow['Promocional 2'],
+                        produto: validRow['Produto'],
+                        etapaAquisicao: validRow['Etapa de aquisição'],
+                        perfilCredito: validRow['Perfil de Crédito'],
                         safraKey: parseSafraToKey(validRow['Safra']) || undefined,
                         kpis: {
                             baseEnviada: parseNumber(validRow['Base Total']),
