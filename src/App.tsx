@@ -221,13 +221,13 @@ function App() {
   );
 
   const { filteredData: previousAdvancedFilteredData } = useAdvancedFilters(
-    shouldRunFilters ? data : {},
-    previousFilters
+    (shouldRunFilters && previousFilters) ? data : {},
+    previousFilters || {}
   );
 
   const { filteredData: previousFilteredData } = useCalendarFilter(
-    shouldRunFilters ? previousAdvancedFilteredData : {},
-    previousFilters
+    (shouldRunFilters && previousFilters) ? previousAdvancedFilteredData : {},
+    previousFilters || {}
   );
 
   const resultados = useResultadosMetrics(filteredData);
