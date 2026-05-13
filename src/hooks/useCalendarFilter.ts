@@ -3,9 +3,11 @@ import { CalendarData, FilterState } from '../types/framework';
 
 export const useCalendarFilter = (data: CalendarData, filters: FilterState) => {
   const filteredData = useMemo(() => {
+    const selectedBUs = Array.isArray(filters?.bu) ? filters.bu : [];
+
     // If no BU selected, show all data (don't filter out)
     // This prevents the calendar from appearing empty
-    const busToFilter = filters.bu.length === 0 ? undefined : filters.bu;
+    const busToFilter = selectedBUs.length === 0 ? undefined : selectedBUs;
 
     const filtered: CalendarData = {};
 
@@ -20,7 +22,7 @@ export const useCalendarFilter = (data: CalendarData, filters: FilterState) => {
     });
 
     return filtered;
-  }, [data, filters.bu]);
+  }, [data, filters?.bu]);
 
   const activityCountByDay = useMemo(() => {
     const counts: { [dateKey: string]: number } = {};
@@ -51,6 +53,6 @@ export const useCalendarFilter = (data: CalendarData, filters: FilterState) => {
     activityCountByDay,
     getDominantBU,
     getTotalActivities,
-    selectedBUs: filters.bu
+    selectedBUs: Array.isArray(filters?.bu) ? filters.bu : []
   };
 };

@@ -42,38 +42,44 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
 
   const matchActivity = (activity: Activity, omit: FilterKey[] = []) => {
-    if (!omit.includes('canais') && filters.canais.length > 0 && !filters.canais.includes(activity.canal)) {
+    const selectedCanais = Array.isArray(filters?.canais) ? filters.canais : [];
+    const selectedJornadas = Array.isArray(filters?.jornadas) ? filters.jornadas : [];
+    const selectedSegmentos = Array.isArray(filters?.segmentos) ? filters.segmentos : [];
+    const selectedParceiros = Array.isArray(filters?.parceiros) ? filters.parceiros : [];
+    const selectedSubgrupos = Array.isArray(filters?.subgrupos) ? filters.subgrupos : [];
+    const selectedBUs = Array.isArray(filters?.bu) ? filters.bu : [];
+
+    if (!omit.includes('canais') && selectedCanais.length > 0 && !selectedCanais.includes(activity.canal)) {
       return false;
     }
 
-    if (!omit.includes('jornadas') && filters.jornadas.length > 0 && !filters.jornadas.includes(activity.jornada)) {
+    if (!omit.includes('jornadas') && selectedJornadas.length > 0 && !selectedJornadas.includes(activity.jornada)) {
       return false;
     }
 
-    if (!omit.includes('segmentos') && filters.segmentos.length > 0 && !filters.segmentos.includes(activity.segmento)) {
+    if (!omit.includes('segmentos') && selectedSegmentos.length > 0 && !selectedSegmentos.includes(activity.segmento)) {
       return false;
     }
 
-    if (!omit.includes('parceiros') && filters.parceiros.length > 0 && !filters.parceiros.includes(activity.parceiro)) {
+    if (!omit.includes('parceiros') && selectedParceiros.length > 0 && !selectedParceiros.includes(activity.parceiro)) {
       return false;
     }
 
-    const subgrupoFilter = filters.subgrupos ?? [];
-    if (!omit.includes('subgrupos') && subgrupoFilter.length > 0 && !subgrupoFilter.includes(activity.subgrupo ?? '')) {
+    if (!omit.includes('subgrupos') && selectedSubgrupos.length > 0 && !selectedSubgrupos.includes(activity.subgrupo ?? '')) {
       return false;
     }
 
-    if (filters.bu.length > 0 && !filters.bu.includes(activity.bu)) {
+    if (selectedBUs.length > 0 && !selectedBUs.includes(activity.bu)) {
       return false;
     }
 
-    const startDate = parseISODate(filters.dataInicio);
+    const startDate = parseISODate(filters?.dataInicio);
     if (startDate) {
       const activityDate = normalizeDayStart(new Date(activity.dataDisparo));
       if (activityDate < normalizeDayStart(startDate)) return false;
     }
 
-    const endDate = parseISODate(filters.dataFim);
+    const endDate = parseISODate(filters?.dataFim);
     if (endDate) {
       const activityDate = normalizeDayStart(new Date(activity.dataDisparo));
       if (activityDate > normalizeDayEnd(endDate)) return false;
