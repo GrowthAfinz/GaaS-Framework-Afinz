@@ -54,12 +54,8 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
         <ChannelDistribution items={channelDistribution} />
         <div className="border-t border-slate-100" />
         <TopOffersTable title="Top Ofertas" items={offerItems} />
-        {promoItems.length > 0 && (
-          <>
-            <div className="border-t border-slate-100" />
-            <TopOffersTable title="Top Promocionais" items={promoItems} />
-          </>
-        )}
+        <div className="border-t border-slate-100" />
+        <TopOffersTable title="Top Promocionais" items={promoItems} />
       </div>
     </div>
   );

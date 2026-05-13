@@ -12,6 +12,14 @@ const CANAL_COLORS: Record<string, string> = {
 
 const toDay = (v?: string) => (v || '').slice(0, 10);
 const isInPeriod = (date: string, start: string, end: string) => date >= start && date <= end;
+const ignoredDimensionValues = new Set(['n/a', 'na', 'nao se aplica', 'sem', 'sem valor', '-', '--']);
+
+const normalizeDimensionValue = (value?: string | null): string | null => {
+  const cleaned = String(value ?? '').trim();
+  if (!cleaned) return null;
+  if (ignoredDimensionValues.has(cleaned.toLowerCase())) return null;
+  return cleaned;
+};
 
 export function useDetailsPaneData(
   nodeId: string | null,
@@ -51,7 +59,7 @@ export function useDetailsPaneData(
     // Top offers by cartões
     const ofertaCounts = new Map<string, { cartoes: number; count: number }>();
     for (const a of activities) {
-      const oferta = a.Oferta;
+      const oferta = normalizeDimensionValue(a.Oferta);
       if (!oferta) continue;
       const existing = ofertaCounts.get(oferta) ?? { cartoes: 0, count: 0 };
       ofertaCounts.set(oferta, {
@@ -68,13 +76,17 @@ export function useDetailsPaneData(
     // Top promocionais by cartões
     const promocionalCounts = new Map<string, { cartoes: number; count: number }>();
     for (const a of activities) {
-      const promo = a.Promocional;
-      if (!promo) continue;
-      const existing = promocionalCounts.get(promo) ?? { cartoes: 0, count: 0 };
-      promocionalCounts.set(promo, {
-        cartoes: existing.cartoes + (a['Cartões Gerados'] ?? 0),
-        count: existing.count + 1,
-      });
+      const promos = [a.Promocional, a['Promocional 2']]
+        .map(normalizeDimensionValue)
+        .filter((promo): promo is string => Boolean(promo));
+
+      for (const promo of Array.from(new Set(promos))) {
+        const existing = promocionalCounts.get(promo) ?? { cartoes: 0, count: 0 };
+        promocionalCounts.set(promo, {
+          cartoes: existing.cartoes + (a['Cartões Gerados'] ?? 0),
+          count: existing.count + 1,
+        });
+      }
     }
 
     const topPromocionais: TopPromocionalItem[] = Array.from(promocionalCounts.entries())

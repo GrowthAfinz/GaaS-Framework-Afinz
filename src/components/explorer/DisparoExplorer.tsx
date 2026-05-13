@@ -72,6 +72,19 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         Segmento: a.segmento || a.raw.Segmento,
         jornada: a.jornada || a.raw.jornada || a.raw.Jornada,
         Canal: a.canal || a.raw.Canal,
+        Parceiro: a.parceiro || a.raw.Parceiro,
+        Subgrupos: a.subgrupo || a.raw.Subgrupos,
+        Oferta: a.oferta || a.raw.Oferta,
+        Promocional: a.promocional || a.raw.Promocional,
+        'Oferta 2': a.raw['Oferta 2'],
+        'Promocional 2': a.raw['Promocional 2'],
+        Produto: a.raw.Produto,
+        'Ordem de disparo': a.ordemDisparo ?? a.raw['Ordem de disparo'],
+        'Cartões Gerados': a.kpis?.cartoes ?? a.raw['Cartões Gerados'],
+        Propostas: a.kpis?.propostas ?? a.raw.Propostas,
+        Aprovados: a.kpis?.aprovados ?? a.raw.Aprovados,
+        'Custo Total Campanha': a.kpis?.custoTotal ?? a.raw['Custo Total Campanha'],
+        CAC: a.kpis?.cac ?? a.raw.CAC,
         'Data de Disparo': dateStr
       } as unknown as ActivityRow;
     });
