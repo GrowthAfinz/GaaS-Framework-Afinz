@@ -1,0 +1,18 @@
+{
+  "source": "https://growthafinz.github.io/GaaS-Framework-Afinz/#",
+  "capturedAt": "2026-04-25T20:27:07.636Z",
+  "note": "Authentication was simulated in the automated browser to capture the published app screens without using real credentials.",
+  "files": [
+    "01-login.png",
+    "02-area-autenticada-sem-dados.png",
+    "03-launch-planner.png",
+    "04-diario-de-bordo.png",
+    "05-explorador-avancado.png",
+    "06-originacao-b2c.png",
+    "07-relatorios.png",
+    "08-jornada-e-disparos.png",
+    "09-orientador.png",
+    "10-media-analytics.png",
+    "11-configuracoes.png"
+  ]
+}

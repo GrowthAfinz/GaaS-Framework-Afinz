@@ -1,0 +1,422 @@
+import { useState, useMemo, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
+import { Menu } from 'lucide-react';
+import { CSVUpload } from './components/CSVUpload';
+import { InlineFilterBar } from './components/InlineFilterBar';
+import { LoginView } from './components/LoginView';
+import { SetPasswordView } from './components/SetPasswordView';
+
+import { ResultadosView } from './components/ResultadosView';
+import { RelatorioView } from './components/RelatorioView';
+import { JornadaDisparosView } from './components/JornadaDisparosView';
+import { DiarioBordo } from './components/DiarioBordo';
+import { FrameworkView } from './components/FrameworkView';
+import { OrientadorView } from './components/OrientadorView';
+import { ConfiguracoesView } from './components/ConfiguracoesView';
+import { OriginacaoB2CView } from './components/OriginacaoB2CView';
+import { DisparoExplorer } from './components/explorer/DisparoExplorer';
+import { useFrameworkData } from './hooks/useFrameworkData';
+import { useAdvancedFilters } from './hooks/useAdvancedFilters';
+import { useCalendarFilter } from './hooks/useCalendarFilter';
+import { useResultadosMetrics } from './hooks/useResultadosMetrics';
+import { useAppStore } from './store/useAppStore';
+import { usePeriod } from './contexts/PeriodContext';
+import { useBU } from './contexts/BUContext';
+import { endOfMonth, format, startOfMonth, subDays, subMonths } from 'date-fns';
+import { MainLayout } from './components/layout/MainLayout';
+import { LaunchPlanner } from './components/launch-planner/LaunchPlanner';
+import PaidMediaAfinzApp from './modules/paid-media-afinz/PaidMediaAfinzApp';
+import { AnimatePresence } from 'framer-motion';
+import { PageTransition } from './components/layout/PageTransition';
+import './App.css';
+import { useAuth } from './context/AuthContext';
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[AppErrorBoundary] Render error caught:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-screen w-full bg-slate-50 flex flex-col items-center justify-center gap-4 p-8">
+          <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-500 text-2xl">!</span>
+            </div>
+            <h2 className="text-lg font-bold text-slate-800 mb-2">Algo deu errado</h2>
+            <p className="text-slate-500 text-sm mb-6">Ocorreu um erro inesperado. Clique abaixo para tentar novamente.</p>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-medium text-sm transition-colors"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function App() {
+  const { user, loading: authLoading } = useAuth();
+  const [urlHash, setUrlHash] = useState(window.location.hash);
+  const [isFilterDropOpen, setIsFilterDropOpen] = useState(false);
+  const [isFilterMenuLocked, setIsFilterMenuLocked] = useState(false);
+  const filterCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filterShellRef = useRef<HTMLDivElement | null>(null);
+
+  const openFilterDrop = () => {
+    if (filterCloseTimeoutRef.current) {
+      clearTimeout(filterCloseTimeoutRef.current);
+      filterCloseTimeoutRef.current = null;
+    }
+    setIsFilterDropOpen(true);
+  };
+
+  const scheduleCloseFilterDrop = () => {
+    if (isFilterMenuLocked) return;
+    if (filterCloseTimeoutRef.current) {
+      clearTimeout(filterCloseTimeoutRef.current);
+    }
+    filterCloseTimeoutRef.current = setTimeout(() => {
+      setIsFilterDropOpen(false);
+      filterCloseTimeoutRef.current = null;
+    }, 260);
+  };
+
+  useEffect(() => {
+    if (isFilterMenuLocked && filterCloseTimeoutRef.current) {
+      clearTimeout(filterCloseTimeoutRef.current);
+      filterCloseTimeoutRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFilterMenuLocked]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!isFilterDropOpen) return;
+      if (!filterShellRef.current) return;
+      if (filterShellRef.current.contains(event.target as Node)) return;
+      scheduleCloseFilterDrop();
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFilterDropOpen, isFilterMenuLocked]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setUrlHash(window.location.hash);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (filterCloseTimeoutRef.current) {
+        clearTimeout(filterCloseTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const {
+    viewSettings,
+    updateActivity,
+    setTab
+  } = useAppStore();
+  const storeFilters = viewSettings.filtrosGlobais;
+  const activeTab = viewSettings.abaAtual;
+
+  const { startDate, endDate, compareEnabled } = usePeriod();
+  const { selectedBUs } = useBU();
+
+  const { data, loading, error, totalActivities, processCSV, loadSimulatedData } = useFrameworkData();
+
+  const filters = useMemo(() => ({
+    ...storeFilters,
+    dataInicio: format(startDate, 'yyyy-MM-dd'),
+    dataFim: format(endDate, 'yyyy-MM-dd'),
+    bu: selectedBUs
+  }), [storeFilters, startDate, endDate, selectedBUs]);
+
+  const isFrameworkView = activeTab === 'framework';
+  const isMidiaPaga = activeTab === 'midia-paga';
+  const shouldRunFilters = !isFrameworkView && !isMidiaPaga;
+
+  const {
+    filteredData: advancedFilteredData,
+    availableCanais,
+    availableJornadas,
+    availableSegmentos,
+    availableParceiros,
+    availableSubgrupos,
+    countByCanal,
+    countByJornada,
+    countBySegmento,
+    countByParceiro,
+    countBySubgrupo,
+    totalRemainingDisparos
+  } = useAdvancedFilters(
+    shouldRunFilters ? data : {},
+    filters
+  );
+
+  const { filteredData } = useCalendarFilter(advancedFilteredData, filters);
+
+  const previousFilters = useMemo(() => {
+    const isFullMonth =
+      format(startDate, 'yyyy-MM-dd') === format(startOfMonth(startDate), 'yyyy-MM-dd') &&
+      format(endDate, 'yyyy-MM-dd') === format(endOfMonth(startDate), 'yyyy-MM-dd');
+
+    const prevStart = isFullMonth
+      ? startOfMonth(subMonths(startDate, 1))
+      : subDays(startDate, Math.abs(Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))) + 1);
+    const prevEnd = isFullMonth
+      ? endOfMonth(subMonths(startDate, 1))
+      : subDays(startDate, 1);
+
+    return {
+      ...filters,
+      dataInicio: format(prevStart, 'yyyy-MM-dd'),
+      dataFim: format(prevEnd, 'yyyy-MM-dd')
+    };
+  }, [filters, startDate, endDate]);
+
+  const launchPlannerFilters = useMemo(() => ({
+    ...storeFilters,
+    bu: selectedBUs,
+    ofertas: [],
+    disparado: 'Todos' as const,
+    dataInicio: '',
+    dataFim: ''
+  }), [storeFilters, selectedBUs]);
+
+  const { filteredData: launchPlannerData } = useAdvancedFilters(
+    activeTab === 'launch' ? data : {},
+    launchPlannerFilters
+  );
+
+  const { filteredData: previousAdvancedFilteredData } = useAdvancedFilters(
+    shouldRunFilters ? data : {},
+    previousFilters
+  );
+
+  const { filteredData: previousFilteredData } = useCalendarFilter(
+    shouldRunFilters ? previousAdvancedFilteredData : {},
+    previousFilters
+  );
+
+  const resultados = useResultadosMetrics(filteredData);
+
+  const hasData = Object.keys(data).length > 0;
+
+  if (authLoading) {
+    return <div className="h-screen w-full bg-slate-50 text-slate-500 flex items-center justify-center">Carregando...</div>;
+  }
+
+  if (!user) return <LoginView />;
+
+  const isRecoveryFlow = urlHash.includes('type=recovery');
+  const isInviteFlow = urlHash.includes('type=invite');
+
+  if (user && (isRecoveryFlow || isInviteFlow)) {
+    return <SetPasswordView />;
+  }
+
+  if (activeTab === 'midia-paga') {
+    return (
+      <AppErrorBoundary>
+        <PaidMediaAfinzApp onBack={() => setTab('launch')} />
+      </AppErrorBoundary>
+    );
+  }
+
+  return (
+    <AppErrorBoundary>
+    <MainLayout
+      onHeaderMouseEnter={openFilterDrop}
+    >
+      {hasData && (
+        <div className="sticky top-0 z-30" ref={filterShellRef}>
+          <div
+            className={`
+              bg-white border-b border-slate-200 shadow-sm transform-gpu origin-top
+              transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
+              ${isFilterDropOpen ? 'max-h-44 opacity-100 translate-y-0 overflow-visible' : 'max-h-0 opacity-0 -translate-y-3 overflow-hidden pointer-events-none'}
+            `}
+            onMouseEnter={openFilterDrop}
+            onMouseMove={openFilterDrop}
+          >
+            <div className="px-6 py-3">
+              <InlineFilterBar
+                availableCanais={availableCanais}
+                availableJornadas={availableJornadas}
+                availableSegmentos={availableSegmentos}
+                availableParceiros={availableParceiros}
+                availableSubgrupos={availableSubgrupos}
+                countByCanal={countByCanal}
+                countByJornada={countByJornada}
+                countBySegmento={countBySegmento}
+                countByParceiro={countByParceiro}
+                countBySubgrupo={countBySubgrupo}
+                totalRemainingDisparos={totalRemainingDisparos}
+                onMenuLockChange={setIsFilterMenuLocked}
+              />
+            </div>
+          </div>
+
+          <div className="relative h-0">
+            <button
+              type="button"
+              aria-label="Area de ativacao dos filtros"
+              className={`absolute top-0 left-0 right-0 h-12 bg-transparent cursor-default z-10 ${isFilterDropOpen ? 'pointer-events-none' : 'pointer-events-auto'}`}
+              onMouseEnter={openFilterDrop}
+              onFocus={openFilterDrop}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 pb-10">
+        {loading && !hasData && (
+          <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                <Menu size={32} className="text-blue-400" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Verificando dados...</h2>
+              <p className="text-slate-500">Carregando informacoes do banco de dados</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !hasData && (
+          <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+            <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-lg">
+              <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Menu size={32} className="text-blue-400" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Bem-vindo ao GaaS</h2>
+              <p className="text-slate-500 mb-8">Faca upload do seu arquivo de dados para comecar a analise.</p>
+              <CSVUpload
+                onFileSelect={processCSV}
+                onLoadSimulatedData={loadSimulatedData}
+                loading={loading}
+                error={error}
+                totalActivities={totalActivities}
+              />
+            </div>
+          </div>
+        )}
+
+        {hasData && (
+          <AnimatePresence mode="wait">
+            <div className="h-full" key={activeTab}>
+              {activeTab === 'launch' && (
+                <PageTransition>
+                  <LaunchPlanner
+                    data={launchPlannerData}
+                    onActivityUpdate={(id, newDate) => updateActivity(id, { dataDisparo: newDate })}
+                  />
+                </PageTransition>
+              )}
+              {activeTab === 'resultados' && (
+                <PageTransition>
+                  <ResultadosView
+                    resultados={resultados}
+                    data={filteredData}
+                    selectedBU={selectedBUs.length === 1 ? selectedBUs[0] : undefined}
+                  />
+                </PageTransition>
+              )}
+              {activeTab === 'jornada' && (
+                <PageTransition>
+                  <JornadaDisparosView
+                    data={filteredData}
+                    previousData={previousFilteredData}
+                    selectedBU={selectedBUs.length === 1 ? selectedBUs[0] : undefined}
+                    selectedCanais={filters.canais}
+                    selectedSegmentos={filters.segmentos}
+                    selectedParceiros={filters.parceiros}
+                  />
+                </PageTransition>
+              )}
+              {activeTab === 'diario' && (
+                <PageTransition>
+                  <DiarioBordo />
+                </PageTransition>
+              )}
+              {activeTab === 'explorador' && (
+                <PageTransition>
+                  <DisparoExplorer
+                    filteredActivities={Object.values(advancedFilteredData).flat()}
+                    onNavigateToFramework={(f) => {
+                      setTab('framework');
+                      if (f?.bu || f?.segmento || f?.jornada) {
+                        const patch: Record<string, string[]> = {};
+                        if (f.bu) patch['bu'] = [f.bu];
+                        if (f.segmento) patch['segmentos'] = [f.segmento];
+                        if (f.jornada) patch['jornadas'] = [f.jornada];
+                      }
+                    }}
+                  />
+                </PageTransition>
+              )}
+              {activeTab === 'framework' && (
+                <PageTransition>
+                  <FrameworkView />
+                </PageTransition>
+              )}
+              {activeTab === 'relatorio' && (
+                <PageTransition>
+                  <RelatorioView
+                    data={advancedFilteredData}
+                    previousData={previousAdvancedFilteredData}
+                    compareEnabled={compareEnabled}
+                    selectedBU={selectedBUs.length === 1 ? selectedBUs[0] : undefined}
+                  />
+                </PageTransition>
+              )}
+              {activeTab === 'orientador' && (
+                <PageTransition>
+                  <OrientadorView />
+                </PageTransition>
+              )}
+              {activeTab === 'originacao-b2c' && (
+                <PageTransition>
+                  <OriginacaoB2CView />
+                </PageTransition>
+              )}
+              {activeTab === 'configuracoes' && (
+                <PageTransition>
+                  <ConfiguracoesView />
+                </PageTransition>
+              )}
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga', 'relatorio'].includes(activeTab) && (
+                <div className="flex items-center justify-center h-full text-slate-500">
+                  <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
+                </div>
+              )}
+            </div>
+          </AnimatePresence>
+        )}
+      </div>
+    </MainLayout>
+    </AppErrorBoundary>
+  );
+}
+
+export default App;

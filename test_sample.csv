@@ -1,0 +1,4 @@
+Activity name / Taxonomia;Data de Disparo;BU;Canal;Segmento;Jornada;Parceiro;Safra;Oferta;Ordem de disparo;Base Total;Base Acionável;Taxa de Entrega;Propostas;Taxa de Proposta;Aprovados;Taxa de Aprovação;Cartões Gerados;Taxa de Finalização;Taxa de Conversão;Taxa de Abertura;CAC;Custo Total Campanha
+Campanha Teste 1;15/10/2025;B2C;Email;Premium;Aquisição;Parceiro A;out/25;Oferta Gold;1;10000;8500;85%;500;5,88%;300;60%;250;83,33%;2,5%;12%;15,50;3875,00
+Campanha Teste 2;20/10/2025;B2B2C;SMS;Standard;Retenção;Parceiro B;out/25;Oferta Silver;2;5000;4200;84%;200;4,76%;100;50%;80;80%;1,6%;10%;20,00;1600,00
+Campanha Teste 3;25/10/2025;Plurix;WhatsApp;VIP;Upsell;Parceiro C;out/25;Oferta Platinum;3;15000;12000;80%;800;6,67%;500;62,5%;400;80%;2,67%;15%;12,25;4900,00
