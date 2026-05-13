@@ -643,20 +643,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     </div>
   );
 
-  const ComparisonModeBadge = () => {
-    if (!shouldShowComparison) return null;
-
-    const modeLabel = compareMode === 'samePeriodLastMonth'
-      ? 'Modo MoM: Comparando com mesmo período do mês anterior'
-      : 'Modo: Comparando com período anterior';
-
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-700">
-        {modeLabel}
-      </span>
-    );
-  };
-
   if (reportActivities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
@@ -709,17 +695,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           </div>
         </div>
 
-        {/* Comparison Mode Feedback */}
-        {compareMode && (
-          <div className="bg-blue-50 border-t border-blue-200 px-8 py-3 flex items-center gap-2">
-            <div className="text-sm text-blue-800 font-medium">
-              {compareMode === 'samePeriodLastMonth'
-                ? '📊 Modo MoM ativado: Comparando com o mesmo período do mês anterior'
-                : '📊 Comparação ativada: Comparando com período anterior'}
-            </div>
-          </div>
-        )}
-
         {/* KPI Summary Strip */}
         {reportMode === 'performance' && <div className="grid grid-cols-4 divide-x divide-slate-200 bg-white border-x border-b border-slate-200">
           {[
@@ -757,7 +732,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             <div className="w-1 h-6 rounded-full" style={{ background: TEAL }} />
             <h2 className="text-base font-bold text-slate-800">Performance campanhas</h2>
             <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{segmentoRows.length} segmentos</span>
-            <ComparisonModeBadge />
           </div>
           <button
             onClick={exportSegmento}
@@ -950,7 +924,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             <div className="w-1 h-6 rounded-full" style={{ background: TEAL }} />
             <h2 className="text-base font-bold text-slate-800">Performance canais</h2>
             <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{canalRows.length} canais</span>
-            <ComparisonModeBadge />
           </div>
           <button
             onClick={exportCanal}
