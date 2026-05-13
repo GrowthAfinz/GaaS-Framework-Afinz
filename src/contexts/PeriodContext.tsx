@@ -8,10 +8,10 @@ interface PeriodContextType {
     endDate: Date;
     preset: PeriodPreset;
     compareEnabled: boolean;
-    compareMode: 'previousPeriod' | null;
+    compareMode: 'previousPeriod' | 'samePeriodLastMonth' | null;
     setPeriod: (start: Date, end: Date, preset?: PeriodPreset) => void;
     setPreset: (preset: PeriodPreset) => void;
-    toggleCompare: (enabled: boolean) => void;
+    toggleCompare: (mode: 'previousPeriod' | 'samePeriodLastMonth' | null) => void;
 }
 
 const PeriodContext = createContext<PeriodContextType | undefined>(undefined);
@@ -23,7 +23,7 @@ export const PeriodProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [endDate, setEndDate] = useState<Date>(() => endOfMonth(new Date()));
     const [preset, setPresetState] = useState<PeriodPreset>('thisMonth');
     const [compareEnabled, setCompareEnabled] = useState(false);
-    const [compareMode, setCompareMode] = useState<'previousPeriod' | null>(null);
+    const [compareMode, setCompareMode] = useState<'previousPeriod' | 'samePeriodLastMonth' | null>(null);
 
 
     // Initial load effect
@@ -104,13 +104,9 @@ export const PeriodProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setPresetState(newPreset);
     };
 
-    const toggleCompare = (enabled: boolean) => {
-        setCompareEnabled(enabled);
-        if (enabled && !compareMode) {
-            setCompareMode('previousPeriod');
-        } else if (!enabled) {
-            setCompareMode(null);
-        }
+    const toggleCompare = (mode: 'previousPeriod' | 'samePeriodLastMonth' | null) => {
+        setCompareMode(mode);
+        setCompareEnabled(mode !== null);
     };
 
     return (

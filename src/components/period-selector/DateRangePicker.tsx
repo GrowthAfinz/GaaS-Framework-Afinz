@@ -22,7 +22,8 @@ interface DateRangePickerProps {
     initialStartDate: Date;
     initialEndDate: Date;
     initialCompareEnabled?: boolean;
-    onApply: (start: Date, end: Date, compareEnabled: boolean) => void;
+    initialCompareMode?: 'previousPeriod' | 'samePeriodLastMonth' | null;
+    onApply: (start: Date, end: Date, compareMode: 'previousPeriod' | 'samePeriodLastMonth' | null) => void;
     onCancel: () => void;
 }
 
@@ -30,13 +31,16 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     initialStartDate,
     initialEndDate,
     initialCompareEnabled = false,
+    initialCompareMode = null,
     onApply,
     onCancel
 }) => {
     const [startDate, setStartDate] = useState<Date>(initialStartDate);
     const [endDate, setEndDate] = useState<Date>(initialEndDate);
     const [hoverDate, setHoverDate] = useState<Date | null>(null);
-    const [compareEnabled, setCompareEnabled] = useState(initialCompareEnabled);
+    const [compareMode, setCompareMode] = useState<'previousPeriod' | 'samePeriodLastMonth' | null>(
+        initialCompareMode || (initialCompareEnabled ? 'previousPeriod' : null)
+    );
 
     const [viewDate, setViewDate] = useState<Date>(endOfMonth(new Date()));
     const today = React.useMemo(() => new Date(), []);
@@ -71,11 +75,15 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         setViewDate(end);
     };
 
-    const prevStart = compareEnabled && startDate && endDate
-        ? subDays(startDate, differenceInDays(endDate, startDate) + 1)
+    const prevStart = compareMode && startDate && endDate
+        ? compareMode === 'previousPeriod'
+            ? subDays(startDate, differenceInDays(endDate, startDate) + 1)
+            : subMonths(startDate, 1)
         : null;
-    const prevEnd = compareEnabled && startDate && endDate
-        ? subDays(endDate, differenceInDays(endDate, startDate) + 1)
+    const prevEnd = compareMode && startDate && endDate
+        ? compareMode === 'previousPeriod'
+            ? subDays(endDate, differenceInDays(endDate, startDate) + 1)
+            : subMonths(endDate, 1)
         : null;
 
     const renderCalendar = (monthDate: Date, position: 'left' | 'right') => {
@@ -207,31 +215,63 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-slate-200 flex justify-between items-center bg-slate-50">
-                    <div className="flex items-center gap-2">
+                <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3">
+                    <fieldset className="border border-slate-200 rounded-lg p-4 space-y-3">
+                        <legend className="text-sm font-bold text-slate-900 px-2">Comparações</legend>
+
                         <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                             <input
-                                type="checkbox"
-                                checked={compareEnabled}
-                                onChange={(e) => setCompareEnabled(e.target.checked)}
+                                type="radio"
+                                name="compare"
+                                value="none"
+                                checked={compareMode === null}
+                                onChange={() => setCompareMode(null)}
                                 className="rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
                             />
-                            Comparar com periodo anterior
+                            Sem comparação
                         </label>
-                    </div>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={onCancel}
-                            className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={() => onApply(startDate, endDate || startDate, compareEnabled)}
-                            className="px-4 py-2 text-sm font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-500"
-                        >
-                            Aplicar
-                        </button>
+
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="compare"
+                                value="previousPeriod"
+                                checked={compareMode === 'previousPeriod'}
+                                onChange={() => setCompareMode('previousPeriod')}
+                                className="rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
+                            />
+                            Comparar com período anterior
+                        </label>
+
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                            <input
+                                type="radio"
+                                name="compare"
+                                value="samePeriodLastMonth"
+                                checked={compareMode === 'samePeriodLastMonth'}
+                                onChange={() => setCompareMode('samePeriodLastMonth')}
+                                className="rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
+                            />
+                            Comparar com o mesmo período no mês anterior
+                        </label>
+                    </fieldset>
+
+                    <div className="flex justify-between items-center">
+                        <div />
+                        <div className="flex gap-3">
+                            <button
+                                onClick={onCancel}
+                                className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => onApply(startDate, endDate || startDate, compareMode)}
+                                className="px-4 py-2 text-sm font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-500"
+                            >
+                                Aplicar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

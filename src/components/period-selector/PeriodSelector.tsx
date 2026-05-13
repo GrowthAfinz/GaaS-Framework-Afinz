@@ -11,7 +11,7 @@ interface PeriodSelectorProps {
 }
 
 export const PeriodSelector: React.FC<PeriodSelectorProps> = ({ compact = false, onOpenChange }) => {
-    const { startDate, endDate, setPeriod, compareEnabled, toggleCompare } = usePeriod();
+    const { startDate, endDate, setPeriod, compareMode, toggleCompare } = usePeriod();
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,9 +33,9 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({ compact = false,
         onOpenChange?.(isOpen);
     }, [isOpen, onOpenChange]);
 
-    const handleApply = (start: Date, end: Date, compare: boolean) => {
+    const handleApply = (start: Date, end: Date, mode: 'previousPeriod' | 'samePeriodLastMonth' | null) => {
         setPeriod(start, end);
-        toggleCompare(compare);
+        toggleCompare(mode);
         setIsOpen(false);
     };
 
@@ -62,7 +62,7 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({ compact = false,
                         <DateRangePicker
                             initialStartDate={startDate}
                             initialEndDate={endDate}
-                            initialCompareEnabled={compareEnabled}
+                            initialCompareMode={compareMode}
                             onApply={handleApply}
                             onCancel={() => setIsOpen(false)}
                         />

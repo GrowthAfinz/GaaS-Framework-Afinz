@@ -140,7 +140,7 @@ function App() {
   const storeFilters = viewSettings.filtrosGlobais;
   const activeTab = viewSettings.abaAtual;
 
-  const { startDate, endDate, compareEnabled } = usePeriod();
+  const { startDate, endDate, compareEnabled, compareMode } = usePeriod();
   const { selectedBUs } = useBU();
 
   const { data, loading, error, totalActivities, processCSV, loadSimulatedData } = useFrameworkData();
@@ -177,6 +177,17 @@ function App() {
   const { filteredData } = useCalendarFilter(advancedFilteredData, filters);
 
   const previousFilters = useMemo(() => {
+    if (!compareMode) return null;
+
+    if (compareMode === 'samePeriodLastMonth') {
+      return {
+        ...filters,
+        dataInicio: format(subMonths(startDate, 1), 'yyyy-MM-dd'),
+        dataFim: format(subMonths(endDate, 1), 'yyyy-MM-dd')
+      };
+    }
+
+    // previousPeriod mode
     const isFullMonth =
       format(startDate, 'yyyy-MM-dd') === format(startOfMonth(startDate), 'yyyy-MM-dd') &&
       format(endDate, 'yyyy-MM-dd') === format(endOfMonth(startDate), 'yyyy-MM-dd');
@@ -193,7 +204,7 @@ function App() {
       dataInicio: format(prevStart, 'yyyy-MM-dd'),
       dataFim: format(prevEnd, 'yyyy-MM-dd')
     };
-  }, [filters, startDate, endDate]);
+  }, [filters, startDate, endDate, compareMode]);
 
   const launchPlannerFilters = useMemo(() => ({
     ...storeFilters,
@@ -384,8 +395,8 @@ function App() {
                 <PageTransition>
                   <RelatorioView
                     data={advancedFilteredData}
-                    previousData={previousAdvancedFilteredData}
-                    compareEnabled={compareEnabled}
+                    previousData={compareMode ? previousAdvancedFilteredData : undefined}
+                    compareMode={compareMode}
                     selectedBU={selectedBUs.length === 1 ? selectedBUs[0] : undefined}
                   />
                 </PageTransition>

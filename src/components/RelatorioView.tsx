@@ -11,7 +11,7 @@ import { MonthlyReportView } from './relatorio/MonthlyReportView';
 interface RelatorioViewProps {
   data: CalendarData;
   previousData?: CalendarData;
-  compareEnabled?: boolean;
+  compareMode?: 'previousPeriod' | 'samePeriodLastMonth' | null;
   selectedBU?: string;
 }
 
@@ -147,7 +147,7 @@ const PARCEIRO_COLORS: Record<string, string> = {
   'Plurix': 'bg-purple-50 text-purple-500 border-purple-100',
 };
 
-export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData, compareEnabled = false, selectedBU }) => {
+export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData, compareMode = null, selectedBU }) => {
   const { viewSettings, setGlobalFilters } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
   const [reportMode, setReportMode] = useState<'performance' | 'monthly'>('performance');
@@ -172,7 +172,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   ), [globalFilters]);
   const reportActivities = useMemo(() => filterReportActivities(allActivities), [allActivities, filterReportActivities]);
   const previousReportActivities = useMemo(() => filterReportActivities(previousAllActivities), [filterReportActivities, previousAllActivities]);
-  const shouldShowComparison = compareEnabled && previousData !== undefined;
+  const shouldShowComparison = compareMode !== null && previousData !== undefined;
 
   // ── Descrições por disparo ──
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
@@ -646,9 +646,13 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const ComparisonModeBadge = () => {
     if (!shouldShowComparison) return null;
 
+    const modeLabel = compareMode === 'samePeriodLastMonth'
+      ? 'Modo MoM: Comparando com mesmo período do mês anterior'
+      : 'Modo: Comparando com período anterior';
+
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-700">
-        Atual vs. período anterior
+        {modeLabel}
       </span>
     );
   };
@@ -704,6 +708,18 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             </div>
           </div>
         </div>
+
+        {/* Comparison Mode Feedback */}
+        {compareMode && (
+          <div className="bg-blue-50 border-t border-blue-200 px-8 py-3 flex items-center gap-2">
+            <div className="text-sm text-blue-800 font-medium">
+              {compareMode === 'samePeriodLastMonth'
+                ? '📊 Modo MoM ativado: Comparando com o mesmo período do mês anterior'
+                : '📊 Comparação ativada: Comparando com período anterior'}
+            </div>
+          </div>
+        )}
+
         {/* KPI Summary Strip */}
         {reportMode === 'performance' && <div className="grid grid-cols-4 divide-x divide-slate-200 bg-white border-x border-b border-slate-200">
           {[
