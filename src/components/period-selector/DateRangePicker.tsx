@@ -191,7 +191,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     };
 
     return (
-        <div className="flex h-[450px] bg-white">
+        <div className="flex h-[390px] bg-white">
             <div className="w-48 bg-slate-50 border-r border-slate-200 p-4 flex flex-col gap-2">
                 {presets.map((preset, i) => (
                     <button
@@ -215,63 +215,43 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3">
-                    <fieldset className="border border-slate-200 rounded-lg p-4 space-y-3">
-                        <legend className="text-sm font-bold text-slate-900 px-2">Comparações</legend>
+                <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 
-                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
                             <input
-                                type="radio"
-                                name="compare"
-                                value="none"
-                                checked={compareMode === null}
-                                onChange={() => setCompareMode(null)}
-                                className="rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
-                            />
-                            Sem comparação
-                        </label>
-
-                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                            <input
-                                type="radio"
-                                name="compare"
-                                value="previousPeriod"
+                                type="checkbox"
                                 checked={compareMode === 'previousPeriod'}
-                                onChange={() => setCompareMode('previousPeriod')}
-                                className="rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
+                                onChange={(event) => setCompareMode(event.target.checked ? 'previousPeriod' : null)}
+                                className="h-3.5 w-3.5 rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
                             />
-                            Comparar com período anterior
+                            Comparar com periodo anterior
                         </label>
 
-                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
                             <input
-                                type="radio"
-                                name="compare"
-                                value="samePeriodLastMonth"
+                                type="checkbox"
                                 checked={compareMode === 'samePeriodLastMonth'}
-                                onChange={() => setCompareMode('samePeriodLastMonth')}
-                                className="rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
+                                onChange={(event) => setCompareMode(event.target.checked ? 'samePeriodLastMonth' : null)}
+                                className="h-3.5 w-3.5 rounded border-slate-300 bg-white text-cyan-600 focus:ring-cyan-500/20"
                             />
-                            Comparar com o mesmo período no mês anterior
+                            Mesmo periodo no mes anterior
                         </label>
-                    </fieldset>
+                    </div>
 
-                    <div className="flex justify-between items-center">
-                        <div />
-                        <div className="flex gap-3">
+                    <div className="flex shrink-0 gap-3">
                             <button
                                 onClick={onCancel}
-                                className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+                                className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={() => onApply(startDate, endDate || startDate, compareMode)}
-                                className="px-4 py-2 text-sm font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-500"
+                                className="px-4 py-2 text-xs font-semibold bg-cyan-600 text-white rounded-lg hover:bg-cyan-500"
                             >
                                 Aplicar
                             </button>
-                        </div>
                     </div>
                 </div>
             </div>
