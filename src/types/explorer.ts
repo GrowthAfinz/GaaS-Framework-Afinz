@@ -98,12 +98,40 @@ export interface TopPromocionalItem {
   count: number;
 }
 
+export interface TopDimensionItem {
+  label: string;
+  cartoes: number;
+  count: number;
+}
+
+export interface FunnelSummary {
+  propostas: number;
+  aprovados: number;
+  cartoes: number;
+  taxaAprovacao: number;
+  taxaFinalizacao: number;
+}
+
+export interface BaseSummary {
+  baseTotal: number;
+  baseAcionavel: number;
+  taxaAcionavel: number;
+  otimBaseMedia: number;
+}
+
 export interface DetailsPaneData {
   node: TreeNode;
   period: string;
   channelDistribution: ChannelDistributionItem[];
   topOffers: TopOfferItem[];
   topPromocionais: TopPromocionalItem[];
+  topParceiros: TopDimensionItem[];
+  topSubgrupos: TopDimensionItem[];
+  topPerfisCredito: TopDimensionItem[];
+  topEtapasAquisicao: TopDimensionItem[];
+  topOrdensDisparo: TopDimensionItem[];
+  funnelSummary: FunnelSummary;
+  baseSummary: BaseSummary;
   activities: ActivityRow[];
   prevMetrics?: NodeMetrics;
 }

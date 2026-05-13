@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { TreeNode, DetailsPaneData, ChannelDistributionItem, TopOfferItem, TopPromocionalItem, NodeMetrics } from '../../types/explorer';
+import { TreeNode, DetailsPaneData, ChannelDistributionItem, TopOfferItem, TopPromocionalItem, TopDimensionItem, NodeMetrics } from '../../types/explorer';
 import { ActivityRow } from '../../types/activity';
 import { format, subDays, differenceInDays } from 'date-fns';
 
@@ -19,6 +19,29 @@ const normalizeDimensionValue = (value?: string | null): string | null => {
   if (!cleaned) return null;
   if (ignoredDimensionValues.has(cleaned.toLowerCase())) return null;
   return cleaned;
+};
+
+const buildTopDimension = (
+  activities: ActivityRow[],
+  getValue: (activity: ActivityRow) => string | number | null | undefined,
+  limit = 3
+): TopDimensionItem[] => {
+  const counts = new Map<string, { cartoes: number; count: number }>();
+
+  for (const activity of activities) {
+    const label = normalizeDimensionValue(getValue(activity)?.toString());
+    if (!label) continue;
+    const existing = counts.get(label) ?? { cartoes: 0, count: 0 };
+    counts.set(label, {
+      cartoes: existing.cartoes + (activity['Cartões Gerados'] ?? 0),
+      count: existing.count + 1,
+    });
+  }
+
+  return Array.from(counts.entries())
+    .map(([label, { cartoes, count }]) => ({ label, cartoes, count }))
+    .sort((a, b) => b.cartoes - a.cartoes)
+    .slice(0, limit);
 };
 
 export function useDetailsPaneData(
@@ -94,6 +117,43 @@ export function useDetailsPaneData(
       .sort((a, b) => b.cartoes - a.cartoes)
       .slice(0, 3);
 
+    const topParceiros = buildTopDimension(activities, (a) => a.Parceiro);
+    const topSubgrupos = buildTopDimension(activities, (a) => a.Subgrupos);
+    const topPerfisCredito = buildTopDimension(activities, (a) => a['Perfil de Crédito']);
+    const topEtapasAquisicao = buildTopDimension(activities, (a) => a['Etapa de aquisição']);
+    const topOrdensDisparo = buildTopDimension(
+      activities,
+      (a) => (a['Ordem de disparo'] === undefined || a['Ordem de disparo'] === null ? null : `Ordem ${a['Ordem de disparo']}`)
+    );
+
+    let baseTotal = 0;
+    let baseAcionavel = 0;
+    let otimBaseSum = 0;
+    let otimBaseCount = 0;
+    for (const a of activities) {
+      baseTotal += a['Base Total'] ?? 0;
+      baseAcionavel += a['Base Acionável'] ?? 0;
+      if (typeof a['% Otimização de base'] === 'number' && Number.isFinite(a['% Otimização de base'])) {
+        otimBaseSum += a['% Otimização de base'];
+        otimBaseCount += 1;
+      }
+    }
+
+    const funnelSummary = {
+      propostas: node.metrics.propostas,
+      aprovados: node.metrics.aprovados,
+      cartoes: node.metrics.cartoes,
+      taxaAprovacao: node.metrics.propostas > 0 ? (node.metrics.aprovados / node.metrics.propostas) * 100 : 0,
+      taxaFinalizacao: node.metrics.aprovados > 0 ? (node.metrics.cartoes / node.metrics.aprovados) * 100 : 0,
+    };
+
+    const baseSummary = {
+      baseTotal,
+      baseAcionavel,
+      taxaAcionavel: baseTotal > 0 ? (baseAcionavel / baseTotal) * 100 : 0,
+      otimBaseMedia: otimBaseCount > 0 ? otimBaseSum / otimBaseCount : 0,
+    };
+
     // Period label
     const period = `${format(new Date(filters.inicio + 'T00:00:00'), 'MMM yyyy')} – ${format(new Date(filters.fim + 'T00:00:00'), 'MMM yyyy')}`;
 
@@ -157,6 +217,21 @@ export function useDetailsPaneData(
       };
     }
 
-    return { node, period, channelDistribution, topOffers, topPromocionais, activities, prevMetrics };
+    return {
+      node,
+      period,
+      channelDistribution,
+      topOffers,
+      topPromocionais,
+      topParceiros,
+      topSubgrupos,
+      topPerfisCredito,
+      topEtapasAquisicao,
+      topOrdensDisparo,
+      funnelSummary,
+      baseSummary,
+      activities,
+      prevMetrics
+    };
   }, [nodeId, nodeMap, allActivities, filters]);
 }
