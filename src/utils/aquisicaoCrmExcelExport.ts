@@ -44,9 +44,23 @@ type BuildIndexesResult = {
   };
 };
 
+type B2cDailyMetric = {
+  data?: string | null;
+  tipo?: string | null;
+  propostas_total?: number | string | null;
+  emissoes_total?: number | string | null;
+};
+
+type B2cRealized = {
+  propostas_total: number;
+  emissoes_total: number;
+  propostas_serasa: number;
+  emissoes_serasa: number;
+};
+
 const SECTIONS: Array<[string, string[]]> = [
   ['B2C', ['TOPO DE FUNIL B2C', 'REPESCAGEM B2C', 'UPGRADE B2C', 'LEADS PARCEIROS B2C', 'CARRINHO ABANDONADO B2C']],
-  ['PLURIX', ['TOPO DE FUNIL PLURIX', 'REPESCAGEM PLURIX', 'UPGRADE PLURIX', 'RECENCIA PLURIX']],
+  ['PLURIX', ['TOPO DE FUNIL PLURIX', 'REPESCAGEM PLURIX', 'UPGRADE PLURIX', 'RECENCIA PLURIX', 'CARRINHO ABANDONADO PLURIX']],
   ['DIA', ['TOPO DE FUNIL DIA', 'REPESCAGEM DIA']],
   ['BEM BARATO', ['TOPO DE FUNIL BB', 'REPESCAGEM BB']],
 ];
@@ -75,6 +89,8 @@ const COLORS = {
   zebra: 'F5F5F5',
   weekend: 'E8E8E8',
   manualB2c: 'EBF3FF',
+  manualB2cRepeat: 'B4C7E7',
+  currentPeriod: 'E2F0F9',
   total: 'D9EAD3',
   auditHeader: '1F4E79',
   auditSubheader: 'D9EAF7',
@@ -144,7 +160,7 @@ function classify(row: RawActivity): [string, string] | null {
   if (bu === 'Plurix' && parceiro === 'N/A' && segmento === 'CRM' && etapa === 'Aquisicao') return ['PLURIX', 'TOPO DE FUNIL PLURIX'];
   if (bu === 'Plurix' && parceiro === 'N/A' && segmento === 'Negados' && etapa === 'Meio_de_Funil') return ['PLURIX', 'REPESCAGEM PLURIX'];
   if (bu === 'Plurix' && parceiro === 'N/A' && segmento === 'Aprovados_nao_convertidos' && etapa === 'Meio_de_Funil') return ['PLURIX', 'UPGRADE PLURIX'];
-  if (bu === 'Plurix' && parceiro === 'N/A' && segmento === 'Abandonados') return ['PLURIX', 'UPGRADE PLURIX'];
+  if (bu === 'Plurix' && parceiro === 'N/A' && segmento === 'Abandonados') return ['PLURIX', 'CARRINHO ABANDONADO PLURIX'];
   if (bu === 'Plurix' && parceiro === 'N/A' && segmento === 'Recencia de Compra') return ['PLURIX', 'RECENCIA PLURIX'];
 
   if (bu === 'B2B2C' && parceiro === 'Dia' && etapa === 'Aquisicao') return ['DIA', 'TOPO DE FUNIL DIA'];
@@ -273,11 +289,45 @@ function buildIndexes(rows: RawActivity[], start: Date, end: Date): BuildIndexes
   };
 }
 
+function buildB2cRealizedIndex(rows: B2cDailyMetric[], start: Date, end: Date): Map<string, B2cRealized> {
+  const realized = new Map<string, B2cRealized>();
+  const ensure = (ds: string): B2cRealized => {
+    const current = realized.get(ds) ?? {
+      propostas_total: 0,
+      emissoes_total: 0,
+      propostas_serasa: 0,
+      emissoes_serasa: 0,
+    };
+    realized.set(ds, current);
+    return current;
+  };
+
+  rows.forEach((row) => {
+    if (!row.data) return;
+    const rowDate = parseIsoDate(String(row.data).slice(0, 10));
+    if (rowDate < start || rowDate > end) return;
+
+    const ds = isoDate(rowDate);
+    const tipo = String(row.tipo ?? '').trim().toLowerCase();
+    const current = ensure(ds);
+    if (tipo === 'total') {
+      current.propostas_total += asInt(row.propostas_total);
+      current.emissoes_total += asInt(row.emissoes_total);
+    } else if (tipo.includes('serasa')) {
+      current.propostas_serasa += asInt(row.propostas_total);
+      current.emissoes_serasa += asInt(row.emissoes_total);
+    }
+  });
+
+  return realized;
+}
+
 function blockColor(section: string, block: string): string {
   if (block.startsWith('TOPO')) return section === 'B2C' ? COLORS.topoB2c : COLORS.topo;
   if (block.startsWith('REPESCAGEM')) return COLORS.repescagem;
   if (block.startsWith('UPGRADE')) return COLORS.upgrade;
   if (block.startsWith('LEADS')) return COLORS.leads;
+  if (block.startsWith('CARRINHO')) return COLORS.leads;
   if (block.startsWith('RECENCIA')) return COLORS.recencia;
   return COLORS.sectionDark;
 }
@@ -313,6 +363,19 @@ function applyBorder(ws: Worksheet, row: number, maxCol: number, topStyle: Borde
   }
 }
 
+function applyB2cRepeatFill(ws: Worksheet, row: number): void {
+  for (let col = 3; col <= 6; col += 1) {
+    const cell = ws.getCell(row, col);
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${COLORS.manualB2cRepeat}` } };
+    cell.border = {
+      top: { style: undefined },
+      bottom: { style: undefined },
+      left: { style: undefined },
+      right: col === 6 ? { style: 'medium', color: { argb: 'FF000000' } } : { style: undefined },
+    };
+  }
+}
+
 function colLetter(col: number): string {
   let n = col;
   let s = '';
@@ -324,7 +387,15 @@ function colLetter(col: number): string {
   return s;
 }
 
-function writeSection(ws: Worksheet, startRow: number, section: string, blocks: string[], idx: Map<string, Metrics>, dates: Date[]): number {
+function writeSection(
+  ws: Worksheet,
+  startRow: number,
+  section: string,
+  blocks: string[],
+  idx: Map<string, Metrics>,
+  dates: Date[],
+  b2cRealizedIdx: Map<string, B2cRealized>,
+): number {
   setCell(ws.getCell(startRow, 1), 'Data', { bold: true, fillColor: COLORS.headerGray });
   setCell(ws.getCell(startRow, 2), 'Dia', { bold: true, fillColor: COLORS.headerGray });
   setCell(ws.getCell(startRow + 1, 1), '', { fillColor: COLORS.headerGray });
@@ -385,7 +456,10 @@ function writeSection(ws: Worksheet, startRow: number, section: string, blocks: 
     });
     const rowsToWrite = [...canais].sort((a, b) => (CHANNEL_ORDER[a] ?? 99) - (CHANNEL_ORDER[b] ?? 99) || a.localeCompare(b));
     if (rowsToWrite.length === 0) rowsToWrite.push('');
-    const zebra = i % 2 ? COLORS.zebra : 'FFFFFF';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isCurrentOrFutureMonthDay = day >= today && day.getMonth() === today.getMonth() && day.getFullYear() === today.getFullYear();
+    const zebra = isCurrentOrFutureMonthDay ? COLORS.currentPeriod : i % 2 ? COLORS.zebra : 'FFFFFF';
 
     rowsToWrite.forEach((canal, channelIndex) => {
       for (let c = 1; c <= maxCol; c += 1) setCell(ws.getCell(rowNum, c), '', { fillColor: zebra });
@@ -395,7 +469,22 @@ function writeSection(ws: Worksheet, startRow: number, section: string, blocks: 
       setCell(ws.getCell(rowNum, 2), DAY_NAMES[day.getDay()], { italic: day.getDay() === 0 || day.getDay() === 6, fillColor: dateFill });
 
       if (section === 'B2C') {
-        for (let c = 3; c <= 6; c += 1) setCell(ws.getCell(rowNum, c), '', { fillColor: COLORS.manualB2c });
+        for (let c = 3; c <= 6; c += 1) {
+          setCell(ws.getCell(rowNum, c), '', { fillColor: channelIndex === 0 ? COLORS.manualB2c : COLORS.manualB2cRepeat });
+        }
+        if (channelIndex === 0) {
+          const realized = b2cRealizedIdx.get(ds);
+          if (realized) {
+            [
+              realized.propostas_total,
+              realized.emissoes_total,
+              realized.propostas_serasa,
+              realized.emissoes_serasa,
+            ].forEach((value, offset) => {
+              if (value) setCell(ws.getCell(rowNum, 3 + offset), value, { fillColor: COLORS.manualB2c });
+            });
+          }
+        }
       }
 
       if (canal) {
@@ -412,6 +501,7 @@ function writeSection(ws: Worksheet, startRow: number, section: string, blocks: 
       }
 
       applyBorder(ws, rowNum, maxCol, channelIndex === 0 ? 'medium' : 'thin', verticalBoundaries);
+      if (section === 'B2C' && channelIndex > 0) applyB2cRepeatFill(ws, rowNum);
       rowNum += 1;
     });
   });
@@ -516,8 +606,15 @@ function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], journeyRows: Journ
   });
 }
 
-function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rawRows: RawActivity[], start: Date, end: Date): Workbook {
+function buildWorkbook(
+  ExcelJSRuntime: { Workbook: new () => Workbook },
+  rawRows: RawActivity[],
+  b2cDailyRows: B2cDailyMetric[],
+  start: Date,
+  end: Date,
+): Workbook {
   const { idx, auditRows, journeyRows, summary } = buildIndexes(rawRows, start, end);
+  const b2cRealizedIdx = buildB2cRealizedIndex(b2cDailyRows, start, end);
   const dates = allDates(start, end);
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = 'GaaS AFINZ';
@@ -528,7 +625,7 @@ function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rawRows
   });
   let nextRow = 1;
   SECTIONS.forEach(([section, blocks]) => {
-    nextRow = writeSection(ws, nextRow, section, blocks, idx, dates);
+    nextRow = writeSection(ws, nextRow, section, blocks, idx, dates, b2cRealizedIdx);
   });
   ws.getColumn(1).width = 12;
   ws.getColumn(2).width = 6;
@@ -565,6 +662,28 @@ async function fetchSupabaseRows(start: Date, end: Date): Promise<RawActivity[]>
   return rows;
 }
 
+async function fetchB2cDailyMetrics(start: Date, end: Date): Promise<B2cDailyMetric[]> {
+  const rows: B2cDailyMetric[] = [];
+  const pageSize = 1000;
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('b2c_daily_metrics')
+      .select('*')
+      .gte('data', isoDate(start))
+      .lte('data', isoDate(end))
+      .order('data', { ascending: true })
+      .order('tipo', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) throw error;
+    rows.push(...((data ?? []) as B2cDailyMetric[]));
+    if (!data || data.length < pageSize) break;
+  }
+
+  return rows;
+}
+
 function downloadBuffer(buffer: BlobPart, filename: string): void {
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -576,9 +695,12 @@ function downloadBuffer(buffer: BlobPart, filename: string): void {
 }
 
 export async function exportAquisicaoCrmXlsx(start: Date, end: Date): Promise<{ rows: number; filename: string }> {
-  const rawRows = await fetchSupabaseRows(start, end);
+  const [rawRows, b2cDailyRows] = await Promise.all([
+    fetchSupabaseRows(start, end),
+    fetchB2cDailyMetrics(start, end),
+  ]);
   const ExcelJSModule = await import('exceljs');
-  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, start, end);
+  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, b2cDailyRows, start, end);
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = `aquisicao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(end).replace(/-/g, '')}.xlsx`;
   downloadBuffer(buffer, filename);
