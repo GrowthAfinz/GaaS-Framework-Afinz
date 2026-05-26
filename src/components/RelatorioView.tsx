@@ -7,6 +7,7 @@ import { ActivityRow } from '../types/activity';
 import { useAppStore } from '../store/useAppStore';
 import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
+import { exportAquisicaoCrmXlsx, getCurrentMonthRange } from '../utils/aquisicaoCrmExcelExport';
 
 interface RelatorioViewProps {
   data: CalendarData;
@@ -187,6 +188,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const [tableSearch, setTableSearch] = useState('');
   const [detailSegmentFilter, setDetailSegmentFilter] = useState<string | null>(null);
   const [detailCanalFilter, setDetailCanalFilter] = useState<string | null>(null);
+  const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
 
   // Reset internal filters when external data (global filters) change
   useEffect(() => {
@@ -513,6 +515,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     downloadBlob(buildCsvBlob(headers, [...segmentoRows, segmentoTotal].map(toRow)), `relatorio_segmento_${format(new Date(), 'yyyyMMdd')}.csv`);
   }, [segmentoRows, segmentoTotal]);
 
+  const exportAquisicaoCrm = useCallback(async () => {
+    const dateFromInput = (value?: string) => value ? new Date(`${value}T00:00:00`) : null;
+    const fallback = getCurrentMonthRange();
+    const start = dateFromInput(globalFilters.dataInicio || viewSettings.periodo.inicio) ?? fallback.start;
+    const end = dateFromInput(globalFilters.dataFim || viewSettings.periodo.fim) ?? fallback.end;
+
+    setIsExportingAquisicao(true);
+    try {
+      await exportAquisicaoCrmXlsx(start, end);
+    } catch (error) {
+      console.error('Erro ao exportar XLSX de Aquisição CRM', error);
+      window.alert('Não foi possível gerar o XLSX de Aquisição CRM. Verifique a conexão com o Supabase e tente novamente.');
+    } finally {
+      setIsExportingAquisicao(false);
+    }
+  }, [globalFilters.dataFim, globalFilters.dataInicio, viewSettings.periodo.fim, viewSettings.periodo.inicio]);
+
   const exportCanal = useCallback(() => {
     const headers = ['Canal', 'Base Enviada', 'Base Entregue', '% Entrega', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base', '% Participação'];
     const toRow = (r: AggregatedRow, isTotal = false) => [
@@ -733,13 +752,24 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             <h2 className="text-base font-bold text-slate-800">Performance campanhas</h2>
             <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{segmentoRows.length} segmentos</span>
           </div>
-          <button
-            onClick={exportSegmento}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
-          >
-            <FileSpreadsheet size={14} />
-            Exportar CSV
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={exportAquisicaoCrm}
+              disabled={isExportingAquisicao}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 disabled:cursor-wait disabled:opacity-60 transition-colors font-medium"
+              title="Exportar Excel diarizado de aquisição CRM com abas Aquisição CRM e Auditoria"
+            >
+              <FileSpreadsheet size={14} />
+              {isExportingAquisicao ? 'Gerando XLSX...' : 'Exportar XLSX Aquisição'}
+            </button>
+            <button
+              onClick={exportSegmento}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
+            >
+              <FileSpreadsheet size={14} />
+              Exportar CSV
+            </button>
+          </div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-b-xl shadow-sm overflow-hidden">
