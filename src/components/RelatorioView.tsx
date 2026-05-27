@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, PanelRightClose, PanelRightOpen, FilterX } from 'lucide-react';
+import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX } from 'lucide-react';
 import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
@@ -8,28 +8,35 @@ import { useAppStore } from '../store/useAppStore';
 import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
 import { exportAquisicaoCrmXlsx, getCurrentMonthRange } from '../utils/aquisicaoCrmExcelExport';
+import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
+import {
+  ColumnKey,
+  DimensionKey,
+  MetricKey,
+  ColumnDef,
+  METRIC_COLUMNS,
+  DIMENSION_COLUMNS,
+  COLUMN_BY_KEY,
+  GROUPABLE_DIMENSIONS,
+  DEFAULT_AGGREGATE_COLUMNS,
+  DEFAULT_CANAL_EXTRA_COLUMNS,
+  DEFAULT_DETAIL_DIMENSIONS,
+  DEFAULT_DETAIL_METRICS,
+  getDimensionValue,
+  getGroupableDimensionLabel,
+} from './relatorio/reportColumnsConfig';
+import { AggregatedRow, computeRow, groupActivitiesByDimension, groupActivitiesByDimensionAsMap } from './relatorio/aggregations';
+import { ColumnsCustomizer } from './relatorio/ColumnsCustomizer';
+import { GroupBySelector } from './relatorio/GroupBySelector';
+import { fmtN, fmtPct, fmtPct4, fmtBRL, formatMetric } from './relatorio/reportFormatters';
+import { AggregateTable } from './relatorio/AggregateTable';
+import { DetailTable } from './relatorio/DetailTable';
 
 interface RelatorioViewProps {
   data: CalendarData;
   previousData?: CalendarData;
   compareMode?: 'previousPeriod' | 'samePeriodLastMonth' | null;
   selectedBU?: string;
-}
-
-interface AggregatedRow {
-  label: string;
-  baseEnviada: number;
-  baseEntregue: number;
-  propostas: number;
-  aprovados: number;
-  emissoes: number;
-  custoTotal: number;
-  taxaEntrega: number;
-  taxaProposta: number;
-  taxaAprovacao: number;
-  taxaFinalizacao: number;
-  custoPorCartao: number;
-  taxaConversaoBase: number;
 }
 
 interface DetailRow {
@@ -40,59 +47,37 @@ interface DetailRow {
   canal: string;
   bu: string;
   parceiro: string;
+  subgrupo: string;
+  oferta: string;
+  oferta2: string;
+  promocional: string;
+  promocional2: string;
+  produto: string;
+  etapaAquisicao: string;
+  perfilCredito: string;
+  safraKey: string;
+  ordemDisparo: string;
+  status: string;
   propostas: number;
   aprovados: number;
   emissoes: number;
+  emissoesIndependentes: number;
+  emissoesAssistidas: number;
   custoTotal: number;
+  cac: number;
   baseEnviada: number;
   baseEntregue: number;
+  aberturas: number;
+  cliques: number;
   taxaEntrega: number;
+  taxaAbertura: number;
   taxaProposta: number;
   taxaAprovacao: number;
   taxaFinalizacao: number;
   custoPorCartao: number;
   taxaConversaoBase: number;
-  aguardando: boolean; // true when baseEnviada is 0 AND date is within d-3
-}
-
-function computeRow(activities: Activity[], label: string): AggregatedRow {
-  const baseEnviada = activities.reduce((s, a) => s + (a.kpis.baseEnviada ?? 0), 0);
-  const baseEntregue = activities.reduce((s, a) => s + (a.kpis.baseEntregue ?? 0), 0);
-  const propostas = activities.reduce((s, a) => s + (a.kpis.propostas ?? 0), 0);
-  const aprovados = activities.reduce((s, a) => s + (a.kpis.aprovados ?? 0), 0);
-  const emissoes = activities.reduce((s, a) => s + ((a.kpis.emissoes ?? a.kpis.cartoes) ?? 0), 0);
-  const custoTotal = activities.reduce((s, a) => s + (a.kpis.custoTotal ?? 0), 0);
-  return {
-    label,
-    baseEnviada,
-    baseEntregue,
-    propostas,
-    aprovados,
-    emissoes,
-    custoTotal,
-    taxaEntrega: baseEnviada > 0 ? baseEntregue / baseEnviada : 0,
-    taxaProposta: baseEntregue > 0 ? propostas / baseEntregue : 0,
-    taxaAprovacao: propostas > 0 ? aprovados / propostas : 0,
-    taxaFinalizacao: baseEntregue > 0 ? emissoes / baseEntregue : 0,
-    custoPorCartao: emissoes > 0 ? custoTotal / emissoes : 0,
-    taxaConversaoBase: baseEnviada > 0 ? emissoes / baseEnviada : 0,
-  };
-}
-
-function fmtN(n: number): string {
-  return n.toLocaleString('pt-BR');
-}
-
-function fmtPct(n: number, decimals = 2): string {
-  return `${(n * 100).toFixed(decimals).replace('.', ',')}%`;
-}
-
-function fmtPct4(n: number): string {
-  return `${(n * 100).toFixed(4).replace('.', ',')}%`;
-}
-
-function fmtBRL(n: number): string {
-  return `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  participacaoEmissoes: number;
+  aguardando: boolean;
 }
 
 function calcVariation(current: number, previous: number): number {
@@ -184,11 +169,21 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   // ── Filtros Destaque ──
   const [destaqueFilter, setDestaqueFilter] = useState<'top-conversores' | 'conversores' | 'aguardando' | null>(null);
   const [showDestaqueMenu, setShowDestaqueMenu] = useState(false);
-  const [isDescriptionCollapsed, setIsDescriptionCollapsed] = useState(false);
   const [tableSearch, setTableSearch] = useState('');
   const [detailSegmentFilter, setDetailSegmentFilter] = useState<string | null>(null);
   const [detailCanalFilter, setDetailCanalFilter] = useState<string | null>(null);
   const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
+
+  // ── Personalização de colunas / agrupamentos ──
+  const [campanhasGroupBy, setCampanhasGroupBy] = useState<DimensionKey>('segmento');
+  const [campanhasColumns, setCampanhasColumns] = useState<ColumnKey[]>([...DEFAULT_AGGREGATE_COLUMNS]);
+  const [canaisGroupBy, setCanaisGroupBy] = useState<DimensionKey>('canal');
+  const [canaisColumns, setCanaisColumns] = useState<ColumnKey[]>([
+    ...DEFAULT_AGGREGATE_COLUMNS,
+    ...DEFAULT_CANAL_EXTRA_COLUMNS,
+  ]);
+  const [detailDimensionCols, setDetailDimensionCols] = useState<ColumnKey[]>([...DEFAULT_DETAIL_DIMENSIONS]);
+  const [detailMetricCols, setDetailMetricCols] = useState<ColumnKey[]>([...DEFAULT_DETAIL_METRICS]);
 
   // Reset internal filters when external data (global filters) change
   useEffect(() => {
@@ -203,6 +198,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   // ── Ordenação ──
   const [sortKey, setSortKey] = useState<keyof DetailRow | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const detailColumnsOrdered = useMemo((): ColumnDef[] => {
+    const visibleSet = new Set<ColumnKey>([...detailDimensionCols, ...detailMetricCols]);
+    return [...DIMENSION_COLUMNS, ...METRIC_COLUMNS].filter(def => visibleSet.has(def.key));
+  }, [detailDimensionCols, detailMetricCols]);
 
   // Mapeia Activity → ActivityRow para o DisparoDetailModal
   const toActivityRow = (a: Activity): ActivityRow => ({
@@ -243,59 +243,29 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     'Custo Total Campanha': a.kpis.custoTotal,
   });
 
-  const segmentoRows = useMemo(() => {
-    const groups = new Map<string, Activity[]>();
-    reportActivities.forEach(a => {
-      const key = a.segmento || 'Sem Segmento';
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(a);
-    });
-    const rows: AggregatedRow[] = [];
-    groups.forEach((acts, label) => rows.push(computeRow(acts, label)));
-    return rows.sort((a, b) => b.emissoes - a.emissoes);
-  }, [reportActivities]);
+  const segmentoRows = useMemo(
+    () => groupActivitiesByDimension(reportActivities, campanhasGroupBy),
+    [reportActivities, campanhasGroupBy]
+  );
 
   const segmentoTotal = useMemo(() => computeRow(reportActivities, 'Total Geral'), [reportActivities]);
   const previousSegmentoTotal = useMemo(() => computeRow(previousReportActivities, 'Total Geral'), [previousReportActivities]);
-  const previousSegmentoRowsByLabel = useMemo(() => {
-    const groups = new Map<string, Activity[]>();
-    previousReportActivities.forEach(a => {
-      const key = a.segmento || 'Sem Segmento';
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(a);
-    });
+  const previousSegmentoRowsByLabel = useMemo(
+    () => groupActivitiesByDimensionAsMap(previousReportActivities, campanhasGroupBy),
+    [previousReportActivities, campanhasGroupBy]
+  );
 
-    const rows = new Map<string, AggregatedRow>();
-    groups.forEach((acts, label) => rows.set(label, computeRow(acts, label)));
-    return rows;
-  }, [previousReportActivities]);
-
-  const canalRows = useMemo(() => {
-    const groups = new Map<string, Activity[]>();
-    reportActivities.forEach(a => {
-      const key = a.canal || 'Sem Canal';
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(a);
-    });
-    const rows: AggregatedRow[] = [];
-    groups.forEach((acts, label) => rows.push(computeRow(acts, label)));
-    return rows.sort((a, b) => b.emissoes - a.emissoes);
-  }, [reportActivities]);
+  const canalRows = useMemo(
+    () => groupActivitiesByDimension(reportActivities, canaisGroupBy),
+    [reportActivities, canaisGroupBy]
+  );
 
   const canalTotal = useMemo(() => computeRow(reportActivities, 'Total Geral'), [reportActivities]);
   const previousCanalTotal = useMemo(() => computeRow(previousReportActivities, 'Total Geral'), [previousReportActivities]);
-  const previousCanalRowsByLabel = useMemo(() => {
-    const groups = new Map<string, Activity[]>();
-    previousReportActivities.forEach(a => {
-      const key = a.canal || 'Sem Canal';
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(a);
-    });
-
-    const rows = new Map<string, AggregatedRow>();
-    groups.forEach((acts, label) => rows.set(label, computeRow(acts, label)));
-    return rows;
-  }, [previousReportActivities]);
+  const previousCanalRowsByLabel = useMemo(
+    () => groupActivitiesByDimensionAsMap(previousReportActivities, canaisGroupBy),
+    [previousReportActivities, canaisGroupBy]
+  );
   const totalCanalEmissoes = canalTotal.emissoes;
 
   // d-3 cutoff: dates from today minus 3 days may still be consolidating
@@ -306,17 +276,26 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     return d;
   }, []);
 
+  const totalDetailEmissoes = useMemo(
+    () => reportActivities.reduce((s, a) => s + ((a.kpis.emissoes ?? a.kpis.cartoes) ?? 0), 0),
+    [reportActivities]
+  );
+
   const detailRows = useMemo((): DetailRow[] => {
     return reportActivities
       .filter(a => a.dataDisparo && !isNaN(a.dataDisparo.getTime()))
       .map(a => {
         const baseEnviada = a.kpis.baseEnviada ?? 0;
         const baseEntregue = a.kpis.baseEntregue ?? 0;
+        const aberturas = a.kpis.aberturas ?? 0;
+        const cliques = a.kpis.cliques ?? 0;
         const propostas = a.kpis.propostas ?? 0;
         const aprovados = a.kpis.aprovados ?? 0;
         const emissoes = (a.kpis.emissoes ?? a.kpis.cartoes) ?? 0;
+        const emissoesIndependentes = a.kpis.emissoesIndependentes ?? 0;
+        const emissoesAssistidas = a.kpis.emissoesAssistidas ?? 0;
         const custoTotal = a.kpis.custoTotal ?? 0;
-        // Aguardando: sem envios E data dentro do janela d-3 (pode ainda consolidar)
+        const cac = a.kpis.cac ?? 0;
         const dispDate = new Date(a.dataDisparo);
         dispDate.setHours(0, 0, 0, 0);
         const aguardando = baseEnviada === 0 && dispDate >= d3Cutoff;
@@ -327,28 +306,42 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           segmento: a.segmento || '',
           canal: a.canal || '',
           bu: a.bu || '',
-          parceiro: (() => {
-            if (a.bu?.toLowerCase() === 'plurix') return 'Plurix';
-            const p = a.parceiro ?? '';
-            return (!p || p.toLowerCase() === 'n/a') ? 'Afinz' : p;
-          })(),
+          parceiro: getDimensionValue(a, 'parceiro'),
+          subgrupo: getDimensionValue(a, 'subgrupo'),
+          oferta: getDimensionValue(a, 'oferta'),
+          oferta2: getDimensionValue(a, 'oferta2'),
+          promocional: getDimensionValue(a, 'promocional'),
+          promocional2: getDimensionValue(a, 'promocional2'),
+          produto: getDimensionValue(a, 'produto'),
+          etapaAquisicao: getDimensionValue(a, 'etapaAquisicao'),
+          perfilCredito: getDimensionValue(a, 'perfilCredito'),
+          safraKey: getDimensionValue(a, 'safraKey'),
+          ordemDisparo: getDimensionValue(a, 'ordemDisparo'),
+          status: getDimensionValue(a, 'status'),
           propostas,
           aprovados,
           emissoes,
+          emissoesIndependentes,
+          emissoesAssistidas,
           custoTotal,
+          cac,
           baseEnviada,
           baseEntregue,
+          aberturas,
+          cliques,
           taxaEntrega: baseEnviada > 0 ? baseEntregue / baseEnviada : 0,
+          taxaAbertura: baseEntregue > 0 ? aberturas / baseEntregue : 0,
           taxaProposta: baseEntregue > 0 ? propostas / baseEntregue : 0,
           taxaAprovacao: propostas > 0 ? aprovados / propostas : 0,
           taxaFinalizacao: baseEntregue > 0 ? emissoes / baseEntregue : 0,
           custoPorCartao: emissoes > 0 ? custoTotal / emissoes : 0,
           taxaConversaoBase: baseEnviada > 0 ? emissoes / baseEnviada : 0,
+          participacaoEmissoes: totalDetailEmissoes > 0 ? emissoes / totalDetailEmissoes : 0,
           aguardando,
         };
       })
       .sort((a, b) => a.date.getTime() - b.date.getTime());
-  }, [d3Cutoff, reportActivities]);
+  }, [d3Cutoff, reportActivities, totalDetailEmissoes]);
 
   // ── Filtro destaque sobre detailRows ──
   const filteredRows = useMemo((): DetailRow[] => {
@@ -746,13 +739,26 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       <>
       {/* ── PERFORMANCE CAMPANHAS ── */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full" style={{ background: TEAL }} />
             <h2 className="text-base font-bold text-slate-800">Performance campanhas</h2>
-            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{segmentoRows.length} segmentos</span>
+            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+              {segmentoRows.length} {getGroupableDimensionLabel(campanhasGroupBy).toLowerCase()}{segmentoRows.length === 1 ? '' : 's'}
+            </span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <GroupBySelector
+              value={campanhasGroupBy}
+              options={GROUPABLE_DIMENSIONS}
+              onChange={setCampanhasGroupBy}
+            />
+            <ColumnsCustomizer
+              value={campanhasColumns}
+              defaults={[...DEFAULT_AGGREGATE_COLUMNS]}
+              available={METRIC_COLUMNS.filter(c => c.key !== 'participacaoEmissoes')}
+              onChange={setCampanhasColumns}
+            />
             <button
               onClick={exportAquisicaoCrm}
               disabled={isExportingAquisicao}
@@ -772,377 +778,90 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-b-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr style={{ background: '#1E293B' }} className="text-white">
-                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[160px]">Segmentos</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Base enviada</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Base entregue</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Entrega.</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >Propostas</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >% Proposta</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >Aprovados</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >% Aprovação</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >Emissões</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Finalização</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Custo / Cartão</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Custo Total</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Conv da Base</th>
-                </tr>
-              </thead>
-              <tbody>
-                {segmentoRows.map((row, idx) => {
-                  const color = segmentColorMap.get(row.label);
-                  const isBanded = idx % 2 !== 0;
-                  const previousRow = previousSegmentoRowsByLabel.get(row.label) ?? computeRow([], row.label);
-                  return (
-                    <tr
-                      key={row.label}
-                      className={`border-t border-slate-100 hover:brightness-95 transition-all cursor-pointer ${color?.bg ?? (isBanded ? 'bg-slate-50' : 'bg-white')}`}
-                      onClick={() => {
-                        setDetailSegmentFilter(current => current === row.label ? null : row.label);
-                        setSelectedActivityRow(null);
-                      }}
-                      title="Filtrar detalhamento por este segmento"
-                    >
-                      <td
-                        className={`px-4 py-2.5 font-semibold text-slate-700 whitespace-nowrap ${color?.border ?? ''}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          applyGlobalSegmentFilter(row.label);
-                        }}
-                        title="Aplicar este segmento no filtro global"
-                      >
-                        {row.label}
-                      </td>
-                      <td className="text-right px-4 py-3 align-top text-slate-600">
-                        <MetricValue value={fmtN(row.baseEnviada)} current={row.baseEnviada} previous={previousRow.baseEnviada} previousValue={fmtN(previousRow.baseEnviada)} />
-                      </td>
-                      <td className="text-right px-4 py-3 align-top text-slate-600">
-                        <MetricValue value={fmtN(row.baseEntregue)} current={row.baseEntregue} previous={previousRow.baseEntregue} previousValue={fmtN(previousRow.baseEntregue)} />
-                      </td>
-                      <td className="text-right px-4 py-3 align-top text-slate-600">
-                        <MetricValue value={fmtPct(row.taxaEntrega)} current={row.taxaEntrega} previous={previousRow.taxaEntrega} previousValue={fmtPct(previousRow.taxaEntrega)} />
-                      </td>
-                      <td
-                        className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                      >
-                        <MetricValue value={fmtN(row.propostas)} current={row.propostas} previous={previousRow.propostas} previousValue={fmtN(previousRow.propostas)} strong />
-                      </td>
-                      <td
-                        className="text-right px-3 py-2.5 text-slate-700"
-                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                      >
-                        <MetricValue value={fmtPct(row.taxaProposta)} current={row.taxaProposta} previous={previousRow.taxaProposta} previousValue={fmtPct(previousRow.taxaProposta)} />
-                      </td>
-                      <td
-                        className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                      >
-                        <MetricValue value={fmtN(row.aprovados)} current={row.aprovados} previous={previousRow.aprovados} previousValue={fmtN(previousRow.aprovados)} strong />
-                      </td>
-                      <td
-                        className="text-right px-3 py-2.5 text-slate-700"
-                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                      >
-                        <MetricValue value={fmtPct(row.taxaAprovacao)} current={row.taxaAprovacao} previous={previousRow.taxaAprovacao} previousValue={fmtPct(previousRow.taxaAprovacao)} />
-                      </td>
-                      <td
-                        className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                      >
-                        <MetricValue value={fmtN(row.emissoes)} current={row.emissoes} previous={previousRow.emissoes} previousValue={fmtN(previousRow.emissoes)} strong />
-                      </td>
-                      <td className="text-right px-4 py-3 align-top text-slate-600">
-                        <MetricValue value={fmtPct(row.taxaFinalizacao)} current={row.taxaFinalizacao} previous={previousRow.taxaFinalizacao} previousValue={fmtPct(previousRow.taxaFinalizacao)} />
-                      </td>
-                      <td className="text-right px-4 py-3 align-top text-slate-600">
-                        <MetricValue value={fmtBRL(row.custoPorCartao)} current={row.custoPorCartao} previous={previousRow.custoPorCartao} previousValue={fmtBRL(previousRow.custoPorCartao)} invertPositive />
-                      </td>
-                      <td className="text-right px-4 py-3 align-top text-slate-600">
-                        <MetricValue value={fmtBRL(row.custoTotal)} current={row.custoTotal} previous={previousRow.custoTotal} previousValue={fmtBRL(previousRow.custoTotal)} invertPositive />
-                      </td>
-                      <td className="text-right px-4 py-3 align-top text-slate-600">
-                        <MetricValue value={fmtPct4(row.taxaConversaoBase)} current={row.taxaConversaoBase} previous={previousRow.taxaConversaoBase} previousValue={fmtPct4(previousRow.taxaConversaoBase)} />
-                      </td>
-                    </tr>
-                  );
-                })}
-                {/* Total row */}
-                <tr className="border-t-2 border-amber-300" style={{ background: '#FFFBCC' }}>
-                  <td className="px-4 py-2.5 font-bold text-slate-900 whitespace-nowrap border-l-4 border-amber-400">Total Geral</td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtN(segmentoTotal.baseEnviada)} current={segmentoTotal.baseEnviada} previous={previousSegmentoTotal.baseEnviada} previousValue={fmtN(previousSegmentoTotal.baseEnviada)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtN(segmentoTotal.baseEntregue)} current={segmentoTotal.baseEntregue} previous={previousSegmentoTotal.baseEntregue} previousValue={fmtN(previousSegmentoTotal.baseEntregue)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtPct(segmentoTotal.taxaEntrega)} current={segmentoTotal.taxaEntrega} previous={previousSegmentoTotal.taxaEntrega} previousValue={fmtPct(previousSegmentoTotal.taxaEntrega)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtN(segmentoTotal.propostas)} current={segmentoTotal.propostas} previous={previousSegmentoTotal.propostas} previousValue={fmtN(previousSegmentoTotal.propostas)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtPct(segmentoTotal.taxaProposta)} current={segmentoTotal.taxaProposta} previous={previousSegmentoTotal.taxaProposta} previousValue={fmtPct(previousSegmentoTotal.taxaProposta)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtN(segmentoTotal.aprovados)} current={segmentoTotal.aprovados} previous={previousSegmentoTotal.aprovados} previousValue={fmtN(previousSegmentoTotal.aprovados)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtPct(segmentoTotal.taxaAprovacao)} current={segmentoTotal.taxaAprovacao} previous={previousSegmentoTotal.taxaAprovacao} previousValue={fmtPct(previousSegmentoTotal.taxaAprovacao)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtN(segmentoTotal.emissoes)} current={segmentoTotal.emissoes} previous={previousSegmentoTotal.emissoes} previousValue={fmtN(previousSegmentoTotal.emissoes)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtPct(segmentoTotal.taxaFinalizacao)} current={segmentoTotal.taxaFinalizacao} previous={previousSegmentoTotal.taxaFinalizacao} previousValue={fmtPct(previousSegmentoTotal.taxaFinalizacao)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtBRL(segmentoTotal.custoPorCartao)} current={segmentoTotal.custoPorCartao} previous={previousSegmentoTotal.custoPorCartao} previousValue={fmtBRL(previousSegmentoTotal.custoPorCartao)} invertPositive strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtBRL(segmentoTotal.custoTotal)} current={segmentoTotal.custoTotal} previous={previousSegmentoTotal.custoTotal} previousValue={fmtBRL(previousSegmentoTotal.custoTotal)} invertPositive strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtPct4(segmentoTotal.taxaConversaoBase)} current={segmentoTotal.taxaConversaoBase} previous={previousSegmentoTotal.taxaConversaoBase} previousValue={fmtPct4(previousSegmentoTotal.taxaConversaoBase)} strong />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <AggregateTable
+          groupColumnLabel={getGroupableDimensionLabel(campanhasGroupBy)}
+          groupCellLabel={(label) => (
+            campanhasGroupBy === 'segmento'
+              ? <SegmentLabel value={label} />
+              : <>{label}</>
+          )}
+          rows={segmentoRows}
+          totalRow={segmentoTotal}
+          previousRowsByLabel={previousSegmentoRowsByLabel}
+          previousTotal={previousSegmentoTotal}
+          visibleColumns={campanhasColumns}
+          shouldShowComparison={shouldShowComparison}
+          totalEmissoesForParticipation={segmentoTotal.emissoes}
+          segmentColorMap={campanhasGroupBy === 'segmento' ? segmentColorMap : undefined}
+          onRowClick={campanhasGroupBy === 'segmento' ? (label) => {
+            setDetailSegmentFilter(current => current === label ? null : label);
+            setSelectedActivityRow(null);
+          } : undefined}
+          onGroupCellClick={campanhasGroupBy === 'segmento' ? applyGlobalSegmentFilter : undefined}
+          rowTitle={campanhasGroupBy === 'segmento' ? 'Filtrar detalhamento por este segmento' : undefined}
+          groupCellTitle={campanhasGroupBy === 'segmento' ? 'Aplicar este segmento no filtro global' : undefined}
+          MetricValue={MetricValue}
+        />
       </section>
 
       {/* ── PERFORMANCE CANAIS ── */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-1 h-6 rounded-full" style={{ background: TEAL }} />
             <h2 className="text-base font-bold text-slate-800">Performance canais</h2>
-            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{canalRows.length} canais</span>
+            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+              {canalRows.length} {getGroupableDimensionLabel(canaisGroupBy).toLowerCase()}{canalRows.length === 1 ? '' : 's'}
+            </span>
           </div>
-          <button
-            onClick={exportCanal}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
-          >
-            <FileSpreadsheet size={14} />
-            Exportar CSV
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <GroupBySelector
+              value={canaisGroupBy}
+              options={GROUPABLE_DIMENSIONS}
+              onChange={setCanaisGroupBy}
+            />
+            <ColumnsCustomizer
+              value={canaisColumns}
+              defaults={[...DEFAULT_AGGREGATE_COLUMNS, ...DEFAULT_CANAL_EXTRA_COLUMNS]}
+              available={METRIC_COLUMNS}
+              onChange={setCanaisColumns}
+            />
+            <button
+              onClick={exportCanal}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
+            >
+              <FileSpreadsheet size={14} />
+              Exportar CSV
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-b-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr style={{ background: '#1E293B' }} className="text-white">
-                  <th className="text-left px-4 py-3 font-semibold whitespace-nowrap min-w-[120px]">Canal</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Base enviada</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Base entregue</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Entrega.</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >Propostas</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >% Proposta</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >Aprovados</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >% Aprovação</th>
-                  <th
-                    className={`text-right px-3 py-3 ${HIGHLIGHT_COLS_HEADER}`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >Emissões</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Finalização</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Custo / Cartão</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">Custo Total</th>
-                  <th className="text-right px-4 py-3 font-semibold whitespace-nowrap">% Conv da Base</th>
-                  <th
-                    className="text-right px-4 py-3 font-semibold whitespace-nowrap"
-                    style={{ background: TEAL }}
-                  >% Participação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {canalRows.map((row, idx) => {
-                  const previousRow = previousCanalRowsByLabel.get(row.label) ?? computeRow([], row.label);
-                  return (
-                  <tr
-                    key={row.label}
-                    className={`border-t border-slate-100 hover:bg-cyan-50 transition-all cursor-pointer ${idx % 2 !== 0 ? 'bg-slate-50' : 'bg-white'}`}
-                    onClick={() => {
-                      setDetailCanalFilter(current => current === row.label ? null : row.label);
-                      setSelectedActivityRow(null);
-                    }}
-                    title="Filtrar detalhamento por este canal"
-                  >
-                    <td
-                      className="px-4 py-2.5 font-semibold text-slate-700 whitespace-nowrap"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        applyGlobalCanalFilter(row.label);
-                      }}
-                      title="Aplicar este canal no filtro global"
-                    >
-                      {row.label}
-                    </td>
-                    <td className="text-right px-4 py-3 align-top text-slate-600">
-                      <MetricValue value={fmtN(row.baseEnviada)} current={row.baseEnviada} previous={previousRow.baseEnviada} previousValue={fmtN(previousRow.baseEnviada)} />
-                    </td>
-                    <td className="text-right px-4 py-3 align-top text-slate-600">
-                      <MetricValue value={fmtN(row.baseEntregue)} current={row.baseEntregue} previous={previousRow.baseEntregue} previousValue={fmtN(previousRow.baseEntregue)} />
-                    </td>
-                    <td className="text-right px-4 py-3 align-top text-slate-600">
-                      <MetricValue value={fmtPct(row.taxaEntrega)} current={row.taxaEntrega} previous={previousRow.taxaEntrega} previousValue={fmtPct(previousRow.taxaEntrega)} />
-                    </td>
-                    <td
-                      className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                      style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                    >
-                      <MetricValue value={fmtN(row.propostas)} current={row.propostas} previous={previousRow.propostas} previousValue={fmtN(previousRow.propostas)} strong />
-                    </td>
-                    <td
-                      className="text-right px-3 py-2.5 text-slate-700"
-                      style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    >
-                      <MetricValue value={fmtPct(row.taxaProposta)} current={row.taxaProposta} previous={previousRow.taxaProposta} previousValue={fmtPct(previousRow.taxaProposta)} />
-                    </td>
-                    <td
-                      className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                      style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                    >
-                      <MetricValue value={fmtN(row.aprovados)} current={row.aprovados} previous={previousRow.aprovados} previousValue={fmtN(previousRow.aprovados)} strong />
-                    </td>
-                    <td
-                      className="text-right px-3 py-2.5 text-slate-700"
-                      style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    >
-                      <MetricValue value={fmtPct(row.taxaAprovacao)} current={row.taxaAprovacao} previous={previousRow.taxaAprovacao} previousValue={fmtPct(previousRow.taxaAprovacao)} />
-                    </td>
-                    <td
-                      className={`text-right px-3 py-2.5 ${HIGHLIGHT_CELL}`}
-                      style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    >
-                      <MetricValue value={fmtN(row.emissoes)} current={row.emissoes} previous={previousRow.emissoes} previousValue={fmtN(previousRow.emissoes)} strong />
-                    </td>
-                    <td className="text-right px-4 py-3 align-top text-slate-600">
-                      <MetricValue value={fmtPct(row.taxaFinalizacao)} current={row.taxaFinalizacao} previous={previousRow.taxaFinalizacao} previousValue={fmtPct(previousRow.taxaFinalizacao)} />
-                    </td>
-                    <td className="text-right px-4 py-3 align-top text-slate-600">
-                      <MetricValue value={fmtBRL(row.custoPorCartao)} current={row.custoPorCartao} previous={previousRow.custoPorCartao} previousValue={fmtBRL(previousRow.custoPorCartao)} invertPositive />
-                    </td>
-                    <td className="text-right px-4 py-3 align-top text-slate-600">
-                      <MetricValue value={fmtBRL(row.custoTotal)} current={row.custoTotal} previous={previousRow.custoTotal} previousValue={fmtBRL(previousRow.custoTotal)} invertPositive />
-                    </td>
-                    <td className="text-right px-4 py-3 align-top text-slate-600">
-                      <MetricValue value={fmtPct4(row.taxaConversaoBase)} current={row.taxaConversaoBase} previous={previousRow.taxaConversaoBase} previousValue={fmtPct4(previousRow.taxaConversaoBase)} />
-                    </td>
-                    <td className="text-right px-4 py-2.5 font-bold text-cyan-700">
-                      {totalCanalEmissoes > 0 ? fmtPct(row.emissoes / totalCanalEmissoes, 0) : '0%'}
-                    </td>
-                  </tr>
-                  );
-                })}
-                {/* Total row */}
-                <tr className="border-t-2 border-amber-300" style={{ background: '#FFFBCC' }}>
-                  <td className="px-4 py-2.5 font-bold text-slate-900 whitespace-nowrap border-l-4 border-amber-400">Total Geral</td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtN(canalTotal.baseEnviada)} current={canalTotal.baseEnviada} previous={previousCanalTotal.baseEnviada} previousValue={fmtN(previousCanalTotal.baseEnviada)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtN(canalTotal.baseEntregue)} current={canalTotal.baseEntregue} previous={previousCanalTotal.baseEntregue} previousValue={fmtN(previousCanalTotal.baseEntregue)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtPct(canalTotal.taxaEntrega)} current={canalTotal.taxaEntrega} previous={previousCanalTotal.taxaEntrega} previousValue={fmtPct(previousCanalTotal.taxaEntrega)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtN(canalTotal.propostas)} current={canalTotal.propostas} previous={previousCanalTotal.propostas} previousValue={fmtN(previousCanalTotal.propostas)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtPct(canalTotal.taxaProposta)} current={canalTotal.taxaProposta} previous={previousCanalTotal.taxaProposta} previousValue={fmtPct(previousCanalTotal.taxaProposta)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtN(canalTotal.aprovados)} current={canalTotal.aprovados} previous={previousCanalTotal.aprovados} previousValue={fmtN(previousCanalTotal.aprovados)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtPct(canalTotal.taxaAprovacao)} current={canalTotal.taxaAprovacao} previous={previousCanalTotal.taxaAprovacao} previousValue={fmtPct(previousCanalTotal.taxaAprovacao)} strong />
-                  </td>
-                  <td
-                    className="text-right px-3 py-2.5 font-bold text-slate-900"
-                    style={{ background: HIGHLIGHT_TOTAL, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                  >
-                    <MetricValue value={fmtN(canalTotal.emissoes)} current={canalTotal.emissoes} previous={previousCanalTotal.emissoes} previousValue={fmtN(previousCanalTotal.emissoes)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtPct(canalTotal.taxaFinalizacao)} current={canalTotal.taxaFinalizacao} previous={previousCanalTotal.taxaFinalizacao} previousValue={fmtPct(previousCanalTotal.taxaFinalizacao)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtBRL(canalTotal.custoPorCartao)} current={canalTotal.custoPorCartao} previous={previousCanalTotal.custoPorCartao} previousValue={fmtBRL(previousCanalTotal.custoPorCartao)} invertPositive strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtBRL(canalTotal.custoTotal)} current={canalTotal.custoTotal} previous={previousCanalTotal.custoTotal} previousValue={fmtBRL(previousCanalTotal.custoTotal)} invertPositive strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">
-                    <MetricValue value={fmtPct4(canalTotal.taxaConversaoBase)} current={canalTotal.taxaConversaoBase} previous={previousCanalTotal.taxaConversaoBase} previousValue={fmtPct4(previousCanalTotal.taxaConversaoBase)} strong />
-                  </td>
-                  <td className="text-right px-4 py-2.5 font-bold text-slate-900">100%</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <AggregateTable
+          groupColumnLabel={getGroupableDimensionLabel(canaisGroupBy)}
+          groupCellLabel={(label) => (
+            canaisGroupBy === 'segmento'
+              ? <SegmentLabel value={label} />
+              : <>{label}</>
+          )}
+          rows={canalRows}
+          totalRow={canalTotal}
+          previousRowsByLabel={previousCanalRowsByLabel}
+          previousTotal={previousCanalTotal}
+          visibleColumns={canaisColumns}
+          shouldShowComparison={shouldShowComparison}
+          totalEmissoesForParticipation={totalCanalEmissoes}
+          onRowClick={canaisGroupBy === 'canal' ? (label) => {
+            setDetailCanalFilter(current => current === label ? null : label);
+            setSelectedActivityRow(null);
+          } : (canaisGroupBy === 'segmento' ? (label) => {
+            setDetailSegmentFilter(current => current === label ? null : label);
+            setSelectedActivityRow(null);
+          } : undefined)}
+          onGroupCellClick={canaisGroupBy === 'canal' ? applyGlobalCanalFilter : (canaisGroupBy === 'segmento' ? applyGlobalSegmentFilter : undefined)}
+          rowTitle={canaisGroupBy === 'canal' ? 'Filtrar detalhamento por este canal' : (canaisGroupBy === 'segmento' ? 'Filtrar detalhamento por este segmento' : undefined)}
+          groupCellTitle={canaisGroupBy === 'canal' ? 'Aplicar este canal no filtro global' : (canaisGroupBy === 'segmento' ? 'Aplicar este segmento no filtro global' : undefined)}
+          MetricValue={MetricValue}
+        />
       </section>
 
       {/* ── DETALHAMENTO POR DISPARO ── */}
@@ -1170,20 +889,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             )}
           </div>
           {!selectedActivityRow && (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsDescriptionCollapsed(value => !value)}
-                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium ${
-                  isDescriptionCollapsed
-                    ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                    : 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100'
-                }`}
-                title={isDescriptionCollapsed ? 'Mostrar coluna de descrição' : 'Ocultar coluna de descrição'}
-              >
-                {isDescriptionCollapsed ? <PanelRightOpen size={13} /> : <PanelRightClose size={13} />}
-                {isDescriptionCollapsed ? 'Mostrar descrição' : 'Ocultar descrição'}
-              </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <ColumnsCustomizer
+                value={detailDimensionCols}
+                defaults={[...DEFAULT_DETAIL_DIMENSIONS]}
+                available={DIMENSION_COLUMNS}
+                onChange={setDetailDimensionCols}
+                label="Dimensões"
+                buttonLabel="Dimensões"
+              />
+              <ColumnsCustomizer
+                value={detailMetricCols}
+                defaults={[...DEFAULT_DETAIL_METRICS]}
+                available={METRIC_COLUMNS.filter(c => c.key !== 'participacaoEmissoes')}
+                onChange={setDetailMetricCols}
+                label="Métricas"
+                buttonLabel="Métricas"
+              />
               {/* Filtros Destaque */}
               <div className="relative">
                 <button
@@ -1392,301 +1114,34 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               <span>Clique nos chips da tabela para aplicar o filtro global da tela.</span>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <colgroup>
-                <col />{/* Data */}
-                <col />{/* Campanha */}
-                <col />{/* Segmento */}
-                <col />{/* Parceiro */}
-                <col />{/* Canal */}
-                <col style={isDescriptionCollapsed ? { visibility: 'collapse' } : undefined} />{/* Descrição */}
-                <col />{/* Entregas */}
-                <col />{/* Propostas */}
-                <col />{/* % Proposta */}
-                <col />{/* Aprovados */}
-                <col />{/* % Aprovação */}
-                <col />{/* Emissões */}
-                <col />{/* % Final. */}
-                <col />{/* C./Cartão */}
-                <col />{/* Custo Total */}
-                <col />{/* % Conv */}
-              </colgroup>
-              <thead>
-                <tr style={{ background: '#1E293B' }} className="text-white">
-                  <th
-                    className="text-left px-2 py-2 font-semibold whitespace-nowrap w-12 cursor-pointer select-none group hover:bg-slate-700 transition-colors"
-                    onClick={() => handleSort('date')}
-                  >
-                    <span className="flex items-center gap-1">
-                      Data
-                      {sortKey === 'date' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th className="text-left px-2 py-2 font-semibold whitespace-nowrap" style={{ minWidth: 140, maxWidth: 180 }}>Campanha</th>
-                  <th className="text-center px-2 py-2 font-semibold whitespace-nowrap min-w-[90px]">Segmento</th>
-                  <th className="text-center px-2 py-2 font-semibold whitespace-nowrap">Parceiro</th>
-                  <th className="text-center px-2 py-2 font-semibold whitespace-nowrap">Canal</th>
-                  <th className="text-left px-2 py-2 font-semibold whitespace-nowrap min-w-[130px]">Descrição</th>
-                  <th
-                    className="text-center px-2 py-2 font-semibold whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors"
-                    onClick={() => handleSort('baseEntregue')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      Entregas
-                      {sortKey === 'baseEntregue' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                    onClick={() => handleSort('propostas')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      Propostas
-                      {sortKey === 'propostas' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    onClick={() => handleSort('taxaProposta')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      % Proposta
-                      {sortKey === 'taxaProposta' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                    onClick={() => handleSort('aprovados')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      Aprovados
-                      {sortKey === 'aprovados' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: HIGHLIGHT_HEADER, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    onClick={() => handleSort('taxaAprovacao')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      % Aprovação
-                      {sortKey === 'taxaAprovacao' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className={`text-center px-2 py-2 ${HIGHLIGHT_COLS_HEADER} cursor-pointer select-none group hover:brightness-90 transition-all`}
-                    style={{ background: HIGHLIGHT_HEADER, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    onClick={() => handleSort('emissoes')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      Emissões
-                      {sortKey === 'emissoes' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className="text-center px-2 py-2 font-semibold whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors"
-                    onClick={() => handleSort('taxaFinalizacao')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      % Final.
-                      {sortKey === 'taxaFinalizacao' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className="text-center px-2 py-2 font-semibold whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors"
-                    onClick={() => handleSort('custoPorCartao')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      C./Cartão
-                      {sortKey === 'custoPorCartao' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className="text-center px-2 py-2 font-semibold whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors"
-                    onClick={() => handleSort('custoTotal')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      Custo Total
-                      {sortKey === 'custoTotal' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                  <th
-                    className="text-center px-2 py-2 font-semibold whitespace-nowrap cursor-pointer select-none group hover:bg-slate-700 transition-colors"
-                    onClick={() => handleSort('taxaConversaoBase')}
-                  >
-                    <span className="flex items-center justify-center gap-1">
-                      % Conv
-                      {sortKey === 'taxaConversaoBase' ? (sortDir === 'desc' ? <ChevronDown size={11} /> : <ChevronUp size={11} />) : <ChevronDown size={11} className="opacity-0 group-hover:opacity-40" />}
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayRows.map((row, idx) => {
-                  const color = segmentColorMap.get(row.segmento);
-                  const isBanded = idx % 2 !== 0;
-                  return (
-                    <tr
-                      key={`${row.date.toISOString()}-${row.activityName}`}
-                      className={`border-t border-slate-100 hover:bg-slate-50 transition-all cursor-pointer ${isBanded ? 'bg-slate-50/40' : 'bg-white'}`}
-                      onClick={() => {
-                        const act = allActivities.find((a: Activity) => a.id === row.activityName);
-                        if (act) setSelectedActivityRow(toActivityRow(act));
-                      }}
-                      title="Clique para ver detalhes do disparo"
-                    >
-                      <td className={`px-2 py-1.5 font-semibold whitespace-nowrap tabular-nums text-xs ${detailLeadCellClass(color, isBanded)} ${color?.border ?? ''}`}>
-                        {format(row.date, 'dd/MM')}
-                      </td>
-                      <td className={`px-2 py-1.5 ${detailLeadCellClass(color, isBanded)}`} style={{ minWidth: 140, maxWidth: 180 }}>
-                        <div className="flex flex-col gap-0.5">
-                          {row.jornada && (
-                            <span className={`text-[11px] font-semibold truncate ${color?.text ?? 'text-slate-600'}`} style={{ maxWidth: 160 }} title={row.jornada}>
-                              {row.jornada}
-                            </span>
-                          )}
-                          <span className="text-[10px] font-mono text-slate-400 break-all leading-tight" title={row.activityName}>
-                            {row.activityName}
-                          </span>
-                        </div>
-                      </td>
-                      <td className={`px-2 py-1.5 text-center ${detailLeadCellClass(color, isBanded)}`}>
-                        {row.segmento ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              applyGlobalSegmentFilter(row.segmento);
-                            }}
-                            className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${color?.bg ?? 'bg-slate-100'} ${color?.text ?? 'text-slate-600'} border ${color?.border ? 'border-current' : 'border-slate-200'}`}
-                            title="Aplicar este segmento no filtro global"
-                          >
-                            {row.segmento}
-                          </button>
-                        ) : (
-                          <span className="text-slate-400 text-xs">—</span>
-                        )}
-                      </td>
-                      {/* Parceiro */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center bg-white">
-                        <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap border ${PARCEIRO_COLORS[row.parceiro] ?? 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                          {row.parceiro}
-                        </span>
-                      </td>
-                      {/* Canal */}
-                      <td className="px-2 py-1.5 whitespace-nowrap text-center bg-white">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (row.canal) applyGlobalCanalFilter(row.canal);
-                          }}
-                          className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap border ${CANAL_COLORS[row.canal ?? ''] ?? 'bg-slate-50 text-slate-500 border-slate-200'}`}
-                          title="Aplicar este canal no filtro global"
-                        >
-                          {row.canal || '—'}
-                        </button>
-                      </td>
-                      {/* Descrição — sempre no DOM; visibilidade controlada pelo <col> */}
-                      <td className="px-2 py-1.5 bg-white" onClick={e => e.stopPropagation()}>
-                        {!isDescriptionCollapsed && (
-                          <div className="flex items-start gap-1.5">
-                            <textarea
-                              className="flex-1 text-xs text-slate-700 bg-white border border-slate-200 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-cyan-400 min-w-[120px]"
-                              rows={2}
-                              placeholder="Adicionar descrição..."
-                              value={editingDescs[row.activityName] ?? ''}
-                              onChange={e => setEditingDescs(prev => ({ ...prev, [row.activityName]: e.target.value }))}
-                            />
-                            {(editingDescs[row.activityName] ?? '') !== (descriptions[row.activityName] ?? '') && (
-                              <button
-                                onClick={() => saveDescription(row.activityName)}
-                                disabled={savingDesc.has(row.activityName)}
-                                className="flex-shrink-0 p-1 rounded bg-cyan-500 hover:bg-cyan-600 text-white transition-colors disabled:opacity-50"
-                                title="Salvar descrição"
-                              >
-                                <Save size={13} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      {/* Entregas */}
-                      <td className="text-center px-2 py-1.5">
-                        {row.aguardando
-                          ? <span className="text-[11px] font-medium text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Aguardando</span>
-                          : <span className="text-slate-600 text-xs tabular-nums">{fmtN(row.baseEntregue)}</span>
-                        }
-                      </td>
-                      <td
-                        className={`text-center px-2 py-1.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                      >{fmtN(row.propostas)}</td>
-                      <td
-                        className="text-center px-2 py-1.5 text-slate-700"
-                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                      >{fmtPct(row.taxaProposta)}</td>
-                      <td
-                        className={`text-center px-2 py-1.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                      >{fmtN(row.aprovados)}</td>
-                      <td
-                        className="text-center px-2 py-1.5 text-slate-700"
-                        style={{ background: HIGHLIGHT_BG, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                      >{fmtPct(row.taxaAprovacao)}</td>
-                      <td
-                        className={`text-center px-2 py-1.5 ${HIGHLIGHT_CELL}`}
-                        style={{ background: HIGHLIGHT_BG, borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                      >{fmtN(row.emissoes)}</td>
-                      <td className="text-center px-2 py-1.5 text-slate-600 text-xs tabular-nums">{fmtPct(row.taxaFinalizacao)}</td>
-                      <td className="text-center px-2 py-1.5 text-slate-600 text-xs tabular-nums">{fmtBRL(row.custoPorCartao)}</td>
-                      <td className="text-center px-2 py-1.5 text-slate-600 text-xs tabular-nums">{fmtBRL(row.custoTotal)}</td>
-                      <td className="text-center px-2 py-1.5 text-slate-600 text-xs tabular-nums">{fmtPct4(row.taxaConversaoBase)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              {displayRows.length > 0 && (
-                <tfoot>
-                  <tr style={{ background: '#1E293B' }} className="text-white text-xs font-bold">
-                    <td colSpan={6} className="px-2 py-2 font-bold whitespace-nowrap">
-                      Totais · {displayRows.length} disparo{displayRows.length !== 1 ? 's' : ''}
-                      {destaqueFilter && <span className="ml-1.5 text-amber-300 font-normal">(filtrado)</span>}
-                    </td>
-                    <td className="text-center px-2 py-2 tabular-nums">{fmtN(summaryRow.totalEntregas)}</td>
-                    <td
-                      className="text-center px-2 py-2 tabular-nums font-bold"
-                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                    >{fmtN(summaryRow.totalPropostas)}</td>
-                    <td
-                      className="text-center px-2 py-2 tabular-nums"
-                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    >{fmtPct(summaryRow.taxaProposta)}</td>
-                    <td
-                      className="text-center px-2 py-2 tabular-nums font-bold"
-                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `1px solid ${HIGHLIGHT_BORDER}` }}
-                    >{fmtN(summaryRow.totalAprovados)}</td>
-                    <td
-                      className="text-center px-2 py-2 tabular-nums"
-                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    >{fmtPct(summaryRow.taxaAprovacao)}</td>
-                    <td
-                      className="text-center px-2 py-2 tabular-nums font-bold"
-                      style={{ background: HIGHLIGHT_TOTAL, color: '#0f172a', borderLeft: `2px solid ${HIGHLIGHT_BORDER}`, borderRight: `2px solid ${HIGHLIGHT_BORDER}` }}
-                    >{fmtN(summaryRow.totalEmissoes)}</td>
-                    <td className="text-center px-2 py-2 tabular-nums">{fmtPct(summaryRow.taxaFinalizacao)}</td>
-                    <td className="text-center px-2 py-2 tabular-nums">{fmtBRL(summaryRow.avgCustoCartao)}</td>
-                    <td className="text-center px-2 py-2 tabular-nums">{fmtBRL(summaryRow.totalCusto)}</td>
-                    <td className="text-center px-2 py-2 tabular-nums">{fmtPct4(summaryRow.taxaConversaoBase)}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
+          <DetailTable
+            rows={displayRows}
+            visibleDimensions={detailDimensionCols}
+            visibleMetrics={detailMetricCols}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={(key) => {
+              if (key === 'date') {
+                handleSort('date');
+              } else {
+                handleSort(key as keyof DetailRow);
+              }
+            }}
+            segmentColorMap={segmentColorMap}
+            descriptions={descriptions}
+            editingDescs={editingDescs}
+            savingDesc={savingDesc}
+            onChangeDescription={(name, value) => setEditingDescs(prev => ({ ...prev, [name]: value }))}
+            onSaveDescription={saveDescription}
+            applyGlobalSegmentFilter={applyGlobalSegmentFilter}
+            applyGlobalCanalFilter={applyGlobalCanalFilter}
+            onRowClick={(activityName) => {
+              const act = allActivities.find((a: Activity) => a.id === activityName);
+              if (act) setSelectedActivityRow(toActivityRow(act));
+            }}
+            summary={summaryRow}
+            destaqueFilter={destaqueFilter}
+          />
         </div>}
       </section>
 
