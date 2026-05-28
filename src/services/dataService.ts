@@ -146,6 +146,8 @@ export const mapSqlToActivity = (row: any): Activity => {
         kpis: {
             baseEnviada: row['Base Total'],
             baseEntregue: row['Base Acionável'],
+            aberturas: row['Abertura'] ?? row['Aberturas'] ?? null,
+            cliques: row['Cliques'] ?? null,
             taxaEntrega: row['Taxa de Entrega'],
             propostas: row['Propostas'],
             taxaPropostas: row['Taxa de Proposta'],
@@ -273,6 +275,7 @@ export const dataService = {
             if (mappedObjective === 'conversion') mappedObjective = 'b2c';
             if (mappedObjective === 'brand') mappedObjective = 'marca';
             if (mappedObjective === 'seguros' || mappedObjective === 'seguro' || mappedObjective === 'Seguros') mappedObjective = 'seguros';
+            if (mappedObjective === 'unknown') mappedObjective = undefined;
 
             return {
                 date: group.date,
