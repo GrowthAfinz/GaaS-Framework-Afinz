@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import Papa from 'papaparse';
 import {
     AlertCircle,
     CheckCircle,
@@ -191,12 +192,30 @@ const normalizeChannel = (value: unknown): Channel => {
     return 'Indefinido';
 };
 
-const parseClipboardMatrix = (text: string): string[][] =>
-    text
-        .replace(/\r/g, '')
-        .split('\n')
-        .filter((line) => line.trim().length > 0)
-        .map((line) => line.split('\t').map((cell) => cell.trim()));
+const parseClipboardMatrix = (text: string): string[][] => {
+    const cleanText = text.replace(/\r/g, '').trim();
+    if (!cleanText) return [];
+
+    if (cleanText.includes('\t')) {
+        return cleanText
+            .split('\n')
+            .filter((line) => line.trim().length > 0)
+            .map((line) => line.split('\t').map((cell) => cell.trim()));
+    }
+
+    const parsed = Papa.parse<string[]>(cleanText, {
+        skipEmptyLines: true,
+    });
+
+    if (parsed.errors.length > 0 || !Array.isArray(parsed.data)) {
+        return cleanText
+            .split('\n')
+            .filter((line) => line.trim().length > 0)
+            .map((line) => line.split(';').map((cell) => cell.trim()));
+    }
+
+    return parsed.data.map((row) => row.map((cell) => String(cell ?? '').trim()));
+};
 
 const findCell = (matrix: string[][], terms: string[]) => {
     const wanted = terms.map(normalizeKey);
@@ -562,7 +581,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <div>
                             <h3 className="text-xl font-bold text-slate-900">Atualizacao Inteligente</h3>
                             <p className="text-sm text-slate-500">
-                                Cole a Dinamica BI, revise pendencias e gere linhas prontas para Excel e base de dados.
+                                Cole a Dinamica BI em formato Excel ou CSV, revise pendencias e gere linhas prontas para Excel e base de dados.
                             </p>
                         </div>
                     </div>
@@ -576,14 +595,14 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <h4 className="text-sm font-bold text-slate-800">1. Entrada de dados</h4>
-                            <p className="text-xs text-slate-500">Cole os dados copiados da aba Dinamica BI. O texto deve manter tabulacoes do Excel.</p>
+                            <p className="text-xs text-slate-500">Cole os dados copiados da aba Dinamica BI em tabulacao de Excel ou CSV com virgula/ponto-e-virgula.</p>
                         </div>
                         <FileSpreadsheet size={18} className="text-slate-400" />
                     </div>
                     <textarea
                         value={input}
                         onChange={(event) => setInput(event.target.value)}
-                        placeholder="Cole aqui os dados da Dinamica BI..."
+                        placeholder="Cole aqui os dados da Dinamica BI em Excel/TSV ou CSV..."
                         className="min-h-44 w-full resize-y rounded-lg border border-slate-300 bg-slate-50 p-4 font-mono text-xs text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10"
                     />
                     <div className="flex items-center justify-between gap-3">
