@@ -14,10 +14,12 @@ import {
     Wand2,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { intelligentUpdateService } from '../../services/intelligentUpdateService';
 import type { Activity } from '../../types/framework';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'error';
+type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 
 interface BlockSummary {
     key: string;
@@ -28,6 +30,8 @@ interface BlockSummary {
 
 interface MetricRow {
     key: string;
+    sourceBlock: SourceBlock;
+    sourceBlocks: SourceBlock[];
     journey: string;
     activityName: string;
     date: string;
@@ -57,6 +61,7 @@ interface UpdateCandidate extends MetricRow {
 
 interface ProcessResult {
     blocks: BlockSummary[];
+    metrics: MetricRow[];
     candidates: UpdateCandidate[];
     tsv: string;
     warnings: string[];
@@ -237,6 +242,8 @@ const mergeMetric = (map: Map<string, MetricRow>, row: MetricRow) => {
 
     map.set(row.key, {
         ...existing,
+        sourceBlocks: Array.from(new Set([...(existing.sourceBlocks ?? [existing.sourceBlock]), row.sourceBlock])),
+        sourceBlock: existing.sourceBlock === 'performance' ? row.sourceBlock : existing.sourceBlock,
         journey: existing.journey || row.journey,
         sent: row.sent ?? existing.sent,
         delivered: row.delivered ?? existing.delivered,
@@ -256,6 +263,7 @@ const readBlockRows = (
     matrix: string[][],
     start: { row: number; col: number } | null,
     channel: Channel,
+    sourceBlock: SourceBlock,
     offsets: {
         journey: number;
         activity: number;
@@ -289,6 +297,8 @@ const readBlockRows = (
         const key = `${normalizeKey(activityName)}|${date}|${rowChannel}`;
         rows.push({
             key,
+            sourceBlock,
+            sourceBlocks: [sourceBlock],
             journey,
             activityName,
             date,
@@ -475,19 +485,19 @@ const processDinamicaBI = (text: string, activities: Activity[]): ProcessResult 
     const pushStart = findCell(matrix, ['journeyname (push)']);
 
     const metricMap = new Map<string, MetricRow>();
-    const whatsappRows = readBlockRows(matrix, whatsappStart, 'WhatsApp', {
+    const whatsappRows = readBlockRows(matrix, whatsappStart, 'WhatsApp', 'whatsapp', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5,
     });
-    const emailRows = readBlockRows(matrix, emailStart, 'E-mail', {
+    const emailRows = readBlockRows(matrix, emailStart, 'E-mail', 'email', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5, clicks: 6,
     });
-    const smsRows = readBlockRows(matrix, smsStart, 'SMS', {
+    const smsRows = readBlockRows(matrix, smsStart, 'SMS', 'sms', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
     });
-    const performanceRows = readBlockRows(matrix, performanceStart, 'Indefinido', {
+    const performanceRows = readBlockRows(matrix, performanceStart, 'Indefinido', 'performance', {
         journey: 0, activity: 1, date: 2, channel: 3, proposals: 4, approved: 5, finalized: 6, assisted: 7, independent: 8,
     });
-    const pushRows = readBlockRows(matrix, pushStart, 'Push', {
+    const pushRows = readBlockRows(matrix, pushStart, 'Push', 'push', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
     });
 
@@ -506,7 +516,8 @@ const processDinamicaBI = (text: string, activities: Activity[]): ProcessResult 
         warnings.push(`Blocos nao detectados: ${missingBlocks.join(', ')}.`);
     }
 
-    const candidates = Array.from(metricMap.values())
+    const metrics = Array.from(metricMap.values());
+    const candidates = metrics
         .map((row) => buildCandidate(row, activities))
         .sort((a, b) => a.status.localeCompare(b.status) || b.confidence - a.confidence);
 
@@ -515,7 +526,7 @@ const processDinamicaBI = (text: string, activities: Activity[]): ProcessResult 
         .map(buildExcelRow)
         .join('\n');
 
-    return { blocks, candidates, tsv, warnings };
+    return { blocks, metrics, candidates, tsv, warnings };
 };
 
 const StatCard = ({ label, value, tone }: { label: string; value: number; tone: string }) => (
@@ -531,7 +542,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [result, setResult] = useState<ProcessResult | null>(null);
     const [statusFilter, setStatusFilter] = useState<CandidateStatus | 'all'>('all');
     const [processing, setProcessing] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [lastRunId, setLastRunId] = useState<string | null>(null);
 
     const summary = useMemo(() => {
         const candidates = result?.candidates ?? [];
@@ -553,6 +567,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const handleProcess = () => {
         setProcessing(true);
         setCopied(false);
+        setSaveMessage(null);
+        setLastRunId(null);
         window.setTimeout(() => {
             setResult(processDinamicaBI(input, activities));
             setProcessing(false);
@@ -566,7 +582,47 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         window.setTimeout(() => setCopied(false), 1800);
     };
 
+    const handleSaveRun = async () => {
+        if (!result) return;
+        setSaving(true);
+        setSaveMessage(null);
+
+        try {
+            const saved = await intelligentUpdateService.saveRun({
+                inputLineCount: input.split('\n').filter(Boolean).length,
+                blocks: result.blocks,
+                metrics: result.metrics,
+                candidates: result.candidates.map((candidate) => ({
+                    ...candidate,
+                    excelTsvRow: buildExcelRow(candidate),
+                })),
+                warnings: result.warnings,
+                summary: {
+                    ready: summary.ready,
+                    review: summary.review,
+                    new: summary.fresh,
+                    duplicate: summary.duplicate,
+                    error: summary.error,
+                },
+            });
+
+            setLastRunId(saved.runId);
+            setSaveMessage({
+                type: 'success',
+                text: `${saved.metricCount} metricas e ${saved.candidateCount} pendencias salvas. ${saved.appliedCount} campanhas prontas aplicadas na base de dados.`,
+            });
+        } catch (error: any) {
+            setSaveMessage({
+                type: 'error',
+                text: error?.message ? `Falha ao salvar: ${error.message}` : 'Falha ao salvar na base de dados.',
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const rowCount = result?.tsv ? result.tsv.split('\n').filter(Boolean).length : 0;
+    const blockingCount = summary.duplicate + summary.error;
 
     return (
         <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xl relative overflow-hidden">
@@ -764,7 +820,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                     <div>
                                         <h4 className="text-sm font-bold text-slate-800">Base de dados</h4>
-                                        <p className="text-xs text-slate-500">Primeiro corte prepara a revisao; a gravacao sera habilitada apos a tabela de auditoria.</p>
+                                        <p className="text-xs text-slate-500">Salva a execucao, registra as pendencias e aplica automaticamente o que estiver pronto.</p>
                                     </div>
                                 </div>
                                 <div className="space-y-2 text-sm">
@@ -778,17 +834,36 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                     <div className="flex justify-between rounded bg-slate-50 px-3 py-2">
                                         <span className="text-slate-500">Pendencias bloqueantes</span>
-                                        <span className="font-bold text-slate-800">{summary.duplicate + summary.error}</span>
+                                        <span className="font-bold text-slate-800">{blockingCount}</span>
                                     </div>
+                                    {lastRunId && (
+                                        <div className="flex justify-between rounded bg-emerald-50 px-3 py-2">
+                                            <span className="text-emerald-700">Execucao salva</span>
+                                            <span className="font-mono text-[10px] font-bold text-emerald-800">{lastRunId.slice(0, 8)}...</span>
+                                        </div>
+                                    )}
                                 </div>
+                                {saveMessage && (
+                                    <div className={`mt-4 rounded-lg border px-3 py-2 text-xs ${
+                                        saveMessage.type === 'success'
+                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                            : 'border-red-200 bg-red-50 text-red-700'
+                                    }`}>
+                                        {saveMessage.text}
+                                    </div>
+                                )}
                                 <button
                                     type="button"
-                                    disabled
-                                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-200 px-4 py-3 text-xs font-bold text-slate-500"
+                                    onClick={handleSaveRun}
+                                    disabled={saving || result.candidates.length === 0}
+                                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
-                                    <Clipboard size={14} />
-                                    Atualizar base de dados em breve
+                                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Clipboard size={14} />}
+                                    {saving ? 'Salvando...' : 'Salvar e aplicar prontas na base de dados'}
                                 </button>
+                                <p className="mt-2 text-[10px] leading-relaxed text-slate-500">
+                                    Linhas em revisao, novas, duplicadas ou com erro ficam registradas para acao humana; apenas status Pronto altera campanhas existentes.
+                                </p>
                             </div>
                         </section>
                     </>
