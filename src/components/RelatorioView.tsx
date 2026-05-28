@@ -519,7 +519,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       await exportAquisicaoCrmXlsx(start, end);
     } catch (error) {
       console.error('Erro ao exportar XLSX de Aquisição CRM', error);
-      window.alert('Não foi possível gerar o XLSX de Aquisição CRM. Verifique a conexão com o Supabase e tente novamente.');
+      window.alert('Não foi possível gerar o XLSX de Aquisição CRM. Verifique a conexão com a base de dados e tente novamente.');
     } finally {
       setIsExportingAquisicao(false);
     }

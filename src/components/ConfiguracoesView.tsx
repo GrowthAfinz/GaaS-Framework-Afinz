@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck, Users } from 'lucide-react';
+import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck, Users, Wand2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUserRole } from '../context/UserRoleContext';
 import { storageService, StorageFile } from '../services/storageService';
@@ -11,6 +11,7 @@ import { GoalsManager } from './admin/GoalsManager';
 import { UserManagementPanel } from './admin/UserManagementPanel';
 import { activityService, versionService } from '../services/activityService';
 import { dataService } from '../services/dataService';
+import { IntelligentFrameworkUpdate } from './admin/IntelligentFrameworkUpdate';
 
 const UPLOAD_FIX_VERSION = 'ENG_FIX_V3_2026-03-09';
 
@@ -244,7 +245,7 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
                 await storageService.uploadFile(slot, file);
             } catch (storageErr: any) {
                 console.warn('⚠️ Storage upload skipped (RLS ou bucket não acessível):', storageErr.message);
-                // Continue anyway — DB sync is the priority
+                // Continue anyway — database sync is the priority
             }
 
             // 2. Parse and Upsert to Database (always required)
@@ -296,13 +297,13 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
             // 2. Parse based on slot
             if (slot === 'b2c') {
                 const { data } = await parseB2CCSV(file);
-                // PERSISTENCE FIX: Save to Supabase
+                // PERSISTENCE FIX: Save to database
                 await dataService.upsertB2CMetrics(data);
                 // Update Store
                 setB2CData(data);
             } else if (slot === 'media') {
                 const data = await parseXLSX(file);
-                // PERSISTENCE FIX: Save to Supabase
+                // PERSISTENCE FIX: Save to database
                 await dataService.upsertPaidMedia(data as any);
                 // Update Store
                 setPaidMediaData(data as any);
@@ -422,7 +423,7 @@ export const ConfiguracoesView: React.FC = () => {
     const [isSending, setIsSending] = useState(false);
     const [sent, setSent] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'users'>('goals');
+    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users'>('goals');
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -547,7 +548,17 @@ export const ConfiguracoesView: React.FC = () => {
                                     : 'border-transparent text-slate-500 hover:text-slate-800'
                                     }`}
                             >
-                                Gestão de Banco de Dados
+                                Gestão da Base de Dados
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('intelligent-update')}
+                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'intelligent-update'
+                                    ? 'border-blue-500 text-blue-500'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                                    }`}
+                            >
+                                <Wand2 size={16} />
+                                Atualização Inteligente
                             </button>
                             {isAdmin && (
                                 <button
@@ -575,6 +586,10 @@ export const ConfiguracoesView: React.FC = () => {
                                 </div>
                             )}
 
+                            {activeTab === 'intelligent-update' && (
+                                <IntelligentFrameworkUpdate />
+                            )}
+
                             {activeTab === 'database' && (
                                 <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xl relative overflow-hidden">
                                     {/* Background subtle effect */}
@@ -586,7 +601,7 @@ export const ConfiguracoesView: React.FC = () => {
                                                 <Database size={24} />
                                             </div>
                                             <div>
-                                                <h3 className="text-xl font-bold text-slate-900">Banco de Dados & Arquivos</h3>
+                                                <h3 className="text-xl font-bold text-slate-900">Base de dados & Arquivos</h3>
                                                 <p className="text-sm text-slate-500">Importação e sincronização das tabelas do sistema.</p>
                                             </div>
                                         </div>

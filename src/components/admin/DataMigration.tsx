@@ -32,7 +32,7 @@ export const DataMigration = () => {
     const addLog = (msg: string) => setLogs(prev => [`${new Date().toLocaleTimeString()} - ${msg}`, ...prev].slice(0, 100));
 
     const handleMigration = async () => {
-        if (!confirm(`Confirmar migração de:\n- ${activities.length} Atividades\n- ${b2cData.length} Registros B2C\n- ${paidMediaData.length} Métricas de Mídia\n\nIsso enviará tudo para o Banco de Dados.`)) return;
+        if (!confirm(`Confirmar migração de:\n- ${activities.length} Atividades\n- ${b2cData.length} Registros B2C\n- ${paidMediaData.length} Métricas de Mídia\n\nIsso enviará tudo para a base de dados.`)) return;
 
         setStatus('migrating');
         setProgress(0);
@@ -201,13 +201,13 @@ export const DataMigration = () => {
 
             setStatus('done');
             addLog('✅ Migração Concluída com Sucesso!');
-            alert('Dados migrados com sucesso para o Supabase!');
+            alert('Dados migrados com sucesso para a base de dados!');
 
         } catch (error: any) {
             setStatus('error');
             addLog(`❌ Erro Fatal: ${error.message}`);
             if (error.message.includes('relation "activities" does not exist')) {
-                addLog('⚠️ Tabela não encontrada! Execute o script SQL no Supabase primeiro.');
+                addLog('⚠️ Tabela não encontrada! Execute o script SQL na base de dados primeiro.');
             }
         }
     };
@@ -222,7 +222,7 @@ export const DataMigration = () => {
                     </div>
                     <div>
                         <h3 className="text-xl font-bold text-slate-900">Migração de Dados (SQL)</h3>
-                        <p className="text-sm text-slate-500">Transfira dados do navegador para o Supabase DB.</p>
+                        <p className="text-sm text-slate-500">Transfira dados do navegador para a base de dados.</p>
                     </div>
                 </div>
             </div>
@@ -250,7 +250,7 @@ export const DataMigration = () => {
                     `}
                 >
                     <UploadCloud />
-                    Iniciar Migração para Banco de Dados
+                    Iniciar Migração para base de dados
                 </button>
             )}
 
