@@ -71,6 +71,7 @@ interface DetailRow {
   cliques: number;
   taxaEntrega: number;
   taxaAbertura: number;
+  taxaClique: number;
   taxaProposta: number;
   taxaAprovacao: number;
   taxaFinalizacao: number;
@@ -177,11 +178,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   // ── Personalização de colunas / agrupamentos ──
   const [campanhasGroupBy, setCampanhasGroupBy] = useState<DimensionKey>('segmento');
   const [campanhasColumns, setCampanhasColumns] = useState<ColumnKey[]>([...DEFAULT_AGGREGATE_COLUMNS]);
-  const [canaisGroupBy, setCanaisGroupBy] = useState<DimensionKey>('canal');
-  const [canaisColumns, setCanaisColumns] = useState<ColumnKey[]>([
-    ...DEFAULT_AGGREGATE_COLUMNS,
-    ...DEFAULT_CANAL_EXTRA_COLUMNS,
-  ]);
   const [detailDimensionCols, setDetailDimensionCols] = useState<ColumnKey[]>([...DEFAULT_DETAIL_DIMENSIONS]);
   const [detailMetricCols, setDetailMetricCols] = useState<ColumnKey[]>([...DEFAULT_DETAIL_METRICS]);
 
@@ -256,15 +252,15 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   );
 
   const canalRows = useMemo(
-    () => groupActivitiesByDimension(reportActivities, canaisGroupBy),
-    [reportActivities, canaisGroupBy]
+    () => groupActivitiesByDimension(reportActivities, 'canal'),
+    [reportActivities]
   );
 
   const canalTotal = useMemo(() => computeRow(reportActivities, 'Total Geral'), [reportActivities]);
   const previousCanalTotal = useMemo(() => computeRow(previousReportActivities, 'Total Geral'), [previousReportActivities]);
   const previousCanalRowsByLabel = useMemo(
-    () => groupActivitiesByDimensionAsMap(previousReportActivities, canaisGroupBy),
-    [previousReportActivities, canaisGroupBy]
+    () => groupActivitiesByDimensionAsMap(previousReportActivities, 'canal'),
+    [previousReportActivities]
   );
   const totalCanalEmissoes = canalTotal.emissoes;
 
@@ -331,6 +327,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           cliques,
           taxaEntrega: baseEnviada > 0 ? baseEntregue / baseEnviada : 0,
           taxaAbertura: baseEntregue > 0 ? aberturas / baseEntregue : 0,
+          taxaClique: aberturas > 0 ? cliques / aberturas : 0,
           taxaProposta: baseEntregue > 0 ? propostas / baseEntregue : 0,
           taxaAprovacao: propostas > 0 ? aprovados / propostas : 0,
           taxaFinalizacao: baseEntregue > 0 ? emissoes / baseEntregue : 0,
@@ -811,21 +808,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             <div className="w-1 h-6 rounded-full" style={{ background: TEAL }} />
             <h2 className="text-base font-bold text-slate-800">Performance canais</h2>
             <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-              {canalRows.length} {getGroupableDimensionLabel(canaisGroupBy).toLowerCase()}{canalRows.length === 1 ? '' : 's'}
+              {canalRows.length} canai{canalRows.length === 1 ? 'l' : 's'}
             </span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <GroupBySelector
-              value={canaisGroupBy}
-              options={GROUPABLE_DIMENSIONS}
-              onChange={setCanaisGroupBy}
-            />
-            <ColumnsCustomizer
-              value={canaisColumns}
-              defaults={[...DEFAULT_AGGREGATE_COLUMNS, ...DEFAULT_CANAL_EXTRA_COLUMNS]}
-              available={METRIC_COLUMNS}
-              onChange={setCanaisColumns}
-            />
             <button
               onClick={exportCanal}
               className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
@@ -837,29 +823,22 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
         </div>
 
         <AggregateTable
-          groupColumnLabel={getGroupableDimensionLabel(canaisGroupBy)}
-          groupCellLabel={(label) => (
-            canaisGroupBy === 'segmento'
-              ? <SegmentLabel value={label} />
-              : <>{label}</>
-          )}
+          groupColumnLabel="Canal"
+          groupCellLabel={(label) => <>{label}</>}
           rows={canalRows}
           totalRow={canalTotal}
           previousRowsByLabel={previousCanalRowsByLabel}
           previousTotal={previousCanalTotal}
-          visibleColumns={canaisColumns}
+          visibleColumns={[...DEFAULT_AGGREGATE_COLUMNS, ...DEFAULT_CANAL_EXTRA_COLUMNS]}
           shouldShowComparison={shouldShowComparison}
           totalEmissoesForParticipation={totalCanalEmissoes}
-          onRowClick={canaisGroupBy === 'canal' ? (label) => {
+          onRowClick={(label) => {
             setDetailCanalFilter(current => current === label ? null : label);
             setSelectedActivityRow(null);
-          } : (canaisGroupBy === 'segmento' ? (label) => {
-            setDetailSegmentFilter(current => current === label ? null : label);
-            setSelectedActivityRow(null);
-          } : undefined)}
-          onGroupCellClick={canaisGroupBy === 'canal' ? applyGlobalCanalFilter : (canaisGroupBy === 'segmento' ? applyGlobalSegmentFilter : undefined)}
-          rowTitle={canaisGroupBy === 'canal' ? 'Filtrar detalhamento por este canal' : (canaisGroupBy === 'segmento' ? 'Filtrar detalhamento por este segmento' : undefined)}
-          groupCellTitle={canaisGroupBy === 'canal' ? 'Aplicar este canal no filtro global' : (canaisGroupBy === 'segmento' ? 'Aplicar este segmento no filtro global' : undefined)}
+          }}
+          onGroupCellClick={applyGlobalCanalFilter}
+          rowTitle="Filtrar detalhamento por este canal"
+          groupCellTitle="Aplicar este canal no filtro global"
           MetricValue={MetricValue}
         />
       </section>

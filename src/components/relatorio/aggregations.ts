@@ -16,6 +16,7 @@ export interface AggregatedRow {
   cac: number;
   taxaEntrega: number;
   taxaAbertura: number;
+  taxaClique: number;
   taxaProposta: number;
   taxaAprovacao: number;
   taxaFinalizacao: number;
@@ -55,6 +56,7 @@ export function computeRow(activities: Activity[], label: string): AggregatedRow
     cac,
     taxaEntrega: baseEnviada > 0 ? baseEntregue / baseEnviada : 0,
     taxaAbertura: baseEntregue > 0 ? aberturas / baseEntregue : 0,
+    taxaClique: aberturas > 0 ? cliques / aberturas : 0,
     taxaProposta: baseEntregue > 0 ? propostas / baseEntregue : 0,
     taxaAprovacao: propostas > 0 ? aprovados / propostas : 0,
     taxaFinalizacao: baseEntregue > 0 ? emissoes / baseEntregue : 0,

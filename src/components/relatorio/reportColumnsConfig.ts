@@ -60,6 +60,7 @@ export const METRIC_COLUMNS: ColumnDef[] = [
   { key: 'aberturas',            label: 'Aberturas',        type: 'metric', format: 'number' },
   { key: 'taxaAbertura',         label: '% Abertura',       type: 'metric', format: 'percent' },
   { key: 'cliques',              label: 'Cliques',          type: 'metric', format: 'number' },
+  { key: 'taxaClique',           label: '% Clique',         type: 'metric', format: 'percent' },
   { key: 'propostas',            label: 'Propostas',        type: 'metric', format: 'number',  highlight: true },
   { key: 'taxaProposta',         label: '% Proposta',       type: 'metric', format: 'percent', highlight: true },
   { key: 'aprovados',            label: 'Aprovados',        type: 'metric', format: 'number',  highlight: true },

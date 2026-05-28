@@ -64,6 +64,7 @@ export interface DetailTableRow {
   cliques: number;
   taxaEntrega: number;
   taxaAbertura: number;
+  taxaClique: number;
   taxaProposta: number;
   taxaAprovacao: number;
   taxaFinalizacao: number;
@@ -273,6 +274,7 @@ export const DetailTable: React.FC<DetailTableProps> = ({
     cliques: 0,
     taxaEntrega: 0,
     taxaAbertura: 0,
+    taxaClique: 0,
     emissoesIndependentes: 0,
     emissoesAssistidas: 0,
     cac: 0,
