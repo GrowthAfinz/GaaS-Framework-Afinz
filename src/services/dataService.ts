@@ -33,6 +33,41 @@ const normalizeText = (value: unknown): string => {
     return value.trim();
 };
 
+// Normaliza Safra para formato canônico YYYY-MM.
+// Aceita: '2026-01', '2026/01', 'jan/26', 'Jan/2026', '01/2026', etc.
+const PT_MONTH_MAP: Record<string, string> = {
+    jan: '01', fev: '02', mar: '03', abr: '04', mai: '05', jun: '06',
+    jul: '07', ago: '08', set: '09', out: '10', nov: '11', dez: '12',
+};
+const normalizeSafra = (value: unknown): string => {
+    const raw = normalizeText(value).toLowerCase();
+    if (!raw) return '';
+    // Already YYYY-MM or YYYY/MM
+    const isoMatch = raw.match(/^(\d{4})[-/](\d{1,2})$/);
+    if (isoMatch) {
+        const [, y, m] = isoMatch;
+        return `${y}-${m.padStart(2, '0')}`;
+    }
+    // MM/YYYY or MM-YYYY
+    const mmYyyy = raw.match(/^(\d{1,2})[-/](\d{4})$/);
+    if (mmYyyy) {
+        const [, m, y] = mmYyyy;
+        return `${y}-${m.padStart(2, '0')}`;
+    }
+    // MMM/YY or MMM/YYYY  (jan/26, fev/2026)
+    const monthYear = raw.match(/^([a-zçãéí]{3,})\.?[-/](\d{2,4})$/i);
+    if (monthYear) {
+        const monthKey = monthYear[1].slice(0, 3);
+        const month = PT_MONTH_MAP[monthKey];
+        if (month) {
+            let year = monthYear[2];
+            if (year.length === 2) year = `20${year}`;
+            return `${year}-${month}`;
+        }
+    }
+    return raw;
+};
+
 const mapB2CMetricRow = (row: any): B2CDataRow => ({
     id: row.id,
     created_at: row.created_at,
@@ -141,7 +176,7 @@ export const mapSqlToActivity = (row: any): Activity => {
         ordemDisparo: Number(row['Ordem de disparo']) || undefined,
         oferta,
         promocional,
-        safraKey: row['Safra'],
+        safraKey: normalizeSafra(row['Safra']),
         status: row['status'] as any, // Cast to ActivityStatus
         kpis: {
             baseEnviada: row['Base Total'],
