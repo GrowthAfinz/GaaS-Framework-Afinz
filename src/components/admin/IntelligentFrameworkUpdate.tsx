@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import {
     AlertCircle,
     CheckCircle,
@@ -11,6 +12,7 @@ import {
     RefreshCw,
     Search,
     Sparkles,
+    Upload,
     Wand2,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -547,6 +549,92 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [lastRunId, setLastRunId] = useState<string | null>(null);
 
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragError, setDragError] = useState<string | null>(null);
+    const [loadedFileName, setLoadedFileName] = useState<string | null>(null);
+
+    const handleFileDrop = async (file: File) => {
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        setDragError(null);
+        setLoadedFileName(null);
+        
+        if (fileExt === 'xlsx' || fileExt === 'xls') {
+            try {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        
+                        if (!worksheet) {
+                            setDragError('Nenhuma planilha encontrada no arquivo Excel.');
+                            return;
+                        }
+                        
+                        const tsvContent = XLSX.utils.sheet_to_csv(worksheet, { FS: '\t' });
+                        
+                        if (!tsvContent.trim()) {
+                            setDragError('A planilha selecionada está vazia.');
+                            return;
+                        }
+                        
+                        setInput(tsvContent);
+                        setLoadedFileName(file.name);
+                        
+                        setProcessing(true);
+                        setCopied(false);
+                        setSaveMessage(null);
+                        setLastRunId(null);
+                        
+                        window.setTimeout(() => {
+                            setResult(processDinamicaBI(tsvContent, activities));
+                            setProcessing(false);
+                        }, 120);
+                    } catch (err) {
+                        console.error(err);
+                        setDragError('Erro ao processar o arquivo Excel. Verifique se o formato é válido.');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (err) {
+                console.error(err);
+                setDragError('Erro ao carregar o arquivo Excel.');
+            }
+        } else if (fileExt === 'csv' || fileExt === 'tsv' || fileExt === 'txt') {
+            try {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target?.result as string;
+                    if (!text.trim()) {
+                        setDragError('O arquivo de texto selecionado está vazio.');
+                        return;
+                    }
+                    
+                    setInput(text);
+                    setLoadedFileName(file.name);
+                    
+                    setProcessing(true);
+                    setCopied(false);
+                    setSaveMessage(null);
+                    setLastRunId(null);
+                    
+                    window.setTimeout(() => {
+                        setResult(processDinamicaBI(text, activities));
+                        setProcessing(false);
+                    }, 120);
+                };
+                reader.readAsText(file);
+            } catch (err) {
+                console.error(err);
+                setDragError('Erro ao ler o arquivo de texto.');
+            }
+        } else {
+            setDragError('Formato de arquivo não suportado. Arraste planilhas Excel (.xlsx, .xls) ou arquivos de texto (.csv, .tsv, .txt).');
+        }
+    };
+
     const summary = useMemo(() => {
         const candidates = result?.candidates ?? [];
         return {
@@ -651,19 +739,83 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <h4 className="text-sm font-bold text-slate-800">1. Entrada de dados</h4>
-                            <p className="text-xs text-slate-500">Cole os dados copiados da aba Dinamica BI em tabulacao de Excel ou CSV com virgula/ponto-e-virgula.</p>
+                            <p className="text-xs text-slate-500">
+                                Cole os dados copiados da aba Dinamica BI ou{' '}
+                                <label className="text-cyan-600 hover:text-cyan-800 font-bold underline cursor-pointer transition duration-150 inline-flex items-center gap-1">
+                                    selecione um arquivo do computador
+                                    <input
+                                        type="file"
+                                        accept=".xlsx,.xls,.csv,.tsv,.txt"
+                                        className="hidden"
+                                        onChange={async (event) => {
+                                            if (event.target.files && event.target.files.length > 0) {
+                                                await handleFileDrop(event.target.files[0]);
+                                            }
+                                        }}
+                                    />
+                                </label>
+                                . Arraste e solte planilhas Excel ou arquivos CSV/TSV na área abaixo.
+                            </p>
                         </div>
                         <FileSpreadsheet size={18} className="text-slate-400" />
                     </div>
-                    <textarea
-                        value={input}
-                        onChange={(event) => setInput(event.target.value)}
-                        placeholder="Cole aqui os dados da Dinamica BI em Excel/TSV ou CSV..."
-                        className="min-h-44 w-full resize-y rounded-lg border border-slate-300 bg-slate-50 p-4 font-mono text-xs text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10"
-                    />
+
+                    {dragError && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800 flex items-center gap-2">
+                            <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+                            <span>{dragError}</span>
+                        </div>
+                    )}
+
+                    {loadedFileName && (
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800 flex items-center gap-2">
+                            <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
+                            <span>Arquivo <strong>{loadedFileName}</strong> importado e processado com sucesso!</span>
+                        </div>
+                    )}
+
+                    <div 
+                        className="relative group"
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDragging(true);
+                        }}
+                        onDragLeave={(e) => {
+                            e.preventDefault();
+                            setIsDragging(false);
+                        }}
+                        onDrop={async (e) => {
+                            e.preventDefault();
+                            setIsDragging(false);
+                            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                                await handleFileDrop(e.dataTransfer.files[0]);
+                            }
+                        }}
+                    >
+                        <textarea
+                            value={input}
+                            onChange={(event) => {
+                                setInput(event.target.value);
+                                setLoadedFileName(null);
+                                setDragError(null);
+                            }}
+                            placeholder="Cole aqui os dados da Dinamica BI em Excel/TSV ou CSV, ou arraste e solte uma planilha..."
+                            className="min-h-44 w-full resize-y rounded-lg border border-slate-300 bg-slate-50 p-4 font-mono text-xs text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10"
+                        />
+                        {isDragging && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-cyan-500 bg-cyan-50/90 backdrop-blur-sm transition-all duration-300 z-20 animate-pulse">
+                                <div className="p-4 bg-cyan-100 rounded-full text-cyan-700 shadow-lg mb-2 animate-bounce">
+                                    <Upload size={28} />
+                                </div>
+                                <p className="text-sm font-bold text-cyan-800">Solte o arquivo para importar</p>
+                                <p className="text-xs text-cyan-600">Planilhas Excel (.xlsx, .xls) ou CSV/TSV/TXT</p>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex items-center justify-between gap-3">
                         <div className="text-xs text-slate-500">
-                            {input ? `${input.split('\n').filter(Boolean).length} linhas coladas` : 'Aguardando colagem'}
+                            {input ? `${input.split('\n').filter(Boolean).length} linhas carregadas` : 'Aguardando colagem'}
                         </div>
                         <button
                             type="button"
