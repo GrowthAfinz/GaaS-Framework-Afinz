@@ -322,17 +322,13 @@ const readBlockRows = (
 
 const activityDateKey = (activity: Activity) => toDateKey(activity.dataDisparo);
 
-const inferDispatchOrder = (candidate: MetricRow, activities: Activity[]) => {
+const inferDispatchOrder = (candidate: MetricRow, previousDispatchMap: Map<string, Activity[]>) => {
     const month = candidate.date.slice(0, 7);
     const journeyKey = normalizeKey(candidate.journey);
     const channel = candidate.channel;
 
-    const previous = activities.filter((activity) => {
-        const sameMonth = activityDateKey(activity).slice(0, 7) === month;
-        const sameChannel = normalizeChannel(activity.canal) === channel;
-        const sameJourney = journeyKey && normalizeKey(activity.jornada) === journeyKey;
-        return sameMonth && sameChannel && sameJourney;
-    });
+    const prevKey = `${month}|${channel}|${journeyKey}`;
+    const previous = previousDispatchMap.get(prevKey) || [];
 
     const activityText = normalizeKey(candidate.activityName);
     const explicitDay = activityText.match(/\bd(\d+)\b/);
@@ -377,15 +373,15 @@ const inferDispatchOrder = (candidate: MetricRow, activities: Activity[]) => {
     };
 };
 
-const buildCandidate = (metric: MetricRow, activities: Activity[]): UpdateCandidate => {
-    const matches = activities.filter((activity) => {
-        const activityName = normalizeKey(activity.raw?.['Activity name / Taxonomia'] || activity.id);
-        return activityName === normalizeKey(metric.activityName)
-            && activityDateKey(activity) === metric.date
-            && normalizeChannel(activity.canal) === metric.channel;
-    });
+const buildCandidate = (
+    metric: MetricRow, 
+    exactMatchMap: Map<string, Activity[]>, 
+    previousDispatchMap: Map<string, Activity[]>
+): UpdateCandidate => {
+    const exactKey = `${normalizeKey(metric.activityName)}|${metric.date}|${metric.channel}`;
+    const matches = exactMatchMap.get(exactKey) || [];
 
-    const dispatch = inferDispatchOrder(metric, activities);
+    const dispatch = inferDispatchOrder(metric, previousDispatchMap);
     const hasCriticalData = Boolean(metric.activityName && metric.date && metric.channel !== 'Indefinido');
 
     if (!hasCriticalData) {
@@ -480,6 +476,30 @@ const processDinamicaBI = (text: string, activities: Activity[]): ProcessResult 
     const matrix = parseClipboardMatrix(text);
     const warnings: string[] = [];
 
+    // 1. Build Index Maps for O(1) campaign lookups
+    const exactMatchMap = new Map<string, Activity[]>();
+    const previousDispatchMap = new Map<string, Activity[]>();
+
+    activities.forEach((activity) => {
+        const actName = normalizeKey(activity.raw?.['Activity name / Taxonomia'] || activity.id);
+        const actDate = activityDateKey(activity);
+        const actChan = normalizeChannel(activity.canal);
+        
+        const exactKey = `${actName}|${actDate}|${actChan}`;
+        if (!exactMatchMap.has(exactKey)) {
+            exactMatchMap.set(exactKey, []);
+        }
+        exactMatchMap.get(exactKey)!.push(activity);
+
+        const actMonth = actDate.slice(0, 7);
+        const actJrn = normalizeKey(activity.jornada);
+        const prevKey = `${actMonth}|${actChan}|${actJrn}`;
+        if (!previousDispatchMap.has(prevKey)) {
+            previousDispatchMap.set(prevKey, []);
+        }
+        previousDispatchMap.get(prevKey)!.push(activity);
+    });
+
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
     const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
     const smsStart = findCell(matrix, ['journeyname (sms)']);
@@ -520,7 +540,7 @@ const processDinamicaBI = (text: string, activities: Activity[]): ProcessResult 
 
     const metrics = Array.from(metricMap.values());
     const candidates = metrics
-        .map((row) => buildCandidate(row, activities))
+        .map((row) => buildCandidate(row, exactMatchMap, previousDispatchMap))
         .sort((a, b) => a.status.localeCompare(b.status) || b.confidence - a.confidence);
 
     const tsv = candidates
@@ -942,27 +962,25 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         </section>
 
                         <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                <div className="mb-3 flex items-center justify-between">
-                                    <div>
-                                        <h4 className="text-sm font-bold text-slate-800">4. Linhas para Excel</h4>
-                                        <p className="text-xs text-slate-500">{rowCount} linhas sem cabecalho, prontas para colar.</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleCopy}
-                                        disabled={!result.tsv}
-                                        className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                                    >
-                                        {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
-                                        {copied ? 'Copiado' : 'Copiar'}
-                                    </button>
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 flex flex-col justify-between items-center text-center min-h-[220px]">
+                                <div className="p-4 bg-emerald-50 rounded-full text-emerald-700 shadow-inner mb-2 animate-pulse">
+                                    <FileSpreadsheet size={36} />
                                 </div>
-                                <textarea
-                                    readOnly
-                                    value={result.tsv}
-                                    className="h-40 w-full resize-none rounded-lg border border-slate-200 bg-white p-3 font-mono text-[10px] text-slate-700 outline-none"
-                                />
+                                <div className="space-y-1">
+                                    <h4 className="text-sm font-bold text-slate-800">4. Dados prontos para o Excel</h4>
+                                    <p className="text-xs text-slate-500 max-w-xs">
+                                        {rowCount} linhas convertidas sem cabeçalho, prontas para serem coladas diretamente na sua planilha de controle.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleCopy}
+                                    disabled={!result.tsv}
+                                    className="mt-4 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 text-xs font-bold transition-all shadow-md active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                >
+                                    {copied ? <CheckCircle size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                    {copied ? 'Conteúdo Copiado!' : 'Copiar linhas para o Excel'}
+                                </button>
                             </div>
 
                             <div className="rounded-lg border border-slate-200 bg-white p-4">
