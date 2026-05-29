@@ -21,6 +21,7 @@ A aba Configuracoes e o painel administrativo do sistema. Permite gerenciar vers
 - Visualizacao de uso de storage
 - Informacoes de autenticacao
 - Operacoes de manutencao
+- Atualizacao Inteligente da Dinamica BI para Excel + base de dados
 
 ---
 
@@ -89,6 +90,21 @@ Ferramenta para migracao e sincronizacao de dados.
 - Sync Metas -> Supabase
 - Limpar dados locais
 - Resetar para versao inicial
+
+### IntelligentFrameworkUpdate.tsx
+Ferramenta incremental para transformar a aba `Dinamica BI` em linhas revisaveis do Framework e registros confirmados na base de dados.
+
+**Operacoes:**
+- arrastar ou selecionar `.xlsx`, `.xls`, `.csv`, `.tsv` ou `.txt`;
+- detectar blocos WhatsApp, E-mail, SMS, Push e Performance;
+- identificar novos disparos por `JourneyName + ActivityName + Canal + Data`;
+- sugerir campos humanos com historico e taxonomia;
+- revisar/editar campanhas em um Review Sheet paginado;
+- buscar por JourneyName, activity, canal, data e dimensoes;
+- copiar linhas TSV para Excel;
+- confirmar apenas linhas aceitas/selecionadas para a base de dados.
+
+Documentacao detalhada: `docs/architecture/ATUALIZADOR_INTELIGENTE_GAAS.md`.
 
 ---
 

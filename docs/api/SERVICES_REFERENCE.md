@@ -14,6 +14,13 @@ Gerenciador principal de entidades de atividade.
 - `syncFrameworkActivities()`: Sincroniza dados importados do CSV para a tabela principal.
 - `delete(id)`: Remove uma atividade.
 
+### `intelligentUpdateService.ts`
+Persistencia do Atualizador Inteligente da Dinamica BI.
+- `saveRun(payload)`: cria uma execucao de atualizacao, salva metricas/candidatos auditados do lote confirmado e aplica as linhas aceitas na tabela `activities`.
+- Usa batches para reduzir travamentos no navegador.
+- Nao salva mais a Dinamica BI inteira quando o usuario confirma apenas um subconjunto.
+- Mantem auditoria em `gaas_update_runs`, `gaas_dinamica_bi_metrics` e `gaas_update_candidates`.
+
 ### `dataService.ts`
 Camada de abstracao de dados gerais.
 - `fetchB2CData()`: Busca metricas B2C diarias.
