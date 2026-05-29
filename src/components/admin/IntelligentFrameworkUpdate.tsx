@@ -24,6 +24,19 @@ type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type HumanField = 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'oferta' | 'promocional';
+type SuggestionField = HumanField | 'bu' | 'parceiro' | 'segmento';
+type ProcessingStage = 'idle' | 'reading' | 'indexing' | 'detecting' | 'reviewing';
+
+type SuggestionBucket = Map<SuggestionField, Map<string, number>>;
+
+interface HistoryIndex {
+    existingKeys: Map<string, Activity[]>;
+    byJourneyChannel: Map<string, SuggestionBucket>;
+    byJourney: Map<string, SuggestionBucket>;
+    bySegmentChannel: Map<string, SuggestionBucket>;
+    byToken: Map<string, SuggestionBucket>;
+    activityCount: number;
+}
 
 interface BlockSummary {
     key: SourceBlock;
@@ -179,6 +192,27 @@ const HUMAN_FIELDS: Array<{ key: HumanField; label: string }> = [
     { key: 'oferta', label: 'Oferta' },
     { key: 'promocional', label: 'Promocional' },
 ];
+
+const SUGGESTION_FIELDS: SuggestionField[] = [
+    'subgrupo',
+    'etapaAquisicao',
+    'perfilCredito',
+    'oferta',
+    'promocional',
+    'bu',
+    'parceiro',
+    'segmento',
+];
+
+const REVIEW_PAGE_SIZE = 100;
+
+const PROCESSING_STAGE_LABEL: Record<ProcessingStage, string> = {
+    idle: 'Aguardando arquivo',
+    reading: 'Lendo arquivo',
+    indexing: 'Organizando historico',
+    detecting: 'Detectando novidades',
+    reviewing: 'Preparando revisao',
+};
 
 const normalize = (value: unknown) =>
     String(value ?? '')
@@ -457,23 +491,6 @@ const inferTaxonomy = (metric: MetricRow) => {
     return { bu, parceiro, segmento };
 };
 
-const scoreSimilarity = (metric: MetricRow, activity: Activity) => {
-    let score = 0;
-    if (normalizeKey(metric.journey) === normalizeKey(activity.jornada)) score += 6;
-    if (normalizeChannel(activity.canal) === metric.channel) score += 3;
-
-    const metricTokens = new Set(normalizeKey(`${metric.journey} ${metric.activityName}`).split(/[_\s-]+/).filter(Boolean));
-    const activityTokens = normalizeKey(`${activity.jornada} ${activity.raw?.['Activity name / Taxonomia'] || activity.id}`)
-        .split(/[_\s-]+/)
-        .filter(Boolean);
-
-    activityTokens.forEach((token) => {
-        if (metricTokens.has(token)) score += 1;
-    });
-
-    return score;
-};
-
 const emptySuggestions = HUMAN_FIELDS.reduce<Record<HumanField, FieldSuggestion[]>>((acc, field) => {
     acc[field.key] = [];
     return acc;
@@ -484,19 +501,79 @@ const suggestionsFor = (
     field: HumanField
 ) => suggestions?.[field] ?? [];
 
-const topSuggestions = (
-    activities: Activity[],
-    field: HumanField | 'bu' | 'parceiro' | 'segmento',
+const createBucket = (): SuggestionBucket =>
+    SUGGESTION_FIELDS.reduce<SuggestionBucket>((bucket, field) => {
+        bucket.set(field, new Map<string, number>());
+        return bucket;
+    }, new Map<SuggestionField, Map<string, number>>());
+
+const bucketFor = (index: Map<string, SuggestionBucket>, key: string) => {
+    const normalizedKey = normalizeKey(key);
+    const existing = index.get(normalizedKey);
+    if (existing) return existing;
+    const bucket = createBucket();
+    index.set(normalizedKey, bucket);
+    return bucket;
+};
+
+const addActivityToBucket = (bucket: SuggestionBucket, activity: Activity) => {
+    SUGGESTION_FIELDS.forEach((field) => {
+        const value = activityField(activity, field);
+        if (!value) return;
+        const counts = bucket.get(field);
+        if (!counts) return;
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+    });
+};
+
+const tokenizeForHistory = (...values: unknown[]) =>
+    Array.from(new Set(
+        normalizeKey(values.join(' '))
+            .split(/[_\s-]+/)
+            .filter((token) => token.length >= 4 && !['cartao', 'campanha', 'jornada', 'teste'].includes(token))
+    )).slice(0, 12);
+
+const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
+    const safeActivities = activities.filter(isValidActivity);
+    const index: HistoryIndex = {
+        existingKeys: new Map<string, Activity[]>(),
+        byJourneyChannel: new Map<string, SuggestionBucket>(),
+        byJourney: new Map<string, SuggestionBucket>(),
+        bySegmentChannel: new Map<string, SuggestionBucket>(),
+        byToken: new Map<string, SuggestionBucket>(),
+        activityCount: safeActivities.length,
+    };
+
+    safeActivities.forEach((activity) => {
+        const channel = normalizeChannel(activity.canal);
+        const journeyKey = normalizeKey(activity.jornada);
+        const noveltyKey = buildNoveltyKey(activity.jornada, channel, activityDateKey(activity));
+        if (!index.existingKeys.has(noveltyKey)) index.existingKeys.set(noveltyKey, []);
+        index.existingKeys.get(noveltyKey)!.push(activity);
+
+        addActivityToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), activity);
+        addActivityToBucket(bucketFor(index.byJourney, journeyKey), activity);
+
+        const segment = activityField(activity, 'segmento');
+        if (segment && channel !== 'Indefinido') {
+            addActivityToBucket(bucketFor(index.bySegmentChannel, `${segment}|${channel}`), activity);
+        }
+
+        tokenizeForHistory(activity.jornada, activity.raw?.['Activity name / Taxonomia'], activity.id)
+            .forEach((token) => addActivityToBucket(bucketFor(index.byToken, token), activity));
+    });
+
+    return index;
+};
+
+const topSuggestionsFromBucket = (
+    bucket: SuggestionBucket | undefined,
+    field: SuggestionField,
     source: string,
     confidenceCap: number
 ): FieldSuggestion[] => {
-    const counts = new Map<string, number>();
-    activities.forEach((activity) => {
-        if (!isValidActivity(activity)) return;
-        const value = activityField(activity, field);
-        if (!value) return;
-        counts.set(value, (counts.get(value) ?? 0) + 1);
-    });
+    const counts = bucket?.get(field);
+    if (!counts || counts.size === 0) return [];
 
     const total = Array.from(counts.values()).reduce((sum, count) => sum + count, 0);
     if (total === 0) return [];
@@ -514,26 +591,23 @@ const topSuggestions = (
 
 const suggestFromHistory = (
     metric: MetricRow,
-    activities: Activity[],
-    field: HumanField | 'bu' | 'parceiro' | 'segmento'
+    historyIndex: HistoryIndex,
+    field: SuggestionField
 ) => {
-    const safeActivities = activities.filter(isValidActivity);
-    const sameJourneyChannel = safeActivities.filter((activity) =>
-        normalizeKey(activity.jornada) === normalizeKey(metric.journey)
-        && normalizeChannel(activity.canal) === metric.channel
-    );
-    const sameJourney = safeActivities.filter((activity) => normalizeKey(activity.jornada) === normalizeKey(metric.journey));
-    const similar = safeActivities
-        .map((activity) => ({ activity, score: scoreSimilarity(metric, activity) }))
-        .filter((item) => item.score >= 6)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 80)
-        .map((item) => item.activity);
+    const taxonomy = inferTaxonomy(metric);
+    const journeyKey = normalizeKey(metric.journey);
+    const journeyChannelKey = normalizeKey(`${journeyKey}|${metric.channel}`);
+    const segmentChannelKey = normalizeKey(`${taxonomy.segmento}|${metric.channel}`);
+    const tokenSuggestions = tokenizeForHistory(metric.journey, metric.activityName)
+        .flatMap((token) =>
+            topSuggestionsFromBucket(historyIndex.byToken.get(normalizeKey(token)), field, 'campanhas similares por token', 70)
+        );
 
     return [
-        ...topSuggestions(sameJourneyChannel, field, 'mesma jornada e canal', 96),
-        ...topSuggestions(sameJourney, field, 'mesma jornada', 88),
-        ...topSuggestions(similar, field, 'campanhas similares', 78),
+        ...topSuggestionsFromBucket(historyIndex.byJourneyChannel.get(journeyChannelKey), field, 'mesma jornada e canal', 96),
+        ...topSuggestionsFromBucket(historyIndex.byJourney.get(journeyKey), field, 'mesma jornada', 88),
+        ...topSuggestionsFromBucket(historyIndex.bySegmentChannel.get(segmentChannelKey), field, 'mesmo segmento e canal', 78),
+        ...tokenSuggestions,
     ].reduce<FieldSuggestion[]>((acc, suggestion) => {
         if (!acc.some((item) => normalizeKey(item.value) === normalizeKey(suggestion.value))) {
             acc.push(suggestion);
@@ -544,17 +618,17 @@ const suggestFromHistory = (
 
 const buildCandidate = (
     metric: MetricRow,
-    activities: Activity[],
+    historyIndex: HistoryIndex,
     importedKeyCount: Map<string, number>
 ): UpdateCandidate => {
     const taxonomy = inferTaxonomy(metric);
     const fieldSuggestions = HUMAN_FIELDS.reduce<Record<HumanField, FieldSuggestion[]>>((acc, field) => {
-        acc[field.key] = suggestFromHistory(metric, activities, field.key);
+        acc[field.key] = suggestFromHistory(metric, historyIndex, field.key);
         return acc;
     }, {} as Record<HumanField, FieldSuggestion[]>);
-    const buSuggestions = suggestFromHistory(metric, activities, 'bu');
-    const parceiroSuggestions = suggestFromHistory(metric, activities, 'parceiro');
-    const segmentoSuggestions = suggestFromHistory(metric, activities, 'segmento');
+    const buSuggestions = suggestFromHistory(metric, historyIndex, 'bu');
+    const parceiroSuggestions = suggestFromHistory(metric, historyIndex, 'parceiro');
+    const segmentoSuggestions = suggestFromHistory(metric, historyIndex, 'segmento');
 
     const valueFor = (field: HumanField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
     const confidences = HUMAN_FIELDS.map((field) => suggestionsFor(fieldSuggestions, field.key)[0]?.confidence ?? 0);
@@ -697,14 +771,7 @@ const toCsv = (tsv: string) =>
 
 const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
     const warnings: string[] = [];
-    const existingKeys = new Map<string, Activity[]>();
-    const safeActivities = activities.filter(isValidActivity);
-
-    safeActivities.forEach((activity) => {
-        const key = buildNoveltyKey(activity.jornada, normalizeChannel(activity.canal), activityDateKey(activity));
-        if (!existingKeys.has(key)) existingKeys.set(key, []);
-        existingKeys.get(key)!.push(activity);
-    });
+    const historyIndex = buildHistoryIndex(activities);
 
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
     const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
@@ -748,7 +815,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     let ignoredExisting = 0;
     const metricMap = new Map<string, MetricRow>();
     allRows.forEach((row) => {
-        if (existingKeys.has(row.key)) {
+        if (historyIndex.existingKeys.has(row.key)) {
             ignoredExisting += 1;
             return;
         }
@@ -759,7 +826,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const candidates = metrics
         .map((row) => {
             try {
-                return buildCandidate(row, safeActivities, importedKeyCount);
+                return buildCandidate(row, historyIndex, importedKeyCount);
             } catch (error) {
                 return buildErrorCandidate(row, error);
             }
@@ -825,6 +892,10 @@ const safeProcessDinamicaBI = (
     }
 };
 
+const nextFrame = () => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+});
+
 const StatCard = ({ label, value, tone }: { label: string; value: number; tone: string }) => (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className={`text-2xl font-bold ${tone}`}>{value}</div>
@@ -847,6 +918,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [debugInfo, setDebugInfo] = useState<ParseDebugInfo | null>(null);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [lastRunId, setLastRunId] = useState<string | null>(null);
+    const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
+    const [reviewPage, setReviewPage] = useState(1);
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -870,6 +943,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         if (statusFilter === 'all') return candidates;
         return candidates.filter((candidate) => candidate.status === statusFilter);
     }, [candidates, statusFilter]);
+    const reviewPageCount = Math.max(1, Math.ceil(filteredCandidates.length / REVIEW_PAGE_SIZE));
+    const pagedCandidates = useMemo(() => {
+        const safePage = Math.min(reviewPage, reviewPageCount);
+        const start = (safePage - 1) * REVIEW_PAGE_SIZE;
+        return filteredCandidates.slice(start, start + REVIEW_PAGE_SIZE);
+    }, [filteredCandidates, reviewPage, reviewPageCount]);
 
     const exportableCandidates = useMemo(() =>
         candidates.filter((candidate) =>
@@ -896,10 +975,15 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setSaveMessage(null);
         setLastRunId(null);
         setCopied(false);
+        setProcessingStage('reading');
 
         try {
             const matrix = await parseFileToMatrix(file);
             if (matrix.length === 0) throw new Error('Arquivo vazio.');
+            setProcessingStage('indexing');
+            await nextFrame();
+            setProcessingStage('detecting');
+            await nextFrame();
             const processedResult = safeProcessDinamicaBI(matrix, activities);
             if (!processedResult.result) {
                 const debug = {
@@ -915,8 +999,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 return;
             }
             const processed = processedResult.result;
+            setProcessingStage('reviewing');
+            await nextFrame();
             setResult(processed);
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
+            setReviewPage(1);
+            setStatusFilter('all');
             setReviewOpen(true);
         } catch (error: any) {
             const debug = {
@@ -932,6 +1020,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setDragError(`${debug.stage}: ${debug.message}`);
         } finally {
             setProcessing(false);
+            setProcessingStage('idle');
         }
     };
 
@@ -1114,6 +1203,17 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <h4 className="text-base font-bold text-slate-900">
                             {processing ? 'Processando arquivo...' : 'Arraste a Dinamica BI aqui'}
                         </h4>
+                        {processing && (
+                            <div className="mt-3 w-full max-w-md rounded-lg border border-cyan-100 bg-white px-3 py-2 text-left">
+                                <div className="flex items-center justify-between text-xs font-bold text-cyan-800">
+                                    <span>{PROCESSING_STAGE_LABEL[processingStage]}</span>
+                                    <span>em andamento</span>
+                                </div>
+                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                    <div className="h-full w-2/3 rounded-full bg-cyan-600" />
+                                </div>
+                            </div>
+                        )}
                         <p className="mt-2 max-w-md text-sm text-slate-500">
                             O sistema detecta novas linhas por JourneyName + Canal + Data e abre a revisao humana automaticamente.
                         </p>
@@ -1137,6 +1237,20 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             <FileSpreadsheet size={14} />
                             Selecionar arquivo
                         </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+                        {[
+                            ['Ingestao', 'detecta blocos e normaliza chave'],
+                            ['Novidade', 'separa novas, existentes e duplicadas'],
+                            ['Taxonomia', 'preenche BU, parceiro e segmento'],
+                            ['Revisao', 'prioriza campos humanos por confianca'],
+                        ].map(([title, description]) => (
+                            <div key={title} className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                                <div className="text-xs font-bold text-slate-800">{title}</div>
+                                <div className="mt-1 text-[11px] leading-snug text-slate-500">{description}</div>
+                            </div>
+                        ))}
                     </div>
                 </section>
 
@@ -1226,7 +1340,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <button
                                         key={status}
                                         type="button"
-                                        onClick={() => setStatusFilter(status)}
+                                        onClick={() => {
+                                            setStatusFilter(status);
+                                            setReviewPage(1);
+                                        }}
                                         className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
                                             statusFilter === status
                                                 ? 'border-cyan-600 bg-cyan-50 text-cyan-700'
@@ -1247,6 +1364,31 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </button>
                         </div>
 
+                        <div className="flex flex-col gap-2 border-b border-slate-200 bg-white px-6 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                            <span>
+                                Mostrando {pagedCandidates.length} de {filteredCandidates.length} candidatos neste filtro. A revisao carrega em paginas para manter a tela responsiva.
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewPage((page) => Math.max(1, page - 1))}
+                                    disabled={reviewPage <= 1}
+                                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 font-bold text-slate-600 disabled:cursor-not-allowed disabled:text-slate-300"
+                                >
+                                    Anterior
+                                </button>
+                                <span className="font-bold text-slate-700">{Math.min(reviewPage, reviewPageCount)} / {reviewPageCount}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewPage((page) => Math.min(reviewPageCount, page + 1))}
+                                    disabled={reviewPage >= reviewPageCount}
+                                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 font-bold text-slate-600 disabled:cursor-not-allowed disabled:text-slate-300"
+                                >
+                                    Proxima
+                                </button>
+                            </div>
+                        </div>
+
                         <main className="min-h-0 flex-1 overflow-auto">
                             <table className="min-w-[1500px] w-full divide-y divide-slate-200 text-left text-xs">
                                 <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-wider text-slate-500 shadow-sm">
@@ -1262,7 +1404,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 bg-white">
-                                    {filteredCandidates.map((candidate) => (
+                                    {pagedCandidates.map((candidate) => (
                                         <tr key={candidate.key} className={candidate.accepted ? 'bg-emerald-50/40' : 'hover:bg-slate-50'}>
                                             <td className="px-3 py-3 align-top">
                                                 <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[candidate.status]}`}>
