@@ -897,7 +897,7 @@ const dayDiff = (fromDate: string, toDate: string) => {
 };
 
 const attributionKey = (row: MetricRow) => `${normalizeKey(row.activityName)}|${canonicalChannel(row.channel)}`;
-const hasDispatchVolume = (row: MetricRow) => positive(row.sent) || positive(row.delivered);
+const hasDispatchVolume = (row: MetricRow) => positive(row.sent) && positive(row.delivered);
 const hasConversionMetric = (row: MetricRow) =>
     positive(row.proposals) || positive(row.approved) || positive(row.finalized) || positive(row.assisted) || positive(row.independent);
 const hasEngagementMetric = (row: MetricRow) => positive(row.opens) || positive(row.clicks);
@@ -935,6 +935,7 @@ const consolidateAttributionRows = (rows: MetricRow[]) => {
             return;
         }
 
+        addMetricValue(anchor, row, 'delivered');
         addMetricValue(anchor, row, 'opens');
         addMetricValue(anchor, row, 'clicks');
         anchor.sourceBlocks = Array.from(new Set([...(anchor.sourceBlocks ?? [anchor.sourceBlock]), row.sourceBlock]));
@@ -985,7 +986,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const attribution = consolidateAttributionRows(rawRows);
     const allRows = attribution.rows;
     if (attribution.merged > 0 || attribution.ignored > 0) {
-        warnings.push(`${attribution.merged} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignored} linhas sem envio ancora foram ignoradas.`);
+        warnings.push(`${attribution.merged} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignored} linhas sem Base Total e Base Acionavel validas foram ignoradas.`);
     }
     const importedKeyCount = allRows.reduce((map, row) => {
         map.set(row.key, (map.get(row.key) ?? 0) + 1);
