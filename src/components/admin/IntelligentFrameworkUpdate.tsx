@@ -1176,6 +1176,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [reviewPage, setReviewPage] = useState(1);
     const [selectedCandidate, setSelectedCandidate] = useState<UpdateCandidate | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+    const [uploadConfirmOpen, setUploadConfirmOpen] = useState(false);
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -1220,6 +1221,16 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         ), [candidates, selectedKeys]);
     const copyCandidates = selectedCandidatesForCopy.length > 0 ? selectedCandidatesForCopy : exportableCandidates;
     const reviewedTsv = useMemo(() => copyCandidates.map(buildExcelRow).join('\n'), [copyCandidates]);
+    const uploadCandidates = useMemo(() => {
+        const source = exportableCandidates.length > 0 ? exportableCandidates : selectedCandidatesForCopy;
+        return source.map((candidate) => ({ ...applyApprovalDefaults(candidate), accepted: true }));
+    }, [exportableCandidates, selectedCandidatesForCopy]);
+    const uploadUsesSelection = exportableCandidates.length === 0 && selectedCandidatesForCopy.length > 0;
+    const uploadBlocks = useMemo(() => {
+        const unique = new Set<SourceBlock>();
+        uploadCandidates.forEach((candidate) => candidate.sourceBlocks.forEach((block) => unique.add(block)));
+        return Array.from(unique);
+    }, [uploadCandidates]);
     const readyFilteredKeys = useMemo(() =>
         filteredCandidates
             .filter((candidate) => candidate.status === 'ready')
@@ -1245,6 +1256,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setLastRunId(null);
         setCopied(false);
         setSelectedKeys(new Set());
+        setUploadConfirmOpen(false);
         setProcessingStage('reading');
 
         try {
@@ -1392,19 +1404,22 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
-    const handleSaveRun = async () => {
+    const handleSaveRun = async (candidatesForRun = result?.candidates ?? []) => {
         if (!result) return;
         setSaving(true);
         setSaveMessage(null);
 
         try {
+            const acceptedCount = candidatesForRun.filter((candidate) =>
+                candidate.accepted && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+            ).length;
             const saved = await intelligentUpdateService.saveRun({
                 sourceLabel: fileMeta?.name ?? 'Dinamica BI',
                 sourceType: fileMeta?.type === 'xlsx' || fileMeta?.type === 'xls' ? 'xlsx' : 'csv',
                 inputLineCount: fileMeta?.rows ?? result.importedRows,
                 blocks: result.blocks,
                 metrics: result.metrics,
-                candidates: result.candidates.map((candidate) => ({
+                candidates: candidatesForRun.map((candidate) => ({
                     ...candidate,
                     excelTsvRow: candidate.accepted ? buildExcelRow(candidate) : '',
                 })),
@@ -1418,7 +1433,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     conflict: summary.conflict,
                     ignored: summary.ignored,
                     ignoredExisting: result.ignoredExisting,
-                    accepted: exportableCandidates.length,
+                    accepted: acceptedCount,
                 },
             });
 
@@ -1428,6 +1443,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 text: `${saved.candidateCount} candidatos auditados. ${saved.appliedCount} linhas confirmadas na base de dados.`,
             });
             setReviewOpen(false);
+            setUploadConfirmOpen(false);
         } catch (error: any) {
             setSaveMessage({
                 type: 'error',
@@ -1436,6 +1452,22 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleConfirmUpload = async () => {
+        if (!result || uploadCandidates.length === 0) return;
+        const uploadKeys = new Set(uploadCandidates.map((candidate) => candidate.key));
+        const candidatesForRun = result.candidates.map((candidate) =>
+            uploadKeys.has(candidate.key)
+                ? { ...applyApprovalDefaults(candidate), accepted: true }
+                : candidate
+        );
+        setResult((current) => current ? {
+            ...current,
+            candidates: candidatesForRun,
+            tsv: candidatesForRun.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n'),
+        } : current);
+        await handleSaveRun(candidatesForRun);
     };
 
     return (
@@ -1883,7 +1915,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <footer className="flex flex-col gap-3 border-t border-slate-200 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-xs text-slate-500">
                                 {selectedCandidatesForCopy.length > 0
-                                    ? `${selectedCandidatesForCopy.length} linhas selecionadas para copiar.`
+                                    ? `${selectedCandidatesForCopy.length} linhas selecionadas. Se nao houver aceitas, elas serao usadas no upload.`
                                     : exportableCandidates.length > 0 && blockingCount > 0
                                         ? `${exportableCandidates.length} linhas aceitas; ${blockingCount} pendentes ficam fora da atualizacao.`
                                         : blockingCount > 0
@@ -1918,14 +1950,93 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={handleSaveRun}
-                                    disabled={saving || exportableCandidates.length === 0}
+                                    onClick={() => setUploadConfirmOpen(true)}
+                                    disabled={saving || uploadCandidates.length === 0}
                                     className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
                                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Clipboard size={14} />}
-                                    Confirmar atualizacao
+                                    Confirmar Atualização
                                 </button>
                             </div>
+                        </footer>
+                    </div>
+                </div>
+            )}
+
+            {uploadConfirmOpen && result && fileMeta && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                            <div>
+                                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                    <Database size={16} className="text-blue-700" />
+                                    Confirmar upload para base de dados
+                                </div>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Revise o lote antes de gravar. Apenas linhas aceitas entram na tabela de campanhas.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setUploadConfirmOpen(false)}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Fechar confirmacao"
+                            >
+                                <X size={16} />
+                            </button>
+                        </header>
+
+                        <main className="space-y-4 px-5 py-4">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Arquivo</div>
+                                <div className="mt-1 truncate text-sm font-bold text-slate-900" title={fileMeta.name}>{fileMeta.name}</div>
+                                <div className="mt-1 text-xs text-slate-500">{fileMeta.rows} linhas lidas da Dinamica BI</div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <StatCard label="Serao gravadas" value={uploadCandidates.length} tone="text-blue-700" />
+                                <StatCard label="Pendentes fora" value={Math.max(0, candidates.length - uploadCandidates.length - summary.ignored)} tone="text-amber-700" />
+                                <StatCard label="Duplicadas" value={summary.duplicate} tone="text-purple-700" />
+                                <StatCard label="Erros" value={summary.error} tone="text-red-700" />
+                            </div>
+
+                            {uploadUsesSelection && (
+                                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs text-blue-800">
+                                    Nenhuma linha aceita foi encontrada. As {uploadCandidates.length} linhas selecionadas serao aprovadas e enviadas neste upload.
+                                </div>
+                            )}
+
+                            <div className="rounded-xl border border-slate-200 px-3 py-3 text-xs text-slate-600">
+                                <div className="font-bold text-slate-900">Conteudo do upload</div>
+                                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                                    <span>Blocos:</span>
+                                    <span className="font-semibold text-slate-800">{uploadBlocks.length > 0 ? uploadBlocks.join(', ') : 'N/A'}</span>
+                                    <span>Defaults aplicados:</span>
+                                    <span className="font-semibold text-slate-800">N/A, Padrao, Cartao</span>
+                                    <span>Auditoria:</span>
+                                    <span className="font-semibold text-slate-800">run, metricas e candidatos</span>
+                                </div>
+                            </div>
+                        </main>
+
+                        <footer className="flex justify-end gap-2 border-t border-slate-200 bg-white px-5 py-4">
+                            <button
+                                type="button"
+                                onClick={() => setUploadConfirmOpen(false)}
+                                disabled={saving}
+                                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                            >
+                                Voltar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmUpload}
+                                disabled={saving || uploadCandidates.length === 0}
+                                className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                                {saving ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                                {saving ? 'Enviando...' : 'Enviar para base de dados'}
+                            </button>
                         </footer>
                     </div>
                 </div>
