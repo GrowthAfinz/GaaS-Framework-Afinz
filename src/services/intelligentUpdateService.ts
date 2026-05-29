@@ -85,6 +85,14 @@ const textOrFallback = (value: unknown, fallback = 'N/A') => {
     return text || fallback;
 };
 
+const chunkArray = <T,>(items: T[], size: number) => {
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size));
+    }
+    return chunks;
+};
+
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     const patch: Record<string, number | string | null> = {};
 
@@ -153,6 +161,8 @@ const applyConfirmedActivityChanges = async (candidates: IntelligentUpdateCandid
         && !['duplicate', 'error', 'ignored'].includes(candidate.status)
     );
     const appliedByKey = new Map<string, string>();
+    const now = new Date().toISOString();
+    const insertRows: Array<Record<string, any> & { __candidateKey: string }> = [];
 
     for (const candidate of confirmedCandidates) {
         const activityId = asDbActivityId(candidate.matchedActivity);
@@ -165,14 +175,39 @@ const applyConfirmedActivityChanges = async (candidates: IntelligentUpdateCandid
             if (error) throw error;
             appliedByKey.set(candidate.key, activityId);
         } else {
-            const { data, error } = await supabase
-                .from('activities')
-                .insert(buildInsertPayload(candidate))
-                .select('id')
-                .single();
+            insertRows.push({
+                ...buildInsertPayload(candidate),
+                __candidateKey: candidate.key,
+                updated_at: now,
+            });
+        }
+    }
 
-            if (error) throw error;
-            if (data?.id) appliedByKey.set(candidate.key, data.id);
+    for (const chunk of chunkArray(insertRows, 100)) {
+        const candidateKeys = chunk.map((row) => row.__candidateKey);
+        const rows = chunk.map(({ __candidateKey, ...row }) => row);
+
+        const { data, error } = await supabase
+            .from('activities')
+            .insert(rows)
+            .select('id');
+
+        if (error) throw error;
+
+        (data || []).forEach((row: any, index: number) => {
+            if (row?.id && candidateKeys[index]) {
+                appliedByKey.set(candidateKeys[index], row.id);
+            }
+        });
+
+        candidateKeys.forEach((key) => {
+            if (!appliedByKey.has(key)) {
+                appliedByKey.set(key, '');
+            }
+        });
+
+        if (insertRows.length > 100) {
+            await new Promise((resolve) => setTimeout(resolve, 50));
         }
     }
 
@@ -224,18 +259,18 @@ export const intelligentUpdateService = {
             },
         }));
 
-        const { data: insertedMetrics, error: metricsError } = metricRows.length > 0
-            ? await supabase
+        const insertedMetrics: Array<{ id: string; natural_key: string }> = [];
+        for (const chunk of chunkArray(metricRows, 500)) {
+            const { data, error } = await supabase
                 .from('gaas_dinamica_bi_metrics')
-                .insert(metricRows)
-                .select('id,natural_key')
-            : { data: [], error: null };
+                .insert(chunk)
+                .select('id,natural_key');
 
-        if (metricsError) throw metricsError;
+            if (error) throw error;
+            insertedMetrics.push(...(data || []));
+        }
 
-        const metricIdByKey = new Map(
-            (insertedMetrics || []).map((metric: any) => [metric.natural_key, metric.id])
-        );
+        const metricIdByKey = new Map(insertedMetrics.map((metric: any) => [metric.natural_key, metric.id]));
 
         const appliedByKey = await applyConfirmedActivityChanges(payload.candidates);
         const now = new Date().toISOString();
@@ -275,11 +310,10 @@ export const intelligentUpdateService = {
             };
         });
 
-        const { error: candidatesError } = candidateRows.length > 0
-            ? await supabase.from('gaas_update_candidates').insert(candidateRows)
-            : { error: null };
-
-        if (candidatesError) throw candidatesError;
+        for (const chunk of chunkArray(candidateRows, 500)) {
+            const { error } = await supabase.from('gaas_update_candidates').insert(chunk);
+            if (error) throw error;
+        }
 
         const appliedCount = appliedByKey.size;
         const finalStatus = appliedCount > 0 ? 'applied' : 'reviewing';

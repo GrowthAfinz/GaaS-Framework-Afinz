@@ -1410,6 +1410,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setSaveMessage(null);
 
         try {
+            const candidateKeysForRun = new Set(candidatesForRun.map((candidate) => candidate.key));
+            const metricsForRun = result.metrics.filter((metric) => candidateKeysForRun.has(metric.key));
             const acceptedCount = candidatesForRun.filter((candidate) =>
                 candidate.accepted && !['duplicate', 'error', 'ignored'].includes(candidate.status)
             ).length;
@@ -1418,7 +1420,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 sourceType: fileMeta?.type === 'xlsx' || fileMeta?.type === 'xls' ? 'xlsx' : 'csv',
                 inputLineCount: fileMeta?.rows ?? result.importedRows,
                 blocks: result.blocks,
-                metrics: result.metrics,
+                metrics: metricsForRun,
                 candidates: candidatesForRun.map((candidate) => ({
                     ...candidate,
                     excelTsvRow: candidate.accepted ? buildExcelRow(candidate) : '',
@@ -1467,7 +1469,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             candidates: candidatesForRun,
             tsv: candidatesForRun.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n'),
         } : current);
-        await handleSaveRun(candidatesForRun);
+        await handleSaveRun(candidatesForRun.filter((candidate) => uploadKeys.has(candidate.key)));
     };
 
     return (
