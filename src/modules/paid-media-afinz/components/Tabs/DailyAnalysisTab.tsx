@@ -6,30 +6,32 @@ import { Calendar, TrendingUp, AlertCircle, BarChart2, Grid, ArrowUpDown } from 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export const DailyAnalysisTab: React.FC = () => {
-    const { filteredData } = useFilters();
+    const { filteredData, filters } = useFilters();
     const [heatmapMetric, setHeatmapMetric] = useState<'cpa' | 'roas' | 'spend'>('cpa');
 
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'asc' });
 
-    // 1. Prepare Daily Table Data
-    // We assume filteredData is already daily-row based, but we might have multiple rows per day (Meta + Google).
-    // So we aggregate by Date.
+    const multiChannel = filters.selectedChannels.length > 1;
+
+    // 1. Prepare Daily Table Data — aggregate by date+channel to avoid mixing
+    // incompatible metrics (e.g. Google Search CPM vs Meta Social CPM)
     const dailyAggregated = useMemo(() => {
         const map = new Map<string, any>();
 
         filteredData.forEach(d => {
             const dateKey = String(d.date).substring(0, 10); // YYYY-MM-DD
-            if (!map.has(dateKey)) {
-                map.set(dateKey, {
+            const key = multiChannel ? `${dateKey}_${d.channel}` : dateKey;
+            if (!map.has(key)) {
+                map.set(key, {
                     date: d.date,
+                    channel: d.channel,
                     spend: 0,
                     impressions: 0,
                     clicks: 0,
                     conversions: 0,
-                    revenue: 0 // If we had revenue
                 });
             }
-            const curr = map.get(dateKey);
+            const curr = map.get(key);
             curr.spend += d.spend;
             curr.impressions += d.impressions;
             curr.clicks += d.clicks;
@@ -42,18 +44,24 @@ export const DailyAnalysisTab: React.FC = () => {
             ctr: d.impressions ? (d.clicks / d.impressions) * 100 : 0,
             cpm: d.impressions ? (d.spend / d.impressions) * 1000 : 0,
             cpc: d.clicks ? d.spend / d.clicks : 0,
-            roas: d.spend ? (d.revenue || 0) / d.spend : 0 // Placeholder
         }));
 
         return data.sort((a, b) => {
-            const aValue = sortConfig.key === 'date' ? new Date(a.date).getTime() : a[sortConfig.key];
-            const bValue = sortConfig.key === 'date' ? new Date(b.date).getTime() : b[sortConfig.key];
-
+            let aValue: number, bValue: number;
+            if (sortConfig.key === 'date') {
+                aValue = new Date(a.date).getTime();
+                bValue = new Date(b.date).getTime();
+                // secondary sort by channel when dates are equal
+                if (aValue === bValue) return (a.channel as string).localeCompare(b.channel as string);
+            } else {
+                aValue = a[sortConfig.key];
+                bValue = b[sortConfig.key];
+            }
             if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
             if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [filteredData, sortConfig]);
+    }, [filteredData, sortConfig, multiChannel]);
 
     const handleSort = (key: string) => {
         setSortConfig(current => ({
@@ -139,6 +147,7 @@ export const DailyAnalysisTab: React.FC = () => {
                             <tr>
                                 {[
                                     { key: 'date', label: 'Data', align: 'left' },
+                                    ...(multiChannel ? [{ key: 'channel', label: 'Canal', align: 'left' }] : []),
                                     { key: 'spend', label: 'Inv.', align: 'right' },
                                     { key: 'impressions', label: 'Impr.', align: 'right' },
                                     { key: 'clicks', label: 'Cliques', align: 'right' },
@@ -168,6 +177,14 @@ export const DailyAnalysisTab: React.FC = () => {
                                     <td className="px-6 py-3 font-medium text-slate-700 whitespace-nowrap">
                                         {format(new Date(row.date), "dd 'de' MMM, EEEE", { locale: ptBR })}
                                     </td>
+                                    {multiChannel && (
+                                        <td className="px-6 py-3">
+                                            {row.channel === 'meta'
+                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">Meta</span>
+                                                : <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">Google</span>
+                                            }
+                                        </td>
+                                    )}
                                     <td className="px-6 py-3 text-right text-slate-600">{fmtBRL(row.spend)}</td>
                                     <td className="px-6 py-3 text-right text-slate-600">{fmtNum(row.impressions)}</td>
                                     <td className="px-6 py-3 text-right text-slate-600">{fmtNum(row.clicks)}</td>
