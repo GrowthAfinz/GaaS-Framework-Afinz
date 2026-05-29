@@ -14,6 +14,13 @@ type RntMetrics = {
   contratacoes: number;  // Cartões Gerados → para seguros/ativação = conversões/contratações
 };
 
+type CopaMetrics = {
+  enviados: number;
+  entregues: number;
+  abertura: number;
+  cliques: number;
+};
+
 type RntJourneyRow = {
   produto: string;
   jornada: string;
@@ -56,6 +63,12 @@ const PRODUCT_OVERRIDES: Record<string, string> = {
  */
 function parseJourney(jornada: string): { produto: string; periodo: string } {
   const j = jornada.toUpperCase().trim();
+
+  if (j.includes('CARRINHO') && j.includes('SEGURO')) {
+    if (j.includes('RESIDENCIA24H') || j.includes('RESIDENCIA')) return { produto: 'Carrinho Seguro Residência', periodo: '' };
+    if (j.includes('MULHER')) return { produto: 'Carrinho Seguro Mulher', periodo: '' };
+    return { produto: 'Carrinho Seguro', periodo: '' };
+  }
 
   // Padrão canônico: JOR_RENTABILIZACAO_BU_...produto..._PERÍODO
   const match = j.match(/^JOR_RENTABILIZACAO_[A-Z0-9]+_(.+?)_([A-Z]{2,5}\d{2})$/);
@@ -150,6 +163,36 @@ function allDates(start: Date, end: Date): Date[] {
 const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 const METRIC_FIELDS: Array<keyof RntMetrics> = ['entregues', 'abertos', 'cliques', 'propostas', 'aprovados', 'contratacoes'];
 
+const COPA_PARTNERS = ['B2C + B2B2C', 'Plurix', 'BB'] as const;
+const COPA_BLOCKS = ['Ativacao', 'Reativacao', 'Novos'] as const;
+const COPA_CHANNELS = ['WPP', 'E-MAIL', 'SMS', 'PUSH'] as const;
+type CopaPartner = typeof COPA_PARTNERS[number];
+type CopaBlock = typeof COPA_BLOCKS[number];
+type CopaChannel = typeof COPA_CHANNELS[number];
+
+const COPA_FIXED_COLS = 7;
+const COPA_BLOCK_WIDTH = 14;
+const COPA_HEADER = [
+  'wpp', 'entregas', 'cliques',
+  'e-mail', 'entregas', 'abertura', 'cliques', 'bounce', 'tx abertura', 'tx clique',
+  'sms', 'entregas',
+  'push', 'entregas',
+];
+
+const COPA_CHANNEL_LAYOUT: Record<
+  CopaChannel,
+  { labelRel: number; label: string; metricRels: Partial<Record<keyof CopaMetrics | 'bounce' | 'txAbertura' | 'txClique', number>> }
+> = {
+  WPP: { labelRel: 0, label: 'wpp', metricRels: { entregues: 1, cliques: 2 } },
+  'E-MAIL': {
+    labelRel: 3,
+    label: 'e-mail',
+    metricRels: { entregues: 4, abertura: 5, cliques: 6, bounce: 7, txAbertura: 8, txClique: 9 },
+  },
+  SMS: { labelRel: 10, label: 'sms', metricRels: { entregues: 11 } },
+  PUSH: { labelRel: 12, label: 'push', metricRels: { entregues: 13 } },
+};
+
 // ── Cores ─────────────────────────────────────────────────────────────────────
 
 const COLORS = {
@@ -167,6 +210,20 @@ const COLORS = {
   zebra:         'F8FAFC',
   audit:         '1D4ED8',
   auditSub:      'DBEAFE',
+  copaHeader:    '1F3864',
+  copaMedia:     '4472C4',
+  copaAtivacao:  '1F4E79',
+  copaReativacao:'833C00',
+  copaNovos:     '1E5631',
+  copaWppFill:   'E2EFDA',
+  copaWppFont:   '375623',
+  copaEmailFill: 'DCE6F1',
+  copaEmailFont: '1F4E79',
+  copaSmsFill:   'FFF2CC',
+  copaSmsFont:   '7F6000',
+  copaPushFill:  'FCE4D6',
+  copaPushFont:  '843C0C',
+  copaTotal:     'D9EAD3',
 };
 
 /** Determina em qual aba o registro vai */
@@ -198,6 +255,75 @@ function canalFill(canal: string): string {
   if (c.includes('SMS')) return COLORS.smsFill;
   if (c.includes('PUSH')) return COLORS.pushFill;
   return 'FFFFFF';
+}
+
+function copaChannelStyle(channel: CopaChannel): { fill: string; font: string } {
+  if (channel === 'WPP') return { fill: COLORS.copaWppFill, font: COLORS.copaWppFont };
+  if (channel === 'E-MAIL') return { fill: COLORS.copaEmailFill, font: COLORS.copaEmailFont };
+  if (channel === 'SMS') return { fill: COLORS.copaSmsFill, font: COLORS.copaSmsFont };
+  return { fill: COLORS.copaPushFill, font: COLORS.copaPushFont };
+}
+
+function copaBlockColor(block: CopaBlock): string {
+  if (block === 'Ativacao') return COLORS.copaAtivacao;
+  if (block === 'Reativacao') return COLORS.copaReativacao;
+  return COLORS.copaNovos;
+}
+
+function emptyCopaMetrics(): CopaMetrics {
+  return { enviados: 0, entregues: 0, abertura: 0, cliques: 0 };
+}
+
+function copaKey(dateStr: string, partner: CopaPartner, block: CopaBlock, channel: CopaChannel): string {
+  return [dateStr, partner, block, channel].join(SEP);
+}
+
+function classifyCopa(row: RawRow): { partner: CopaPartner; block: CopaBlock } | null {
+  const jornada = String(row['jornada'] ?? '').toUpperCase();
+  if (!jornada.includes('COPA') || jornada.includes('CARTONISTAS')) return null;
+
+  let partner: CopaPartner = 'B2C + B2B2C';
+  if (jornada.includes('PLURIX')) partner = 'Plurix';
+  else if (jornada.includes('_BB_')) partner = 'BB';
+
+  let block: CopaBlock | null = null;
+  if (jornada.includes('NOVOS')) block = 'Novos';
+  else if (jornada.includes('REATIVACAO')) block = 'Reativacao';
+  else if (jornada.includes('ATIVACAO') || jornada.includes('VISA')) block = 'Ativacao';
+
+  return block ? { partner, block } : null;
+}
+
+function buildCopaIndex(rows: RawRow[], start: Date, end: Date): Map<string, CopaMetrics> {
+  const idx = new Map<string, CopaMetrics>();
+  for (const row of rows) {
+    let rowDate: Date;
+    try { rowDate = parseRowDate(row['Data de Disparo']); } catch { continue; }
+    if (rowDate < start || rowDate > end) continue;
+
+    const classified = classifyCopa(row);
+    if (!classified) continue;
+
+    const channel = normalizeCanal(row['Canal']) as CopaChannel;
+    if (!COPA_CHANNELS.includes(channel)) continue;
+
+    const key = copaKey(isoDate(rowDate), classified.partner, classified.block, channel);
+    const current = idx.get(key) ?? emptyCopaMetrics();
+    current.enviados += asInt(row['Base Total']);
+    current.entregues += asInt(row['Base Acionável']);
+    current.abertura += asInt(row['Abertura']);
+    current.cliques += asInt(row['Cliques']);
+    idx.set(key, current);
+  }
+  return idx;
+}
+
+function hasCopaData(metrics?: CopaMetrics): boolean {
+  return Boolean(metrics && (metrics.enviados > 0 || metrics.entregues > 0 || metrics.abertura > 0 || metrics.cliques > 0));
+}
+
+function safeRate(numerator: number, denominator: number): number | '' {
+  return denominator > 0 ? numerator / denominator : '';
 }
 
 // ── Helpers Excel ─────────────────────────────────────────────────────────────
@@ -374,6 +500,184 @@ function normalizeCanal(value: unknown): string {
 }
 
 // ── Escrita de seção no worksheet ─────────────────────────────────────────────
+
+function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date, end: Date): void {
+  const idx = buildCopaIndex(rows, start, end);
+  const totalBlocks = COPA_PARTNERS.length * COPA_BLOCKS.length;
+  const maxCol = COPA_FIXED_COLS + totalBlocks * COPA_BLOCK_WIDTH;
+  const ws = wb.addWorksheet('Rentabilização Copa', {
+    views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', activeCell: 'A5', showGridLines: false }],
+  });
+
+  ws.mergeCells('A1:B1');
+  ws.mergeCells('C1:D1');
+  ws.mergeCells('E1:F1');
+  for (let col = 1; col <= maxCol; col++) {
+    const fillColor = col <= 2 ? COLORS.copaAtivacao : col <= 4 ? '2E75B6' : col <= 6 ? '1D7B2B' : col === 7 ? '7F6000' : COLORS.copaHeader;
+    setCell(ws.getCell(1, col), '', { bold: col <= 7, fillColor, fontColor: col <= 7 ? 'FFFFFF' : '000000', size: 11 });
+  }
+
+  for (let col = 1; col <= COPA_FIXED_COLS; col++) {
+    setCell(ws.getCell(2, col), '', { fillColor: COLORS.copaHeader });
+    setCell(ws.getCell(3, col), '', { fillColor: COLORS.copaHeader });
+  }
+
+  let blockStart = COPA_FIXED_COLS + 1;
+  for (const partner of COPA_PARTNERS) {
+    for (const block of COPA_BLOCKS) {
+      const color = copaBlockColor(block);
+      ws.mergeCells(2, blockStart, 2, blockStart + COPA_BLOCK_WIDTH - 1);
+      setCell(ws.getCell(2, blockStart), `${block} (${partner})`, { bold: true, fillColor: color, fontColor: 'FFFFFF', size: 10 });
+
+      for (const channel of COPA_CHANNELS) {
+        const layout = COPA_CHANNEL_LAYOUT[channel];
+        const { fill, font } = copaChannelStyle(channel);
+        const metricRels = Object.values(layout.metricRels).filter((rel): rel is number => typeof rel === 'number');
+        const channelStart = blockStart + layout.labelRel;
+        const channelEnd = blockStart + Math.max(layout.labelRel, ...metricRels);
+        ws.mergeCells(3, channelStart, 3, channelEnd);
+        setCell(ws.getCell(3, channelStart), layout.label, { bold: true, fillColor: fill, fontColor: font, size: 9 });
+        for (let col = channelStart + 1; col <= channelEnd; col++) setCell(ws.getCell(3, col), '', { fillColor: fill, fontColor: font });
+      }
+
+      COPA_HEADER.forEach((label, rel) => {
+        const channel = rel < 3 ? 'WPP' : rel < 10 ? 'E-MAIL' : rel < 12 ? 'SMS' : 'PUSH';
+        const { fill, font } = copaChannelStyle(channel);
+        setCell(ws.getCell(4, blockStart + rel), label, { bold: true, fillColor: fill, fontColor: font, size: 8 });
+      });
+      blockStart += COPA_BLOCK_WIDTH;
+    }
+  }
+
+  ['Data', 'Dia', 'Trafego LP', 'Optins LP', 'Invt. Midia (R$)', 'Cliques Midia', 'CPC (R$)'].forEach((label, idxLabel) => {
+    setCell(ws.getCell(4, idxLabel + 1), label, {
+      bold: true,
+      fillColor: idxLabel < 2 ? COLORS.copaHeader : COLORS.copaMedia,
+      fontColor: 'FFFFFF',
+      size: 8,
+    });
+  });
+
+  [1, 2, 3, 4].forEach((row) => border(ws, row, maxCol, row <= 2 ? 'medium' : 'thin'));
+  ws.getRow(1).height = 20;
+  ws.getRow(2).height = 16;
+  ws.getRow(3).height = 14;
+  ws.getRow(4).height = 14;
+
+  const totals = new Map<string, CopaMetrics>();
+  const getTotal = (partner: CopaPartner, block: CopaBlock, channel: CopaChannel): CopaMetrics => {
+    const key = [partner, block, channel].join(SEP);
+    const current = totals.get(key) ?? emptyCopaMetrics();
+    totals.set(key, current);
+    return current;
+  };
+
+  dates.forEach((day, dayIndex) => {
+    const row = 5 + dayIndex;
+    const ds = isoDate(day);
+    ws.getRow(row).height = 15;
+    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), '', { fillColor: 'FFFFFF', size: 9 });
+
+    setCell(ws.getCell(row, 1), day.toLocaleDateString('pt-BR'), { fillColor: 'FFFFFF', size: 9 });
+    setCell(ws.getCell(row, 2), DAY_NAMES[day.getDay()], { fillColor: 'FFFFFF', size: 9 });
+
+    let startCol = COPA_FIXED_COLS + 1;
+    for (const partner of COPA_PARTNERS) {
+      for (const block of COPA_BLOCKS) {
+        for (const channel of COPA_CHANNELS) {
+          const layout = COPA_CHANNEL_LAYOUT[channel];
+          const metrics = idx.get(copaKey(ds, partner, block, channel));
+          if (hasCopaData(metrics)) {
+            const { fill, font } = copaChannelStyle(channel);
+            setCell(ws.getCell(row, startCol + layout.labelRel), layout.label, { bold: true, fillColor: fill, fontColor: font, size: 8 });
+
+            const total = getTotal(partner, block, channel);
+            total.enviados += metrics!.enviados;
+            total.entregues += metrics!.entregues;
+            total.abertura += metrics!.abertura;
+            total.cliques += metrics!.cliques;
+
+            const writeNumber = (rel: number | undefined, value: number | '') => {
+              if (rel === undefined) return;
+              const c = ws.getCell(row, startCol + rel);
+              setCell(c, value || '', { fillColor: fill, fontColor: font, size: 9 });
+              if (value !== '') c.numFmt = '#,##0';
+            };
+            writeNumber(layout.metricRels.entregues, metrics!.entregues);
+            writeNumber(layout.metricRels.abertura, metrics!.abertura);
+            writeNumber(layout.metricRels.cliques, metrics!.cliques);
+
+            if (channel === 'E-MAIL') {
+              [
+                [layout.metricRels.bounce, safeRate(Math.max(0, metrics!.enviados - metrics!.entregues), metrics!.enviados)],
+                [layout.metricRels.txAbertura, safeRate(metrics!.abertura, metrics!.entregues)],
+                [layout.metricRels.txClique, safeRate(metrics!.cliques, metrics!.entregues)],
+              ].forEach(([rel, value]) => {
+                if (rel === undefined) return;
+                const c = ws.getCell(row, startCol + Number(rel));
+                setCell(c, value, { fillColor: fill, fontColor: font, size: 9 });
+                if (value !== '') c.numFmt = '0.0%';
+              });
+            }
+          }
+        }
+        startCol += COPA_BLOCK_WIDTH;
+      }
+    }
+    border(ws, row, maxCol);
+  });
+
+  const totalRow = 5 + dates.length;
+  ws.getRow(totalRow).height = 15;
+  for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(totalRow, col), '', { bold: true, fillColor: COLORS.copaTotal, size: 9 });
+  setCell(ws.getCell(totalRow, 1), 'total', { bold: true, fillColor: COLORS.copaTotal, size: 9 });
+
+  let startCol = COPA_FIXED_COLS + 1;
+  for (const partner of COPA_PARTNERS) {
+    for (const block of COPA_BLOCKS) {
+      for (const channel of COPA_CHANNELS) {
+        const layout = COPA_CHANNEL_LAYOUT[channel];
+        const total = totals.get([partner, block, channel].join(SEP));
+        if (hasCopaData(total)) {
+          const { fill, font } = copaChannelStyle(channel);
+          setCell(ws.getCell(totalRow, startCol + layout.labelRel), layout.label, { bold: true, fillColor: fill, fontColor: font, size: 8 });
+
+          const writeTotalFormula = (rel: number | undefined) => {
+            if (rel === undefined) return;
+            const letter = colLetter(startCol + rel);
+            const c = ws.getCell(totalRow, startCol + rel);
+            setCell(c, { formula: `SUM(${letter}5:${letter}${totalRow - 1})` }, { bold: true, fillColor: fill, fontColor: font, size: 9 });
+            c.numFmt = '#,##0';
+          };
+          writeTotalFormula(layout.metricRels.entregues);
+          writeTotalFormula(layout.metricRels.abertura);
+          writeTotalFormula(layout.metricRels.cliques);
+
+          if (channel === 'E-MAIL') {
+            [
+              [layout.metricRels.bounce, safeRate(Math.max(0, total!.enviados - total!.entregues), total!.enviados)],
+              [layout.metricRels.txAbertura, safeRate(total!.abertura, total!.entregues)],
+              [layout.metricRels.txClique, safeRate(total!.cliques, total!.entregues)],
+            ].forEach(([rel, value]) => {
+              if (rel === undefined) return;
+              const c = ws.getCell(totalRow, startCol + Number(rel));
+              setCell(c, value, { bold: true, fillColor: fill, fontColor: font, size: 9 });
+              if (value !== '') c.numFmt = '0.0%';
+            });
+          }
+        }
+      }
+      startCol += COPA_BLOCK_WIDTH;
+    }
+  }
+  border(ws, totalRow, maxCol, 'medium');
+
+  [11, 5, 11, 9, 12, 13, 9].forEach((width, idxWidth) => { ws.getColumn(idxWidth + 1).width = width; });
+  for (let col = COPA_FIXED_COLS + 1; col <= maxCol; col++) {
+    const rel = (col - COPA_FIXED_COLS - 1) % COPA_BLOCK_WIDTH;
+    ws.getColumn(col).width = [0, 3, 10, 12].includes(rel) ? 10 : rel >= 7 && rel <= 9 ? 11 : 13;
+  }
+}
 
 function writeSection(
   ws: Worksheet,
@@ -596,6 +900,8 @@ function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: R
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = 'GaaS AFINZ — Rentabilização';
   wb.created = new Date();
+
+  writeCopaSheet(wb, rows, dates, start, end);
 
   // Aba 1: Seguros (cross-sell BU Seguros)
   buildTabSheet(wb, 'Seguros', seguros, dates, 'seguros');
