@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calculator, ChevronLeft, ChevronRight, Save, Target } from 'lucide-react';
+import { Calculator, ChevronLeft, ChevronRight, Download, Save, Target } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 type GoalFormState = {
@@ -57,6 +57,39 @@ export const GoalsManager: React.FC = () => {
             b2c_meta: goal?.b2c_meta || 0
         });
     }, [currentMonthKey, goals]);
+
+    const handleExportLastMonth = () => {
+        const lastMonthDate = addMonth(currentDate, -1);
+        const lastMonthKey = getMonthKey(lastMonthDate);
+        const lastMonthLabel = lastMonthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        const goal = goals.find((entry) => entry.mes === lastMonthKey);
+
+        if (!goal) {
+            alert(`Nenhuma meta encontrada para ${lastMonthLabel}.`);
+            return;
+        }
+
+        const exportData = {
+            mes: goal.mes,
+            competencia: lastMonthLabel,
+            exportado_em: new Date().toISOString(),
+            metas: {
+                dia: goal.cartoes_meta ?? 0,
+                bem_barato: goal.b2b2c_meta ?? 0,
+                plurix: goal.plurix_meta ?? 0,
+                b2c: goal.b2c_meta ?? 0,
+                cac_max: goal.cac_max ?? 0,
+            },
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `meta_${lastMonthKey}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     const handleSave = async () => {
         setLoading(true);
@@ -151,19 +184,30 @@ export const GoalsManager: React.FC = () => {
                     ))}
                 </div>
 
-                <div className="mt-6 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-slate-500">
                         A aba de Originação B2C usa a meta de <strong className="text-slate-700">B2C</strong> como referência mensal.
                     </p>
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={loading}
-                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        <Save size={16} />
-                        {loading ? 'Salvando...' : 'Salvar metas'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleExportLastMonth}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                            title={`Exportar meta de ${addMonth(currentDate, -1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`}
+                        >
+                            <Download size={16} />
+                            Exportar mês passado
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <Save size={16} />
+                            {loading ? 'Salvando...' : 'Salvar metas'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
