@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 import type { Activity } from '../types/framework';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
-type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'error';
+type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 
 export interface IntelligentUpdateMetricPayload {
@@ -31,13 +31,26 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     fieldToReview: string;
     suggestion: string;
     confidence: number;
-    previousDispatches: number;
-    suggestedOrder: string;
+    previousDispatches?: number;
+    suggestedOrder?: string;
     basis: string;
     excelTsvRow: string;
+    accepted?: boolean;
+    bu?: string;
+    parceiro?: string;
+    segmento?: string;
+    subgrupo?: string;
+    etapaAquisicao?: string;
+    perfilCredito?: string;
+    produto?: string;
+    oferta?: string;
+    promocional?: string;
+    ordemDisparo?: number;
 }
 
 export interface IntelligentUpdateRunPayload {
+    sourceLabel?: string;
+    sourceType?: 'paste' | 'csv' | 'xlsx' | 'manual';
     inputLineCount: number;
     blocks: Array<{ key: string; label: string; detected: boolean; rows: number }>;
     metrics: IntelligentUpdateMetricPayload[];
@@ -62,6 +75,8 @@ const asDbActivityId = (activity?: Activity): string | null => {
     return isUuid(rawId) ? rawId : null;
 };
 
+const toTimestamp = (date: string) => `${date}T03:00:00.000Z`;
+
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     const patch: Record<string, number | string | null> = {};
 
@@ -74,11 +89,16 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     if (candidate.finalized !== undefined) patch['Cartões Gerados'] = candidate.finalized;
     if (candidate.assisted !== undefined) patch['Emissões Assistidas'] = candidate.assisted;
     if (candidate.independent !== undefined) patch['Emissões Independentes'] = candidate.independent;
-
-    const suggestedOrderNumber = Number(candidate.suggestedOrder.match(/\d+/)?.[0]);
-    if (Number.isFinite(suggestedOrderNumber)) {
-        patch['Ordem de disparo'] = suggestedOrderNumber;
-    }
+    if (candidate.bu) patch['BU'] = candidate.bu;
+    if (candidate.parceiro) patch['Parceiro'] = candidate.parceiro;
+    if (candidate.segmento) patch['Segmento'] = candidate.segmento;
+    if (candidate.subgrupo) patch['Subgrupos'] = candidate.subgrupo;
+    if (candidate.etapaAquisicao) patch['Etapa de aquisição'] = candidate.etapaAquisicao;
+    if (candidate.perfilCredito) patch['Perfil de Crédito'] = candidate.perfilCredito;
+    if (candidate.produto) patch['Produto'] = candidate.produto;
+    if (candidate.oferta) patch['Oferta'] = candidate.oferta;
+    if (candidate.promocional) patch['Promocional'] = candidate.promocional;
+    if (candidate.ordemDisparo !== undefined) patch['Ordem de disparo'] = candidate.ordemDisparo;
 
     return {
         ...patch,
@@ -86,24 +106,69 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     };
 };
 
-const applyReadyActivityUpdates = async (candidates: IntelligentUpdateCandidatePayload[]) => {
-    const readyCandidates = candidates.filter((candidate) =>
-        candidate.status === 'ready' && asDbActivityId(candidate.matchedActivity)
+const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
+    prog_gaas: false,
+    status: 'Realizado',
+    BU: candidate.bu || 'B2C',
+    jornada: candidate.journey,
+    'Activity name / Taxonomia': candidate.activityName,
+    'Canal': candidate.channel,
+    'Data de Disparo': toTimestamp(candidate.date),
+    'Data Fim': toTimestamp(candidate.date),
+    'Safra': candidate.date ? `${candidate.date.slice(5, 7)}/${candidate.date.slice(2, 4)}` : null,
+    'Parceiro': candidate.parceiro || null,
+    'Segmento': candidate.segmento || 'CRM',
+    'Subgrupos': candidate.subgrupo || null,
+    'Etapa de aquisição': candidate.etapaAquisicao || null,
+    'Perfil de Crédito': candidate.perfilCredito || null,
+    'Produto': candidate.produto || 'Cartao',
+    'Oferta': candidate.oferta || null,
+    'Promocional': candidate.promocional || null,
+    'Oferta 2': 'Padrao',
+    'Promocional 2': 'N/A',
+    'Ordem de disparo': candidate.ordemDisparo ?? null,
+    'Base Total': candidate.sent ?? null,
+    'Base Acionável': candidate.delivered ?? null,
+    'Abertura': candidate.opens ?? null,
+    'Cliques': candidate.clicks ?? null,
+    'Cartões Gerados': candidate.finalized ?? null,
+    'Aprovados': candidate.approved ?? null,
+    'Propostas': candidate.proposals ?? null,
+    'Emissões Independentes': candidate.independent ?? null,
+    'Emissões Assistidas': candidate.assisted ?? null,
+    updated_at: new Date().toISOString(),
+});
+
+const applyConfirmedActivityChanges = async (candidates: IntelligentUpdateCandidatePayload[]) => {
+    const confirmedCandidates = candidates.filter((candidate) =>
+        candidate.accepted
+        && !['duplicate', 'error', 'ignored'].includes(candidate.status)
     );
+    const appliedByKey = new Map<string, string>();
 
-    for (const candidate of readyCandidates) {
+    for (const candidate of confirmedCandidates) {
         const activityId = asDbActivityId(candidate.matchedActivity);
-        if (!activityId) continue;
+        if (activityId) {
+            const { error } = await supabase
+                .from('activities')
+                .update(numericPatch(candidate))
+                .eq('id', activityId);
 
-        const { error } = await supabase
-            .from('activities')
-            .update(numericPatch(candidate))
-            .eq('id', activityId);
+            if (error) throw error;
+            appliedByKey.set(candidate.key, activityId);
+        } else {
+            const { data, error } = await supabase
+                .from('activities')
+                .insert(buildInsertPayload(candidate))
+                .select('id')
+                .single();
 
-        if (error) throw error;
+            if (error) throw error;
+            if (data?.id) appliedByKey.set(candidate.key, data.id);
+        }
     }
 
-    return readyCandidates.length;
+    return appliedByKey;
 };
 
 export const intelligentUpdateService = {
@@ -111,8 +176,8 @@ export const intelligentUpdateService = {
         const { data: run, error: runError } = await supabase
             .from('gaas_update_runs')
             .insert({
-                source_type: 'paste',
-                source_label: 'Dinamica BI colada',
+                source_type: payload.sourceType ?? 'csv',
+                source_label: payload.sourceLabel ?? 'Dinamica BI',
                 status: 'reviewing',
                 pasted_row_count: payload.inputLineCount,
                 detected_blocks: payload.blocks,
@@ -160,31 +225,34 @@ export const intelligentUpdateService = {
             (insertedMetrics || []).map((metric: any) => [metric.natural_key, metric.id])
         );
 
-        const appliedCount = await applyReadyActivityUpdates(payload.candidates);
+        const appliedByKey = await applyConfirmedActivityChanges(payload.candidates);
         const now = new Date().toISOString();
 
         const candidateRows = payload.candidates.map((candidate) => {
-            const activityId = asDbActivityId(candidate.matchedActivity);
-            const wasApplied = candidate.status === 'ready' && Boolean(activityId);
+            const existingActivityId = asDbActivityId(candidate.matchedActivity);
+            const appliedActivityId = appliedByKey.get(candidate.key) ?? existingActivityId;
+            const wasApplied = Boolean(appliedByKey.get(candidate.key));
 
             return {
                 run_id: run.id,
                 metric_id: metricIdByKey.get(candidate.key) ?? null,
-                activity_id: activityId,
+                activity_id: appliedActivityId ?? null,
                 status: wasApplied ? 'applied' : candidate.status,
                 match_count: candidate.matchCount,
                 field_to_review: candidate.fieldToReview,
                 suggestion: candidate.suggestion,
                 confidence: candidate.confidence,
-                previous_dispatches_count: candidate.previousDispatches,
-                suggested_dispatch_order: candidate.suggestedOrder,
+                previous_dispatches_count: candidate.previousDispatches ?? 0,
+                suggested_dispatch_order: candidate.suggestedOrder ?? null,
                 dispatch_order_basis: candidate.basis,
                 excel_tsv_row: candidate.excelTsvRow,
                 proposed_activity_update: {
                     ...numericPatch(candidate),
                     activity_name: candidate.activityName,
+                    journey: candidate.journey,
                     channel: candidate.channel,
                     metric_date: candidate.date,
+                    accepted: Boolean(candidate.accepted),
                     applied_automatically: wasApplied,
                 },
                 applied_at: wasApplied ? now : null,
@@ -197,6 +265,7 @@ export const intelligentUpdateService = {
 
         if (candidatesError) throw candidatesError;
 
+        const appliedCount = appliedByKey.size;
         const finalStatus = appliedCount > 0 ? 'applied' : 'reviewing';
         const { error: updateRunError } = await supabase
             .from('gaas_update_runs')
