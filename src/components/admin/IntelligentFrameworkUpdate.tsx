@@ -888,6 +888,62 @@ const toCsv = (tsv: string) =>
         )
         .join('\n');
 
+const positive = (value?: number) => (value ?? 0) > 0;
+const dayDiff = (fromDate: string, toDate: string) => {
+    const from = new Date(`${fromDate}T12:00:00`);
+    const to = new Date(`${toDate}T12:00:00`);
+    if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime())) return Number.POSITIVE_INFINITY;
+    return Math.round((to.getTime() - from.getTime()) / 86400000);
+};
+
+const attributionKey = (row: MetricRow) => `${normalizeKey(row.activityName)}|${canonicalChannel(row.channel)}`;
+const hasDispatchVolume = (row: MetricRow) => positive(row.sent) || positive(row.delivered);
+const hasConversionMetric = (row: MetricRow) =>
+    positive(row.proposals) || positive(row.approved) || positive(row.finalized) || positive(row.assisted) || positive(row.independent);
+const hasEngagementMetric = (row: MetricRow) => positive(row.opens) || positive(row.clicks);
+const isAttributionResidual = (row: MetricRow) =>
+    row.sourceBlock !== 'performance' && !hasDispatchVolume(row) && !hasConversionMetric(row);
+
+const addMetricValue = (target: MetricRow, source: MetricRow, field: keyof MetricRow) => {
+    const value = source[field];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return;
+    const current = target[field];
+    (target as any)[field] = (typeof current === 'number' ? current : 0) + value;
+};
+
+const consolidateAttributionRows = (rows: MetricRow[]) => {
+    const anchors = rows.filter((row) => !isAttributionResidual(row));
+    const anchorsByAttributionKey = anchors.reduce((map, row) => {
+        const key = attributionKey(row);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(row);
+        return map;
+    }, new Map<string, MetricRow[]>());
+
+    let merged = 0;
+    let ignored = 0;
+
+    rows.filter(isAttributionResidual).forEach((row) => {
+        const candidates = anchorsByAttributionKey.get(attributionKey(row)) ?? [];
+        const anchor = candidates
+            .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
+            .filter((item) => item.diff >= 0 && item.diff <= 2)
+            .sort((a, b) => a.diff - b.diff)[0]?.candidate;
+
+        if (!anchor) {
+            ignored += 1;
+            return;
+        }
+
+        addMetricValue(anchor, row, 'opens');
+        addMetricValue(anchor, row, 'clicks');
+        anchor.sourceBlocks = Array.from(new Set([...(anchor.sourceBlocks ?? [anchor.sourceBlock]), row.sourceBlock]));
+        merged += hasEngagementMetric(row) ? 1 : 0;
+    });
+
+    return { rows: anchors, merged, ignored };
+};
+
 const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
     const warnings: string[] = [];
     const historyIndex = buildHistoryIndex(activities);
@@ -925,7 +981,12 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const missingBlocks = blocks.filter((block) => !block.detected).map((block) => block.label);
     if (missingBlocks.length > 0) warnings.push(`Blocos nao detectados: ${missingBlocks.join(', ')}.`);
 
-    const allRows = [...whatsappRows, ...emailRows, ...smsRows, ...performanceRows, ...pushRows];
+    const rawRows = [...whatsappRows, ...emailRows, ...smsRows, ...performanceRows, ...pushRows];
+    const attribution = consolidateAttributionRows(rawRows);
+    const allRows = attribution.rows;
+    if (attribution.merged > 0 || attribution.ignored > 0) {
+        warnings.push(`${attribution.merged} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignored} linhas sem envio ancora foram ignoradas.`);
+    }
     const importedKeyCount = allRows.reduce((map, row) => {
         map.set(row.key, (map.get(row.key) ?? 0) + 1);
         return map;
@@ -962,7 +1023,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
         .map(buildExcelRow)
         .join('\n');
 
-    return { blocks, metrics, candidates, ignoredExisting, importedRows: allRows.length, tsv, warnings };
+    return { blocks, metrics, candidates, ignoredExisting, importedRows: rawRows.length, tsv, warnings };
 };
 
 const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((resolve, reject) => {
