@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useFilters } from '../../context/FilterContext';
 import { ProjectionBox } from '../ProjectionBox';
 import { ResponsiveContainer, ComposedChart, Line, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
@@ -93,11 +93,22 @@ export const MonthlyAnalysisTab: React.FC = () => {
     const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
 
     // Shared State for Synchronization
-    const [useCustomDate, setUseCustomDate] = useState(true);
+    // Default to global period filter; user can override with "Período Personalizado"
+    const [useCustomDate, setUseCustomDate] = useState(false);
     const [customDateRange, setCustomDateRange] = useState({
-        from: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-        to: format(new Date(), 'yyyy-MM-dd')
+        from: format(filters.dateRange.from, 'yyyy-MM-dd'),
+        to: format(filters.dateRange.to, 'yyyy-MM-dd')
     });
+
+    // Keep custom range in sync when global period changes (only when not in custom mode)
+    useEffect(() => {
+        if (!useCustomDate) {
+            setCustomDateRange({
+                from: format(filters.dateRange.from, 'yyyy-MM-dd'),
+                to: format(filters.dateRange.to, 'yyyy-MM-dd')
+            });
+        }
+    }, [filters.dateRange.from.getTime(), filters.dateRange.to.getTime(), useCustomDate]);
     const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('day');
 
     const chartData = useMemo(() => {
