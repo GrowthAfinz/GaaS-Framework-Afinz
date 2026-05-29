@@ -21,7 +21,7 @@ import { intelligentUpdateService } from '../../services/intelligentUpdateServic
 import type { Activity } from '../../types/framework';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
-type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'error' | 'ignored';
+type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type HumanField = 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'oferta' | 'promocional';
 type SuggestionField = HumanField | 'bu' | 'parceiro' | 'segmento';
@@ -31,6 +31,7 @@ type SuggestionBucket = Map<SuggestionField, Map<string, number>>;
 
 interface HistoryIndex {
     existingKeys: Map<string, Activity[]>;
+    byDispatchSignature: Map<string, Activity[]>;
     byJourneyChannel: Map<string, SuggestionBucket>;
     byJourney: Map<string, SuggestionBucket>;
     bySegmentChannel: Map<string, SuggestionBucket>;
@@ -69,6 +70,7 @@ interface MetricRow {
     finalized?: number;
     assisted?: number;
     independent?: number;
+    dispatchSignature: string;
 }
 
 interface UpdateCandidate extends MetricRow {
@@ -90,6 +92,8 @@ interface UpdateCandidate extends MetricRow {
     promocional: string;
     ordemDisparo?: number;
     suggestions: Record<HumanField, FieldSuggestion[]>;
+    conflictJourneys?: string[];
+    conflictReason?: string;
 }
 
 interface ProcessResult {
@@ -172,6 +176,7 @@ const STATUS_LABEL: Record<CandidateStatus, string> = {
     review: 'Revisar',
     new: 'Novo',
     duplicate: 'Duplicado',
+    conflict: 'Conflito',
     error: 'Erro',
     ignored: 'Ignorado',
 };
@@ -181,6 +186,7 @@ const STATUS_CLASS: Record<CandidateStatus, string> = {
     review: 'bg-amber-50 text-amber-700 border-amber-200',
     new: 'bg-blue-50 text-blue-700 border-blue-200',
     duplicate: 'bg-purple-50 text-purple-700 border-purple-200',
+    conflict: 'bg-orange-50 text-orange-700 border-orange-200',
     error: 'bg-red-50 text-red-700 border-red-200',
     ignored: 'bg-slate-100 text-slate-500 border-slate-200',
 };
@@ -212,6 +218,65 @@ const PROCESSING_STAGE_LABEL: Record<ProcessingStage, string> = {
     indexing: 'Organizando historico',
     detecting: 'Detectando novidades',
     reviewing: 'Preparando revisao',
+};
+
+const SEGMENT_BY_TAXONOMY_CODE: Record<string, string> = {
+    abn: 'Abandono',
+    ac: 'Acordo Certo',
+    adq: 'Adquirencia',
+    alv: 'Alvorada',
+    apr: 'Aprovados',
+    anc: 'Aprovados nao convertidos',
+    atl: 'Ativo com limite',
+    atv: 'Ativo Geral',
+    bsp: 'Base Proprietaria',
+    bb: 'Bem Barato',
+    abb: 'Ativo Bem Barato',
+    car: 'Carrinho Abandonado',
+    blq: 'Cartao Bloqueado',
+    cart: 'Cartonista',
+    emi: 'Clientes Emissores',
+    club: 'Clube',
+    cp: 'Credito Pessoal',
+    rtv: 'Reativacao',
+    cap: 'Desenrola Contemplado aVista aPrazo',
+    dne: 'Desenrola Nao Elegiveis',
+    dia: 'Dia',
+    err: 'Erro',
+    frm: 'Farmacia',
+    freq: 'Frequentes e recorrentes',
+    ina: 'Inadimplente',
+    inv: 'Investidores',
+    ipr: 'Ip roxo',
+    leal: 'Leal',
+    ami: 'Mais Amigo',
+    nsa: 'Nao se aplica',
+    ngd: 'Negados',
+    expl: 'Novo explorador e ocasional',
+    nov: 'Novos',
+    org: 'Organico',
+    bpc: 'Parceiro Bom Pra Credito',
+    srsa: 'Parceiro Serasa',
+    tbm: 'Pos Tombamento',
+    pre: 'Pre Analisados',
+    chu: 'Pre churn e churn',
+    pro: 'Prospect',
+    in1: 'Publico 1 - Investidores',
+    pf1: 'Publico 1 - PF Atrasado',
+    pj1: 'Publico 1 - PJ Negado',
+    pf2: 'Publico 2 - PF Em dia - Lim Baixo',
+    pj2: 'Publico 2 - PJ Aceito',
+    pf3: 'Publico 3 - PF Em dia - Lim Alto',
+    quo: 'Quod',
+    rec: 'Recencia',
+    seg: 'Segurados',
+    sem: 'Sem Parar',
+    pao: 'Super Pao',
+    tst: 'Teste',
+    tds: 'Todos',
+    upo: 'Upgrade de Oferta',
+    nvp: 'Venda Nova Platinum',
+    vnd: 'Vendedor',
 };
 
 const normalize = (value: unknown) =>
@@ -289,6 +354,20 @@ const normalizeChannel = (value: unknown): Channel => {
     return 'Indefinido';
 };
 
+const taxonomyTokens = (value: unknown) =>
+    normalizeKey(value)
+        .split(/[_\s-]+/)
+        .filter(Boolean);
+
+const inferSegmentFromTaxonomy = (value: unknown) => {
+    const tokens = taxonomyTokens(value);
+    for (const token of tokens) {
+        const segment = SEGMENT_BY_TAXONOMY_CODE[token];
+        if (segment) return segment;
+    }
+    return '';
+};
+
 const canonicalChannel = (channel: Channel | string) => {
     const normalized = normalizeChannel(channel);
     return normalized === 'Indefinido' ? String(channel ?? '') : normalized;
@@ -296,6 +375,9 @@ const canonicalChannel = (channel: Channel | string) => {
 
 const buildNoveltyKey = (journey: unknown, channel: unknown, date: unknown) =>
     `${normalizeKey(journey)}|${canonicalChannel(String(channel))}|${toDateKey(date)}`;
+
+const buildDispatchSignature = (activityName: unknown, channel: unknown, date: unknown) =>
+    `${normalizeKey(activityName)}|${canonicalChannel(String(channel))}|${toDateKey(date)}`;
 
 const parseClipboardMatrix = (text: string): string[][] => {
     const cleanText = text.replace(/\r/g, '').trim();
@@ -359,6 +441,7 @@ const mergeMetric = (map: Map<string, MetricRow>, row: MetricRow) => {
         ...existing,
         sourceBlocks: Array.from(new Set([...(existing.sourceBlocks ?? [existing.sourceBlock]), row.sourceBlock])),
         sourceBlock: existing.sourceBlock === 'performance' ? row.sourceBlock : existing.sourceBlock,
+        dispatchSignature: existing.dispatchSignature || row.dispatchSignature,
         activityName: existing.activityName || row.activityName,
         sent: row.sent ?? existing.sent,
         delivered: row.delivered ?? existing.delivered,
@@ -409,8 +492,10 @@ const readBlockRows = (
         if (!looksLikeActivityName(activityName) || !looksLikeDate(getCell(matrix, row, start.col + offsets.date))) continue;
 
         const key = buildNoveltyKey(journey, rowChannel, date);
+        const dispatchSignature = buildDispatchSignature(activityName, rowChannel, date);
         rows.push({
             key,
+            dispatchSignature,
             sourceBlock,
             sourceBlocks: [sourceBlock],
             journey,
@@ -461,6 +546,7 @@ const activityField = (activity: Activity, field: HumanField | 'bu' | 'parceiro'
 
 const inferTaxonomy = (metric: MetricRow) => {
     const text = normalizeKey(`${metric.journey} ${metric.activityName}`);
+    const segmentByCode = inferSegmentFromTaxonomy(`${metric.journey} ${metric.activityName}`);
 
     const bu = text.includes('plurix') || text.includes('_plu_') || text.startsWith('plu_')
         ? 'Plurix'
@@ -480,13 +566,14 @@ const inferTaxonomy = (metric: MetricRow) => {
                     ? 'N/A'
                     : 'N/A';
 
-    const segmento = text.includes('carrinho') || text.includes('_car_')
-        ? 'Abandonados'
-        : text.includes('base proprietaria') || text.includes('_bsp_') || text.includes('_bp_')
-            ? 'Base_Proprietaria'
-            : text.includes('crm')
-                ? 'CRM'
-                : 'CRM';
+    const segmento = segmentByCode
+        || (text.includes('carrinho') || text.includes('_car_')
+            ? 'Carrinho Abandonado'
+            : text.includes('base proprietaria') || text.includes('_bsp_') || text.includes('_bp_')
+                ? 'Base Proprietaria'
+                : text.includes('crm')
+                    ? 'CRM'
+                    : 'CRM');
 
     return { bu, parceiro, segmento };
 };
@@ -537,6 +624,7 @@ const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
     const safeActivities = activities.filter(isValidActivity);
     const index: HistoryIndex = {
         existingKeys: new Map<string, Activity[]>(),
+        byDispatchSignature: new Map<string, Activity[]>(),
         byJourneyChannel: new Map<string, SuggestionBucket>(),
         byJourney: new Map<string, SuggestionBucket>(),
         bySegmentChannel: new Map<string, SuggestionBucket>(),
@@ -548,8 +636,12 @@ const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
         const channel = normalizeChannel(activity.canal);
         const journeyKey = normalizeKey(activity.jornada);
         const noveltyKey = buildNoveltyKey(activity.jornada, channel, activityDateKey(activity));
+        const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
+        const dispatchSignature = buildDispatchSignature(activityName, channel, activityDateKey(activity));
         if (!index.existingKeys.has(noveltyKey)) index.existingKeys.set(noveltyKey, []);
         index.existingKeys.get(noveltyKey)!.push(activity);
+        if (!index.byDispatchSignature.has(dispatchSignature)) index.byDispatchSignature.set(dispatchSignature, []);
+        index.byDispatchSignature.get(dispatchSignature)!.push(activity);
 
         addActivityToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), activity);
         addActivityToBucket(bucketFor(index.byJourney, journeyKey), activity);
@@ -619,7 +711,8 @@ const suggestFromHistory = (
 const buildCandidate = (
     metric: MetricRow,
     historyIndex: HistoryIndex,
-    importedKeyCount: Map<string, number>
+    importedKeyCount: Map<string, number>,
+    importedSignatureJourneys: Map<string, Set<string>>
 ): UpdateCandidate => {
     const taxonomy = inferTaxonomy(metric);
     const fieldSuggestions = HUMAN_FIELDS.reduce<Record<HumanField, FieldSuggestion[]>>((acc, field) => {
@@ -634,6 +727,18 @@ const buildCandidate = (
     const confidences = HUMAN_FIELDS.map((field) => suggestionsFor(fieldSuggestions, field.key)[0]?.confidence ?? 0);
     const averageConfidence = Math.round(confidences.reduce((sum, value) => sum + value, 0) / confidences.length);
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
+    const importedJourneys = importedSignatureJourneys.get(metric.dispatchSignature) ?? new Set<string>();
+    const historicalSignatureMatches = historyIndex.byDispatchSignature.get(metric.dispatchSignature) ?? [];
+    const historicalJourneys = new Set(
+        historicalSignatureMatches
+            .map((activity) => activity.jornada)
+            .filter((journey) => normalizeKey(journey) !== normalizeKey(metric.journey))
+    );
+    const conflictJourneys = Array.from(new Set([
+        ...Array.from(importedJourneys).filter((journey) => normalizeKey(journey) !== normalizeKey(metric.journey)),
+        ...Array.from(historicalJourneys),
+    ])).filter(Boolean);
+    const renamedJourneyConflict = conflictJourneys.length > 0;
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
     const missingHumanSuggestion = HUMAN_FIELDS.some((field) => !suggestionsFor(fieldSuggestions, field.key)[0]?.value);
 
@@ -641,11 +746,13 @@ const buildCandidate = (
         ? 'error'
         : duplicateCount > 1
             ? 'duplicate'
-            : missingHumanSuggestion
-                ? 'new'
-                : averageConfidence >= 80
-                    ? 'ready'
-                    : 'review';
+            : renamedJourneyConflict
+                ? 'conflict'
+                : missingHumanSuggestion
+                    ? 'new'
+                    : averageConfidence >= 80
+                        ? 'ready'
+                        : 'review';
 
     return {
         ...metric,
@@ -655,18 +762,26 @@ const buildCandidate = (
             ? 'Chave'
             : duplicateCount > 1
                 ? 'Duplicidade'
-                : missingHumanSuggestion
-                    ? 'Campos humanos'
-                    : status === 'ready'
-                        ? 'Aprovar'
-                        : 'Sugestoes',
-        suggestion: status === 'ready' ? 'Sugestoes historicas fortes' : 'Revisar campos sugeridos',
-        confidence: missingCritical || duplicateCount > 1 ? 0 : averageConfidence,
+                : renamedJourneyConflict
+                    ? 'Conflito de jornada'
+                    : missingHumanSuggestion
+                        ? 'Campos humanos'
+                        : status === 'ready'
+                            ? 'Aprovar'
+                            : 'Sugestoes',
+        suggestion: renamedJourneyConflict
+            ? 'Possivel renomeacao de jornada no SFMC'
+            : status === 'ready'
+                ? 'Sugestoes historicas fortes'
+                : 'Revisar campos sugeridos',
+        confidence: missingCritical || duplicateCount > 1 || renamedJourneyConflict ? 0 : averageConfidence,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
             : duplicateCount > 1
                 ? 'mais de uma linha no arquivo com a mesma chave'
-                : 'sugestoes por taxonomia e historico',
+                : renamedJourneyConflict
+                    ? `mesma activity, canal e data com jornada diferente: ${conflictJourneys.join(', ')}`
+                    : 'sugestoes por taxonomia e historico',
         accepted: false,
         bu: buSuggestions[0]?.value || taxonomy.bu,
         parceiro: parceiroSuggestions[0]?.value || taxonomy.parceiro,
@@ -679,6 +794,8 @@ const buildCandidate = (
         promocional: valueFor('promocional', ''),
         ordemDisparo: undefined,
         suggestions: fieldSuggestions,
+        conflictJourneys,
+        conflictReason: renamedJourneyConflict ? 'activity_name_channel_date' : undefined,
     };
 };
 
@@ -706,6 +823,8 @@ const buildErrorCandidate = (metric: MetricRow, error: unknown): UpdateCandidate
         promocional: '',
         ordemDisparo: undefined,
         suggestions: emptySuggestions,
+        conflictJourneys: [],
+        conflictReason: undefined,
     };
 };
 
@@ -811,6 +930,11 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
         map.set(row.key, (map.get(row.key) ?? 0) + 1);
         return map;
     }, new Map<string, number>());
+    const importedSignatureJourneys = allRows.reduce((map, row) => {
+        if (!map.has(row.dispatchSignature)) map.set(row.dispatchSignature, new Set<string>());
+        map.get(row.dispatchSignature)!.add(row.journey);
+        return map;
+    }, new Map<string, Set<string>>());
 
     let ignoredExisting = 0;
     const metricMap = new Map<string, MetricRow>();
@@ -826,7 +950,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const candidates = metrics
         .map((row) => {
             try {
-                return buildCandidate(row, historyIndex, importedKeyCount);
+                return buildCandidate(row, historyIndex, importedKeyCount, importedSignatureJourneys);
             } catch (error) {
                 return buildErrorCandidate(row, error);
             }
@@ -920,6 +1044,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [lastRunId, setLastRunId] = useState<string | null>(null);
     const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
     const [reviewPage, setReviewPage] = useState(1);
+    const [selectedCandidate, setSelectedCandidate] = useState<UpdateCandidate | null>(null);
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -929,6 +1054,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         review: candidates.filter((candidate) => candidate.status === 'review').length,
         fresh: candidates.filter((candidate) => candidate.status === 'new').length,
         duplicate: candidates.filter((candidate) => candidate.status === 'duplicate').length,
+        conflict: candidates.filter((candidate) => candidate.status === 'conflict').length,
         error: candidates.filter((candidate) => candidate.status === 'error').length,
         ignored: candidates.filter((candidate) => candidate.status === 'ignored').length,
     }), [candidates]);
@@ -1099,6 +1225,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     new: summary.fresh,
                     duplicate: summary.duplicate,
                     error: summary.error,
+                    conflict: summary.conflict,
                     ignored: summary.ignored,
                     ignoredExisting: result.ignoredExisting,
                     accepted: exportableCandidates.length,
@@ -1276,6 +1403,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             <StatCard label="Revisao" value={summary.review} tone="text-amber-700" />
                             <StatCard label="Novas" value={summary.fresh} tone="text-blue-700" />
                             <StatCard label="Duplicadas" value={summary.duplicate} tone="text-purple-700" />
+                            <StatCard label="Conflitos" value={summary.conflict} tone="text-orange-700" />
                             <StatCard label="Existentes ignoradas" value={result.ignoredExisting} tone="text-slate-700" />
                         </div>
 
@@ -1336,7 +1464,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
                         <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3">
                             <div className="flex flex-wrap gap-2">
-                                {(['all', 'ready', 'review', 'new', 'duplicate', 'error', 'ignored'] as const).map((status) => (
+                                {(['all', 'ready', 'review', 'new', 'conflict', 'duplicate', 'error', 'ignored'] as const).map((status) => (
                                     <button
                                         key={status}
                                         type="button"
@@ -1405,7 +1533,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 bg-white">
                                     {pagedCandidates.map((candidate) => (
-                                        <tr key={candidate.key} className={candidate.accepted ? 'bg-emerald-50/40' : 'hover:bg-slate-50'}>
+                                        <tr
+                                            key={candidate.key}
+                                            onClick={() => setSelectedCandidate(candidate)}
+                                            className={`${candidate.accepted ? 'bg-emerald-50/40' : 'hover:bg-slate-50'} cursor-pointer`}
+                                        >
                                             <td className="px-3 py-3 align-top">
                                                 <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[candidate.status]}`}>
                                                     {candidate.accepted ? 'Aceito' : STATUS_LABEL[candidate.status]}
@@ -1463,7 +1595,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 <div className="flex flex-col gap-2">
                                                     <button
                                                         type="button"
-                                                        onClick={() => acceptCandidate(candidate.key)}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            acceptCandidate(candidate.key);
+                                                        }}
                                                         disabled={candidate.status === 'duplicate' || candidate.status === 'error' || candidate.status === 'ignored'}
                                                         className="rounded-md bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                                     >
@@ -1471,10 +1606,23 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => ignoreCandidate(candidate.key)}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            ignoreCandidate(candidate.key);
+                                                        }}
                                                         className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-bold text-slate-600 transition hover:bg-slate-100"
                                                     >
                                                         Ignorar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            setSelectedCandidate(candidate);
+                                                        }}
+                                                        className="rounded-md border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] font-bold text-cyan-700 transition hover:bg-cyan-100"
+                                                    >
+                                                        Ver metrica
                                                     </button>
                                                 </div>
                                             </td>
@@ -1533,6 +1681,121 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     Confirmar atualizacao
                                 </button>
                             </div>
+                        </footer>
+                    </div>
+                </div>
+            )}
+
+            {selectedCandidate && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[selectedCandidate.status]}`}>
+                                        {selectedCandidate.accepted ? 'Aceito' : STATUS_LABEL[selectedCandidate.status]}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-400">{selectedCandidate.channel} - {formatDateBR(selectedCandidate.date)}</span>
+                                </div>
+                                <h3 className="mt-2 text-lg font-bold text-slate-900">{selectedCandidate.journey}</h3>
+                                <p className="mt-1 text-xs text-slate-500">{selectedCandidate.activityName}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCandidate(null)}
+                                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Fechar detalhe da metrica"
+                            >
+                                <X size={18} />
+                            </button>
+                        </header>
+
+                        <div className="grid gap-4 p-6 lg:grid-cols-[1.1fr_0.9fr]">
+                            <section className="space-y-3">
+                                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Resultado consolidado</h4>
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    {[
+                                        ['Base Total', selectedCandidate.sent],
+                                        ['Base Acionavel', selectedCandidate.delivered],
+                                        ['Aberturas', selectedCandidate.opens],
+                                        ['Cliques', selectedCandidate.clicks],
+                                        ['Propostas', selectedCandidate.proposals],
+                                        ['Aprovados', selectedCandidate.approved],
+                                        ['Cartoes', selectedCandidate.finalized],
+                                        ['Emissoes Assistidas', selectedCandidate.assisted],
+                                        ['Emissoes Indep.', selectedCandidate.independent],
+                                    ].map(([label, value]) => (
+                                        <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
+                                            <div className="mt-1 text-lg font-bold text-slate-900">{value ?? '-'}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                                    <div><span className="font-bold text-slate-900">Blocos consolidados:</span> {selectedCandidate.sourceBlocks.join(', ')}</div>
+                                    <div className="mt-1"><span className="font-bold text-slate-900">Chave de novidade:</span> {selectedCandidate.key}</div>
+                                    <div className="mt-1"><span className="font-bold text-slate-900">Assinatura anti-renomeacao:</span> {selectedCandidate.dispatchSignature}</div>
+                                </div>
+                            </section>
+
+                            <section className="space-y-3">
+                                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Revisao compacta</h4>
+                                {selectedCandidate.status === 'conflict' && (
+                                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs text-orange-800">
+                                        <div className="font-bold">Possivel jornada renomeada no SFMC</div>
+                                        <div className="mt-1">{selectedCandidate.basis}</div>
+                                    </div>
+                                )}
+                                <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div><span className="text-slate-400">BU:</span> {selectedCandidate.bu}</div>
+                                        <div><span className="text-slate-400">Parceiro:</span> {selectedCandidate.parceiro}</div>
+                                        <div><span className="text-slate-400">Segmento:</span> {selectedCandidate.segmento}</div>
+                                        <div><span className="text-slate-400">Produto:</span> {selectedCandidate.produto}</div>
+                                        <div><span className="text-slate-400">Subgrupo:</span> {selectedCandidate.subgrupo}</div>
+                                        <div><span className="text-slate-400">Etapa:</span> {selectedCandidate.etapaAquisicao || '-'}</div>
+                                        <div><span className="text-slate-400">Perfil:</span> {selectedCandidate.perfilCredito || '-'}</div>
+                                        <div><span className="text-slate-400">Oferta:</span> {selectedCandidate.oferta || '-'}</div>
+                                        <div><span className="text-slate-400">Promocional:</span> {selectedCandidate.promocional || '-'}</div>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                                    <div className="font-bold text-slate-900">{selectedCandidate.fieldToReview}</div>
+                                    <div className="mt-1">{selectedCandidate.suggestion}</div>
+                                    <div className="mt-1 text-slate-400">{selectedCandidate.basis}</div>
+                                </div>
+                            </section>
+                        </div>
+
+                        <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCandidate(null)}
+                                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                            >
+                                Fechar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    ignoreCandidate(selectedCandidate.key);
+                                    setSelectedCandidate(null);
+                                }}
+                                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                            >
+                                Ignorar disparo
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    acceptCandidate(selectedCandidate.key);
+                                    setSelectedCandidate(null);
+                                }}
+                                disabled={selectedCandidate.status === 'duplicate' || selectedCandidate.status === 'error' || selectedCandidate.status === 'ignored'}
+                                className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                                Aceitar disparo
+                            </button>
                         </footer>
                     </div>
                 </div>

@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 import type { Activity } from '../types/framework';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
-type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'error' | 'ignored';
+type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 
 export interface IntelligentUpdateMetricPayload {
@@ -22,6 +22,7 @@ export interface IntelligentUpdateMetricPayload {
     finalized?: number;
     assisted?: number;
     independent?: number;
+    dispatchSignature?: string;
 }
 
 export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetricPayload {
@@ -46,6 +47,8 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     oferta?: string;
     promocional?: string;
     ordemDisparo?: number;
+    conflictJourneys?: string[];
+    conflictReason?: string;
 }
 
 export interface IntelligentUpdateRunPayload {
@@ -171,6 +174,9 @@ const applyConfirmedActivityChanges = async (candidates: IntelligentUpdateCandid
     return appliedByKey;
 };
 
+const candidateStatusForDb = (status: CandidateStatus) =>
+    status === 'conflict' ? 'review' : status;
+
 export const intelligentUpdateService = {
     async saveRun(payload: IntelligentUpdateRunPayload): Promise<IntelligentUpdateRunResult> {
         const { data: run, error: runError } = await supabase
@@ -209,6 +215,7 @@ export const intelligentUpdateService = {
             natural_key: metric.key,
             raw_payload: {
                 source_blocks: metric.sourceBlocks ?? [metric.sourceBlock],
+                dispatch_signature: metric.dispatchSignature ?? null,
             },
         }));
 
@@ -237,7 +244,7 @@ export const intelligentUpdateService = {
                 run_id: run.id,
                 metric_id: metricIdByKey.get(candidate.key) ?? null,
                 activity_id: appliedActivityId ?? null,
-                status: wasApplied ? 'applied' : candidate.status,
+                status: wasApplied ? 'applied' : candidateStatusForDb(candidate.status),
                 match_count: candidate.matchCount,
                 field_to_review: candidate.fieldToReview,
                 suggestion: candidate.suggestion,
@@ -254,6 +261,10 @@ export const intelligentUpdateService = {
                     metric_date: candidate.date,
                     accepted: Boolean(candidate.accepted),
                     applied_automatically: wasApplied,
+                    status_original: candidate.status,
+                    conflict_reason: candidate.conflictReason ?? null,
+                    conflict_journeys: candidate.conflictJourneys ?? [],
+                    dispatch_signature: candidate.dispatchSignature ?? null,
                 },
                 applied_at: wasApplied ? now : null,
             };
