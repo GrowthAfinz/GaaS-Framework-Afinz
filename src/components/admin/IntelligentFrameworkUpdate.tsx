@@ -400,6 +400,9 @@ const readBlockRows = (
 
 const activityDateKey = (activity: Activity) => toDateKey(activity.dataDisparo);
 
+const isValidActivity = (activity: Activity | null | undefined): activity is Activity =>
+    Boolean(activity && typeof activity === 'object');
+
 const getRaw = (activity: Activity, keys: string[]) => {
     for (const key of keys) {
         const value = activity.raw?.[key];
@@ -471,6 +474,16 @@ const scoreSimilarity = (metric: MetricRow, activity: Activity) => {
     return score;
 };
 
+const emptySuggestions = HUMAN_FIELDS.reduce<Record<HumanField, FieldSuggestion[]>>((acc, field) => {
+    acc[field.key] = [];
+    return acc;
+}, {} as Record<HumanField, FieldSuggestion[]>);
+
+const suggestionsFor = (
+    suggestions: Partial<Record<HumanField, FieldSuggestion[]>> | undefined,
+    field: HumanField
+) => suggestions?.[field] ?? [];
+
 const topSuggestions = (
     activities: Activity[],
     field: HumanField | 'bu' | 'parceiro' | 'segmento',
@@ -479,6 +492,7 @@ const topSuggestions = (
 ): FieldSuggestion[] => {
     const counts = new Map<string, number>();
     activities.forEach((activity) => {
+        if (!isValidActivity(activity)) return;
         const value = activityField(activity, field);
         if (!value) return;
         counts.set(value, (counts.get(value) ?? 0) + 1);
@@ -503,12 +517,13 @@ const suggestFromHistory = (
     activities: Activity[],
     field: HumanField | 'bu' | 'parceiro' | 'segmento'
 ) => {
-    const sameJourneyChannel = activities.filter((activity) =>
+    const safeActivities = activities.filter(isValidActivity);
+    const sameJourneyChannel = safeActivities.filter((activity) =>
         normalizeKey(activity.jornada) === normalizeKey(metric.journey)
         && normalizeChannel(activity.canal) === metric.channel
     );
-    const sameJourney = activities.filter((activity) => normalizeKey(activity.jornada) === normalizeKey(metric.journey));
-    const similar = activities
+    const sameJourney = safeActivities.filter((activity) => normalizeKey(activity.jornada) === normalizeKey(metric.journey));
+    const similar = safeActivities
         .map((activity) => ({ activity, score: scoreSimilarity(metric, activity) }))
         .filter((item) => item.score >= 6)
         .sort((a, b) => b.score - a.score)
@@ -534,16 +549,19 @@ const buildCandidate = (
 ): UpdateCandidate => {
     const taxonomy = inferTaxonomy(metric);
     const fieldSuggestions = HUMAN_FIELDS.reduce<Record<HumanField, FieldSuggestion[]>>((acc, field) => {
-        acc[field] = suggestFromHistory(metric, activities, field);
+        acc[field.key] = suggestFromHistory(metric, activities, field.key);
         return acc;
     }, {} as Record<HumanField, FieldSuggestion[]>);
+    const buSuggestions = suggestFromHistory(metric, activities, 'bu');
+    const parceiroSuggestions = suggestFromHistory(metric, activities, 'parceiro');
+    const segmentoSuggestions = suggestFromHistory(metric, activities, 'segmento');
 
-    const valueFor = (field: HumanField, fallback: string) => fieldSuggestions[field][0]?.value || fallback;
-    const confidences = HUMAN_FIELDS.map((field) => fieldSuggestions[field][0]?.confidence ?? 0);
+    const valueFor = (field: HumanField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
+    const confidences = HUMAN_FIELDS.map((field) => suggestionsFor(fieldSuggestions, field.key)[0]?.confidence ?? 0);
     const averageConfidence = Math.round(confidences.reduce((sum, value) => sum + value, 0) / confidences.length);
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
-    const missingHumanSuggestion = HUMAN_FIELDS.some((field) => !fieldSuggestions[field][0]?.value);
+    const missingHumanSuggestion = HUMAN_FIELDS.some((field) => !suggestionsFor(fieldSuggestions, field.key)[0]?.value);
 
     const status: CandidateStatus = missingCritical
         ? 'error'
@@ -576,9 +594,9 @@ const buildCandidate = (
                 ? 'mais de uma linha no arquivo com a mesma chave'
                 : 'sugestoes por taxonomia e historico',
         accepted: false,
-        bu: suggestFromHistory(metric, activities, 'bu')[0]?.value || taxonomy.bu,
-        parceiro: suggestFromHistory(metric, activities, 'parceiro')[0]?.value || taxonomy.parceiro,
-        segmento: suggestFromHistory(metric, activities, 'segmento')[0]?.value || taxonomy.segmento,
+        bu: buSuggestions[0]?.value || taxonomy.bu,
+        parceiro: parceiroSuggestions[0]?.value || taxonomy.parceiro,
+        segmento: segmentoSuggestions[0]?.value || taxonomy.segmento,
         subgrupo: valueFor('subgrupo', 'N/A'),
         etapaAquisicao: valueFor('etapaAquisicao', ''),
         perfilCredito: valueFor('perfilCredito', ''),
@@ -587,6 +605,33 @@ const buildCandidate = (
         promocional: valueFor('promocional', ''),
         ordemDisparo: undefined,
         suggestions: fieldSuggestions,
+    };
+};
+
+const buildErrorCandidate = (metric: MetricRow, error: unknown): UpdateCandidate => {
+    const taxonomy = inferTaxonomy(metric);
+    const message = error instanceof Error ? error.message : 'Erro desconhecido ao montar candidato';
+
+    return {
+        ...metric,
+        status: 'error',
+        matchCount: 0,
+        fieldToReview: 'Processamento',
+        suggestion: 'Linha precisa de revisao manual',
+        confidence: 0,
+        basis: message,
+        accepted: false,
+        bu: taxonomy.bu,
+        parceiro: taxonomy.parceiro,
+        segmento: taxonomy.segmento,
+        subgrupo: 'N/A',
+        etapaAquisicao: '',
+        perfilCredito: '',
+        produto: 'Cartao',
+        oferta: '',
+        promocional: '',
+        ordemDisparo: undefined,
+        suggestions: emptySuggestions,
     };
 };
 
@@ -653,8 +698,9 @@ const toCsv = (tsv: string) =>
 const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
     const warnings: string[] = [];
     const existingKeys = new Map<string, Activity[]>();
+    const safeActivities = activities.filter(isValidActivity);
 
-    activities.forEach((activity) => {
+    safeActivities.forEach((activity) => {
         const key = buildNoveltyKey(activity.jornada, normalizeChannel(activity.canal), activityDateKey(activity));
         if (!existingKeys.has(key)) existingKeys.set(key, []);
         existingKeys.get(key)!.push(activity);
@@ -711,7 +757,13 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
 
     const metrics = Array.from(metricMap.values());
     const candidates = metrics
-        .map((row) => buildCandidate(row, activities, importedKeyCount))
+        .map((row) => {
+            try {
+                return buildCandidate(row, safeActivities, importedKeyCount);
+            } catch (error) {
+                return buildErrorCandidate(row, error);
+            }
+        })
         .sort((a, b) => a.status.localeCompare(b.status) || b.confidence - a.confidence);
 
     const tsv = candidates
@@ -1234,7 +1286,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 </div>
                                             </td>
                                             {HUMAN_FIELDS.map((field) => {
-                                                const top = candidate.suggestions[field.key][0];
+                                                const suggestions = suggestionsFor(candidate.suggestions, field.key);
+                                                const top = suggestions[0];
                                                 const listId = `${candidate.key}-${field.key}`;
                                                 return (
                                                     <td key={field.key} className="w-44 px-3 py-3 align-top">
@@ -1248,7 +1301,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                             className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10"
                                                         />
                                                         <datalist id={listId}>
-                                                            {candidate.suggestions[field.key].map((suggestion) => (
+                                                            {suggestions.map((suggestion) => (
                                                                 <option key={`${field.key}-${suggestion.value}`} value={suggestion.value} />
                                                             ))}
                                                         </datalist>
