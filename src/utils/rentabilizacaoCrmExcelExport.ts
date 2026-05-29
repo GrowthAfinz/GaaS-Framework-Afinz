@@ -38,6 +38,19 @@ type AuditRow = {
   linhas: number;
 } & RntMetrics;
 
+type CopaAuditRow = {
+  destino: string;
+  parceiro: string;
+  bloco: string;
+  jornada: string;
+  canal: string;
+  linhas: number;
+  enviados: number;
+  entregues: number;
+  abertura: number;
+  cliques: number;
+};
+
 // ── Mapeamento de produto via journey name ─────────────────────────────────────
 
 // Normalização de período: ABRI26 → ABR26, MAIO26 → MAI26
@@ -71,6 +84,13 @@ function parseJourney(jornada: string): { produto: string; periodo: string } {
   }
 
   // Padrão canônico: JOR_RENTABILIZACAO_BU_...produto..._PERÍODO
+  const cartonistasMatch = j.match(/^JOR_RENTABILIZACAO_CARTONISTAS_(.+?)_([A-Z]{2,5}\d{2})$/);
+  if (cartonistasMatch) {
+    const periodRaw = PERIODO_NORM[cartonistasMatch[2]] ?? cartonistasMatch[2];
+    const productKey = cartonistasMatch[1].replace(/_COPA/g, '').replace(/_/g, ' ').trim();
+    return { produto: `Cartonistas ${titleCase(productKey.toLowerCase())}`, periodo: formatPeriodo(periodRaw) };
+  }
+
   const match = j.match(/^JOR_RENTABILIZACAO_[A-Z0-9]+_(.+?)_([A-Z]{2,5}\d{2})$/);
   if (match) {
     const productRaw = match[1];
@@ -132,6 +152,19 @@ function asInt(value: unknown): number {
   if (value === null || value === undefined || value === '') return 0;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+}
+
+function normalizeFieldName(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function rowValue(row: RawRow, ...parts: string[]): unknown {
+  const wanted = parts.map(normalizeFieldName);
+  const key = Object.keys(row).find((candidate) => {
+    const normalized = normalizeFieldName(candidate);
+    return wanted.every((part) => normalized.includes(part));
+  });
+  return key ? row[key] : undefined;
 }
 
 function isoDate(date: Date): string {
@@ -328,6 +361,66 @@ function safeRate(numerator: number, denominator: number): number | '' {
 
 // ── Helpers Excel ─────────────────────────────────────────────────────────────
 
+function classifyCopaAudit(row: RawRow): { destino: string; parceiro: string; bloco: string } | null {
+  const jornada = String(row['jornada'] ?? '').toUpperCase();
+  if (!jornada.includes('COPA')) return null;
+
+  let parceiro = 'B2C + B2B2C';
+  if (jornada.includes('PLURIX')) parceiro = 'Plurix';
+  else if (jornada.includes('_BB_')) parceiro = 'BB';
+
+  const classified = classifyCopa(row);
+  if (classified) {
+    return { destino: 'Rentabilizacao Copa', parceiro: classified.partner, bloco: classified.block };
+  }
+
+  if (jornada.includes('CARTONISTAS')) {
+    return { destino: 'Rentabilizacao', parceiro, bloco: 'Cartonistas' };
+  }
+
+  return { destino: 'Fora do mapa Copa', parceiro, bloco: 'Sem bloco definido' };
+}
+
+function buildCopaAuditRows(rows: RawRow[], start: Date, end: Date): CopaAuditRow[] {
+  const map = new Map<string, CopaAuditRow>();
+
+  for (const row of rows) {
+    let rowDate: Date;
+    try { rowDate = parseRowDate(row['Data de Disparo']); } catch { continue; }
+    if (rowDate < start || rowDate > end) continue;
+
+    const classified = classifyCopaAudit(row);
+    if (!classified) continue;
+
+    const jornada = String(row['jornada'] ?? '');
+    const canal = normalizeCanal(row['Canal']);
+    const key = [classified.destino, classified.parceiro, classified.bloco, jornada, canal].join(SEP);
+    const current = map.get(key) ?? {
+      ...classified,
+      jornada,
+      canal,
+      linhas: 0,
+      enviados: 0,
+      entregues: 0,
+      abertura: 0,
+      cliques: 0,
+    };
+
+    current.linhas++;
+    current.enviados += asInt(rowValue(row, 'base', 'total'));
+    current.entregues += asInt(rowValue(row, 'base', 'acion'));
+    current.abertura += asInt(row['Abertura']);
+    current.cliques += asInt(row['Cliques']);
+    map.set(key, current);
+  }
+
+  return [...map.values()].sort((a, b) =>
+    `${a.destino}|${a.parceiro}|${a.bloco}|${a.jornada}|${a.canal}`.localeCompare(
+      `${b.destino}|${b.parceiro}|${b.bloco}|${b.jornada}|${b.canal}`,
+    )
+  );
+}
+
 function setCell(
   cell: Cell,
   value?: string | number | object,
@@ -448,6 +541,10 @@ function buildIndexes(rows: RawRow[], start: Date, end: Date): IndexResult {
     let rowDate: Date;
     try { rowDate = parseRowDate(row['Data de Disparo']); } catch { continue; }
     if (rowDate < start || rowDate > end) continue;
+
+    const jornada = String(row['jornada'] ?? '');
+    const jornadaUpper = jornada.toUpperCase();
+    if (jornadaUpper.includes('COPA') && !jornadaUpper.includes('CARTONISTAS')) continue;
     summary.source++;
 
     const canal = normalizeCanal(row['Canal']);
@@ -472,7 +569,6 @@ function buildIndexes(rows: RawRow[], start: Date, end: Date): IndexResult {
 
       if (!produtoSeen[tab].has(produto)) produtoSeen[tab].set(produto, rowDate.getTime());
 
-      const jornada = String(row['jornada'] ?? '');
       const activity = String(row['Activity name / Taxonomia'] ?? '');
       const bu = String(row['BU'] ?? '');
       const jKey = [produto, jornada, activity, bu, canal].join(SEP);
@@ -484,7 +580,6 @@ function buildIndexes(rows: RawRow[], start: Date, end: Date): IndexResult {
       METRIC_FIELDS.forEach((f) => { jr[f] += metrics[f]; });
       summary.mapped++;
     } else {
-      const jornada = String(row['jornada'] ?? '');
       const bu = String(row['BU'] ?? '');
       const motivo = `Fora do padrão JOR_RENTABILIZACAO: ${jornada || 'sem jornada'}`;
       const aKey = [motivo, bu, canal].join(SEP);
@@ -835,7 +930,14 @@ function buildTabSheet(
 
 // ── Aba Auditoria ─────────────────────────────────────────────────────────────
 
-function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], segurosJourneys: RntJourneyRow[], rntJourneys: RntJourneyRow[], summary: IndexResult['summary']): void {
+function writeAuditSheet(
+  wb: Workbook,
+  auditRows: AuditRow[],
+  segurosJourneys: RntJourneyRow[],
+  rntJourneys: RntJourneyRow[],
+  copaJourneys: CopaAuditRow[],
+  summary: IndexResult['summary'],
+): void {
   const ws = wb.addWorksheet('Auditoria', { views: [{ state: 'frozen', ySplit: 4, showGridLines: false }] });
 
   setCell(ws.getCell('A1'), 'Auditoria — Rentabilização CRM', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left', size: 12 });
@@ -853,6 +955,32 @@ function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], segurosJourneys: R
   });
 
   let cursor = 7;
+
+  if (copaJourneys.length > 0) {
+    setCell(ws.getCell(cursor, 1), 'Mapa de campanhas Copa', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left' });
+    ws.mergeCells(cursor, 1, cursor, 10);
+    cursor++;
+    [
+      'Regra: Ativacao, Reativacao e Novos com COPA entram apenas na aba Rentabilizacao Copa.',
+      'Regra: Cartonistas com COPA continua na aba Rentabilizacao; nao entra na aba Copa.',
+      'Use Destino + Bloco/Produto para conferir onde cada journey foi atribuida.',
+    ].forEach((text) => {
+      setCell(ws.getCell(cursor, 1), text, { italic: true, fillColor: COLORS.auditSub, align: 'left' });
+      ws.mergeCells(cursor, 1, cursor, 10);
+      cursor++;
+    });
+
+    ['Destino', 'Parceiro', 'Bloco/Produto', 'Jornada', 'Canal', 'Linhas', 'Base enviada', 'Entregues', 'Abertura', 'Cliques'].forEach((h, i) => {
+      setCell(ws.getCell(cursor, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit });
+    });
+    cursor++;
+    copaJourneys.forEach((jr) => {
+      [jr.destino, jr.parceiro, jr.bloco, jr.jornada, jr.canal, jr.linhas, jr.enviados, jr.entregues, jr.abertura, jr.cliques]
+        .forEach((v, c) => setCell(ws.getCell(cursor, c + 1), v, { align: c < 5 ? 'left' : 'center' }));
+      cursor++;
+    });
+    cursor += 3;
+  }
 
   // Escreve seção de resumo por produto para cada grupo
   const writeJourneyBlock = (label: string, journeyRows: RntJourneyRow[]) => {
@@ -921,6 +1049,7 @@ function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], segurosJourneys: R
 
 function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: RawRow[], start: Date, end: Date): Workbook {
   const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
+  const copaAuditRows = buildCopaAuditRows(rows, start, end);
   const dates = allDates(start, end);
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = 'GaaS AFINZ — Rentabilização';
@@ -935,7 +1064,7 @@ function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: R
   buildTabSheet(wb, 'Rentabilização', rentabilizacao, dates, 'rentabilizacao');
 
   // Aba 3: Auditoria
-  writeAuditSheet(wb, auditRows, seguros.journeyRows, rentabilizacao.journeyRows, summary);
+  writeAuditSheet(wb, auditRows, seguros.journeyRows, rentabilizacao.journeyRows, copaAuditRows, summary);
 
   return wb;
 }
