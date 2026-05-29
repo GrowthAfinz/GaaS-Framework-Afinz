@@ -216,6 +216,8 @@ const toDateKey = (value: unknown): string => {
     const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
 
+    if (!/[/-]/.test(raw)) return '';
+
     const parsed = new Date(raw);
     return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : '';
 };
@@ -261,7 +263,15 @@ const parseClipboardMatrix = (text: string): string[][] => {
             .map((line) => line.split('\t').map((cell) => cell.trim()));
     }
 
-    const parsed = Papa.parse<string[]>(cleanText, { skipEmptyLines: true });
+    const firstLine = cleanText.split('\n')[0] ?? '';
+    const delimiter = (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0)
+        ? ';'
+        : undefined;
+
+    const parsed = Papa.parse<string[]>(cleanText, {
+        delimiter,
+        skipEmptyLines: true,
+    });
     if (parsed.errors.length > 0 || !Array.isArray(parsed.data)) {
         return cleanText
             .split('\n')
@@ -269,7 +279,9 @@ const parseClipboardMatrix = (text: string): string[][] => {
             .map((line) => line.split(';').map((cell) => cell.trim()));
     }
 
-    return parsed.data.map((row) => row.map((cell) => String(cell ?? '').trim()));
+    return parsed.data
+        .filter((row): row is string[] => Array.isArray(row))
+        .map((row) => row.map((cell) => String(cell ?? '').trim()));
 };
 
 const findCell = (matrix: string[][], terms: string[]) => {
@@ -284,6 +296,12 @@ const findCell = (matrix: string[][], terms: string[]) => {
 };
 
 const getCell = (matrix: string[][], row: number, col: number) => matrix[row]?.[col] ?? '';
+
+const looksLikeDate = (value: string) => Boolean(toDateKey(value));
+const looksLikeActivityName = (value: string) => {
+    const text = normalizeKey(value);
+    return text.includes('_') || text.includes('afz') || text.includes('plu') || text.includes('jor_');
+};
 
 const mergeMetric = (map: Map<string, MetricRow>, row: MetricRow) => {
     const existing = map.get(row.key);
@@ -343,6 +361,7 @@ const readBlockRows = (
 
         if (!activityName && !journey && !date) continue;
         if (!activityName || !journey || !date || rowChannel === 'Indefinido') continue;
+        if (!looksLikeActivityName(activityName) || !looksLikeDate(getCell(matrix, row, start.col + offsets.date))) continue;
 
         const key = buildNoveltyKey(journey, rowChannel, date);
         rows.push({
@@ -706,7 +725,9 @@ const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((reso
                 const worksheet = workbook.Sheets[sheetName];
                 if (!worksheet) throw new Error('Nenhuma planilha encontrada no arquivo.');
                 const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, raw: false, defval: '' });
-                resolve(rows.map((row) => row.map((cell) => String(cell ?? '').trim())));
+                resolve(rows
+                    .filter((row): row is unknown[] => Array.isArray(row))
+                    .map((row) => row.map((cell) => String(cell ?? '').trim())));
                 return;
             }
 
