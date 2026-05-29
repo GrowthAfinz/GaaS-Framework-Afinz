@@ -373,7 +373,10 @@ const canonicalChannel = (channel: Channel | string) => {
     return normalized === 'Indefinido' ? String(channel ?? '') : normalized;
 };
 
-const buildNoveltyKey = (journey: unknown, channel: unknown, date: unknown) =>
+const buildNoveltyKey = (journey: unknown, activityName: unknown, channel: unknown, date: unknown) =>
+    `${normalizeKey(journey)}|${normalizeKey(activityName)}|${canonicalChannel(String(channel))}|${toDateKey(date)}`;
+
+const buildJourneyDayKey = (journey: unknown, channel: unknown, date: unknown) =>
     `${normalizeKey(journey)}|${canonicalChannel(String(channel))}|${toDateKey(date)}`;
 
 const buildDispatchSignature = (activityName: unknown, channel: unknown, date: unknown) =>
@@ -491,7 +494,7 @@ const readBlockRows = (
         if (!activityName || !journey || !date || rowChannel === 'Indefinido') continue;
         if (!looksLikeActivityName(activityName) || !looksLikeDate(getCell(matrix, row, start.col + offsets.date))) continue;
 
-        const key = buildNoveltyKey(journey, rowChannel, date);
+        const key = buildNoveltyKey(journey, activityName, rowChannel, date);
         const dispatchSignature = buildDispatchSignature(activityName, rowChannel, date);
         rows.push({
             key,
@@ -635,8 +638,8 @@ const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
     safeActivities.forEach((activity) => {
         const channel = normalizeChannel(activity.canal);
         const journeyKey = normalizeKey(activity.jornada);
-        const noveltyKey = buildNoveltyKey(activity.jornada, channel, activityDateKey(activity));
         const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
+        const noveltyKey = buildNoveltyKey(activity.jornada, activityName, channel, activityDateKey(activity));
         const dispatchSignature = buildDispatchSignature(activityName, channel, activityDateKey(activity));
         if (!index.existingKeys.has(noveltyKey)) index.existingKeys.set(noveltyKey, []);
         index.existingKeys.get(noveltyKey)!.push(activity);
@@ -1019,6 +1022,16 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
         map.set(row.key, (map.get(row.key) ?? 0) + 1);
         return map;
     }, new Map<string, number>());
+    const journeyDayActivityCount = allRows.reduce((map, row) => {
+        const key = buildJourneyDayKey(row.journey, row.channel, row.date);
+        if (!map.has(key)) map.set(key, new Set<string>());
+        map.get(key)!.add(normalizeKey(row.activityName));
+        return map;
+    }, new Map<string, Set<string>>());
+    const multiActivityGroups = Array.from(journeyDayActivityCount.values()).filter((set) => set.size > 1).length;
+    if (multiActivityGroups > 0) {
+        warnings.push(`${multiActivityGroups} grupos jornada/canal/data tinham multiplas activities e foram preservados como disparos separados.`);
+    }
     const importedSignatureJourneys = allRows.reduce((map, row) => {
         if (!map.has(row.dispatchSignature)) map.set(row.dispatchSignature, new Set<string>());
         map.get(row.dispatchSignature)!.add(row.journey);
