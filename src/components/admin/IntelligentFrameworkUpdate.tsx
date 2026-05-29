@@ -911,8 +911,8 @@ const addMetricValue = (target: MetricRow, source: MetricRow, field: keyof Metri
     (target as any)[field] = (typeof current === 'number' ? current : 0) + value;
 };
 
-const consolidateAttributionRows = (rows: MetricRow[]) => {
-    const anchors = rows.filter((row) => !isAttributionResidual(row));
+const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: MetricRow[]) => {
+    const anchors = dispatchRows.filter((row) => !isAttributionResidual(row));
     const anchorsByAttributionKey = anchors.reduce((map, row) => {
         const key = attributionKey(row);
         if (!map.has(key)) map.set(key, []);
@@ -920,18 +920,24 @@ const consolidateAttributionRows = (rows: MetricRow[]) => {
         return map;
     }, new Map<string, MetricRow[]>());
 
-    let merged = 0;
-    let ignored = 0;
+    let mergedResidual = 0;
+    let ignoredResidual = 0;
+    let mergedPerformance = 0;
+    let ignoredPerformance = 0;
 
-    rows.filter(isAttributionResidual).forEach((row) => {
+    const findAnchor = (row: MetricRow) => {
         const candidates = anchorsByAttributionKey.get(attributionKey(row)) ?? [];
-        const anchor = candidates
+        return candidates
             .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
             .filter((item) => item.diff >= 0 && item.diff <= 2)
             .sort((a, b) => a.diff - b.diff)[0]?.candidate;
+    };
+
+    dispatchRows.filter(isAttributionResidual).forEach((row) => {
+        const anchor = findAnchor(row);
 
         if (!anchor) {
-            ignored += 1;
+            ignoredResidual += 1;
             return;
         }
 
@@ -939,10 +945,27 @@ const consolidateAttributionRows = (rows: MetricRow[]) => {
         addMetricValue(anchor, row, 'opens');
         addMetricValue(anchor, row, 'clicks');
         anchor.sourceBlocks = Array.from(new Set([...(anchor.sourceBlocks ?? [anchor.sourceBlock]), row.sourceBlock]));
-        merged += hasEngagementMetric(row) ? 1 : 0;
+        mergedResidual += hasEngagementMetric(row) || positive(row.delivered) ? 1 : 0;
     });
 
-    return { rows: anchors, merged, ignored };
+    performanceRows.forEach((row) => {
+        const anchor = findAnchor(row);
+
+        if (!anchor) {
+            ignoredPerformance += 1;
+            return;
+        }
+
+        addMetricValue(anchor, row, 'proposals');
+        addMetricValue(anchor, row, 'approved');
+        addMetricValue(anchor, row, 'finalized');
+        addMetricValue(anchor, row, 'assisted');
+        addMetricValue(anchor, row, 'independent');
+        anchor.sourceBlocks = Array.from(new Set([...(anchor.sourceBlocks ?? [anchor.sourceBlock]), 'performance']));
+        mergedPerformance += hasConversionMetric(row) ? 1 : 0;
+    });
+
+    return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, ignoredPerformance };
 };
 
 const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
@@ -982,11 +1005,15 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const missingBlocks = blocks.filter((block) => !block.detected).map((block) => block.label);
     if (missingBlocks.length > 0) warnings.push(`Blocos nao detectados: ${missingBlocks.join(', ')}.`);
 
-    const rawRows = [...whatsappRows, ...emailRows, ...smsRows, ...performanceRows, ...pushRows];
-    const attribution = consolidateAttributionRows(rawRows);
+    const dispatchRows = [...whatsappRows, ...emailRows, ...smsRows, ...pushRows];
+    const rawRows = [...dispatchRows, ...performanceRows];
+    const attribution = consolidateOperationalRows(dispatchRows, performanceRows);
     const allRows = attribution.rows;
-    if (attribution.merged > 0 || attribution.ignored > 0) {
-        warnings.push(`${attribution.merged} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignored} linhas sem Base Total e Base Acionavel validas foram ignoradas.`);
+    if (attribution.mergedResidual > 0 || attribution.ignoredResidual > 0) {
+        warnings.push(`${attribution.mergedResidual} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignoredResidual} linhas sem Base Total e Base Acionavel validas foram ignoradas.`);
+    }
+    if (attribution.mergedPerformance > 0 || attribution.ignoredPerformance > 0) {
+        warnings.push(`${attribution.mergedPerformance} linhas de performance D0-D2 consolidadas no disparo real; ${attribution.ignoredPerformance} linhas de performance sem disparo acionavel foram ignoradas.`);
     }
     const importedKeyCount = allRows.reduce((map, row) => {
         map.set(row.key, (map.get(row.key) ?? 0) + 1);
@@ -1017,7 +1044,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
                 return buildErrorCandidate(row, error);
             }
         })
-        .sort((a, b) => a.status.localeCompare(b.status) || b.confidence - a.confidence);
+        .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status) || b.confidence - a.confidence);
 
     const tsv = candidates
         .filter((candidate) => candidate.status !== 'duplicate' && candidate.status !== 'error' && candidate.status !== 'ignored')
@@ -1626,10 +1653,17 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 const top = suggestions[0];
                                                 const listId = `${candidate.key}-${field.key}`;
                                                 return (
-                                                    <td key={field.key} className="w-44 px-3 py-3 align-top">
+                                                    <td
+                                                        key={field.key}
+                                                        className="w-44 px-3 py-3 align-top"
+                                                        onClick={(event) => event.stopPropagation()}
+                                                    >
                                                         <input
                                                             value={candidate[field.key]}
                                                             list={listId}
+                                                            onClick={(event) => event.stopPropagation()}
+                                                            onFocus={(event) => event.stopPropagation()}
+                                                            onPointerDown={(event) => event.stopPropagation()}
                                                             onChange={(event) => updateCandidate(candidate.key, {
                                                                 [field.key]: event.target.value,
                                                                 accepted: false,
