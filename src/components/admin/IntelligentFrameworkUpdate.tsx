@@ -382,6 +382,17 @@ const buildJourneyDayKey = (journey: unknown, channel: unknown, date: unknown) =
 const buildDispatchSignature = (activityName: unknown, channel: unknown, date: unknown) =>
     `${normalizeKey(activityName)}|${canonicalChannel(String(channel))}|${toDateKey(date)}`;
 
+const isSameJourneyFamily = (currentJourney: unknown, otherJourney: unknown) => {
+    const current = normalizeKey(currentJourney);
+    const other = normalizeKey(otherJourney);
+    if (current === other) return true;
+
+    const plurixCartAbandonado = 'jor_aquisicao_plurix_carrinho_abandonado';
+    if (current.startsWith(plurixCartAbandonado) && other.startsWith(plurixCartAbandonado)) return true;
+
+    return false;
+};
+
 const parseClipboardMatrix = (text: string): string[][] => {
     const cleanText = text.replace(/\r/g, '').trim();
     if (!cleanText) return [];
@@ -735,10 +746,10 @@ const buildCandidate = (
     const historicalJourneys = new Set(
         historicalSignatureMatches
             .map((activity) => activity.jornada)
-            .filter((journey) => normalizeKey(journey) !== normalizeKey(metric.journey))
+            .filter((journey) => !isSameJourneyFamily(metric.journey, journey))
     );
     const conflictJourneys = Array.from(new Set([
-        ...Array.from(importedJourneys).filter((journey) => normalizeKey(journey) !== normalizeKey(metric.journey)),
+        ...Array.from(importedJourneys).filter((journey) => !isSameJourneyFamily(metric.journey, journey)),
         ...Array.from(historicalJourneys),
     ])).filter(Boolean);
     const renamedJourneyConflict = conflictJourneys.length > 0;
@@ -1147,6 +1158,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
     const [reviewPage, setReviewPage] = useState(1);
     const [selectedCandidate, setSelectedCandidate] = useState<UpdateCandidate | null>(null);
+    const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -1184,7 +1196,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             && !['duplicate', 'error', 'ignored'].includes(candidate.status)
         ), [candidates]);
 
-    const reviewedTsv = useMemo(() => exportableCandidates.map(buildExcelRow).join('\n'), [exportableCandidates]);
+    const selectedCandidatesForCopy = useMemo(() =>
+        candidates.filter((candidate) =>
+            selectedKeys.has(candidate.key)
+            && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+        ), [candidates, selectedKeys]);
+    const copyCandidates = selectedCandidatesForCopy.length > 0 ? selectedCandidatesForCopy : exportableCandidates;
+    const reviewedTsv = useMemo(() => copyCandidates.map(buildExcelRow).join('\n'), [copyCandidates]);
+    const readyFilteredKeys = useMemo(() =>
+        filteredCandidates
+            .filter((candidate) => candidate.status === 'ready')
+            .map((candidate) => candidate.key),
+        [filteredCandidates]);
+    const selectedReadyCount = readyFilteredKeys.filter((key) => selectedKeys.has(key)).length;
     const blockingCount = candidates.filter((candidate) =>
         candidate.status !== 'ignored'
         && (candidate.status === 'duplicate' || candidate.status === 'error' || !candidate.accepted)
@@ -1203,6 +1227,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setSaveMessage(null);
         setLastRunId(null);
         setCopied(false);
+        setSelectedKeys(new Set());
         setProcessingStage('reading');
 
         try {
@@ -1233,6 +1258,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewPage(1);
             setStatusFilter('all');
+            setSelectedKeys(new Set());
             setReviewOpen(true);
         } catch (error: any) {
             const debug = {
@@ -1271,6 +1297,39 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
     const acceptCandidate = (key: string) => updateCandidate(key, { accepted: true });
     const ignoreCandidate = (key: string) => updateCandidate(key, { status: 'ignored', accepted: false });
+
+    const toggleCandidateSelection = (key: string, checked: boolean) => {
+        setSelectedKeys((current) => {
+            const next = new Set(current);
+            if (checked) next.add(key);
+            else next.delete(key);
+            return next;
+        });
+    };
+
+    const toggleReadySelection = () => {
+        setSelectedKeys((current) => {
+            const next = new Set(current);
+            const allSelected = readyFilteredKeys.length > 0 && readyFilteredKeys.every((key) => next.has(key));
+            readyFilteredKeys.forEach((key) => {
+                if (allSelected) next.delete(key);
+                else next.add(key);
+            });
+            return next;
+        });
+    };
+
+    const acceptSelectedCandidates = () => {
+        setResult((current) => {
+            if (!current) return current;
+            const candidates = current.candidates.map((candidate) =>
+                selectedKeys.has(candidate.key) && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+                    ? { ...candidate, accepted: true }
+                    : candidate
+            );
+            return { ...current, candidates, tsv: candidates.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n') };
+        });
+    };
 
     const acceptHighConfidence = () => {
         setResult((current) => {
@@ -1594,6 +1653,39 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </button>
                         </div>
 
+                        {statusFilter === 'ready' && (
+                            <div className="flex flex-col gap-2 border-b border-slate-200 bg-emerald-50/50 px-6 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                                <label className="inline-flex items-center gap-2 font-bold text-emerald-800">
+                                    <input
+                                        type="checkbox"
+                                        checked={readyFilteredKeys.length > 0 && selectedReadyCount === readyFilteredKeys.length}
+                                        onChange={toggleReadySelection}
+                                        className="h-4 w-4 rounded border-emerald-300 text-emerald-600"
+                                    />
+                                    Selecionar todos da aba Pronto ({selectedReadyCount}/{readyFilteredKeys.length})
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={acceptSelectedCandidates}
+                                        disabled={selectedKeys.size === 0}
+                                        className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                                    >
+                                        Aprovar selecionados
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleCopy}
+                                        disabled={!reviewedTsv}
+                                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                                    >
+                                        <Copy size={14} />
+                                        Copiar selecionados
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex flex-col gap-2 border-b border-slate-200 bg-white px-6 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                             <span>
                                 Mostrando {pagedCandidates.length} de {filteredCandidates.length} candidatos neste filtro. A revisao carrega em paginas para manter a tela responsiva.
@@ -1623,6 +1715,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             <table className="min-w-[1500px] w-full divide-y divide-slate-200 text-left text-xs">
                                 <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-wider text-slate-500 shadow-sm">
                                     <tr>
+                                        {statusFilter === 'ready' && <th className="px-3 py-3 font-bold">Sel.</th>}
                                         <th className="px-3 py-3 font-bold">Status</th>
                                         <th className="px-3 py-3 font-bold">Chave</th>
                                         <th className="px-3 py-3 font-bold">Automaticos</th>
@@ -1640,6 +1733,16 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                             onClick={() => setSelectedCandidate(candidate)}
                                             className={`${candidate.accepted ? 'bg-emerald-50/40' : 'hover:bg-slate-50'} cursor-pointer`}
                                         >
+                                            {statusFilter === 'ready' && (
+                                                <td className="px-3 py-3 align-top" onClick={(event) => event.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedKeys.has(candidate.key)}
+                                                        onChange={(event) => toggleCandidateSelection(candidate.key, event.target.checked)}
+                                                        className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="px-3 py-3 align-top">
                                                 <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[candidate.status]}`}>
                                                     {candidate.accepted ? 'Aceito' : STATUS_LABEL[candidate.status]}
@@ -1750,9 +1853,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
                         <footer className="flex flex-col gap-3 border-t border-slate-200 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-xs text-slate-500">
-                                {blockingCount > 0
-                                    ? `${blockingCount} linhas ainda precisam de aceite, edicao ou ignorar.`
-                                    : `${exportableCandidates.length} linhas prontas para Excel e base de dados.`}
+                                {selectedCandidatesForCopy.length > 0
+                                    ? `${selectedCandidatesForCopy.length} linhas selecionadas para copiar.`
+                                    : blockingCount > 0
+                                        ? `${blockingCount} linhas ainda precisam de aceite, edicao ou ignorar.`
+                                        : `${exportableCandidates.length} linhas prontas para Excel e base de dados.`}
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <button
