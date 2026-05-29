@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calculator, ChevronLeft, ChevronRight, Download, Save, Target } from 'lucide-react';
+import { Calculator, ChevronLeft, ChevronRight, Copy, Save, Target } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 type GoalFormState = {
@@ -58,7 +58,7 @@ export const GoalsManager: React.FC = () => {
         });
     }, [currentMonthKey, goals]);
 
-    const handleExportLastMonth = () => {
+    const handleImportLastMonth = async () => {
         const lastMonthDate = addMonth(currentDate, -1);
         const lastMonthKey = getMonthKey(lastMonthDate);
         const lastMonthLabel = lastMonthDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -69,26 +69,29 @@ export const GoalsManager: React.FC = () => {
             return;
         }
 
-        const exportData = {
-            mes: goal.mes,
-            competencia: lastMonthLabel,
-            exportado_em: new Date().toISOString(),
-            metas: {
-                dia: goal.cartoes_meta ?? 0,
-                bem_barato: goal.b2b2c_meta ?? 0,
-                plurix: goal.plurix_meta ?? 0,
-                b2c: goal.b2c_meta ?? 0,
+        setLoading(true);
+        try {
+            const nextGoal = {
+                mes: currentMonthKey,
+                cartoes_meta: goal.cartoes_meta ?? 0,
+                b2b2c_meta: goal.b2b2c_meta ?? 0,
+                plurix_meta: goal.plurix_meta ?? 0,
+                b2c_meta: goal.b2c_meta ?? 0,
                 cac_max: goal.cac_max ?? 0,
-            },
-        };
+            };
 
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `meta_${lastMonthKey}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+            const nextGoals = [...goals.filter((g) => g.mes !== currentMonthKey), nextGoal];
+            setGoals(nextGoals);
+
+            const { dataService } = await import('../../services/dataService');
+            await dataService.upsertGoal(nextGoal);
+            alert(`Metas de ${lastMonthLabel} copiadas para ${currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}.`);
+        } catch (error: any) {
+            console.error('Erro ao importar meta:', error);
+            alert(`Erro ao importar meta: ${error.message || 'Erro desconhecido'}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSave = async () => {
@@ -191,12 +194,13 @@ export const GoalsManager: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={handleExportLastMonth}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-                            title={`Exportar meta de ${addMonth(currentDate, -1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`}
+                            onClick={handleImportLastMonth}
+                            disabled={loading}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            title={`Copiar metas de ${addMonth(currentDate, -1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} para este mês`}
                         >
-                            <Download size={16} />
-                            Exportar mês passado
+                            <Copy size={16} />
+                            Importar mês passado
                         </button>
                         <button
                             type="button"
