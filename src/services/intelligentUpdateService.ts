@@ -80,6 +80,11 @@ const asDbActivityId = (activity?: Activity): string | null => {
 
 const toTimestamp = (date: string) => `${date}T03:00:00.000Z`;
 
+const textOrFallback = (value: unknown, fallback = 'N/A') => {
+    const text = value === undefined || value === null ? '' : String(value).trim();
+    return text || fallback;
+};
+
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     const patch: Record<string, number | string | null> = {};
 
@@ -112,21 +117,21 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
 const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
     prog_gaas: false,
     status: 'Realizado',
-    BU: candidate.bu || 'B2C',
+    BU: textOrFallback(candidate.bu, 'B2C'),
     jornada: candidate.journey,
     'Activity name / Taxonomia': candidate.activityName,
     'Canal': candidate.channel,
     'Data de Disparo': toTimestamp(candidate.date),
     'Data Fim': toTimestamp(candidate.date),
     'Safra': candidate.date ? `${candidate.date.slice(5, 7)}/${candidate.date.slice(2, 4)}` : null,
-    'Parceiro': candidate.parceiro || null,
-    'Segmento': candidate.segmento || 'CRM',
-    'Subgrupos': candidate.subgrupo || null,
-    'Etapa de aquisição': candidate.etapaAquisicao || null,
-    'Perfil de Crédito': candidate.perfilCredito || null,
-    'Produto': candidate.produto || 'Cartao',
-    'Oferta': candidate.oferta || null,
-    'Promocional': candidate.promocional || null,
+    'Parceiro': textOrFallback(candidate.parceiro),
+    'Segmento': textOrFallback(candidate.segmento, 'CRM'),
+    'Subgrupos': textOrFallback(candidate.subgrupo),
+    'Etapa de aquisição': textOrFallback(candidate.etapaAquisicao),
+    'Perfil de Crédito': textOrFallback(candidate.perfilCredito),
+    'Produto': textOrFallback(candidate.produto, 'Cartao'),
+    'Oferta': textOrFallback(candidate.oferta, 'Padrao'),
+    'Promocional': textOrFallback(candidate.promocional),
     'Oferta 2': 'Padrao',
     'Promocional 2': 'N/A',
     'Ordem de disparo': candidate.ordemDisparo ?? null,

@@ -843,6 +843,22 @@ const buildErrorCandidate = (metric: MetricRow, error: unknown): UpdateCandidate
 };
 
 const valueOrBlank = (value: unknown) => value === undefined || value === null ? '' : String(value);
+const textOrFallback = (value: unknown, fallback = 'N/A') => {
+    const text = valueOrBlank(value).trim();
+    return text || fallback;
+};
+
+const applyApprovalDefaults = (candidate: UpdateCandidate): UpdateCandidate => ({
+    ...candidate,
+    parceiro: textOrFallback(candidate.parceiro),
+    segmento: textOrFallback(candidate.segmento),
+    subgrupo: textOrFallback(candidate.subgrupo),
+    etapaAquisicao: textOrFallback(candidate.etapaAquisicao),
+    perfilCredito: textOrFallback(candidate.perfilCredito),
+    produto: textOrFallback(candidate.produto, 'Cartao'),
+    oferta: textOrFallback(candidate.oferta, 'Padrao'),
+    promocional: textOrFallback(candidate.promocional),
+});
 
 const buildExcelRow = (candidate: UpdateCandidate) => {
     const baseTotal = candidate.sent ?? '';
@@ -862,18 +878,19 @@ const buildExcelRow = (candidate: UpdateCandidate) => {
             case 'Data de Disparo': return formatDateBR(candidate.date);
             case 'Data Fim': return formatDateBR(candidate.date);
             case 'Safra': return generateSafra(candidate.date);
-            case 'BU': return candidate.bu;
-            case 'Parceiro': return candidate.parceiro;
-            case 'Segmento': return candidate.segmento;
-            case 'Subgrupos': return candidate.subgrupo;
+            case 'BU': return textOrFallback(candidate.bu, 'B2C');
+            case 'Parceiro': return textOrFallback(candidate.parceiro);
+            case 'SIGLA': return 'N/A';
+            case 'Segmento': return textOrFallback(candidate.segmento, 'CRM');
+            case 'Subgrupos': return textOrFallback(candidate.subgrupo);
             case 'Base Total': return baseTotal;
             case 'Base Acionavel': return baseAcionavel;
-            case 'Etapa de aquisicao': return candidate.etapaAquisicao;
+            case 'Etapa de aquisicao': return textOrFallback(candidate.etapaAquisicao);
             case 'Ordem de disparo': return candidate.ordemDisparo ?? '';
-            case 'Perfil de Credito': return candidate.perfilCredito;
-            case 'Produto': return candidate.produto;
-            case 'Oferta': return candidate.oferta;
-            case 'Promocional': return candidate.promocional;
+            case 'Perfil de Credito': return textOrFallback(candidate.perfilCredito);
+            case 'Produto': return textOrFallback(candidate.produto, 'Cartao');
+            case 'Oferta': return textOrFallback(candidate.oferta, 'Padrao');
+            case 'Promocional': return textOrFallback(candidate.promocional);
             case 'Oferta 2': return 'Padrao';
             case 'Promocional 2': return 'N/A';
             case 'Abertura': return candidate.opens ?? '';
@@ -1295,7 +1312,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         });
     };
 
-    const acceptCandidate = (key: string) => updateCandidate(key, { accepted: true });
+    const acceptCandidate = (key: string) => {
+        setResult((current) => {
+            if (!current) return current;
+            const candidates = current.candidates.map((candidate) =>
+                candidate.key === key ? { ...applyApprovalDefaults(candidate), accepted: true } : candidate
+            );
+            return {
+                ...current,
+                candidates,
+                tsv: candidates.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n'),
+            };
+        });
+    };
     const ignoreCandidate = (key: string) => updateCandidate(key, { status: 'ignored', accepted: false });
 
     const toggleCandidateSelection = (key: string, checked: boolean) => {
@@ -1324,7 +1353,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
                 selectedKeys.has(candidate.key) && !['duplicate', 'error', 'ignored'].includes(candidate.status)
-                    ? { ...candidate, accepted: true }
+                    ? { ...applyApprovalDefaults(candidate), accepted: true }
                     : candidate
             );
             return { ...current, candidates, tsv: candidates.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n') };
@@ -1336,7 +1365,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
                 candidate.confidence >= 80 && !['duplicate', 'error', 'ignored'].includes(candidate.status)
-                    ? { ...candidate, accepted: true }
+                    ? { ...applyApprovalDefaults(candidate), accepted: true }
                     : candidate
             );
             return { ...current, candidates, tsv: candidates.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n') };
