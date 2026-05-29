@@ -58,7 +58,6 @@ function parseJourney(jornada: string): { produto: string; periodo: string } {
   const j = jornada.toUpperCase().trim();
 
   // Padrão canônico: JOR_RENTABILIZACAO_BU_...produto..._PERÍODO
-  // Período: 3-5 letras + 2 dígitos (ex: MAR26, ABR26, MAIO26, ABRI26)
   const match = j.match(/^JOR_RENTABILIZACAO_[A-Z0-9]+_(.+?)_([A-Z]{2,5}\d{2})$/);
   if (match) {
     const productRaw = match[1];
@@ -68,8 +67,36 @@ function parseJourney(jornada: string): { produto: string; periodo: string } {
     return { produto: product, periodo: formatPeriodo(periodRaw) };
   }
 
-  // Fallback: usar o journey name limpo
+  // JOR_RENTABILIZACAO sem período: extrair produto direto
+  const matchNoPeriod = j.match(/^JOR_RENTABILIZACAO_[A-Z0-9]+_(.+)$/);
+  if (matchNoPeriod) {
+    const productKey = matchNoPeriod[1].replace(/_/g, ' ');
+    const product = PRODUCT_OVERRIDES[productKey] ?? titleCase(productKey.toLowerCase());
+    return { produto: product, periodo: '' };
+  }
+
   return { produto: titleCase(j.replace(/^JOR_RENTABILIZACAO_/, '').replace(/_/g, ' ').toLowerCase()), periodo: '' };
+}
+
+/** Extrai produto de jornadas JOR_ATIVACAO_* */
+function parseAtivacaoJourney(jornada: string): { produto: string; periodo: string } {
+  const j = jornada.toUpperCase().trim()
+    .replace(/^JOR_ATIVA[ÇC]AO_/, '')  // remover prefixo (com ou sem acento)
+    .replace(/_SEEDLIST$/, '')
+    .replace(/ \(COPIAR\)$/, '')
+    .replace(/_TESTE$/, '');
+
+  const ATIVACAO_NAMES: Record<string, string> = {
+    'DESBLOQUEIO_VC':               'Desbloqueio VC',
+    'DESBLOQUEIO_PLURIX_MAISAMIGO': 'Desbloqueio Plurix Mais Amigo',
+    'WELCOME_AFINZ_VC':             'Welcome Afinz VC',
+    'WELCOME_PLURIX_MAISAMIGO':     'Welcome Plurix Mais Amigo',
+    'INCENTIVO_AO_USO_AFINZ_VC':    'Incentivo ao Uso Afinz',
+    'POS_TOMBAMENTO_DESBLOQUEIO_PLURIX_MAISAMIGO_MAIO': 'Desbloqueio Pós-Tombamento',
+  };
+
+  const produto = ATIVACAO_NAMES[j] ?? titleCase(j.replace(/_/g, ' ').toLowerCase());
+  return { produto, periodo: '' };
 }
 
 function titleCase(str: string): string {
@@ -142,11 +169,25 @@ const COLORS = {
   auditSub:      'DBEAFE',
 };
 
-function productHeaderColor(produto: string): string {
+/** Determina em qual aba o registro vai */
+function getTab(row: RawRow): 'seguros' | 'rentabilizacao' {
+  const jornada = String(row['jornada'] ?? '').toUpperCase();
+  const bu = String(row['BU'] ?? '').toUpperCase();
+  if (bu === 'SEGUROS' || jornada.includes('SEGURO')) return 'seguros';
+  return 'rentabilizacao';
+}
+
+function productHeaderColor(produto: string, tab: 'seguros' | 'rentabilizacao'): string {
   const p = produto.toLowerCase();
-  if (p.includes('mulher')) return COLORS.seguroMulher;
-  if (p.includes('resid')) return COLORS.seguroRes;
-  if (p.includes('ativa')) return COLORS.ativacao;
+  if (tab === 'seguros') {
+    if (p.includes('mulher')) return COLORS.seguroMulher;
+    if (p.includes('resid'))  return COLORS.seguroRes;
+    return COLORS.seguroMulher;
+  }
+  // Rentabilização
+  if (p.includes('cartonist'))    return '7C3AED'; // violet-700
+  if (p.includes('ativa'))        return COLORS.ativacao;
+  if (p.includes('leal') || p.includes('amigo')) return '0369A1'; // sky-700
   return COLORS.outro;
 }
 
@@ -208,27 +249,49 @@ function idxKey(dateStr: string, produto: string, canal: string): string {
 /** Retorna null para linhas que devem ir para Auditoria */
 function classify(row: RawRow): { produto: string; periodo: string } | null {
   const jornada = String(row['jornada'] ?? '');
-  if (!jornada.toUpperCase().startsWith('JOR_RENTABILIZACAO')) {
-    return null;  // vai para Auditoria
-  }
-  return parseJourney(jornada);
+  const j = jornada.toUpperCase().trim();
+
+  if (j.startsWith('JOR_RENTABILIZACAO')) return parseJourney(jornada);
+
+  if (j.startsWith('JOR_ATIVACAO_') || j.startsWith('JOR_ATIVAÇÃO_'))
+    return parseAtivacaoJourney(jornada);
+
+  if (j.startsWith('JOR_INCENTIVO_AO_USO_'))
+    return { produto: 'Incentivo ao Uso', periodo: '' };
+
+  if (j.startsWith('JOR_POS_TOMBAMENTO_DESBLOQUEIO_'))
+    return { produto: 'Desbloqueio Pós-Tombamento', periodo: '' };
+
+  if (j.startsWith('JOR_CARTAO_VC_WELCOME') || j.startsWith('JOR_CARTAO_VC_WELCOME'))
+    return { produto: 'Welcome VC', periodo: '' };
+
+  return null;  // vai para Auditoria
 }
 
 // ── Indexação das linhas ───────────────────────────────────────────────────────
 
-type IndexResult = {
+type TabIndex = {
   idx: Map<string, RntMetrics>;
   produtoOrder: string[];
-  auditRows: AuditRow[];
   journeyRows: RntJourneyRow[];
+};
+
+type IndexResult = {
+  seguros: TabIndex;
+  rentabilizacao: TabIndex;
+  auditRows: AuditRow[];
   summary: { source: number; mapped: number; audit: number };
 };
 
+function buildTabIndex(): TabIndex {
+  return { idx: new Map(), produtoOrder: [], journeyRows: [] };
+}
+
 function buildIndexes(rows: RawRow[], start: Date, end: Date): IndexResult {
-  const idx = new Map<string, RntMetrics>();
-  const produtoSeen = new Map<string, number>(); // produto → first date seen (for ordering)
+  const tabs = { seguros: buildTabIndex(), rentabilizacao: buildTabIndex() };
+  const produtoSeen: Record<string, Map<string, number>> = { seguros: new Map(), rentabilizacao: new Map() };
   const auditMap = new Map<string, AuditRow>();
-  const journeyMap = new Map<string, RntJourneyRow>();
+  const journeyMap: Record<string, Map<string, RntJourneyRow>> = { seguros: new Map(), rentabilizacao: new Map() };
   const summary = { source: 0, mapped: 0, audit: 0 };
 
   for (const row of rows) {
@@ -239,34 +302,34 @@ function buildIndexes(rows: RawRow[], start: Date, end: Date): IndexResult {
 
     const canal = normalizeCanal(row['Canal']);
     const metrics: RntMetrics = {
-      entregues:     asInt(row['Base Acionável']),
-      abertos:       asInt(row['Abertura']),
-      cliques:       asInt(row['Cliques']),
-      propostas:     asInt(row['Propostas']),
-      aprovados:     asInt(row['Aprovados']),
-      contratacoes:  asInt(row['Cartões Gerados']),
+      entregues:    asInt(row['Base Acionável']),
+      abertos:      asInt(row['Abertura']),
+      cliques:      asInt(row['Cliques']),
+      propostas:    asInt(row['Propostas']),
+      aprovados:    asInt(row['Aprovados']),
+      contratacoes: asInt(row['Cartões Gerados']),
     };
 
     const classified = classify(row);
     if (classified) {
       const { produto } = classified;
+      const tab = getTab(row);
       const ds = isoDate(rowDate);
       const key = idxKey(ds, produto, canal);
-      const cur = idx.get(key) ?? { entregues: 0, abertos: 0, cliques: 0, propostas: 0, aprovados: 0, contratacoes: 0 };
+      const cur = tabs[tab].idx.get(key) ?? { entregues: 0, abertos: 0, cliques: 0, propostas: 0, aprovados: 0, contratacoes: 0 };
       METRIC_FIELDS.forEach((f) => { cur[f] += metrics[f]; });
-      idx.set(key, cur);
+      tabs[tab].idx.set(key, cur);
 
-      if (!produtoSeen.has(produto)) produtoSeen.set(produto, rowDate.getTime());
+      if (!produtoSeen[tab].has(produto)) produtoSeen[tab].set(produto, rowDate.getTime());
 
-      // Journey map
       const jornada = String(row['jornada'] ?? '');
       const activity = String(row['Activity name / Taxonomia'] ?? '');
       const bu = String(row['BU'] ?? '');
       const jKey = [produto, jornada, activity, bu, canal].join(SEP);
-      if (!journeyMap.has(jKey)) {
-        journeyMap.set(jKey, { produto, jornada, activity, bu, canal, linhas: 0, entregues: 0, abertos: 0, cliques: 0, propostas: 0, aprovados: 0, contratacoes: 0 });
+      if (!journeyMap[tab].has(jKey)) {
+        journeyMap[tab].set(jKey, { produto, jornada, activity, bu, canal, linhas: 0, entregues: 0, abertos: 0, cliques: 0, propostas: 0, aprovados: 0, contratacoes: 0 });
       }
-      const jr = journeyMap.get(jKey)!;
+      const jr = journeyMap[tab].get(jKey)!;
       jr.linhas++;
       METRIC_FIELDS.forEach((f) => { jr[f] += metrics[f]; });
       summary.mapped++;
@@ -285,16 +348,18 @@ function buildIndexes(rows: RawRow[], start: Date, end: Date): IndexResult {
     }
   }
 
-  // Ordenar produtos por data do primeiro disparo
-  const produtoOrder = [...produtoSeen.entries()].sort((a, b) => a[1] - b[1]).map(([p]) => p);
+  // Montar produtoOrder ordenado por data do primeiro disparo para cada tab
+  (['seguros', 'rentabilizacao'] as const).forEach((tab) => {
+    tabs[tab].produtoOrder = [...produtoSeen[tab].entries()].sort((a, b) => a[1] - b[1]).map(([p]) => p);
+    tabs[tab].journeyRows = [...journeyMap[tab].values()].sort((a, b) =>
+      `${a.produto}|${a.jornada}|${a.canal}`.localeCompare(`${b.produto}|${b.jornada}|${b.canal}`)
+    );
+  });
 
   return {
-    idx,
-    produtoOrder,
+    seguros: tabs.seguros,
+    rentabilizacao: tabs.rentabilizacao,
     auditRows: [...auditMap.values()].sort((a, b) => a.motivo.localeCompare(b.motivo)),
-    journeyRows: [...journeyMap.values()].sort((a, b) =>
-      `${a.produto}|${a.jornada}|${a.canal}`.localeCompare(`${b.produto}|${b.jornada}|${b.canal}`)
-    ),
     summary,
   };
 }
@@ -316,8 +381,9 @@ function writeSection(
   produto: string,
   idx: Map<string, RntMetrics>,
   dates: Date[],
+  tab: 'seguros' | 'rentabilizacao' = 'rentabilizacao',
 ): number {
-  const color = productHeaderColor(produto);
+  const color = productHeaderColor(produto, tab);
   const numMetricCols = 6;  // Entregues | Abertos | Cliques | Propostas | Aprovados | Contratações
   const numTaxCols = 3;     // Tx Entrega | Tx Abertura | Tx Conv
   const maxCol = 2 + numMetricCols + numTaxCols; // Data | Dia | 6 métricas | 3 taxas = 11
@@ -409,10 +475,39 @@ function writeSection(
   return totalRow + 3; // 2 linhas de gap entre seções
 }
 
+// ── Criação de sheet diarizado ────────────────────────────────────────────────
+
+function buildTabSheet(
+  wb: Workbook,
+  sheetName: string,
+  tabData: TabIndex,
+  dates: Date[],
+  tab: 'seguros' | 'rentabilizacao',
+): void {
+  const ws = wb.addWorksheet(sheetName, {
+    views: [{ state: 'frozen', xSplit: 2, ySplit: 2, topLeftCell: 'C3', activeCell: 'C3', showGridLines: false }],
+  });
+  let nextRow = 1;
+  for (const produto of tabData.produtoOrder) {
+    nextRow = writeSection(ws, nextRow, produto, tabData.idx, dates, tab);
+  }
+  ws.getColumn(1).width = 22;
+  ws.getColumn(2).width = 6;
+  ws.getColumn(3).width = 12;
+  ws.getColumn(4).width = 10;
+  ws.getColumn(5).width = 10;
+  ws.getColumn(6).width = 12;
+  ws.getColumn(7).width = 12;
+  ws.getColumn(8).width = 14;
+  ws.getColumn(9).width = 11;
+  ws.getColumn(10).width = 12;
+  ws.getColumn(11).width = 10;
+}
+
 // ── Aba Auditoria ─────────────────────────────────────────────────────────────
 
-function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], journeyRows: RntJourneyRow[], summary: IndexResult['summary']): void {
-  const ws = wb.addWorksheet('Auditoria', { views: [{ state: 'frozen', ySplit: 8, showGridLines: false }] });
+function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], segurosJourneys: RntJourneyRow[], rntJourneys: RntJourneyRow[], summary: IndexResult['summary']): void {
+  const ws = wb.addWorksheet('Auditoria', { views: [{ state: 'frozen', ySplit: 4, showGridLines: false }] });
 
   setCell(ws.getCell('A1'), 'Auditoria — Rentabilização CRM', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left', size: 12 });
   ws.mergeCells('A1:K1');
@@ -420,7 +515,7 @@ function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], journeyRows: RntJo
   // Contadores globais
   [
     ['Linhas fonte no período', summary.source],
-    ['Linhas mapeadas (JOR_RENTABILIZACAO_*)', summary.mapped],
+    ['Linhas mapeadas', summary.mapped],
     ['Linhas fora do mapeamento', summary.audit],
   ].forEach(([label, value], i) => {
     const row = i + 3;
@@ -428,57 +523,67 @@ function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], journeyRows: RntJo
     setCell(ws.getCell(row, 2), Number(value), { fillColor: COLORS.auditSub });
   });
 
-  // Resumo por produto
-  const prodSummary = new Map<string, RntMetrics & { linhas: number }>();
-  journeyRows.forEach((jr) => {
-    const cur = prodSummary.get(jr.produto) ?? { linhas: 0, entregues: 0, abertos: 0, cliques: 0, propostas: 0, aprovados: 0, contratacoes: 0 };
-    cur.linhas += jr.linhas;
-    METRIC_FIELDS.forEach((f) => { cur[f] += jr[f]; });
-    prodSummary.set(jr.produto, cur);
-  });
+  let cursor = 7;
 
-  const prodStart = 7;
-  setCell(ws.getCell(prodStart, 1), 'Resumo por produto', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left' });
-  ws.mergeCells(prodStart, 1, prodStart, 9);
-  ['Produto', 'Linhas', 'Entregues', 'Abertos', 'Cliques', 'Propostas', 'Aprovados', 'Contratações'].forEach((h, i) => {
-    setCell(ws.getCell(prodStart + 1, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit });
-  });
-  let pr = prodStart + 2;
-  [...prodSummary.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([prod, totals]) => {
-    setCell(ws.getCell(pr, 1), prod, { align: 'left' });
-    ['linhas', ...METRIC_FIELDS].forEach((f, i) => {
-      setCell(ws.getCell(pr, 2 + i), totals[f as keyof typeof totals] as number);
+  // Escreve seção de resumo por produto para cada grupo
+  const writeJourneyBlock = (label: string, journeyRows: RntJourneyRow[]) => {
+    if (journeyRows.length === 0) return;
+
+    const prodSummary = new Map<string, RntMetrics & { linhas: number }>();
+    journeyRows.forEach((jr) => {
+      const cur = prodSummary.get(jr.produto) ?? { linhas: 0, entregues: 0, abertos: 0, cliques: 0, propostas: 0, aprovados: 0, contratacoes: 0 };
+      cur.linhas += jr.linhas;
+      METRIC_FIELDS.forEach((f) => { cur[f] += jr[f]; });
+      prodSummary.set(jr.produto, cur);
     });
-    pr++;
-  });
+
+    setCell(ws.getCell(cursor, 1), `Resumo — ${label}`, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left' });
+    ws.mergeCells(cursor, 1, cursor, 9);
+    ['Produto', 'Linhas', 'Entregues', 'Abertos', 'Cliques', 'Propostas', 'Aprovados', 'Contratações'].forEach((h, i) => {
+      setCell(ws.getCell(cursor + 1, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit });
+    });
+    cursor += 2;
+    [...prodSummary.entries()].sort(([a], [b]) => a.localeCompare(b)).forEach(([prod, totals]) => {
+      setCell(ws.getCell(cursor, 1), prod, { align: 'left' });
+      ['linhas', ...METRIC_FIELDS].forEach((f, i) => {
+        setCell(ws.getCell(cursor, 2 + i), totals[f as keyof typeof totals] as number);
+      });
+      cursor++;
+    });
+    cursor += 2;
+
+    // Mapa de jornadas deste grupo
+    setCell(ws.getCell(cursor, 1), `Mapa de jornadas — ${label}`, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left' });
+    ws.mergeCells(cursor, 1, cursor, 11);
+    ['Produto', 'Jornada', 'Activity name / Taxonomia', 'BU', 'Canal', 'Linhas', 'Entregues', 'Abertos', 'Cliques', 'Aprovados', 'Contratações'].forEach((h, i) => {
+      setCell(ws.getCell(cursor + 1, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit });
+    });
+    cursor += 2;
+    journeyRows.forEach((jr) => {
+      [jr.produto, jr.jornada, jr.activity, jr.bu, jr.canal, jr.linhas, jr.entregues, jr.abertos, jr.cliques, jr.aprovados, jr.contratacoes]
+        .forEach((v, c) => setCell(ws.getCell(cursor, c + 1), v, { align: c < 5 ? 'left' : 'center' }));
+      cursor++;
+    });
+    cursor += 3;
+  };
+
+  writeJourneyBlock('Seguros', segurosJourneys);
+  writeJourneyBlock('Rentabilização', rntJourneys);
 
   // Linhas fora do mapeamento
   if (auditRows.length > 0) {
-    const auditStart = pr + 2;
-    setCell(ws.getCell(auditStart, 1), 'Linhas fora do padrão JOR_RENTABILIZACAO_*', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left' });
-    ws.mergeCells(auditStart, 1, auditStart, 9);
+    setCell(ws.getCell(cursor, 1), 'Linhas fora do padrão JOR_RENTABILIZACAO_*', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left' });
+    ws.mergeCells(cursor, 1, cursor, 9);
     ['Motivo', 'BU', 'Jornada', 'Canal', 'Linhas', 'Entregues', 'Abertos', 'Propostas', 'Contratações'].forEach((h, i) => {
-      setCell(ws.getCell(auditStart + 1, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit });
+      setCell(ws.getCell(cursor + 1, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit });
     });
-    auditRows.forEach((ar, idx) => {
-      const row = auditStart + 2 + idx;
+    cursor += 2;
+    auditRows.forEach((ar) => {
       [ar.motivo, ar.bu, ar.jornada, ar.canal, ar.linhas, ar.entregues, ar.abertos, ar.propostas, ar.contratacoes]
-        .forEach((v, i) => setCell(ws.getCell(row, i + 1), v, { align: i < 4 ? 'left' : 'center' }));
+        .forEach((v, i) => setCell(ws.getCell(cursor, i + 1), v, { align: i < 4 ? 'left' : 'center' }));
+      cursor++;
     });
   }
-
-  // Mapa de jornadas
-  const jornStart = pr + 4 + (auditRows.length > 0 ? auditRows.length + 4 : 0);
-  setCell(ws.getCell(jornStart, 1), 'Mapa de jornadas e atividades', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit, align: 'left' });
-  ws.mergeCells(jornStart, 1, jornStart, 11);
-  ['Produto', 'Jornada', 'Activity name / Taxonomia', 'BU', 'Canal', 'Linhas', 'Entregues', 'Abertos', 'Cliques', 'Aprovados', 'Contratações'].forEach((h, i) => {
-    setCell(ws.getCell(jornStart + 1, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.audit });
-  });
-  journeyRows.forEach((jr, i) => {
-    const row = jornStart + 2 + i;
-    [jr.produto, jr.jornada, jr.activity, jr.bu, jr.canal, jr.linhas, jr.entregues, jr.abertos, jr.cliques, jr.aprovados, jr.contratacoes]
-      .forEach((v, c) => setCell(ws.getCell(row, c + 1), v, { align: c < 5 ? 'left' : 'center' }));
-  });
 
   [30, 50, 60, 14, 12, 10, 12, 10, 10, 12, 14].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 }
@@ -486,35 +591,21 @@ function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], journeyRows: RntJo
 // ── Workbook principal ────────────────────────────────────────────────────────
 
 function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: RawRow[], start: Date, end: Date): Workbook {
-  const { idx, produtoOrder, auditRows, journeyRows, summary } = buildIndexes(rows, start, end);
+  const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
   const dates = allDates(start, end);
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = 'GaaS AFINZ — Rentabilização';
   wb.created = new Date();
 
-  const ws = wb.addWorksheet('Rentabilização CRM', {
-    views: [{ state: 'frozen', xSplit: 2, ySplit: 2, topLeftCell: 'C3', activeCell: 'C3', showGridLines: false }],
-  });
+  // Aba 1: Seguros (cross-sell BU Seguros)
+  buildTabSheet(wb, 'Seguros', seguros, dates, 'seguros');
 
-  let nextRow = 1;
-  for (const produto of produtoOrder) {
-    nextRow = writeSection(ws, nextRow, produto, idx, dates);
-  }
+  // Aba 2: Rentabilização (Cartonistas, Ativação CRM, Copa _rnt_, etc.)
+  buildTabSheet(wb, 'Rentabilização', rentabilizacao, dates, 'rentabilizacao');
 
-  // Larguras de colunas
-  ws.getColumn(1).width = 22;  // Data · Canal
-  ws.getColumn(2).width = 6;   // Dia
-  ws.getColumn(3).width = 12;  // Entregues
-  ws.getColumn(4).width = 10;  // Abertos
-  ws.getColumn(5).width = 10;  // Cliques
-  ws.getColumn(6).width = 12;  // Propostas
-  ws.getColumn(7).width = 12;  // Aprovados
-  ws.getColumn(8).width = 14;  // Contratações
-  ws.getColumn(9).width = 11;  // Tx Entrega
-  ws.getColumn(10).width = 12; // Tx Abertura
-  ws.getColumn(11).width = 10; // Tx Conv
+  // Aba 3: Auditoria
+  writeAuditSheet(wb, auditRows, seguros.journeyRows, rentabilizacao.journeyRows, summary);
 
-  writeAuditSheet(wb, auditRows, journeyRows, summary);
   return wb;
 }
 
