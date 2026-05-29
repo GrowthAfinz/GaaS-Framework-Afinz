@@ -1884,8 +1884,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             <div className="text-xs text-slate-500">
                                 {selectedCandidatesForCopy.length > 0
                                     ? `${selectedCandidatesForCopy.length} linhas selecionadas para copiar.`
-                                    : blockingCount > 0
-                                        ? `${blockingCount} linhas ainda precisam de aceite, edicao ou ignorar.`
+                                    : exportableCandidates.length > 0 && blockingCount > 0
+                                        ? `${exportableCandidates.length} linhas aceitas; ${blockingCount} pendentes ficam fora da atualizacao.`
+                                        : blockingCount > 0
+                                            ? `${blockingCount} linhas ainda precisam de aceite, edicao ou ignorar.`
                                         : `${exportableCandidates.length} linhas prontas para Excel e base de dados.`}
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -1917,7 +1919,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={handleSaveRun}
-                                    disabled={saving || blockingCount > 0 || exportableCandidates.length === 0}
+                                    disabled={saving || exportableCandidates.length === 0}
                                     className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
                                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Clipboard size={14} />}
