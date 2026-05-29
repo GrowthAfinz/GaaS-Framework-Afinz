@@ -33,6 +33,16 @@ const normalizeText = (value: unknown): string => {
     return value.trim();
 };
 
+const normalizeFrameworkChannel = (value: unknown): string => {
+    const raw = normalizeText(value);
+    const normalized = raw.toLowerCase().replace(/[\s_-]+/g, '');
+    if (normalized === 'push') return 'Push';
+    if (normalized === 'sms') return 'SMS';
+    if (normalized === 'whatsapp' || normalized === 'wpp') return 'WhatsApp';
+    if (normalized === 'email' || normalized === 'e-mail' || normalized === 'mail') return 'E-mail';
+    return raw;
+};
+
 // Normaliza Safra para formato canônico YYYY-MM.
 // Aceita: '2026-01', '2026/01', 'jan/26', 'Jan/2026', '01/2026', etc.
 const PT_MONTH_MAP: Record<string, string> = {
@@ -102,7 +112,7 @@ const normalizeBU = (value: unknown): string => {
 // Helper to map SQL row to Activity
 export const mapSqlToActivity = (row: any): Activity => {
     const bu = normalizeBU(row['BU']);
-    const canal = normalizeText(row['Canal']);
+    const canal = normalizeFrameworkChannel(row['Canal']);
     const segmento = normalizeText(row['Segmento']);
     const parceiro = normalizeText(row['Parceiro']);
     const jornada = normalizeText(row['jornada']);

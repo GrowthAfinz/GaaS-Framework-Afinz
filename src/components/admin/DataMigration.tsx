@@ -22,6 +22,16 @@ const toNonNegativeInt = (value: unknown): number => {
     return Math.round(num);
 };
 
+const normalizeFrameworkChannel = (value: unknown): string => {
+    const raw = value === undefined || value === null ? '' : String(value).trim();
+    const normalized = raw.toLowerCase().replace(/[\s_-]+/g, '');
+    if (normalized === 'push') return 'Push';
+    if (normalized === 'sms') return 'SMS';
+    if (normalized === 'whatsapp' || normalized === 'wpp') return 'WhatsApp';
+    if (normalized === 'email' || normalized === 'e-mail' || normalized === 'mail') return 'E-mail';
+    return raw;
+};
+
 export const DataMigration = () => {
     const { activities, b2cData, paidMediaData } = useAppStore();
     const [status, setStatus] = useState<'idle' | 'migrating' | 'done' | 'error'>('idle');
@@ -84,7 +94,7 @@ export const DataMigration = () => {
                     data_fim: parseDate(a.raw?.['Data Fim']),
 
                     bu: a.bu,
-                    canal: a.canal,
+                    canal: normalizeFrameworkChannel(a.canal),
                     segmento: a.segmento,
                     segmento_sigla: a.raw?.['SIGLA.1'],
                     subgrupo: a.subgrupo ?? a.raw?.['Subgrupos'],

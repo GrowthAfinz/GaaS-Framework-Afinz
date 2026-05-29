@@ -3,6 +3,16 @@ import { parseDate } from '../utils/formatters';
 import { ActivityFormSchema, ActivityFormInput } from '../schemas/ActivityFormSchema';
 import { ActivityRow } from '../types/activity';
 
+const normalizeFrameworkChannel = (value: unknown): string => {
+    const raw = value === undefined || value === null ? '' : String(value).trim();
+    const normalized = raw.toLowerCase().replace(/[\s_-]+/g, '');
+    if (normalized === 'push') return 'Push';
+    if (normalized === 'sms') return 'SMS';
+    if (normalized === 'whatsapp' || normalized === 'wpp') return 'WhatsApp';
+    if (normalized === 'email' || normalized === 'e-mail' || normalized === 'mail') return 'E-mail';
+    return raw;
+};
+
 /**
  * Service Layer para operações Unificadas de Atividades (GaaS + Histórico)
  */
@@ -165,7 +175,7 @@ export const syncFrameworkActivities = async (
             "Data de Disparo": toISOSafe(activity.dataDisparo),
             "Data Fim": toISOSafe(activity.raw?.['Data Fim']),
             "BU": activity.bu,
-            "Canal": activity.canal,
+            "Canal": normalizeFrameworkChannel(activity.canal),
             "Safra": activity.safraKey || activity.raw?.['Safra'],
             "jornada": activity.jornada || activity.raw?.['Jornada'],
             "Parceiro": activity.parceiro,
