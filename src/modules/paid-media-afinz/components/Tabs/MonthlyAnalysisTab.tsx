@@ -123,7 +123,7 @@ export const MonthlyAnalysisTab: React.FC = () => {
             if (dDate < startOfDay(rangeStart) || dDate > endOfDay(rangeEnd)) return false;
 
             if (filters.selectedChannels.length && !filters.selectedChannels.includes(d.channel as any)) return false;
-            if (filters.selectedObjectives.length && !filters.selectedObjectives.includes(d.objective as any)) return false;
+            if (d.objective && filters.selectedObjectives.length && !filters.selectedObjectives.includes(d.objective as any)) return false;
             if (filters.selectedCampaigns.length && !filters.selectedCampaigns.includes(d.campaign)) return false;
             if (filters.selectedAdsets.length && (!d.adset_name || !filters.selectedAdsets.includes(d.adset_name))) return false;
             if (filters.selectedAds.length && (!d.ad_name || !filters.selectedAds.includes(d.ad_name))) return false;

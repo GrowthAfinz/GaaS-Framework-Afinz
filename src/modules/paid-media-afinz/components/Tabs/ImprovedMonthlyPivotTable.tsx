@@ -28,6 +28,7 @@ interface KPIs extends Metrics {
   ctr: number;
   cpa: number;
   cpm: number;
+  cpc: number;
 }
 
 interface ColumnConfig {
@@ -50,6 +51,7 @@ const deriveKPIs = (m: Metrics): KPIs => ({
   ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0,
   cpa: m.conversions > 0 ? m.spend / m.conversions : 0,
   cpm: m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0,
+  cpc: m.clicks > 0 ? m.spend / m.clicks : 0,
 });
 
 const getPrevMonth = (monthKey: string): string => {
@@ -121,7 +123,7 @@ const CPACell: React.FC<{ value: number; avgCPA: number; prev?: number; currDay?
 
 export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps> = ({ rawData, filters }) => {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-    new Set(['label', 'spend', 'impressions', 'clicks', 'conversions', 'ctr', 'cpa', 'cpm'])
+    new Set(['label', 'spend', 'impressions', 'clicks', 'conversions', 'ctr', 'cpa', 'cpc', 'cpm'])
   );
 
   const allColumns: ColumnConfig[] = useMemo(() => [
@@ -132,6 +134,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
     { key: 'conversions', label: 'Conversões',   formatter: fmtNum,                                       align: 'center' },
     { key: 'ctr',         label: 'CTR',          formatter: fmtPct,                                       align: 'center' },
     { key: 'cpa',         label: 'CPA',          formatter: (v: number) => v > 0 ? fmtBRL(v) : '—',      align: 'center', inverse: true },
+    { key: 'cpc',         label: 'CPC',          formatter: (v: number) => v > 0 ? fmtBRL(v) : '—',      align: 'center', inverse: true },
     { key: 'cpm',         label: 'CPM',          formatter: fmtBRL,                                       align: 'center', inverse: true },
   ], []);
 
@@ -147,7 +150,7 @@ export const ImprovedMonthlyPivotTable: React.FC<ImprovedMonthlyPivotTableProps>
 
     return rawData.filter(d => {
       if (filters.selectedChannels.length && !filters.selectedChannels.includes(d.channel as any)) return false;
-      if (filters.selectedObjectives.length && !filters.selectedObjectives.includes(d.objective as any)) return false;
+      if (d.objective && filters.selectedObjectives.length && !filters.selectedObjectives.includes(d.objective as any)) return false;
       if (filters.selectedCampaigns.length && !filters.selectedCampaigns.includes(d.campaign)) return false;
       if (filters.selectedAdsets.length && (!d.adset_name || !filters.selectedAdsets.includes(d.adset_name))) return false;
       if (filters.selectedAds.length && (!d.ad_name || !filters.selectedAds.includes(d.ad_name))) return false;

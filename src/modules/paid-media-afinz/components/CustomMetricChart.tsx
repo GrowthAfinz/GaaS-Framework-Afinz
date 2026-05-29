@@ -61,7 +61,7 @@ export const CustomMetricChart: React.FC<CustomMetricChartProps> = ({
             if (filters.selectedChannels.length > 0 && !filters.selectedChannels.includes(d.channel as any)) return false;
 
             // Objectives
-            if (filters.selectedObjectives.length > 0 && !filters.selectedObjectives.includes(d.objective as any)) return false;
+            if (d.objective && filters.selectedObjectives.length > 0 && !filters.selectedObjectives.includes(d.objective as any)) return false;
 
             // Campaigns
             if (filters.selectedCampaigns.length > 0 && !filters.selectedCampaigns.includes(d.campaign)) return false;
