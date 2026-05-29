@@ -1177,6 +1177,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [selectedCandidate, setSelectedCandidate] = useState<UpdateCandidate | null>(null);
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
     const [uploadConfirmOpen, setUploadConfirmOpen] = useState(false);
+    const [reviewSearchTerm, setReviewSearchTerm] = useState('');
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -1198,9 +1199,26 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     }, [activeCandidates]);
 
     const filteredCandidates = useMemo(() => {
-        if (statusFilter === 'all') return candidates;
-        return candidates.filter((candidate) => candidate.status === statusFilter);
-    }, [candidates, statusFilter]);
+        const term = normalizeKey(reviewSearchTerm);
+        return candidates.filter((candidate) => {
+            const statusMatches = statusFilter === 'all' || candidate.status === statusFilter;
+            if (!statusMatches) return false;
+            if (!term) return true;
+
+            const haystack = normalizeKey([
+                candidate.journey,
+                candidate.activityName,
+                candidate.channel,
+                candidate.date,
+                candidate.bu,
+                candidate.parceiro,
+                candidate.segmento,
+                candidate.subgrupo,
+            ].join(' '));
+
+            return haystack.includes(term);
+        });
+    }, [candidates, statusFilter, reviewSearchTerm]);
     const reviewPageCount = Math.max(1, Math.ceil(filteredCandidates.length / REVIEW_PAGE_SIZE));
     const pagedCandidates = useMemo(() => {
         const safePage = Math.min(reviewPage, reviewPageCount);
@@ -1257,6 +1275,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setCopied(false);
         setSelectedKeys(new Set());
         setUploadConfirmOpen(false);
+        setReviewSearchTerm('');
         setProcessingStage('reading');
 
         try {
@@ -1686,7 +1705,43 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </div>
                         </header>
 
-                        <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3">
+                        <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3">
+                            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                                <div className="relative w-full xl:max-w-md">
+                                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="search"
+                                        value={reviewSearchTerm}
+                                        onChange={(event) => {
+                                            setReviewSearchTerm(event.target.value);
+                                            setReviewPage(1);
+                                        }}
+                                        placeholder="Buscar JourneyName, activity, canal ou segmento"
+                                        className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-xs font-semibold text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                    />
+                                    {reviewSearchTerm && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setReviewSearchTerm('');
+                                                setReviewPage(1);
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                            aria-label="Limpar busca"
+                                        >
+                                            <X size={13} />
+                                        </button>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={acceptHighConfidence}
+                                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                                >
+                                    <Sparkles size={14} />
+                                    Aceitar alta confianca
+                                </button>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {(['all', 'ready', 'review', 'new', 'conflict', 'duplicate', 'error', 'ignored'] as const).map((status) => (
                                     <button
@@ -1706,14 +1761,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </button>
                                 ))}
                             </div>
-                            <button
-                                type="button"
-                                onClick={acceptHighConfidence}
-                                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
-                            >
-                                <Sparkles size={14} />
-                                Aceitar alta confianca
-                            </button>
                         </div>
 
                         {statusFilter === 'ready' && (
@@ -1751,7 +1798,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
                         <div className="flex flex-col gap-2 border-b border-slate-200 bg-white px-6 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                             <span>
-                                Mostrando {pagedCandidates.length} de {filteredCandidates.length} candidatos neste filtro. A revisao carrega em paginas para manter a tela responsiva.
+                                Mostrando {pagedCandidates.length} de {filteredCandidates.length} candidatos{reviewSearchTerm ? ` para "${reviewSearchTerm}"` : ' neste filtro'}. A revisao carrega em paginas para manter a tela responsiva.
                             </span>
                             <div className="flex items-center gap-2">
                                 <button
@@ -1906,7 +1953,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     {filteredCandidates.length === 0 && (
                                         <tr>
                                             <td colSpan={10} className="px-3 py-16 text-center text-slate-500">
-                                                Nenhum candidato neste filtro.
+                                                {reviewSearchTerm ? 'Nenhum candidato encontrado para esta busca.' : 'Nenhum candidato neste filtro.'}
                                             </td>
                                         </tr>
                                     )}
