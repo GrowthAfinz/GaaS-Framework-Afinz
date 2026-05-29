@@ -8,6 +8,7 @@ import { useAppStore } from '../store/useAppStore';
 import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
 import { exportAquisicaoCrmXlsx, getCurrentMonthRange } from '../utils/aquisicaoCrmExcelExport';
+import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import {
   ColumnKey,
@@ -174,6 +175,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const [detailSegmentFilter, setDetailSegmentFilter] = useState<string | null>(null);
   const [detailCanalFilter, setDetailCanalFilter] = useState<string | null>(null);
   const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
+  const [isExportingRnt, setIsExportingRnt] = useState(false);
 
   // ── Personalização de colunas / agrupamentos ──
   const [campanhasGroupBy, setCampanhasGroupBy] = useState<DimensionKey>('segmento');
@@ -522,6 +524,23 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     }
   }, [globalFilters.dataFim, globalFilters.dataInicio, viewSettings.periodo.fim, viewSettings.periodo.inicio]);
 
+  const exportRentabilizacaoCrm = useCallback(async () => {
+    const dateFromInput = (value?: string) => value ? new Date(`${value}T00:00:00`) : null;
+    const fallback = getCurrentMonthRange();
+    const start = dateFromInput(globalFilters.dataInicio || viewSettings.periodo.inicio) ?? fallback.start;
+    const end = dateFromInput(globalFilters.dataFim || viewSettings.periodo.fim) ?? fallback.end;
+
+    setIsExportingRnt(true);
+    try {
+      await exportRentabilizacaoCrmXlsx(start, end);
+    } catch (error) {
+      console.error('Erro ao exportar XLSX de Rentabilização CRM', error);
+      window.alert('Não foi possível gerar o XLSX de Rentabilização CRM. Verifique a conexão com a base de dados e tente novamente.');
+    } finally {
+      setIsExportingRnt(false);
+    }
+  }, [globalFilters.dataFim, globalFilters.dataInicio, viewSettings.periodo.fim, viewSettings.periodo.inicio]);
+
   const exportCanal = useCallback(() => {
     const headers = ['Canal', 'Base Enviada', 'Base Entregue', '% Entrega', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base', '% Participação'];
     const toRow = (r: AggregatedRow, isTotal = false) => [
@@ -764,6 +783,15 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             >
               <FileSpreadsheet size={14} />
               {isExportingAquisicao ? 'Gerando XLSX...' : 'Exportar XLSX Aquisição'}
+            </button>
+            <button
+              onClick={exportRentabilizacaoCrm}
+              disabled={isExportingRnt}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-orange-500 disabled:cursor-wait disabled:opacity-60 transition-colors font-medium"
+              title="Exportar Excel diarizado de Rentabilização CRM (cross-sell, ativação, seguros)"
+            >
+              <FileSpreadsheet size={14} />
+              {isExportingRnt ? 'Gerando XLSX...' : 'Exportar XLSX Rentabilização'}
             </button>
             <button
               onClick={exportSegmento}
