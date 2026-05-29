@@ -356,6 +356,30 @@ function border(ws: Worksheet, row: number, maxCol: number, topStyle: BorderStyl
   }
 }
 
+function copaBlockEndCols(maxCol: number): Set<number> {
+  const cols = new Set<number>();
+  for (let col = COPA_FIXED_COLS + COPA_BLOCK_WIDTH; col <= maxCol; col += COPA_BLOCK_WIDTH) cols.add(col);
+  return cols;
+}
+
+function copaBorder(ws: Worksheet, row: number, maxCol: number, topStyle?: BorderStyle): void {
+  const blockEnds = copaBlockEndCols(maxCol);
+  for (let col = 1; col <= maxCol; col++) {
+    const isFixed = col <= COPA_FIXED_COLS;
+    const isBoundary = blockEnds.has(col);
+    ws.getCell(row, col).border = {
+      top: isFixed || topStyle ? { style: topStyle ?? 'thin', color: { argb: isFixed ? 'FFBFBFBF' : 'FF000000' } } : undefined,
+      bottom: isFixed ? { style: 'thin', color: { argb: 'FFBFBFBF' } } : undefined,
+      left: isFixed ? { style: 'thin', color: { argb: 'FFBFBFBF' } } : undefined,
+      right: isBoundary
+        ? { style: 'medium', color: { argb: 'FF000000' } }
+        : isFixed
+          ? { style: 'thin', color: { argb: 'FFBFBFBF' } }
+          : undefined,
+    };
+  }
+}
+
 function colLetter(col: number): string {
   let n = col; let s = '';
   while (n > 0) { const mod = (n - 1) % 26; s = String.fromCharCode(65 + mod) + s; n = Math.floor((n - mod) / 26); }
@@ -558,7 +582,7 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
     });
   });
 
-  [1, 2, 3, 4].forEach((row) => border(ws, row, maxCol, row <= 2 ? 'medium' : 'thin'));
+  [1, 2, 3, 4].forEach((row) => copaBorder(ws, row, maxCol, row <= 2 ? 'medium' : 'thin'));
   ws.getRow(1).height = 20;
   ws.getRow(2).height = 16;
   ws.getRow(3).height = 14;
@@ -575,11 +599,12 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
   dates.forEach((day, dayIndex) => {
     const row = 5 + dayIndex;
     const ds = isoDate(day);
+    const baseFill = dayIndex % 2 === 0 ? 'FFFFFF' : 'F2F2F2';
     ws.getRow(row).height = 15;
-    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), '', { fillColor: 'FFFFFF', size: 9 });
+    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), '', { fillColor: baseFill, size: 9 });
 
-    setCell(ws.getCell(row, 1), day.toLocaleDateString('pt-BR'), { fillColor: 'FFFFFF', size: 9 });
-    setCell(ws.getCell(row, 2), DAY_NAMES[day.getDay()], { fillColor: 'FFFFFF', size: 9 });
+    setCell(ws.getCell(row, 1), day.toLocaleDateString('pt-BR'), { fillColor: baseFill, size: 9 });
+    setCell(ws.getCell(row, 2), DAY_NAMES[day.getDay()], { fillColor: baseFill, size: 9 });
 
     let startCol = COPA_FIXED_COLS + 1;
     for (const partner of COPA_PARTNERS) {
@@ -624,7 +649,7 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
         startCol += COPA_BLOCK_WIDTH;
       }
     }
-    border(ws, row, maxCol);
+    copaBorder(ws, row, maxCol);
   });
 
   const totalRow = 5 + dates.length;
@@ -670,7 +695,7 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
       startCol += COPA_BLOCK_WIDTH;
     }
   }
-  border(ws, totalRow, maxCol, 'medium');
+  copaBorder(ws, totalRow, maxCol, 'medium');
 
   [11, 5, 11, 9, 12, 13, 9].forEach((width, idxWidth) => { ws.getColumn(idxWidth + 1).width = width; });
   for (let col = COPA_FIXED_COLS + 1; col <= maxCol; col++) {
