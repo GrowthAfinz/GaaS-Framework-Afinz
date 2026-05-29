@@ -95,6 +95,17 @@ interface FileMeta {
     type: string;
 }
 
+interface ParseDebugInfo {
+    fileName?: string;
+    fileSize?: number;
+    fileType?: string;
+    stage?: string;
+    matrixRows?: number;
+    firstRowColumns?: number;
+    message: string;
+    stack?: string;
+}
+
 const FRAMEWORK_HEADERS = [
     'Disparado?',
     'Jornada',
@@ -742,6 +753,26 @@ const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((reso
     else reader.readAsText(file);
 });
 
+const safeProcessDinamicaBI = (
+    matrix: string[][],
+    activities: Activity[]
+): { result: ProcessResult | null; error?: ParseDebugInfo } => {
+    try {
+        return { result: processDinamicaBI(matrix, activities) };
+    } catch (error: any) {
+        return {
+            result: null,
+            error: {
+                stage: 'processDinamicaBI',
+                matrixRows: matrix.length,
+                firstRowColumns: matrix[0]?.length ?? 0,
+                message: error?.message || 'Erro desconhecido ao processar a Dinamica BI.',
+                stack: error?.stack,
+            },
+        };
+    }
+};
+
 const StatCard = ({ label, value, tone }: { label: string; value: number; tone: string }) => (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className={`text-2xl font-bold ${tone}`}>{value}</div>
@@ -761,6 +792,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [reviewOpen, setReviewOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [dragError, setDragError] = useState<string | null>(null);
+    const [debugInfo, setDebugInfo] = useState<ParseDebugInfo | null>(null);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [lastRunId, setLastRunId] = useState<string | null>(null);
 
@@ -808,6 +840,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
         setProcessing(true);
         setDragError(null);
+        setDebugInfo(null);
         setSaveMessage(null);
         setLastRunId(null);
         setCopied(false);
@@ -815,12 +848,36 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         try {
             const matrix = await parseFileToMatrix(file);
             if (matrix.length === 0) throw new Error('Arquivo vazio.');
-            const processed = processDinamicaBI(matrix, activities);
+            const processedResult = safeProcessDinamicaBI(matrix, activities);
+            if (!processedResult.result) {
+                const debug = {
+                    ...processedResult.error,
+                    fileName: file.name,
+                    fileSize: file.size,
+                    fileType: ext,
+                    message: processedResult.error?.message || 'Erro ao processar arquivo.',
+                };
+                console.error('[Atualizacao Inteligente] Falha ao processar arquivo', debug);
+                setDebugInfo(debug);
+                setDragError(`Erro ao processar o arquivo (${debug.stage || 'parser'}): ${debug.message}`);
+                return;
+            }
+            const processed = processedResult.result;
             setResult(processed);
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewOpen(true);
         } catch (error: any) {
-            setDragError(error?.message || 'Erro ao processar arquivo.');
+            const debug = {
+                fileName: file.name,
+                fileSize: file.size,
+                fileType: ext,
+                stage: 'parseFileToMatrix',
+                message: error?.message || 'Erro ao processar arquivo.',
+                stack: error?.stack,
+            };
+            console.error('[Atualizacao Inteligente] Falha ao ler arquivo', debug);
+            setDebugInfo(debug);
+            setDragError(`${debug.stage}: ${debug.message}`);
         } finally {
             setProcessing(false);
         }
@@ -953,9 +1010,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     </div>
 
                     {dragError && (
-                        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
-                            <AlertCircle size={14} className="text-red-500" />
-                            <span>{dragError}</span>
+                        <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
+                            <div className="flex items-center gap-2">
+                                <AlertCircle size={14} className="text-red-500" />
+                                <span>{dragError}</span>
+                            </div>
+                            {debugInfo && (
+                                <div className="rounded-md bg-white/70 p-2 font-mono text-[10px] text-red-700">
+                                    <div>arquivo: {debugInfo.fileName || '-'}</div>
+                                    <div>etapa: {debugInfo.stage || '-'}</div>
+                                    <div>linhas matriz: {debugInfo.matrixRows ?? '-'}</div>
+                                    <div>colunas primeira linha: {debugInfo.firstRowColumns ?? '-'}</div>
+                                </div>
+                            )}
                         </div>
                     )}
 
