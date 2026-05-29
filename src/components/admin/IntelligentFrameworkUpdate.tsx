@@ -951,17 +951,50 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         return map;
     }, new Map<string, MetricRow[]>());
 
+    // Secondary index: activityName only (sem canal) — usado como fallback para
+    // ECRED-API, cujos resultados aparecem no bloco PERF com canal='ECRED-API'
+    // mesmo que o disparo tenha sido WPP/SMS. O attributionKey normal falha porque
+    // os canais diferem ('WhatsApp' vs 'ECRED-API'), então sem este índice os
+    // cartões finalizados ficam em ignoredPerformance.
+    const anchorsByActivityName = anchors.reduce((map, row) => {
+        const key = normalizeKey(row.activityName);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(row);
+        return map;
+    }, new Map<string, MetricRow[]>());
+
+    const isEcredChannel = (channel: string | undefined) =>
+        /ecred/i.test(String(channel ?? ''));
+
     let mergedResidual = 0;
     let ignoredResidual = 0;
     let mergedPerformance = 0;
+    let mergedEcred = 0;
     let ignoredPerformance = 0;
 
     const findAnchor = (row: MetricRow) => {
         const candidates = anchorsByAttributionKey.get(attributionKey(row)) ?? [];
-        return candidates
+        const match = candidates
             .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
             .filter((item) => item.diff >= 0 && item.diff <= 2)
             .sort((a, b) => a.diff - b.diff)[0]?.candidate;
+
+        if (match) return match;
+
+        // Fallback ECRED-API: o resultado de conversão do caminho ECRED chega no bloco
+        // PERF com canal='ECRED-API', mas o disparo original é WPP/SMS. Busca pelo
+        // activityName sem considerar o canal, dentro da janela D0-D2.
+        if (isEcredChannel(row.channel)) {
+            const ecredCandidates = anchorsByActivityName.get(normalizeKey(row.activityName)) ?? [];
+            const ecredMatch = ecredCandidates
+                .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
+                .filter((item) => item.diff >= 0 && item.diff <= 2)
+                .sort((a, b) => a.diff - b.diff)[0]?.candidate;
+            if (ecredMatch) mergedEcred += 1;
+            return ecredMatch;
+        }
+
+        return undefined;
     };
 
     dispatchRows.filter(isAttributionResidual).forEach((row) => {
@@ -996,7 +1029,7 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         mergedPerformance += hasConversionMetric(row) ? 1 : 0;
     });
 
-    return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, ignoredPerformance };
+    return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, mergedEcred, ignoredPerformance };
 };
 
 const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
@@ -1045,6 +1078,9 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     }
     if (attribution.mergedPerformance > 0 || attribution.ignoredPerformance > 0) {
         warnings.push(`${attribution.mergedPerformance} linhas de performance D0-D2 consolidadas no disparo real; ${attribution.ignoredPerformance} linhas de performance sem disparo acionavel foram ignoradas.`);
+    }
+    if (attribution.mergedEcred > 0) {
+        warnings.push(`${attribution.mergedEcred} linhas ECRED-API consolidadas via caminho ecred (cartoes emitidos pelo canal ECRED atribuidos ao disparo de origem).`);
     }
     const importedKeyCount = allRows.reduce((map, row) => {
         map.set(row.key, (map.get(row.key) ?? 0) + 1);
