@@ -1796,18 +1796,18 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             )}
 
             {selectedCandidate && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-                        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
-                            <div>
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm">
+                    <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <header className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+                            <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[selectedCandidate.status]}`}>
                                         {selectedCandidate.accepted ? 'Aceito' : STATUS_LABEL[selectedCandidate.status]}
                                     </span>
                                     <span className="text-xs font-bold text-slate-400">{selectedCandidate.channel} - {formatDateBR(selectedCandidate.date)}</span>
                                 </div>
-                                <h3 className="mt-2 text-lg font-bold text-slate-900">{selectedCandidate.journey}</h3>
-                                <p className="mt-1 text-xs text-slate-500">{selectedCandidate.activityName}</p>
+                                <h3 className="mt-2 break-words text-lg font-bold leading-snug text-slate-900">{selectedCandidate.journey}</h3>
+                                <p className="mt-1 break-all text-xs text-slate-500">{selectedCandidate.activityName}</p>
                             </div>
                             <button
                                 type="button"
@@ -1819,10 +1819,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </button>
                         </header>
 
-                        <div className="grid gap-4 p-6 lg:grid-cols-[1.1fr_0.9fr]">
+                        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                        <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
                             <section className="space-y-3">
                                 <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Resultado consolidado</h4>
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                                     {[
                                         ['Base Total', selectedCandidate.sent],
                                         ['Base Acionavel', selectedCandidate.delivered],
@@ -1842,8 +1843,20 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </div>
                                 <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
                                     <div><span className="font-bold text-slate-900">Blocos consolidados:</span> {selectedCandidate.sourceBlocks.join(', ')}</div>
-                                    <div className="mt-1"><span className="font-bold text-slate-900">Chave de novidade:</span> {selectedCandidate.key}</div>
-                                    <div className="mt-1"><span className="font-bold text-slate-900">Assinatura anti-renomeacao:</span> {selectedCandidate.dispatchSignature}</div>
+                                    <div className="mt-2 font-bold text-slate-900">Identidade do disparo</div>
+                                    <div className="mt-1 grid gap-1 md:grid-cols-2">
+                                        <div><span className="text-slate-400">Jornada:</span> <span className="break-words">{selectedCandidate.journey}</span></div>
+                                        <div><span className="text-slate-400">Canal:</span> {selectedCandidate.channel}</div>
+                                        <div><span className="text-slate-400">Data:</span> {formatDateBR(selectedCandidate.date)}</div>
+                                        <div><span className="text-slate-400">Activity:</span> <span className="break-all">{selectedCandidate.activityName}</span></div>
+                                    </div>
+                                    <details className="mt-3 rounded-md bg-slate-50 p-2">
+                                        <summary className="cursor-pointer text-[11px] font-bold text-slate-500">Ver identificadores tecnicos</summary>
+                                        <div className="mt-2 break-all font-mono text-[10px] text-slate-500">
+                                            <div>identity: {selectedCandidate.key}</div>
+                                            <div className="mt-1">anti-renomeacao: {selectedCandidate.dispatchSignature}</div>
+                                        </div>
+                                    </details>
                                 </div>
                             </section>
 
@@ -1856,7 +1869,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                 )}
                                 <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid gap-2 md:grid-cols-2">
                                         <div><span className="text-slate-400">BU:</span> {selectedCandidate.bu}</div>
                                         <div><span className="text-slate-400">Parceiro:</span> {selectedCandidate.parceiro}</div>
                                         <div><span className="text-slate-400">Segmento:</span> {selectedCandidate.segmento}</div>
@@ -1875,8 +1888,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </div>
                             </section>
                         </div>
+                        </div>
 
-                        <footer className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-6 py-4">
+                        <footer className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-200 px-6 py-4">
                             <button
                                 type="button"
                                 onClick={() => setSelectedCandidate(null)}
