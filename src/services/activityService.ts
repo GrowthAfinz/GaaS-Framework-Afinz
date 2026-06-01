@@ -140,6 +140,19 @@ export const syncFrameworkActivities = async (
         throw new Error(`Falha ao preparar limpeza da base antiga: ${unlinkError.message}`);
     }
 
+    const { error: unlinkRentabilizacaoError } = await supabase
+        .from('rentabilizacao_activities')
+        .update({ activities_id: null })
+        .not('activities_id', 'is', null);
+
+    if (
+        unlinkRentabilizacaoError
+        && !['42P01', '42703'].includes(unlinkRentabilizacaoError.code)
+    ) {
+        console.error('Erro ao desvincular rentabilizacao da base antiga:', unlinkRentabilizacaoError);
+        throw new Error(`Falha ao preparar rentabilizacao para limpeza da base antiga: ${unlinkRentabilizacaoError.message}`);
+    }
+
     const { error: deleteError } = await supabase
         .from('activities')
         .delete()
