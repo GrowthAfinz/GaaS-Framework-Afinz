@@ -84,13 +84,6 @@ function parseJourney(jornada: string): { produto: string; periodo: string } {
   }
 
   // Padrão canônico: JOR_RENTABILIZACAO_BU_...produto..._PERÍODO
-  const cartonistasMatch = j.match(/^JOR_RENTABILIZACAO_CARTONISTAS_(.+?)_([A-Z]{2,5}\d{2})$/);
-  if (cartonistasMatch) {
-    const periodRaw = PERIODO_NORM[cartonistasMatch[2]] ?? cartonistasMatch[2];
-    const productKey = cartonistasMatch[1].replace(/_COPA/g, '').replace(/_/g, ' ').trim();
-    return { produto: `Cartonistas ${titleCase(productKey.toLowerCase())}`, periodo: formatPeriodo(periodRaw) };
-  }
-
   const match = j.match(/^JOR_RENTABILIZACAO_[A-Z0-9]+_(.+?)_([A-Z]{2,5}\d{2})$/);
   if (match) {
     const productRaw = match[1];
@@ -199,6 +192,7 @@ const METRIC_FIELDS: Array<keyof RntMetrics> = ['entregues', 'abertos', 'cliques
 const COPA_PARTNERS = ['B2C + B2B2C', 'Plurix', 'BB'] as const;
 const COPA_BLOCKS = ['Ativacao', 'Reativacao', 'Novos'] as const;
 const COPA_CHANNELS = ['WPP', 'E-MAIL', 'SMS', 'PUSH'] as const;
+const COPA_ACTION_START = new Date(2026, 3, 13);
 type CopaPartner = typeof COPA_PARTNERS[number];
 type CopaBlock = typeof COPA_BLOCKS[number];
 type CopaChannel = typeof COPA_CHANNELS[number];
@@ -313,14 +307,15 @@ function copaKey(dateStr: string, partner: CopaPartner, block: CopaBlock, channe
 
 function classifyCopa(row: RawRow): { partner: CopaPartner; block: CopaBlock } | null {
   const jornada = String(row['jornada'] ?? '').toUpperCase();
-  if (!jornada.includes('COPA') || jornada.includes('CARTONISTAS')) return null;
+  if (!jornada.includes('COPA')) return null;
 
   let partner: CopaPartner = 'B2C + B2B2C';
   if (jornada.includes('PLURIX')) partner = 'Plurix';
   else if (jornada.includes('_BB_')) partner = 'BB';
 
   let block: CopaBlock | null = null;
-  if (jornada.includes('NOVOS')) block = 'Novos';
+  if (jornada.includes('CARTONISTAS')) block = 'Ativacao';
+  else if (jornada.includes('NOVOS')) block = 'Novos';
   else if (jornada.includes('REATIVACAO')) block = 'Reativacao';
   else if (jornada.includes('ATIVACAO') || jornada.includes('VISA')) block = 'Ativacao';
 
@@ -372,10 +367,6 @@ function classifyCopaAudit(row: RawRow): { destino: string; parceiro: string; bl
   const classified = classifyCopa(row);
   if (classified) {
     return { destino: 'Rentabilizacao Copa', parceiro: classified.partner, bloco: classified.block };
-  }
-
-  if (jornada.includes('CARTONISTAS')) {
-    return { destino: 'Rentabilizacao', parceiro, bloco: 'Cartonistas' };
   }
 
   return { destino: 'Fora do mapa Copa', parceiro, bloco: 'Sem bloco definido' };
@@ -544,7 +535,7 @@ function buildIndexes(rows: RawRow[], start: Date, end: Date): IndexResult {
 
     const jornada = String(row['jornada'] ?? '');
     const jornadaUpper = jornada.toUpperCase();
-    if (jornadaUpper.includes('COPA') && !jornadaUpper.includes('CARTONISTAS')) continue;
+    if (jornadaUpper.includes('COPA')) continue;
     summary.source++;
 
     const canal = normalizeCanal(row['Canal']);
@@ -961,8 +952,8 @@ function writeAuditSheet(
     ws.mergeCells(cursor, 1, cursor, 10);
     cursor++;
     [
-      'Regra: Ativacao, Reativacao e Novos com COPA entram apenas na aba Rentabilizacao Copa.',
-      'Regra: Cartonistas com COPA continua na aba Rentabilizacao; nao entra na aba Copa.',
+      'Regra: Ativacao, Reativacao, Novos e Cartonistas com COPA entram apenas na aba Rentabilizacao Copa.',
+      'Regra: Cartonistas com COPA e tratado como bloco Ativacao por correcao de UTM/jornada.',
       'Use Destino + Bloco/Produto para conferir onde cada journey foi atribuida.',
     ].forEach((text) => {
       setCell(ws.getCell(cursor, 1), text, { italic: true, fillColor: COLORS.auditSub, align: 'left' });
@@ -1049,13 +1040,15 @@ function writeAuditSheet(
 
 function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: RawRow[], start: Date, end: Date): Workbook {
   const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
-  const copaAuditRows = buildCopaAuditRows(rows, start, end);
+  const copaStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
+  const copaDates = copaStart <= end ? allDates(copaStart, end) : [];
+  const copaAuditRows = copaStart <= end ? buildCopaAuditRows(rows, copaStart, end) : [];
   const dates = allDates(start, end);
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = 'GaaS AFINZ — Rentabilização';
   wb.created = new Date();
 
-  writeCopaSheet(wb, rows, dates, start, end);
+  writeCopaSheet(wb, rows, copaDates, copaStart, end);
 
   // Aba 1: Seguros (cross-sell BU Seguros)
   buildTabSheet(wb, 'Seguros', seguros, dates, 'seguros');

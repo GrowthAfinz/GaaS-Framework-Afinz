@@ -7,7 +7,7 @@ import { ActivityRow } from '../types/activity';
 import { useAppStore } from '../store/useAppStore';
 import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
-import { exportAquisicaoCrmXlsx, getCurrentMonthRange } from '../utils/aquisicaoCrmExcelExport';
+import { exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import {
@@ -38,6 +38,8 @@ interface RelatorioViewProps {
   previousData?: CalendarData;
   compareMode?: 'previousPeriod' | 'samePeriodLastMonth' | null;
   selectedBU?: string;
+  periodStart: Date;
+  periodEnd: Date;
 }
 
 interface DetailRow {
@@ -135,7 +137,7 @@ const PARCEIRO_COLORS: Record<string, string> = {
   'Plurix': 'bg-purple-50 text-purple-500 border-purple-100',
 };
 
-export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData, compareMode = null, selectedBU }) => {
+export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData, compareMode = null, selectedBU, periodStart, periodEnd }) => {
   const { viewSettings, setGlobalFilters } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
   const [reportMode, setReportMode] = useState<'performance' | 'monthly'>('performance');
@@ -508,10 +510,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   }, [segmentoRows, segmentoTotal]);
 
   const exportAquisicaoCrm = useCallback(async () => {
-    const dateFromInput = (value?: string) => value ? new Date(`${value}T00:00:00`) : null;
-    const fallback = getCurrentMonthRange();
-    const start = dateFromInput(globalFilters.dataInicio || viewSettings.periodo.inicio) ?? fallback.start;
-    const end = dateFromInput(globalFilters.dataFim || viewSettings.periodo.fim) ?? fallback.end;
+    const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
+    const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
 
     setIsExportingAquisicao(true);
     try {
@@ -522,13 +522,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     } finally {
       setIsExportingAquisicao(false);
     }
-  }, [globalFilters.dataFim, globalFilters.dataInicio, viewSettings.periodo.fim, viewSettings.periodo.inicio]);
+  }, [periodEnd, periodStart]);
 
   const exportRentabilizacaoCrm = useCallback(async () => {
-    const dateFromInput = (value?: string) => value ? new Date(`${value}T00:00:00`) : null;
-    const fallback = getCurrentMonthRange();
-    const start = dateFromInput(globalFilters.dataInicio || viewSettings.periodo.inicio) ?? fallback.start;
-    const end = dateFromInput(globalFilters.dataFim || viewSettings.periodo.fim) ?? fallback.end;
+    const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
+    const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
 
     setIsExportingRnt(true);
     try {
@@ -539,7 +537,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     } finally {
       setIsExportingRnt(false);
     }
-  }, [globalFilters.dataFim, globalFilters.dataInicio, viewSettings.periodo.fim, viewSettings.periodo.inicio]);
+  }, [periodEnd, periodStart]);
 
   const exportCanal = useCallback(() => {
     const headers = ['Canal', 'Base Enviada', 'Base Entregue', '% Entrega', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base', '% Participação'];

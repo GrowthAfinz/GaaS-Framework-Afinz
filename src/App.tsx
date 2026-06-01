@@ -398,6 +398,8 @@ function App() {
                     previousData={compareMode ? previousAdvancedFilteredData : undefined}
                     compareMode={compareMode}
                     selectedBU={selectedBUs.length === 1 ? selectedBUs[0] : undefined}
+                    periodStart={startDate}
+                    periodEnd={endDate}
                   />
                 </PageTransition>
               )}
