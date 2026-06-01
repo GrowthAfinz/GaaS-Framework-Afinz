@@ -130,14 +130,24 @@ export const getAllActivities = async (): Promise<ActivityRow[]> => {
 export const syncFrameworkActivities = async (
     frameworkActivities: any[]
 ): Promise<void> => {
+    const { error: unlinkError } = await supabase
+        .from('gaas_update_candidates')
+        .update({ activity_id: null })
+        .not('activity_id', 'is', null);
+
+    if (unlinkError && unlinkError.code !== '42P01') {
+        console.error('Erro ao desvincular auditoria da base antiga:', unlinkError);
+        throw new Error(`Falha ao preparar limpeza da base antiga: ${unlinkError.message}`);
+    }
+
     const { error: deleteError } = await supabase
         .from('activities')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .not('id', 'is', null);
 
     if (deleteError) {
         console.error('Erro ao limpar dados antigos:', deleteError);
-        throw new Error('Falha ao limpar histórico antigo.');
+        throw new Error(`Falha ao limpar base antiga: ${deleteError.message}`);
     }
 
     if (frameworkActivities.length === 0) return;
