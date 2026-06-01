@@ -58,6 +58,46 @@ type B2cRealized = {
   emissoes_serasa: number;
 };
 
+type CampaignWeek = {
+  weekStart: string;
+  metrics: Metrics;
+  linhas: number;
+};
+
+type CampaignOverviewRow = {
+  status: 'Escalar' | 'Corrigir' | 'Monitorar' | 'Investigar';
+  score: number;
+  confidence: number;
+  deltaEntreguesPct: number | null;
+  deltaEmitidosPct: number | null;
+  deltaEfPct: number | null;
+  baselineWeeks: number;
+  secao: string;
+  bloco: string;
+  bu: string;
+  parceiro: string;
+  segmento: string;
+  etapa: string;
+  canal: string;
+  jornada: string;
+  taxonomia: string;
+  current: Metrics & { linhas: number };
+  baseline: Metrics & { linhas: number };
+};
+
+type DimensionOverviewRow = {
+  dimensao: string;
+  valor: string;
+  status: CampaignOverviewRow['status'];
+  scoreMedio: number;
+  campanhas: number;
+  entregues: number;
+  emitidos: number;
+  propostas: number;
+  deltaEntreguesPct: number | null;
+  deltaEmitidosPct: number | null;
+};
+
 const SECTIONS: Array<[string, string[]]> = [
   ['B2C', ['TOPO DE FUNIL B2C', 'REPESCAGEM B2C', 'UPGRADE B2C', 'LEADS PARCEIROS B2C', 'CARRINHO ABANDONADO B2C']],
   ['PLURIX', ['TOPO DE FUNIL PLURIX', 'REPESCAGEM PLURIX', 'UPGRADE PLURIX', 'RECENCIA PLURIX', 'CARRINHO ABANDONADO PLURIX']],
@@ -122,12 +162,69 @@ function addDays(date: Date, days: number): Date {
   return next;
 }
 
+function startOfWeek(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  const diff = (next.getDay() + 6) % 7;
+  next.setDate(next.getDate() - diff);
+  return next;
+}
+
+function pctDelta(current: number, baseline: number): number | null {
+  if (!baseline) return current ? null : 0;
+  return (current - baseline) / baseline;
+}
+
+function safeRate(numerator: number, denominator: number): number {
+  if (!denominator) return 0;
+  return numerator / denominator;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function emptyMetrics(): Metrics & { linhas: number } {
+  return { entregues: 0, emitidos: 0, aprovados: 0, propostas: 0, linhas: 0 };
+}
+
+function addMetrics(target: Metrics & { linhas: number }, source: Metrics, linhas = 0): void {
+  NUMERIC_FIELDS.forEach((field) => { target[field] += source[field]; });
+  target.linhas += linhas;
+}
+
 function allDates(start: Date, end: Date): Date[] {
   const dates: Date[] = [];
   for (let date = new Date(start); date <= end; date = addDays(date, 1)) {
     dates.push(new Date(date));
   }
   return dates;
+}
+
+function averageMetrics(total: Metrics & { linhas: number }, divisor: number): Metrics & { linhas: number } {
+  if (!divisor) return emptyMetrics();
+  return {
+    entregues: total.entregues / divisor,
+    emitidos: total.emitidos / divisor,
+    aprovados: total.aprovados / divisor,
+    propostas: total.propostas / divisor,
+    linhas: total.linhas / divisor,
+  };
+}
+
+function metricHealthScore(current: number, baseline: number): number {
+  if (!baseline) return current > 0 ? 75 : 35;
+  return clamp((current / baseline) * 100, 0, 140);
+}
+
+function formatPercentValue(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return 'N/A';
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatRatioValue(value: number): string {
+  if (!Number.isFinite(value)) return '0.00%';
+  return `${(value * 100).toFixed(2)}%`;
 }
 
 function asInt(value: any): number {
@@ -320,6 +417,267 @@ function buildB2cRealizedIndex(rows: B2cDailyMetric[], start: Date, end: Date): 
   });
 
   return realized;
+}
+
+function buildCampaignOverviewRows(rows: RawActivity[], focusWeekStart: Date): CampaignOverviewRow[] {
+  const focusWeek = isoDate(focusWeekStart);
+  const baselineWeekStarts = Array.from({ length: 4 }, (_value, index) => isoDate(addDays(focusWeekStart, -7 * (index + 1))));
+  const acceptedWeeks = new Set([focusWeek, ...baselineWeekStarts]);
+  const campaignWeeks = new Map<string, {
+    secao: string;
+    bloco: string;
+    bu: string;
+    parceiro: string;
+    segmento: string;
+    etapa: string;
+    canal: string;
+    jornada: string;
+    taxonomia: string;
+    weeks: Map<string, CampaignWeek>;
+  }>();
+
+  rows.forEach((row) => {
+    const mapped = classify(row);
+    if (!mapped) return;
+
+    const rowDate = parseRowDate(get(row, 'Data de Disparo'));
+    const week = isoDate(startOfWeek(rowDate));
+    if (!acceptedWeeks.has(week)) return;
+
+    const canal = normalizeChannel(get(row, 'Canal'));
+    const metrics: Metrics = {
+      entregues: asInt(get(row, 'Base AcionÃ¡vel') ?? get(row, 'Base AcionÃƒÂ¡vel')),
+      emitidos: asInt(get(row, 'CartÃµes Gerados') ?? get(row, 'CartÃƒÂµes Gerados')),
+      aprovados: asInt(get(row, 'Aprovados')),
+      propostas: asInt(get(row, 'Propostas')),
+    };
+    const etapa = text(get(row, 'Etapa de aquisiÃ§Ã£o') ?? get(row, 'Etapa de aquisiÃƒÂ§ÃƒÂ£o')) || 'N/A';
+    const descriptor = {
+      secao: mapped[0],
+      bloco: mapped[1],
+      bu: text(get(row, 'BU')) || 'N/A',
+      parceiro: text(get(row, 'Parceiro')) || 'N/A',
+      segmento: text(get(row, 'Segmento')) || 'N/A',
+      etapa,
+      canal,
+      jornada: text(get(row, 'jornada') ?? get(row, 'Jornada')) || 'N/A',
+      taxonomia: text(get(row, 'Activity name / Taxonomia')) || 'N/A',
+    };
+    const key = [
+      descriptor.secao,
+      descriptor.bloco,
+      descriptor.bu,
+      descriptor.parceiro,
+      descriptor.segmento,
+      descriptor.etapa,
+      descriptor.canal,
+      descriptor.jornada,
+      descriptor.taxonomia,
+    ].join('\u001F');
+
+    if (!campaignWeeks.has(key)) {
+      campaignWeeks.set(key, { ...descriptor, weeks: new Map() });
+    }
+    const campaign = campaignWeeks.get(key)!;
+    const currentWeek = campaign.weeks.get(week) ?? { weekStart: week, metrics: { entregues: 0, emitidos: 0, aprovados: 0, propostas: 0 }, linhas: 0 };
+    NUMERIC_FIELDS.forEach((field) => { currentWeek.metrics[field] += metrics[field]; });
+    currentWeek.linhas += 1;
+    campaign.weeks.set(week, currentWeek);
+  });
+
+  const rowsOut: CampaignOverviewRow[] = [];
+  campaignWeeks.forEach((campaign) => {
+    const currentWeek = campaign.weeks.get(focusWeek);
+    const current = emptyMetrics();
+    if (currentWeek) addMetrics(current, currentWeek.metrics, currentWeek.linhas);
+
+    const baselineTotal = emptyMetrics();
+    let baselineWeeks = 0;
+    baselineWeekStarts.forEach((week) => {
+      const item = campaign.weeks.get(week);
+      if (!item) return;
+      baselineWeeks += 1;
+      addMetrics(baselineTotal, item.metrics, item.linhas);
+    });
+    if (!current.linhas && !baselineWeeks) return;
+
+    const baseline = averageMetrics(baselineTotal, baselineWeeks);
+    const currentConversion = safeRate(current.emitidos || current.propostas, current.entregues);
+    const baselineConversion = safeRate(baseline.emitidos || baseline.propostas, baseline.entregues);
+    const deltaEntreguesPct = pctDelta(current.entregues, baseline.entregues);
+    const deltaEmitidosPct = pctDelta(current.emitidos, baseline.emitidos);
+    const deltaEfPct = pctDelta(currentConversion, baselineConversion);
+
+    const entregaScore = metricHealthScore(current.entregues, baseline.entregues);
+    const resultadoScore = current.emitidos
+      ? metricHealthScore(current.emitidos, baseline.emitidos)
+      : metricHealthScore(current.propostas, baseline.propostas);
+    const eficienciaScore = baselineConversion ? clamp((currentConversion / baselineConversion) * 100, 0, 140) : currentConversion > 0 ? 75 : 35;
+    const confidence = clamp(
+      55 + (baselineWeeks * 8) + (current.linhas > 0 ? 10 : 0) + (current.entregues > 0 ? 7 : -15),
+      20,
+      98,
+    );
+    const score = Math.round((entregaScore * 0.35) + (resultadoScore * 0.35) + (eficienciaScore * 0.20) + (confidence * 0.10));
+
+    let status: CampaignOverviewRow['status'] = 'Monitorar';
+    if (!current.linhas || (current.entregues === 0 && baseline.entregues > 0)) {
+      status = 'Investigar';
+    } else if (baselineWeeks < 2) {
+      status = 'Monitorar';
+    } else if (score >= 85 && current.entregues >= baseline.entregues * 0.9 && currentConversion >= baselineConversion) {
+      status = 'Escalar';
+    } else if (
+      current.entregues >= baseline.entregues * 0.85
+      && (currentConversion < baselineConversion * 0.85 || current.emitidos < baseline.emitidos * 0.75)
+    ) {
+      status = 'Corrigir';
+    } else if (score < 55 || confidence < 65) {
+      status = 'Investigar';
+    }
+
+    rowsOut.push({
+      status,
+      score,
+      confidence: Math.round(confidence),
+      deltaEntreguesPct,
+      deltaEmitidosPct,
+      deltaEfPct,
+      baselineWeeks,
+      secao: campaign.secao,
+      bloco: campaign.bloco,
+      bu: campaign.bu,
+      parceiro: campaign.parceiro,
+      segmento: campaign.segmento,
+      etapa: campaign.etapa,
+      canal: campaign.canal,
+      jornada: campaign.jornada,
+      taxonomia: campaign.taxonomia,
+      current,
+      baseline,
+    });
+  });
+
+  const statusOrder: Record<CampaignOverviewRow['status'], number> = { Escalar: 0, Corrigir: 1, Investigar: 2, Monitorar: 3 };
+  return rowsOut.sort((a, b) => statusOrder[a.status] - statusOrder[b.status] || b.score - a.score || b.current.entregues - a.current.entregues);
+}
+
+function aggregateDimensionRows(rows: CampaignOverviewRow[]): DimensionOverviewRow[] {
+  const dimensions: Array<[string, (row: CampaignOverviewRow) => string]> = [
+    ['BU', (row) => row.bu],
+    ['Bloco', (row) => row.bloco],
+    ['Canal', (row) => row.canal],
+    ['Segmento', (row) => row.segmento],
+  ];
+  const out: DimensionOverviewRow[] = [];
+
+  dimensions.forEach(([dimensao, getter]) => {
+    const map = new Map<string, CampaignOverviewRow[]>();
+    rows.forEach((row) => {
+      const value = getter(row) || 'N/A';
+      map.set(value, [...(map.get(value) ?? []), row]);
+    });
+    map.forEach((items, valor) => {
+      const current = emptyMetrics();
+      const baseline = emptyMetrics();
+      items.forEach((item) => {
+        addMetrics(current, item.current, item.current.linhas);
+        addMetrics(baseline, item.baseline, item.baseline.linhas);
+      });
+      const worstStatus = items.some((item) => item.status === 'Investigar') ? 'Investigar'
+        : items.some((item) => item.status === 'Corrigir') ? 'Corrigir'
+          : items.some((item) => item.status === 'Escalar') ? 'Escalar'
+            : 'Monitorar';
+      out.push({
+        dimensao,
+        valor,
+        status: worstStatus,
+        scoreMedio: Math.round(items.reduce((sum, item) => sum + item.score, 0) / items.length),
+        campanhas: items.length,
+        entregues: current.entregues,
+        emitidos: current.emitidos,
+        propostas: current.propostas,
+        deltaEntreguesPct: pctDelta(current.entregues, baseline.entregues),
+        deltaEmitidosPct: pctDelta(current.emitidos, baseline.emitidos),
+      });
+    });
+  });
+
+  return out.sort((a, b) => a.dimensao.localeCompare(b.dimensao) || b.entregues - a.entregues);
+}
+
+function buildWeeklyTrendRows(rows: RawActivity[], focusWeekStart: Date): Array<{ semana: string; label: string } & Metrics & { campanhas: number }> {
+  const weekStarts = Array.from({ length: 5 }, (_value, index) => addDays(focusWeekStart, -7 * (4 - index)));
+  const acceptedWeeks = new Set(weekStarts.map(isoDate));
+  const trend = new Map<string, Metrics & { campanhas: Set<string> }>();
+
+  weekStarts.forEach((week) => {
+    trend.set(isoDate(week), { entregues: 0, emitidos: 0, aprovados: 0, propostas: 0, campanhas: new Set() });
+  });
+
+  rows.forEach((row) => {
+    const mapped = classify(row);
+    if (!mapped) return;
+    const rowDate = parseRowDate(get(row, 'Data de Disparo'));
+    const week = isoDate(startOfWeek(rowDate));
+    if (!acceptedWeeks.has(week)) return;
+
+    const metrics: Metrics = {
+      entregues: asInt(get(row, 'Base AcionÃ¡vel') ?? get(row, 'Base AcionÃƒÂ¡vel')),
+      emitidos: asInt(get(row, 'CartÃµes Gerados') ?? get(row, 'CartÃƒÂµes Gerados')),
+      aprovados: asInt(get(row, 'Aprovados')),
+      propostas: asInt(get(row, 'Propostas')),
+    };
+    const current = trend.get(week)!;
+    NUMERIC_FIELDS.forEach((field) => { current[field] += metrics[field]; });
+    current.campanhas.add([
+      text(get(row, 'jornada') ?? get(row, 'Jornada')),
+      normalizeChannel(get(row, 'Canal')),
+      text(get(row, 'Activity name / Taxonomia')),
+    ].join('\u001F'));
+  });
+
+  return weekStarts.map((week) => {
+    const ds = isoDate(week);
+    const values = trend.get(ds)!;
+    return {
+      semana: ds,
+      label: `${week.toLocaleDateString('pt-BR')} - ${addDays(week, 6).toLocaleDateString('pt-BR')}`,
+      entregues: values.entregues,
+      emitidos: values.emitidos,
+      aprovados: values.aprovados,
+      propostas: values.propostas,
+      campanhas: values.campanhas.size,
+    };
+  });
+}
+
+function findFocusWeekStart(rows: RawActivity[], start: Date, end: Date): Date {
+  let latestMappedDate: Date | null = null;
+  rows.forEach((row) => {
+    if (!classify(row)) return;
+    const rowDate = parseRowDate(get(row, 'Data de Disparo'));
+    if (rowDate < start || rowDate > end) return;
+    if (!latestMappedDate || rowDate > latestMappedDate) latestMappedDate = rowDate;
+  });
+  return startOfWeek(latestMappedDate ?? end);
+}
+
+function getBaselineQueryStart(start: Date): Date {
+  return addDays(startOfWeek(start), -28);
+}
+
+function statusColor(status: CampaignOverviewRow['status']): string {
+  if (status === 'Escalar') return 'D9EAD3';
+  if (status === 'Corrigir') return 'FCE4D6';
+  if (status === 'Investigar') return 'FFF2CC';
+  return 'D9EAF7';
+}
+
+function writeTableHeader(ws: Worksheet, row: number, labels: string[], fillColor = COLORS.auditHeader): void {
+  labels.forEach((label, offset) => {
+    setCell(ws.getCell(row, offset + 1), label, { bold: true, fontColor: 'FFFFFF', fillColor, align: offset === 0 ? 'left' : 'center' });
+  });
 }
 
 function blockColor(section: string, block: string): string {
@@ -606,6 +964,172 @@ function writeAuditSheet(wb: Workbook, auditRows: AuditRow[], journeyRows: Journ
   });
 }
 
+function writeOverviewCampanhasSheet(
+  wb: Workbook,
+  rawRows: RawActivity[],
+  auditRows: AuditRow[],
+  summary: BuildIndexesResult['summary'],
+  start: Date,
+  end: Date,
+): void {
+  const focusWeekStart = findFocusWeekStart(rawRows, start, end);
+  const focusWeekEnd = addDays(focusWeekStart, 6);
+  const overviewRows = buildCampaignOverviewRows(rawRows, focusWeekStart);
+  const dimensionRows = aggregateDimensionRows(overviewRows);
+  const trendRows = buildWeeklyTrendRows(rawRows, focusWeekStart);
+  const current = emptyMetrics();
+  const baseline = emptyMetrics();
+  overviewRows.forEach((row) => {
+    addMetrics(current, row.current, row.current.linhas);
+    addMetrics(baseline, row.baseline, row.baseline.linhas);
+  });
+
+  const rowsWithCurrent = overviewRows.filter((row) => row.current.linhas > 0);
+  const averageScore = rowsWithCurrent.length
+    ? Math.round(rowsWithCurrent.reduce((sum, row) => sum + row.score, 0) / rowsWithCurrent.length)
+    : 0;
+  const averageConfidence = rowsWithCurrent.length
+    ? Math.round(rowsWithCurrent.reduce((sum, row) => sum + row.confidence, 0) / rowsWithCurrent.length)
+    : 0;
+  const statusCounts = overviewRows.reduce<Record<CampaignOverviewRow['status'], number>>((acc, row) => {
+    if (row.current.linhas > 0 || row.status !== 'Monitorar') acc[row.status] += 1;
+    return acc;
+  }, { Escalar: 0, Corrigir: 0, Monitorar: 0, Investigar: 0 });
+
+  const ws = wb.addWorksheet('Overview Campanhas', {
+    views: [{ state: 'frozen', ySplit: 16, showGridLines: false }],
+  });
+
+  setCell(ws.getCell('A1'), 'Overview Campanhas', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.auditHeader, align: 'left' });
+  ws.mergeCells('A1:L1');
+  setCell(
+    ws.getCell('A2'),
+    `Periodo exportado: ${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')} | Semana foco: ${focusWeekStart.toLocaleDateString('pt-BR')} - ${focusWeekEnd.toLocaleDateString('pt-BR')} | Baseline: media das 4 semanas anteriores`,
+    { align: 'left' },
+  );
+  ws.mergeCells('A2:L2');
+
+  setCell(ws.getCell('A4'), 'Resumo Executivo', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.sectionDark, align: 'left' });
+  ws.mergeCells('A4:E4');
+  writeTableHeader(ws, 5, ['Metrica', 'Semana foco', 'Media 4 semanas', 'Delta', 'Leitura']);
+  const executiveRows: Array<[string, string | number, string | number, string, string]> = [
+    ['Entregues', current.entregues, Math.round(baseline.entregues), formatPercentValue(pctDelta(current.entregues, baseline.entregues)), 'Input principal de escala'],
+    ['Emitidos', current.emitidos, Math.round(baseline.emitidos), formatPercentValue(pctDelta(current.emitidos, baseline.emitidos)), 'Resultado final'],
+    ['Propostas', current.propostas, Math.round(baseline.propostas), formatPercentValue(pctDelta(current.propostas, baseline.propostas)), 'Sinal de funil'],
+    ['Eficiencia', formatRatioValue(safeRate(current.emitidos || current.propostas, current.entregues)), formatRatioValue(safeRate(baseline.emitidos || baseline.propostas, baseline.entregues)), formatPercentValue(pctDelta(safeRate(current.emitidos || current.propostas, current.entregues), safeRate(baseline.emitidos || baseline.propostas, baseline.entregues))), 'Resultado por entrega'],
+    ['Score Growth medio', averageScore, '100 = baseline saudavel', averageScore >= 85 ? 'forte' : averageScore >= 65 ? 'neutro' : 'fraco', 'Score ponderado'],
+    ['Confianca media', `${averageConfidence}%`, 'historico + cobertura', averageConfidence >= 80 ? 'alta' : averageConfidence >= 65 ? 'media' : 'baixa', 'Qualidade do sinal'],
+    ['Fila de acao', statusCounts.Escalar + statusCounts.Corrigir + statusCounts.Investigar, `${overviewRows.length} campanhas`, `${statusCounts.Escalar} escalar | ${statusCounts.Corrigir} corrigir | ${statusCounts.Investigar} investigar`, 'Prioridade da semana'],
+  ];
+  executiveRows.forEach((values, index) => {
+    const row = 6 + index;
+    values.forEach((value, offset) => setCell(ws.getCell(row, offset + 1), value, { align: offset === 0 || offset === 4 ? 'left' : 'center', fillColor: index % 2 ? COLORS.zebra : 'FFFFFF' }));
+    applyBorder(ws, row, 5);
+  });
+
+  setCell(ws.getCell('G4'), 'Saude dos Dados', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.sectionDark, align: 'left' });
+  ws.mergeCells('G4:L4');
+  [
+    ['Linhas fonte', summary.source_rows],
+    ['Mapeadas', summary.mapped_source_rows],
+    ['Fora do relatorio', summary.audit_source_rows],
+    ['Cobertura', formatPercentValue(summary.source_rows ? summary.mapped_source_rows / summary.source_rows : 0)],
+    ['Campanhas foco', rowsWithCurrent.length],
+  ].forEach(([label, value], index) => {
+    const row = 5 + index;
+    setCell(ws.getCell(row, 7), String(label), { bold: true, fillColor: COLORS.auditSubheader, align: 'left' });
+    setCell(ws.getCell(row, 8), value as string | number, { fillColor: COLORS.auditSubheader });
+  });
+
+  let rowCursor = 15;
+  setCell(ws.getCell(rowCursor, 1), 'Tendencia Semanal', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.sectionDark, align: 'left' });
+  ws.mergeCells(rowCursor, 1, rowCursor, 8);
+  rowCursor += 1;
+  writeTableHeader(ws, rowCursor, ['Semana', 'Campanhas', 'Entregues', 'Emitidos', 'Aprovados', 'Propostas', 'Tx resultado/entrega', 'Leitura']);
+  trendRows.forEach((row, index) => {
+    const excelRow = rowCursor + 1 + index;
+    const delta = index === 0 ? null : pctDelta(row.entregues, trendRows[index - 1].entregues);
+    [row.label, row.campanhas, row.entregues, row.emitidos, row.aprovados, row.propostas, formatRatioValue(safeRate(row.emitidos || row.propostas, row.entregues)), index === trendRows.length - 1 ? 'semana foco' : formatPercentValue(delta)].forEach((value, offset) => {
+      setCell(ws.getCell(excelRow, offset + 1), value, { align: offset === 0 ? 'left' : 'center', fillColor: index % 2 ? COLORS.zebra : 'FFFFFF' });
+    });
+    applyBorder(ws, excelRow, 8);
+  });
+
+  rowCursor += trendRows.length + 3;
+  setCell(ws.getCell(rowCursor, 1), 'Drivers de Crescimento', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.sectionDark, align: 'left' });
+  ws.mergeCells(rowCursor, 1, rowCursor, 10);
+  rowCursor += 1;
+  writeTableHeader(ws, rowCursor, ['Dimensao', 'Valor', 'Status', 'Score medio', 'Campanhas', 'Entregues', 'Delta entregues', 'Emitidos', 'Delta emitidos', 'Propostas']);
+  dimensionRows.slice(0, 36).forEach((row, index) => {
+    const excelRow = rowCursor + 1 + index;
+    [row.dimensao, row.valor, row.status, row.scoreMedio, row.campanhas, row.entregues, formatPercentValue(row.deltaEntreguesPct), row.emitidos, formatPercentValue(row.deltaEmitidosPct), row.propostas].forEach((value, offset) => {
+      setCell(ws.getCell(excelRow, offset + 1), value, { align: offset < 3 ? 'left' : 'center', fillColor: offset === 2 ? statusColor(row.status) : index % 2 ? COLORS.zebra : 'FFFFFF' });
+    });
+    applyBorder(ws, excelRow, 10);
+  });
+
+  rowCursor += Math.min(dimensionRows.length, 36) + 3;
+  setCell(ws.getCell(rowCursor, 1), 'Fila de Acoes', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.sectionDark, align: 'left' });
+  ws.mergeCells(rowCursor, 1, rowCursor, 16);
+  rowCursor += 1;
+  const actionHeaderRow = rowCursor;
+  writeTableHeader(ws, actionHeaderRow, ['Status', 'Score', 'Confianca', 'BU', 'Bloco', 'Canal', 'Segmento', 'Jornada', 'Taxonomia', 'Entregues', 'Emitidos', 'Propostas', 'Delta entrega', 'Delta resultado', 'Baseline sem.', 'Proxima acao']);
+  overviewRows.forEach((row, index) => {
+    const excelRow = actionHeaderRow + 1 + index;
+    const action = row.status === 'Escalar' ? 'Aumentar prioridade mantendo eficiencia'
+      : row.status === 'Corrigir' ? 'Revisar oferta, segmentacao ou criativo'
+        : row.status === 'Investigar' ? 'Checar mapeamento, base ou anomalia'
+          : 'Acompanhar ate ganhar historico';
+    [
+      row.status,
+      row.score,
+      `${row.confidence}%`,
+      row.bu,
+      row.bloco,
+      row.canal,
+      row.segmento,
+      row.jornada,
+      row.taxonomia,
+      row.current.linhas ? row.current.entregues : 'N/A',
+      row.current.linhas ? row.current.emitidos : 'N/A',
+      row.current.linhas ? row.current.propostas : 'N/A',
+      formatPercentValue(row.deltaEntreguesPct),
+      formatPercentValue(row.deltaEmitidosPct),
+      row.baselineWeeks,
+      action,
+    ].forEach((value, offset) => {
+      setCell(ws.getCell(excelRow, offset + 1), value, { align: [7, 8, 15].includes(offset) ? 'left' : 'center', fillColor: offset === 0 ? statusColor(row.status) : index % 2 ? COLORS.zebra : 'FFFFFF' });
+    });
+    applyBorder(ws, excelRow, 16);
+  });
+  if (overviewRows.length > 0) {
+    ws.autoFilter = {
+      from: { row: actionHeaderRow, column: 1 },
+      to: { row: actionHeaderRow + overviewRows.length, column: 16 },
+    };
+  }
+
+  rowCursor = actionHeaderRow + overviewRows.length + 3;
+  setCell(ws.getCell(rowCursor, 1), 'Riscos de Dados', { bold: true, fontColor: 'FFFFFF', fillColor: COLORS.sectionDark, align: 'left' });
+  ws.mergeCells(rowCursor, 1, rowCursor, 7);
+  rowCursor += 1;
+  writeTableHeader(ws, rowCursor, ['Motivo', 'BU', 'Parceiro', 'Segmento', 'Canal', 'Linhas', 'Entregues']);
+  auditRows.slice(0, 40).forEach((row, index) => {
+    const excelRow = rowCursor + 1 + index;
+    [row.motivo, row.bu || 'N/A', row.parceiro || 'N/A', row.segmento || 'N/A', row.canal || 'N/A', row.linhas, row.entregues].forEach((value, offset) => {
+      setCell(ws.getCell(excelRow, offset + 1), value, { align: offset <= 4 ? 'left' : 'center', fillColor: index % 2 ? COLORS.zebra : 'FFFFFF' });
+    });
+    applyBorder(ws, excelRow, 7);
+  });
+
+  [22, 12, 12, 14, 28, 12, 22, 44, 52, 14, 12, 12, 14, 14, 12, 34].forEach((width, index) => {
+    ws.getColumn(index + 1).width = width;
+  });
+  ws.eachRow((row) => {
+    row.height = 22;
+  });
+}
+
 function buildWorkbook(
   ExcelJSRuntime: { Workbook: new () => Workbook },
   rawRows: RawActivity[],
@@ -635,6 +1159,7 @@ function buildWorkbook(
   }
 
   writeAuditSheet(wb, auditRows, journeyRows, summary);
+  writeOverviewCampanhasSheet(wb, rawRows, auditRows, summary, start, end);
   return wb;
 }
 
@@ -695,16 +1220,21 @@ function downloadBuffer(buffer: BlobPart, filename: string): void {
 }
 
 export async function exportAquisicaoCrmXlsx(start: Date, end: Date): Promise<{ rows: number; filename: string }> {
+  const queryStart = getBaselineQueryStart(start);
   const [rawRows, b2cDailyRows] = await Promise.all([
-    fetchSupabaseRows(start, end),
-    fetchB2cDailyMetrics(start, end),
+    fetchSupabaseRows(queryStart, end),
+    fetchB2cDailyMetrics(queryStart, end),
   ]);
   const ExcelJSModule = await import('exceljs');
   const workbook = buildWorkbook(ExcelJSModule.default, rawRows, b2cDailyRows, start, end);
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = `aquisicao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(end).replace(/-/g, '')}.xlsx`;
   downloadBuffer(buffer, filename);
-  return { rows: rawRows.length, filename };
+  const rowsInPeriod = rawRows.filter((row) => {
+    const rowDate = parseRowDate(get(row, 'Data de Disparo'));
+    return rowDate >= start && rowDate <= end;
+  }).length;
+  return { rows: rowsInPeriod, filename };
 }
 
 export function getCurrentMonthRange(): { start: Date; end: Date } {
