@@ -133,7 +133,7 @@ export const syncFrameworkActivities = async (
     const { error: deleteError } = await supabase
         .from('activities')
         .delete()
-        .eq('prog_gaas', false);
+        .neq('id', '00000000-0000-0000-0000-000000000000');
 
     if (deleteError) {
         console.error('Erro ao limpar dados antigos:', deleteError);

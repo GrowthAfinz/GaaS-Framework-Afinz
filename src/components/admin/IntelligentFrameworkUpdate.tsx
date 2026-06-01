@@ -23,8 +23,8 @@ import type { Activity } from '../../types/framework';
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
-type HumanField = 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'oferta' | 'promocional';
-type SuggestionField = HumanField | 'bu' | 'parceiro' | 'segmento';
+type HumanField = 'parceiro' | 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'oferta' | 'promocional';
+type SuggestionField = HumanField | 'bu' | 'segmento';
 type ProcessingStage = 'idle' | 'reading' | 'indexing' | 'detecting' | 'reviewing';
 
 type SuggestionBucket = Map<SuggestionField, Map<string, number>>;
@@ -192,6 +192,7 @@ const STATUS_CLASS: Record<CandidateStatus, string> = {
 };
 
 const HUMAN_FIELDS: Array<{ key: HumanField; label: string }> = [
+    { key: 'parceiro', label: 'Parceiro' },
     { key: 'subgrupo', label: 'Subgrupo' },
     { key: 'etapaAquisicao', label: 'Etapa' },
     { key: 'perfilCredito', label: 'Perfil' },
@@ -206,7 +207,6 @@ const SUGGESTION_FIELDS: SuggestionField[] = [
     'oferta',
     'promocional',
     'bu',
-    'parceiro',
     'segmento',
 ];
 
@@ -734,7 +734,6 @@ const buildCandidate = (
         return acc;
     }, {} as Record<HumanField, FieldSuggestion[]>);
     const buSuggestions = suggestFromHistory(metric, historyIndex, 'bu');
-    const parceiroSuggestions = suggestFromHistory(metric, historyIndex, 'parceiro');
     const segmentoSuggestions = suggestFromHistory(metric, historyIndex, 'segmento');
 
     const valueFor = (field: HumanField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
@@ -798,7 +797,7 @@ const buildCandidate = (
                     : 'sugestoes por taxonomia e historico',
         accepted: false,
         bu: buSuggestions[0]?.value || taxonomy.bu,
-        parceiro: parceiroSuggestions[0]?.value || taxonomy.parceiro,
+        parceiro: valueFor('parceiro', taxonomy.parceiro),
         segmento: segmentoSuggestions[0]?.value || taxonomy.segmento,
         subgrupo: valueFor('subgrupo', 'N/A'),
         etapaAquisicao: valueFor('etapaAquisicao', ''),
@@ -1649,8 +1648,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         {[
                             ['Ingestao', 'detecta blocos e normaliza chave'],
                             ['Novidade', 'separa novas, existentes e duplicadas'],
-                            ['Taxonomia', 'preenche BU, parceiro e segmento'],
-                            ['Revisao', 'prioriza campos humanos por confianca'],
+                            ['Taxonomia', 'preenche BU e segmento'],
+                            ['Revisao', 'prioriza parceiro e campos humanos por confianca'],
                         ].map(([title, description]) => (
                             <div key={title} className="rounded-lg border border-slate-200 bg-white px-3 py-3">
                                 <div className="text-xs font-bold text-slate-800">{title}</div>
@@ -1905,7 +1904,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                             <td className="w-56 px-3 py-3 align-top">
                                                 <div className="space-y-1 text-slate-700">
                                                     <div><span className="text-slate-400">BU:</span> {candidate.bu}</div>
-                                                    <div><span className="text-slate-400">Parceiro:</span> {candidate.parceiro}</div>
                                                     <div><span className="text-slate-400">Segmento:</span> {candidate.segmento}</div>
                                                     <div><span className="text-slate-400">Produto:</span> {candidate.produto}</div>
                                                 </div>
