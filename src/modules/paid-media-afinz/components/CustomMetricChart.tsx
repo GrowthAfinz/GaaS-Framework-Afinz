@@ -43,7 +43,7 @@ export const CustomMetricChart: React.FC<CustomMetricChartProps> = ({
     customDateRange,
     setCustomDateRange
 }) => {
-    const { rawData, filters } = useFilters();
+    const { rawData, filteredData, filters } = useFilters();
 
     // Local State
     const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['spend', 'conversions']);
@@ -52,37 +52,30 @@ export const CustomMetricChart: React.FC<CustomMetricChartProps> = ({
     const chartData = useMemo(() => {
         if (!rawData || rawData.length === 0) return [];
 
-        let filtered = rawData.filter(d => {
-            // Apply Global Campaign/Channel Filters
-            // (Replicating logic from FilterContext roughly, or we assume rawData needs filtering)
-            const dateObj = new Date(d.date);
-
-            // Channels
-            if (filters.selectedChannels.length > 0 && !filters.selectedChannels.includes(d.channel as any)) return false;
-
-            // Objectives
-            if (d.objective && filters.selectedObjectives.length > 0 && !filters.selectedObjectives.includes(d.objective as any)) return false;
-
-            // Campaigns
-            if (filters.selectedCampaigns.length > 0 && !filters.selectedCampaigns.includes(d.campaign)) return false;
-
-            // Adsets
-            if (filters.selectedAdsets.length > 0 && (!d.adset_name || !filters.selectedAdsets.includes(d.adset_name))) return false;
-
-            // Ads
-            if (filters.selectedAds.length > 0 && (!d.ad_name || !filters.selectedAds.includes(d.ad_name))) return false;
-
-            // Date Range (Local or Global)
-            const range = useCustomDate ? {
+        // When not using a custom date, filteredData from context already has the correct
+        // period + channel + objective + campaign filters applied — use it directly so
+        // totals always match the Overview tab.
+        // When using a custom date override, apply only the date change on rawData while
+        // keeping all other global filters from context.
+        let filtered: typeof filteredData;
+        if (!useCustomDate) {
+            filtered = filteredData;
+        } else {
+            const range = {
                 start: startOfDay(parseISO(customDateRange.from)),
                 end: endOfDay(parseISO(customDateRange.to))
-            } : {
-                start: startOfDay(filters.dateRange.from),
-                end: endOfDay(filters.dateRange.to)
             };
-
-            return isWithinInterval(dateObj, range);
-        });
+            filtered = rawData.filter(d => {
+                const dateObj = new Date(d.date);
+                if (!isWithinInterval(dateObj, range)) return false;
+                if (filters.selectedChannels.length > 0 && !filters.selectedChannels.includes(d.channel as any)) return false;
+                if (d.objective && filters.selectedObjectives.length > 0 && !filters.selectedObjectives.includes(d.objective as any)) return false;
+                if (filters.selectedCampaigns.length > 0 && !filters.selectedCampaigns.includes(d.campaign)) return false;
+                if (filters.selectedAdsets.length > 0 && (!d.adset_name || !filters.selectedAdsets.includes(d.adset_name))) return false;
+                if (filters.selectedAds.length > 0 && (!d.ad_name || !filters.selectedAds.includes(d.ad_name))) return false;
+                return true;
+            });
+        }
 
         // Aggregate by Granularity (Day/Week/Month)
         const aggMap = new Map<string, any>();
@@ -142,7 +135,7 @@ export const CustomMetricChart: React.FC<CustomMetricChartProps> = ({
 
         return result;
 
-    }, [rawData, filters, useCustomDate, customDateRange, granularity]);
+    }, [rawData, filteredData, filters, useCustomDate, customDateRange, granularity]);
 
     const handleMetricToggle = (key: string) => {
         if (selectedMetrics.includes(key)) {
