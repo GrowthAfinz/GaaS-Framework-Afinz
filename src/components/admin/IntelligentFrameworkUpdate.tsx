@@ -1148,11 +1148,19 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
     let ignoredPerformance = 0;
 
     const findAnchor = (row: MetricRow) => {
-        const candidates = anchorsByAttributionKey.get(attributionKey(row)) ?? [];
-        const match = candidates
+        const candidates = (anchorsByAttributionKey.get(attributionKey(row)) ?? [])
             .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
-            .filter((item) => item.diff >= 0 && item.diff <= 2)
-            .sort((a, b) => a.diff - b.diff)[0]?.candidate;
+            .filter((item) => item.diff >= 0 && item.diff <= 2);
+
+        // Preferir ancora com a MESMA jornada do PERF. Sem isso, quando o BI duplica
+        // a mesma activity+canal+data em jornadas diferentes (ex: ABRI26 e MAIO26),
+        // todas as linhas PERF caem na primeira ancora e a jornada canonica fica com
+        // 0 cartoes. Com a preferencia por jornada, cada PERF vai para o seu disparo.
+        const sameJourney = candidates.filter((item) =>
+            row.journey && isSameJourneyFamily(item.candidate.journey, row.journey)
+        );
+        const pool = sameJourney.length > 0 ? sameJourney : candidates;
+        const match = pool.sort((a, b) => a.diff - b.diff)[0]?.candidate;
 
         if (match) return match;
 
