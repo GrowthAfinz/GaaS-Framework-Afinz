@@ -99,6 +99,7 @@ interface UpdateCandidate extends MetricRow {
     suggestions: Partial<Record<SuggestionField, FieldSuggestion[]>>;
     conflictJourneys?: string[];
     conflictReason?: string;
+    matchedActivity?: Activity;
 }
 
 interface ProcessResult {
@@ -787,6 +788,11 @@ const buildCandidate = (
         ...Array.from(historicalJourneys),
     ])).filter(Boolean);
     const renamedJourneyConflict = conflictJourneys.length > 0;
+    // Disparo ja existe na base (mesma activity + canal + data, independente da jornada).
+    // historicalSignatureMatches usa a chave anti-renomeacao (dispatchSignature),
+    // entao se houver match o disparo fisico ja foi gravado em activities.
+    const existingDispatch = historicalSignatureMatches[0];
+    const existsInBase = Boolean(existingDispatch);
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
     const missingHumanSuggestion = ['parceiro', 'subgrupo', 'etapaAquisicao', 'perfilCredito', 'oferta', 'promocional']
         .some((field) => !suggestionsFor(fieldSuggestions, field as SuggestionField)[0]?.value);
@@ -795,13 +801,17 @@ const buildCandidate = (
         ? 'error'
         : duplicateCount > 1
             ? 'duplicate'
-            : renamedJourneyConflict
-                ? 'conflict'
-                : missingHumanSuggestion
-                    ? 'new'
-                    : averageConfidence >= 80
-                        ? 'ready'
-                        : 'review';
+            : existsInBase
+                // Ja existe na base: renomeacao de jornada => conflito; mesma jornada => duplicado.
+                // Em ambos os casos NUNCA pode virar insert novo (matchedActivity forca update).
+                ? (renamedJourneyConflict ? 'conflict' : 'duplicate')
+                : renamedJourneyConflict
+                    ? 'conflict'
+                    : missingHumanSuggestion
+                        ? 'new'
+                        : averageConfidence >= 80
+                            ? 'ready'
+                            : 'review';
 
     return {
         ...metric,
@@ -811,26 +821,36 @@ const buildCandidate = (
             ? 'Chave'
             : duplicateCount > 1
                 ? 'Duplicidade'
-                : renamedJourneyConflict
-                    ? 'Conflito de jornada'
-                    : missingHumanSuggestion
-                        ? 'Campos humanos'
-                        : status === 'ready'
-                            ? 'Aprovar'
-                            : 'Sugestoes',
-        suggestion: renamedJourneyConflict
-            ? 'Possivel renomeacao de jornada no SFMC'
-            : status === 'ready'
-                ? 'Sugestoes historicas fortes'
-                : 'Revisar campos sugeridos',
-        confidence: missingCritical || duplicateCount > 1 || renamedJourneyConflict ? 0 : averageConfidence,
+                : existsInBase
+                    ? (renamedJourneyConflict ? 'Jornada renomeada' : 'Ja existe na base')
+                    : renamedJourneyConflict
+                        ? 'Conflito de jornada'
+                        : missingHumanSuggestion
+                            ? 'Campos humanos'
+                            : status === 'ready'
+                                ? 'Aprovar'
+                                : 'Sugestoes',
+        suggestion: existsInBase
+            ? (renamedJourneyConflict
+                ? 'Disparo ja existe na base com outra jornada (possivel renomeacao)'
+                : 'Disparo ja existe na base de dados')
+            : renamedJourneyConflict
+                ? 'Possivel renomeacao de jornada no SFMC'
+                : status === 'ready'
+                    ? 'Sugestoes historicas fortes'
+                    : 'Revisar campos sugeridos',
+        confidence: missingCritical || duplicateCount > 1 || existsInBase || renamedJourneyConflict ? 0 : averageConfidence,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
             : duplicateCount > 1
                 ? 'mais de uma linha no arquivo com a mesma chave'
-                : renamedJourneyConflict
-                    ? `mesma activity, canal e data com jornada diferente: ${conflictJourneys.join(', ')}`
-                    : 'sugestoes por taxonomia e historico',
+                : existsInBase
+                    ? (renamedJourneyConflict
+                        ? `disparo ja existe na base; jornada na base: ${existingDispatch?.jornada ?? '-'} | jornada no arquivo: ${metric.journey}`
+                        : 'activity, canal e data ja existem na base de dados')
+                    : renamedJourneyConflict
+                        ? `mesma activity, canal e data com jornada diferente: ${conflictJourneys.join(', ')}`
+                        : 'sugestoes por taxonomia e historico',
         accepted: false,
         domain: metric.domain,
         bu: hasDeterministicBasePropria ? taxonomy.bu : valueFor('bu', taxonomy.bu),
@@ -845,7 +865,12 @@ const buildCandidate = (
         ordemDisparo: undefined,
         suggestions: fieldSuggestions,
         conflictJourneys,
-        conflictReason: renamedJourneyConflict ? 'activity_name_channel_date' : undefined,
+        // matchedActivity forca UPDATE no service (asDbActivityId) em vez de INSERT,
+        // evitando duplicar disparo que ja existe na base.
+        matchedActivity: existingDispatch,
+        conflictReason: existsInBase
+            ? (renamedJourneyConflict ? 'renamed_journey_existing_dispatch' : 'existing_dispatch')
+            : (renamedJourneyConflict ? 'activity_name_channel_date' : undefined),
     };
 };
 
@@ -1467,7 +1492,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             && !['duplicate', 'error', 'ignored'].includes(candidate.status)
         ), [candidates, selectedKeys]);
     const copyCandidates = selectedCandidatesForCopy.length > 0 ? selectedCandidatesForCopy : exportableCandidates;
-    const reviewedTsv = useMemo(() => copyCandidates.map(buildExcelRow).join('\n'), [copyCandidates]);
+    // Disparos que ja existem na base (matchedActivity) nao devem virar linha nova no Excel:
+    // a gravacao deles e UPDATE, nao append. Excluidos da copia TSV por padrao.
+    const reviewedTsv = useMemo(
+        () => copyCandidates.filter((candidate) => !candidate.matchedActivity).map(buildExcelRow).join('\n'),
+        [copyCandidates]
+    );
     const uploadCandidates = useMemo(() => {
         const source = exportableCandidates.length > 0 ? exportableCandidates : selectedCandidatesForCopy;
         return source.map((candidate) => ({ ...applyApprovalDefaults(candidate), accepted: true }));
