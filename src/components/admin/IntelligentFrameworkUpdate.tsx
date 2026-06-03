@@ -1292,15 +1292,122 @@ const inferRentabilizacaoTaxonomy = (metric: MetricRow) => {
     return { bu, parceiro: 'N/A', segmento, produto, etapaAquisicao: 'Rentabilizacao' };
 };
 
+// ── Inteligencia de historico para Rentabilizacao ───────────────────────────────
+// Aprende, da tabela rentabilizacao_activities, o mapeamento jornada/segmento -> dimensoes
+// e reaplica ao subir novos disparos (consistente com o que o XLSX de Rentabilizacao classifica).
+interface RentHistoryIndex {
+    byJourneyChannel: Map<string, SuggestionBucket>;
+    byJourney: Map<string, SuggestionBucket>;
+    bySegmentChannel: Map<string, SuggestionBucket>;
+    byToken: Map<string, SuggestionBucket>;
+    existingSignatures: Set<string>;
+    rowCount: number;
+}
+
+const RENT_FIELD_COLUMN: Record<SuggestionField, string> = {
+    bu: 'BU',
+    parceiro: 'Parceiro',
+    segmento: 'Segmento',
+    subgrupo: 'Subgrupos',
+    etapaAquisicao: 'Etapa de aquisição',
+    perfilCredito: 'Perfil de Crédito',
+    produto: 'Produto',
+    oferta: 'Oferta',
+    promocional: 'Promocional',
+};
+
+const addRawRowToBucket = (bucket: SuggestionBucket, row: Record<string, any>) => {
+    SUGGESTION_FIELDS.forEach((field) => {
+        const value = String(row[RENT_FIELD_COLUMN[field]] ?? '').trim();
+        if (!value || value === 'N/A') return;
+        const counts = bucket.get(field);
+        if (!counts) return;
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+    });
+};
+
+const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryIndex => {
+    const index: RentHistoryIndex = {
+        byJourneyChannel: new Map(),
+        byJourney: new Map(),
+        bySegmentChannel: new Map(),
+        byToken: new Map(),
+        existingSignatures: new Set(),
+        rowCount: rows.length,
+    };
+    rows.forEach((row) => {
+        const journey = String(row['jornada'] ?? '');
+        const activityName = String(row['Activity name / Taxonomia'] ?? '');
+        const rawCanal = row['Canal'];
+        const channel = normalizeChannel(rawCanal);
+        const journeyKey = normalizeKey(journey);
+        index.existingSignatures.add(buildDispatchSignature(activityName, rawCanal, row['Data de Disparo']));
+        if (journeyKey) {
+            addRawRowToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), row);
+            addRawRowToBucket(bucketFor(index.byJourney, journeyKey), row);
+        }
+        const segment = String(row['Segmento'] ?? '').trim();
+        if (segment && channel !== 'Indefinido') {
+            addRawRowToBucket(bucketFor(index.bySegmentChannel, `${segment}|${channel}`), row);
+        }
+        tokenizeForHistory(journey, activityName).forEach((token) =>
+            addRawRowToBucket(bucketFor(index.byToken, token), row)
+        );
+    });
+    return index;
+};
+
+const emptyRentHistoryIndex = (): RentHistoryIndex => ({
+    byJourneyChannel: new Map(),
+    byJourney: new Map(),
+    bySegmentChannel: new Map(),
+    byToken: new Map(),
+    existingSignatures: new Set(),
+    rowCount: 0,
+});
+
+const suggestRentFields = (
+    metric: MetricRow,
+    index: RentHistoryIndex,
+    taxonomySegment: string
+): Partial<Record<SuggestionField, FieldSuggestion[]>> => {
+    const journeyKey = normalizeKey(metric.journey);
+    const journeyChannelKey = normalizeKey(`${journeyKey}|${metric.channel}`);
+    const segmentChannelKey = normalizeKey(`${taxonomySegment}|${metric.channel}`);
+    const journeyChannelBucket = index.byJourneyChannel.get(journeyChannelKey);
+    const journeyBucket = index.byJourney.get(journeyKey);
+    const segmentChannelBucket = index.bySegmentChannel.get(segmentChannelKey);
+    const tokenBuckets = tokenizeForHistory(metric.journey, metric.activityName)
+        .map((token) => index.byToken.get(normalizeKey(token)))
+        .filter((bucket): bucket is SuggestionBucket => Boolean(bucket));
+
+    const result: Partial<Record<SuggestionField, FieldSuggestion[]>> = {};
+    for (const field of SUGGESTION_FIELDS) {
+        result[field] = [
+            ...topSuggestionsFromBucket(journeyChannelBucket, field, 'mesma jornada e canal', 96),
+            ...topSuggestionsFromBucket(journeyBucket, field, 'mesma jornada', 90),
+            ...topSuggestionsFromBucket(segmentChannelBucket, field, 'mesmo segmento e canal', 80),
+            ...tokenBuckets.flatMap((bucket) => topSuggestionsFromBucket(bucket, field, 'campanhas similares por token', 72)),
+        ].reduce<FieldSuggestion[]>((acc, suggestion) => {
+            if (!acc.some((item) => normalizeKey(item.value) === normalizeKey(suggestion.value))) acc.push(suggestion);
+            return acc;
+        }, []).slice(0, 5);
+    }
+    return result;
+};
+
 const buildRentabilizacaoCandidate = (
     metric: MetricRow,
     importedKeyCount: Map<string, number>,
-    existingSignatures: Set<string>
+    history: RentHistoryIndex
 ): UpdateCandidate => {
     const taxonomy = inferRentabilizacaoTaxonomy(metric);
+    const fieldSuggestions = suggestRentFields(metric, history, taxonomy.segmento);
+    const pick = (field: SuggestionField, fallback: string) =>
+        suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     // Ja existe na tabela rentabilizacao_activities (mesma activity+canal+data)?
-    const existsInBase = existingSignatures.has(metric.dispatchSignature);
+    const existsInBase = history.existingSignatures.has(metric.dispatchSignature);
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
     const missingDispatchVolume = !hasDispatchVolume(metric);
     const status: CandidateStatus = missingCritical
@@ -1341,23 +1448,25 @@ const buildRentabilizacaoCandidate = (
                         ? 'activity, canal e data ja existem em rentabilizacao_activities'
                         : 'regras portadas do upload de rentabilizacao',
         accepted: false,
-        bu: taxonomy.bu,
-        parceiro: taxonomy.parceiro,
-        segmento: taxonomy.segmento,
-        subgrupo: 'N/A',
-        etapaAquisicao: taxonomy.etapaAquisicao,
-        perfilCredito: 'N/A',
-        produto: taxonomy.produto,
-        oferta: 'Padrao',
-        promocional: 'N/A',
+        // Dimensoes herdadas do historico de rentabilizacao_activities (jornada/segmento),
+        // com fallback para a taxonomia inferida quando nao ha historico.
+        bu: pick('bu', taxonomy.bu),
+        parceiro: pick('parceiro', taxonomy.parceiro),
+        segmento: pick('segmento', taxonomy.segmento),
+        subgrupo: pick('subgrupo', 'N/A'),
+        etapaAquisicao: pick('etapaAquisicao', taxonomy.etapaAquisicao),
+        perfilCredito: pick('perfilCredito', 'N/A'),
+        produto: pick('produto', taxonomy.produto),
+        oferta: pick('oferta', 'Padrao'),
+        promocional: pick('promocional', 'N/A'),
         ordemDisparo: undefined,
-        suggestions: emptySuggestions,
+        suggestions: fieldSuggestions,
         conflictJourneys: [],
         conflictReason: undefined,
     };
 };
 
-const processRentabilizacaoDinamicaBI = (matrix: string[][], existingSignatures: Set<string>): ProcessResult => {
+const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex): ProcessResult => {
     const warnings: string[] = [];
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
     const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
@@ -1402,7 +1511,7 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], existingSignatures:
         return map;
     }, new Map<string, number>());
     const candidates = metrics
-        .map((row) => buildRentabilizacaoCandidate(row, importedKeyCount, existingSignatures))
+        .map((row) => buildRentabilizacaoCandidate(row, importedKeyCount, history))
         .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status));
     const ignoredExisting = candidates.filter((candidate) => candidate.status === 'ignored').length;
     const tsv = candidates
@@ -1547,10 +1656,10 @@ const safeProcessDinamicaBI = (
     matrix: string[][],
     activities: Activity[],
     domain: UpdateDomain,
-    existingRentSignatures: Set<string>
+    rentHistory: RentHistoryIndex
 ): { result: ProcessResult | null; error?: ParseDebugInfo } => {
     try {
-        return { result: domain === 'rentabilizacao' ? processRentabilizacaoDinamicaBI(matrix, existingRentSignatures) : processDinamicaBI(matrix, activities) };
+        return { result: domain === 'rentabilizacao' ? processRentabilizacaoDinamicaBI(matrix, rentHistory) : processDinamicaBI(matrix, activities) };
     } catch (error: any) {
         return {
             result: null,
@@ -1719,22 +1828,20 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             if (matrix.length === 0) throw new Error('Arquivo vazio.');
             setProcessingStage('indexing');
             await nextFrame();
-            // Para rentabilizacao, busca os disparos ja gravados na base e monta o
-            // conjunto de assinaturas (activity+canal+data) para nao reinserir o que ja existe.
-            let existingRentSignatures = new Set<string>();
+            // Para rentabilizacao, carrega o historico completo da base para (1) deduplicar
+            // o que ja existe e (2) herdar dimensoes (BU/Segmento/Etapa) por jornada/segmento.
+            let rentHistory = emptyRentHistoryIndex();
             if (activeDomain === 'rentabilizacao') {
                 try {
-                    const existing = await intelligentUpdateService.fetchExistingDispatches('rentabilizacao');
-                    existingRentSignatures = new Set(
-                        existing.map((row) => buildDispatchSignature(row.activityName, row.channel, row.date))
-                    );
+                    const historyRows = await intelligentUpdateService.fetchDomainHistory('rentabilizacao');
+                    rentHistory = buildRentHistoryIndex(historyRows);
                 } catch (fetchError) {
-                    console.warn('[Atualizacao Inteligente] Falha ao carregar base de rentabilizacao para deduplicacao', fetchError);
+                    console.warn('[Atualizacao Inteligente] Falha ao carregar historico de rentabilizacao', fetchError);
                 }
             }
             setProcessingStage('detecting');
             await nextFrame();
-            const processedResult = safeProcessDinamicaBI(matrix, activities, activeDomain, existingRentSignatures);
+            const processedResult = safeProcessDinamicaBI(matrix, activities, activeDomain, rentHistory);
             if (!processedResult.result) {
                 const debug = {
                     ...processedResult.error,

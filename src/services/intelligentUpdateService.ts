@@ -349,6 +349,26 @@ export const intelligentUpdateService = {
         return rows;
     },
 
+    // Historico completo da tabela do dominio (todas as colunas) para inteligencia
+    // de sugestoes por jornada/segmento. Usado na Rentabilizacao para herdar a
+    // classificacao ja existente ao subir novos disparos.
+    async fetchDomainHistory(domain: UpdateDomain): Promise<Array<Record<string, any>>> {
+        const table = targetTableForDomain(domain);
+        const pageSize = 1000;
+        const rows: Array<Record<string, any>> = [];
+        for (let offset = 0; ; offset += pageSize) {
+            const { data, error } = await supabase
+                .from(table)
+                .select('*')
+                .range(offset, offset + pageSize - 1);
+            if (error) throw error;
+            const batch = data ?? [];
+            rows.push(...batch);
+            if (batch.length < pageSize) break;
+        }
+        return rows;
+    },
+
     async saveRun(payload: IntelligentUpdateRunPayload): Promise<IntelligentUpdateRunResult> {
         const runInsertPayload = {
             domain: payload.domain,
