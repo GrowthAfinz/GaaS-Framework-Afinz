@@ -855,6 +855,34 @@ const electCanonicalJourney = (
     return roles;
 };
 
+// Quando o BI duplica a mesma activity+canal+data em varias jornadas, cada candidato
+// recebe as emissoes da SUA jornada (via consolidacao por jornada). Para que TODOS os
+// candidatos da colisao exibam o resultado da activity (Conflito/Revisar), propagamos o
+// MAX de cada metrica de resultado para todos do grupo. Max evita dupla contagem do
+// mesmo cartao reportado sob nomes diferentes. So a vencedora (status nao-conflito)
+// e gravada no banco; as demais apenas exibem.
+const GROUP_RESULT_FIELDS: Array<keyof MetricRow> = ['proposals', 'approved', 'finalized', 'assisted', 'independent'];
+
+const propagateGroupEmissions = (candidates: UpdateCandidate[]): UpdateCandidate[] => {
+    const groups = new Map<string, UpdateCandidate[]>();
+    candidates.forEach((candidate) => {
+        const list = groups.get(candidate.dispatchSignature);
+        if (list) list.push(candidate); else groups.set(candidate.dispatchSignature, [candidate]);
+    });
+    groups.forEach((group) => {
+        if (group.length < 2) return; // sem colisao de jornada
+        GROUP_RESULT_FIELDS.forEach((field) => {
+            let best = 0;
+            group.forEach((candidate) => {
+                const value = candidate[field];
+                if (typeof value === 'number' && value > best) best = value;
+            });
+            if (best > 0) group.forEach((candidate) => { (candidate as any)[field] = best; });
+        });
+    });
+    return candidates;
+};
+
 const buildCandidate = (
     metric: MetricRow,
     historyIndex: HistoryIndex,
@@ -912,7 +940,10 @@ const buildCandidate = (
                     ? (baseJourneyDiffers ? 'conflict' : 'duplicate')
                     : missingHumanSuggestion
                         ? 'new'
-                        : averageConfidence >= 80
+                        // BP/Base Propria e deterministico (taxonomia forca BU/Parceiro/Segmento);
+                        // com todos os campos humanos cobertos pelo historico, vira Pronto mesmo
+                        // sem historico de mesma-jornada (que e o unico que ultrapassa 80%).
+                        : (averageConfidence >= 80 || hasDeterministicBasePropria)
                             ? 'ready'
                             : 'review';
 
@@ -1457,14 +1488,14 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     });
 
     const metrics = Array.from(metricMap.values());
-    const candidates = metrics
+    const candidates = propagateGroupEmissions(metrics
         .map((row) => {
             try {
                 return buildCandidate(row, historyIndex, importedKeyCount, importedSignatureJourneys);
             } catch (error) {
                 return buildErrorCandidate(row, error);
             }
-        })
+        }))
         .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status) || b.confidence - a.confidence);
 
     const tsv = candidates
