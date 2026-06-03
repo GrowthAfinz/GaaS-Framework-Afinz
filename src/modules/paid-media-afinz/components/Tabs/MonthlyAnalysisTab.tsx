@@ -112,35 +112,29 @@ export const MonthlyAnalysisTab: React.FC = () => {
     const [granularity, setGranularity] = useState<'day' | 'week' | 'month'>('day');
 
     const chartData = useMemo(() => {
-        // Determine effective range
-        const rangeStart = useCustomDate ? parseISO(customDateRange.from) : filters.dateRange.from;
-        const rangeEnd = useCustomDate ? parseISO(customDateRange.to) : filters.dateRange.to;
-
-        // Filter RAW data based on this range (and other filters)
-        // We use rawData to ensure we have all granular points before aggregating
         if (!rawData) return [];
 
-        const relevantData = rawData.filter(d => {
-            // Basic Global Filters (Channel/Objective/Campaign) should be respected
-            // Replicating FilterContext logic briefly or relying on 'filteredData' if it matches range?
-            // 'filteredData' in context assumes global range. 
-            // If useCustomDate is TRUE, we must filter rawData manually.
-            // If useCustomDate is FALSE, 'filteredData' is already filtered by date, BUT 'filteredData' might be pre-aggregated? 
-            // No, filteredData is usually raw rows filtered.
-
-            // Simplest: Filter rawData by everything
-
-            const dDate = new Date(d.date);
-            if (dDate < startOfDay(rangeStart) || dDate > endOfDay(rangeEnd)) return false;
-
-            if (filters.selectedChannels.length && !filters.selectedChannels.includes(d.channel as any)) return false;
-            if (d.objective && filters.selectedObjectives.length && !filters.selectedObjectives.includes(d.objective as any)) return false;
-            if (filters.selectedCampaigns.length && !filters.selectedCampaigns.includes(d.campaign)) return false;
-            if (filters.selectedAdsets.length && (!d.adset_name || !filters.selectedAdsets.includes(d.adset_name))) return false;
-            if (filters.selectedAds.length && (!d.ad_name || !filters.selectedAds.includes(d.ad_name))) return false;
-
-            return true;
-        });
+        // When not using a custom date range, reuse filteredData from context — it already
+        // respects period + channel + objective + campaign filters, so totals match the Overview.
+        // When using a custom date, apply only the date override on top of rawData while keeping
+        // all other global filters (channel, objective, campaign, adset, ad) from context.
+        let relevantData: typeof filteredData;
+        if (!useCustomDate) {
+            relevantData = filteredData;
+        } else {
+            const rangeStart = parseISO(customDateRange.from);
+            const rangeEnd = parseISO(customDateRange.to);
+            relevantData = rawData.filter(d => {
+                const dDate = new Date(d.date);
+                if (dDate < startOfDay(rangeStart) || dDate > endOfDay(rangeEnd)) return false;
+                if (filters.selectedChannels.length && !filters.selectedChannels.includes(d.channel as any)) return false;
+                if (d.objective && filters.selectedObjectives.length && !filters.selectedObjectives.includes(d.objective as any)) return false;
+                if (filters.selectedCampaigns.length && !filters.selectedCampaigns.includes(d.campaign)) return false;
+                if (filters.selectedAdsets.length && (!d.adset_name || !filters.selectedAdsets.includes(d.adset_name))) return false;
+                if (filters.selectedAds.length && (!d.ad_name || !filters.selectedAds.includes(d.ad_name))) return false;
+                return true;
+            });
+        }
 
         // Aggregate by Granularity
         const aggMap = new Map<string, any>();
@@ -190,7 +184,7 @@ export const MonthlyAnalysisTab: React.FC = () => {
 
         return result;
 
-    }, [rawData, filters, useCustomDate, customDateRange, granularity]);
+    }, [rawData, filteredData, filters, useCustomDate, customDateRange, granularity]);
 
 
 
