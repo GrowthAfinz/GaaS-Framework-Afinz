@@ -1199,11 +1199,17 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         // PERF com canal='ECRED-API', mas o disparo original e WPP/SMS. Busca pelo
         // activityName sem considerar o canal, dentro da janela D0-D2.
         if (isEcredChannel(row.channel)) {
-            const ecredCandidates = anchorsByActivityName.get(normalizeKey(row.activityName)) ?? [];
-            const ecredMatch = ecredCandidates
+            const ecredCandidates = (anchorsByActivityName.get(normalizeKey(row.activityName)) ?? [])
                 .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
-                .filter((item) => item.diff >= 0 && item.diff <= 2)
-                .sort((a, b) => a.diff - b.diff)[0]?.candidate;
+                .filter((item) => item.diff >= 0 && item.diff <= 2);
+            // Mesma preferencia por jornada do caminho principal: quando o BI duplica a
+            // activity em varias jornadas, cada PERF ECRED-API vai para a ancora da SUA
+            // jornada (evita somar 3x o mesmo cartao numa unica jornada).
+            const ecredSameJourney = ecredCandidates.filter((item) =>
+                row.journey && isSameJourneyFamily(item.candidate.journey, row.journey)
+            );
+            const ecredPool = ecredSameJourney.length > 0 ? ecredSameJourney : ecredCandidates;
+            const ecredMatch = ecredPool.sort((a, b) => a.diff - b.diff)[0]?.candidate;
             if (ecredMatch) mergedEcred += 1;
             return ecredMatch;
         }
