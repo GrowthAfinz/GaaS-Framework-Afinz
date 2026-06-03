@@ -1714,6 +1714,15 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
+    const isRentReview = (result?.domain ?? activeDomain) === 'rentabilizacao';
+    // Rentabilizacao foca em poucas dimensoes relevantes (BU, Parceiro, Segmento, Etapa);
+    // os campos sempre-N/A da aquisicao (Subgrupo, Perfil, Oferta, Promocional, Ordem) somem.
+    const reviewFields = useMemo(
+        () => isRentReview
+            ? REVIEW_FIELDS.filter((field) => ['bu', 'parceiro', 'segmento', 'etapaAquisicao'].includes(field.key))
+            : REVIEW_FIELDS,
+        [isRentReview]
+    );
 
     const summary = useMemo(() => ({
         ready: candidates.filter((candidate) => candidate.status === 'ready').length,
@@ -2503,7 +2512,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         {statusFilter === 'ready' && <th className="px-3 py-3 font-bold">Sel.</th>}
                                         <th className="px-3 py-3 font-bold">Status</th>
                                         <th className="px-3 py-3 font-bold">Identidade</th>
-                                        {REVIEW_FIELDS.map((field) => (
+                                        {reviewFields.map((field) => (
                                             <th key={field.key} className="px-3 py-3 font-bold">{field.label}</th>
                                         ))}
                                         <th className="px-3 py-3 font-bold">Confianca</th>
@@ -2540,7 +2549,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                     <span>{formatDateBR(candidate.date)}</span>
                                                 </div>
                                             </td>
-                                            {REVIEW_FIELDS.map((field) => {
+                                            {reviewFields.map((field) => {
                                                 const hasSuggestions = field.key !== 'ordemDisparo';
                                                 const suggestions = hasSuggestions
                                                     ? suggestionsFor(candidate.suggestions, field.key as SuggestionField)
@@ -2626,7 +2635,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     ))}
                                     {filteredCandidates.length === 0 && (
                                         <tr>
-                                            <td colSpan={REVIEW_FIELDS.length + 4} className="px-3 py-16 text-center text-slate-500">
+                                            <td colSpan={reviewFields.length + 4} className="px-3 py-16 text-center text-slate-500">
                                                 {reviewSearchTerm ? 'Nenhum candidato encontrado para esta busca.' : 'Nenhum candidato neste filtro.'}
                                             </td>
                                         </tr>
@@ -2792,22 +2801,32 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <div className="min-h-0 flex-1 overflow-y-auto p-6">
                         <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
                             <section className="space-y-3">
-                                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Resultado consolidado</h4>
-                                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                                    {[
-                                        ['Base Total', selectedCandidate.sent],
-                                        ['Base Acionavel', selectedCandidate.delivered],
-                                        ['Aberturas', selectedCandidate.opens],
-                                        ['Cliques', selectedCandidate.clicks],
-                                        ['Propostas', selectedCandidate.proposals],
-                                        ['Aprovados', selectedCandidate.approved],
-                                        ['Cartoes', selectedCandidate.finalized],
-                                        ['Emissoes Assistidas', selectedCandidate.assisted],
-                                        ['Emissoes Indep.', selectedCandidate.independent],
-                                    ].map(([label, value]) => (
-                                        <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    {isRentReview ? 'Engajamento' : 'Resultado consolidado'}
+                                </h4>
+                                <div className={`grid gap-2 ${isRentReview ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}>
+                                    {(isRentReview
+                                        ? [
+                                            ['Base Total', selectedCandidate.sent],
+                                            ['Base Acionavel', selectedCandidate.delivered],
+                                            ['Aberturas', selectedCandidate.opens],
+                                            ['Cliques', selectedCandidate.clicks],
+                                        ]
+                                        : [
+                                            ['Base Total', selectedCandidate.sent],
+                                            ['Base Acionavel', selectedCandidate.delivered],
+                                            ['Aberturas', selectedCandidate.opens],
+                                            ['Cliques', selectedCandidate.clicks],
+                                            ['Propostas', selectedCandidate.proposals],
+                                            ['Aprovados', selectedCandidate.approved],
+                                            ['Cartoes', selectedCandidate.finalized],
+                                            ['Emissoes Assistidas', selectedCandidate.assisted],
+                                            ['Emissoes Indep.', selectedCandidate.independent],
+                                        ]
+                                    ).map(([label, value]) => (
+                                        <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                                             <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
-                                            <div className="mt-1 text-lg font-bold text-slate-900">{value ?? '-'}</div>
+                                            <div className="mt-0.5 text-base font-bold text-slate-900">{value ?? '-'}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -2893,7 +2912,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 )}
                                 <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
                                     <div className="grid gap-3 md:grid-cols-2">
-                                        {REVIEW_FIELDS.map((field) => {
+                                        {reviewFields.map((field) => {
                                             const hasSuggestions = field.key !== 'ordemDisparo';
                                             const suggestions = hasSuggestions
                                                 ? suggestionsFor(selectedCandidate.suggestions, field.key as SuggestionField)
