@@ -4,8 +4,10 @@ import type { Activity } from '../types/framework';
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
+type UpdateDomain = 'aquisicao' | 'rentabilizacao';
 
 export interface IntelligentUpdateMetricPayload {
+    domain?: UpdateDomain;
     key: string;
     sourceBlock: SourceBlock;
     sourceBlocks?: SourceBlock[];
@@ -52,6 +54,7 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
 }
 
 export interface IntelligentUpdateRunPayload {
+    domain: UpdateDomain;
     sourceLabel?: string;
     sourceType?: 'paste' | 'csv' | 'xlsx' | 'manual';
     inputLineCount: number;
@@ -59,7 +62,7 @@ export interface IntelligentUpdateRunPayload {
     metrics: IntelligentUpdateMetricPayload[];
     candidates: IntelligentUpdateCandidatePayload[];
     warnings: string[];
-    summary: Record<string, number>;
+    summary: Record<string, number | string>;
 }
 
 export interface IntelligentUpdateRunResult {
@@ -91,6 +94,35 @@ const chunkArray = <T,>(items: T[], size: number) => {
         chunks.push(items.slice(i, i + size));
     }
     return chunks;
+};
+
+const targetTableForDomain = (domain: UpdateDomain) =>
+    domain === 'rentabilizacao' ? 'rentabilizacao_activities' : 'activities';
+
+const optionalAuditColumnError = (error: any) => {
+    const message = `${error?.message ?? ''} ${error?.details ?? ''} ${error?.hint ?? ''}`;
+    return /domain|target_table|target_record_id/i.test(message)
+        && /column|schema cache|could not find|does not exist/i.test(message);
+};
+
+const stripOptionalAuditColumns = <T extends Record<string, any>>(row: T) => {
+    const { domain, target_table, target_record_id, ...rest } = row;
+    return rest;
+};
+
+const insertWithOptionalAuditColumns = async <T extends Record<string, any>>(
+    tableName: string,
+    rows: T[],
+    selectColumns?: string
+) => {
+    let query = supabase.from(tableName).insert(rows);
+    if (selectColumns) query = query.select(selectColumns);
+    const result = await query;
+    if (!result.error || !optionalAuditColumnError(result.error)) return result;
+
+    let fallbackQuery = supabase.from(tableName).insert(rows.map(stripOptionalAuditColumns));
+    if (selectColumns) fallbackQuery = fallbackQuery.select(selectColumns);
+    return fallbackQuery;
 };
 
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
@@ -155,14 +187,85 @@ const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
     updated_at: new Date().toISOString(),
 });
 
-const applyConfirmedActivityChanges = async (candidates: IntelligentUpdateCandidatePayload[]) => {
+const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
+    prog_gaas: false,
+    status: 'Enviado',
+    BU: textOrFallback(candidate.bu, 'Cartoes'),
+    jornada: candidate.journey,
+    'Activity name / Taxonomia': candidate.activityName,
+    'Canal': candidate.channel,
+    'Data de Disparo': toTimestamp(candidate.date),
+    'Parceiro': textOrFallback(candidate.parceiro),
+    'Segmento': textOrFallback(candidate.segmento, 'Rentabilizacao'),
+    'Subgrupos': textOrFallback(candidate.subgrupo),
+    'Etapa de aquisição': textOrFallback(candidate.etapaAquisicao, 'Rentabilizacao'),
+    'Perfil de Crédito': textOrFallback(candidate.perfilCredito),
+    'Produto': textOrFallback(candidate.produto, 'Cartao'),
+    'Oferta': textOrFallback(candidate.oferta, 'Padrao'),
+    'Promocional': textOrFallback(candidate.promocional),
+    'Ordem de disparo': candidate.ordemDisparo ?? null,
+    'Base Total': candidate.sent ?? null,
+    'Base Acionável': candidate.delivered ?? null,
+    'Abertura': candidate.opens ?? null,
+    'Cliques': candidate.clicks ?? null,
+    'Cartões Gerados': candidate.finalized ?? null,
+    'Aprovados': candidate.approved ?? null,
+    'Propostas': candidate.proposals ?? null,
+    'Emissões Independentes': candidate.independent ?? null,
+    'Emissões Assistidas': candidate.assisted ?? null,
+    updated_at: new Date().toISOString(),
+});
+
+type AppliedTarget = { id: string; table: string };
+
+const applyConfirmedActivityChanges = async (
+    candidates: IntelligentUpdateCandidatePayload[],
+    domain: UpdateDomain
+) => {
     const confirmedCandidates = candidates.filter((candidate) =>
         candidate.accepted
         && !['duplicate', 'error', 'ignored'].includes(candidate.status)
     );
-    const appliedByKey = new Map<string, string>();
+    const appliedByKey = new Map<string, AppliedTarget>();
+    const targetTable = targetTableForDomain(domain);
     const now = new Date().toISOString();
     const insertRows: Array<Record<string, any> & { __candidateKey: string }> = [];
+
+    if (domain === 'rentabilizacao') {
+        const rows = confirmedCandidates.map((candidate) => ({
+            ...buildRentabilizacaoInsertPayload(candidate),
+            __candidateKey: candidate.key,
+            updated_at: now,
+        }));
+
+        for (const chunk of chunkArray(rows, 100)) {
+            const candidateKeys = chunk.map((row) => row.__candidateKey);
+            const upsertRows = chunk.map(({ __candidateKey, ...row }) => row);
+
+            const { data, error } = await supabase
+                .from('rentabilizacao_activities')
+                .upsert(upsertRows, { onConflict: '"Activity name / Taxonomia","Canal","Data de Disparo"' })
+                .select('id');
+
+            if (error) throw error;
+
+            (data || []).forEach((row: any, index: number) => {
+                if (candidateKeys[index]) {
+                    appliedByKey.set(candidateKeys[index], { id: row?.id ?? '', table: targetTable });
+                }
+            });
+
+            candidateKeys.forEach((key) => {
+                if (!appliedByKey.has(key)) appliedByKey.set(key, { id: '', table: targetTable });
+            });
+
+            if (rows.length > 100) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+        }
+
+        return appliedByKey;
+    }
 
     for (const candidate of confirmedCandidates) {
         const activityId = asDbActivityId(candidate.matchedActivity);
@@ -173,7 +276,7 @@ const applyConfirmedActivityChanges = async (candidates: IntelligentUpdateCandid
                 .eq('id', activityId);
 
             if (error) throw error;
-            appliedByKey.set(candidate.key, activityId);
+            appliedByKey.set(candidate.key, { id: activityId, table: targetTable });
         } else {
             insertRows.push({
                 ...buildInsertPayload(candidate),
@@ -196,13 +299,13 @@ const applyConfirmedActivityChanges = async (candidates: IntelligentUpdateCandid
 
         (data || []).forEach((row: any, index: number) => {
             if (row?.id && candidateKeys[index]) {
-                appliedByKey.set(candidateKeys[index], row.id);
+                appliedByKey.set(candidateKeys[index], { id: row.id, table: targetTable });
             }
         });
 
         candidateKeys.forEach((key) => {
             if (!appliedByKey.has(key)) {
-                appliedByKey.set(key, '');
+                appliedByKey.set(key, { id: '', table: targetTable });
             }
         });
 
@@ -219,24 +322,39 @@ const candidateStatusForDb = (status: CandidateStatus) =>
 
 export const intelligentUpdateService = {
     async saveRun(payload: IntelligentUpdateRunPayload): Promise<IntelligentUpdateRunResult> {
-        const { data: run, error: runError } = await supabase
+        const runInsertPayload = {
+            domain: payload.domain,
+            source_type: payload.sourceType ?? 'csv',
+            source_label: payload.sourceLabel ?? 'Dinamica BI',
+            status: 'reviewing',
+            pasted_row_count: payload.inputLineCount,
+            detected_blocks: payload.blocks,
+            summary: payload.summary,
+            warnings: payload.warnings,
+        };
+
+        let runResult = await supabase
             .from('gaas_update_runs')
-            .insert({
-                source_type: payload.sourceType ?? 'csv',
-                source_label: payload.sourceLabel ?? 'Dinamica BI',
-                status: 'reviewing',
-                pasted_row_count: payload.inputLineCount,
-                detected_blocks: payload.blocks,
-                summary: payload.summary,
-                warnings: payload.warnings,
-            })
+            .insert(runInsertPayload)
             .select('id')
             .single();
+
+        if (runResult.error && optionalAuditColumnError(runResult.error)) {
+            const { domain, ...fallbackRunPayload } = runInsertPayload;
+            runResult = await supabase
+                .from('gaas_update_runs')
+                .insert(fallbackRunPayload)
+                .select('id')
+                .single();
+        }
+
+        const { data: run, error: runError } = runResult;
 
         if (runError) throw runError;
         if (!run?.id) throw new Error('Execucao criada sem identificador.');
 
         const metricRows = payload.metrics.map((metric) => ({
+            domain: metric.domain ?? payload.domain,
             run_id: run.id,
             source_block: metric.sourceBlock,
             channel: metric.channel,
@@ -254,6 +372,7 @@ export const intelligentUpdateService = {
             independent: metric.independent ?? null,
             natural_key: metric.key,
             raw_payload: {
+                domain: metric.domain ?? payload.domain,
                 source_blocks: metric.sourceBlocks ?? [metric.sourceBlock],
                 dispatch_signature: metric.dispatchSignature ?? null,
             },
@@ -261,10 +380,7 @@ export const intelligentUpdateService = {
 
         const insertedMetrics: Array<{ id: string; natural_key: string }> = [];
         for (const chunk of chunkArray(metricRows, 500)) {
-            const { data, error } = await supabase
-                .from('gaas_dinamica_bi_metrics')
-                .insert(chunk)
-                .select('id,natural_key');
+            const { data, error } = await insertWithOptionalAuditColumns('gaas_dinamica_bi_metrics', chunk, 'id,natural_key');
 
             if (error) throw error;
             insertedMetrics.push(...(data || []));
@@ -272,18 +388,22 @@ export const intelligentUpdateService = {
 
         const metricIdByKey = new Map(insertedMetrics.map((metric: any) => [metric.natural_key, metric.id]));
 
-        const appliedByKey = await applyConfirmedActivityChanges(payload.candidates);
+        const appliedByKey = await applyConfirmedActivityChanges(payload.candidates, payload.domain);
         const now = new Date().toISOString();
 
         const candidateRows = payload.candidates.map((candidate) => {
-            const existingActivityId = asDbActivityId(candidate.matchedActivity);
-            const appliedActivityId = appliedByKey.get(candidate.key) ?? existingActivityId;
-            const wasApplied = Boolean(appliedByKey.get(candidate.key));
+            const existingActivityId = payload.domain === 'aquisicao' ? asDbActivityId(candidate.matchedActivity) : null;
+            const appliedTarget = appliedByKey.get(candidate.key);
+            const targetRecordId = appliedTarget?.id ?? existingActivityId ?? null;
+            const wasApplied = Boolean(appliedTarget);
 
             return {
+                domain: candidate.domain ?? payload.domain,
+                target_table: appliedTarget?.table ?? targetTableForDomain(payload.domain),
+                target_record_id: targetRecordId,
                 run_id: run.id,
                 metric_id: metricIdByKey.get(candidate.key) ?? null,
-                activity_id: appliedActivityId ?? null,
+                activity_id: payload.domain === 'aquisicao' ? targetRecordId : null,
                 status: wasApplied ? 'applied' : candidateStatusForDb(candidate.status),
                 match_count: candidate.matchCount,
                 field_to_review: candidate.fieldToReview,
@@ -295,6 +415,9 @@ export const intelligentUpdateService = {
                 excel_tsv_row: candidate.excelTsvRow,
                 proposed_activity_update: {
                     ...numericPatch(candidate),
+                    domain: candidate.domain ?? payload.domain,
+                    target_table: appliedTarget?.table ?? targetTableForDomain(payload.domain),
+                    target_record_id: targetRecordId,
                     activity_name: candidate.activityName,
                     journey: candidate.journey,
                     channel: candidate.channel,
@@ -311,7 +434,7 @@ export const intelligentUpdateService = {
         });
 
         for (const chunk of chunkArray(candidateRows, 500)) {
-            const { error } = await supabase.from('gaas_update_candidates').insert(chunk);
+            const { error } = await insertWithOptionalAuditColumns('gaas_update_candidates', chunk);
             if (error) throw error;
         }
 
@@ -323,6 +446,8 @@ export const intelligentUpdateService = {
                 status: finalStatus,
                 summary: {
                     ...payload.summary,
+                    domain: payload.domain,
+                    targetTable: targetTableForDomain(payload.domain),
                     metrics: payload.metrics.length,
                     candidates: payload.candidates.length,
                     applied: appliedCount,

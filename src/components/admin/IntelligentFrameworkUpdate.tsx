@@ -9,6 +9,7 @@ import {
     Database,
     Download,
     FileSpreadsheet,
+    CalendarDays,
     Loader2,
     Search,
     Sparkles,
@@ -23,8 +24,11 @@ import type { Activity } from '../../types/framework';
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
-type HumanField = 'parceiro' | 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'oferta' | 'promocional';
-type SuggestionField = HumanField | 'bu' | 'segmento';
+type UpdateDomain = 'aquisicao' | 'rentabilizacao';
+type TextReviewField = 'bu' | 'parceiro' | 'segmento' | 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'produto' | 'oferta' | 'promocional';
+type NumericReviewField = 'ordemDisparo';
+type ReviewField = TextReviewField | NumericReviewField;
+type SuggestionField = Exclude<ReviewField, 'ordemDisparo'>;
 type ProcessingStage = 'idle' | 'reading' | 'indexing' | 'detecting' | 'reviewing';
 
 type SuggestionBucket = Map<SuggestionField, Map<string, number>>;
@@ -54,6 +58,7 @@ interface FieldSuggestion {
 }
 
 interface MetricRow {
+    domain: UpdateDomain;
     key: string;
     sourceBlock: SourceBlock;
     sourceBlocks: SourceBlock[];
@@ -91,12 +96,13 @@ interface UpdateCandidate extends MetricRow {
     oferta: string;
     promocional: string;
     ordemDisparo?: number;
-    suggestions: Record<HumanField, FieldSuggestion[]>;
+    suggestions: Partial<Record<SuggestionField, FieldSuggestion[]>>;
     conflictJourneys?: string[];
     conflictReason?: string;
 }
 
 interface ProcessResult {
+    domain: UpdateDomain;
     blocks: BlockSummary[];
     metrics: MetricRow[];
     candidates: UpdateCandidate[];
@@ -180,7 +186,6 @@ const STATUS_LABEL: Record<CandidateStatus, string> = {
     error: 'Erro',
     ignored: 'Ignorado',
 };
-
 const STATUS_CLASS: Record<CandidateStatus, string> = {
     ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     review: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -191,23 +196,29 @@ const STATUS_CLASS: Record<CandidateStatus, string> = {
     ignored: 'bg-slate-100 text-slate-500 border-slate-200',
 };
 
-const HUMAN_FIELDS: Array<{ key: HumanField; label: string }> = [
+const REVIEW_FIELDS: Array<{ key: ReviewField; label: string; type?: 'number' }> = [
+    { key: 'bu', label: 'BU' },
     { key: 'parceiro', label: 'Parceiro' },
+    { key: 'segmento', label: 'Segmento' },
     { key: 'subgrupo', label: 'Subgrupo' },
     { key: 'etapaAquisicao', label: 'Etapa' },
     { key: 'perfilCredito', label: 'Perfil' },
+    { key: 'produto', label: 'Produto' },
     { key: 'oferta', label: 'Oferta' },
     { key: 'promocional', label: 'Promocional' },
+    { key: 'ordemDisparo', label: 'Ordem', type: 'number' },
 ];
 
 const SUGGESTION_FIELDS: SuggestionField[] = [
+    'bu',
+    'parceiro',
+    'segmento',
     'subgrupo',
     'etapaAquisicao',
     'perfilCredito',
+    'produto',
     'oferta',
     'promocional',
-    'bu',
-    'segmento',
 ];
 
 const REVIEW_PAGE_SIZE = 100;
@@ -220,6 +231,16 @@ const PROCESSING_STAGE_LABEL: Record<ProcessingStage, string> = {
     reviewing: 'Preparando revisao',
 };
 
+const DOMAIN_LABEL: Record<UpdateDomain, string> = {
+    aquisicao: 'Aquisição',
+    rentabilizacao: 'Rentabilização',
+};
+
+const DOMAIN_TARGET_TABLE: Record<UpdateDomain, string> = {
+    aquisicao: 'activities',
+    rentabilizacao: 'rentabilizacao_activities',
+};
+
 const SEGMENT_BY_TAXONOMY_CODE: Record<string, string> = {
     abn: 'Abandono',
     ac: 'Acordo Certo',
@@ -229,7 +250,8 @@ const SEGMENT_BY_TAXONOMY_CODE: Record<string, string> = {
     anc: 'Aprovados nao convertidos',
     atl: 'Ativo com limite',
     atv: 'Ativo Geral',
-    bsp: 'Base Proprietaria',
+    bp: 'Base_Proprietaria',
+    bsp: 'Base_Proprietaria',
     bb: 'Bem Barato',
     abb: 'Ativo Bem Barato',
     car: 'Carrinho Abandonado',
@@ -472,6 +494,7 @@ const mergeMetric = (map: Map<string, MetricRow>, row: MetricRow) => {
 const readBlockRows = (
     matrix: string[][],
     start: { row: number; col: number } | null,
+    domain: UpdateDomain,
     channel: Channel,
     sourceBlock: SourceBlock,
     offsets: {
@@ -508,6 +531,7 @@ const readBlockRows = (
         const key = buildNoveltyKey(journey, activityName, rowChannel, date);
         const dispatchSignature = buildDispatchSignature(activityName, rowChannel, date);
         rows.push({
+            domain,
             key,
             dispatchSignature,
             sourceBlock,
@@ -544,7 +568,7 @@ const getRaw = (activity: Activity, keys: string[]) => {
     return '';
 };
 
-const activityField = (activity: Activity, field: HumanField | 'bu' | 'parceiro' | 'segmento') => {
+const activityField = (activity: Activity, field: SuggestionField) => {
     switch (field) {
         case 'bu': return activity.bu || getRaw(activity, ['BU']);
         case 'parceiro': return activity.parceiro || getRaw(activity, ['Parceiro']);
@@ -552,6 +576,7 @@ const activityField = (activity: Activity, field: HumanField | 'bu' | 'parceiro'
         case 'subgrupo': return activity.subgrupo || getRaw(activity, ['Subgrupos']);
         case 'etapaAquisicao': return activity.etapaAquisicao || getRaw(activity, ['Etapa de aquisicao', 'Etapa de aquisição']);
         case 'perfilCredito': return activity.perfilCredito || getRaw(activity, ['Perfil de Credito', 'Perfil de Crédito']);
+        case 'produto': return activity.produto || getRaw(activity, ['Produto']);
         case 'oferta': return activity.oferta || getRaw(activity, ['Oferta']);
         case 'promocional': return activity.promocional || getRaw(activity, ['Promocional']);
         default: return '';
@@ -560,6 +585,15 @@ const activityField = (activity: Activity, field: HumanField | 'bu' | 'parceiro'
 
 const inferTaxonomy = (metric: MetricRow) => {
     const text = normalizeKey(`${metric.journey} ${metric.activityName}`);
+    const tokens = taxonomyTokens(`${metric.journey} ${metric.activityName}`);
+    const hasBasePropriaSignal = tokens.some((token) =>
+        ['bp', 'bsp'].includes(token)
+    ) || /base[_\s-]+propri(a|etaria)/.test(text);
+
+    if (hasBasePropriaSignal) {
+        return { bu: 'B2C', parceiro: 'Proprietaria', segmento: 'Base_Proprietaria' };
+    }
+
     const segmentByCode = inferSegmentFromTaxonomy(`${metric.journey} ${metric.activityName}`);
 
     const bu = text.includes('plurix') || text.includes('_plu_') || text.startsWith('plu_')
@@ -592,14 +626,14 @@ const inferTaxonomy = (metric: MetricRow) => {
     return { bu, parceiro, segmento };
 };
 
-const emptySuggestions = HUMAN_FIELDS.reduce<Record<HumanField, FieldSuggestion[]>>((acc, field) => {
-    acc[field.key] = [];
+const emptySuggestions = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, FieldSuggestion[]>>>((acc, field) => {
+    acc[field] = [];
     return acc;
-}, {} as Record<HumanField, FieldSuggestion[]>);
+}, {});
 
 const suggestionsFor = (
-    suggestions: Partial<Record<HumanField, FieldSuggestion[]>> | undefined,
-    field: HumanField
+    suggestions: Partial<Record<SuggestionField, FieldSuggestion[]>> | undefined,
+    field: SuggestionField
 ) => suggestions?.[field] ?? [];
 
 const createBucket = (): SuggestionBucket =>
@@ -729,15 +763,16 @@ const buildCandidate = (
     importedSignatureJourneys: Map<string, Set<string>>
 ): UpdateCandidate => {
     const taxonomy = inferTaxonomy(metric);
-    const fieldSuggestions = HUMAN_FIELDS.reduce<Record<HumanField, FieldSuggestion[]>>((acc, field) => {
-        acc[field.key] = suggestFromHistory(metric, historyIndex, field.key);
+    const hasDeterministicBasePropria = taxonomy.bu === 'B2C' && taxonomy.parceiro === 'Proprietaria' && taxonomy.segmento === 'Base_Proprietaria';
+    const fieldSuggestions = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, FieldSuggestion[]>>>((acc, field) => {
+        acc[field] = suggestFromHistory(metric, historyIndex, field);
         return acc;
-    }, {} as Record<HumanField, FieldSuggestion[]>);
-    const buSuggestions = suggestFromHistory(metric, historyIndex, 'bu');
-    const segmentoSuggestions = suggestFromHistory(metric, historyIndex, 'segmento');
+    }, {});
 
-    const valueFor = (field: HumanField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
-    const confidences = HUMAN_FIELDS.map((field) => suggestionsFor(fieldSuggestions, field.key)[0]?.confidence ?? 0);
+    const valueFor = (field: SuggestionField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
+    const confidences = SUGGESTION_FIELDS
+        .filter((field) => !['bu', 'segmento', 'produto'].includes(field))
+        .map((field) => suggestionsFor(fieldSuggestions, field)[0]?.confidence ?? 0);
     const averageConfidence = Math.round(confidences.reduce((sum, value) => sum + value, 0) / confidences.length);
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     const importedJourneys = importedSignatureJourneys.get(metric.dispatchSignature) ?? new Set<string>();
@@ -753,7 +788,8 @@ const buildCandidate = (
     ])).filter(Boolean);
     const renamedJourneyConflict = conflictJourneys.length > 0;
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
-    const missingHumanSuggestion = HUMAN_FIELDS.some((field) => !suggestionsFor(fieldSuggestions, field.key)[0]?.value);
+    const missingHumanSuggestion = ['parceiro', 'subgrupo', 'etapaAquisicao', 'perfilCredito', 'oferta', 'promocional']
+        .some((field) => !suggestionsFor(fieldSuggestions, field as SuggestionField)[0]?.value);
 
     const status: CandidateStatus = missingCritical
         ? 'error'
@@ -796,13 +832,14 @@ const buildCandidate = (
                     ? `mesma activity, canal e data com jornada diferente: ${conflictJourneys.join(', ')}`
                     : 'sugestoes por taxonomia e historico',
         accepted: false,
-        bu: buSuggestions[0]?.value || taxonomy.bu,
+        domain: metric.domain,
+        bu: hasDeterministicBasePropria ? taxonomy.bu : valueFor('bu', taxonomy.bu),
         parceiro: valueFor('parceiro', taxonomy.parceiro),
-        segmento: segmentoSuggestions[0]?.value || taxonomy.segmento,
+        segmento: hasDeterministicBasePropria ? taxonomy.segmento : valueFor('segmento', taxonomy.segmento),
         subgrupo: valueFor('subgrupo', 'N/A'),
         etapaAquisicao: valueFor('etapaAquisicao', ''),
         perfilCredito: valueFor('perfilCredito', ''),
-        produto: 'Cartao',
+        produto: valueFor('produto', 'Cartao'),
         oferta: valueFor('oferta', ''),
         promocional: valueFor('promocional', ''),
         ordemDisparo: undefined,
@@ -950,11 +987,11 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         return map;
     }, new Map<string, MetricRow[]>());
 
-    // Secondary index: activityName only (sem canal) — usado como fallback para
+    // Secondary index: activityName only (sem canal) - usado como fallback para
     // ECRED-API, cujos resultados aparecem no bloco PERF com canal='ECRED-API'
     // mesmo que o disparo tenha sido WPP/SMS. O attributionKey normal falha porque
-    // os canais diferem ('WhatsApp' vs 'ECRED-API'), então sem este índice os
-    // cartões finalizados ficam em ignoredPerformance.
+    // os canais diferem ('WhatsApp' vs 'ECRED-API'), entao sem este indice os
+    // cartoes finalizados ficam em ignoredPerformance.
     const anchorsByActivityName = anchors.reduce((map, row) => {
         const key = normalizeKey(row.activityName);
         if (!map.has(key)) map.set(key, []);
@@ -980,8 +1017,8 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
 
         if (match) return match;
 
-        // Fallback ECRED-API: o resultado de conversão do caminho ECRED chega no bloco
-        // PERF com canal='ECRED-API', mas o disparo original é WPP/SMS. Busca pelo
+        // Fallback ECRED-API: o resultado de conversao do caminho ECRED chega no bloco
+        // PERF com canal='ECRED-API', mas o disparo original e WPP/SMS. Busca pelo
         // activityName sem considerar o canal, dentro da janela D0-D2.
         if (isEcredChannel(row.channel)) {
             const ecredCandidates = anchorsByActivityName.get(normalizeKey(row.activityName)) ?? [];
@@ -1031,6 +1068,155 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
     return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, mergedEcred, ignoredPerformance };
 };
 
+const isRentabilizacaoJourney = (journey: unknown) => {
+    const j = normalizeKey(journey).toUpperCase();
+    return j.startsWith('JOR_RENTABILIZACAO_')
+        || j.startsWith('JOR_ATIVACAO_')
+        || j.startsWith('JOR_ATIVACAO')
+        || j.startsWith('JOR_INCENTIVO_AO_USO_')
+        || j.startsWith('JOR_POS_TOMBAMENTO_DESBLOQUEIO_')
+        || j.startsWith('JOR_CARTAO_VC_WELCOME')
+        || j.includes('SEGURO');
+};
+
+const inferRentabilizacaoTaxonomy = (metric: MetricRow) => {
+    const text = normalizeKey(`${metric.journey} ${metric.activityName}`).toUpperCase();
+    const bu = text.includes('PLURIX') || text.includes('MAISAMIGO') || text.includes('PLU_')
+        ? 'Plurix'
+        : text.includes('B2B2C') || text.includes('_BB_') || text.includes('BB_')
+            ? 'B2B2C'
+            : text.includes('SEGURO') || text.includes('AFZ_SEG_')
+                ? 'Seguros'
+                : 'B2C';
+    const segmento = text.includes('SEGURO')
+        ? 'Rentabilizacao'
+        : text.includes('NOVOS')
+            ? 'Novos'
+            : text.includes('REATIVACAO')
+                ? 'Reativacao'
+                : text.includes('CARTONISTAS')
+                    ? 'Cartonistas'
+                    : text.includes('ATIVACAO') || text.includes('WELCOME') || text.includes('DESBLOQUEIO')
+                        ? 'Ativacao'
+                        : 'Rentabilizacao';
+    const produto = text.includes('SEGURO MULHER')
+        ? 'Seguro Mulher'
+        : text.includes('SEGURO RESIDENCIA')
+            ? 'Seguro Residencia'
+            : 'Cartao';
+
+    return { bu, parceiro: 'N/A', segmento, produto, etapaAquisicao: 'Rentabilizacao' };
+};
+
+const buildRentabilizacaoCandidate = (
+    metric: MetricRow,
+    importedKeyCount: Map<string, number>
+): UpdateCandidate => {
+    const taxonomy = inferRentabilizacaoTaxonomy(metric);
+    const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
+    const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
+    const missingDispatchVolume = !hasDispatchVolume(metric);
+    const status: CandidateStatus = missingCritical
+        ? 'error'
+        : duplicateCount > 1
+            ? 'duplicate'
+            : missingDispatchVolume
+                ? 'ignored'
+                : 'ready';
+
+    return {
+        ...metric,
+        status,
+        matchCount: 0,
+        fieldToReview: missingCritical
+            ? 'Chave'
+            : duplicateCount > 1
+                ? 'Duplicidade'
+                : missingDispatchVolume
+                    ? 'Disparo sem volume acionavel'
+                    : 'Aprovar',
+        suggestion: status === 'ready' ? 'Classificacao por regra de rentabilizacao' : 'Linha fora do upload automatico',
+        confidence: status === 'ready' ? 86 : 0,
+        basis: missingCritical
+            ? 'journey, canal ou data ausente'
+            : duplicateCount > 1
+                ? 'mais de uma linha no arquivo com a mesma chave'
+                : missingDispatchVolume
+                    ? 'Base Total e Base Acionavel precisam ser maiores que zero'
+                    : 'regras portadas do upload de rentabilizacao',
+        accepted: false,
+        bu: taxonomy.bu,
+        parceiro: taxonomy.parceiro,
+        segmento: taxonomy.segmento,
+        subgrupo: 'N/A',
+        etapaAquisicao: taxonomy.etapaAquisicao,
+        perfilCredito: 'N/A',
+        produto: taxonomy.produto,
+        oferta: 'Padrao',
+        promocional: 'N/A',
+        ordemDisparo: undefined,
+        suggestions: emptySuggestions,
+        conflictJourneys: [],
+        conflictReason: undefined,
+    };
+};
+
+const processRentabilizacaoDinamicaBI = (matrix: string[][]): ProcessResult => {
+    const warnings: string[] = [];
+    const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
+    const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
+    const smsStart = findCell(matrix, ['journeyname (sms)']);
+    const pushStart = findCell(matrix, ['journeyname (push)']);
+
+    const whatsappRows = readBlockRows(matrix, whatsappStart, 'rentabilizacao', 'WhatsApp', 'whatsapp', {
+        journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5,
+    });
+    const emailRows = readBlockRows(matrix, emailStart, 'rentabilizacao', 'E-mail', 'email', {
+        journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5, clicks: 6,
+    });
+    const smsRows = readBlockRows(matrix, smsStart, 'rentabilizacao', 'SMS', 'sms', {
+        journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
+    });
+    const pushRows = readBlockRows(matrix, pushStart, 'rentabilizacao', 'Push', 'push', {
+        journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
+    });
+
+    const blocks: BlockSummary[] = [
+        { key: 'whatsapp', label: 'WhatsApp', detected: Boolean(whatsappStart), rows: whatsappRows.length },
+        { key: 'email', label: 'E-mail', detected: Boolean(emailStart), rows: emailRows.length },
+        { key: 'sms', label: 'SMS', detected: Boolean(smsStart), rows: smsRows.length },
+        { key: 'push', label: 'Push', detected: Boolean(pushStart), rows: pushRows.length },
+        { key: 'performance', label: 'Performance', detected: false, rows: 0 },
+    ];
+    const rawRows = [...whatsappRows, ...emailRows, ...smsRows, ...pushRows];
+    const scopedRows = rawRows.filter((row) => isRentabilizacaoJourney(row.journey));
+    const ignoredOutOfScope = rawRows.length - scopedRows.length;
+    if (ignoredOutOfScope > 0) warnings.push(`${ignoredOutOfScope} linhas fora do escopo de rentabilizacao foram ignoradas.`);
+
+    const metricMap = new Map<string, MetricRow>();
+    scopedRows.forEach((row) => {
+        mergeMetric(metricMap, {
+            ...row,
+            key: row.dispatchSignature,
+        });
+    });
+    const metrics = Array.from(metricMap.values());
+    const importedKeyCount = scopedRows.reduce((map, row) => {
+        map.set(row.dispatchSignature, (map.get(row.dispatchSignature) ?? 0) + 1);
+        return map;
+    }, new Map<string, number>());
+    const candidates = metrics
+        .map((row) => buildRentabilizacaoCandidate(row, importedKeyCount))
+        .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status));
+    const ignoredExisting = candidates.filter((candidate) => candidate.status === 'ignored').length;
+    const tsv = candidates
+        .filter((candidate) => !['duplicate', 'error', 'ignored'].includes(candidate.status))
+        .map(buildExcelRow)
+        .join('\n');
+
+    return { domain: 'rentabilizacao', blocks, metrics, candidates, ignoredExisting, importedRows: rawRows.length, tsv, warnings };
+};
+
 const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
     const warnings: string[] = [];
     const historyIndex = buildHistoryIndex(activities);
@@ -1041,19 +1227,19 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const performanceStart = findCell(matrix, ['journey (resultados de performance)']);
     const pushStart = findCell(matrix, ['journeyname (push)']);
 
-    const whatsappRows = readBlockRows(matrix, whatsappStart, 'WhatsApp', 'whatsapp', {
+    const whatsappRows = readBlockRows(matrix, whatsappStart, 'aquisicao', 'WhatsApp', 'whatsapp', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5,
     });
-    const emailRows = readBlockRows(matrix, emailStart, 'E-mail', 'email', {
+    const emailRows = readBlockRows(matrix, emailStart, 'aquisicao', 'E-mail', 'email', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5, clicks: 6,
     });
-    const smsRows = readBlockRows(matrix, smsStart, 'SMS', 'sms', {
+    const smsRows = readBlockRows(matrix, smsStart, 'aquisicao', 'SMS', 'sms', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
     });
-    const performanceRows = readBlockRows(matrix, performanceStart, 'Indefinido', 'performance', {
+    const performanceRows = readBlockRows(matrix, performanceStart, 'aquisicao', 'Indefinido', 'performance', {
         journey: 0, activity: 1, date: 2, channel: 3, proposals: 4, approved: 5, finalized: 6, assisted: 7, independent: 8,
     });
-    const pushRows = readBlockRows(matrix, pushStart, 'Push', 'push', {
+    const pushRows = readBlockRows(matrix, pushStart, 'aquisicao', 'Push', 'push', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
     });
 
@@ -1127,7 +1313,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
         .map(buildExcelRow)
         .join('\n');
 
-    return { blocks, metrics, candidates, ignoredExisting, importedRows: rawRows.length, tsv, warnings };
+    return { domain: 'aquisicao', blocks, metrics, candidates, ignoredExisting, importedRows: rawRows.length, tsv, warnings };
 };
 
 const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((resolve, reject) => {
@@ -1163,10 +1349,11 @@ const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((reso
 
 const safeProcessDinamicaBI = (
     matrix: string[][],
-    activities: Activity[]
+    activities: Activity[],
+    domain: UpdateDomain
 ): { result: ProcessResult | null; error?: ParseDebugInfo } => {
     try {
-        return { result: processDinamicaBI(matrix, activities) };
+        return { result: domain === 'rentabilizacao' ? processRentabilizacaoDinamicaBI(matrix) : processDinamicaBI(matrix, activities) };
     } catch (error: any) {
         return {
             result: null,
@@ -1213,6 +1400,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
     const [uploadConfirmOpen, setUploadConfirmOpen] = useState(false);
     const [reviewSearchTerm, setReviewSearchTerm] = useState('');
+    const [activeDomain, setActiveDomain] = useState<UpdateDomain>('aquisicao');
+    const [flowChooserOpen, setFlowChooserOpen] = useState(false);
+    const [periodFilterOpen, setPeriodFilterOpen] = useState(false);
+    const [reviewStartDate, setReviewStartDate] = useState('');
+    const [reviewEndDate, setReviewEndDate] = useState('');
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -1238,6 +1430,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         return candidates.filter((candidate) => {
             const statusMatches = statusFilter === 'all' || candidate.status === statusFilter;
             if (!statusMatches) return false;
+            if (reviewStartDate && candidate.date < reviewStartDate) return false;
+            if (reviewEndDate && candidate.date > reviewEndDate) return false;
             if (!term) return true;
 
             const haystack = normalizeKey([
@@ -1253,7 +1447,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
             return haystack.includes(term);
         });
-    }, [candidates, statusFilter, reviewSearchTerm]);
+    }, [candidates, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
     const reviewPageCount = Math.max(1, Math.ceil(filteredCandidates.length / REVIEW_PAGE_SIZE));
     const pagedCandidates = useMemo(() => {
         const safePage = Math.min(reviewPage, reviewPageCount);
@@ -1311,6 +1505,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setSelectedKeys(new Set());
         setUploadConfirmOpen(false);
         setReviewSearchTerm('');
+        setReviewStartDate('');
+        setReviewEndDate('');
         setProcessingStage('reading');
 
         try {
@@ -1320,7 +1516,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             await nextFrame();
             setProcessingStage('detecting');
             await nextFrame();
-            const processedResult = safeProcessDinamicaBI(matrix, activities);
+            const processedResult = safeProcessDinamicaBI(matrix, activities, activeDomain);
             if (!processedResult.result) {
                 const debug = {
                     ...processedResult.error,
@@ -1376,6 +1572,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     .join('\n'),
             };
         });
+        setSelectedCandidate((current) => current?.key === key ? { ...current, ...updates } : current);
     };
 
     const acceptCandidate = (key: string) => {
@@ -1470,6 +1667,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 candidate.accepted && !['duplicate', 'error', 'ignored'].includes(candidate.status)
             ).length;
             const saved = await intelligentUpdateService.saveRun({
+                domain: result.domain,
                 sourceLabel: fileMeta?.name ?? 'Dinamica BI',
                 sourceType: fileMeta?.type === 'xlsx' || fileMeta?.type === 'xls' ? 'xlsx' : 'csv',
                 inputLineCount: fileMeta?.rows ?? result.importedRows,
@@ -1490,6 +1688,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     ignored: summary.ignored,
                     ignoredExisting: result.ignoredExisting,
                     accepted: acceptedCount,
+                    domain: result.domain,
+                    targetTable: DOMAIN_TARGET_TABLE[result.domain],
                 },
             });
 
@@ -1539,13 +1739,23 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <div>
                             <h3 className="text-xl font-bold text-slate-900">Atualizacao Inteligente</h3>
                             <p className="text-sm text-slate-500">
-                                Arraste a Dinamica BI, revise os campos essenciais e confirme Excel + base de dados.
+                                Fluxo atual: {DOMAIN_LABEL[activeDomain]}. Revise campos, gere Excel e envie para base de dados.
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                        <Database size={14} />
-                        Historico carregado: {activities.length} campanhas
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setFlowChooserOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 transition hover:bg-cyan-100"
+                        >
+                            <Wand2 size={14} />
+                            Alterar fluxo
+                        </button>
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                            <Database size={14} />
+                            Historico carregado: {activities.length} campanhas
+                        </div>
                     </div>
                 </div>
 
@@ -1706,6 +1916,59 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 )}
             </div>
 
+            {flowChooserOpen && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                            <div>
+                            <h3 className="text-base font-bold text-slate-900">Escolher fluxo de atualização</h3>
+                                <p className="mt-1 text-xs text-slate-500">Cada fluxo usa regras e tabela destino próprias.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setFlowChooserOpen(false)}
+                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                aria-label="Fechar selecao de fluxo"
+                            >
+                                <X size={16} />
+                            </button>
+                        </header>
+                        <main className="grid gap-3 p-5">
+                            {(['aquisicao', 'rentabilizacao'] as const).map((domain) => (
+                                <button
+                                    key={domain}
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveDomain(domain);
+                                        setResult(null);
+                                        setFileMeta(null);
+                                        setSelectedKeys(new Set());
+                                        setFlowChooserOpen(false);
+                                    }}
+                                    className={`rounded-xl border px-4 py-4 text-left transition ${
+                                        activeDomain === domain
+                                            ? 'border-cyan-500 bg-cyan-50'
+                                            : 'border-slate-200 bg-white hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-bold text-slate-900">Atualizar {DOMAIN_LABEL[domain]}</div>
+                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                                            {DOMAIN_TARGET_TABLE[domain]}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        {domain === 'aquisicao'
+                                            ? 'Campanhas do framework de aquisição, com revisão completa das dimensões antes de gravar.'
+                                            : 'Réguas de rentabilização, seguros, Copa e ativações mapeáveis para a base de rentabilização.'}
+                                    </p>
+                                </button>
+                            ))}
+                        </main>
+                    </div>
+                </div>
+            )}
+
             {reviewOpen && result && fileMeta && (
                 <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
                     <div className="flex w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
@@ -1717,8 +1980,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                             <FileSpreadsheet size={18} />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-slate-900">Review Sheet da Atualizacao</h3>
-                                            <p className="text-xs text-slate-500">{fileMeta.name}</p>
+                                            <h3 className="text-lg font-bold text-slate-900">Revisao de {DOMAIN_LABEL[result.domain]}</h3>
+                                            <p className="text-xs text-slate-500">{fileMeta.name} - destino: {DOMAIN_TARGET_TABLE[result.domain]}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1742,30 +2005,82 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
                         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3">
                             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                                <div className="relative w-full xl:max-w-md">
-                                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        type="search"
-                                        value={reviewSearchTerm}
-                                        onChange={(event) => {
-                                            setReviewSearchTerm(event.target.value);
-                                            setReviewPage(1);
-                                        }}
-                                        placeholder="Buscar JourneyName, activity, canal ou segmento"
-                                        className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-xs font-semibold text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
-                                    />
-                                    {reviewSearchTerm && (
+                                <div className="flex w-full flex-col gap-2 xl:max-w-3xl">
+                                    <div className="flex gap-2">
+                                        <div className="relative min-w-0 flex-1">
+                                            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="search"
+                                                value={reviewSearchTerm}
+                                                onChange={(event) => {
+                                                    setReviewSearchTerm(event.target.value);
+                                                    setReviewPage(1);
+                                                }}
+                                                placeholder="Buscar JourneyName, activity, canal ou segmento"
+                                                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-xs font-semibold text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+                                            />
+                                            {reviewSearchTerm && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setReviewSearchTerm('');
+                                                        setReviewPage(1);
+                                                    }}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                                    aria-label="Limpar busca"
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            )}
+                                        </div>
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setReviewSearchTerm('');
-                                                setReviewPage(1);
-                                            }}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                                            aria-label="Limpar busca"
+                                            onClick={() => setPeriodFilterOpen((open) => !open)}
+                                            className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                                                reviewStartDate || reviewEndDate || periodFilterOpen
+                                                    ? 'border-cyan-500 bg-cyan-50 text-cyan-700'
+                                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                            }`}
                                         >
-                                            <X size={13} />
+                                            <CalendarDays size={14} />
+                                            Período
                                         </button>
+                                    </div>
+                                    {periodFilterOpen && (
+                                        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2">
+                                            <input
+                                                type="date"
+                                                value={reviewStartDate}
+                                                onChange={(event) => {
+                                                    setReviewStartDate(event.target.value);
+                                                    setReviewPage(1);
+                                                }}
+                                                className="rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-500"
+                                            />
+                                            <span className="text-xs text-slate-400">ate</span>
+                                            <input
+                                                type="date"
+                                                value={reviewEndDate}
+                                                onChange={(event) => {
+                                                    setReviewEndDate(event.target.value);
+                                                    setReviewPage(1);
+                                                }}
+                                                className="rounded-md border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-500"
+                                            />
+                                            {(reviewStartDate || reviewEndDate) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setReviewStartDate('');
+                                                        setReviewEndDate('');
+                                                        setReviewPage(1);
+                                                    }}
+                                                    className="rounded-md px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100"
+                                                >
+                                                    Limpar
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                                 <button
@@ -1851,20 +2166,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     disabled={reviewPage >= reviewPageCount}
                                     className="rounded-md border border-slate-200 bg-white px-3 py-1.5 font-bold text-slate-600 disabled:cursor-not-allowed disabled:text-slate-300"
                                 >
-                                    Proxima
+                                    Próxima
                                 </button>
                             </div>
                         </div>
 
                         <main className="min-h-0 flex-1 overflow-auto">
-                            <table className="min-w-[1500px] w-full divide-y divide-slate-200 text-left text-xs">
+                            <table className="min-w-[2300px] w-full divide-y divide-slate-200 text-left text-xs">
                                 <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-wider text-slate-500 shadow-sm">
                                     <tr>
                                         {statusFilter === 'ready' && <th className="px-3 py-3 font-bold">Sel.</th>}
                                         <th className="px-3 py-3 font-bold">Status</th>
-                                        <th className="px-3 py-3 font-bold">Chave</th>
-                                        <th className="px-3 py-3 font-bold">Automaticos</th>
-                                        {HUMAN_FIELDS.map((field) => (
+                                        <th className="px-3 py-3 font-bold">Identidade</th>
+                                        {REVIEW_FIELDS.map((field) => (
                                             <th key={field.key} className="px-3 py-3 font-bold">{field.label}</th>
                                         ))}
                                         <th className="px-3 py-3 font-bold">Confianca</th>
@@ -1901,15 +2215,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                     <span>{formatDateBR(candidate.date)}</span>
                                                 </div>
                                             </td>
-                                            <td className="w-56 px-3 py-3 align-top">
-                                                <div className="space-y-1 text-slate-700">
-                                                    <div><span className="text-slate-400">BU:</span> {candidate.bu}</div>
-                                                    <div><span className="text-slate-400">Segmento:</span> {candidate.segmento}</div>
-                                                    <div><span className="text-slate-400">Produto:</span> {candidate.produto}</div>
-                                                </div>
-                                            </td>
-                                            {HUMAN_FIELDS.map((field) => {
-                                                const suggestions = suggestionsFor(candidate.suggestions, field.key);
+                                            {REVIEW_FIELDS.map((field) => {
+                                                const hasSuggestions = field.key !== 'ordemDisparo';
+                                                const suggestions = hasSuggestions
+                                                    ? suggestionsFor(candidate.suggestions, field.key as SuggestionField)
+                                                    : [];
                                                 const top = suggestions[0];
                                                 const listId = `${candidate.key}-${field.key}`;
                                                 return (
@@ -1919,22 +2229,27 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                         onClick={(event) => event.stopPropagation()}
                                                     >
                                                         <input
-                                                            value={candidate[field.key]}
-                                                            list={listId}
+                                                            type={field.type === 'number' ? 'number' : 'text'}
+                                                            value={candidate[field.key] ?? ''}
+                                                            list={hasSuggestions ? listId : undefined}
                                                             onClick={(event) => event.stopPropagation()}
                                                             onFocus={(event) => event.stopPropagation()}
                                                             onPointerDown={(event) => event.stopPropagation()}
                                                             onChange={(event) => updateCandidate(candidate.key, {
-                                                                [field.key]: event.target.value,
+                                                                [field.key]: field.type === 'number'
+                                                                    ? (event.target.value ? Number(event.target.value) : undefined)
+                                                                    : event.target.value,
                                                                 accepted: false,
                                                             } as Partial<UpdateCandidate>)}
                                                             className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10"
                                                         />
-                                                        <datalist id={listId}>
-                                                            {suggestions.map((suggestion) => (
-                                                                <option key={`${field.key}-${suggestion.value}`} value={suggestion.value} />
-                                                            ))}
-                                                        </datalist>
+                                                        {hasSuggestions && (
+                                                            <datalist id={listId}>
+                                                                {suggestions.map((suggestion) => (
+                                                                    <option key={`${field.key}-${suggestion.value}`} value={suggestion.value} />
+                                                                ))}
+                                                            </datalist>
+                                                        )}
                                                         {top && (
                                                             <div className="mt-1 text-[10px] leading-tight text-slate-400">
                                                                 {top.confidence}% - {top.source} ({top.count})
@@ -1986,7 +2301,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     ))}
                                     {filteredCandidates.length === 0 && (
                                         <tr>
-                                            <td colSpan={10} className="px-3 py-16 text-center text-slate-500">
+                                            <td colSpan={REVIEW_FIELDS.length + 4} className="px-3 py-16 text-center text-slate-500">
                                                 {reviewSearchTerm ? 'Nenhum candidato encontrado para esta busca.' : 'Nenhum candidato neste filtro.'}
                                             </td>
                                         </tr>
@@ -1998,7 +2313,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <footer className="flex flex-col gap-3 border-t border-slate-200 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-xs text-slate-500">
                                 {selectedCandidatesForCopy.length > 0
-                                    ? `${selectedCandidatesForCopy.length} linhas selecionadas. Se nao houver aceitas, elas serao usadas no upload.`
+                                    ? `${selectedCandidatesForCopy.length} linhas selecionadas. Se não houver aceitas, elas serão usadas no upload.`
                                     : exportableCandidates.length > 0 && blockingCount > 0
                                         ? `${exportableCandidates.length} linhas aceitas; ${blockingCount} pendentes ficam fora da atualizacao.`
                                         : blockingCount > 0
@@ -2038,7 +2353,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
                                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Clipboard size={14} />}
-                                    Confirmar Atualização
+                                    Enviar para base de dados
                                 </button>
                             </div>
                         </footer>
@@ -2077,7 +2392,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <StatCard label="Serao gravadas" value={uploadCandidates.length} tone="text-blue-700" />
+                                <StatCard label="Serão gravadas" value={uploadCandidates.length} tone="text-blue-700" />
                                 <StatCard label="Pendentes fora" value={Math.max(0, candidates.length - uploadCandidates.length - summary.ignored)} tone="text-amber-700" />
                                 <StatCard label="Duplicadas" value={summary.duplicate} tone="text-purple-700" />
                                 <StatCard label="Erros" value={summary.error} tone="text-red-700" />
@@ -2085,19 +2400,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
                             {uploadUsesSelection && (
                                 <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs text-blue-800">
-                                    Nenhuma linha aceita foi encontrada. As {uploadCandidates.length} linhas selecionadas serao aprovadas e enviadas neste upload.
+                                    Nenhuma linha aceita foi encontrada. As {uploadCandidates.length} linhas selecionadas serão aprovadas e enviadas neste upload.
                                 </div>
                             )}
 
                             <div className="rounded-xl border border-slate-200 px-3 py-3 text-xs text-slate-600">
-                                <div className="font-bold text-slate-900">Conteudo do upload</div>
+                                <div className="font-bold text-slate-900">Conteúdo do upload</div>
                                 <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
                                     <span>Blocos:</span>
                                     <span className="font-semibold text-slate-800">{uploadBlocks.length > 0 ? uploadBlocks.join(', ') : 'N/A'}</span>
                                     <span>Defaults aplicados:</span>
                                     <span className="font-semibold text-slate-800">N/A, Padrao, Cartao</span>
                                     <span>Auditoria:</span>
-                                    <span className="font-semibold text-slate-800">run, metricas e candidatos</span>
+                                    <span className="font-semibold text-slate-800">run, métricas e candidatos</span>
                                 </div>
                             </div>
                         </main>
@@ -2173,15 +2488,68 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </div>
                                 <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
                                     <div><span className="font-bold text-slate-900">Blocos consolidados:</span> {selectedCandidate.sourceBlocks.join(', ')}</div>
-                                    <div className="mt-2 font-bold text-slate-900">Identidade do disparo</div>
-                                    <div className="mt-1 grid gap-1 md:grid-cols-2">
-                                        <div><span className="text-slate-400">Jornada:</span> <span className="break-words">{selectedCandidate.journey}</span></div>
-                                        <div><span className="text-slate-400">Canal:</span> {selectedCandidate.channel}</div>
-                                        <div><span className="text-slate-400">Data:</span> {formatDateBR(selectedCandidate.date)}</div>
-                                        <div><span className="text-slate-400">Activity:</span> <span className="break-all">{selectedCandidate.activityName}</span></div>
+                                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                                        Editar Jornada, Activity, Canal ou Data altera a chave de unicidade usada para gravar na base de dados.
+                                    </div>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <label className="block">
+                                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Jornada</span>
+                                            <input
+                                                value={selectedCandidate.journey}
+                                                onChange={(event) => updateCandidate(selectedCandidate.key, {
+                                                    journey: event.target.value,
+                                                    accepted: false,
+                                                })}
+                                                className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500"
+                                            />
+                                        </label>
+                                        <label className="block">
+                                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Canal</span>
+                                            <select
+                                                value={selectedCandidate.channel}
+                                                onChange={(event) => {
+                                                    const channel = event.target.value as Channel;
+                                                    updateCandidate(selectedCandidate.key, {
+                                                        channel,
+                                                        dispatchSignature: buildDispatchSignature(selectedCandidate.activityName, channel, selectedCandidate.date),
+                                                        accepted: false,
+                                                    });
+                                                }}
+                                                className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500"
+                                            >
+                                                {(['WhatsApp', 'E-mail', 'SMS', 'Push'] as Channel[]).map((channel) => (
+                                                    <option key={channel} value={channel}>{channel}</option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        <label className="block">
+                                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Data</span>
+                                            <input
+                                                type="date"
+                                                value={selectedCandidate.date}
+                                                onChange={(event) => updateCandidate(selectedCandidate.key, {
+                                                    date: event.target.value,
+                                                    dispatchSignature: buildDispatchSignature(selectedCandidate.activityName, selectedCandidate.channel, event.target.value),
+                                                    accepted: false,
+                                                })}
+                                                className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500"
+                                            />
+                                        </label>
+                                        <label className="block">
+                                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Activity name / Taxonomia</span>
+                                            <input
+                                                value={selectedCandidate.activityName}
+                                                onChange={(event) => updateCandidate(selectedCandidate.key, {
+                                                    activityName: event.target.value,
+                                                    dispatchSignature: buildDispatchSignature(event.target.value, selectedCandidate.channel, selectedCandidate.date),
+                                                    accepted: false,
+                                                })}
+                                                className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500"
+                                            />
+                                        </label>
                                     </div>
                                     <details className="mt-3 rounded-md bg-slate-50 p-2">
-                                        <summary className="cursor-pointer text-[11px] font-bold text-slate-500">Ver identificadores tecnicos</summary>
+                                        <summary className="cursor-pointer text-[11px] font-bold text-slate-500">Ver identificadores técnicos</summary>
                                         <div className="mt-2 break-all font-mono text-[10px] text-slate-500">
                                             <div>identity: {selectedCandidate.key}</div>
                                             <div className="mt-1">anti-renomeacao: {selectedCandidate.dispatchSignature}</div>
@@ -2199,16 +2567,44 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                 )}
                                 <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600">
-                                    <div className="grid gap-2 md:grid-cols-2">
-                                        <div><span className="text-slate-400">BU:</span> {selectedCandidate.bu}</div>
-                                        <div><span className="text-slate-400">Parceiro:</span> {selectedCandidate.parceiro}</div>
-                                        <div><span className="text-slate-400">Segmento:</span> {selectedCandidate.segmento}</div>
-                                        <div><span className="text-slate-400">Produto:</span> {selectedCandidate.produto}</div>
-                                        <div><span className="text-slate-400">Subgrupo:</span> {selectedCandidate.subgrupo}</div>
-                                        <div><span className="text-slate-400">Etapa:</span> {selectedCandidate.etapaAquisicao || '-'}</div>
-                                        <div><span className="text-slate-400">Perfil:</span> {selectedCandidate.perfilCredito || '-'}</div>
-                                        <div><span className="text-slate-400">Oferta:</span> {selectedCandidate.oferta || '-'}</div>
-                                        <div><span className="text-slate-400">Promocional:</span> {selectedCandidate.promocional || '-'}</div>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        {REVIEW_FIELDS.map((field) => {
+                                            const hasSuggestions = field.key !== 'ordemDisparo';
+                                            const suggestions = hasSuggestions
+                                                ? suggestionsFor(selectedCandidate.suggestions, field.key as SuggestionField)
+                                                : [];
+                                            const top = suggestions[0];
+                                            const listId = `detail-${selectedCandidate.key}-${field.key}`;
+                                            return (
+                                                <label key={field.key} className="block">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{field.label}</span>
+                                                    <input
+                                                        type={field.type === 'number' ? 'number' : 'text'}
+                                                        value={selectedCandidate[field.key] ?? ''}
+                                                        list={hasSuggestions ? listId : undefined}
+                                                        onChange={(event) => updateCandidate(selectedCandidate.key, {
+                                                            [field.key]: field.type === 'number'
+                                                                ? (event.target.value ? Number(event.target.value) : undefined)
+                                                                : event.target.value,
+                                                            accepted: false,
+                                                        } as Partial<UpdateCandidate>)}
+                                                        className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500"
+                                                    />
+                                                    {hasSuggestions && (
+                                                        <datalist id={listId}>
+                                                            {suggestions.map((suggestion) => (
+                                                                <option key={`${field.key}-${suggestion.value}`} value={suggestion.value} />
+                                                            ))}
+                                                        </datalist>
+                                                    )}
+                                                    {top && (
+                                                        <div className="mt-1 text-[10px] leading-tight text-slate-400">
+                                                            {top.confidence}% - {top.source} ({top.count})
+                                                        </div>
+                                                    )}
+                                                </label>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
