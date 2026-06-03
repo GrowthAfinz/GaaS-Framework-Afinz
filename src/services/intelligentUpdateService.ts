@@ -147,6 +147,9 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     if (candidate.oferta) patch['Oferta'] = candidate.oferta;
     if (candidate.promocional) patch['Promocional'] = candidate.promocional;
     if (candidate.ordemDisparo !== undefined) patch['Ordem de disparo'] = candidate.ordemDisparo;
+    // Renomeia a jornada canonica quando o disparo ja existe na base sob nome antigo
+    // (BI renomeou no SFMC). Aplicado apenas em candidatos aceitos pelo humano.
+    if (candidate.journey) patch['jornada'] = candidate.journey;
 
     return {
         ...patch,

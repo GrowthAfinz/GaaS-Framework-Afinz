@@ -40,6 +40,7 @@ interface HistoryIndex {
     byJourney: Map<string, SuggestionBucket>;
     bySegmentChannel: Map<string, SuggestionBucket>;
     byToken: Map<string, SuggestionBucket>;
+    knownJourneys: Set<string>;
     activityCount: number;
 }
 
@@ -678,12 +679,14 @@ const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
         byJourney: new Map<string, SuggestionBucket>(),
         bySegmentChannel: new Map<string, SuggestionBucket>(),
         byToken: new Map<string, SuggestionBucket>(),
+        knownJourneys: new Set<string>(),
         activityCount: safeActivities.length,
     };
 
     safeActivities.forEach((activity) => {
         const channel = normalizeChannel(activity.canal);
         const journeyKey = normalizeKey(activity.jornada);
+        if (journeyKey) index.knownJourneys.add(journeyKey);
         const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
         const noveltyKey = buildNoveltyKey(activity.jornada, activityName, channel, activityDateKey(activity));
         const dispatchSignature = buildDispatchSignature(activityName, channel, activityDateKey(activity));
@@ -730,31 +733,126 @@ const topSuggestionsFromBucket = (
         }));
 };
 
-const suggestFromHistory = (
+// Computa sugestoes de TODOS os campos de uma vez. Antes, suggestFromHistory era
+// chamada 1x por campo (9x), refazendo inferTaxonomy + tokenize + lookups a cada vez.
+// Agora o contexto (taxonomia, buckets, tokens) e calculado uma unica vez por linha.
+const suggestAllFields = (
     metric: MetricRow,
-    historyIndex: HistoryIndex,
-    field: SuggestionField
-) => {
+    historyIndex: HistoryIndex
+): Partial<Record<SuggestionField, FieldSuggestion[]>> => {
     const taxonomy = inferTaxonomy(metric);
     const journeyKey = normalizeKey(metric.journey);
     const journeyChannelKey = normalizeKey(`${journeyKey}|${metric.channel}`);
     const segmentChannelKey = normalizeKey(`${taxonomy.segmento}|${metric.channel}`);
-    const tokenSuggestions = tokenizeForHistory(metric.journey, metric.activityName)
-        .flatMap((token) =>
-            topSuggestionsFromBucket(historyIndex.byToken.get(normalizeKey(token)), field, 'campanhas similares por token', 70)
-        );
+    const journeyChannelBucket = historyIndex.byJourneyChannel.get(journeyChannelKey);
+    const journeyBucket = historyIndex.byJourney.get(journeyKey);
+    const segmentChannelBucket = historyIndex.bySegmentChannel.get(segmentChannelKey);
+    const tokenBuckets = tokenizeForHistory(metric.journey, metric.activityName)
+        .map((token) => historyIndex.byToken.get(normalizeKey(token)))
+        .filter((bucket): bucket is SuggestionBucket => Boolean(bucket));
 
-    return [
-        ...topSuggestionsFromBucket(historyIndex.byJourneyChannel.get(journeyChannelKey), field, 'mesma jornada e canal', 96),
-        ...topSuggestionsFromBucket(historyIndex.byJourney.get(journeyKey), field, 'mesma jornada', 88),
-        ...topSuggestionsFromBucket(historyIndex.bySegmentChannel.get(segmentChannelKey), field, 'mesmo segmento e canal', 78),
-        ...tokenSuggestions,
-    ].reduce<FieldSuggestion[]>((acc, suggestion) => {
-        if (!acc.some((item) => normalizeKey(item.value) === normalizeKey(suggestion.value))) {
-            acc.push(suggestion);
-        }
-        return acc;
-    }, []).slice(0, 5);
+    const result: Partial<Record<SuggestionField, FieldSuggestion[]>> = {};
+    for (const field of SUGGESTION_FIELDS) {
+        result[field] = [
+            ...topSuggestionsFromBucket(journeyChannelBucket, field, 'mesma jornada e canal', 96),
+            ...topSuggestionsFromBucket(journeyBucket, field, 'mesma jornada', 88),
+            ...topSuggestionsFromBucket(segmentChannelBucket, field, 'mesmo segmento e canal', 78),
+            ...tokenBuckets.flatMap((bucket) => topSuggestionsFromBucket(bucket, field, 'campanhas similares por token', 70)),
+        ].reduce<FieldSuggestion[]>((acc, suggestion) => {
+            if (!acc.some((item) => normalizeKey(item.value) === normalizeKey(suggestion.value))) {
+                acc.push(suggestion);
+            }
+            return acc;
+        }, []).slice(0, 5);
+    }
+    return result;
+};
+
+// ── Eleicao da jornada canonica quando o BI duplica a mesma activity+canal+data ──
+type CanonicalRole = 'winner' | 'superseded' | 'ambiguous';
+
+const MONTH_RANK: Record<string, number> = {
+    jan: 1, fev: 2, mar: 3, abr: 4, abri: 4, mai: 5, maio: 5, jun: 6,
+    jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12,
+};
+const PERIOD_TOKEN_RE = /(jan|fev|mar|abri|abr|maio|mai|jun|jul|ago|set|out|nov|dez)\s*(\d{4}|\d{2})/gi;
+const VARIANT_JUNK_RE = /\(teste\)|\bteste\b|\(interno\)|\binterno\b|\(v\d\)|_v\d(?:\b|_)|\(copiar\)|rascunho|nova jornada/i;
+
+const journeyPeriodRank = (journey: string): number => {
+    const text = normalizeKey(journey);
+    let best = 0;
+    PERIOD_TOKEN_RE.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = PERIOD_TOKEN_RE.exec(text))) {
+        const month = MONTH_RANK[match[1]] ?? 0;
+        if (!month) continue;
+        let year = parseInt(match[2], 10);
+        if (year < 100) year += 2000;
+        best = Math.max(best, year * 100 + month);
+    }
+    return best;
+};
+
+// "tronco" da jornada sem o token de periodo: identifica a campanha base
+const journeyStem = (journey: string): string =>
+    normalizeKey(journey).replace(PERIOD_TOKEN_RE, ' ').replace(/\s+/g, ' ').trim();
+
+// Recebe as jornadas distintas que colidem na mesma assinatura (arquivo) e
+// devolve o papel de cada uma: winner (canonica/gravavel) | superseded | ambiguous.
+// knownJourneys = jornadas que ja existem na base (para preferir nome novo no caso 2).
+const electCanonicalJourney = (
+    journeys: string[],
+    knownJourneys: Set<string>
+): Map<string, CanonicalRole> => {
+    const roles = new Map<string, CanonicalRole>();
+    const distinct = Array.from(new Set(journeys.map((j) => (j ?? '').trim()).filter(Boolean)));
+    if (distinct.length <= 1) return roles; // sem colisao
+    const norm = (j: string) => normalizeKey(j);
+    const mark = (list: string[], role: CanonicalRole) => list.forEach((j) => roles.set(norm(j), role));
+    const elect = (winner: string, pool: string[]) => {
+        mark([winner], 'winner');
+        mark(pool.filter((j) => norm(j) !== norm(winner)), 'superseded');
+    };
+
+    // 1. descartar variantes obvias (teste/interno/v1/v2/rascunho/copiar/nova jornada)
+    mark(distinct.filter((j) => VARIANT_JUNK_RE.test(j)), 'superseded');
+    let pool = distinct.filter((j) => !VARIANT_JUNK_RE.test(j));
+
+    // 2. preferir JOR_ sobre rascunho/nao-JOR
+    const jorPool = pool.filter((j) => norm(j).startsWith('jor_'));
+    if (jorPool.length > 0 && jorPool.length < pool.length) {
+        mark(pool.filter((j) => !norm(j).startsWith('jor_')), 'superseded');
+        pool = jorPool;
+    }
+
+    if (pool.length === 0) { mark(distinct, 'ambiguous'); return roles; }
+    if (pool.length === 1) { mark(pool, 'winner'); return roles; }
+
+    const pickNewestUnique = (candidates: string[]): string | null => {
+        let best = -1;
+        candidates.forEach((j) => { best = Math.max(best, journeyPeriodRank(j)); });
+        const top = candidates.filter((j) => journeyPeriodRank(j) === best);
+        return top.length === 1 ? top[0] : null;
+    };
+
+    // 3. mesmo stem (renomeacao pura) => periodo mais novo vence
+    if (new Set(pool.map(journeyStem)).size === 1) {
+        const winner = pickNewestUnique(pool);
+        if (winner) elect(winner, pool); else mark(pool, 'ambiguous');
+        return roles;
+    }
+
+    // 4. stems diferentes => preferir a jornada NOVA (que ainda nao existe na base)
+    const novel = pool.filter((j) => !knownJourneys.has(norm(j)));
+    if (novel.length === 1) { elect(novel[0], pool); return roles; }
+    if (novel.length > 1) {
+        const winner = pickNewestUnique(novel);
+        if (winner) { elect(winner, pool); return roles; }
+    }
+
+    // nenhuma claramente nova / empate => conflito seguro
+    mark(pool, 'ambiguous');
+    return roles;
 };
 
 const buildCandidate = (
@@ -765,10 +863,7 @@ const buildCandidate = (
 ): UpdateCandidate => {
     const taxonomy = inferTaxonomy(metric);
     const hasDeterministicBasePropria = taxonomy.bu === 'B2C' && taxonomy.parceiro === 'Proprietaria' && taxonomy.segmento === 'Base_Proprietaria';
-    const fieldSuggestions = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, FieldSuggestion[]>>>((acc, field) => {
-        acc[field] = suggestFromHistory(metric, historyIndex, field);
-        return acc;
-    }, {});
+    const fieldSuggestions = suggestAllFields(metric, historyIndex);
 
     const valueFor = (field: SuggestionField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
     const confidences = SUGGESTION_FIELDS
@@ -778,21 +873,28 @@ const buildCandidate = (
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     const importedJourneys = importedSignatureJourneys.get(metric.dispatchSignature) ?? new Set<string>();
     const historicalSignatureMatches = historyIndex.byDispatchSignature.get(metric.dispatchSignature) ?? [];
-    const historicalJourneys = new Set(
-        historicalSignatureMatches
-            .map((activity) => activity.jornada)
-            .filter((journey) => !isSameJourneyFamily(metric.journey, journey))
-    );
-    const conflictJourneys = Array.from(new Set([
-        ...Array.from(importedJourneys).filter((journey) => !isSameJourneyFamily(metric.journey, journey)),
-        ...Array.from(historicalJourneys),
-    ])).filter(Boolean);
-    const renamedJourneyConflict = conflictJourneys.length > 0;
-    // Disparo ja existe na base (mesma activity + canal + data, independente da jornada).
-    // historicalSignatureMatches usa a chave anti-renomeacao (dispatchSignature),
-    // entao se houver match o disparo fisico ja foi gravado em activities.
+
+    // Disparo ja existe na base (mesma activity+canal+data, qualquer jornada).
     const existingDispatch = historicalSignatureMatches[0];
     const existsInBase = Boolean(existingDispatch);
+    const baseJourneyDiffers = historicalSignatureMatches.some(
+        (activity) => !isSameJourneyFamily(metric.journey, activity.jornada)
+    );
+
+    // Duplicacao do BI: a mesma activity+canal+data vem com varios nomes de jornada
+    // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
+    const fileJourneys = Array.from(new Set([metric.journey, ...Array.from(importedJourneys)])).filter(Boolean);
+    const canonicalRoles = electCanonicalJourney(fileJourneys, historyIndex.knownJourneys);
+    const myRole = canonicalRoles.get(normalizeKey(metric.journey));
+    const fileSuperseded = myRole === 'superseded';
+    const fileAmbiguous = myRole === 'ambiguous';
+    const winnerJourney = fileJourneys.find((journey) => canonicalRoles.get(normalizeKey(journey)) === 'winner');
+
+    const conflictJourneys = Array.from(new Set([
+        ...Array.from(importedJourneys).filter((journey) => !isSameJourneyFamily(metric.journey, journey)),
+        ...historicalSignatureMatches.map((activity) => activity.jornada).filter((journey) => !isSameJourneyFamily(metric.journey, journey)),
+    ])).filter(Boolean);
+
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
     const missingHumanSuggestion = ['parceiro', 'subgrupo', 'etapaAquisicao', 'perfilCredito', 'oferta', 'promocional']
         .some((field) => !suggestionsFor(fieldSuggestions, field as SuggestionField)[0]?.value);
@@ -801,12 +903,13 @@ const buildCandidate = (
         ? 'error'
         : duplicateCount > 1
             ? 'duplicate'
-            : existsInBase
-                // Ja existe na base: renomeacao de jornada => conflito; mesma jornada => duplicado.
-                // Em ambos os casos NUNCA pode virar insert novo (matchedActivity forca update).
-                ? (renamedJourneyConflict ? 'conflict' : 'duplicate')
-                : renamedJourneyConflict
-                    ? 'conflict'
+            : (fileSuperseded || fileAmbiguous)
+                // Nome antigo/variante do BI, ou colisao sem vencedor claro => conflito (nunca grava no escuro)
+                ? 'conflict'
+                : existsInBase
+                    // Ja existe na base: jornada diferente => conflito (renomeacao); mesma => duplicado.
+                    // matchedActivity garante UPDATE em vez de INSERT.
+                    ? (baseJourneyDiffers ? 'conflict' : 'duplicate')
                     : missingHumanSuggestion
                         ? 'new'
                         : averageConfidence >= 80
@@ -821,36 +924,42 @@ const buildCandidate = (
             ? 'Chave'
             : duplicateCount > 1
                 ? 'Duplicidade'
+                : fileSuperseded
+                    ? 'Jornada antiga (BI)'
+                    : fileAmbiguous
+                        ? 'Colisao de jornada'
+                        : existsInBase
+                            ? (baseJourneyDiffers ? 'Jornada renomeada' : 'Ja existe na base')
+                            : missingHumanSuggestion
+                                ? 'Campos humanos'
+                                : status === 'ready'
+                                    ? 'Aprovar'
+                                    : 'Sugestoes',
+        suggestion: fileSuperseded
+            ? `Nome antigo/variante do BI; canonica: ${winnerJourney ?? '-'}`
+            : fileAmbiguous
+                ? 'Colisao de jornada sem vencedor claro'
                 : existsInBase
-                    ? (renamedJourneyConflict ? 'Jornada renomeada' : 'Ja existe na base')
-                    : renamedJourneyConflict
-                        ? 'Conflito de jornada'
-                        : missingHumanSuggestion
-                            ? 'Campos humanos'
-                            : status === 'ready'
-                                ? 'Aprovar'
-                                : 'Sugestoes',
-        suggestion: existsInBase
-            ? (renamedJourneyConflict
-                ? 'Disparo ja existe na base com outra jornada (possivel renomeacao)'
-                : 'Disparo ja existe na base de dados')
-            : renamedJourneyConflict
-                ? 'Possivel renomeacao de jornada no SFMC'
-                : status === 'ready'
-                    ? 'Sugestoes historicas fortes'
-                    : 'Revisar campos sugeridos',
-        confidence: missingCritical || duplicateCount > 1 || existsInBase || renamedJourneyConflict ? 0 : averageConfidence,
+                    ? (baseJourneyDiffers
+                        ? 'Disparo ja existe na base com outra jornada (renomeacao)'
+                        : 'Disparo ja existe na base de dados')
+                    : status === 'ready'
+                        ? 'Sugestoes historicas fortes'
+                        : 'Revisar campos sugeridos',
+        confidence: missingCritical || duplicateCount > 1 || fileSuperseded || fileAmbiguous || existsInBase ? 0 : averageConfidence,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
             : duplicateCount > 1
                 ? 'mais de uma linha no arquivo com a mesma chave'
-                : existsInBase
-                    ? (renamedJourneyConflict
-                        ? `disparo ja existe na base; jornada na base: ${existingDispatch?.jornada ?? '-'} | jornada no arquivo: ${metric.journey}`
-                        : 'activity, canal e data ja existem na base de dados')
-                    : renamedJourneyConflict
-                        ? `mesma activity, canal e data com jornada diferente: ${conflictJourneys.join(', ')}`
-                        : 'sugestoes por taxonomia e historico',
+                : fileSuperseded
+                    ? `jornada substituida pela mais recente: ${winnerJourney ?? '-'}`
+                    : fileAmbiguous
+                        ? `colisao de jornada sem vencedor claro: ${conflictJourneys.join(', ')}`
+                        : existsInBase
+                            ? (baseJourneyDiffers
+                                ? `disparo ja existe na base; jornada na base: ${existingDispatch?.jornada ?? '-'} | jornada no arquivo: ${metric.journey}`
+                                : 'activity, canal e data ja existem na base de dados')
+                            : 'sugestoes por taxonomia e historico',
         accepted: false,
         domain: metric.domain,
         bu: hasDeterministicBasePropria ? taxonomy.bu : valueFor('bu', taxonomy.bu),
@@ -866,11 +975,16 @@ const buildCandidate = (
         suggestions: fieldSuggestions,
         conflictJourneys,
         // matchedActivity forca UPDATE no service (asDbActivityId) em vez de INSERT,
-        // evitando duplicar disparo que ja existe na base.
-        matchedActivity: existingDispatch,
-        conflictReason: existsInBase
-            ? (renamedJourneyConflict ? 'renamed_journey_existing_dispatch' : 'existing_dispatch')
-            : (renamedJourneyConflict ? 'activity_name_channel_date' : undefined),
+        // evitando duplicar disparo que ja existe na base. Nao setar para nomes
+        // antigos/variantes (superseded) ou colisoes ambiguas: esses nunca devem gravar.
+        matchedActivity: (fileSuperseded || fileAmbiguous) ? undefined : existingDispatch,
+        conflictReason: fileSuperseded
+            ? 'superseded_file_journey'
+            : fileAmbiguous
+                ? 'ambiguous_file_journey'
+                : existsInBase
+                    ? (baseJourneyDiffers ? 'renamed_journey_existing_dispatch' : 'existing_dispatch')
+                    : undefined,
     };
 };
 
@@ -1492,10 +1606,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             && !['duplicate', 'error', 'ignored'].includes(candidate.status)
         ), [candidates, selectedKeys]);
     const copyCandidates = selectedCandidatesForCopy.length > 0 ? selectedCandidatesForCopy : exportableCandidates;
-    // Disparos que ja existem na base (matchedActivity) nao devem virar linha nova no Excel:
-    // a gravacao deles e UPDATE, nao append. Excluidos da copia TSV por padrao.
+    // Disparos que ja existem na base (matchedActivity) ou em conflito (nome antigo do BI,
+    // colisao, renomeacao) nao devem virar linha nova no Excel: a gravacao deles e UPDATE
+    // ou revisao manual, nunca append. Excluidos da copia TSV por padrao.
     const reviewedTsv = useMemo(
-        () => copyCandidates.filter((candidate) => !candidate.matchedActivity).map(buildExcelRow).join('\n'),
+        () => copyCandidates
+            .filter((candidate) => !candidate.matchedActivity && candidate.status !== 'conflict')
+            .map(buildExcelRow).join('\n'),
         [copyCandidates]
     );
     const uploadCandidates = useMemo(() => {
