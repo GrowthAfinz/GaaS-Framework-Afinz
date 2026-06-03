@@ -1257,10 +1257,13 @@ const inferRentabilizacaoTaxonomy = (metric: MetricRow) => {
 
 const buildRentabilizacaoCandidate = (
     metric: MetricRow,
-    importedKeyCount: Map<string, number>
+    importedKeyCount: Map<string, number>,
+    existingSignatures: Set<string>
 ): UpdateCandidate => {
     const taxonomy = inferRentabilizacaoTaxonomy(metric);
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
+    // Ja existe na tabela rentabilizacao_activities (mesma activity+canal+data)?
+    const existsInBase = existingSignatures.has(metric.dispatchSignature);
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
     const missingDispatchVolume = !hasDispatchVolume(metric);
     const status: CandidateStatus = missingCritical
@@ -1269,7 +1272,10 @@ const buildRentabilizacaoCandidate = (
             ? 'duplicate'
             : missingDispatchVolume
                 ? 'ignored'
-                : 'ready';
+                : existsInBase
+                    // Ja gravado na base de rentabilizacao: nao reinserir.
+                    ? 'duplicate'
+                    : 'ready';
 
     return {
         ...metric,
@@ -1281,8 +1287,12 @@ const buildRentabilizacaoCandidate = (
                 ? 'Duplicidade'
                 : missingDispatchVolume
                     ? 'Disparo sem volume acionavel'
-                    : 'Aprovar',
-        suggestion: status === 'ready' ? 'Classificacao por regra de rentabilizacao' : 'Linha fora do upload automatico',
+                    : existsInBase
+                        ? 'Ja existe na base'
+                        : 'Aprovar',
+        suggestion: existsInBase
+            ? 'Disparo ja existe na base de rentabilizacao'
+            : status === 'ready' ? 'Classificacao por regra de rentabilizacao' : 'Linha fora do upload automatico',
         confidence: status === 'ready' ? 86 : 0,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
@@ -1290,7 +1300,9 @@ const buildRentabilizacaoCandidate = (
                 ? 'mais de uma linha no arquivo com a mesma chave'
                 : missingDispatchVolume
                     ? 'Base Total e Base Acionavel precisam ser maiores que zero'
-                    : 'regras portadas do upload de rentabilizacao',
+                    : existsInBase
+                        ? 'activity, canal e data ja existem em rentabilizacao_activities'
+                        : 'regras portadas do upload de rentabilizacao',
         accepted: false,
         bu: taxonomy.bu,
         parceiro: taxonomy.parceiro,
@@ -1308,7 +1320,7 @@ const buildRentabilizacaoCandidate = (
     };
 };
 
-const processRentabilizacaoDinamicaBI = (matrix: string[][]): ProcessResult => {
+const processRentabilizacaoDinamicaBI = (matrix: string[][], existingSignatures: Set<string>): ProcessResult => {
     const warnings: string[] = [];
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
     const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
@@ -1353,7 +1365,7 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][]): ProcessResult => {
         return map;
     }, new Map<string, number>());
     const candidates = metrics
-        .map((row) => buildRentabilizacaoCandidate(row, importedKeyCount))
+        .map((row) => buildRentabilizacaoCandidate(row, importedKeyCount, existingSignatures))
         .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status));
     const ignoredExisting = candidates.filter((candidate) => candidate.status === 'ignored').length;
     const tsv = candidates
@@ -1497,10 +1509,11 @@ const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((reso
 const safeProcessDinamicaBI = (
     matrix: string[][],
     activities: Activity[],
-    domain: UpdateDomain
+    domain: UpdateDomain,
+    existingRentSignatures: Set<string>
 ): { result: ProcessResult | null; error?: ParseDebugInfo } => {
     try {
-        return { result: domain === 'rentabilizacao' ? processRentabilizacaoDinamicaBI(matrix) : processDinamicaBI(matrix, activities) };
+        return { result: domain === 'rentabilizacao' ? processRentabilizacaoDinamicaBI(matrix, existingRentSignatures) : processDinamicaBI(matrix, activities) };
     } catch (error: any) {
         return {
             result: null,
@@ -1669,9 +1682,22 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             if (matrix.length === 0) throw new Error('Arquivo vazio.');
             setProcessingStage('indexing');
             await nextFrame();
+            // Para rentabilizacao, busca os disparos ja gravados na base e monta o
+            // conjunto de assinaturas (activity+canal+data) para nao reinserir o que ja existe.
+            let existingRentSignatures = new Set<string>();
+            if (activeDomain === 'rentabilizacao') {
+                try {
+                    const existing = await intelligentUpdateService.fetchExistingDispatches('rentabilizacao');
+                    existingRentSignatures = new Set(
+                        existing.map((row) => buildDispatchSignature(row.activityName, row.channel, row.date))
+                    );
+                } catch (fetchError) {
+                    console.warn('[Atualizacao Inteligente] Falha ao carregar base de rentabilizacao para deduplicacao', fetchError);
+                }
+            }
             setProcessingStage('detecting');
             await nextFrame();
-            const processedResult = safeProcessDinamicaBI(matrix, activities, activeDomain);
+            const processedResult = safeProcessDinamicaBI(matrix, activities, activeDomain, existingRentSignatures);
             if (!processedResult.result) {
                 const debug = {
                     ...processedResult.error,

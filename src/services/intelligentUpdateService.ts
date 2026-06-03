@@ -324,6 +324,31 @@ const candidateStatusForDb = (status: CandidateStatus) =>
     status === 'conflict' ? 'review' : status;
 
 export const intelligentUpdateService = {
+    // Busca os disparos ja gravados na tabela do dominio (activity name, canal, data)
+    // para deduplicar contra a base e nao reinserir o que ja existe.
+    async fetchExistingDispatches(
+        domain: UpdateDomain
+    ): Promise<Array<{ activityName: string; channel: string; date: string }>> {
+        const table = targetTableForDomain(domain);
+        const pageSize = 1000;
+        const rows: Array<{ activityName: string; channel: string; date: string }> = [];
+        for (let offset = 0; ; offset += pageSize) {
+            const { data, error } = await supabase
+                .from(table)
+                .select('"Activity name / Taxonomia", "Canal", "Data de Disparo"')
+                .range(offset, offset + pageSize - 1);
+            if (error) throw error;
+            const batch = data ?? [];
+            batch.forEach((row: any) => rows.push({
+                activityName: row['Activity name / Taxonomia'] ?? '',
+                channel: row['Canal'] ?? '',
+                date: row['Data de Disparo'] ?? '',
+            }));
+            if (batch.length < pageSize) break;
+        }
+        return rows;
+    },
+
     async saveRun(payload: IntelligentUpdateRunPayload): Promise<IntelligentUpdateRunResult> {
         const runInsertPayload = {
             domain: payload.domain,
