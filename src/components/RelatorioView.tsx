@@ -5,6 +5,7 @@ import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
 import { useAppStore } from '../store/useAppStore';
+import { useBU } from '../contexts/BUContext';
 import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
 import { exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
@@ -140,11 +141,16 @@ const PARCEIRO_COLORS: Record<string, string> = {
 export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData, compareMode = null, selectedBU, periodStart, periodEnd }) => {
   const { viewSettings, setGlobalFilters } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
+  const { selectedBUs } = useBU();
   const [reportMode, setReportMode] = useState<'performance' | 'monthly'>('performance');
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
   const previousAllActivities = useMemo(() => Object.values(previousData ?? {}).flat(), [previousData]);
   const filterReportActivities = useCallback((activities: Activity[]) => (
     activities.filter((activity) => {
+      // Filtro de BU — respeita seleção do painel superior
+      if (selectedBUs.length > 0 && !selectedBUs.includes(activity.bu as import('../contexts/BUContext').BU)) {
+        return false;
+      }
       if (globalFilters.segmentos.length > 0 && !globalFilters.segmentos.includes(activity.segmento)) {
         return false;
       }
@@ -159,7 +165,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       }
       return true;
     })
-  ), [globalFilters]);
+  ), [globalFilters, selectedBUs]);
   const reportActivities = useMemo(() => filterReportActivities(allActivities), [allActivities, filterReportActivities]);
   const previousReportActivities = useMemo(() => filterReportActivities(previousAllActivities), [filterReportActivities, previousAllActivities]);
   const shouldShowComparison = compareMode !== null && previousData !== undefined;
