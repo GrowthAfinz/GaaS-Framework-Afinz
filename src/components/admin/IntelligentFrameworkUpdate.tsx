@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import {
@@ -10,7 +11,10 @@ import {
     Download,
     FileSpreadsheet,
     CalendarDays,
+    ChevronDown,
+    Edit3,
     Loader2,
+    MoreHorizontal,
     Search,
     Sparkles,
     Upload,
@@ -31,15 +35,18 @@ type ReviewField = TextReviewField | NumericReviewField;
 type SuggestionField = Exclude<ReviewField, 'ordemDisparo'>;
 type ProcessingStage = 'idle' | 'reading' | 'indexing' | 'detecting' | 'reviewing';
 
-type SuggestionBucket = Map<SuggestionField, Map<string, number>>;
+type SuggestionStat = { count: number; lastUsed?: string };
+type SuggestionBucket = Map<SuggestionField, Map<string, SuggestionStat>>;
 
 interface HistoryIndex {
     existingKeys: Map<string, Activity[]>;
     byDispatchSignature: Map<string, Activity[]>;
     byJourneyChannel: Map<string, SuggestionBucket>;
     byJourney: Map<string, SuggestionBucket>;
+    byActivity: Map<string, SuggestionBucket>;
     bySegmentChannel: Map<string, SuggestionBucket>;
     byToken: Map<string, SuggestionBucket>;
+    global: SuggestionBucket;
     knownJourneys: Set<string>;
     activityCount: number;
 }
@@ -56,6 +63,32 @@ interface FieldSuggestion {
     confidence: number;
     source: string;
     count: number;
+    lastUsed?: string;
+    evidence?: string;
+    deterministic?: boolean;
+    historicalConflict?: string;
+}
+
+interface ManualOverride {
+    field: ReviewField;
+    previousValue: string | number | undefined;
+    nextValue: string | number | undefined;
+    mode: 'single' | 'bulk';
+    changedAt: string;
+}
+
+interface ProcessInsights {
+    rawRows: number;
+    validMetricRows: number;
+    uniqueJourneys: number;
+    uniqueActivities: number;
+    actionableDispatches: number;
+    existingDispatches: number;
+    newDispatches: number;
+    classificationConflicts: number;
+    orphanPerformanceRows: number;
+    invalidVolumeRows: number;
+    originCounts: Record<string, number>;
 }
 
 interface MetricRow {
@@ -101,6 +134,7 @@ interface UpdateCandidate extends MetricRow {
     conflictJourneys?: string[];
     conflictReason?: string;
     matchedActivity?: Activity;
+    manualOverrides?: ManualOverride[];
 }
 
 interface ProcessResult {
@@ -112,6 +146,7 @@ interface ProcessResult {
     importedRows: number;
     tsv: string;
     warnings: string[];
+    insights: ProcessInsights;
 }
 
 interface FileMeta {
@@ -130,6 +165,39 @@ interface ParseDebugInfo {
     message: string;
     stack?: string;
 }
+
+const buildProcessInsights = (
+    rawRows: MetricRow[],
+    metrics: MetricRow[],
+    candidates: UpdateCandidate[],
+    existingDispatches: number,
+    orphanPerformanceRows = 0,
+    invalidVolumeRows = 0
+): ProcessInsights => {
+    const originCounts: Record<string, number> = { Institucional: 0, 'Serasa/Ecred': 0, Proprietaria: 0, 'Sem origem': 0 };
+    metrics.forEach((metric) => {
+        const deterministic = inferDeterministicDimensions(metric);
+        const evidence = normalizeKey(deterministic.evidence);
+        if (['serasa', 'ecred', 'srs', 'srsa', 'parceiroserasa'].includes(evidence)) originCounts['Serasa/Ecred'] += 1;
+        else if (['institucional', 'inst'].includes(evidence)) originCounts.Institucional += 1;
+        else if (deterministic.parceiro === 'Proprietaria') originCounts.Proprietaria += 1;
+        else originCounts['Sem origem'] += 1;
+    });
+    return {
+        rawRows: rawRows.length,
+        validMetricRows: metrics.length,
+        uniqueJourneys: new Set(metrics.map((row) => normalizeKey(row.journey))).size,
+        uniqueActivities: new Set(metrics.map((row) => normalizeKey(row.activityName))).size,
+        actionableDispatches: metrics.length,
+        existingDispatches,
+        newDispatches: candidates.filter((candidate) => !candidate.matchedActivity && !['duplicate', 'ignored', 'error'].includes(candidate.status)).length,
+        classificationConflicts: candidates.filter((candidate) => candidate.status === 'conflict'
+            || Object.values(candidate.suggestions).some((items) => items?.some((item) => item.historicalConflict))).length,
+        orphanPerformanceRows,
+        invalidVolumeRows,
+        originCounts,
+    };
+};
 
 const FRAMEWORK_HEADERS = [
     'Disparado?',
@@ -383,6 +451,42 @@ const taxonomyTokens = (value: unknown) =>
         .split(/[_\s-]+/)
         .filter(Boolean);
 
+const normalizedOriginTokens = (value: unknown) =>
+    taxonomyTokens(value).flatMap((token) => {
+        const cadenceMatch = token.match(/^d\d+(.*)$/);
+        return cadenceMatch?.[1] ? [token, cadenceMatch[1]] : [token];
+    });
+
+const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activityName'>) => {
+    const activityTokens = normalizedOriginTokens(metric.activityName);
+    const journeyTokens = normalizedOriginTokens(metric.journey);
+    const findOrigin = (tokens: string[]) => {
+        if (tokens.some((token) => ['serasa', 'ecred', 'srs', 'srsa', 'parceiroserasa'].includes(token))) {
+            return { parceiro: 'Serasa', evidence: tokens.find((token) => ['serasa', 'ecred', 'srs', 'srsa', 'parceiroserasa'].includes(token))! };
+        }
+        if (tokens.some((token) => ['institucional', 'inst'].includes(token))) {
+            return { parceiro: 'Proprietaria', evidence: tokens.find((token) => ['institucional', 'inst'].includes(token))! };
+        }
+        if (tokens.some((token) => ['bp', 'bsp'].includes(token))
+            || /base[_\s-]+propri(a|etaria)/.test(normalizeKey(tokens.join(' ')))) {
+            return { parceiro: 'Proprietaria', evidence: tokens.find((token) => ['bp', 'bsp'].includes(token)) ?? 'base_propria' };
+        }
+        if (tokens.includes('bem') && tokens.includes('barato') || tokens.includes('b2b2c') && tokens.includes('bb')) {
+            return { parceiro: 'Bem Barato', evidence: 'bem_barato' };
+        }
+        return null;
+    };
+
+    const activityOrigin = findOrigin(activityTokens);
+    const journeyOrigin = activityOrigin ? null : findOrigin(journeyTokens);
+    const origin = activityOrigin ?? journeyOrigin;
+    return {
+        parceiro: origin?.parceiro,
+        source: activityOrigin ? 'token determinístico da activity' : journeyOrigin ? 'token determinístico da jornada' : undefined,
+        evidence: origin?.evidence,
+    };
+};
+
 const inferSegmentFromTaxonomy = (value: unknown) => {
     const tokens = taxonomyTokens(value);
     for (const token of tokens) {
@@ -588,6 +692,7 @@ const activityField = (activity: Activity, field: SuggestionField) => {
 const inferTaxonomy = (metric: MetricRow) => {
     const text = normalizeKey(`${metric.journey} ${metric.activityName}`);
     const tokens = taxonomyTokens(`${metric.journey} ${metric.activityName}`);
+    const deterministic = inferDeterministicDimensions(metric);
     const hasBasePropriaSignal = tokens.some((token) =>
         ['bp', 'bsp'].includes(token)
     ) || /base[_\s-]+propri(a|etaria)/.test(text);
@@ -606,7 +711,7 @@ const inferTaxonomy = (metric: MetricRow) => {
                 ? 'Seguros'
                 : 'B2C';
 
-    const parceiro = text.includes('serasa') || text.includes('_srs_')
+    const parceiro = deterministic.parceiro || (text.includes('serasa') || text.includes('ecred') || text.includes('_srs_')
         ? 'Serasa'
         : text.includes('bem barato') || text.includes('_bb_') || text.includes('b2b2c_bb')
             ? 'Bem Barato'
@@ -614,7 +719,7 @@ const inferTaxonomy = (metric: MetricRow) => {
                 ? 'Proprietaria'
                 : bu === 'Plurix'
                     ? 'N/A'
-                    : 'N/A';
+                    : 'N/A');
 
     const segmento = segmentByCode
         || (text.includes('carrinho') || text.includes('_car_')
@@ -640,9 +745,9 @@ const suggestionsFor = (
 
 const createBucket = (): SuggestionBucket =>
     SUGGESTION_FIELDS.reduce<SuggestionBucket>((bucket, field) => {
-        bucket.set(field, new Map<string, number>());
+        bucket.set(field, new Map<string, SuggestionStat>());
         return bucket;
-    }, new Map<SuggestionField, Map<string, number>>());
+    }, new Map<SuggestionField, Map<string, SuggestionStat>>());
 
 const bucketFor = (index: Map<string, SuggestionBucket>, key: string) => {
     const normalizedKey = normalizeKey(key);
@@ -654,12 +759,17 @@ const bucketFor = (index: Map<string, SuggestionBucket>, key: string) => {
 };
 
 const addActivityToBucket = (bucket: SuggestionBucket, activity: Activity) => {
+    const usedAt = activityDateKey(activity);
     SUGGESTION_FIELDS.forEach((field) => {
         const value = activityField(activity, field);
         if (!value) return;
         const counts = bucket.get(field);
         if (!counts) return;
-        counts.set(value, (counts.get(value) ?? 0) + 1);
+        const current = counts.get(value);
+        counts.set(value, {
+            count: (current?.count ?? 0) + 1,
+            lastUsed: !current?.lastUsed || usedAt > current.lastUsed ? usedAt : current.lastUsed,
+        });
     });
 };
 
@@ -677,8 +787,10 @@ const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
         byDispatchSignature: new Map<string, Activity[]>(),
         byJourneyChannel: new Map<string, SuggestionBucket>(),
         byJourney: new Map<string, SuggestionBucket>(),
+        byActivity: new Map<string, SuggestionBucket>(),
         bySegmentChannel: new Map<string, SuggestionBucket>(),
         byToken: new Map<string, SuggestionBucket>(),
+        global: createBucket(),
         knownJourneys: new Set<string>(),
         activityCount: safeActivities.length,
     };
@@ -697,6 +809,8 @@ const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
 
         addActivityToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), activity);
         addActivityToBucket(bucketFor(index.byJourney, journeyKey), activity);
+        addActivityToBucket(bucketFor(index.byActivity, normalizeKey(activityName)), activity);
+        addActivityToBucket(index.global, activity);
 
         const segment = activityField(activity, 'segmento');
         if (segment && channel !== 'Indefinido') {
@@ -719,17 +833,18 @@ const topSuggestionsFromBucket = (
     const counts = bucket?.get(field);
     if (!counts || counts.size === 0) return [];
 
-    const total = Array.from(counts.values()).reduce((sum, count) => sum + count, 0);
+    const total = Array.from(counts.values()).reduce((sum, stat) => sum + stat.count, 0);
     if (total === 0) return [];
 
     return Array.from(counts.entries())
-        .sort((a, b) => b[1] - a[1])
+        .sort((a, b) => b[1].count - a[1].count || String(b[1].lastUsed ?? '').localeCompare(String(a[1].lastUsed ?? '')))
         .slice(0, 5)
-        .map(([value, count]) => ({
+        .map(([value, stat]) => ({
             value,
-            count,
+            count: stat.count,
             source,
-            confidence: Math.min(confidenceCap, Math.round((count / total) * confidenceCap)),
+            lastUsed: stat.lastUsed,
+            confidence: Math.min(confidenceCap, Math.round((stat.count / total) * confidenceCap)),
         }));
 };
 
@@ -746,6 +861,7 @@ const suggestAllFields = (
     const segmentChannelKey = normalizeKey(`${taxonomy.segmento}|${metric.channel}`);
     const journeyChannelBucket = historyIndex.byJourneyChannel.get(journeyChannelKey);
     const journeyBucket = historyIndex.byJourney.get(journeyKey);
+    const activityBucket = historyIndex.byActivity.get(normalizeKey(metric.activityName));
     const segmentChannelBucket = historyIndex.bySegmentChannel.get(segmentChannelKey);
     const tokenBuckets = tokenizeForHistory(metric.journey, metric.activityName)
         .map((token) => historyIndex.byToken.get(normalizeKey(token)))
@@ -753,17 +869,37 @@ const suggestAllFields = (
 
     const result: Partial<Record<SuggestionField, FieldSuggestion[]>> = {};
     for (const field of SUGGESTION_FIELDS) {
+        const deterministic = inferDeterministicDimensions(metric);
+        const deterministicSuggestion: FieldSuggestion[] = field === 'parceiro' && deterministic.parceiro
+            ? [{
+                value: deterministic.parceiro,
+                confidence: 100,
+                source: deterministic.source ?? 'regra determinística',
+                count: 1,
+                evidence: deterministic.evidence,
+                deterministic: true,
+            }]
+            : [];
         result[field] = [
+            ...deterministicSuggestion,
+            ...topSuggestionsFromBucket(activityBucket, field, 'mesma activity', 99),
             ...topSuggestionsFromBucket(journeyChannelBucket, field, 'mesma jornada e canal', 96),
             ...topSuggestionsFromBucket(journeyBucket, field, 'mesma jornada', 88),
             ...topSuggestionsFromBucket(segmentChannelBucket, field, 'mesmo segmento e canal', 78),
             ...tokenBuckets.flatMap((bucket) => topSuggestionsFromBucket(bucket, field, 'campanhas similares por token', 70)),
+            ...topSuggestionsFromBucket(historyIndex.global, field, 'outros valores da base', 45),
         ].reduce<FieldSuggestion[]>((acc, suggestion) => {
             if (!acc.some((item) => normalizeKey(item.value) === normalizeKey(suggestion.value))) {
                 acc.push(suggestion);
             }
             return acc;
-        }, []).slice(0, 5);
+        }, []).slice(0, 12);
+        if (deterministicSuggestion[0]) {
+            const historicalConflict = result[field]?.find((item) =>
+                !item.deterministic && normalizeKey(item.value) !== normalizeKey(deterministicSuggestion[0].value)
+            );
+            deterministicSuggestion[0].historicalConflict = historicalConflict?.value;
+        }
     }
     return result;
 };
@@ -1317,12 +1453,17 @@ const RENT_FIELD_COLUMN: Record<SuggestionField, string> = {
 };
 
 const addRawRowToBucket = (bucket: SuggestionBucket, row: Record<string, any>) => {
+    const usedAt = toDateKey(row['Data de Disparo']);
     SUGGESTION_FIELDS.forEach((field) => {
         const value = String(row[RENT_FIELD_COLUMN[field]] ?? '').trim();
         if (!value || value === 'N/A') return;
         const counts = bucket.get(field);
         if (!counts) return;
-        counts.set(value, (counts.get(value) ?? 0) + 1);
+        const current = counts.get(value);
+        counts.set(value, {
+            count: (current?.count ?? 0) + 1,
+            lastUsed: !current?.lastUsed || usedAt > current.lastUsed ? usedAt : current.lastUsed,
+        });
     });
 };
 
@@ -1519,7 +1660,17 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
         .map(buildExcelRow)
         .join('\n');
 
-    return { domain: 'rentabilizacao', blocks, metrics, candidates, ignoredExisting, importedRows: rawRows.length, tsv, warnings };
+    return {
+        domain: 'rentabilizacao',
+        blocks,
+        metrics,
+        candidates,
+        ignoredExisting,
+        importedRows: rawRows.length,
+        tsv,
+        warnings,
+        insights: buildProcessInsights(rawRows, metrics, candidates, ignoredExisting),
+    };
 };
 
 const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
@@ -1618,11 +1769,47 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
         .map(buildExcelRow)
         .join('\n');
 
-    return { domain: 'aquisicao', blocks, metrics, candidates, ignoredExisting, importedRows: rawRows.length, tsv, warnings };
+    return {
+        domain: 'aquisicao',
+        blocks,
+        metrics,
+        candidates,
+        ignoredExisting,
+        importedRows: rawRows.length,
+        tsv,
+        warnings,
+        insights: buildProcessInsights(
+            rawRows,
+            metrics,
+            candidates,
+            ignoredExisting,
+            attribution.ignoredPerformance,
+            attribution.ignoredResidual
+        ),
+    };
 };
 
 const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((resolve, reject) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
+        Papa.parse<string[]>(file, {
+            worker: true,
+            skipEmptyLines: false,
+            delimiter: ext === 'tsv' ? '\t' : '',
+            complete: (results) => {
+                if (results.errors.length > 0 && results.data.length === 0) {
+                    reject(new Error(results.errors[0]?.message || 'Erro ao interpretar o arquivo.'));
+                    return;
+                }
+                resolve(results.data
+                    .filter((row): row is string[] => Array.isArray(row))
+                    .map((row) => row.map((cell) => String(cell ?? '').trim())));
+            },
+            error: (error) => reject(new Error(error.message || 'Erro ao ler o arquivo.')),
+        });
+        return;
+    }
+
     const reader = new FileReader();
 
     reader.onerror = () => reject(new Error('Erro ao ler o arquivo.'));
@@ -1641,15 +1828,13 @@ const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((reso
                 return;
             }
 
-            const text = String(event.target?.result ?? '');
-            resolve(parseClipboardMatrix(text));
+            reject(new Error('Formato não suportado pelo parser.'));
         } catch (error: any) {
             reject(new Error(error?.message || 'Erro ao processar o arquivo.'));
         }
     };
 
-    if (ext === 'xlsx' || ext === 'xls') reader.readAsArrayBuffer(file);
-    else reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
 });
 
 const safeProcessDinamicaBI = (
@@ -1677,6 +1862,128 @@ const safeProcessDinamicaBI = (
 const nextFrame = () => new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
 });
+
+const suggestionGroup = (suggestion: FieldSuggestion) => {
+    if (suggestion.deterministic || suggestion.confidence >= 90) return 'Recomendadas';
+    if (suggestion.source.includes('jornada')) return 'Usadas nesta jornada';
+    if (suggestion.source.includes('base')) return 'Outros valores da base';
+    return 'Histórico relacionado';
+};
+
+const HistoryCombobox = ({
+    value,
+    suggestions,
+    onChange,
+    compact = false,
+}: {
+    value: string;
+    suggestions: FieldSuggestion[];
+    onChange: (value: string) => void;
+    compact?: boolean;
+}) => {
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState(value);
+    const anchorRef = useRef<HTMLDivElement>(null);
+    const [position, setPosition] = useState({ top: 0, left: 0, width: 280 });
+
+    useEffect(() => setDraft(value), [value]);
+    useEffect(() => {
+        if (!open || !anchorRef.current) return;
+        const rect = anchorRef.current.getBoundingClientRect();
+        setPosition({
+            top: Math.min(window.innerHeight - 360, rect.bottom + 4),
+            left: Math.min(window.innerWidth - 320, rect.left),
+            width: Math.max(280, rect.width),
+        });
+    }, [open]);
+
+    const filtered = suggestions.filter((item) =>
+        !draft || normalizeKey(item.value).includes(normalizeKey(draft))
+    );
+    const groups = ['Recomendadas', 'Usadas nesta jornada', 'Histórico relacionado', 'Outros valores da base']
+        .map((label) => ({ label, items: filtered.filter((item) => suggestionGroup(item) === label) }))
+        .filter((group) => group.items.length > 0);
+
+    return (
+        <div ref={anchorRef} className="relative">
+            <div className="relative">
+                <input
+                    value={draft}
+                    onChange={(event) => {
+                        setDraft(event.target.value);
+                        setOpen(true);
+                    }}
+                    onFocus={() => setOpen(true)}
+                    onBlur={() => window.setTimeout(() => {
+                        onChange(draft);
+                        setOpen(false);
+                    }, 140)}
+                    className={`w-full rounded-md border border-slate-200 bg-white pr-7 text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10 ${
+                        compact ? 'px-2 py-1 text-[11px]' : 'px-2 py-1.5 text-xs'
+                    }`}
+                />
+                <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setOpen((current) => !current)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100"
+                    aria-label="Abrir sugestões"
+                >
+                    <ChevronDown size={13} />
+                </button>
+            </div>
+            {open && createPortal(
+                <div
+                    className="fixed z-[120] max-h-80 overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-2xl"
+                    style={{ top: position.top, left: position.left, width: position.width }}
+                    onMouseDown={(event) => event.preventDefault()}
+                >
+                    {groups.map((group) => (
+                        <div key={group.label}>
+                            <div className="px-2 pb-1 pt-2 text-[9px] font-bold uppercase tracking-wide text-slate-400">{group.label}</div>
+                            {group.items.map((suggestion) => (
+                                <button
+                                    key={`${group.label}-${suggestion.value}`}
+                                    type="button"
+                                    onClick={() => {
+                                        setDraft(suggestion.value);
+                                        onChange(suggestion.value);
+                                        setOpen(false);
+                                    }}
+                                    className="flex w-full items-start justify-between gap-3 rounded-md px-2 py-2 text-left hover:bg-cyan-50"
+                                >
+                                    <span>
+                                        <span className="block text-xs font-semibold text-slate-800">{suggestion.value}</span>
+                                        <span className="mt-0.5 block text-[10px] text-slate-400">
+                                            {suggestion.source}{suggestion.evidence ? ` · ${suggestion.evidence}` : ''}
+                                        </span>
+                                    </span>
+                                    <span className="shrink-0 text-right text-[10px] text-slate-500">
+                                        <span className="block font-bold">{suggestion.count} usos</span>
+                                        {suggestion.lastUsed && <span>{formatDateBR(suggestion.lastUsed)}</span>}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    ))}
+                    {groups.length === 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onChange(draft);
+                                setOpen(false);
+                            }}
+                            className="w-full rounded-md px-3 py-3 text-left text-xs text-slate-600 hover:bg-slate-50"
+                        >
+                            Usar “{draft || 'novo valor'}”
+                        </button>
+                    )}
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+};
 
 const StatCard = ({ label, value, tone }: { label: string; value: number; tone: string }) => (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -1711,6 +2018,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [periodFilterOpen, setPeriodFilterOpen] = useState(false);
     const [reviewStartDate, setReviewStartDate] = useState('');
     const [reviewEndDate, setReviewEndDate] = useState('');
+    const [reviewMode, setReviewMode] = useState<'operation' | 'dimensions' | 'metrics'>('operation');
+    const [bulkEditOpen, setBulkEditOpen] = useState(false);
+    const [bulkField, setBulkField] = useState<ReviewField>('promocional');
+    const [bulkValue, setBulkValue] = useState('');
+    const [bulkScope, setBulkScope] = useState<'selected' | 'filtered'>('selected');
+    const [undoSnapshot, setUndoSnapshot] = useState<UpdateCandidate[] | null>(null);
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -1769,6 +2082,26 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         const start = (safePage - 1) * REVIEW_PAGE_SIZE;
         return filteredCandidates.slice(start, start + REVIEW_PAGE_SIZE);
     }, [filteredCandidates, reviewPage, reviewPageCount]);
+    const bulkSuggestions = useMemo(() => {
+        if (bulkField === 'ordemDisparo') return [];
+        const source = bulkScope === 'filtered'
+            ? filteredCandidates
+            : candidates.filter((candidate) => selectedKeys.has(candidate.key));
+        const merged = new Map<string, FieldSuggestion>();
+        source.forEach((candidate) => {
+            suggestionsFor(candidate.suggestions, bulkField as SuggestionField).forEach((suggestion) => {
+                const key = normalizeKey(suggestion.value);
+                const current = merged.get(key);
+                if (!current) merged.set(key, { ...suggestion });
+                else {
+                    current.count += suggestion.count;
+                    current.confidence = Math.max(current.confidence, suggestion.confidence);
+                    if ((suggestion.lastUsed ?? '') > (current.lastUsed ?? '')) current.lastUsed = suggestion.lastUsed;
+                }
+            });
+        });
+        return Array.from(merged.values()).sort((a, b) => b.confidence - a.confidence || b.count - a.count).slice(0, 20);
+    }, [bulkField, bulkScope, candidates, filteredCandidates, selectedKeys]);
 
     const exportableCandidates = useMemo(() =>
         candidates.filter((candidate) =>
@@ -1830,6 +2163,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setReviewSearchTerm('');
         setReviewStartDate('');
         setReviewEndDate('');
+        setReviewMode('operation');
+        setUndoSnapshot(null);
+        setBulkEditOpen(false);
         setProcessingStage('reading');
 
         try {
@@ -1891,12 +2227,27 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         }
     };
 
-    const updateCandidate = (key: string, updates: Partial<UpdateCandidate>) => {
+    const updateCandidate = (key: string, updates: Partial<UpdateCandidate>, mode: 'single' | 'bulk' = 'single') => {
         setResult((current) => {
             if (!current) return current;
-            const candidates = current.candidates.map((candidate) =>
-                candidate.key === key ? { ...candidate, ...updates } : candidate
-            );
+            const candidates = current.candidates.map((candidate) => {
+                if (candidate.key !== key) return candidate;
+                const changedAt = new Date().toISOString();
+                const overrides = Object.entries(updates)
+                    .filter(([field]) => REVIEW_FIELDS.some((item) => item.key === field))
+                    .map(([field, nextValue]) => ({
+                        field: field as ReviewField,
+                        previousValue: candidate[field as ReviewField],
+                        nextValue: nextValue as string | number | undefined,
+                        mode,
+                        changedAt,
+                    }));
+                return {
+                    ...candidate,
+                    ...updates,
+                    manualOverrides: [...(candidate.manualOverrides ?? []), ...overrides],
+                };
+            });
             return {
                 ...current,
                 candidates,
@@ -1907,6 +2258,50 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             };
         });
         setSelectedCandidate((current) => current?.key === key ? { ...current, ...updates } : current);
+    };
+
+    const applyBulkEdit = () => {
+        if (!result || !bulkValue.trim()) return;
+        const targetKeys = new Set(
+            bulkScope === 'filtered'
+                ? filteredCandidates.map((candidate) => candidate.key)
+                : Array.from(selectedKeys)
+        );
+        setUndoSnapshot(result.candidates);
+        setResult((current) => {
+            if (!current) return current;
+            const changedAt = new Date().toISOString();
+            const candidates = current.candidates.map((candidate) => {
+                if (!targetKeys.has(candidate.key)) return candidate;
+                const nextValue = bulkField === 'ordemDisparo' ? Number(bulkValue) : bulkValue;
+                const override: ManualOverride = {
+                    field: bulkField,
+                    previousValue: candidate[bulkField],
+                    nextValue,
+                    mode: 'bulk',
+                    changedAt,
+                };
+                return {
+                    ...candidate,
+                    [bulkField]: nextValue,
+                    accepted: false,
+                    manualOverrides: [...(candidate.manualOverrides ?? []), override],
+                };
+            });
+            return { ...current, candidates, tsv: candidates.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n') };
+        });
+        setBulkEditOpen(false);
+        setBulkValue('');
+    };
+
+    const undoBulkEdit = () => {
+        if (!undoSnapshot) return;
+        setResult((current) => current ? {
+            ...current,
+            candidates: undoSnapshot,
+            tsv: undoSnapshot.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n'),
+        } : current);
+        setUndoSnapshot(null);
     };
 
     const acceptCandidate = (key: string) => {
@@ -2304,8 +2699,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             )}
 
             {reviewOpen && result && fileMeta && (
-                <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-                    <div className="flex w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-slate-100">
+                    <div className="flex w-full flex-col overflow-hidden bg-white">
                         <header className="border-b border-slate-200 bg-white px-6 py-4">
                             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
@@ -2328,12 +2723,28 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <X size={18} />
                                 </button>
                             </div>
-                            <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-                                <StatCard label="Novas linhas" value={candidates.length} tone="text-blue-700" />
-                                <StatCard label="Ignoradas existentes" value={result.ignoredExisting} tone="text-slate-700" />
-                                <StatCard label="Pendencias" value={blockingCount} tone="text-amber-700" />
-                                <StatCard label="Confianca media" value={averageConfidence} tone="text-emerald-700" />
-                                <StatCard label="Aceitas" value={exportableCandidates.length} tone="text-indigo-700" />
+                            <div className="mt-3 rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-2.5 text-sm text-cyan-950">
+                                <strong>{result.insights.rawRows.toLocaleString('pt-BR')} linhas</strong> da Dinâmica BI foram consolidadas em{' '}
+                                <strong>{result.insights.uniqueJourneys} jornadas</strong>,{' '}
+                                <strong>{result.insights.uniqueActivities} activities</strong> e{' '}
+                                <strong>{result.insights.newDispatches} novos disparos</strong>.
+                            </div>
+                            <div className="mt-3 grid grid-cols-3 gap-2 lg:grid-cols-8">
+                                {[
+                                    ['Linhas BI', result.insights.rawRows],
+                                    ['Métricas válidas', result.insights.validMetricRows],
+                                    ['Jornadas', result.insights.uniqueJourneys],
+                                    ['Activities', result.insights.uniqueActivities],
+                                    ['Acionáveis', result.insights.actionableDispatches],
+                                    ['Existentes', result.insights.existingDispatches],
+                                    ['Novos', result.insights.newDispatches],
+                                    ['Conflitos', result.insights.classificationConflicts],
+                                ].map(([label, value]) => (
+                                    <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                        <div className="text-lg font-bold text-slate-900">{Number(value).toLocaleString('pt-BR')}</div>
+                                        <div className="text-[10px] font-semibold text-slate-500">{label}</div>
+                                    </div>
+                                ))}
                             </div>
                         </header>
 
@@ -2426,6 +2837,33 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     Aceitar alta confianca
                                 </button>
                             </div>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+                                    {([
+                                        ['operation', 'Operação'],
+                                        ['dimensions', 'Dimensões'],
+                                        ['metrics', 'Métricas'],
+                                    ] as const).map(([mode, label]) => (
+                                        <button
+                                            key={mode}
+                                            type="button"
+                                            onClick={() => setReviewMode(mode)}
+                                            className={`rounded-md px-3 py-1.5 text-xs font-bold ${
+                                                reviewMode === mode ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap gap-2 text-[10px]">
+                                    {Object.entries(result.insights.originCounts).map(([origin, count]) => (
+                                        <span key={origin} className="rounded-full border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-600">
+                                            {origin}: {count}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {(['all', 'ready', 'review', 'new', 'conflict', 'duplicate', 'error', 'ignored'] as const).map((status) => (
                                     <button
@@ -2447,23 +2885,43 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </div>
                         </div>
 
-                        {statusFilter === 'ready' && (
-                            <div className="flex flex-col gap-2 border-b border-slate-200 bg-emerald-50/50 px-6 py-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-                                <label className="inline-flex items-center gap-2 font-bold text-emerald-800">
+                        <div className={`flex flex-col gap-2 border-b px-6 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
+                            selectedKeys.size > 0 ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600'
+                        }`}>
+                                <label className="inline-flex items-center gap-2 font-bold">
                                     <input
                                         type="checkbox"
-                                        checked={readyFilteredKeys.length > 0 && selectedReadyCount === readyFilteredKeys.length}
-                                        onChange={toggleReadySelection}
-                                        className="h-4 w-4 rounded border-emerald-300 text-emerald-600"
+                                        checked={filteredCandidates.length > 0 && filteredCandidates.every((candidate) => selectedKeys.has(candidate.key))}
+                                        onChange={() => {
+                                            const allSelected = filteredCandidates.length > 0 && filteredCandidates.every((candidate) => selectedKeys.has(candidate.key));
+                                            setSelectedKeys((current) => {
+                                                const next = new Set(current);
+                                                filteredCandidates.forEach((candidate) => allSelected ? next.delete(candidate.key) : next.add(candidate.key));
+                                                return next;
+                                            });
+                                        }}
+                                        className="h-4 w-4 rounded border-slate-300"
                                     />
-                                    Selecionar todos da aba Pronto ({selectedReadyCount}/{readyFilteredKeys.length})
+                                    {selectedKeys.size > 0
+                                        ? `${selectedKeys.size} selecionados`
+                                        : `Selecionar todos os ${filteredCandidates.length} filtrados`}
                                 </label>
                                 <div className="flex flex-wrap gap-2">
+                                    {selectedKeys.size > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setBulkEditOpen(true)}
+                                            className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-bold text-blue-700"
+                                        >
+                                            <Edit3 size={13} />
+                                            Editar campos
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={acceptSelectedCandidates}
                                         disabled={selectedKeys.size === 0}
-                                        className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                                        className="rounded-lg border border-white/30 bg-white px-3 py-2 text-xs font-bold text-emerald-700 disabled:cursor-not-allowed disabled:text-slate-300"
                                     >
                                         Aprovar selecionados
                                     </button>
@@ -2471,14 +2929,23 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         type="button"
                                         onClick={handleCopy}
                                         disabled={!reviewedTsv}
-                                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+                                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
                                     >
                                         <Copy size={14} />
                                         Copiar selecionados
                                     </button>
+                                    {selectedKeys.size > 0 && (
+                                        <button type="button" onClick={() => setSelectedKeys(new Set())} className="rounded-lg px-3 py-2 text-xs font-bold text-white hover:bg-white/10">
+                                            Limpar seleção
+                                        </button>
+                                    )}
+                                    {undoSnapshot && (
+                                        <button type="button" onClick={undoBulkEdit} className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+                                            Desfazer edição
+                                        </button>
+                                    )}
                                 </div>
-                            </div>
-                        )}
+                        </div>
 
                         <div className="flex flex-col gap-2 border-b border-slate-200 bg-white px-6 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                             <span>
@@ -2506,17 +2973,26 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         </div>
 
                         <main className="min-h-0 flex-1 overflow-auto">
-                            <table className="min-w-[2300px] w-full divide-y divide-slate-200 text-left text-xs">
+                            <table className="w-full table-fixed divide-y divide-slate-200 text-left text-xs">
                                 <thead className="sticky top-0 z-10 bg-white text-[10px] uppercase tracking-wider text-slate-500 shadow-sm">
                                     <tr>
-                                        {statusFilter === 'ready' && <th className="px-3 py-3 font-bold">Sel.</th>}
-                                        <th className="px-3 py-3 font-bold">Status</th>
-                                        <th className="px-3 py-3 font-bold">Identidade</th>
-                                        {reviewFields.map((field) => (
-                                            <th key={field.key} className="px-3 py-3 font-bold">{field.label}</th>
-                                        ))}
-                                        <th className="px-3 py-3 font-bold">Confianca</th>
-                                        <th className="px-3 py-3 font-bold">Acoes</th>
+                                        <th className="w-10 px-3 py-3 font-bold">Sel.</th>
+                                        <th className="w-24 px-3 py-3 font-bold">Status</th>
+                                        <th className="w-[32%] px-3 py-3 font-bold">Disparo</th>
+                                        {reviewMode === 'operation' && <>
+                                            <th className="w-[31%] px-3 py-3 font-bold">Classificação</th>
+                                            <th className="w-[18%] px-3 py-3 font-bold">Revisão</th>
+                                        </>}
+                                        {reviewMode === 'dimensions' && <>
+                                            <th className="w-[38%] px-3 py-3 font-bold">Dimensões</th>
+                                            <th className="w-[12%] px-3 py-3 font-bold">Confiança</th>
+                                        </>}
+                                        {reviewMode === 'metrics' && <>
+                                            <th className="px-3 py-3 font-bold">Base</th>
+                                            <th className="px-3 py-3 font-bold">Engajamento</th>
+                                            <th className="px-3 py-3 font-bold">Conversão</th>
+                                        </>}
+                                        <th className="w-24 px-3 py-3 font-bold">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -2526,78 +3002,64 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                             onClick={() => setSelectedCandidate(candidate)}
                                             className={`${candidate.accepted ? 'bg-emerald-50/40' : 'hover:bg-slate-50'} cursor-pointer`}
                                         >
-                                            {statusFilter === 'ready' && (
-                                                <td className="px-3 py-3 align-top" onClick={(event) => event.stopPropagation()}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedKeys.has(candidate.key)}
-                                                        onChange={(event) => toggleCandidateSelection(candidate.key, event.target.checked)}
-                                                        className="h-4 w-4 rounded border-slate-300 text-emerald-600"
-                                                    />
-                                                </td>
-                                            )}
+                                            <td className="px-3 py-3 align-top" onClick={(event) => event.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedKeys.has(candidate.key)}
+                                                    onChange={(event) => toggleCandidateSelection(candidate.key, event.target.checked)}
+                                                    className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                                                />
+                                            </td>
                                             <td className="px-3 py-3 align-top">
                                                 <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[candidate.status]}`}>
                                                     {candidate.accepted ? 'Aceito' : STATUS_LABEL[candidate.status]}
                                                 </span>
                                             </td>
-                                            <td className="w-80 px-3 py-3 align-top">
-                                                <div className="font-semibold text-slate-900">{candidate.journey}</div>
-                                                <div className="mt-1 text-slate-500">{candidate.activityName}</div>
+                                            <td className="px-3 py-3 align-top">
+                                                <div className="truncate font-semibold text-slate-900" title={candidate.journey}>{candidate.journey}</div>
+                                                <div className="mt-1 truncate text-slate-500" title={candidate.activityName}>{candidate.activityName}</div>
                                                 <div className="mt-2 flex gap-2 text-[10px] font-bold text-slate-500">
                                                     <span>{candidate.channel}</span>
                                                     <span>{formatDateBR(candidate.date)}</span>
                                                 </div>
                                             </td>
-                                            {reviewFields.map((field) => {
-                                                const hasSuggestions = field.key !== 'ordemDisparo';
-                                                const suggestions = hasSuggestions
-                                                    ? suggestionsFor(candidate.suggestions, field.key as SuggestionField)
-                                                    : [];
-                                                const top = suggestions[0];
-                                                const listId = `${candidate.key}-${field.key}`;
-                                                return (
-                                                    <td
-                                                        key={field.key}
-                                                        className="w-44 px-3 py-3 align-top"
-                                                        onClick={(event) => event.stopPropagation()}
-                                                    >
-                                                        <input
-                                                            type={field.type === 'number' ? 'number' : 'text'}
-                                                            value={candidate[field.key] ?? ''}
-                                                            list={hasSuggestions ? listId : undefined}
-                                                            onClick={(event) => event.stopPropagation()}
-                                                            onFocus={(event) => event.stopPropagation()}
-                                                            onPointerDown={(event) => event.stopPropagation()}
-                                                            onChange={(event) => updateCandidate(candidate.key, {
-                                                                [field.key]: field.type === 'number'
-                                                                    ? (event.target.value ? Number(event.target.value) : undefined)
-                                                                    : event.target.value,
-                                                                accepted: false,
-                                                            } as Partial<UpdateCandidate>)}
-                                                            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/10"
-                                                        />
-                                                        {hasSuggestions && (
-                                                            <datalist id={listId}>
-                                                                {suggestions.map((suggestion) => (
-                                                                    <option key={`${field.key}-${suggestion.value}`} value={suggestion.value} />
-                                                                ))}
-                                                            </datalist>
-                                                        )}
-                                                        {top && (
-                                                            <div className="mt-1 text-[10px] leading-tight text-slate-400">
-                                                                {top.confidence}% - {top.source} ({top.count})
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                );
-                                            })}
-                                            <td className="px-3 py-3 align-top font-bold text-slate-700">
-                                                {candidate.confidence}%
-                                                <div className="mt-1 max-w-40 text-[10px] font-normal text-slate-400">{candidate.basis}</div>
-                                            </td>
+                                            {reviewMode === 'operation' && <>
+                                                <td className="px-3 py-3 align-top">
+                                                    <div className="font-semibold text-slate-800">{candidate.bu} · {candidate.parceiro} · {candidate.segmento}</div>
+                                                    <div className="mt-1 text-[11px] text-slate-500">{candidate.subgrupo} · {candidate.etapaAquisicao} · {candidate.perfilCredito}</div>
+                                                    <div className="mt-2 flex flex-wrap gap-1">
+                                                        {candidate.oferta && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-600">{candidate.oferta}</span>}
+                                                        {candidate.promocional && <span className="rounded bg-cyan-50 px-1.5 py-0.5 text-[9px] text-cyan-700">{candidate.promocional}</span>}
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3 align-top">
+                                                    <div className="font-bold text-slate-800">{candidate.fieldToReview}</div>
+                                                    <div className="mt-1 line-clamp-2 text-[10px] text-slate-500">{candidate.suggestion}</div>
+                                                </td>
+                                            </>}
+                                            {reviewMode === 'dimensions' && <>
+                                                <td className="px-3 py-3 align-top">
+                                                    <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-[11px]">
+                                                        <span><b>BU:</b> {candidate.bu}</span>
+                                                        <span><b>Parceiro:</b> {candidate.parceiro}</span>
+                                                        <span><b>Segmento:</b> {candidate.segmento}</span>
+                                                        <span><b>Subgrupo:</b> {candidate.subgrupo}</span>
+                                                        <span><b>Etapa:</b> {candidate.etapaAquisicao}</span>
+                                                        <span><b>Perfil:</b> {candidate.perfilCredito}</span>
+                                                        <span><b>Produto:</b> {candidate.produto}</span>
+                                                        <span><b>Oferta:</b> {candidate.oferta}</span>
+                                                        <span><b>Promo:</b> {candidate.promocional}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3 align-top font-bold text-slate-700">{candidate.confidence}%</td>
+                                            </>}
+                                            {reviewMode === 'metrics' && <>
+                                                <td className="px-3 py-3 align-top"><b>{candidate.sent ?? '-'}</b> total<br/><span className="text-slate-500">{candidate.delivered ?? '-'} acionável</span></td>
+                                                <td className="px-3 py-3 align-top"><b>{candidate.opens ?? '-'}</b> aberturas<br/><span className="text-slate-500">{candidate.clicks ?? '-'} cliques</span></td>
+                                                <td className="px-3 py-3 align-top"><b>{candidate.proposals ?? '-'}</b> propostas<br/><span className="text-slate-500">{candidate.approved ?? '-'} aprovados · {candidate.finalized ?? '-'} cartões</span></td>
+                                            </>}
                                             <td className="px-3 py-3 align-top">
-                                                <div className="flex flex-col gap-2">
+                                                <div className="flex items-center gap-1">
                                                     <button
                                                         type="button"
                                                         onClick={(event) => {
@@ -2605,19 +3067,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                             acceptCandidate(candidate.key);
                                                         }}
                                                         disabled={candidate.status === 'duplicate' || candidate.status === 'error' || candidate.status === 'ignored'}
-                                                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                                        className="rounded-md bg-emerald-600 px-2 py-1.5 text-[10px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                                        title="Aceitar"
                                                     >
-                                                        Aceitar
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            ignoreCandidate(candidate.key);
-                                                        }}
-                                                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-bold text-slate-600 transition hover:bg-slate-100"
-                                                    >
-                                                        Ignorar
+                                                        <CheckCircle size={13} />
                                                     </button>
                                                     <button
                                                         type="button"
@@ -2625,9 +3078,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                             event.stopPropagation();
                                                             setSelectedCandidate(candidate);
                                                         }}
-                                                        className="rounded-md border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-[10px] font-bold text-cyan-700 transition hover:bg-cyan-100"
+                                                        className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100"
+                                                        title="Editar detalhes"
                                                     >
-                                                        Ver metrica
+                                                        <Edit3 size={13} />
+                                                    </button>
+                                                    <button type="button" onClick={(event) => { event.stopPropagation(); ignoreCandidate(candidate.key); }} className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-100" title="Ignorar">
+                                                        <MoreHorizontal size={13} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -2635,7 +3092,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     ))}
                                     {filteredCandidates.length === 0 && (
                                         <tr>
-                                            <td colSpan={reviewFields.length + 4} className="px-3 py-16 text-center text-slate-500">
+                                            <td colSpan={7} className="px-3 py-16 text-center text-slate-500">
                                                 {reviewSearchTerm ? 'Nenhum candidato encontrado para esta busca.' : 'Nenhum candidato neste filtro.'}
                                             </td>
                                         </tr>
@@ -2774,9 +3231,57 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 </div>
             )}
 
+            {bulkEditOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+                        <header className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900">Editar campos em massa</h3>
+                                <p className="mt-1 text-xs text-slate-500">A alteração fica disponível para desfazer até o upload.</p>
+                            </div>
+                            <button type="button" onClick={() => setBulkEditOpen(false)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100"><X size={16}/></button>
+                        </header>
+                        <main className="space-y-4 p-5">
+                            <div className="grid grid-cols-2 gap-3">
+                                <label>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400">Campo</span>
+                                    <select value={bulkField} onChange={(event) => { setBulkField(event.target.value as ReviewField); setBulkValue(''); }} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs">
+                                        {REVIEW_FIELDS.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}
+                                    </select>
+                                </label>
+                                <label>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400">Aplicar em</span>
+                                    <select value={bulkScope} onChange={(event) => setBulkScope(event.target.value as 'selected' | 'filtered')} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs">
+                                        <option value="selected">{selectedKeys.size} selecionados</option>
+                                        <option value="filtered">{filteredCandidates.length} resultados filtrados</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <label className="block">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Novo valor</span>
+                                <div className="mt-1">
+                                    {bulkField === 'ordemDisparo' ? (
+                                        <input type="number" value={bulkValue} onChange={(event) => setBulkValue(event.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"/>
+                                    ) : (
+                                        <HistoryCombobox value={bulkValue} suggestions={bulkSuggestions} onChange={setBulkValue}/>
+                                    )}
+                                </div>
+                            </label>
+                            <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                                <strong>{bulkScope === 'selected' ? selectedKeys.size : filteredCandidates.length} activities</strong> receberão <strong>{REVIEW_FIELDS.find((field) => field.key === bulkField)?.label} = {bulkValue || '...'}</strong>.
+                            </div>
+                        </main>
+                        <footer className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                            <button type="button" onClick={() => setBulkEditOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600">Cancelar</button>
+                            <button type="button" onClick={applyBulkEdit} disabled={!bulkValue.trim()} className="rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white disabled:bg-slate-300">Aplicar alteração</button>
+                        </footer>
+                    </div>
+                </div>
+            )}
+
             {selectedCandidate && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-sm">
-                    <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/35 backdrop-blur-sm">
+                    <div className="flex h-full w-full max-w-3xl flex-col overflow-hidden bg-white shadow-2xl">
                         <header className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2">
@@ -2918,29 +3423,31 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 ? suggestionsFor(selectedCandidate.suggestions, field.key as SuggestionField)
                                                 : [];
                                             const top = suggestions[0];
-                                            const listId = `detail-${selectedCandidate.key}-${field.key}`;
                                             return (
                                                 <label key={field.key} className="block">
                                                     <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{field.label}</span>
-                                                    <input
-                                                        type={field.type === 'number' ? 'number' : 'text'}
-                                                        value={selectedCandidate[field.key] ?? ''}
-                                                        list={hasSuggestions ? listId : undefined}
-                                                        onChange={(event) => updateCandidate(selectedCandidate.key, {
-                                                            [field.key]: field.type === 'number'
-                                                                ? (event.target.value ? Number(event.target.value) : undefined)
-                                                                : event.target.value,
-                                                            accepted: false,
-                                                        } as Partial<UpdateCandidate>)}
-                                                        className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500"
-                                                    />
-                                                    {hasSuggestions && (
-                                                        <datalist id={listId}>
-                                                            {suggestions.map((suggestion) => (
-                                                                <option key={`${field.key}-${suggestion.value}`} value={suggestion.value} />
-                                                            ))}
-                                                        </datalist>
-                                                    )}
+                                                    <div className="mt-1">
+                                                        {hasSuggestions ? (
+                                                            <HistoryCombobox
+                                                                value={String(selectedCandidate[field.key] ?? '')}
+                                                                suggestions={suggestions}
+                                                                onChange={(value) => updateCandidate(selectedCandidate.key, {
+                                                                    [field.key]: value,
+                                                                    accepted: false,
+                                                                } as Partial<UpdateCandidate>)}
+                                                            />
+                                                        ) : (
+                                                            <input
+                                                                type="number"
+                                                                value={selectedCandidate[field.key] ?? ''}
+                                                                onChange={(event) => updateCandidate(selectedCandidate.key, {
+                                                                    [field.key]: event.target.value ? Number(event.target.value) : undefined,
+                                                                    accepted: false,
+                                                                } as Partial<UpdateCandidate>)}
+                                                                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-800 outline-none focus:border-cyan-500"
+                                                            />
+                                                        )}
+                                                    </div>
                                                     {top && (
                                                         <div className="mt-1 text-[10px] leading-tight text-slate-400">
                                                             {top.confidence}% - {top.source} ({top.count})

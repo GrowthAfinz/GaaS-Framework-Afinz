@@ -51,6 +51,13 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     ordemDisparo?: number;
     conflictJourneys?: string[];
     conflictReason?: string;
+    manualOverrides?: Array<{
+        field: string;
+        previousValue?: string | number;
+        nextValue?: string | number;
+        mode: 'single' | 'bulk';
+        changedAt: string;
+    }>;
 }
 
 export interface IntelligentUpdateRunPayload {
@@ -476,6 +483,7 @@ export const intelligentUpdateService = {
                     conflict_reason: candidate.conflictReason ?? null,
                     conflict_journeys: candidate.conflictJourneys ?? [],
                     dispatch_signature: candidate.dispatchSignature ?? null,
+                    manual_overrides: candidate.manualOverrides ?? [],
                 },
                 applied_at: wasApplied ? now : null,
             };
