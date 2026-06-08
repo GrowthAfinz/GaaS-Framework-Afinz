@@ -1399,34 +1399,146 @@ const isRentabilizacaoJourney = (journey: unknown) => {
         || j.includes('SEGURO');
 };
 
-const inferRentabilizacaoTaxonomy = (metric: MetricRow) => {
-    const text = normalizeKey(`${metric.journey} ${metric.activityName}`).toUpperCase();
+interface RentabilizacaoTaxonomy {
+    family: string;
+    bu: string;
+    parceiro: string;
+    segmento: string;
+    subgrupo: string;
+    produto: string;
+    etapaAquisicao: string;
+    perfilCredito: string;
+    oferta: string;
+    promocional?: string;
+    evidence: string;
+}
+
+const rentTitleCase = (value: string) =>
+    value
+        .toLowerCase()
+        .split(/[\s_]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+
+const inferRentabilizacaoContext = (journey: unknown, activityName: unknown): RentabilizacaoTaxonomy => {
+    const journeyText = normalizeKey(journey).toUpperCase();
+    const activityText = normalizeKey(activityName).toUpperCase();
+    const text = `${journeyText} ${activityText}`;
+    const isInsurance = text.includes('SEGURO') || text.includes('AFZ_SEG_');
+    const isCopa = journeyText.includes('COPA');
+
     const bu = text.includes('PLURIX') || text.includes('MAISAMIGO') || text.includes('PLU_')
         ? 'Plurix'
-        : text.includes('B2B2C') || text.includes('_BB_') || text.includes('BB_')
-            ? 'B2B2C'
-            : text.includes('SEGURO') || text.includes('AFZ_SEG_')
-                ? 'Seguros'
+        : isInsurance
+            ? 'Seguros'
+            : text.includes('B2B2C') || text.includes('_BB_') || text.includes('BB_')
+                ? 'B2B2C'
                 : 'B2C';
-    const segmento = text.includes('SEGURO')
-        ? 'Rentabilizacao'
-        : text.includes('NOVOS')
-            ? 'Novos'
-            : text.includes('REATIVACAO')
-                ? 'Reativacao'
-                : text.includes('CARTONISTAS')
-                    ? 'Cartonistas'
-                    : text.includes('ATIVACAO') || text.includes('WELCOME') || text.includes('DESBLOQUEIO')
-                        ? 'Ativacao'
-                        : 'Rentabilizacao';
-    const produto = text.includes('SEGURO MULHER')
-        ? 'Seguro Mulher'
-        : text.includes('SEGURO RESIDENCIA')
-            ? 'Seguro Residencia'
-            : 'Cartao';
 
-    return { bu, parceiro: 'N/A', segmento, produto, etapaAquisicao: 'Rentabilizacao' };
+    if (isInsurance) {
+        const isCarrinho = text.includes('CARRINHO');
+        const produto = text.includes('AUTO_E_RESIDENCIAL') || (text.includes('AUTO') && text.includes('RESIDENCIA'))
+            ? 'Seguro Auto e Residencial'
+            : text.includes('SEGURO_AUTO')
+                ? 'Seguro Auto'
+                : text.includes('RESIDENCIA24H') || text.includes('RESIDENCIA')
+            ? `${isCarrinho ? 'Carrinho ' : ''}Seguro Residencia${text.includes('24H') ? ' 24h' : ''}`
+            : text.includes('MULHER')
+                ? `${isCarrinho ? 'Carrinho ' : ''}Seguro Mulher`
+                : isCarrinho
+                    ? 'Carrinho Seguro'
+                    : 'Seguro';
+        return {
+            family: `seguros:${normalizeKey(produto)}`,
+            bu,
+            parceiro: 'N/A',
+            segmento: 'Rentabilizacao',
+            subgrupo: 'N/A',
+            produto,
+            etapaAquisicao: 'Rentabilizacao',
+            perfilCredito: 'N/A',
+            oferta: 'Padrao',
+            evidence: 'jornada ou activity contem token explicito de seguro',
+        };
+    }
+
+    const segmento = journeyText.includes('NOVOS')
+        ? 'Novos'
+        : journeyText.includes('REATIVACAO')
+            ? 'Reativacao'
+            : journeyText.includes('CARTONISTAS')
+                ? isCopa ? 'Ativacao' : 'Cartonistas'
+                : text.includes('ATIVACAO') || text.includes('WELCOME') || text.includes('DESBLOQUEIO') || (isCopa && text.includes('VISA'))
+                    ? 'Ativacao'
+                    : 'Rentabilizacao';
+
+    if (isCopa) {
+        return {
+            family: `copa:${normalizeKey(segmento)}`,
+            bu,
+            parceiro: 'N/A',
+            segmento,
+            subgrupo: 'N/A',
+            produto: 'Cartao',
+            etapaAquisicao: 'Rentabilizacao',
+            perfilCredito: 'N/A',
+            oferta: 'Padrao',
+            promocional: 'Copa',
+            evidence: `regra do XLSX Rentabilizacao Copa: ${segmento}`,
+        };
+    }
+
+    let produto = 'Cartao';
+    let family = `rentabilizacao:${normalizeKey(segmento)}`;
+    if (journeyText.startsWith('JOR_INCENTIVO_AO_USO_')) {
+        produto = 'Incentivo ao Uso';
+        family = 'rentabilizacao:incentivo_ao_uso';
+    } else if (journeyText.includes('INCENTIVO_AO_USO_AFINZ')) {
+        produto = 'Incentivo ao Uso Afinz';
+        family = 'rentabilizacao:incentivo_ao_uso_afinz';
+    } else if (journeyText.startsWith('JOR_POS_TOMBAMENTO_DESBLOQUEIO_')) {
+        produto = 'Desbloqueio Pos-Tombamento';
+        family = 'rentabilizacao:desbloqueio_pos_tombamento';
+    } else if (journeyText.includes('WELCOME_PLURIX')) {
+        produto = 'Welcome Plurix Mais Amigo';
+        family = 'rentabilizacao:welcome_plurix';
+    } else if (journeyText.includes('WELCOME_AFINZ') || journeyText.startsWith('JOR_CARTAO_VC_WELCOME')) {
+        produto = 'Welcome Afinz VC';
+        family = 'rentabilizacao:welcome_afinz';
+    } else if (journeyText.includes('DESBLOQUEIO_PLURIX')) {
+        produto = 'Desbloqueio Plurix Mais Amigo';
+        family = 'rentabilizacao:desbloqueio_plurix';
+    } else if (journeyText.includes('DESBLOQUEIO_VC')) {
+        produto = 'Desbloqueio VC';
+        family = 'rentabilizacao:desbloqueio_vc';
+    } else if (journeyText.startsWith('JOR_RENTABILIZACAO_')) {
+        const rawProduct = journeyText
+            .replace(/^JOR_RENTABILIZACAO_[A-Z0-9]+_/, '')
+            .replace(/_[A-Z]{2,5}\d{2}$/, '');
+        if (rawProduct && !['ATIVACAO', 'REATIVACAO', 'NOVOS', 'CARTONISTAS'].includes(rawProduct)) {
+            produto = rentTitleCase(rawProduct);
+            family = `rentabilizacao:${normalizeKey(rawProduct)}`;
+        }
+    }
+
+    return {
+        family,
+        bu,
+        parceiro: 'N/A',
+        segmento,
+        subgrupo: 'N/A',
+        produto,
+        etapaAquisicao: 'Rentabilizacao',
+        perfilCredito: 'N/A',
+        oferta: 'Padrao',
+        promocional: 'N/A',
+        evidence: `familia deterministica ${family}`,
+    };
 };
+
+const inferRentabilizacaoTaxonomy = (metric: MetricRow) =>
+    inferRentabilizacaoContext(metric.journey, metric.activityName);
 
 // ── Inteligencia de historico para Rentabilizacao ───────────────────────────────
 // Aprende, da tabela rentabilizacao_activities, o mapeamento jornada/segmento -> dimensoes
@@ -1434,8 +1546,11 @@ const inferRentabilizacaoTaxonomy = (metric: MetricRow) => {
 interface RentHistoryIndex {
     byJourneyChannel: Map<string, SuggestionBucket>;
     byJourney: Map<string, SuggestionBucket>;
+    byFamilyChannel: Map<string, SuggestionBucket>;
+    byFamily: Map<string, SuggestionBucket>;
     bySegmentChannel: Map<string, SuggestionBucket>;
     byToken: Map<string, SuggestionBucket>;
+    global: SuggestionBucket;
     existingSignatures: Set<string>;
     rowCount: number;
 }
@@ -1471,8 +1586,11 @@ const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryInd
     const index: RentHistoryIndex = {
         byJourneyChannel: new Map(),
         byJourney: new Map(),
+        byFamilyChannel: new Map(),
+        byFamily: new Map(),
         bySegmentChannel: new Map(),
         byToken: new Map(),
+        global: createBucket(),
         existingSignatures: new Set(),
         rowCount: rows.length,
     };
@@ -1482,17 +1600,21 @@ const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryInd
         const rawCanal = row['Canal'];
         const channel = normalizeChannel(rawCanal);
         const journeyKey = normalizeKey(journey);
+        const taxonomy = inferRentabilizacaoContext(journey, activityName);
         index.existingSignatures.add(buildDispatchSignature(activityName, rawCanal, row['Data de Disparo']));
         if (journeyKey) {
             addRawRowToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), row);
             addRawRowToBucket(bucketFor(index.byJourney, journeyKey), row);
         }
+        addRawRowToBucket(bucketFor(index.byFamilyChannel, `${taxonomy.family}|${channel}`), row);
+        addRawRowToBucket(bucketFor(index.byFamily, taxonomy.family), row);
+        addRawRowToBucket(index.global, row);
         const segment = String(row['Segmento'] ?? '').trim();
         if (segment && channel !== 'Indefinido') {
             addRawRowToBucket(bucketFor(index.bySegmentChannel, `${segment}|${channel}`), row);
         }
         tokenizeForHistory(journey, activityName).forEach((token) =>
-            addRawRowToBucket(bucketFor(index.byToken, token), row)
+            addRawRowToBucket(bucketFor(index.byToken, `${taxonomy.family}|${token}`), row)
         );
     });
     return index;
@@ -1501,8 +1623,11 @@ const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryInd
 const emptyRentHistoryIndex = (): RentHistoryIndex => ({
     byJourneyChannel: new Map(),
     byJourney: new Map(),
+    byFamilyChannel: new Map(),
+    byFamily: new Map(),
     bySegmentChannel: new Map(),
     byToken: new Map(),
+    global: createBucket(),
     existingSignatures: new Set(),
     rowCount: 0,
 });
@@ -1510,29 +1635,70 @@ const emptyRentHistoryIndex = (): RentHistoryIndex => ({
 const suggestRentFields = (
     metric: MetricRow,
     index: RentHistoryIndex,
-    taxonomySegment: string
+    taxonomy: RentabilizacaoTaxonomy
 ): Partial<Record<SuggestionField, FieldSuggestion[]>> => {
     const journeyKey = normalizeKey(metric.journey);
     const journeyChannelKey = normalizeKey(`${journeyKey}|${metric.channel}`);
-    const segmentChannelKey = normalizeKey(`${taxonomySegment}|${metric.channel}`);
+    const familyChannelKey = normalizeKey(`${taxonomy.family}|${metric.channel}`);
+    const familyKey = normalizeKey(taxonomy.family);
+    const segmentChannelKey = normalizeKey(`${taxonomy.segmento}|${metric.channel}`);
     const journeyChannelBucket = index.byJourneyChannel.get(journeyChannelKey);
     const journeyBucket = index.byJourney.get(journeyKey);
+    const familyChannelBucket = index.byFamilyChannel.get(familyChannelKey);
+    const familyBucket = index.byFamily.get(familyKey);
     const segmentChannelBucket = index.bySegmentChannel.get(segmentChannelKey);
     const tokenBuckets = tokenizeForHistory(metric.journey, metric.activityName)
-        .map((token) => index.byToken.get(normalizeKey(token)))
+        .map((token) => index.byToken.get(normalizeKey(`${taxonomy.family}|${token}`)))
         .filter((bucket): bucket is SuggestionBucket => Boolean(bucket));
+    const deterministicValues: Partial<Record<SuggestionField, string>> = {
+        bu: taxonomy.bu,
+        parceiro: taxonomy.parceiro,
+        segmento: taxonomy.segmento,
+        subgrupo: taxonomy.subgrupo,
+        etapaAquisicao: taxonomy.etapaAquisicao,
+        perfilCredito: taxonomy.perfilCredito,
+        produto: taxonomy.produto,
+        oferta: taxonomy.oferta,
+        promocional: taxonomy.promocional,
+    };
+    const isCompatible = (field: SuggestionField, suggestion: FieldSuggestion) => {
+        if (taxonomy.family.startsWith('seguros:')) return true;
+        const value = normalizeKey(suggestion.value);
+        if (value.includes('seguro')) return false;
+        if (field === 'bu' && value === 'seguros') return false;
+        return true;
+    };
 
     const result: Partial<Record<SuggestionField, FieldSuggestion[]>> = {};
     for (const field of SUGGESTION_FIELDS) {
+        const deterministic = deterministicValues[field]
+            ? [{
+                value: deterministicValues[field]!,
+                confidence: 100,
+                source: 'regra deterministica de rentabilizacao',
+                count: 1,
+                evidence: taxonomy.evidence,
+                deterministic: true,
+            } satisfies FieldSuggestion]
+            : [];
         result[field] = [
+            ...deterministic,
             ...topSuggestionsFromBucket(journeyChannelBucket, field, 'mesma jornada e canal', 96),
             ...topSuggestionsFromBucket(journeyBucket, field, 'mesma jornada', 90),
-            ...topSuggestionsFromBucket(segmentChannelBucket, field, 'mesmo segmento e canal', 80),
-            ...tokenBuckets.flatMap((bucket) => topSuggestionsFromBucket(bucket, field, 'campanhas similares por token', 72)),
-        ].reduce<FieldSuggestion[]>((acc, suggestion) => {
+            ...topSuggestionsFromBucket(familyChannelBucket, field, 'mesma familia e canal', 86),
+            ...topSuggestionsFromBucket(familyBucket, field, 'mesma familia de rentabilizacao', 82),
+            ...topSuggestionsFromBucket(segmentChannelBucket, field, 'mesmo segmento e canal', 68),
+            ...tokenBuckets.flatMap((bucket) => topSuggestionsFromBucket(bucket, field, 'mesma familia e token', 64)),
+            ...topSuggestionsFromBucket(index.global, field, 'outros valores da base', 35),
+        ].filter((suggestion) => isCompatible(field, suggestion)).reduce<FieldSuggestion[]>((acc, suggestion) => {
             if (!acc.some((item) => normalizeKey(item.value) === normalizeKey(suggestion.value))) acc.push(suggestion);
             return acc;
-        }, []).slice(0, 5);
+        }, []).slice(0, 10);
+        if (deterministic[0]) {
+            deterministic[0].historicalConflict = result[field]?.find((item) =>
+                !item.deterministic && normalizeKey(item.value) !== normalizeKey(deterministic[0].value)
+            )?.value;
+        }
     }
     return result;
 };
@@ -1543,9 +1709,7 @@ const buildRentabilizacaoCandidate = (
     history: RentHistoryIndex
 ): UpdateCandidate => {
     const taxonomy = inferRentabilizacaoTaxonomy(metric);
-    const fieldSuggestions = suggestRentFields(metric, history, taxonomy.segmento);
-    const pick = (field: SuggestionField, fallback: string) =>
-        suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
+    const fieldSuggestions = suggestRentFields(metric, history, taxonomy);
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     // Ja existe na tabela rentabilizacao_activities (mesma activity+canal+data)?
     const existsInBase = history.existingSignatures.has(metric.dispatchSignature);
@@ -1589,17 +1753,17 @@ const buildRentabilizacaoCandidate = (
                         ? 'activity, canal e data ja existem em rentabilizacao_activities'
                         : 'regras portadas do upload de rentabilizacao',
         accepted: false,
-        // Dimensoes herdadas do historico de rentabilizacao_activities (jornada/segmento),
-        // com fallback para a taxonomia inferida quando nao ha historico.
-        bu: pick('bu', taxonomy.bu),
-        parceiro: pick('parceiro', taxonomy.parceiro),
-        segmento: pick('segmento', taxonomy.segmento),
-        subgrupo: pick('subgrupo', 'N/A'),
-        etapaAquisicao: pick('etapaAquisicao', taxonomy.etapaAquisicao),
-        perfilCredito: pick('perfilCredito', 'N/A'),
-        produto: pick('produto', taxonomy.produto),
-        oferta: pick('oferta', 'Padrao'),
-        promocional: pick('promocional', 'N/A'),
+        // Dimensoes estruturais seguem a taxonomia deterministica. O historico
+        // complementa campos operacionais sem misturar Seguros com outras familias.
+        bu: taxonomy.bu,
+        parceiro: taxonomy.parceiro,
+        segmento: taxonomy.segmento,
+        subgrupo: taxonomy.subgrupo,
+        etapaAquisicao: taxonomy.etapaAquisicao,
+        perfilCredito: taxonomy.perfilCredito,
+        produto: taxonomy.produto,
+        oferta: taxonomy.oferta,
+        promocional: taxonomy.promocional ?? 'N/A',
         ordemDisparo: undefined,
         suggestions: fieldSuggestions,
         conflictJourneys: [],
@@ -2028,11 +2192,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
     const isRentReview = (result?.domain ?? activeDomain) === 'rentabilizacao';
-    // Rentabilizacao foca em poucas dimensoes relevantes (BU, Parceiro, Segmento, Etapa);
-    // os campos sempre-N/A da aquisicao (Subgrupo, Perfil, Oferta, Promocional, Ordem) somem.
+    // A tabela permanece compacta, mas o drawer permite revisar todas as dimensoes
+    // relevantes para Rentabilizacao e Seguros.
     const reviewFields = useMemo(
         () => isRentReview
-            ? REVIEW_FIELDS.filter((field) => ['bu', 'parceiro', 'segmento', 'etapaAquisicao'].includes(field.key))
+            ? REVIEW_FIELDS.filter((field) => field.key !== 'ordemDisparo')
             : REVIEW_FIELDS,
         [isRentReview]
     );
