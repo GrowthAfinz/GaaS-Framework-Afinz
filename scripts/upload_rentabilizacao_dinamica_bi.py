@@ -6,10 +6,10 @@ Lê o CSV multi-bloco SFMC (WPP | EMAIL | SMS | PUSH) e insere diretamente
 na tabela rentabilizacao_activities no Supabase.
 
 Uso:
-    python upload_rentabilizacao_dinamica_bi.py <arquivo.csv> [--dry-run]
+    python upload_rentabilizacao_dinamica_bi.py <arquivo.csv> [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--dry-run]
 """
 
-import sys, os, csv, re
+import sys, os, csv, re, argparse
 from datetime import datetime
 from collections import defaultdict
 
@@ -132,10 +132,10 @@ def extract_rows(csv_rows: list[list[str]]) -> list[dict]:
                 }
 
             r = records[key]
-            sent = safe_int(row[scol]) if scol and scol < len(row) else None
-            deliv = safe_int(row[delcol]) if delcol and delcol < len(row) else None
-            opens = safe_int(row[opcol]) if opcol and opcol < len(row) else None
-            clicks = safe_int(row[clcol]) if clcol and clcol < len(row) else None
+            sent = safe_int(row[scol]) if scol is not None and scol < len(row) else None
+            deliv = safe_int(row[delcol]) if delcol is not None and delcol < len(row) else None
+            opens = safe_int(row[opcol]) if opcol is not None and opcol < len(row) else None
+            clicks = safe_int(row[clcol]) if clcol is not None and clcol < len(row) else None
 
             def add(field, value):
                 if value is not None:
@@ -161,6 +161,28 @@ def extract_rows(csv_rows: list[list[str]]) -> list[dict]:
                 deduped[uq][f] = (a + b) if (a or b) else None
 
     return list(deduped.values())
+
+def filter_period(records: list[dict], start: str | None = None, end: str | None = None) -> list[dict]:
+    if not start and not end:
+        return records
+
+    for label, value in (('start', start), ('end', end)):
+        if value and not parse_date(value):
+            raise ValueError(f'--{label} invalido: {value}. Use YYYY-MM-DD ou DD/MM/YYYY.')
+
+    start_iso = parse_date(start) if start else None
+    end_iso = parse_date(end) if end else None
+    filtered = []
+
+    for rec in records:
+        day = str(rec.get('Data de Disparo') or '')[:10]
+        if start_iso and day < start_iso:
+            continue
+        if end_iso and day > end_iso:
+            continue
+        filtered.append(rec)
+
+    return filtered
 
 # ── Upload em batches ─────────────────────────────────────────────────────────
 def upload(records: list[dict], dry_run: bool = False) -> None:
@@ -202,12 +224,15 @@ def upload(records: list[dict], dry_run: bool = False) -> None:
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Upload Direto - Dinamica BI Rentabilizacao -> rentabilizacao_activities')
+    parser.add_argument('path', help='Arquivo CSV multi-bloco da Dinamica BI')
+    parser.add_argument('--start', help='Data inicial inclusiva, YYYY-MM-DD ou DD/MM/YYYY')
+    parser.add_argument('--end', help='Data final inclusiva, YYYY-MM-DD ou DD/MM/YYYY')
+    parser.add_argument('--dry-run', action='store_true', help='Processa e resume sem inserir no Supabase')
+    args = parser.parse_args()
 
-    path = sys.argv[1]
-    dry_run = '--dry-run' in sys.argv
+    path = args.path
+    dry_run = args.dry_run
 
     if not os.path.exists(path):
         sys.exit(f'Arquivo não encontrado: {path}')
@@ -219,6 +244,9 @@ def main():
 
     records = extract_rows(all_rows)
     print(f'Registros de Rentabilização extraídos: {len(records)}')
+    records = filter_period(records, args.start, args.end)
+    if args.start or args.end:
+        print(f'Registros após filtro de período ({args.start or "inicio"} a {args.end or "fim"}): {len(records)}')
 
     upload(records, dry_run=dry_run)
 

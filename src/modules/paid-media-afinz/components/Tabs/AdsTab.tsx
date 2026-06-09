@@ -343,7 +343,7 @@ export const AdsTab: React.FC = () => {
             if (!raw.has(key)) {
                 const creative = creativeMap.get(d.ad_id || '');
 
-                const thumbnailUrl = resolveCreativeAssetUrl(creative, { width: 400 }) || undefined;
+                const thumbnailUrl = resolveCreativeAssetUrl(creative, { width: 800, quality: 95 }) || undefined;
 
                 // ── media_type: reliable source from Edge Function v25 ──
                 // When creative is undefined (join miss), use 'unknown' — DO NOT default to 'image'

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
     LineChart,
     Line,
@@ -13,6 +13,7 @@ import { CalendarData } from '../../types/framework';
 import { format, startOfWeek, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tooltip as InfoTooltip } from '../Tooltip';
+import { ChevronDown, Check } from 'lucide-react';
 
 interface PerformanceEvolutionChartProps {
     data: CalendarData;
@@ -35,7 +36,50 @@ type MetricType =
     | 'aprovados'
     | 'cartoes'
     | 'custoTotal';
-type GroupBy = 'daily' | 'weekly';
+
+type GroupBy = 'daily' | 'weekly' | 'monthly';
+
+const METRIC_CONFIGS: Record<MetricType, { label: string; color: string; group: string }> = {
+    conversao: { label: 'Taxa de Conversão', color: '#3b82f6', group: 'Taxas & Eficiência' }, // Blue
+    entrega: { label: 'Taxa de Entrega', color: '#10b981', group: 'Taxas & Eficiência' }, // Emerald
+    abertura: { label: 'Taxa de Abertura / Interesse', color: '#f59e0b', group: 'Taxas & Eficiência' }, // Amber
+    envios: { label: 'Qtd de Envios (Base)', color: '#ec4899', group: 'Volumetria' }, // Pink
+    entregas: { label: 'Qtd de Entregas (Base)', color: '#8b5cf6', group: 'Volumetria' }, // Purple
+    disparos: { label: 'Qtd de Disparos (Atividades)', color: '#06b6d4', group: 'Volumetria' }, // Cyan
+    propostas: { label: 'Qtd de Propostas', color: '#a855f7', group: 'Volumetria' }, // Purple-light
+    aprovados: { label: 'Qtd de Aprovados', color: '#14b8a6', group: 'Volumetria' }, // Teal
+    cartoes: { label: 'Qtd de Cartões', color: '#6366f1', group: 'Volumetria' }, // Indigo
+    cac: { label: 'CAC Médio', color: '#ef4444', group: 'Financeiro' }, // Red
+    custoTotal: { label: 'Custo Total Campanha', color: '#f43f5e', group: 'Financeiro' } // Rose
+};
+
+const METRIC_GROUPS = [
+    {
+        label: 'Taxas & Eficiência',
+        metrics: ['conversao', 'entrega', 'abertura'] as MetricType[]
+    },
+    {
+        label: 'Volumetria (Quantidades)',
+        metrics: ['disparos', 'envios', 'entregas', 'propostas', 'aprovados', 'cartoes'] as MetricType[]
+    },
+    {
+        label: 'Financeiro',
+        metrics: ['cac', 'custoTotal'] as MetricType[]
+    }
+];
+
+const formatMetricValue = (val: number | string, metricType: MetricType) => {
+    const num = Number(val);
+    if (isNaN(num)) return val;
+    
+    if (metricType === 'cac' || metricType === 'custoTotal') {
+        return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (['conversao', 'entrega', 'abertura'].includes(metricType)) {
+        return `${num.toFixed(2)}%`;
+    }
+    return Math.round(num).toLocaleString('pt-BR');
+};
 
 export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps> = ({
     data,
@@ -45,12 +89,35 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
     selectedParceiros = [],
     onDayClick
 }) => {
-    const [metric, setMetric] = useState<MetricType>('conversao');
+    const [selectedMetrics, setSelectedMetrics] = useState<MetricType[]>(['conversao']);
     const [groupBy, setGroupBy] = useState<GroupBy>('daily');
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const toggleMetric = (m: MetricType) => {
+        setSelectedMetrics(prev => {
+            if (prev.includes(m)) {
+                if (prev.length === 1) return prev; // Keep at least one selected
+                return prev.filter(x => x !== m);
+            } else {
+                if (prev.length >= 3) return prev; // Limit to 3 metrics
+                return [...prev, m];
+            }
+        });
+    };
 
     const handleDotClick = (data: any) => {
         if (onDayClick && groupBy === 'daily') {
-            // data.payload contains the full data object from the chart
             const dateStr = data.payload?.date || data.date;
             if (dateStr) {
                 onDayClick(dateStr);
@@ -58,28 +125,11 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
         }
     };
 
-    const formatValue = (val: number | string) => {
-        const num = Number(val);
-        if (isNaN(num)) return val;
-        
-        if (metric === 'cac' || metric === 'custoTotal') {
-            return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        }
-        if (['conversao', 'entrega', 'abertura'].includes(metric)) {
-            return `${num.toFixed(2)}%`;
-        }
-        if (['envios', 'entregas', 'disparos', 'propostas', 'aprovados', 'cartoes'].includes(metric)) {
-            return Math.round(num).toLocaleString('pt-BR');
-        }
-        return num.toLocaleString('pt-BR');
-    };
-
     const chartData = useMemo(() => {
         const aggregated: { [key: string]: any } = {};
         const dates = Object.keys(data).sort();
 
         dates.forEach(dateKey => {
-            // Filter inline
             const activities = data[dateKey].filter(activity => {
                 if (selectedBU && activity.bu !== selectedBU) return false;
                 if (selectedCanais.length > 0 && !selectedCanais.includes(activity.canal)) return false;
@@ -100,6 +150,11 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                 key = format(weekStart, 'yyyy-MM-dd');
                 label = `Sem ${format(weekStart, 'dd/MM')}`;
                 timestamp = weekStart.getTime();
+            } else if (groupBy === 'monthly') {
+                const date = parseISO(dateKey);
+                key = format(date, 'yyyy-MM');
+                label = format(date, 'MMM/yy', { locale: ptBR });
+                timestamp = new Date(date.getFullYear(), date.getMonth(), 1).getTime();
             }
 
             if (!aggregated[key]) {
@@ -129,125 +184,197 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
         });
 
         const result = Object.values(aggregated).map(item => {
-            let value = 0;
-            switch (metric) {
-                case 'conversao':
-                    value = item.baseEnviada > 0 ? (item.cartoes / item.baseEnviada) * 100 : 0;
-                    break;
-                case 'cac':
-                    value = item.cartoes > 0 ? item.custo / item.cartoes : 0;
-                    break;
-                case 'entrega':
-                    value = item.baseEnviada > 0 ? (item.baseEntregue / item.baseEnviada) * 100 : 0;
-                    break;
-                case 'abertura':
-                    value = item.baseEntregue > 0 ? (item.propostas / item.baseEntregue) * 100 : 0;
-                    break;
-                case 'envios':
-                    value = item.baseEnviada;
-                    break;
-                case 'entregas':
-                    value = item.baseEntregue;
-                    break;
-                case 'disparos':
-                    value = item.count;
-                    break;
-                case 'propostas':
-                    value = item.propostas;
-                    break;
-                case 'aprovados':
-                    value = item.aprovados;
-                    break;
-                case 'cartoes':
-                    value = item.cartoes;
-                    break;
-                case 'custoTotal':
-                    value = item.custo;
-                    break;
-            }
-            return {
-                ...item,
-                value: Number(value.toFixed(2))
-            };
+            const dataPoint: any = { ...item };
+            selectedMetrics.forEach(m => {
+                let value = 0;
+                switch (m) {
+                    case 'conversao':
+                        value = item.baseEnviada > 0 ? (item.cartoes / item.baseEnviada) * 100 : 0;
+                        break;
+                    case 'cac':
+                        value = item.cartoes > 0 ? item.custo / item.cartoes : 0;
+                        break;
+                    case 'entrega':
+                        value = item.baseEnviada > 0 ? (item.baseEntregue / item.baseEnviada) * 100 : 0;
+                        break;
+                    case 'abertura':
+                        value = item.baseEntregue > 0 ? (item.propostas / item.baseEntregue) * 100 : 0;
+                        break;
+                    case 'envios':
+                        value = item.baseEnviada;
+                        break;
+                    case 'entregas':
+                        value = item.baseEntregue;
+                        break;
+                    case 'disparos':
+                        value = item.count;
+                        break;
+                    case 'propostas':
+                        value = item.propostas;
+                        break;
+                    case 'aprovados':
+                        value = item.aprovados;
+                        break;
+                    case 'cartoes':
+                        value = item.cartoes;
+                        break;
+                    case 'custoTotal':
+                        value = item.custo;
+                        break;
+                }
+                dataPoint[m] = Number(value.toFixed(2));
+            });
+            return dataPoint;
         }).sort((a, b) => a.timestamp - b.timestamp);
 
         return result;
-    }, [data, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros, groupBy, metric]);
+    }, [data, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros, groupBy, selectedMetrics]);
 
     const stats = useMemo(() => {
-        if (chartData.length === 0) return { avg: 0, max: 0, maxDate: '', min: 0, minDate: '' };
-        const values = chartData.map(d => d.value);
-        const max = Math.max(...values);
-        const min = Math.min(...values);
-        const sum = values.reduce((a, b) => a + b, 0);
-        const avg = sum / values.length;
+        if (chartData.length === 0) return [];
+        return selectedMetrics.map(m => {
+            const values = chartData.map(d => Number(d[m] || 0));
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+            const sum = values.reduce((a, b) => a + b, 0);
+            const avg = sum / values.length;
 
-        const maxItem = chartData.find(d => d.value === max);
-        const minItem = chartData.find(d => d.value === min);
+            const maxItem = chartData.find(d => Number(d[m] || 0) === max);
+            const minItem = chartData.find(d => Number(d[m] || 0) === min);
 
-        return {
-            avg: avg.toFixed(2),
-            max: max.toFixed(2),
-            maxDate: maxItem?.label || '',
-            min: min.toFixed(2),
-            minDate: minItem?.label || ''
-        };
-    }, [chartData]);
+            return {
+                metric: m,
+                label: METRIC_CONFIGS[m].label,
+                color: METRIC_CONFIGS[m].color,
+                avg,
+                max,
+                maxDate: maxItem?.label || '',
+                min,
+                minDate: minItem?.label || ''
+            };
+        });
+    }, [chartData, selectedMetrics]);
+
+    const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+                    <p className="text-slate-800 font-bold mb-2">{label}</p>
+                    {payload.map((entry: any) => {
+                        const m = entry.dataKey as MetricType;
+                        return (
+                            <div key={entry.name} className="flex items-center gap-2 text-sm mb-1 last:mb-0">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                                <span className="text-slate-500">{METRIC_CONFIGS[m]?.label || entry.name}:</span>
+                                <span className="text-slate-800 font-mono font-bold">
+                                    {formatMetricValue(entry.value, m)}
+                                </span>
+                            </div>
+                        );
+                    })}
+                    {groupBy === 'daily' && (
+                        <p className="text-xs text-slate-400 mt-2 italic">Clique para ver detalhes</p>
+                    )}
+                </div>
+            );
+        }
+        return null;
+    };
 
     return (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                 <div>
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        📊 Análise Temporal
+                        Análise Temporal
                         <InfoTooltip content="Evolução das métricas ao longo do tempo com comparação e agrupamento." />
                     </h2>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex flex-col">
-                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1">Métrica</label>
-                        <select
-                            value={metric}
-                            onChange={(e) => setMetric(e.target.value as MetricType)}
-                            className="bg-white border border-slate-300 text-slate-900 text-xs rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    <div className="flex flex-col relative" ref={dropdownRef}>
+                        <label className="text-[10px] text-slate-500 uppercase font-bold mb-1">Métricas (Máx. 3)</label>
+                        <button
+                            type="button"
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                            className="bg-white border border-slate-300 text-slate-700 text-xs rounded-lg px-3 py-1.5 hover:bg-slate-50 font-medium flex items-center justify-between gap-1.5 shadow-sm min-w-[200px] text-left focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                            <optgroup label="Taxas & Eficiência">
-                                <option value="conversao">Taxa de Conversão</option>
-                                <option value="entrega">Taxa de Entrega</option>
-                                <option value="abertura">Taxa de Abertura / Interesse</option>
-                            </optgroup>
-                            <optgroup label="Volumetria (Quantidades)">
-                                <option value="disparos">Quantidade de Disparos (Atividades)</option>
-                                <option value="envios">Quantidade de Envios (Base)</option>
-                                <option value="entregas">Quantidade de Entregas (Base)</option>
-                                <option value="propostas">Quantidade de Propostas</option>
-                                <option value="aprovados">Quantidade de Aprovados</option>
-                                <option value="cartoes">Quantidade de Cartões</option>
-                            </optgroup>
-                            <optgroup label="Financeiro">
-                                <option value="cac">CAC Médio</option>
-                                <option value="custoTotal">Custo Total Campanha</option>
-                            </optgroup>
-                        </select>
+                            <span className="truncate text-slate-700 font-medium">
+                                {selectedMetrics.length === 1 
+                                    ? METRIC_CONFIGS[selectedMetrics[0]].label 
+                                    : `${selectedMetrics.length} métricas selecionadas`}
+                            </span>
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                        </button>
+
+                        {isDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-[0_12px_32px_rgba(15,23,42,0.12)] z-30 p-2 max-h-[320px] overflow-y-auto">
+                                {METRIC_GROUPS.map(group => (
+                                    <div key={group.label} className="mb-2 last:mb-0">
+                                        <div className="px-2 py-1 text-[9px] text-slate-400 uppercase font-bold tracking-wider">
+                                            {group.label}
+                                        </div>
+                                        <div className="space-y-0.5 mt-0.5">
+                                            {group.metrics.map(metricKey => {
+                                                const isSelected = selectedMetrics.includes(metricKey);
+                                                const isMaxReached = selectedMetrics.length >= 3;
+                                                const isDisabled = !isSelected && isMaxReached;
+                                                const config = METRIC_CONFIGS[metricKey];
+
+                                                return (
+                                                    <button
+                                                        key={metricKey}
+                                                        type="button"
+                                                        disabled={isDisabled}
+                                                        onClick={() => toggleMetric(metricKey)}
+                                                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors ${
+                                                            isSelected 
+                                                                ? 'bg-slate-50 font-semibold text-slate-900' 
+                                                                : isDisabled 
+                                                                    ? 'opacity-40 cursor-not-allowed text-slate-400' 
+                                                                    : 'hover:bg-slate-50 text-slate-700'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-2 truncate">
+                                                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: config.color }} />
+                                                            <span className="truncate">{config.label}</span>
+                                                        </div>
+                                                        {isSelected && (
+                                                            <Check className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col">
                         <label className="text-[10px] text-slate-500 uppercase font-bold mb-1">Agrupamento</label>
-                        <div className="flex bg-slate-100 rounded p-0.5 border border-slate-200">
+                        <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
                             <button
                                 onClick={() => setGroupBy('daily')}
-                                className={`px-2 py-1 text-xs font-medium rounded transition ${groupBy === 'daily' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                                className={`px-2.5 py-1 text-xs font-medium rounded transition ${groupBy === 'daily' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
                                     }`}
                             >
                                 Diário
                             </button>
                             <button
                                 onClick={() => setGroupBy('weekly')}
-                                className={`px-2 py-1 text-xs font-medium rounded transition ${groupBy === 'weekly' ? 'bg-blue-600 text-white' : 'text-slate-500'
+                                className={`px-2.5 py-1 text-xs font-medium rounded transition ${groupBy === 'weekly' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
                                     }`}
                             >
                                 Semanal
+                            </button>
+                            <button
+                                onClick={() => setGroupBy('monthly')}
+                                className={`px-2.5 py-1 text-xs font-medium rounded transition ${groupBy === 'monthly' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                                    }`}
+                            >
+                                Mensal
                             </button>
                         </div>
                     </div>
@@ -263,56 +390,56 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                             stroke="#94A3B8"
                             tick={{ fill: '#94A3B8', fontSize: 10 }}
                         />
-                        <YAxis stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 10 }} />
-                        <Tooltip
-                            contentStyle={{ backgroundColor: '#ffffff', borderColor: '#E2E8F0', color: '#1e293b' }}
-                            formatter={(value: number) => {
-                                let label = '';
-                                if (metric === 'cac') label = 'CAC';
-                                else if (metric === 'custoTotal') label = 'Custo Total';
-                                else if (['conversao', 'entrega', 'abertura'].includes(metric)) label = 'Taxa';
-                                else if (metric === 'disparos') label = 'Disparos';
-                                else if (metric === 'envios') label = 'Envios';
-                                else if (metric === 'entregas') label = 'Entregas';
-                                else if (metric === 'propostas') label = 'Propostas';
-                                else if (metric === 'aprovados') label = 'Aprovados';
-                                else if (metric === 'cartoes') label = 'Cartões';
-                                else label = 'Valor';
-
-                                return [formatValue(value), label];
-                            }}
+                        <YAxis 
+                            stroke="#94A3B8" 
+                            tick={{ fill: '#94A3B8', fontSize: 10 }}
+                            tickFormatter={(value) => value.toLocaleString('pt-BR')}
                         />
-                        <Legend />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
 
-                        <Line
-                            type="monotone"
-                            dataKey="value"
-                            name="Atual"
-                            stroke="#3b82f6"
-                            strokeWidth={3}
-                            dot={groupBy === 'daily' ? { r: 5, fill: '#3b82f6', strokeWidth: 0, cursor: 'pointer' } : { r: 4, fill: '#3b82f6', strokeWidth: 0 }}
-                            activeDot={{ r: 7 }}
-                            onClick={(state: any) => handleDotClick(state)}
-                        />
+                        {selectedMetrics.map((m) => (
+                            <Line
+                                key={m}
+                                type="monotone"
+                                dataKey={m}
+                                name={METRIC_CONFIGS[m].label}
+                                stroke={METRIC_CONFIGS[m].color}
+                                strokeWidth={2.5}
+                                dot={groupBy === 'daily' ? { r: 4, fill: METRIC_CONFIGS[m].color, strokeWidth: 0, cursor: 'pointer' } : { r: 3, fill: METRIC_CONFIGS[m].color, strokeWidth: 0 }}
+                                activeDot={{ r: 6 }}
+                                onClick={(state: any) => handleDotClick(state)}
+                            />
+                        ))}
                     </LineChart>
                 </ResponsiveContainer>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-slate-200 flex gap-6 text-sm">
-                <div>
-                    <span className="text-slate-500 mr-2">Média:</span>
-                    <span className="text-slate-900 font-bold">{formatValue(stats.avg)}</span>
-                </div>
-                <div>
-                    <span className="text-slate-500 mr-2">Máx:</span>
-                    <span className="text-slate-900 font-bold">{formatValue(stats.max)}</span>
-                    <span className="text-xs text-slate-500 ml-1">({stats.maxDate})</span>
-                </div>
-                <div>
-                    <span className="text-slate-500 mr-2">Mín:</span>
-                    <span className="text-slate-900 font-bold">{formatValue(stats.min)}</span>
-                    <span className="text-xs text-slate-500 ml-1">({stats.minDate})</span>
-                </div>
+            <div className="mt-6 pt-4 border-t border-slate-200 flex flex-col gap-3">
+                {stats.map(stat => (
+                    <div key={stat.metric} className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs sm:text-sm">
+                        <div className="flex items-center gap-2 min-w-[180px]">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stat.color }} />
+                            <span className="font-semibold text-slate-700">{stat.label}:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                            <div>
+                                <span className="text-slate-500 mr-1.5">Média:</span>
+                                <span className="text-slate-900 font-bold">{formatMetricValue(stat.avg, stat.metric)}</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 mr-1.5">Máx:</span>
+                                <span className="text-slate-900 font-bold">{formatMetricValue(stat.max, stat.metric)}</span>
+                                <span className="text-[11px] text-slate-400 ml-1">({stat.maxDate})</span>
+                            </div>
+                            <div>
+                                <span className="text-slate-500 mr-1.5">Mín:</span>
+                                <span className="text-slate-900 font-bold">{formatMetricValue(stat.min, stat.metric)}</span>
+                                <span className="text-[11px] text-slate-400 ml-1">({stat.minDate})</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

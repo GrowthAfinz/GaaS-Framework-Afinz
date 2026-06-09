@@ -1,8 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
 export const supabaseUrl = 'https://mipiwxadnpwtcgfcedym.supabase.co';
-// Note: The key provided involves a 'sb_publishable_' prefix which is unusual for standard Supabase Anon keys (usually 'eyJ...').
-// usage might require verify, but we will proceed with provided key.
-export const supabaseKey = 'sb_publishable_kOxFYyTTDbp9sHMhol9aDQ_SrGUsrmc';
+export const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pcGl3eGFkbnB3dGNnZmNlZHltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NjU1NDUsImV4cCI6MjA4NTA0MTU0NX0.kIPhFfqvcJJh2S4yS2PsopmSYsZfC7ZNausumJGtmrM';
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

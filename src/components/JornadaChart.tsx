@@ -22,7 +22,7 @@ interface JornadaChartProps {
     onPointClick: (date: Date) => void;
 }
 
-type GroupBy = 'daily' | 'weekly';
+type GroupBy = 'daily' | 'weekly' | 'monthly';
 
 export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyFilters = [], onPointClick }) => {
     const [groupBy, setGroupBy] = useState<GroupBy>('daily');
@@ -45,6 +45,10 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                 const weekStart = startOfWeek(date, { weekStartsOn: 0 }); // Sunday start
                 key = format(weekStart, 'yyyy-MM-dd');
                 label = `Semana ${format(weekStart, 'dd/MM')}`;
+            } else if (groupBy === 'monthly') {
+                const date = parseISO(dateKey);
+                key = format(date, 'yyyy-MM');
+                label = format(date, 'MMMM/yy', { locale: ptBR });
             }
 
             if (!aggregated[key]) {
@@ -55,7 +59,7 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                     aprovados: 0,
                     propostas: 0,
                     anomalies: 0,
-                    timestamp: parseISO(key).getTime() // For sorting
+                    timestamp: parseISO(key.length === 7 ? `${key}-01` : key).getTime() // For sorting
                 };
             }
 
@@ -163,6 +167,15 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                             }`}
                     >
                         Semanal
+                    </button>
+                    <button
+                        onClick={() => setGroupBy('monthly')}
+                        className={`px-3 py-1 text-xs font-medium rounded transition ${groupBy === 'monthly'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                    >
+                        Mensal
                     </button>
                 </div>
             </div>

@@ -11,13 +11,13 @@
 //    a. Best:  url_1080 via /adimages?hashes= (1080px, server-accessible)
 //    b. Good:  creative.image_url (full-res direct URL, server-accessible)
 //    c. Fallback: source-only — browser loads thumbnail_url directly from Meta CDN
-// 3. For VIDEO ads: always source-only — Meta CDN requires browser session for thumbnails.
+// 3. For VIDEO ads: host the high-res thumbnail returned by /thumbnails when available.
 // 4. thumbnail_url: signed CDN URL with stp=p64x64 — DO NOT modify (stp is in the signature).
-//    Used only as browser-side fallback for video/source-only ads.
+//    Used only as browser-side fallback for source-only ads.
 //
 // Safety:
 // - Guard: abort upsert if no creative data returned.
-// - COALESCE: never null-out good existing values, except storage fields for video/source-only.
+// - COALESCE: never null-out good existing values, except when explicitly clearing broken storage.
 // - Min size check: reject downloads < 5KB (Meta returns ~2KB placeholder when blocked).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -29,6 +29,13 @@ const ASSET_UPLOAD_CONCURRENCY = 8;
 const MIN_VALID_IMAGE_BYTES = 5000;
 
 type MediaType = 'image' | 'video' | null;
+
+type StoryMedia = {
+  url: string | null;
+  width: number | null;
+  height: number | null;
+  mediaType: MediaType;
+};
 
 type HostedAssetResult = {
   bucket: string | null;
@@ -100,6 +107,91 @@ async function metaGet(path: string, token: string, retries = 3): Promise<any> {
   return null;
 }
 
+function pickStoryMedia(story: any): StoryMedia {
+  let best: StoryMedia = {
+    url: typeof story?.full_picture === 'string' ? story.full_picture : null,
+    width: null,
+    height: null,
+    mediaType: null,
+  };
+  let bestScore = best.url ? 1 : 0;
+
+  const visit = (attachment: any) => {
+    if (!attachment) return;
+    const image = attachment.media?.image;
+    const src = typeof image?.src === 'string' ? image.src : null;
+    const width = typeof image?.width === 'number' ? image.width : null;
+    const height = typeof image?.height === 'number' ? image.height : null;
+    const score = width || height || (src ? 1 : 0);
+    if (src && score > bestScore) {
+      const type = typeof attachment.type === 'string' ? attachment.type.toLowerCase() : '';
+      best = {
+        url: src,
+        width,
+        height,
+        mediaType: type.includes('video') ? 'video' : 'image',
+      };
+      bestScore = score;
+    }
+    if (Array.isArray(attachment.subattachments?.data)) {
+      for (const sub of attachment.subattachments.data) visit(sub);
+    }
+  };
+
+  if (Array.isArray(story?.attachments?.data)) {
+    for (const attachment of story.attachments.data) visit(attachment);
+  }
+
+  if (best.url && !best.mediaType) best.mediaType = 'image';
+  return best;
+}
+
+function isLowResMetaPreview(url: string | null | undefined) {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    const stp = parsed.searchParams.get('stp') || '';
+    return /[ps](64|100|130|160|168|200|320)(?!\d)(x(64|100|130|160|168|200|320)(?!\d))?/i.test(stp);
+  } catch {
+    return false;
+  }
+}
+
+function pickCreativeEmbeddedMedia(creative: any): StoryMedia {
+  const candidates: StoryMedia[] = [];
+  const add = (url: unknown, mediaType: MediaType, width: unknown = null, height: unknown = null) => {
+    if (typeof url !== 'string' || isLowResMetaPreview(url)) return;
+    candidates.push({
+      url,
+      mediaType,
+      width: typeof width === 'number' ? width : null,
+      height: typeof height === 'number' ? height : null,
+    });
+  };
+
+  const spec = creative?.object_story_spec || {};
+  add(spec.link_data?.picture, 'image');
+  add(spec.template_data?.picture, 'image');
+  add(spec.photo_data?.url, 'image');
+  add(spec.video_data?.image_url, 'video');
+  if (Array.isArray(spec.link_data?.child_attachments)) {
+    for (const item of spec.link_data.child_attachments) add(item.picture, 'image');
+  }
+  if (Array.isArray(spec.template_data?.child_attachments)) {
+    for (const item of spec.template_data.child_attachments) add(item.picture, 'image');
+  }
+
+  const feed = creative?.asset_feed_spec || {};
+  if (Array.isArray(feed.images)) {
+    for (const item of feed.images) add(item.url || item.picture, 'image', item.width, item.height);
+  }
+  if (Array.isArray(feed.videos)) {
+    for (const item of feed.videos) add(item.thumbnail_url || item.picture, 'video', item.width, item.height);
+  }
+
+  return candidates[0] || { url: null, width: null, height: null, mediaType: null };
+}
+
 async function downloadBinary(sourceUrl: string, retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -147,31 +239,20 @@ async function hostCreativeAsset(
 ): Promise<HostedAssetResult> {
   const { sourceUrl, mediaType, creativeId, assetKey, width, height } = params;
 
-  // VIDEO: Meta CDN thumbnail URLs require browser session — never host server-side.
-  // forceResetStorage clears any previously broken hosted files.
-  if (mediaType === 'video') {
-    return {
-      bucket: null, storagePath: null, publicUrl: null, sourceUrl, width, height, contentType: null,
-      origin: 'meta-cdn',
-      syncStatus: 'source-only',
-      syncError: null,
-      forceResetStorage: true,
-    };
-  }
-
   // NULL mediaType or missing data: serve source-only from Meta CDN.
   // Do NOT attempt to download thumbnail_url — it is always low-res.
+  // Missing fresh source data should not erase an existing hosted asset.
   if (!sourceUrl || !mediaType || !creativeId) {
     return {
       bucket: null, storagePath: null, publicUrl: null, sourceUrl, width, height, contentType: null,
       origin: sourceUrl ? 'meta-cdn' : 'legacy',
       syncStatus: sourceUrl ? 'source-only' : 'sync-failed',
       syncError: sourceUrl ? null : 'Missing source asset URL',
-      forceResetStorage: true, // clear any previously hosted low-res thumbnail
+      forceResetStorage: false,
     };
   }
 
-  // IMAGE with a real high-res source URL: download and host in Storage.
+  // Media with a real high-res source URL: download and host in Storage.
   const base = `${mediaType}/${sanitizeSegment(creativeId)}/${sanitizeSegment(assetKey || creativeId)}`;
   const cacheKey = `${base}::${sourceUrl}`;
   if (assetCache.has(cacheKey)) return assetCache.get(cacheKey)!;
@@ -195,9 +276,10 @@ async function hostCreativeAsset(
       const msg = err instanceof Error ? err.message : String(err);
       console.warn('[Asset Host Fallback]', msg, { creativeId, sourceUrl: sourceUrl?.slice(0, 80) });
       // Download failed (CDN blocked or error) — serve source-only from Meta CDN.
+      // Keep any existing hosted asset because the failure may be transient.
       return {
         bucket: null, storagePath: null, publicUrl: null, sourceUrl, width, height, contentType: null,
-        origin: 'meta-cdn', syncStatus: 'source-only', syncError: null, forceResetStorage: true,
+        origin: 'meta-cdn', syncStatus: 'source-only', syncError: null, forceResetStorage: false,
       };
     }
   })();
@@ -239,11 +321,11 @@ Deno.serve(async (req) => {
   try {
     // image_url = direct URL to the full-resolution image used in the creative.
     // This is the key addition vs previous versions — avoids /adimages lookup for most image ads.
-    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url,effective_object_story_id,body,title,description,call_to_action_type}';
+    const adsFields = 'id,name,adset_id,campaign_id,effective_status,creative{id,image_hash,image_url,video_id,thumbnail_url,effective_object_story_id,object_story_spec,asset_feed_spec,body,title,call_to_action_type}';
     let allAds: any[] = [];
     let adsApiError: string | null = null;
     let nextUrl: string | null =
-      `${GRAPH_API_BASE}/${AD_ACCOUNT_ID}/ads?fields=${encodeURIComponent(adsFields)}&limit=200&access_token=${META_TOKEN}`;
+      `${GRAPH_API_BASE}/${AD_ACCOUNT_ID}/ads?fields=${encodeURIComponent(adsFields)}&thumbnail_width=1000&thumbnail_height=1000&limit=200&access_token=${META_TOKEN}`;
 
     while (nextUrl) {
       const res = await fetch(nextUrl);
@@ -272,6 +354,24 @@ Deno.serve(async (req) => {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
+
+    // Enrich creatives that the Ads listing returns without direct media fields.
+    const sparseCreativeIds = [...creativeDetailsMap.values()]
+      .filter((c) => c?.id && !c.image_hash && !c.image_url && !c.video_id)
+      .map((c) => c.id as string);
+    for (const batch of chunks(sparseCreativeIds, 10)) {
+      await Promise.all(batch.map(async (creativeId) => {
+        const d = await metaGet(
+          `/${creativeId}?fields=id,image_hash,image_url,video_id,thumbnail_url,effective_object_story_id,object_story_spec,asset_feed_spec,body,title,call_to_action_type&thumbnail_width=1000&thumbnail_height=1000&access_token=${META_TOKEN}`,
+          META_TOKEN,
+        );
+        if (d?.id) {
+          creativeDetailsMap.set(creativeId, { ...(creativeDetailsMap.get(creativeId) || {}), ...d });
+        }
+      }));
+      await sleep(300);
+    }
+    console.log(`[v17] sparse creatives enriched: ${sparseCreativeIds.length}`);
 
     // Fetch url_1080 from /adimages for ads that have image_hash.
     // url_1080 is the highest quality (1080px) and is server-accessible.
@@ -319,6 +419,40 @@ Deno.serve(async (req) => {
       await sleep(300);
     }
 
+    // Some promoted-post creatives do not expose image_hash, image_url or video_id.
+    // For those, use the effective post/story media as a higher-res fallback.
+    const storyIds = [...new Set<string>([...creativeDetailsMap.values()]
+      .map((c) => c.effective_object_story_id)
+      .filter(Boolean) as string[])];
+    const storyMediaMap = new Map<string, StoryMedia>();
+    for (const batch of chunks(storyIds, 10)) {
+      await Promise.all(batch.map(async (storyId) => {
+        const d = await metaGet(`/${storyId}?fields=full_picture,attachments{type,media{image,source},subattachments{type,media{image,source}}}&access_token=${META_TOKEN}`, META_TOKEN);
+        if (!d) return;
+        const media = pickStoryMedia(d);
+        if (media.url) storyMediaMap.set(storyId, media);
+      }));
+      await sleep(300);
+    }
+    console.log(`[v17] story media resolved: ${storyMediaMap.size}`);
+
+    // Direct AdCreative reads can return a larger signed thumbnail when the Ads
+    // listing only exposes the default 64px preview.
+    const directThumbnailMap = new Map<string, string>();
+    const thumbnailCreativeIds = [...creativeDetailsMap.values()]
+      .filter((c) => c?.id && !c.image_hash && !c.image_url && !c.video_id)
+      .map((c) => c.id as string);
+    for (const batch of chunks(thumbnailCreativeIds, 10)) {
+      await Promise.all(batch.map(async (creativeId) => {
+        const d = await metaGet(`/${creativeId}?fields=thumbnail_url&thumbnail_width=1000&thumbnail_height=1000&access_token=${META_TOKEN}`, META_TOKEN);
+        if (typeof d?.thumbnail_url === 'string' && !isLowResMetaPreview(d.thumbnail_url)) {
+          directThumbnailMap.set(creativeId, d.thumbnail_url);
+        }
+      }));
+      await sleep(300);
+    }
+    console.log(`[v17] direct creative thumbnails resolved: ${directThumbnailMap.size}`);
+
     // Fetch adset names.
     const adsetIds = [...new Set(allAds.map((ad) => ad.adset_id).filter(Boolean))];
     const adsetMap = new Map<string, string>();
@@ -347,10 +481,20 @@ Deno.serve(async (req) => {
 
         // Determine media type.
         // video_id → video; image_hash or image_url → image; else null.
+        const directThumbnailUrl = creative?.id ? directThumbnailMap.get(creative.id) : null;
+        const apiThumbnailUrl = directThumbnailUrl || creative?.thumbnail_url;
+        const apiThumbnailMedia: StoryMedia = !isLowResMetaPreview(apiThumbnailUrl)
+          ? { url: apiThumbnailUrl, width: null, height: null, mediaType: 'image' }
+          : { url: null, width: null, height: null, mediaType: null };
+        const embeddedMedia = pickCreativeEmbeddedMedia(creative);
+        const storyMedia = embeddedMedia.url ? embeddedMedia : creative?.effective_object_story_id
+          ? storyMediaMap.get(creative.effective_object_story_id)
+          : null;
+
         const mediaType: MediaType =
           creative?.video_id ? 'video'
           : (creative?.image_hash || creative?.image_url) ? 'image'
-          : null;
+          : (storyMedia?.mediaType ?? apiThumbnailMedia.mediaType ?? null);
 
         const imageData = creative?.image_hash ? imageDataMap.get(creative.image_hash) : null;
 
@@ -358,7 +502,7 @@ Deno.serve(async (req) => {
         // 1. url_1080 from /adimages (1080px, best quality, server-accessible)
         // 2. creative.image_url (full-res direct URL, server-accessible for most image ads)
         // 3. If both null → source-only (browser loads thumbnail_url directly)
-        const imageUrl = imageData?.url_1080 || creative?.image_url || null;
+        const imageUrl = imageData?.url_1080 || creative?.image_url || (storyMedia?.mediaType === 'image' ? storyMedia.url : null) || apiThumbnailMedia.url || null;
 
         const videoData = creative?.video_id ? videoDataMap.get(creative.video_id) : null;
         // thumbnail_url is kept only for browser-side fallback (never hosted in Storage).
@@ -367,20 +511,22 @@ Deno.serve(async (req) => {
         let ar = null;
         if (imageData?.width && imageData?.height) ar = imageData.width / imageData.height;
         else if (videoData?.width && videoData?.height) ar = videoData.width / videoData.height;
+        else if (storyMedia?.width && storyMedia?.height) ar = storyMedia.width / storyMedia.height;
 
         // sourceUrl for hosting:
         // - image: use imageUrl (url_1080 or image_url) — high-res, server-accessible
         // - video: highResThumb from /thumbnails edge — highest res, server-accessible
         // - null mediaType: no sourceUrl for hosting (source-only via thumbnail_url)
-        const sourceUrlForHosting = mediaType === 'image' ? imageUrl : mediaType === 'video' ? videoData?.highResThumb : null;
+        const videoThumbForHosting = isLowResMetaPreview(videoData?.highResThumb) ? null : videoData?.highResThumb;
+        const sourceUrlForHosting = mediaType === 'image' ? imageUrl : mediaType === 'video' ? (videoThumbForHosting || storyMedia?.url || apiThumbnailMedia.url || imageUrl || ex.image_url || null) : null;
 
         const ha = await hostCreativeAsset(supabase, SUPABASE_URL, assetCache, {
           sourceUrl: sourceUrlForHosting,
           mediaType,
           creativeId: creative?.id || null,
-          assetKey: mediaType === 'image' ? (creative?.image_hash || creative?.id || null) : creative?.video_id || null,
-          width: mediaType === 'image' ? (imageData?.width || null) : videoData?.width || null,
-          height: mediaType === 'image' ? (imageData?.height || null) : videoData?.height || null,
+          assetKey: mediaType === 'image' ? (creative?.image_hash || creative?.id || null) : (creative?.video_id || creative?.id || null),
+          width: mediaType === 'image' ? (imageData?.width || storyMedia?.width || null) : (videoData?.width || storyMedia?.width || null),
+          height: mediaType === 'image' ? (imageData?.height || storyMedia?.height || null) : (videoData?.height || storyMedia?.height || null),
         });
 
         // forceResetStorage: clear any previously hosted broken/low-res files.
