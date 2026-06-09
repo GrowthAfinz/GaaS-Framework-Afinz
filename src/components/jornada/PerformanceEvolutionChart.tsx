@@ -23,7 +23,18 @@ interface PerformanceEvolutionChartProps {
     onDayClick?: (date: string) => void;
 }
 
-type MetricType = 'conversao' | 'cac' | 'entrega' | 'abertura';
+type MetricType =
+    | 'conversao'
+    | 'cac'
+    | 'entrega'
+    | 'abertura'
+    | 'envios'
+    | 'entregas'
+    | 'disparos'
+    | 'propostas'
+    | 'aprovados'
+    | 'cartoes'
+    | 'custoTotal';
 type GroupBy = 'daily' | 'weekly';
 
 export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps> = ({
@@ -45,6 +56,22 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                 onDayClick(dateStr);
             }
         }
+    };
+
+    const formatValue = (val: number | string) => {
+        const num = Number(val);
+        if (isNaN(num)) return val;
+        
+        if (metric === 'cac' || metric === 'custoTotal') {
+            return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+        if (['conversao', 'entrega', 'abertura'].includes(metric)) {
+            return `${num.toFixed(2)}%`;
+        }
+        if (['envios', 'entregas', 'disparos', 'propostas', 'aprovados', 'cartoes'].includes(metric)) {
+            return Math.round(num).toLocaleString('pt-BR');
+        }
+        return num.toLocaleString('pt-BR');
     };
 
     const chartData = useMemo(() => {
@@ -83,6 +110,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                     baseEnviada: 0,
                     baseEntregue: 0,
                     propostas: 0,
+                    aprovados: 0,
                     cartoes: 0,
                     custo: 0,
                     count: 0
@@ -93,6 +121,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                 aggregated[key].baseEnviada += activity.kpis.baseEnviada || 0;
                 aggregated[key].baseEntregue += activity.kpis.baseEntregue || 0;
                 aggregated[key].propostas += activity.kpis.propostas || 0;
+                aggregated[key].aprovados += activity.kpis.aprovados || 0;
                 aggregated[key].cartoes += activity.kpis.cartoes || 0;
                 aggregated[key].custo += activity.kpis.custoTotal || 0;
                 aggregated[key].count += 1;
@@ -113,6 +142,27 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                     break;
                 case 'abertura':
                     value = item.baseEntregue > 0 ? (item.propostas / item.baseEntregue) * 100 : 0;
+                    break;
+                case 'envios':
+                    value = item.baseEnviada;
+                    break;
+                case 'entregas':
+                    value = item.baseEntregue;
+                    break;
+                case 'disparos':
+                    value = item.count;
+                    break;
+                case 'propostas':
+                    value = item.propostas;
+                    break;
+                case 'aprovados':
+                    value = item.aprovados;
+                    break;
+                case 'cartoes':
+                    value = item.cartoes;
+                    break;
+                case 'custoTotal':
+                    value = item.custo;
                     break;
             }
             return {
@@ -160,12 +210,25 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                         <select
                             value={metric}
                             onChange={(e) => setMetric(e.target.value as MetricType)}
-                            className="bg-white border border-slate-300 text-slate-900 text-xs rounded px-2 py-1.5"
+                            className="bg-white border border-slate-300 text-slate-900 text-xs rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                         >
-                            <option value="conversao">Taxa de Conversão</option>
-                            <option value="cac">CAC</option>
-                            <option value="entrega">Taxa de Entrega</option>
-                            <option value="abertura">Taxa de Abertura</option>
+                            <optgroup label="Taxas & Eficiência">
+                                <option value="conversao">Taxa de Conversão</option>
+                                <option value="entrega">Taxa de Entrega</option>
+                                <option value="abertura">Taxa de Abertura / Interesse</option>
+                            </optgroup>
+                            <optgroup label="Volumetria (Quantidades)">
+                                <option value="disparos">Quantidade de Disparos (Atividades)</option>
+                                <option value="envios">Quantidade de Envios (Base)</option>
+                                <option value="entregas">Quantidade de Entregas (Base)</option>
+                                <option value="propostas">Quantidade de Propostas</option>
+                                <option value="aprovados">Quantidade de Aprovados</option>
+                                <option value="cartoes">Quantidade de Cartões</option>
+                            </optgroup>
+                            <optgroup label="Financeiro">
+                                <option value="cac">CAC Médio</option>
+                                <option value="custoTotal">Custo Total Campanha</option>
+                            </optgroup>
                         </select>
                     </div>
 
@@ -203,10 +266,21 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                         <YAxis stroke="#94A3B8" tick={{ fill: '#94A3B8', fontSize: 10 }} />
                         <Tooltip
                             contentStyle={{ backgroundColor: '#ffffff', borderColor: '#E2E8F0', color: '#1e293b' }}
-                            formatter={(value: number) => [
-                                `${value.toFixed(2)}${metric === 'cac' ? '' : '%'}`,
-                                metric === 'cac' ? 'CAC' : 'Taxa'
-                            ]}
+                            formatter={(value: number) => {
+                                let label = '';
+                                if (metric === 'cac') label = 'CAC';
+                                else if (metric === 'custoTotal') label = 'Custo Total';
+                                else if (['conversao', 'entrega', 'abertura'].includes(metric)) label = 'Taxa';
+                                else if (metric === 'disparos') label = 'Disparos';
+                                else if (metric === 'envios') label = 'Envios';
+                                else if (metric === 'entregas') label = 'Entregas';
+                                else if (metric === 'propostas') label = 'Propostas';
+                                else if (metric === 'aprovados') label = 'Aprovados';
+                                else if (metric === 'cartoes') label = 'Cartões';
+                                else label = 'Valor';
+
+                                return [formatValue(value), label];
+                            }}
                         />
                         <Legend />
 
@@ -227,16 +301,16 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
             <div className="mt-4 pt-4 border-t border-slate-200 flex gap-6 text-sm">
                 <div>
                     <span className="text-slate-500 mr-2">Média:</span>
-                    <span className="text-slate-900 font-bold">{stats.avg}{metric === 'cac' ? '' : '%'}</span>
+                    <span className="text-slate-900 font-bold">{formatValue(stats.avg)}</span>
                 </div>
                 <div>
                     <span className="text-slate-500 mr-2">Máx:</span>
-                    <span className="text-slate-900 font-bold">{stats.max}{metric === 'cac' ? '' : '%'}</span>
+                    <span className="text-slate-900 font-bold">{formatValue(stats.max)}</span>
                     <span className="text-xs text-slate-500 ml-1">({stats.maxDate})</span>
                 </div>
                 <div>
                     <span className="text-slate-500 mr-2">Mín:</span>
-                    <span className="text-slate-900 font-bold">{stats.min}{metric === 'cac' ? '' : '%'}</span>
+                    <span className="text-slate-900 font-bold">{formatValue(stats.min)}</span>
                     <span className="text-xs text-slate-500 ml-1">({stats.minDate})</span>
                 </div>
             </div>
