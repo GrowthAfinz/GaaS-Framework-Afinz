@@ -503,6 +503,27 @@ const canonicalChannel = (channel: Channel | string) => {
     return normalized === 'Indefinido' ? String(channel ?? '') : normalized;
 };
 
+const PLURIX_CART_INDEPENDENT_JOURNEY = 'JOR_AQUISICAO_PLURIX_CARRINHO_ABANDONADO_INDEPENDENTE';
+const PLURIX_CART_ASSISTED_JOURNEY = 'JOR_AQUISICAO_PLURIX_CARRINHO_ABANDONADO_ASSISTIDO';
+
+const isPlurixCartActivity = (activityName: unknown) =>
+    normalizeKey(activityName).includes('carrinhoabandonado');
+
+const canonicalPlurixCartJourney = (journey: unknown, activityName: unknown) => {
+    const journeyKey = normalizeKey(journey);
+    const isPlurixCartJourney = journeyKey.includes('aquisicao_plurix_carrinho_abandonado');
+    if (!isPlurixCartJourney || journeyKey.includes('teste')) return String(journey ?? '').trim();
+
+    return normalizeKey(activityName).includes('carrinhoabandonadoassistido')
+        ? PLURIX_CART_ASSISTED_JOURNEY
+        : PLURIX_CART_INDEPENDENT_JOURNEY;
+};
+
+const canonicalActivityJourney = (activity: Activity) => {
+    const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
+    return canonicalPlurixCartJourney(activity.jornada, activityName);
+};
+
 const buildNoveltyKey = (journey: unknown, activityName: unknown, channel: unknown, date: unknown) =>
     `${normalizeKey(journey)}|${normalizeKey(activityName)}|${canonicalChannel(String(channel))}|${toDateKey(date)}`;
 
@@ -515,12 +536,7 @@ const buildDispatchSignature = (activityName: unknown, channel: unknown, date: u
 const isSameJourneyFamily = (currentJourney: unknown, otherJourney: unknown) => {
     const current = normalizeKey(currentJourney);
     const other = normalizeKey(otherJourney);
-    if (current === other) return true;
-
-    const plurixCartAbandonado = 'jor_aquisicao_plurix_carrinho_abandonado';
-    if (current.startsWith(plurixCartAbandonado) && other.startsWith(plurixCartAbandonado)) return true;
-
-    return false;
+    return current === other;
 };
 
 const parseClipboardMatrix = (text: string): string[][] => {
@@ -625,8 +641,9 @@ const readBlockRows = (
     const rows: MetricRow[] = [];
 
     for (let row = start.row + 1; row < matrix.length; row += 1) {
-        const journey = getCell(matrix, row, start.col + offsets.journey);
+        const rawJourney = getCell(matrix, row, start.col + offsets.journey);
         const activityName = getCell(matrix, row, start.col + offsets.activity);
+        const journey = canonicalPlurixCartJourney(rawJourney, activityName);
         const date = toDateKey(getCell(matrix, row, start.col + offsets.date));
         const rowChannel = offsets.channel !== undefined
             ? normalizeChannel(getCell(matrix, row, start.col + offsets.channel))
@@ -836,10 +853,11 @@ const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
 
     safeActivities.forEach((activity) => {
         const channel = normalizeChannel(activity.canal);
-        const journeyKey = normalizeKey(activity.jornada);
+        const canonicalJourney = canonicalActivityJourney(activity);
+        const journeyKey = normalizeKey(canonicalJourney);
         if (journeyKey) index.knownJourneys.add(journeyKey);
         const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
-        const noveltyKey = buildNoveltyKey(activity.jornada, activityName, channel, activityDateKey(activity));
+        const noveltyKey = buildNoveltyKey(canonicalJourney, activityName, channel, activityDateKey(activity));
         const dispatchSignature = buildDispatchSignature(activityName, channel, activityDateKey(activity));
         if (!index.existingKeys.has(noveltyKey)) index.existingKeys.set(noveltyKey, []);
         index.existingKeys.get(noveltyKey)!.push(activity);
@@ -1037,6 +1055,38 @@ const electCanonicalJourney = (
 // mesmo cartao reportado sob nomes diferentes. So a vencedora (status nao-conflito)
 // e gravada no banco; as demais apenas exibem.
 const GROUP_RESULT_FIELDS: Array<keyof MetricRow> = ['proposals', 'approved', 'finalized', 'assisted', 'independent'];
+const ALL_METRIC_FIELDS: Array<keyof MetricRow> = [
+    'sent', 'delivered', 'opens', 'clicks', ...GROUP_RESULT_FIELDS,
+];
+
+const collapsePlurixCartDuplicates = (rows: MetricRow[]) => {
+    const result: MetricRow[] = [];
+    const grouped = new Map<string, MetricRow>();
+
+    rows.forEach((row) => {
+        if (!isPlurixCartActivity(row.activityName)) {
+            result.push(row);
+            return;
+        }
+
+        const existing = grouped.get(row.key);
+        if (!existing) {
+            grouped.set(row.key, { ...row });
+            return;
+        }
+
+        ALL_METRIC_FIELDS.forEach((field) => {
+            const previous = existing[field];
+            const incoming = row[field];
+            if (typeof incoming === 'number' && (!Number.isFinite(Number(previous)) || incoming > Number(previous))) {
+                (existing as any)[field] = incoming;
+            }
+        });
+        existing.sourceBlocks = Array.from(new Set([...existing.sourceBlocks, ...row.sourceBlocks]));
+    });
+
+    return [...result, ...grouped.values()];
+};
 
 const propagateGroupEmissions = (candidates: UpdateCandidate[]): UpdateCandidate[] => {
     const groups = new Map<string, UpdateCandidate[]>();
@@ -1076,15 +1126,28 @@ const buildCandidate = (
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     const importedJourneys = importedSignatureJourneys.get(metric.dispatchSignature) ?? new Set<string>();
     const historicalSignatureMatches = historyIndex.byDispatchSignature.get(metric.dispatchSignature) ?? [];
+    const compatibleHistoricalMatches = historicalSignatureMatches.filter(
+        (activity) => isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
+    );
 
     // Disparo ja existe na base (mesma activity+canal+data, qualquer jornada).
-    const existingDispatch = historicalSignatureMatches[0];
+    const existingDispatch = [...compatibleHistoricalMatches].sort((left, right) => {
+        const target = normalizeKey(metric.journey);
+        const score = (activity: Activity) => {
+            const rawJourney = normalizeKey(activity.jornada);
+            if (rawJourney === target) return 3;
+            if (
+                target === normalizeKey(PLURIX_CART_ASSISTED_JOURNEY)
+                && (rawJourney.includes('assistido') || rawJourney.includes('lojista'))
+            ) return 2;
+            return 1;
+        };
+        return score(right) - score(left);
+    })[0];
     const existsInBase = Boolean(existingDispatch);
     const refreshDetails = metricRefreshDetails(metric, existingDispatch);
     const hasMetricRefresh = refreshDetails.length > 0;
-    const baseJourneyDiffers = historicalSignatureMatches.some(
-        (activity) => !isSameJourneyFamily(metric.journey, activity.jornada)
-    );
+    const baseJourneyDiffers = Boolean(historicalSignatureMatches.length > 0 && compatibleHistoricalMatches.length === 0);
 
     // Duplicacao do BI: a mesma activity+canal+data vem com varios nomes de jornada
     // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
@@ -1097,7 +1160,9 @@ const buildCandidate = (
 
     const conflictJourneys = Array.from(new Set([
         ...Array.from(importedJourneys).filter((journey) => !isSameJourneyFamily(metric.journey, journey)),
-        ...historicalSignatureMatches.map((activity) => activity.jornada).filter((journey) => !isSameJourneyFamily(metric.journey, journey)),
+        ...historicalSignatureMatches
+            .filter((activity) => !isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity)))
+            .map((activity) => activity.jornada),
     ])).filter(Boolean);
 
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
@@ -1932,9 +1997,10 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const missingBlocks = blocks.filter((block) => !block.detected).map((block) => block.label);
     if (missingBlocks.length > 0) warnings.push(`Blocos nao detectados: ${missingBlocks.join(', ')}.`);
 
-    const dispatchRows = [...whatsappRows, ...emailRows, ...smsRows, ...pushRows];
-    const rawRows = [...dispatchRows, ...performanceRows];
-    const attribution = consolidateOperationalRows(dispatchRows, performanceRows);
+    const dispatchRows = collapsePlurixCartDuplicates([...whatsappRows, ...emailRows, ...smsRows, ...pushRows]);
+    const collapsedPerformanceRows = collapsePlurixCartDuplicates(performanceRows);
+    const rawRows = [...dispatchRows, ...collapsedPerformanceRows];
+    const attribution = consolidateOperationalRows(dispatchRows, collapsedPerformanceRows);
     const allRows = attribution.rows;
     if (attribution.mergedResidual > 0 || attribution.ignoredResidual > 0) {
         warnings.push(`${attribution.mergedResidual} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignoredResidual} linhas sem Base Total e Base Acionavel validas foram ignoradas.`);
