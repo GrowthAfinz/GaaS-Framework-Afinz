@@ -25,7 +25,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { intelligentUpdateService } from '../../services/intelligentUpdateService';
 import type { Activity } from '../../types/framework';
 
-type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
+type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type UpdateDomain = 'aquisicao' | 'rentabilizacao';
@@ -134,6 +134,7 @@ interface UpdateCandidate extends MetricRow {
     conflictJourneys?: string[];
     conflictReason?: string;
     matchedActivity?: Activity;
+    metricRefresh?: boolean;
     manualOverrides?: ManualOverride[];
 }
 
@@ -439,6 +440,7 @@ const generateSafra = (dateKey: string) => {
 
 const normalizeChannel = (value: unknown): Channel => {
     const text = normalize(value);
+    if (text.includes('ecred')) return 'ECRED-API';
     if (text.includes('whatsapp') || text.includes('wpp')) return 'WhatsApp';
     if (text.includes('mail') || text === 'email') return 'E-mail';
     if (text.includes('sms')) return 'SMS';
@@ -687,6 +689,43 @@ const activityField = (activity: Activity, field: SuggestionField) => {
         case 'promocional': return activity.promocional || getRaw(activity, ['Promocional']);
         default: return '';
     }
+};
+
+const activityMetricValue = (activity: Activity, field: keyof MetricRow): number => {
+    switch (field) {
+        case 'sent': return activity.kpis?.baseEnviada ?? parseNumber(getRaw(activity, ['Base Total'])) ?? 0;
+        case 'delivered': return activity.kpis?.baseEntregue ?? parseNumber(getRaw(activity, ['Base Acionavel', 'Base Acionável'])) ?? 0;
+        case 'opens': return activity.kpis?.aberturas ?? parseNumber(getRaw(activity, ['Abertura'])) ?? 0;
+        case 'clicks': return activity.kpis?.cliques ?? parseNumber(getRaw(activity, ['Cliques'])) ?? 0;
+        case 'proposals': return activity.kpis?.propostas ?? parseNumber(getRaw(activity, ['Propostas'])) ?? 0;
+        case 'approved': return activity.kpis?.aprovados ?? parseNumber(getRaw(activity, ['Aprovados'])) ?? 0;
+        case 'finalized': return activity.kpis?.cartoes ?? activity.kpis?.emissoes ?? parseNumber(getRaw(activity, ['Cartoes Gerados', 'Cartões Gerados'])) ?? 0;
+        case 'assisted': return activity.kpis?.emissoesAssistidas ?? parseNumber(getRaw(activity, ['Emissoes Assistidas', 'Emissões Assistidas'])) ?? 0;
+        case 'independent': return activity.kpis?.emissoesIndependentes ?? parseNumber(getRaw(activity, ['Emissoes Independentes', 'Emissões Independentes'])) ?? 0;
+        default: return 0;
+    }
+};
+
+const REFRESHABLE_METRIC_FIELDS: Array<keyof MetricRow> = [
+    'sent',
+    'delivered',
+    'opens',
+    'clicks',
+    'proposals',
+    'approved',
+    'finalized',
+    'assisted',
+    'independent',
+];
+
+const metricRefreshDetails = (metric: MetricRow, existing?: Activity) => {
+    if (!existing) return [];
+    return REFRESHABLE_METRIC_FIELDS.flatMap((field) => {
+        const next = metric[field];
+        if (typeof next !== 'number' || !Number.isFinite(next)) return [];
+        const previous = activityMetricValue(existing, field);
+        return previous === next ? [] : [{ field, previous, next }];
+    });
 };
 
 const inferTaxonomy = (metric: MetricRow) => {
@@ -1041,6 +1080,8 @@ const buildCandidate = (
     // Disparo ja existe na base (mesma activity+canal+data, qualquer jornada).
     const existingDispatch = historicalSignatureMatches[0];
     const existsInBase = Boolean(existingDispatch);
+    const refreshDetails = metricRefreshDetails(metric, existingDispatch);
+    const hasMetricRefresh = refreshDetails.length > 0;
     const baseJourneyDiffers = historicalSignatureMatches.some(
         (activity) => !isSameJourneyFamily(metric.journey, activity.jornada)
     );
@@ -1073,7 +1114,7 @@ const buildCandidate = (
                 : existsInBase
                     // Ja existe na base: jornada diferente => conflito (renomeacao); mesma => duplicado.
                     // matchedActivity garante UPDATE em vez de INSERT.
-                    ? (baseJourneyDiffers ? 'conflict' : 'duplicate')
+                    ? (baseJourneyDiffers ? 'conflict' : hasMetricRefresh ? 'ready' : 'duplicate')
                     : missingHumanSuggestion
                         ? 'new'
                         // BP/Base Propria e deterministico (taxonomia forca BU/Parceiro/Segmento);
@@ -1096,7 +1137,7 @@ const buildCandidate = (
                     : fileAmbiguous
                         ? 'Colisao de jornada'
                         : existsInBase
-                            ? (baseJourneyDiffers ? 'Jornada renomeada' : 'Ja existe na base')
+                            ? (baseJourneyDiffers ? 'Jornada renomeada' : hasMetricRefresh ? 'Atualizar resultados' : 'Ja existe na base')
                             : missingHumanSuggestion
                                 ? 'Campos humanos'
                                 : status === 'ready'
@@ -1109,11 +1150,15 @@ const buildCandidate = (
                 : existsInBase
                     ? (baseJourneyDiffers
                         ? 'Disparo ja existe na base com outra jornada (renomeacao)'
-                        : 'Disparo ja existe na base de dados')
+                        : hasMetricRefresh
+                            ? `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`
+                            : 'Disparo ja existe na base de dados')
                     : status === 'ready'
                         ? 'Sugestoes historicas fortes'
                         : 'Revisar campos sugeridos',
-        confidence: missingCritical || duplicateCount > 1 || fileSuperseded || fileAmbiguous || existsInBase ? 0 : averageConfidence,
+        confidence: hasMetricRefresh && !baseJourneyDiffers
+            ? 100
+            : missingCritical || duplicateCount > 1 || fileSuperseded || fileAmbiguous || existsInBase ? 0 : averageConfidence,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
             : duplicateCount > 1
@@ -1125,7 +1170,9 @@ const buildCandidate = (
                         : existsInBase
                             ? (baseJourneyDiffers
                                 ? `disparo ja existe na base; jornada na base: ${existingDispatch?.jornada ?? '-'} | jornada no arquivo: ${metric.journey}`
-                                : 'activity, canal e data ja existem na base de dados')
+                                : hasMetricRefresh
+                                    ? refreshDetails.map(({ field, previous, next }) => `${String(field)}: ${previous} -> ${next}`).join(' | ')
+                                    : 'activity, canal e data ja existem na base de dados')
                             : 'sugestoes por taxonomia e historico',
         accepted: false,
         domain: metric.domain,
@@ -1145,6 +1192,7 @@ const buildCandidate = (
         // evitando duplicar disparo que ja existe na base. Nao setar para nomes
         // antigos/variantes (superseded) ou colisoes ambiguas: esses nunca devem gravar.
         matchedActivity: (fileSuperseded || fileAmbiguous) ? undefined : existingDispatch,
+        metricRefresh: hasMetricRefresh && !baseJourneyDiffers,
         conflictReason: fileSuperseded
             ? 'superseded_file_journey'
             : fileAmbiguous
@@ -1205,11 +1253,11 @@ const applyApprovalDefaults = (candidate: UpdateCandidate): UpdateCandidate => (
 const buildExcelRow = (candidate: UpdateCandidate) => {
     const baseTotal = candidate.sent ?? '';
     const baseAcionavel = candidate.delivered ?? '';
-    const cartoes = candidate.finalized ?? '';
-    const aprovados = candidate.approved ?? '';
-    const propostas = candidate.proposals ?? '';
-    const independentes = candidate.independent ?? '';
-    const assistidas = candidate.assisted ?? '';
+    const cartoes = candidate.finalized ?? 0;
+    const aprovados = candidate.approved ?? 0;
+    const propostas = candidate.proposals ?? 0;
+    const independentes = candidate.independent ?? 0;
+    const assistidas = candidate.assisted ?? 0;
 
     const cols = FRAMEWORK_HEADERS.map((header) => {
         switch (header) {
@@ -1279,8 +1327,12 @@ const isAttributionResidual = (row: MetricRow) =>
 
 const addMetricValue = (target: MetricRow, source: MetricRow, field: keyof MetricRow) => {
     const value = source[field];
-    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return;
     const current = target[field];
+    if (value === 0) {
+        if (typeof current !== 'number') (target as any)[field] = 0;
+        return;
+    }
     (target as any)[field] = (typeof current === 'number' ? current : 0) + value;
 };
 
@@ -1383,6 +1435,12 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         addMetricValue(anchor, row, 'independent');
         anchor.sourceBlocks = Array.from(new Set([...(anchor.sourceBlocks ?? [anchor.sourceBlock]), 'performance']));
         mergedPerformance += hasConversionMetric(row) ? 1 : 0;
+    });
+
+    anchors.forEach((anchor) => {
+        GROUP_RESULT_FIELDS.forEach((field) => {
+            if (typeof anchor[field] !== 'number') (anchor as any)[field] = 0;
+        });
     });
 
     return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, mergedEcred, ignoredPerformance };
@@ -1912,7 +1970,6 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     allRows.forEach((row) => {
         if (historyIndex.existingKeys.has(row.key)) {
             ignoredExisting += 1;
-            return;
         }
         mergeMetric(metricMap, row);
     });
@@ -2785,7 +2842,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             <StatCard label="Novas" value={summary.fresh} tone="text-blue-700" />
                             <StatCard label="Duplicadas" value={summary.duplicate} tone="text-purple-700" />
                             <StatCard label="Conflitos" value={summary.conflict} tone="text-orange-700" />
-                            <StatCard label="Existentes ignoradas" value={result.ignoredExisting} tone="text-slate-700" />
+                            <StatCard label="Existentes analisadas" value={result.ignoredExisting} tone="text-slate-700" />
                         </div>
 
                         <div className="grid grid-cols-1 gap-2 md:grid-cols-5">

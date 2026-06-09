@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import type { Activity } from '../types/framework';
 
-type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'Indefinido';
+type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type UpdateDomain = 'aquisicao' | 'rentabilizacao';
@@ -51,6 +51,7 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     ordemDisparo?: number;
     conflictJourneys?: string[];
     conflictReason?: string;
+    metricRefresh?: boolean;
     manualOverrides?: Array<{
         field: string;
         previousValue?: string | number;
@@ -134,6 +135,8 @@ const insertWithOptionalAuditColumns = async <T extends Record<string, any>>(
 
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     const patch: Record<string, number | string | null> = {};
+    const manuallyChanged = new Set((candidate.manualOverrides ?? []).map((override) => override.field));
+    const includeDimension = (field: string) => !candidate.metricRefresh || manuallyChanged.has(field);
 
     if (candidate.sent !== undefined) patch['Base Total'] = candidate.sent;
     if (candidate.delivered !== undefined) patch['Base Acionável'] = candidate.delivered;
@@ -144,19 +147,19 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     if (candidate.finalized !== undefined) patch['Cartões Gerados'] = candidate.finalized;
     if (candidate.assisted !== undefined) patch['Emissões Assistidas'] = candidate.assisted;
     if (candidate.independent !== undefined) patch['Emissões Independentes'] = candidate.independent;
-    if (candidate.bu) patch['BU'] = candidate.bu;
-    if (candidate.parceiro) patch['Parceiro'] = candidate.parceiro;
-    if (candidate.segmento) patch['Segmento'] = candidate.segmento;
-    if (candidate.subgrupo) patch['Subgrupos'] = candidate.subgrupo;
-    if (candidate.etapaAquisicao) patch['Etapa de aquisição'] = candidate.etapaAquisicao;
-    if (candidate.perfilCredito) patch['Perfil de Crédito'] = candidate.perfilCredito;
-    if (candidate.produto) patch['Produto'] = candidate.produto;
-    if (candidate.oferta) patch['Oferta'] = candidate.oferta;
-    if (candidate.promocional) patch['Promocional'] = candidate.promocional;
-    if (candidate.ordemDisparo !== undefined) patch['Ordem de disparo'] = candidate.ordemDisparo;
+    if (candidate.bu && includeDimension('bu')) patch['BU'] = candidate.bu;
+    if (candidate.parceiro && includeDimension('parceiro')) patch['Parceiro'] = candidate.parceiro;
+    if (candidate.segmento && includeDimension('segmento')) patch['Segmento'] = candidate.segmento;
+    if (candidate.subgrupo && includeDimension('subgrupo')) patch['Subgrupos'] = candidate.subgrupo;
+    if (candidate.etapaAquisicao && includeDimension('etapaAquisicao')) patch['Etapa de aquisição'] = candidate.etapaAquisicao;
+    if (candidate.perfilCredito && includeDimension('perfilCredito')) patch['Perfil de Crédito'] = candidate.perfilCredito;
+    if (candidate.produto && includeDimension('produto')) patch['Produto'] = candidate.produto;
+    if (candidate.oferta && includeDimension('oferta')) patch['Oferta'] = candidate.oferta;
+    if (candidate.promocional && includeDimension('promocional')) patch['Promocional'] = candidate.promocional;
+    if (candidate.ordemDisparo !== undefined && includeDimension('ordemDisparo')) patch['Ordem de disparo'] = candidate.ordemDisparo;
     // Renomeia a jornada canonica quando o disparo ja existe na base sob nome antigo
     // (BI renomeou no SFMC). Aplicado apenas em candidatos aceitos pelo humano.
-    if (candidate.journey) patch['jornada'] = candidate.journey;
+    if (candidate.journey && !candidate.metricRefresh) patch['jornada'] = candidate.journey;
 
     return {
         ...patch,
@@ -189,11 +192,11 @@ const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
     'Base Acionável': candidate.delivered ?? null,
     'Abertura': candidate.opens ?? null,
     'Cliques': candidate.clicks ?? null,
-    'Cartões Gerados': candidate.finalized ?? null,
-    'Aprovados': candidate.approved ?? null,
-    'Propostas': candidate.proposals ?? null,
-    'Emissões Independentes': candidate.independent ?? null,
-    'Emissões Assistidas': candidate.assisted ?? null,
+    'Cartões Gerados': candidate.finalized ?? 0,
+    'Aprovados': candidate.approved ?? 0,
+    'Propostas': candidate.proposals ?? 0,
+    'Emissões Independentes': candidate.independent ?? 0,
+    'Emissões Assistidas': candidate.assisted ?? 0,
     updated_at: new Date().toISOString(),
 });
 
