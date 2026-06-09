@@ -21,11 +21,71 @@ export type EtapaAquisicao = typeof ETAPAS_AQUISICAO[number];
 // CUSTOS PADRÃO POR CANAL (baseado no FRAMEWORK)
 // ========================================
 
-export const CUSTO_UNITARIO_CANAL: Record<Canal, number> = {
-    'E-mail': 0.001,
-    'Push': 0.001,
-    'SMS': 0.064,
-    'WhatsApp': 0.420,
+/**
+ * Custo unitário do canal POR ANO (vigência).
+ * Fonte: planilha de custos Afinz. Cada chave é o ano de vigência; usamos o
+ * valor do ano do disparo (ou o ano vigente mais próximo abaixo dele).
+ *   - 2025  → tabela "2025-11"
+ *   - 2026+ → tabela "2026"
+ */
+export const CUSTO_UNITARIO_CANAL_POR_ANO: Record<number, Record<Canal, number>> = {
+    2025: {
+        'E-mail': 0.000865,
+        'Push': 0.000865,
+        'SMS': 0.064,
+        'WhatsApp': 0.420,
+    },
+    2026: {
+        'E-mail': 0.001024,
+        'Push': 0.001024,
+        'SMS': 0.0748,
+        'WhatsApp': 0.3812,
+    },
+};
+
+const ANOS_CUSTO_CANAL = Object.keys(CUSTO_UNITARIO_CANAL_POR_ANO)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+/** Custos do canal vigentes (último ano da tabela) — usado para novos disparos. */
+export const CUSTO_UNITARIO_CANAL: Record<Canal, number> =
+    CUSTO_UNITARIO_CANAL_POR_ANO[ANOS_CUSTO_CANAL[ANOS_CUSTO_CANAL.length - 1]];
+
+/** Normaliza nomes de canal para a chave canônica da tabela de custos. */
+const normalizeCanalKey = (canal: string): Canal | null => {
+    const c = (canal || '').toLowerCase().replace(/[\s_-]+/g, '');
+    if (c === 'email' || c === 'mail') return 'E-mail';
+    if (c === 'push') return 'Push';
+    if (c === 'sms') return 'SMS';
+    if (c === 'whatsapp' || c === 'wpp') return 'WhatsApp';
+    return null;
+};
+
+/**
+ * Retorna o custo unitário do canal vigente para a data do disparo.
+ * Se a data for inválida, usa a tabela do ano vigente mais recente.
+ */
+export const getCustoUnitarioCanal = (canal: string, date?: string | Date | null): number => {
+    const key = normalizeCanalKey(canal);
+    if (!key) return 0;
+
+    let year = NaN;
+    if (date instanceof Date) year = date.getFullYear();
+    else if (typeof date === 'string' && date) year = new Date(date).getFullYear();
+
+    // Escolhe o maior ano de vigência <= ano do disparo; senão o mais antigo disponível.
+    let chosen = ANOS_CUSTO_CANAL[0];
+    if (Number.isFinite(year)) {
+        for (const y of ANOS_CUSTO_CANAL) {
+            if (y <= year) chosen = y;
+        }
+        // Acima do último ano conhecido → usa o último (mais recente).
+        if (year > ANOS_CUSTO_CANAL[ANOS_CUSTO_CANAL.length - 1]) {
+            chosen = ANOS_CUSTO_CANAL[ANOS_CUSTO_CANAL.length - 1];
+        }
+    }
+
+    return CUSTO_UNITARIO_CANAL_POR_ANO[chosen][key] ?? 0;
 };
 
 // ========================================

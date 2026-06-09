@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient';
 import { parseDate } from '../utils/formatters';
 import { ActivityFormSchema, ActivityFormInput } from '../schemas/ActivityFormSchema';
 import { ActivityRow } from '../types/activity';
+import { getCustoUnitarioCanal, CUSTO_UNITARIO_OFERTA } from '../constants/frameworkFields';
 
 const normalizeFrameworkChannel = (value: unknown): string => {
     const raw = value === undefined || value === null ? '' : String(value).trim();
@@ -191,6 +192,27 @@ export const syncFrameworkActivities = async (
             return null;
         };
 
+        // ── Cálculos financeiros (fonte única) ─────────────────────────────
+        // Custo/CAC/Conversão costumam vir vazios da planilha; computamos aqui
+        // usando o custo de canal vigente por ano + custo de oferta, com o custo
+        // incidindo sobre a base entregue (convenção do histórico).
+        const baseTotalNum = activity.kpis?.baseEnviada ?? parseNum(activity.raw?.['Base Total']) ?? 0;
+        const baseAcionavelNum = activity.kpis?.baseEntregue ?? parseNum(activity.raw?.['Base Acionável']) ?? 0;
+        const cartoesNum = activity.kpis?.cartoes ?? parseNum(activity.raw?.['Cartões Gerados']) ?? 0;
+        const canalNorm = normalizeFrameworkChannel(activity.canal);
+        const canalUnit = parseNum(activity.raw?.['Custo unitário do canal'])
+            || getCustoUnitarioCanal(canalNorm, activity.dataDisparo ?? activity.raw?.['Data de Disparo']);
+        const ofertaUnit = parseNum(activity.raw?.['Custo Unitário Oferta'])
+            || CUSTO_UNITARIO_OFERTA[(activity.oferta || '') as keyof typeof CUSTO_UNITARIO_OFERTA]
+            || 0;
+        const baseCusto = baseAcionavelNum || baseTotalNum;
+        const custoTotalCalc = (activity.kpis?.custoTotal ?? parseNum(activity.raw?.['Custo Total Campanha']))
+            || (baseCusto * (ofertaUnit + canalUnit)) || null;
+        const cacCalc = (activity.kpis?.cac ?? parseNum(activity.raw?.['CAC']))
+            || (cartoesNum > 0 && custoTotalCalc ? custoTotalCalc / cartoesNum : null);
+        const conversaoCalc = (activity.kpis?.taxaConversao ?? parseNum(activity.raw?.['Taxa de Conversão']))
+            ?? (baseTotalNum > 0 ? cartoesNum / baseTotalNum : null);
+
         return {
             prog_gaas: false,
             status: 'Realizado',
@@ -224,17 +246,17 @@ export const syncFrameworkActivities = async (
             "% Otimização de base": parseNum(activity.raw?.['% Otimização de base']),
             "Custo Unitário Oferta": parseNum(activity.raw?.['Custo Unitário Oferta']),
             "Custo Total da Oferta": parseNum(activity.raw?.['Custo Total da Oferta']),
-            "Custo unitário do canal": parseNum(activity.raw?.['Custo unitário do canal']),
+            "Custo unitário do canal": parseNum(activity.raw?.['Custo unitário do canal']) ?? canalUnit,
             "Custo total canal": parseNum(activity.raw?.['Custo total canal']),
-            "Custo Total Campanha": activity.kpis?.custoTotal ?? parseNum(activity.raw?.['Custo Total Campanha']),
-            "CAC": activity.kpis?.cac ?? parseNum(activity.raw?.['CAC']),
+            "Custo Total Campanha": custoTotalCalc,
+            "CAC": cacCalc,
             "Taxa de Entrega": activity.kpis?.taxaEntrega ?? parseNum(activity.raw?.['Taxa de Entrega']),
             "Taxa de Abertura": activity.kpis?.taxaAbertura ?? parseNum(activity.raw?.['Taxa de Abertura']),
             "Taxa de Clique": parseNum(activity.raw?.['Taxa de Clique']),
             "Taxa de Proposta": activity.kpis?.taxaPropostas ?? parseNum(activity.raw?.['Taxa de Proposta']),
             "Taxa de Aprovação": activity.kpis?.taxaAprovacao ?? parseNum(activity.raw?.['Taxa de Aprovação']),
             "Taxa de Finalização": activity.kpis?.taxaFinalizacao ?? parseNum(activity.raw?.['Taxa de Finalização']),
-            "Taxa de Conversão": activity.kpis?.taxaConversao ?? parseNum(activity.raw?.['Taxa de Conversão']),
+            "Taxa de Conversão": conversaoCalc,
             "Cartões Gerados": activity.kpis?.cartoes ?? parseNum(activity.raw?.['Cartões Gerados']),
             "Aprovados": activity.kpis?.aprovados ?? parseNum(activity.raw?.['Aprovados']),
             "Propostas": activity.kpis?.propostas ?? parseNum(activity.raw?.['Propostas']),

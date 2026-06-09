@@ -31,6 +31,50 @@ const CompactMetric: React.FC<{ label: string; value: string; sub?: string }> = 
   </div>
 );
 
+const IGNORED_DIM = new Set(['', 'n/a', 'na', 'n/a / padrão', '-', '--', 'sem', 'null', 'undefined']);
+const IdentityChip: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => {
+  const v = value === undefined || value === null ? '' : String(value).trim();
+  if (IGNORED_DIM.has(v.toLowerCase())) return null;
+  return (
+    <div className="flex flex-col gap-0.5 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5 min-w-0">
+      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+      <span className="text-[11px] font-semibold text-slate-700 truncate" title={v}>{v}</span>
+    </div>
+  );
+};
+
+// Diagnóstico automático: identifica a etapa de maior perda no funil do recorte.
+const BottleneckInsight: React.FC<{ data: DetailsPaneData }> = ({ data }) => {
+  const sum = (pick: (a: typeof data.activities[number]) => number) =>
+    data.activities.reduce((acc, a) => acc + (Number(pick(a)) || 0), 0);
+
+  const enviado = sum((a) => a['Base Total'] ?? 0);
+  const entregue = sum((a) => a['Base Acionável'] ?? 0);
+  const propostas = sum((a) => a['Propostas'] ?? 0);
+  const aprovados = sum((a) => a['Aprovados'] ?? 0);
+  const cartoes = sum((a) => a['Cartões Gerados'] ?? 0);
+
+  const stages = [
+    { nome: 'Entrega', taxa: enviado > 0 ? entregue / enviado : null, dica: 'Revise qualidade/higienização da base.' },
+    { nome: 'Proposta', taxa: entregue > 0 ? propostas / entregue : null, dica: 'Teste oferta/criativo e timing do disparo.' },
+    { nome: 'Aprovação', taxa: propostas > 0 ? aprovados / propostas : null, dica: 'Avalie perfil de crédito do público.' },
+    { nome: 'Finalização', taxa: aprovados > 0 ? cartoes / aprovados : null, dica: 'Reduza fricção na ativação do cartão.' },
+  ].filter((s): s is { nome: string; taxa: number; dica: string } => s.taxa !== null);
+
+  if (stages.length === 0) return null;
+  const worst = stages.reduce((min, s) => (s.taxa < min.taxa ? s : min), stages[0]);
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+      <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Maior gargalo</p>
+      <p className="text-sm font-bold text-amber-800 mt-0.5">
+        {worst.nome} · {(worst.taxa * 100).toFixed(1)}%
+      </p>
+      <p className="text-[11px] text-amber-700 mt-0.5">{worst.dica}</p>
+    </div>
+  );
+};
+
 export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewAll }) => {
   const [activeTab, setActiveTab] = useState<DetailsTab>('mix');
 
@@ -90,6 +134,30 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
+        {node.type === 'disparo' && data.activities[0] && (() => {
+          const a = data.activities[0];
+          return (
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Identificação</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <IdentityChip label="BU" value={a.BU} />
+                <IdentityChip label="Canal" value={a.Canal} />
+                <IdentityChip label="Segmento" value={a.Segmento} />
+                <IdentityChip label="Jornada" value={a.jornada} />
+                <IdentityChip label="Parceiro" value={a.Parceiro} />
+                <IdentityChip label="Subgrupo" value={a.Subgrupos} />
+                <IdentityChip label="Oferta" value={a.Oferta} />
+                <IdentityChip label="Promocional" value={a.Promocional} />
+                <IdentityChip label="Produto" value={a.Produto} />
+                <IdentityChip label="Perfil Crédito" value={a['Perfil de Crédito']} />
+                <IdentityChip label="Etapa Funil" value={a['Etapa de aquisição']} />
+                <IdentityChip label="Safra" value={a.Safra} />
+                <IdentityChip label="Ordem" value={a['Ordem de disparo']} />
+              </div>
+              <div className="border-t border-slate-100 mt-1" />
+            </div>
+          );
+        })()}
         <PerformanceCard metrics={node.metrics} count={node.count} prevMetrics={data.prevMetrics} />
         <div className="border-t border-slate-100" />
         <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
@@ -138,6 +206,7 @@ export const DetailsPane: React.FC<DetailsPaneProps> = ({ data, onClose, onViewA
               <CompactMetric label="Finalização" value={fmtPct(funnelSummary.taxaFinalizacao)} sub="cartões / aprovados" />
               <CompactMetric label="Conversão" value={fmtPct(node.metrics.taxaConversao)} sub="conversão do recorte" />
             </div>
+            <BottleneckInsight data={data} />
           </div>
         )}
 

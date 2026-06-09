@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 
 import { ActivityRow } from '../../types/activity';
 import { activityService } from '../../services/activityService';
+import { mapSqlToActivity } from '../../services/dataService';
 import { useAppStore } from '../../store/useAppStore';
 import { usePeriod } from '../../contexts/PeriodContext';
 import { formatDateKey, parseDate } from '../../utils/formatters';
@@ -31,6 +32,7 @@ interface DisparoExplorerProps {
 
 export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFramework, filteredActivities }) => {
   const storeActivitiesRaw = useAppStore((state) => state.activities);
+  const setStoreActivities = useAppStore((state) => state.setActivities);
   const filtrosGlobais = useAppStore((state) => state.viewSettings.filtrosGlobais);
   const storeActivities = React.useMemo(() => {
     const sourceActivities = filteredActivities || storeActivitiesRaw;
@@ -440,7 +442,21 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         <DisparoDetailModal
           activity={disparoModalActivity}
           onClose={() => setDisparoModalActivity(null)}
-          onSaved={() => setDisparoModalActivity(null)}
+          onSaved={(updated) => {
+            try {
+              const mapped = mapSqlToActivity(updated);
+              // Atualiza store (origem principal) casando pelo uuid em raw.id
+              const cur = useAppStore.getState().activities;
+              if (cur.length > 0) {
+                setStoreActivities(cur.map((act) => (act.raw?.id === (updated as ActivityRow).id ? mapped : act)));
+              }
+              // Atualiza lista buscada (fallback)
+              setFetchedActivities((prev) => prev.map((r) => (r.id === (updated as ActivityRow).id ? (updated as ActivityRow) : r)));
+            } catch {
+              /* refresh best-effort */
+            }
+            setDisparoModalActivity(null);
+          }}
         />
       )}
 

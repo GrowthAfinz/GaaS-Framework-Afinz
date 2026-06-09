@@ -3,6 +3,7 @@ import { Activity, FrameworkRow } from '../types/framework';
 import { DailyAdMetrics, MediaInsight, CampaignMapping } from '../schemas/paid-media';
 import { B2CDataRow } from '../types/b2c';
 import { parseDate } from '../utils/formatters';
+import { getCustoUnitarioCanal, CUSTO_UNITARIO_OFERTA } from '../constants/frameworkFields';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 1000;
@@ -174,9 +175,29 @@ export const mapSqlToActivity = (row: any): Activity => {
         'Emissões Assistidas': row['Emissões Assistidas'],
     };
 
+    const dataDisparo = parseDate(row['Data de Disparo']) || new Date(row['Data de Disparo']);
+
+    // Métricas financeiras frequentemente vêm nulas do banco — computamos aqui
+    // (fonte única) usando o custo de canal vigente por ano + custo de oferta.
+    const baseTotal = toFiniteNumber(row['Base Total']);
+    const baseAcionavel = toFiniteNumber(row['Base Acionável']);
+    const cartoes = toFiniteNumber(row['Cartões Gerados']);
+    const custoUnitarioCanal =
+        toFiniteNumber(row['Custo unitário do canal']) || getCustoUnitarioCanal(canal, dataDisparo);
+    const custoUnitarioOferta =
+        toFiniteNumber(row['Custo Unitário Oferta']) ||
+        CUSTO_UNITARIO_OFERTA[(oferta || '') as keyof typeof CUSTO_UNITARIO_OFERTA] ||
+        0;
+    // Custo incide sobre a base entregue (convenção do histórico); cai para a enviada.
+    const baseCusto = baseAcionavel || baseTotal;
+    const custoTotalComputado =
+        toFiniteNumber(row['Custo Total Campanha']) || baseCusto * (custoUnitarioOferta + custoUnitarioCanal);
+    const cacComputado =
+        toFiniteNumber(row['CAC']) || (cartoes > 0 ? custoTotalComputado / cartoes : 0);
+
     return {
         id: row['Activity name / Taxonomia'] || row.id,
-        dataDisparo: parseDate(row['Data de Disparo']) || new Date(row['Data de Disparo']), // Fallback to standard if parse fail
+        dataDisparo,
         canal,
         bu,
         segmento,
@@ -205,8 +226,8 @@ export const mapSqlToActivity = (row: any): Activity => {
             cartoes: row['Cartões Gerados'],
             emissoesIndependentes: row['Emissões Independentes'],
             emissoesAssistidas: row['Emissões Assistidas'],
-            cac: row['CAC'],
-            custoTotal: row['Custo Total Campanha']
+            cac: cacComputado || null,
+            custoTotal: custoTotalComputado || null
         },
         raw
     };

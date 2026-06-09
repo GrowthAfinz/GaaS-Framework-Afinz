@@ -1,6 +1,19 @@
 import { useMemo } from 'react';
 import { ActivityRow } from '../../types/activity';
 import { TreeNode, NodeMetrics, ExplorerFilters, NodeType } from '../../types/explorer';
+import { getCustoUnitarioCanal } from '../../constants/frameworkFields';
+
+/** Custo total do disparo — usa o do banco se existir, senão computa por canal/ano. */
+function rowCustoTotal(r: ActivityRow): number {
+  const stored = Number(r['Custo Total Campanha'] ?? 0);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+  // Custo incide sobre a base entregue (convenção do histórico); cai para a enviada.
+  const baseCusto = (Number(r['Base Acionável'] ?? 0) || 0) || (Number(r['Base Total'] ?? 0) || 0);
+  const canalUnit =
+    Number(r['Custo unitário do canal'] ?? 0) || getCustoUnitarioCanal(r.Canal ?? '', r['Data de Disparo']);
+  const ofertaUnit = Number(r['Custo Unitário Oferta'] ?? 0) || 0;
+  return baseCusto * (ofertaUnit + canalUnit);
+}
 
 const BU_COLORS: Record<string, string> = {
   B2C: '#3B82F6',
@@ -30,23 +43,21 @@ function emptyMetrics(): NodeMetrics {
 
 function aggregateMetrics(rows: ActivityRow[]): NodeMetrics {
   const total = emptyMetrics();
-  let convSum = 0, convCount = 0;
+  let baseEnviada = 0;
 
   for (const r of rows) {
-    total.baseTotal += r['Base Total'] ?? 0;
-    total.cartoes += r['Cartões Gerados'] ?? 0;
-    total.propostas += r['Propostas'] ?? 0;
-    total.aprovados += r['Aprovados'] ?? 0;
-    total.custoTotal += r['Custo Total Campanha'] ?? 0;
-
-    if (r['Taxa de Conversão'] != null && r['Taxa de Conversão'] > 0) {
-      convSum += r['Taxa de Conversão'];
-      convCount++;
-    }
+    const base = Number(r['Base Total'] ?? 0) || 0;
+    total.baseTotal += base;
+    baseEnviada += base;
+    total.cartoes += Number(r['Cartões Gerados'] ?? 0) || 0;
+    total.propostas += Number(r['Propostas'] ?? 0) || 0;
+    total.aprovados += Number(r['Aprovados'] ?? 0) || 0;
+    total.custoTotal += rowCustoTotal(r);
   }
 
   total.cac = total.cartoes > 0 ? total.custoTotal / total.cartoes : 0;
-  total.taxaConversao = convCount > 0 ? convSum / convCount : 0;
+  // Conversão = Cartões ÷ Base Enviada (em %), consistente em todos os níveis.
+  total.taxaConversao = baseEnviada > 0 ? (total.cartoes / baseEnviada) * 100 : 0;
 
   return total;
 }
@@ -62,25 +73,30 @@ function buildNodeId(parts: string[]): string {
 }
 
 function buildDisparoNodes(rows: ActivityRow[], parentId: string, parentColor: string): TreeNode[] {
-  return rows.map((activity): TreeNode => ({
-    id: `disparo-${activity.id}`,
-    label: activity['Activity name / Taxonomia'] || activity.id,
-    type: 'disparo',
-    count: 1,
-    parentId,
-    metrics: {
-      baseTotal: activity['Base Total'] ?? 0,
-      cartoes: activity['Cartões Gerados'] ?? 0,
-      propostas: activity['Propostas'] ?? 0,
-      aprovados: activity['Aprovados'] ?? 0,
-      custoTotal: activity['Custo Total Campanha'] ?? 0,
-      cac: activity['CAC'] ?? 0,
-      taxaConversao: activity['Taxa de Conversão'] ?? 0,
-    },
-    children: [],
-    activityIds: [activity.id],
-    color: parentColor,
-  }));
+  return rows.map((activity): TreeNode => {
+    const base = Number(activity['Base Total'] ?? 0) || 0;
+    const cartoes = Number(activity['Cartões Gerados'] ?? 0) || 0;
+    const custoTotal = rowCustoTotal(activity);
+    return {
+      id: `disparo-${activity.id}`,
+      label: activity['Activity name / Taxonomia'] || activity.id,
+      type: 'disparo',
+      count: 1,
+      parentId,
+      metrics: {
+        baseTotal: base,
+        cartoes,
+        propostas: Number(activity['Propostas'] ?? 0) || 0,
+        aprovados: Number(activity['Aprovados'] ?? 0) || 0,
+        custoTotal,
+        cac: cartoes > 0 ? custoTotal / cartoes : 0,
+        taxaConversao: base > 0 ? (cartoes / base) * 100 : 0,
+      },
+      children: [],
+      activityIds: [activity.id],
+      color: parentColor,
+    };
+  });
 }
 
 function buildChildren(

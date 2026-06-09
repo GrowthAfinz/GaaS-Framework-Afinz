@@ -1,5 +1,5 @@
 import { Activity } from '../types/framework';
-import { CUSTO_UNITARIO_CANAL, CUSTO_UNITARIO_OFERTA } from '../constants/frameworkFields';
+import { getCustoUnitarioCanal, CUSTO_UNITARIO_OFERTA } from '../constants/frameworkFields';
 
 /**
  * Converte qualquer valor (string com "R$", "%", separador BR, número ou null)
@@ -68,20 +68,22 @@ export const deriveActivityMetrics = (activity: Activity): DerivedMetrics => {
     const aprovados = toNum(k.aprovados ?? raw['Aprovados']);
     const cartoes = toNum(k.cartoes ?? k.emissoes ?? raw['Cartões Gerados']);
 
-    // Custos unitários: usa o do banco, senão a tabela padrão por canal/oferta.
+    // Custos unitários: usa o do banco, senão a tabela padrão (por ano) por canal/oferta.
     const custoUnitarioCanal =
         toNum(raw['Custo unitário do canal']) ||
-        CUSTO_UNITARIO_CANAL[activity.canal as keyof typeof CUSTO_UNITARIO_CANAL] ||
-        0;
+        getCustoUnitarioCanal(activity.canal, activity.dataDisparo);
     const custoUnitarioOferta =
         toNum(raw['Custo Unitário Oferta']) ||
         CUSTO_UNITARIO_OFERTA[(activity.oferta || '') as keyof typeof CUSTO_UNITARIO_OFERTA] ||
         0;
 
-    // Custo Total: banco → senão Volume × (C.U. Oferta + C.U. Canal)
+    // Custo Total: banco → senão Base Entregue × (C.U. Oferta + C.U. Canal).
+    // Convenção do histórico: o custo incide sobre a base acionável/entregue
+    // (cai para a base enviada quando a entregue não está disponível).
+    const baseCusto = baseEntregue || baseEnviada;
     const custoTotal =
         toNum(k.custoTotal ?? raw['Custo Total Campanha']) ||
-        baseEnviada * (custoUnitarioOferta + custoUnitarioCanal);
+        baseCusto * (custoUnitarioOferta + custoUnitarioCanal);
 
     // CAC: banco → senão Custo Total ÷ Cartões
     const cac = toNum(k.cac ?? raw['CAC']) || safeDiv(custoTotal, cartoes);
@@ -103,7 +105,7 @@ export const deriveActivityMetrics = (activity: Activity): DerivedMetrics => {
         cac,
         taxaEntrega: toRate(k.taxaEntrega ?? raw['Taxa de Entrega']) || safeDiv(baseEntregue, baseEnviada),
         taxaAbertura: toRate(k.taxaAbertura ?? raw['Taxa de Abertura']) || safeDiv(aberturas, baseEntregue),
-        taxaClique: toRate(k.taxaClique ?? raw['Taxa de Clique']) || safeDiv(cliques, aberturas),
+        taxaClique: toRate(raw['Taxa de Clique']) || safeDiv(cliques, aberturas),
         taxaProposta: toRate(raw['Taxa de Proposta']) || safeDiv(propostas, baseEntregue),
         taxaAprovacao: toRate(k.taxaAprovacao ?? raw['Taxa de Aprovação']) || safeDiv(aprovados, propostas),
         taxaFinalizacao: toRate(k.taxaFinalizacao ?? raw['Taxa de Finalização']) || safeDiv(cartoes, aprovados),
