@@ -2,7 +2,9 @@ import React, { useMemo } from 'react';
 import { AlertCircle, TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { CalendarData } from '../../types/framework';
 import { Tooltip } from '../Tooltip';
-import { useBottleneckTrend, FunnelMetrics } from '../../hooks/useBottleneckTrend';
+import { useBottleneckTrend } from '../../hooks/useBottleneckTrend';
+import { useAppStore } from '../../store/useAppStore';
+import { getBottleneckStages, FunnelMetricsExt } from '../../constants/funnelConfig';
 
 interface BottleneckAnalysisProps {
     data: CalendarData;
@@ -15,14 +17,14 @@ interface BottleneckAnalysisProps {
 
 interface StageData {
     name: string;
-    prevKey: string;
-    key: string;
     value: number;
     prevValue: number;
     conversionRate: number;
     drop: number;
     isBottleneck: boolean;
     severity: 'critical' | 'warning' | 'ok';
+    causes: string[];
+    action: string;
     trend?: {
         value: number | null;
         direction: 'up' | 'down' | 'stable' | 'none';
@@ -38,13 +40,18 @@ export const BottleneckAnalysis: React.FC<BottleneckAnalysisProps> = ({
     selectedParceiros = []
 }) => {
     const { calcularTendencia } = useBottleneckTrend();
+    const frente = useAppStore((s) => s.viewSettings.frente);
 
-    const calculateMetrics = (dataset: CalendarData): FunnelMetrics => {
-        let totalBaseEnviada = 0;
-        let totalBaseEntregue = 0;
-        let totalPropostas = 0;
-        let totalAprovados = 0;
-        let totalEmissoes = 0;
+    const calculateMetrics = (dataset: CalendarData): FunnelMetricsExt => {
+        const m: FunnelMetricsExt = {
+            baseEnviada: 0,
+            baseEntregue: 0,
+            aberturas: 0,
+            cliques: 0,
+            propostas: 0,
+            aprovados: 0,
+            emissoes: 0,
+        };
 
         Object.values(dataset).forEach((activities) => {
             activities.forEach((activity) => {
@@ -53,21 +60,17 @@ export const BottleneckAnalysis: React.FC<BottleneckAnalysisProps> = ({
                 if (selectedSegmentos.length > 0 && !selectedSegmentos.includes(activity.segmento)) return;
                 if (selectedParceiros.length > 0 && !selectedParceiros.includes(activity.parceiro)) return;
 
-                totalBaseEnviada += activity.kpis.baseEnviada || 0;
-                totalBaseEntregue += activity.kpis.baseEntregue || 0;
-                totalPropostas += activity.kpis.propostas || 0;
-                totalAprovados += activity.kpis.aprovados || 0;
-                totalEmissoes += activity.kpis.emissoes || 0;
+                m.baseEnviada += activity.kpis.baseEnviada || 0;
+                m.baseEntregue += activity.kpis.baseEntregue || 0;
+                m.aberturas += activity.kpis.aberturas || 0;
+                m.cliques += activity.kpis.cliques || 0;
+                m.propostas += activity.kpis.propostas || 0;
+                m.aprovados += activity.kpis.aprovados || 0;
+                m.emissoes += activity.kpis.emissoes || 0;
             });
         });
 
-        return {
-            baseEnviada: totalBaseEnviada,
-            baseEntregue: totalBaseEntregue,
-            propostas: totalPropostas,
-            aprovados: totalAprovados,
-            emissoes: totalEmissoes
-        };
+        return m;
     };
 
     const analysis = useMemo(() => {
@@ -75,26 +78,11 @@ export const BottleneckAnalysis: React.FC<BottleneckAnalysisProps> = ({
         const previousMetrics = previousData ? calculateMetrics(previousData) : null;
 
         const trends = calcularTendencia(currentMetrics, previousMetrics);
-
-        const stagesDef = [
-            { name: 'Envio → Entrega', key: 'baseEntregue', prevKey: 'baseEnviada' },
-            { name: 'Entrega → Abertura', key: 'propostas', prevKey: 'baseEntregue' }, // Using Propostas as proxy for Abertura/Interest
-            { name: 'Abertura → Proposta', key: 'aprovados', prevKey: 'propostas' },
-            { name: 'Proposta → Emissão', key: 'emissoes', prevKey: 'aprovados' },
-        ];
+        const stagesDef = getBottleneckStages(frente);
 
         const result: StageData[] = stagesDef.map((stage) => {
-            let prev = 0;
-            if (stage.prevKey === 'baseEnviada') prev = currentMetrics.baseEnviada;
-            else if (stage.prevKey === 'baseEntregue') prev = currentMetrics.baseEntregue;
-            else if (stage.prevKey === 'propostas') prev = currentMetrics.propostas;
-            else if (stage.prevKey === 'aprovados') prev = currentMetrics.aprovados;
-
-            let current = 0;
-            if (stage.key === 'baseEntregue') current = currentMetrics.baseEntregue;
-            else if (stage.key === 'propostas') current = currentMetrics.propostas;
-            else if (stage.key === 'aprovados') current = currentMetrics.aprovados;
-            else if (stage.key === 'emissoes') current = currentMetrics.emissoes;
+            const prev = currentMetrics[stage.fromKey];
+            const current = currentMetrics[stage.toKey];
 
             const conversionRate = prev > 0 ? (current / prev) * 100 : 0;
             const drop = prev - current;
@@ -107,20 +95,20 @@ export const BottleneckAnalysis: React.FC<BottleneckAnalysisProps> = ({
 
             return {
                 name: stage.name,
-                prevKey: stage.prevKey,
-                key: stage.key,
                 value: current,
                 prevValue: prev,
                 conversionRate,
                 drop,
                 isBottleneck: severity !== 'ok',
                 severity,
+                causes: stage.causes,
+                action: stage.action,
                 trend: trendData ? { value: trendData.tendencia, direction: trendData.direcao } : undefined
             };
         });
 
         return result;
-    }, [data, previousData, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros]);
+    }, [data, previousData, frente, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros]);
 
     // Find the biggest bottleneck
     const biggestBottleneck = useMemo(() => {
@@ -129,34 +117,7 @@ export const BottleneckAnalysis: React.FC<BottleneckAnalysisProps> = ({
         return bottlenecks.reduce((prev, curr) => prev.conversionRate < curr.conversionRate ? prev : curr);
     }, [analysis]);
 
-    const getCausesAndActions = (stageName: string) => {
-        switch (stageName) {
-            case 'Envio → Entrega':
-                return {
-                    causes: ['Base desatualizada', 'Blacklist', 'Reputação do IP'],
-                    action: 'Higienizar base, verificar reputação'
-                };
-            case 'Entrega → Abertura':
-                return {
-                    causes: ['Assunto fraco', 'Horário ruim', 'Remetente desconhecido'],
-                    action: 'Teste A/B assunto e horário'
-                };
-            case 'Abertura → Proposta':
-                return {
-                    causes: ['Jornada confusa', 'CTA fraco', 'Instabilidade'],
-                    action: 'Verificar logs, revisar fluxo no app'
-                };
-            case 'Proposta → Emissão':
-                return {
-                    causes: ['Critério restritivo', 'Documentação complexa'],
-                    action: 'Revisar política com crédito'
-                };
-            default:
-                return { causes: [], action: '' };
-        }
-    };
-
-    const renderTrend = (trend?: { value: number | null, direction: 'up' | 'down' | 'stable' | 'none' }) => {
+    const renderTrend =(trend?: { value: number | null, direction: 'up' | 'down' | 'stable' | 'none' }) => {
         if (!trend || trend.value === null || trend.direction === 'none') return <span className="text-slate-500">-</span>;
 
         const { value, direction } = trend;
@@ -216,7 +177,7 @@ export const BottleneckAnalysis: React.FC<BottleneckAnalysisProps> = ({
                                     💡 Possíveis Causas
                                 </h4>
                                 <ul className="space-y-1">
-                                    {getCausesAndActions(biggestBottleneck.name).causes.map((cause, idx) => (
+                                    {biggestBottleneck.causes.map((cause, idx) => (
                                         <li key={idx} className="text-slate-700 text-sm flex items-start gap-2">
                                             <span className="text-slate-400 mt-1">•</span>
                                             {cause}
@@ -230,7 +191,7 @@ export const BottleneckAnalysis: React.FC<BottleneckAnalysisProps> = ({
                                     🎯 Ação Sugerida
                                 </h4>
                                 <p className="text-slate-700 text-sm">
-                                    {getCausesAndActions(biggestBottleneck.name).action}
+                                    {biggestBottleneck.action}
                                 </p>
                             </div>
                         </div>

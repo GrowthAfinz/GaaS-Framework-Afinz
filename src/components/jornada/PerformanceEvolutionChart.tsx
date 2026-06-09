@@ -14,6 +14,7 @@ import { format, startOfWeek, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Tooltip as InfoTooltip } from '../Tooltip';
 import { ChevronDown, Check } from 'lucide-react';
+import { useAppStore } from '../../store/useAppStore';
 
 interface PerformanceEvolutionChartProps {
     data: CalendarData;
@@ -29,12 +30,15 @@ type MetricType =
     | 'cac'
     | 'entrega'
     | 'abertura'
+    | 'clique'
     | 'envios'
     | 'entregas'
     | 'disparos'
     | 'propostas'
     | 'aprovados'
     | 'cartoes'
+    | 'aberturasQtd'
+    | 'cliques'
     | 'custoTotal';
 
 type GroupBy = 'daily' | 'weekly' | 'monthly';
@@ -43,9 +47,12 @@ const METRIC_CONFIGS: Record<MetricType, { label: string; color: string; group: 
     conversao: { label: 'Taxa de Conversão', color: '#3b82f6', group: 'Taxas & Eficiência' }, // Blue
     entrega: { label: 'Taxa de Entrega', color: '#10b981', group: 'Taxas & Eficiência' }, // Emerald
     abertura: { label: 'Taxa de Abertura / Interesse', color: '#f59e0b', group: 'Taxas & Eficiência' }, // Amber
+    clique: { label: 'Taxa de Clique', color: '#0ea5e9', group: 'Taxas & Eficiência' }, // Sky
     envios: { label: 'Qtd de Envios (Base)', color: '#ec4899', group: 'Volumetria' }, // Pink
     entregas: { label: 'Qtd de Entregas (Base)', color: '#8b5cf6', group: 'Volumetria' }, // Purple
     disparos: { label: 'Qtd de Disparos (Atividades)', color: '#06b6d4', group: 'Volumetria' }, // Cyan
+    aberturasQtd: { label: 'Qtd de Aberturas', color: '#f59e0b', group: 'Volumetria' }, // Amber
+    cliques: { label: 'Qtd de Cliques', color: '#0ea5e9', group: 'Volumetria' }, // Sky
     propostas: { label: 'Qtd de Propostas', color: '#a855f7', group: 'Volumetria' }, // Purple-light
     aprovados: { label: 'Qtd de Aprovados', color: '#14b8a6', group: 'Volumetria' }, // Teal
     cartoes: { label: 'Qtd de Cartões', color: '#6366f1', group: 'Volumetria' }, // Indigo
@@ -53,20 +60,32 @@ const METRIC_CONFIGS: Record<MetricType, { label: string; color: string; group: 
     custoTotal: { label: 'Custo Total Campanha', color: '#f43f5e', group: 'Financeiro' } // Rose
 };
 
-const METRIC_GROUPS = [
-    {
-        label: 'Taxas & Eficiência',
-        metrics: ['conversao', 'entrega', 'abertura'] as MetricType[]
-    },
-    {
-        label: 'Volumetria (Quantidades)',
-        metrics: ['disparos', 'envios', 'entregas', 'propostas', 'aprovados', 'cartoes'] as MetricType[]
-    },
-    {
-        label: 'Financeiro',
-        metrics: ['cac', 'custoTotal'] as MetricType[]
-    }
-];
+// Grupos de métricas por frente. Rentabilização foca em engajamento (sem CAC/Cartões).
+const getMetricGroups = (rentab: boolean) => rentab
+    ? [
+        {
+            label: 'Taxas & Eficiência',
+            metrics: ['entrega', 'abertura', 'clique'] as MetricType[]
+        },
+        {
+            label: 'Volumetria (Quantidades)',
+            metrics: ['disparos', 'envios', 'entregas', 'aberturasQtd', 'cliques'] as MetricType[]
+        }
+    ]
+    : [
+        {
+            label: 'Taxas & Eficiência',
+            metrics: ['conversao', 'entrega', 'abertura'] as MetricType[]
+        },
+        {
+            label: 'Volumetria (Quantidades)',
+            metrics: ['disparos', 'envios', 'entregas', 'propostas', 'aprovados', 'cartoes'] as MetricType[]
+        },
+        {
+            label: 'Financeiro',
+            metrics: ['cac', 'custoTotal'] as MetricType[]
+        }
+    ];
 
 const formatMetricValue = (val: number | string, metricType: MetricType) => {
     const num = Number(val);
@@ -75,7 +94,7 @@ const formatMetricValue = (val: number | string, metricType: MetricType) => {
     if (metricType === 'cac' || metricType === 'custoTotal') {
         return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    if (['conversao', 'entrega', 'abertura'].includes(metricType)) {
+    if (['conversao', 'entrega', 'abertura', 'clique'].includes(metricType)) {
         return `${num.toFixed(2)}%`;
     }
     return Math.round(num).toLocaleString('pt-BR');
@@ -89,10 +108,22 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
     selectedParceiros = [],
     onDayClick
 }) => {
-    const [selectedMetrics, setSelectedMetrics] = useState<MetricType[]>(['conversao']);
+    const frente = useAppStore((s) => s.viewSettings.frente);
+    const rentab = frente === 'rentabilizacao';
+    const metricGroups = useMemo(() => getMetricGroups(rentab), [rentab]);
+    const [selectedMetrics, setSelectedMetrics] = useState<MetricType[]>([rentab ? 'abertura' : 'conversao']);
     const [groupBy, setGroupBy] = useState<GroupBy>('daily');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Ao trocar de frente, garante que só métricas válidas fiquem selecionadas.
+    useEffect(() => {
+        const valid = new Set(metricGroups.flatMap(g => g.metrics));
+        setSelectedMetrics(prev => {
+            const filtered = prev.filter(m => valid.has(m));
+            return filtered.length > 0 ? filtered : [rentab ? 'abertura' : 'conversao'];
+        });
+    }, [metricGroups, rentab]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -164,6 +195,8 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                     timestamp,
                     baseEnviada: 0,
                     baseEntregue: 0,
+                    aberturas: 0,
+                    cliques: 0,
                     propostas: 0,
                     aprovados: 0,
                     cartoes: 0,
@@ -175,6 +208,8 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
             activities.forEach(activity => {
                 aggregated[key].baseEnviada += activity.kpis.baseEnviada || 0;
                 aggregated[key].baseEntregue += activity.kpis.baseEntregue || 0;
+                aggregated[key].aberturas += activity.kpis.aberturas || 0;
+                aggregated[key].cliques += activity.kpis.cliques || 0;
                 aggregated[key].propostas += activity.kpis.propostas || 0;
                 aggregated[key].aprovados += activity.kpis.aprovados || 0;
                 aggregated[key].cartoes += activity.kpis.cartoes || 0;
@@ -198,13 +233,23 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                         value = item.baseEnviada > 0 ? (item.baseEntregue / item.baseEnviada) * 100 : 0;
                         break;
                     case 'abertura':
-                        value = item.baseEntregue > 0 ? (item.propostas / item.baseEntregue) * 100 : 0;
+                        // Aquisição usa Propostas como proxy; Rentabilização usa aberturas reais.
+                        value = item.baseEntregue > 0 ? ((rentab ? item.aberturas : item.propostas) / item.baseEntregue) * 100 : 0;
+                        break;
+                    case 'clique':
+                        value = item.aberturas > 0 ? (item.cliques / item.aberturas) * 100 : 0;
                         break;
                     case 'envios':
                         value = item.baseEnviada;
                         break;
                     case 'entregas':
                         value = item.baseEntregue;
+                        break;
+                    case 'aberturasQtd':
+                        value = item.aberturas;
+                        break;
+                    case 'cliques':
+                        value = item.cliques;
                         break;
                     case 'disparos':
                         value = item.count;
@@ -228,7 +273,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
         }).sort((a, b) => a.timestamp - b.timestamp);
 
         return result;
-    }, [data, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros, groupBy, selectedMetrics]);
+    }, [data, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros, groupBy, selectedMetrics, rentab]);
 
     const stats = useMemo(() => {
         if (chartData.length === 0) return [];
@@ -309,7 +354,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
 
                         {isDropdownOpen && (
                             <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-[0_12px_32px_rgba(15,23,42,0.12)] z-30 p-2 max-h-[320px] overflow-y-auto">
-                                {METRIC_GROUPS.map(group => (
+                                {metricGroups.map(group => (
                                     <div key={group.label} className="mb-2 last:mb-0">
                                         <div className="px-2 py-1 text-[9px] text-slate-400 uppercase font-bold tracking-wider">
                                             {group.label}

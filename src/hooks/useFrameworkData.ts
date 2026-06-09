@@ -9,6 +9,7 @@ import { WorkerMessage, WorkerResponse } from '../workers/csvWorker';
 
 export const useFrameworkData = (): {
   data: CalendarData;
+  rentabilizacaoData: CalendarData;
   loading: boolean;
   error: string | null;
   totalActivities: number;
@@ -16,7 +17,7 @@ export const useFrameworkData = (): {
   loadSimulatedData: () => void;
   debugHeaders: string[];
 } => {
-  const { setFrameworkData, activities: storeActivities } = useAppStore();
+  const { setFrameworkData, activities: storeActivities, rentabilizacaoActivities: storeRentabActivities } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debugHeaders, setDebugHeaders] = useState<string[]>([]);
@@ -35,6 +36,19 @@ export const useFrameworkData = (): {
     });
     return grouped;
   }, [storeActivities]);
+
+  // Frente de Rentabilização: mesmo agrupamento por data, fonte separada.
+  const rentabilizacaoData = useMemo(() => {
+    const grouped: CalendarData = {};
+    storeRentabActivities.forEach((activity) => {
+      const dateKey = formatDateKey(activity.dataDisparo);
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(activity);
+    });
+    return grouped;
+  }, [storeRentabActivities]);
 
   const processCSV = useCallback((file: File, options?: { updateStore?: boolean }): Promise<any> => {
     return new Promise((resolve, reject) => {
@@ -150,16 +164,20 @@ export const useFrameworkData = (): {
       try {
         console.log('📡 Conectando ao Supabase para buscar dados...');
         import('../services/dataService').then(async ({ dataService }) => {
-          const [fetchedActivities, fetchedB2C, fetchedPaid, fetchedGoals] = await Promise.all([
+          const [fetchedActivities, fetchedRentab, fetchedB2C, fetchedPaid, fetchedGoals] = await Promise.all([
             dataService.fetchActivities(),
+            dataService.fetchRentabilizacaoActivities().catch((rentabErr) => {
+              console.warn('⚠️ Falha ao carregar rentabilizacao_activities:', rentabErr);
+              return [];
+            }),
             dataService.fetchB2CMetrics(),
             dataService.fetchPaidMedia(),
             dataService.fetchGoals()
           ]);
 
-          console.log(`✅ Dados Carregados: ${fetchedActivities.length} Atividades, ${fetchedB2C.length} B2C, ${fetchedPaid.length} Media, ${fetchedGoals.length} Metas.`);
+          console.log(`✅ Dados Carregados: ${fetchedActivities.length} Atividades, ${fetchedRentab.length} Rentabilização, ${fetchedB2C.length} B2C, ${fetchedPaid.length} Media, ${fetchedGoals.length} Metas.`);
 
-          const { activities: currentActivities, setActivities } = useAppStore.getState();
+          const { activities: currentActivities, setActivities, setRentabilizacaoActivities } = useAppStore.getState();
 
           if (fetchedActivities.length > 0) {
             setActivities(fetchedActivities);
@@ -169,6 +187,8 @@ export const useFrameworkData = (): {
           } else {
             console.log('⏭️ Supabase vazio, mantendo atividades locais.');
           }
+
+          setRentabilizacaoActivities(fetchedRentab);
 
           let finalB2C = fetchedB2C;
           if (fetchedB2C.length === 0) {
@@ -237,6 +257,7 @@ export const useFrameworkData = (): {
 
   return {
     data,
+    rentabilizacaoData,
     loading,
     error,
     totalActivities,

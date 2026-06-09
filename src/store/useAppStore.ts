@@ -22,7 +22,8 @@ const storage: StateStorage = {
 interface AppState {
     // Data
     frameworkData: FrameworkRow[];
-    activities: Activity[]; // Processed activities for easier consumption
+    activities: Activity[]; // Processed activities for easier consumption (frente: aquisição)
+    rentabilizacaoActivities: Activity[]; // Atividades da frente de rentabilização (tabela separada)
     goals: Goal[];
     journal: JournalEntry[];
 
@@ -32,6 +33,7 @@ interface AppState {
     // Actions
     setFrameworkData: (data: FrameworkRow[], activities: Activity[]) => void;
     setActivities: (activities: Activity[]) => void; // <--- ADDED
+    setRentabilizacaoActivities: (activities: Activity[]) => void;
     setGoals: (goals: Goal[]) => void;
     addJournalEntry: (entry: JournalEntry) => void;
     updateJournalEntry: (id: string, entry: Partial<JournalEntry>) => void;
@@ -47,6 +49,7 @@ interface AppState {
     setTab: (tab: ViewSettings['abaAtual']) => void;
     setPeriodo: (inicio: string, fim: string) => void;
     setPerspective: (perspective: ViewSettings['perspective']) => void;
+    setFrente: (frente: ViewSettings['frente']) => void;
 
     // B2C Actions
     b2cData: B2CDataRow[];
@@ -79,6 +82,7 @@ export const useAppStore = create<AppState>()(
         (set) => ({
             frameworkData: [],
             activities: [],
+            rentabilizacaoActivities: [],
             goals: [],
             journal: [],
 
@@ -87,16 +91,23 @@ export const useAppStore = create<AppState>()(
                 abaAtual: 'launch',
                 filtrosGlobais: INITIAL_FILTERS,
                 modoTempoJornada: 'diario',
-                perspective: 'crm'
+                perspective: 'crm',
+                frente: 'aquisicao'
             },
 
             setPerspective: (perspective) => set((state) => ({
                 viewSettings: { ...state.viewSettings, perspective }
             })),
 
+            setFrente: (frente) => set((state) => ({
+                viewSettings: { ...state.viewSettings, frente }
+            })),
+
             setFrameworkData: (data, activities) => set({ frameworkData: data, activities }),
 
             setActivities: (activities) => set({ activities }), // <--- ADDED IMPLEMENTATION
+
+            setRentabilizacaoActivities: (rentabilizacaoActivities) => set({ rentabilizacaoActivities }),
 
             setGoals: (goals) => set({ goals }),
 
@@ -160,11 +171,17 @@ export const useAppStore = create<AppState>()(
         }),
         {
             name: 'app-storage', // unique name
-            version: 2,
+            version: 3,
             migrate: (persisted: any, version: number) => {
                 if (version < 2) {
                     const fg = persisted?.viewSettings?.filtrosGlobais;
                     if (fg && !fg.subgrupos) fg.subgrupos = [];
+                }
+                if (version < 3) {
+                    // `frente` passou a ser obrigatório no ViewSettings.
+                    if (persisted?.viewSettings && !persisted.viewSettings.frente) {
+                        persisted.viewSettings.frente = 'aquisicao';
+                    }
                 }
                 return persisted;
             },
@@ -172,7 +189,7 @@ export const useAppStore = create<AppState>()(
             partialize: (state) => ({
                 // Select fields to persist (ONLY UI STATE)
                 journal: state.journal, // Ideally this moves to Supabase too (Fase 3)
-                viewSettings: { ...state.viewSettings, abaAtual: 'launch', perspective: 'crm' }, // Reverte para launch e CRM ao iniciar
+                viewSettings: { ...state.viewSettings, abaAtual: 'launch', perspective: 'crm', frente: 'aquisicao' }, // Reverte para launch, CRM e Aquisição ao iniciar
                 alertConfig: state.alertConfig
             }),
             onRehydrateStorage: () => (state) => {

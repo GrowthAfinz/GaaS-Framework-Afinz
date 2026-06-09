@@ -110,12 +110,17 @@ export interface JournalEntry {
   conclusao?: string;
 }
 
+/** Frente de campanha: aquisição (venda/emissão) vs rentabilização (pós-emissão). */
+export type Frente = "aquisicao" | "rentabilizacao";
+
 export interface ViewSettings {
   periodo: { inicio: string; fim: string };
   abaAtual: "launch" | "resultados" | "jornada" | "framework" | "diario" | "orientador" | "configuracoes" | "originacao-b2c" | "midia-paga" | "explorador" | "relatorio";
   filtrosGlobais: FilterState;
   modoTempoJornada: "diario" | "semanal";
   perspective: "total" | "crm" | "b2c";
+  /** Frente ativa para as abas de análise (Launch, Relatórios, Jornada). */
+  frente: Frente;
 }
 
 export type AnomalyType = 'pending' | 'no_sent' | 'no_delivered' | 'no_open';

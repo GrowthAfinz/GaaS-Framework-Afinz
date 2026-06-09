@@ -20,6 +20,7 @@ import {
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
 import { useAppStore } from '../../store/useAppStore';
 import { NavDropdown } from './NavDropdown';
+import { FrenteSwitcher } from './FrenteSwitcher';
 import { useBU, BU } from '../../contexts/BUContext';
 import { useUserRole } from '../../context/UserRoleContext';
 import { FullscreenButton } from '../ui/FullscreenButton';
@@ -51,9 +52,17 @@ const BU_DOT: Record<string, string> = {
 };
 
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
-    const { setTab, viewSettings } = useAppStore();
+    const { setTab, viewSettings, setFrente } = useAppStore();
     const activeTab = viewSettings.abaAtual;
     const { toggleBU, isBUSelected, isBULocked } = useBU();
+    const isSegurosSelected = isBUSelected('Seguros');
+
+    // Seguros = Rentabilização: ao selecionar a BU Seguros, força a frente.
+    useEffect(() => {
+        if (isSegurosSelected) {
+            setFrente('rentabilizacao');
+        }
+    }, [isSegurosSelected, setFrente]);
     const { canSeeTab } = useUserRole();
     const setPendingNavigation = useExplorerStore((s) => s.setPendingNavigation);
 
@@ -249,6 +258,12 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
                         ))}
                     </div>
                 </div>
+
+                {/* Divider */}
+                <div className="h-6 w-px bg-slate-200" />
+
+                {/* Frente Switch (Aquisição | Rentabilização) */}
+                <FrenteSwitcher />
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-slate-200" />

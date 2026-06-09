@@ -8,8 +8,10 @@ import { PeriodComparisonBanner } from './resultados/PeriodComparisonBanner';
 import { useGoals } from '../hooks/useGoals';
 import { useMonthComparison } from '../hooks/useMonthComparison';
 import { CalendarData, Activity } from '../types/framework';
-import { Target } from 'lucide-react';
+import { Target, TrendingUp } from 'lucide-react';
 import { DailyDetailsModal } from './jornada/DailyDetailsModal';
+import { aggregateMetrics } from '../utils/activityMetrics';
+import { useAppStore } from '../store/useAppStore';
 import { format } from 'date-fns';
 
 interface ResultadosViewProps {
@@ -21,6 +23,18 @@ interface ResultadosViewProps {
 export const ResultadosView: React.FC<ResultadosViewProps> = ({ resultados, data, selectedBU }) => {
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const { getGoal, saveGoal } = useGoals();
+  const rentab = useAppStore((s) => s.viewSettings.frente === 'rentabilizacao');
+
+  // Resumo de engajamento (frente Rentabilização) — Cartões/CAC não se aplicam.
+  const engajamento = useMemo(() => {
+    const agg = aggregateMetrics(Object.values(data).flat());
+    return {
+      ...agg,
+      taxaEntrega: agg.baseEnviada > 0 ? agg.baseEntregue / agg.baseEnviada : 0,
+      taxaAbertura: agg.baseEntregue > 0 ? agg.aberturas / agg.baseEntregue : 0,
+      taxaClique: agg.aberturas > 0 ? agg.cliques / agg.aberturas : 0,
+    };
+  }, [data]);
 
   // Modal State
   const [dailyModalOpen, setDailyModalOpen] = useState(false);
@@ -77,13 +91,21 @@ export const ResultadosView: React.FC<ResultadosViewProps> = ({ resultados, data
 
   const currentCAC = totalCartoes > 0 ? totalCusto / totalCartoes : 0;
 
-  if (Object.keys(resultados).length === 0) {
+  if (!rentab && Object.keys(resultados).length === 0) {
     return (
       <div className="text-center py-12 text-slate-500">
         Nenhum resultado registrado
       </div>
     );
   }
+
+  const engajamentoCards = [
+    { label: 'Disparos', value: engajamento.disparos.toLocaleString('pt-BR') },
+    { label: 'Base Enviada', value: Math.round(engajamento.baseEnviada).toLocaleString('pt-BR') },
+    { label: 'Base Entregue', value: Math.round(engajamento.baseEntregue).toLocaleString('pt-BR'), hint: `Entrega: ${(engajamento.taxaEntrega * 100).toFixed(1)}%` },
+    { label: 'Aberturas', value: Math.round(engajamento.aberturas).toLocaleString('pt-BR'), hint: `Abertura: ${(engajamento.taxaAbertura * 100).toFixed(1)}%`, accent: 'text-cyan-700' },
+    { label: 'Cliques', value: Math.round(engajamento.cliques).toLocaleString('pt-BR'), hint: `Clique: ${(engajamento.taxaClique * 100).toFixed(1)}%`, accent: 'text-emerald-600' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -95,42 +117,64 @@ export const ResultadosView: React.FC<ResultadosViewProps> = ({ resultados, data
       {/* 1. Análise de Distribuição */}
       <DistributionAnalysis data={data} />
 
-      {/* 2. Projections Section (Evolução + Projeção do Mês) */}
-      <ProjectionsSection
-        data={data}
-        currentGoal={currentGoal}
-        selectedBU={selectedBU}
-        onPointClick={(date) => {
-          const dateStr = format(date, 'yyyy-MM-dd');
-          handleDayClick(dateStr);
-        }}
-      />
-
-      {/* 3. Meta vs Realizado | Comparativo de Canais */}
-      <div className="grid grid-cols-1 gap-6">
+      {rentab ? (
+        /* Frente Rentabilização: resumo de engajamento (sem metas/CAC nesta fase) */
         <div className="bg-white border border-slate-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Target size={20} className="text-blue-400" />
-              Meta vs. Realizado <span className="text-slate-500 text-sm font-normal">({selectedBU || 'Global'})</span>
-            </h2>
-            <button
-              onClick={() => setIsGoalsModalOpen(true)}
-              className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
-            >
-              Definir Metas
-            </button>
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-1">
+            <TrendingUp size={20} className="text-emerald-500" />
+            Engajamento da Rentabilização <span className="text-slate-500 text-sm font-normal">({selectedBU || 'Global'})</span>
+          </h2>
+          <p className="text-xs text-slate-500 mb-6">Metas de rentabilização ainda não configuradas — exibindo desempenho de engajamento do período.</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {engajamentoCards.map((c) => (
+              <div key={c.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{c.label}</p>
+                <p className={`mt-2 font-mono text-2xl font-semibold ${c.accent || 'text-slate-900'}`}>{c.value}</p>
+                <p className="mt-1 text-xs text-slate-500">{c.hint || ' '}</p>
+              </div>
+            ))}
           </div>
-
-          <GoalsVisualization
-            goal={currentGoal}
-            currentCartoes={totalCartoes}
-            currentAprovacoes={totalAprovacoes}
-            currentCAC={currentCAC}
-            scope={selectedBU || 'Global'}
-          />
         </div>
-      </div>
+      ) : (
+        <>
+          {/* 2. Projections Section (Evolução + Projeção do Mês) */}
+          <ProjectionsSection
+            data={data}
+            currentGoal={currentGoal}
+            selectedBU={selectedBU}
+            onPointClick={(date) => {
+              const dateStr = format(date, 'yyyy-MM-dd');
+              handleDayClick(dateStr);
+            }}
+          />
+
+          {/* 3. Meta vs Realizado | Comparativo de Canais */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white border border-slate-200 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Target size={20} className="text-blue-400" />
+                  Meta vs. Realizado <span className="text-slate-500 text-sm font-normal">({selectedBU || 'Global'})</span>
+                </h2>
+                <button
+                  onClick={() => setIsGoalsModalOpen(true)}
+                  className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+                >
+                  Definir Metas
+                </button>
+              </div>
+
+              <GoalsVisualization
+                goal={currentGoal}
+                currentCartoes={totalCartoes}
+                currentAprovacoes={totalAprovacoes}
+                currentCAC={currentCAC}
+                scope={selectedBU || 'Global'}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Modal de Metas */}
       <GoalsModal

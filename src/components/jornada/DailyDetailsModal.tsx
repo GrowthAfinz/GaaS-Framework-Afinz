@@ -4,6 +4,7 @@ import { X, Edit2, Check, ExternalLink, ArrowRight, Layers } from 'lucide-react'
 import { deriveActivityMetrics, aggregateMetrics } from '../../utils/activityMetrics';
 import { useAppStore } from '../../store/useAppStore';
 import { useExplorerStore } from '../../store/explorerStore';
+import { getDailyFunnelSteps, isRentabilizacao } from '../../constants/funnelConfig';
 
 interface DailyDetailsModalProps {
     date: Date | null;
@@ -69,6 +70,9 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
     titleOverride,
 }) => {
     const setTab = useAppStore((s) => s.setTab);
+    const frente = useAppStore((s) => s.viewSettings.frente);
+    const rentab = isRentabilizacao(frente);
+    const funnelSteps = getDailyFunnelSteps(frente);
     const setPendingNavigation = useExplorerStore((s) => s.setPendingNavigation);
 
     if (!date && !titleOverride) return null;
@@ -128,15 +132,23 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
                 </div>
 
                 {/* ── Resumo do dia ──────────────────────────────────── */}
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-px bg-slate-200 border-b border-slate-200 shrink-0">
-                    {[
-                        { label: 'Enviado', value: fmtInt(summary.baseEnviada) },
-                        { label: 'Entregue', value: fmtInt(summary.baseEntregue) },
-                        { label: 'Cartões', value: fmtInt(summary.cartoes), accent: 'text-cyan-700' },
-                        { label: 'Conversão', value: fmtPct(summary.taxaConversao), accent: 'text-emerald-600' },
-                        { label: 'Custo Total', value: fmtBRL(summary.custoTotal) },
-                        { label: 'CAC médio', value: fmtBRL(summary.cac) },
-                    ].map((kpi) => (
+                <div className={`grid grid-cols-3 ${rentab ? 'sm:grid-cols-4' : 'sm:grid-cols-6'} gap-px bg-slate-200 border-b border-slate-200 shrink-0`}>
+                    {(rentab
+                        ? [
+                            { label: 'Enviado', value: fmtInt(summary.baseEnviada) },
+                            { label: 'Entregue', value: fmtInt(summary.baseEntregue) },
+                            { label: 'Aberturas', value: fmtInt(summary.aberturas), accent: 'text-cyan-700' },
+                            { label: 'Cliques', value: fmtInt(summary.cliques), accent: 'text-emerald-600' },
+                        ]
+                        : [
+                            { label: 'Enviado', value: fmtInt(summary.baseEnviada) },
+                            { label: 'Entregue', value: fmtInt(summary.baseEntregue) },
+                            { label: 'Cartões', value: fmtInt(summary.cartoes), accent: 'text-cyan-700' },
+                            { label: 'Conversão', value: fmtPct(summary.taxaConversao), accent: 'text-emerald-600' },
+                            { label: 'Custo Total', value: fmtBRL(summary.custoTotal) },
+                            { label: 'CAC médio', value: fmtBRL(summary.cac) },
+                        ]
+                    ).map((kpi) => (
                         <div key={kpi.label} className="bg-white px-3 py-2.5 text-center">
                             <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{kpi.label}</div>
                             <div className={`text-sm font-bold tabular-nums ${kpi.accent ?? 'text-slate-900'}`}>{kpi.value}</div>
@@ -209,38 +221,52 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
                                     </div>
                                 </div>
 
-                                {/* Linha 2: funil completo */}
+                                {/* Linha 2: funil (por frente) */}
                                 <div className="flex items-start justify-between gap-1 bg-slate-50/70 rounded-lg px-3 py-2.5 overflow-x-auto">
-                                    <FunnelStep label="Enviado" value={m.baseEnviada} />
-                                    <FunnelArrow />
-                                    <FunnelStep label="Entregue" value={m.baseEntregue} rate={fmtPct(m.taxaEntrega)} />
-                                    <FunnelArrow />
-                                    <FunnelStep label="Aberturas" value={m.aberturas} rate={fmtPct(m.taxaAbertura)} />
-                                    <FunnelArrow />
-                                    <FunnelStep label="Cliques" value={m.cliques} rate={fmtPct(m.taxaClique)} />
-                                    <FunnelArrow />
-                                    <FunnelStep label="Propostas" value={m.propostas} rate={fmtPct(m.taxaProposta)} />
-                                    <FunnelArrow />
-                                    <FunnelStep label="Aprovados" value={m.aprovados} rate={fmtPct(m.taxaAprovacao)} />
-                                    <FunnelArrow />
-                                    <FunnelStep label="Cartões" value={m.cartoes} rate={fmtPct(m.taxaFinalizacao)} accent="text-cyan-700" />
+                                    {funnelSteps.map((step, i) => (
+                                        <React.Fragment key={step.label}>
+                                            {i > 0 && <FunnelArrow />}
+                                            <FunnelStep
+                                                label={step.label}
+                                                value={m[step.valueKey]}
+                                                rate={step.rateKey ? fmtPct(m[step.rateKey]) : undefined}
+                                                accent={step.accent}
+                                            />
+                                        </React.Fragment>
+                                    ))}
                                 </div>
 
-                                {/* Linha 3: resultado financeiro + dimensões de oferta */}
+                                {/* Linha 3: resultado financeiro (só Aquisição) + dimensões de oferta */}
                                 <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
                                     <div className="flex flex-wrap gap-2">
-                                        <div className="px-3 py-1.5 bg-emerald-50 rounded-lg">
-                                            <span className="text-[9px] uppercase text-emerald-600 font-semibold block">Conversão</span>
-                                            <span className="text-xs font-bold text-emerald-700 tabular-nums">{fmtPct(m.taxaConversao)}</span>
-                                        </div>
-                                        <div className="px-3 py-1.5 bg-slate-100 rounded-lg">
-                                            <span className="text-[9px] uppercase text-slate-500 font-semibold block">Custo Total</span>
-                                            <span className="text-xs font-bold text-slate-800 tabular-nums">{fmtBRL(m.custoTotal)}</span>
-                                        </div>
-                                        <div className="px-3 py-1.5 bg-slate-100 rounded-lg">
-                                            <span className="text-[9px] uppercase text-slate-500 font-semibold block">CAC</span>
-                                            <span className="text-xs font-bold text-slate-800 tabular-nums">{fmtBRL(m.cac)}</span>
-                                        </div>
+                                        {!rentab && (
+                                            <>
+                                                <div className="px-3 py-1.5 bg-emerald-50 rounded-lg">
+                                                    <span className="text-[9px] uppercase text-emerald-600 font-semibold block">Conversão</span>
+                                                    <span className="text-xs font-bold text-emerald-700 tabular-nums">{fmtPct(m.taxaConversao)}</span>
+                                                </div>
+                                                <div className="px-3 py-1.5 bg-slate-100 rounded-lg">
+                                                    <span className="text-[9px] uppercase text-slate-500 font-semibold block">Custo Total</span>
+                                                    <span className="text-xs font-bold text-slate-800 tabular-nums">{fmtBRL(m.custoTotal)}</span>
+                                                </div>
+                                                <div className="px-3 py-1.5 bg-slate-100 rounded-lg">
+                                                    <span className="text-[9px] uppercase text-slate-500 font-semibold block">CAC</span>
+                                                    <span className="text-xs font-bold text-slate-800 tabular-nums">{fmtBRL(m.cac)}</span>
+                                                </div>
+                                            </>
+                                        )}
+                                        {rentab && (
+                                            <>
+                                                <div className="px-3 py-1.5 bg-cyan-50 rounded-lg">
+                                                    <span className="text-[9px] uppercase text-cyan-600 font-semibold block">Taxa de Abertura</span>
+                                                    <span className="text-xs font-bold text-cyan-700 tabular-nums">{fmtPct(m.taxaAbertura)}</span>
+                                                </div>
+                                                <div className="px-3 py-1.5 bg-emerald-50 rounded-lg">
+                                                    <span className="text-[9px] uppercase text-emerald-600 font-semibold block">Taxa de Clique</span>
+                                                    <span className="text-xs font-bold text-emerald-700 tabular-nums">{fmtPct(m.taxaClique)}</span>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                     <div className="flex flex-wrap gap-1.5 justify-end">
                                         <DimChip label="Oferta" value={activity.oferta} />

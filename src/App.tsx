@@ -143,7 +143,18 @@ function App() {
   const { startDate, endDate, compareEnabled, compareMode } = usePeriod();
   const { selectedBUs } = useBU();
 
-  const { data, loading, error, totalActivities, processCSV, loadSimulatedData } = useFrameworkData();
+  const { data, rentabilizacaoData, loading, error, totalActivities, processCSV, loadSimulatedData } = useFrameworkData();
+
+  // Frente ativa: nas abas em escopo (Launch, Relatórios, Resultados, Jornada),
+  // Rentabilização troca a fonte para rentabilizacao_activities. Demais abas
+  // sempre usam a frente de Aquisição (comportamento inalterado).
+  const frente = viewSettings.frente;
+  const sourceData = useMemo(() => {
+    const FRENTE_SCOPED_TABS = new Set(['launch', 'relatorio', 'resultados', 'jornada']);
+    return frente === 'rentabilizacao' && FRENTE_SCOPED_TABS.has(activeTab)
+      ? rentabilizacaoData
+      : data;
+  }, [frente, activeTab, data, rentabilizacaoData]);
 
   const filters = useMemo(() => ({
     ...storeFilters,
@@ -170,7 +181,7 @@ function App() {
     countBySubgrupo,
     totalRemainingDisparos
   } = useAdvancedFilters(
-    shouldRunFilters ? data : {},
+    shouldRunFilters ? sourceData : {},
     filters
   );
 
@@ -216,12 +227,12 @@ function App() {
   }), [storeFilters, selectedBUs]);
 
   const { filteredData: launchPlannerData } = useAdvancedFilters(
-    activeTab === 'launch' ? data : {},
+    activeTab === 'launch' ? sourceData : {},
     launchPlannerFilters
   );
 
   const { filteredData: previousAdvancedFilteredData } = useAdvancedFilters(
-    (shouldRunFilters && previousFilters) ? data : {},
+    (shouldRunFilters && previousFilters) ? sourceData : {},
     previousFilters || {}
   );
 
@@ -232,7 +243,7 @@ function App() {
 
   const resultados = useResultadosMetrics(filteredData);
 
-  const hasData = Object.keys(data).length > 0;
+  const hasData = Object.keys(data).length > 0 || Object.keys(rentabilizacaoData).length > 0;
 
   if (authLoading) {
     return <div className="h-screen w-full bg-slate-50 text-slate-500 flex items-center justify-center">Carregando...</div>;

@@ -261,6 +261,35 @@ export const dataService = {
         return allRows.map(mapSqlToActivity);
     },
 
+    /** Frente de Rentabilização: lê a tabela `rentabilizacao_activities`.
+     *  Mesma estrutura de `fetchActivities` — reusa `mapSqlToActivity` (os KPIs de
+     *  engajamento: baseEnviada/baseEntregue/aberturas/cliques já são mapeados). */
+    async fetchRentabilizacaoActivities(): Promise<Activity[]> {
+        const allRows: any[] = [];
+        let from = 0;
+
+        while (true) {
+            const to = from + PAGE_SIZE - 1;
+            const { data, error } = await supabase
+                .from('rentabilizacao_activities')
+                .select('*')
+                .order('Data de Disparo', { ascending: false })
+                .range(from, to);
+
+            if (error) throw error;
+
+            const page = data || [];
+            if (page.length === 0) break;
+
+            allRows.push(...page);
+
+            if (page.length < PAGE_SIZE) break;
+            from += PAGE_SIZE;
+        }
+
+        return allRows.map(mapSqlToActivity);
+    },
+
     async fetchB2CMetrics(): Promise<B2CDataRow[]> {
         const { data: typedData, error: typedError } = await supabase
             .from('b2c_daily')

@@ -32,6 +32,7 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
 
   const { viewSettings, setGlobalFilters } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
+  const rentab = viewSettings.frente === 'rentabilizacao';
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -45,6 +46,8 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
   const kpis = useMemo(() => {
     let totalBaseEnviada = 0;
     let totalBaseEntregue = 0;
+    let totalAberturas = 0;
+    let totalCliques = 0;
     let totalPropostas = 0;
     let totalAprovados = 0;
     let totalCartoes = 0;
@@ -55,6 +58,8 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
       activities.forEach((activity) => {
         totalBaseEnviada += activity.kpis.baseEnviada || 0;
         totalBaseEntregue += activity.kpis.baseEntregue || 0;
+        totalAberturas += activity.kpis.aberturas || 0;
+        totalCliques += activity.kpis.cliques || 0;
         totalPropostas += activity.kpis.propostas || 0;
         totalAprovados += activity.kpis.aprovados || 0;
         totalCartoes += activity.kpis.cartoes || 0;
@@ -64,7 +69,11 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
     });
 
     const taxaEntrega = totalBaseEnviada > 0 ? (totalBaseEntregue / totalBaseEnviada) * 100 : 0;
-    const taxaAbertura = totalBaseEntregue > 0 ? (totalPropostas / totalBaseEntregue) * 100 : 0;
+    // Aquisição usa Propostas como proxy de abertura; Rentabilização usa aberturas reais.
+    const taxaAbertura = totalBaseEntregue > 0
+      ? ((rentab ? totalAberturas : totalPropostas) / totalBaseEntregue) * 100
+      : 0;
+    const taxaClique = totalAberturas > 0 ? (totalCliques / totalAberturas) * 100 : 0;
     const taxaAprovação = totalPropostas > 0 ? (totalAprovados / totalPropostas) * 100 : 0;
     const taxaConversao = totalBaseEnviada > 0 ? (totalCartoes / totalBaseEnviada) * 100 : 0;
     const cacMedio = totalCartoes > 0 ? totalCusto / totalCartoes : 0;
@@ -72,6 +81,8 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
     return {
       baseEnviada: totalBaseEnviada,
       baseEntregue: totalBaseEntregue,
+      aberturas: totalAberturas,
+      cliques: totalCliques,
       propostas: totalPropostas,
       aprovados: totalAprovados,
       cartoes: totalCartoes,
@@ -79,11 +90,12 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
       atividades: totalAtividades,
       taxaEntrega,
       taxaAbertura,
+      taxaClique,
       taxaAprovação,
       taxaConversao,
       cacMedio
     };
-  }, [data]);
+  }, [data, rentab]);
 
   const toggleAnomalyFilter = (filter: AnomalyType) => {
     setSelectedAnomalyFilters((prev) =>
@@ -268,16 +280,33 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
           <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.taxaEntrega.toFixed(1)}%</p>
           <p className="mt-1 text-xs text-slate-500">Sucesso no recebimento</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Cartões Gerados</p>
-          <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.cartoes.toLocaleString('pt-BR')}</p>
-          <p className="mt-1 text-xs text-slate-500">Emissões finais validadas</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">CAC Médio & Custo</p>
-          <p className="mt-2 font-mono text-2xl font-semibold text-slate-900">R$ {kpis.cacMedio.toFixed(2)}</p>
-          <p className="mt-1 text-xs text-slate-500">Total: R$ {Math.round(kpis.custo).toLocaleString('pt-BR')}</p>
-        </div>
+        {rentab ? (
+          <>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Aberturas</p>
+              <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.aberturas.toLocaleString('pt-BR')}</p>
+              <p className="mt-1 text-xs text-slate-500">Taxa: {kpis.taxaAbertura.toFixed(1)}%</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Cliques &amp; Taxa</p>
+              <p className="mt-2 font-mono text-2xl font-semibold text-slate-900">{kpis.cliques.toLocaleString('pt-BR')}</p>
+              <p className="mt-1 text-xs text-slate-500">Taxa de Clique: {kpis.taxaClique.toFixed(1)}%</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Cartões Gerados</p>
+              <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.cartoes.toLocaleString('pt-BR')}</p>
+              <p className="mt-1 text-xs text-slate-500">Emissões finais validadas</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">CAC Médio & Custo</p>
+              <p className="mt-2 font-mono text-2xl font-semibold text-slate-900">R$ {kpis.cacMedio.toFixed(2)}</p>
+              <p className="mt-1 text-xs text-slate-500">Total: R$ {Math.round(kpis.custo).toLocaleString('pt-BR')}</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Seção de Gráficos Lado a Lado (Salesforce style) */}
