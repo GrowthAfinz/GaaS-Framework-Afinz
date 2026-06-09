@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart2, AlertTriangle } from 'lucide-react';
+import { BarChart2, AlertTriangle, Filter, X } from 'lucide-react';
 import { CalendarData, AnomalyType } from '../types/framework';
 import { JornadaChart } from './JornadaChart';
 import { DailyDetailsModal } from './jornada/DailyDetailsModal';
 import { PerformanceEvolutionChart } from './jornada/PerformanceEvolutionChart';
+import { BottleneckAnalysis } from './jornada/BottleneckAnalysis';
 import { Tooltip } from './Tooltip';
 import { format } from 'date-fns';
+import { useAppStore } from '../store/useAppStore';
 
 interface JornadaDisparosViewProps {
   data: CalendarData;
@@ -18,7 +20,7 @@ interface JornadaDisparosViewProps {
 
 export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
   data,
-  // previousData,
+  previousData,
   selectedBU,
   selectedCanais = [],
   selectedSegmentos = [],
@@ -27,6 +29,61 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
   const [chartMode, setChartMode] = useState<'performance' | 'anomalies'>('performance');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedAnomalyFilters, setSelectedAnomalyFilters] = useState<AnomalyType[]>([]);
+
+  const { viewSettings, setGlobalFilters } = useAppStore();
+  const globalFilters = viewSettings.filtrosGlobais;
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      (globalFilters.bu ?? []).length > 0 ||
+      (globalFilters.canais ?? []).length > 0 ||
+      (globalFilters.segmentos ?? []).length > 0 ||
+      (globalFilters.parceiros ?? []).length > 0
+    );
+  }, [globalFilters]);
+
+  const kpis = useMemo(() => {
+    let totalBaseEnviada = 0;
+    let totalBaseEntregue = 0;
+    let totalPropostas = 0;
+    let totalAprovados = 0;
+    let totalCartoes = 0;
+    let totalCusto = 0;
+    let totalAtividades = 0;
+
+    Object.values(data).forEach((activities) => {
+      activities.forEach((activity) => {
+        totalBaseEnviada += activity.kpis.baseEnviada || 0;
+        totalBaseEntregue += activity.kpis.baseEntregue || 0;
+        totalPropostas += activity.kpis.propostas || 0;
+        totalAprovados += activity.kpis.aprovados || 0;
+        totalCartoes += activity.kpis.cartoes || 0;
+        totalCusto += activity.kpis.custoTotal || 0;
+        totalAtividades += 1;
+      });
+    });
+
+    const taxaEntrega = totalBaseEnviada > 0 ? (totalBaseEntregue / totalBaseEnviada) * 100 : 0;
+    const taxaAbertura = totalBaseEntregue > 0 ? (totalPropostas / totalBaseEntregue) * 100 : 0;
+    const taxaAprovação = totalPropostas > 0 ? (totalAprovados / totalPropostas) * 100 : 0;
+    const taxaConversao = totalBaseEnviada > 0 ? (totalCartoes / totalBaseEnviada) * 100 : 0;
+    const cacMedio = totalCartoes > 0 ? totalCusto / totalCartoes : 0;
+
+    return {
+      baseEnviada: totalBaseEnviada,
+      baseEntregue: totalBaseEntregue,
+      propostas: totalPropostas,
+      aprovados: totalAprovados,
+      cartoes: totalCartoes,
+      custo: totalCusto,
+      atividades: totalAtividades,
+      taxaEntrega,
+      taxaAbertura,
+      taxaAprovação,
+      taxaConversao,
+      cacMedio
+    };
+  }, [data]);
 
   const toggleAnomalyFilter = (filter: AnomalyType) => {
     setSelectedAnomalyFilters((prev) =>
@@ -50,7 +107,7 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
   }, [data, selectedDate, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex flex-col gap-6 bg-slate-50 p-6">
       <DailyDetailsModal
         date={selectedDate}
         activities={selectedActivities}
@@ -66,7 +123,7 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
           </h1>
           <p className="text-sm text-slate-500">Análise profunda de conversão e identificação de gargalos</p>
           <p className="text-xs text-slate-500 mt-1">
-            Total Activities: {Object.values(data).reduce((acc, curr) => acc + curr.length, 0)}
+            Total de Atividades no Período: {Object.values(data).reduce((acc, curr) => acc + curr.length, 0)}
           </p>
         </div>
 
@@ -132,33 +189,128 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
         </div>
       </div>
 
-      <JornadaChart
-        data={data}
-        mode={chartMode}
-        anomalyFilters={selectedAnomalyFilters}
-        onPointClick={setSelectedDate}
-      />
+      {/* Registro de Filtros Aplicados (Salesforce Style) */}
+      {hasActiveFilters && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-[0_8px_24px_rgba(15,23,42,0.02)] flex flex-wrap items-center gap-3">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <Filter size={14} className="text-slate-400" />
+            Filtros Ativos:
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {(globalFilters.bu ?? []).map((buItem) => (
+              <span key={`bu-${buItem}`} className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-700 text-xs px-2.5 py-1 rounded-full font-semibold">
+                BU: {buItem}
+                <button
+                  onClick={() => setGlobalFilters({ bu: globalFilters.bu.filter((x) => x !== buItem) })}
+                  className="hover:bg-blue-100 rounded-full p-0.5 transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            {(globalFilters.canais ?? []).map((channelItem) => (
+              <span key={`canal-${channelItem}`} className="inline-flex items-center gap-1 bg-teal-50 border border-teal-100 text-teal-700 text-xs px-2.5 py-1 rounded-full font-semibold">
+                Canal: {channelItem}
+                <button
+                  onClick={() => setGlobalFilters({ canais: globalFilters.canais.filter((x) => x !== channelItem) })}
+                  className="hover:bg-teal-100 rounded-full p-0.5 transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            {(globalFilters.segmentos ?? []).map((segItem) => (
+              <span key={`seg-${segItem}`} className="inline-flex items-center gap-1 bg-purple-50 border border-purple-100 text-purple-700 text-xs px-2.5 py-1 rounded-full font-semibold max-w-[200px]">
+                <span className="truncate">Campanha: {segItem}</span>
+                <button
+                  onClick={() => setGlobalFilters({ segmentos: globalFilters.segmentos.filter((x) => x !== segItem) })}
+                  className="hover:bg-purple-100 rounded-full p-0.5 transition-colors flex-shrink-0"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            {(globalFilters.parceiros ?? []).map((parcItem) => (
+              <span key={`parc-${parcItem}`} className="inline-flex items-center gap-1 bg-amber-50 border border-amber-100 text-amber-700 text-xs px-2.5 py-1 rounded-full font-semibold">
+                Parceiro: {parcItem}
+                <button
+                  onClick={() => setGlobalFilters({ parceiros: globalFilters.parceiros.filter((x) => x !== parcItem) })}
+                  className="hover:bg-amber-100 rounded-full p-0.5 transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <button
+            onClick={() => setGlobalFilters({ bu: [], canais: [], segmentos: [], parceiros: [], subgrupos: [], ofertas: [] })}
+            className="text-xs text-red-500 hover:text-red-700 font-bold ml-auto"
+          >
+            Limpar Filtros
+          </button>
+        </div>
+      )}
 
-      <PerformanceEvolutionChart
-        data={data}
-        selectedBU={selectedBU}
-        selectedCanais={selectedCanais}
-        selectedSegmentos={selectedSegmentos}
-        selectedParceiros={selectedParceiros}
-        onDayClick={(dateStr) => {
-          const date = new Date(`${dateStr}T00:00:00`);
-          setSelectedDate(date);
-        }}
-      />
+      {/* Painel de KPIs Ponderados */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Atividades no Período</p>
+          <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.atividades}</p>
+          <p className="mt-1 text-xs text-slate-500">Disparos no escopo</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Volume Acionado (Base)</p>
+          <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.baseEnviada.toLocaleString('pt-BR')}</p>
+          <p className="mt-1 text-xs text-slate-500">Total de clientes enviados</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Taxa de Entrega Média</p>
+          <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.taxaEntrega.toFixed(1)}%</p>
+          <p className="mt-1 text-xs text-slate-500">Sucesso no recebimento</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Cartões Gerados</p>
+          <p className="mt-2 font-mono text-3xl font-semibold text-slate-900">{kpis.cartoes.toLocaleString('pt-BR')}</p>
+          <p className="mt-1 text-xs text-slate-500">Emissões finais validadas</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">CAC Médio & Custo</p>
+          <p className="mt-2 font-mono text-2xl font-semibold text-slate-900">R$ {kpis.cacMedio.toFixed(2)}</p>
+          <p className="mt-1 text-xs text-slate-500">Total: R$ {Math.round(kpis.custo).toLocaleString('pt-BR')}</p>
+        </div>
+      </div>
 
-      {/* <BottleneckAnalysis
-        data={selectedActivities.length > 0 ? { [selectedDate?.toISOString().split('T')[0] || '']: selectedActivities } : data}
+      {/* Seção de Gráficos Lado a Lado (Salesforce style) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <JornadaChart
+          data={data}
+          mode={chartMode}
+          anomalyFilters={selectedAnomalyFilters}
+          onPointClick={setSelectedDate}
+        />
+
+        <PerformanceEvolutionChart
+          data={data}
+          selectedBU={selectedBU}
+          selectedCanais={selectedCanais}
+          selectedSegmentos={selectedSegmentos}
+          selectedParceiros={selectedParceiros}
+          onDayClick={(dateStr) => {
+            const date = new Date(`${dateStr}T00:00:00`);
+            setSelectedDate(date);
+          }}
+        />
+      </div>
+
+      {/* Análise de Gargalos (Funil de Jornada) */}
+      <BottleneckAnalysis
+        data={data}
         previousData={previousData}
         selectedBU={selectedBU}
         selectedCanais={selectedCanais}
         selectedSegmentos={selectedSegmentos}
         selectedParceiros={selectedParceiros}
-      /> */}
+      />
     </div>
   );
 };

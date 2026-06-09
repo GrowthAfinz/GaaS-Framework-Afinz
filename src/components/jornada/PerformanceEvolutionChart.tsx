@@ -145,7 +145,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
     }, [chartData]);
 
     return (
-        <div className="bg-white border border-slate-200 rounded-lg p-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                 <div>
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">

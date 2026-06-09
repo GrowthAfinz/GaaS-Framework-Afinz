@@ -120,18 +120,18 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
-                <div className="bg-slate-800 border border-slate-700 p-3 rounded shadow-lg">
-                    <p className="text-slate-200 font-bold mb-2">{label}</p>
+                <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+                    <p className="text-slate-800 font-bold mb-2">{label}</p>
                     {payload.map((entry: any) => (
                         <div key={entry.name} className="flex items-center gap-2 text-sm">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                            <span className="text-slate-400 capitalize">{entry.name}:</span>
-                            <span className="text-slate-200 font-mono font-bold">
+                            <span className="text-slate-500 capitalize">{entry.name}:</span>
+                            <span className="text-slate-800 font-mono font-bold">
                                 {entry.value.toLocaleString('pt-BR')}
                             </span>
                         </div>
                     ))}
-                    <p className="text-xs text-slate-500 mt-2 italic">Clique para ver detalhes</p>
+                    <p className="text-xs text-slate-400 mt-2 italic">Clique para ver detalhes</p>
                 </div>
             );
         }
@@ -139,18 +139,18 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
     };
 
     return (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
             <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-slate-100">
+                <h2 className="text-lg font-bold text-slate-800">
                     {mode === 'performance' ? 'Evolução de Performance' : 'Evolução de Anomalias'}
                 </h2>
 
-                <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+                <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200">
                     <button
                         onClick={() => setGroupBy('daily')}
                         className={`px-3 py-1 text-xs font-medium rounded transition ${groupBy === 'daily'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-400 hover:text-slate-200'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800'
                             }`}
                     >
                         Diário
@@ -158,8 +158,8 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                     <button
                         onClick={() => setGroupBy('weekly')}
                         className={`px-3 py-1 text-xs font-medium rounded transition ${groupBy === 'weekly'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-400 hover:text-slate-200'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800'
                             }`}
                     >
                         Semanal
@@ -167,22 +167,22 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                 </div>
             </div>
 
-            <div className="h-[400px] w-full cursor-pointer">
+            <div className="h-[300px] w-full cursor-pointer">
                 <ResponsiveContainer width="100%" height="100%">
                     {mode === 'performance' ? (
                         <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} onClick={handleChartClick}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                             <XAxis
                                 dataKey="label"
-                                stroke="#94a3b8"
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                stroke="#64748b"
+                                tick={{ fill: '#64748b', fontSize: 12 }}
                                 tickLine={false}
                                 axisLine={false}
                                 minTickGap={30}
                             />
                             <YAxis
-                                stroke="#94a3b8"
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                stroke="#64748b"
+                                tick={{ fill: '#64748b', fontSize: 12 }}
                                 tickLine={false}
                                 axisLine={false}
                                 tickFormatter={(value) => value.toLocaleString('pt-BR')}
@@ -198,7 +198,7 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                                 dataKey="propostas"
                                 name="Propostas"
                                 stroke="#8b5cf6" // Purple
-                                strokeWidth={2}
+                                strokeWidth={2.5}
                                 dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 0 }}
                                 activeDot={{ r: 6 }}
                                 hide={!visibleLines.propostas}
@@ -208,7 +208,7 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                                 dataKey="aprovados"
                                 name="Aprovados"
                                 stroke="#10b981" // Emerald
-                                strokeWidth={2}
+                                strokeWidth={2.5}
                                 dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
                                 activeDot={{ r: 6 }}
                                 hide={!visibleLines.aprovados}
@@ -218,7 +218,7 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                                 dataKey="cartoes"
                                 name="Cartões"
                                 stroke="#3b82f6" // Blue
-                                strokeWidth={2}
+                                strokeWidth={2.5}
                                 dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
                                 activeDot={{ r: 6 }}
                                 hide={!visibleLines.cartoes}
@@ -226,18 +226,18 @@ export const JornadaChart: React.FC<JornadaChartProps> = ({ data, mode, anomalyF
                         </LineChart>
                     ) : (
                         <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }} onClick={handleChartClick}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                             <XAxis
                                 dataKey="label"
-                                stroke="#94a3b8"
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                stroke="#64748b"
+                                tick={{ fill: '#64748b', fontSize: 12 }}
                                 tickLine={false}
                                 axisLine={false}
                                 minTickGap={30}
                             />
                             <YAxis
-                                stroke="#94a3b8"
-                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                stroke="#64748b"
+                                tick={{ fill: '#64748b', fontSize: 12 }}
                                 tickLine={false}
                                 axisLine={false}
                             />
