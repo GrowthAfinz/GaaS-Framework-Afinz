@@ -37,11 +37,12 @@ export const NavDropdown: React.FC<NavDropdownProps> = ({ title, items, isActive
             <button
                 type="button"
                 onClick={() => setIsOpen((prev) => !prev)}
+                style={{ fontFamily: "'Trebuchet MS', Calibri, sans-serif" }}
                 className={`
-                    flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200
+                    flex items-center gap-2 py-1.5 text-[15px] tracking-tight border-b-2 transition-colors duration-200
                     ${isActive || isOpen
-                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
+                        ? 'text-cyan-600 font-bold border-cyan-500'
+                        : 'text-slate-600 font-semibold border-transparent hover:text-cyan-600'
                     }
                 `}
             >

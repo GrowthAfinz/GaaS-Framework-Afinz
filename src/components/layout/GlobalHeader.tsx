@@ -176,7 +176,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
 
             {/* ── CENTER: Navigation ─────────────────────────────────── */}
             <div className="flex-1 flex justify-center">
-                <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                <nav
+                    className="hidden lg:flex items-center gap-6"
+                    style={{ fontFamily: "'Trebuchet MS', Calibri, sans-serif" }}
+                >
                     {navGroups.map((group) => {
                         if (group.direct || group.items.length === 1) {
                             const item = group.items[0];
@@ -187,10 +190,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
                                     type="button"
                                     onClick={item.onClick}
                                     className={[
-                                        'flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200',
+                                        'flex items-center gap-2 py-1.5 text-[15px] tracking-tight border-b-2 transition-colors duration-200',
                                         isActive
-                                            ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                            : 'text-slate-500 hover:text-slate-800 hover:bg-white/60',
+                                            ? 'text-cyan-600 font-bold border-cyan-500'
+                                            : 'text-slate-600 font-semibold border-transparent hover:text-cyan-600',
                                     ].join(' ')}
                                 >
                                     {group.title}
