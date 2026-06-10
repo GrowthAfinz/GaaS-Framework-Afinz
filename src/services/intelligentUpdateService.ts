@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import type { Activity } from '../types/framework';
+import { classifyRentabilizacao } from '../utils/rentabilizacaoClassify';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
@@ -200,7 +201,10 @@ const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
     updated_at: new Date().toISOString(),
 });
 
-const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
+const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
+  // Segmento/Subgrupo determinísticos a partir da jornada (taxonomia de Rentabilização).
+  const { segmento: segmentoClassificado, subgrupo: subgrupoClassificado } = classifyRentabilizacao(candidate.journey);
+  return {
     prog_gaas: false,
     status: 'Enviado',
     BU: textOrFallback(candidate.bu, 'Cartoes'),
@@ -209,8 +213,8 @@ const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidateP
     'Canal': candidate.channel,
     'Data de Disparo': toTimestamp(candidate.date),
     'Parceiro': textOrFallback(candidate.parceiro),
-    'Segmento': textOrFallback(candidate.segmento, 'Rentabilizacao'),
-    'Subgrupos': textOrFallback(candidate.subgrupo),
+    'Segmento': segmentoClassificado || textOrFallback(candidate.segmento, 'Rentabilizacao'),
+    'Subgrupos': subgrupoClassificado || textOrFallback(candidate.subgrupo),
     'Etapa de aquisição': textOrFallback(candidate.etapaAquisicao, 'Rentabilizacao'),
     'Perfil de Crédito': textOrFallback(candidate.perfilCredito),
     'Produto': textOrFallback(candidate.produto, 'Cartao'),
@@ -227,7 +231,8 @@ const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidateP
     'Emissões Independentes': candidate.independent ?? null,
     'Emissões Assistidas': candidate.assisted ?? null,
     updated_at: new Date().toISOString(),
-});
+  };
+};
 
 type AppliedTarget = { id: string; table: string };
 

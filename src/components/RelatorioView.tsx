@@ -24,6 +24,8 @@ import {
   DEFAULT_CANAL_EXTRA_COLUMNS,
   DEFAULT_DETAIL_DIMENSIONS,
   DEFAULT_DETAIL_METRICS,
+  ENGAGEMENT_AGGREGATE_COLUMNS,
+  ENGAGEMENT_DETAIL_METRICS,
   getDimensionValue,
   getGroupableDimensionLabel,
 } from './relatorio/reportColumnsConfig';
@@ -141,6 +143,7 @@ const PARCEIRO_COLORS: Record<string, string> = {
 export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData, compareMode = null, selectedBU, periodStart, periodEnd }) => {
   const { viewSettings, setGlobalFilters } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
+  const rentab = viewSettings.frente === 'rentabilizacao';
   const { selectedBUs } = useBU();
   const [reportMode, setReportMode] = useState<'performance' | 'monthly'>('performance');
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
@@ -186,10 +189,20 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const [isExportingRnt, setIsExportingRnt] = useState(false);
 
   // ── Personalização de colunas / agrupamentos ──
+  // Defaults por frente: Rentabilização usa visão de engajamento (sem aquisição).
+  const aggregateDefaults = rentab ? ENGAGEMENT_AGGREGATE_COLUMNS : DEFAULT_AGGREGATE_COLUMNS;
+  const detailMetricDefaults = rentab ? ENGAGEMENT_DETAIL_METRICS : DEFAULT_DETAIL_METRICS;
   const [campanhasGroupBy, setCampanhasGroupBy] = useState<DimensionKey>('segmento');
-  const [campanhasColumns, setCampanhasColumns] = useState<ColumnKey[]>([...DEFAULT_AGGREGATE_COLUMNS]);
+  const [campanhasColumns, setCampanhasColumns] = useState<ColumnKey[]>([...aggregateDefaults]);
   const [detailDimensionCols, setDetailDimensionCols] = useState<ColumnKey[]>([...DEFAULT_DETAIL_DIMENSIONS]);
-  const [detailMetricCols, setDetailMetricCols] = useState<ColumnKey[]>([...DEFAULT_DETAIL_METRICS]);
+  const [detailMetricCols, setDetailMetricCols] = useState<ColumnKey[]>([...detailMetricDefaults]);
+
+  // Ao trocar de frente, repõe os conjuntos de colunas padrão da frente ativa.
+  useEffect(() => {
+    setCampanhasColumns([...aggregateDefaults]);
+    setDetailMetricCols([...detailMetricDefaults]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rentab]);
 
   // Reset internal filters when external data (global filters) change
   useEffect(() => {
@@ -729,12 +742,20 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
 
         {/* KPI Summary Strip */}
         {reportMode === 'performance' && <div className="grid grid-cols-4 divide-x divide-slate-200 bg-white border-x border-b border-slate-200">
-          {[
-            { label: 'Base Enviada', value: fmtN(segmentoTotal.baseEnviada), current: segmentoTotal.baseEnviada, previous: previousSegmentoTotal.baseEnviada },
-            { label: 'Propostas', value: fmtN(segmentoTotal.propostas), current: segmentoTotal.propostas, previous: previousSegmentoTotal.propostas },
-            { label: 'Aprovados', value: fmtN(segmentoTotal.aprovados), current: segmentoTotal.aprovados, previous: previousSegmentoTotal.aprovados },
-            { label: 'Emissões', value: fmtN(segmentoTotal.emissoes), current: segmentoTotal.emissoes, previous: previousSegmentoTotal.emissoes },
-          ].map(kpi => (
+          {(rentab
+            ? [
+              { label: 'Base Enviada', value: fmtN(segmentoTotal.baseEnviada), current: segmentoTotal.baseEnviada, previous: previousSegmentoTotal.baseEnviada },
+              { label: 'Base Entregue', value: fmtN(segmentoTotal.baseEntregue), current: segmentoTotal.baseEntregue, previous: previousSegmentoTotal.baseEntregue },
+              { label: 'Aberturas', value: fmtN(segmentoTotal.aberturas), current: segmentoTotal.aberturas, previous: previousSegmentoTotal.aberturas },
+              { label: 'Cliques', value: fmtN(segmentoTotal.cliques), current: segmentoTotal.cliques, previous: previousSegmentoTotal.cliques },
+            ]
+            : [
+              { label: 'Base Enviada', value: fmtN(segmentoTotal.baseEnviada), current: segmentoTotal.baseEnviada, previous: previousSegmentoTotal.baseEnviada },
+              { label: 'Propostas', value: fmtN(segmentoTotal.propostas), current: segmentoTotal.propostas, previous: previousSegmentoTotal.propostas },
+              { label: 'Aprovados', value: fmtN(segmentoTotal.aprovados), current: segmentoTotal.aprovados, previous: previousSegmentoTotal.aprovados },
+              { label: 'Emissões', value: fmtN(segmentoTotal.emissoes), current: segmentoTotal.emissoes, previous: previousSegmentoTotal.emissoes },
+            ]
+          ).map(kpi => (
             <div key={kpi.label} className="px-6 py-3 text-center">
               <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{kpi.label}</p>
               <div className="mt-0.5">

@@ -7,6 +7,7 @@ export type MetricKey =
   | 'aberturas'
   | 'taxaAbertura'
   | 'cliques'
+  | 'taxaClique'
   | 'propostas'
   | 'taxaProposta'
   | 'aprovados'
@@ -122,6 +123,20 @@ export const DEFAULT_AGGREGATE_COLUMNS: MetricKey[] = [
 ];
 
 export const DEFAULT_CANAL_EXTRA_COLUMNS: MetricKey[] = ['participacaoEmissoes'];
+
+// ── Frente Rentabilização: visão enxuta de engajamento ──
+// Sem Propostas/Aprovados/Emissões/CAC/Custo — só funil de engajamento.
+export const ENGAGEMENT_AGGREGATE_COLUMNS: MetricKey[] = [
+  'baseEnviada', 'baseEntregue', 'taxaEntrega',
+  'aberturas', 'taxaAbertura',
+  'cliques', 'taxaClique',
+];
+
+export const ENGAGEMENT_DETAIL_METRICS: MetricKey[] = [
+  'baseEntregue',
+  'aberturas', 'taxaAbertura',
+  'cliques', 'taxaClique',
+];
 
 export const DEFAULT_DETAIL_DIMENSIONS: DimensionKey[] = [
   'segmento', 'parceiro', 'canal', 'descricao',

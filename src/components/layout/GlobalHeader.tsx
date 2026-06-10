@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-    User,
     Search,
     Settings2,
     Calendar,
@@ -10,7 +9,6 @@ import {
     PieChart,
     LayoutDashboard,
     BookOpen,
-    Lock,
     ClipboardList,
     FolderOpen,
     GitBranch,
@@ -21,7 +19,8 @@ import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
 import { useAppStore } from '../../store/useAppStore';
 import { NavDropdown } from './NavDropdown';
 import { FrenteSwitcher } from './FrenteSwitcher';
-import { useBU, BU } from '../../contexts/BUContext';
+import { BUDropdown } from './BUDropdown';
+import { useBU } from '../../contexts/BUContext';
 import { useUserRole } from '../../context/UserRoleContext';
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { useGlobalSearch, GlobalSearchResult, GlobalSearchResultType } from '../../hooks/useGlobalSearch';
@@ -54,7 +53,7 @@ const BU_DOT: Record<string, string> = {
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
     const { setTab, viewSettings, setFrente } = useAppStore();
     const activeTab = viewSettings.abaAtual;
-    const { toggleBU, isBUSelected, isBULocked } = useBU();
+    const { isBUSelected } = useBU();
     const isSegurosSelected = isBUSelected('Seguros');
 
     // Seguros = Rentabilização: ao selecionar a BU Seguros, força a frente.
@@ -148,13 +147,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
         items: group.items.filter(item => canSeeTab(item.id))
     })).filter(group => group.items.length > 0);
 
-    const buOptions: { id: BU; label: string; color: string }[] = [
-        { id: 'B2C', label: 'B2C', color: 'bg-blue-500' },
-        { id: 'B2B2C', label: 'B2B2C', color: 'bg-emerald-500' },
-        { id: 'Plurix', label: 'Plurix', color: 'bg-purple-500' },
-        { id: 'Seguros', label: 'Seguros', color: 'bg-orange-500' },
-    ];
-
     const isGroupActive = (items: { id: string }[]) => {
         return items.some(item => item.id === activeTab);
     };
@@ -227,37 +219,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
 
             {/* ── RIGHT: Controls ────────────────────────────────────── */}
             <div className="shrink-0 flex items-center gap-3">
-                {/* BU Filter */}
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider hidden xl:block">BU:</span>
-                        {isBULocked && (
-                            <span title="BU locked by your role">
-                                <Lock size={12} className="text-amber-500" />
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex bg-slate-100 rounded-md p-0.5 gap-0.5 border border-slate-200">
-                        {buOptions.map((bu) => (
-                            <button
-                                key={bu.id}
-                                onClick={() => toggleBU(bu.id)}
-                                disabled={isBULocked}
-                                className={[
-                                    'px-2 py-1 rounded text-[11px] font-medium transition-all flex items-center gap-1',
-                                    isBULocked ? 'opacity-50 cursor-not-allowed' : '',
-                                    isBUSelected(bu.id)
-                                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
-                                        : 'text-slate-500 hover:text-slate-700 hover:bg-white',
-                                ].join(' ')}
-                                title={isBULocked ? `BU locked to ${bu.label}` : `Filtrar por ${bu.label}`}
-                            >
-                                <div className={`w-1.5 h-1.5 rounded-full ${bu.color} ${isBUSelected(bu.id) ? 'opacity-100' : 'opacity-40'}`} />
-                                <span>{bu.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {/* BU Filter (dropdown compacto) */}
+                <BUDropdown />
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-slate-200" />
@@ -375,13 +338,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
 
                 {/* Fullscreen */}
                 <FullscreenButton />
-
-                {/* Avatar */}
-                <div className="flex items-center cursor-pointer hover:bg-slate-100 p-1 rounded-lg transition-all group">
-                    <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-cyan-700 rounded-full flex items-center justify-center ring-2 ring-cyan-100 group-hover:ring-cyan-200 transition-all">
-                        <User size={15} className="text-white" />
-                    </div>
-                </div>
             </div>
         </header>
     );

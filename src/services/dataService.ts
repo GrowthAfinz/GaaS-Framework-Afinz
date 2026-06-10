@@ -4,6 +4,7 @@ import { DailyAdMetrics, MediaInsight, CampaignMapping } from '../schemas/paid-m
 import { B2CDataRow } from '../types/b2c';
 import { parseDate } from '../utils/formatters';
 import { getCustoUnitarioCanal, CUSTO_UNITARIO_OFERTA } from '../constants/frameworkFields';
+import { classifyRentabilizacao } from '../utils/rentabilizacaoClassify';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 1000;
@@ -258,7 +259,11 @@ export const dataService = {
             from += PAGE_SIZE;
         }
 
-        return allRows.map(mapSqlToActivity);
+        // Seguros pertence à frente de Rentabilização — não deve aparecer na Aquisição.
+        // (As campanhas de Seguros vivem em rentabilizacao_activities; sem perda.)
+        return allRows
+            .map(mapSqlToActivity)
+            .filter((a) => a.bu !== 'Seguros');
     },
 
     /** Frente de Rentabilização: lê a tabela `rentabilizacao_activities`.
@@ -287,7 +292,13 @@ export const dataService = {
             from += PAGE_SIZE;
         }
 
-        return allRows.map(mapSqlToActivity);
+        // Classificação determinística Segmento/Subgrupo a partir da jornada
+        // (garante exibição correta independentemente do estado do banco).
+        return allRows.map((row) => {
+            const activity = mapSqlToActivity(row);
+            const { segmento, subgrupo } = classifyRentabilizacao(activity.jornada);
+            return { ...activity, segmento, subgrupo };
+        });
     },
 
     async fetchB2CMetrics(): Promise<B2CDataRow[]> {
