@@ -748,8 +748,10 @@ const metricRefreshDetails = (metric: MetricRow, existing?: Activity) => {
 
 const inferTaxonomy = (metric: MetricRow) => {
     const text = normalizeKey(`${metric.journey} ${metric.activityName}`);
+    const journeyText = normalizeKey(metric.journey);
     const tokens = taxonomyTokens(`${metric.journey} ${metric.activityName}`);
     const deterministic = inferDeterministicDimensions(metric);
+    const isNovosCopa = journeyText.includes('novos') && journeyText.includes('copa');
     const hasBasePropriaSignal = tokens.some((token) =>
         ['bp', 'bsp'].includes(token)
     ) || /base[_\s-]+propri(a|etaria)/.test(text);
@@ -778,7 +780,9 @@ const inferTaxonomy = (metric: MetricRow) => {
                     ? 'N/A'
                     : 'N/A');
 
-    const segmento = segmentByCode
+    const segmento = isNovosCopa
+        ? 'Novos'
+        : segmentByCode
         || (text.includes('carrinho') || text.includes('_car_')
             ? 'Carrinho Abandonado'
             : text.includes('base proprietaria') || text.includes('_bsp_') || text.includes('_bp_')
@@ -787,7 +791,7 @@ const inferTaxonomy = (metric: MetricRow) => {
                     ? 'CRM'
                     : 'CRM');
 
-    return { bu, parceiro, segmento };
+    return { bu, parceiro, segmento, subgrupo: isNovosCopa ? 'Copa' : undefined };
 };
 
 const emptySuggestions = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, FieldSuggestion[]>>>((acc, field) => {
@@ -1117,6 +1121,7 @@ const buildCandidate = (
 ): UpdateCandidate => {
     const taxonomy = inferTaxonomy(metric);
     const hasDeterministicBasePropria = taxonomy.bu === 'B2C' && taxonomy.parceiro === 'Proprietaria' && taxonomy.segmento === 'Base_Proprietaria';
+    const hasDeterministicNovosCopa = taxonomy.segmento === 'Novos' && taxonomy.subgrupo === 'Copa';
     const fieldSuggestions = suggestAllFields(metric, historyIndex);
 
     const valueFor = (field: SuggestionField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
@@ -1244,8 +1249,8 @@ const buildCandidate = (
         domain: metric.domain,
         bu: hasDeterministicBasePropria ? taxonomy.bu : valueFor('bu', taxonomy.bu),
         parceiro: valueFor('parceiro', taxonomy.parceiro),
-        segmento: hasDeterministicBasePropria ? taxonomy.segmento : valueFor('segmento', taxonomy.segmento),
-        subgrupo: valueFor('subgrupo', 'N/A'),
+        segmento: hasDeterministicBasePropria || hasDeterministicNovosCopa ? taxonomy.segmento : valueFor('segmento', taxonomy.segmento),
+        subgrupo: hasDeterministicNovosCopa ? taxonomy.subgrupo : valueFor('subgrupo', 'N/A'),
         etapaAquisicao: valueFor('etapaAquisicao', ''),
         perfilCredito: valueFor('perfilCredito', ''),
         produto: valueFor('produto', 'Cartao'),
