@@ -35,21 +35,21 @@ export const BUDropdown: React.FC = () => {
                 onClick={() => !isBULocked && setOpen((v) => !v)}
                 disabled={isBULocked}
                 className={[
-                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 bg-slate-100 transition-all',
-                    isBULocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-200',
+                    'flex items-center gap-2 h-8 px-3 rounded-md border border-slate-300 bg-white transition-colors',
+                    isBULocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50',
                 ].join(' ')}
                 title={isBULocked ? 'BU travada pelo seu perfil' : 'Filtrar por BU'}
             >
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">BU</span>
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">BU</span>
                 {isBULocked && <Lock size={11} className="text-amber-500" />}
                 <div className="flex items-center gap-0.5">
                     {BU_OPTIONS.filter((bu) => isBUSelected(bu.id)).map((bu) => (
                         <span key={bu.id} className={`w-1.5 h-1.5 rounded-full ${bu.color}`} />
                     ))}
-                    {selectedCount === 0 && <span className="text-[10px] text-slate-400">nenhuma</span>}
+                    {selectedCount === 0 && <span className="text-[11px] text-slate-400">nenhuma</span>}
                 </div>
-                <span className="text-[10px] font-semibold text-slate-500 tabular-nums">· {selectedCount}</span>
-                <ChevronDown size={12} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <span className="text-xs font-semibold text-slate-600 tabular-nums">{selectedCount}</span>
+                <ChevronDown size={13} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
 
             {open && (

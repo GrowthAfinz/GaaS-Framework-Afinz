@@ -41,48 +41,35 @@ const parseISODate = (value?: string) => {
 export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => {
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
 
+  // Pré-computa os filtros selecionados como Sets + limites de período (uma vez
+  // por mudança de filtro) — evita array.includes por atividade × dimensão.
+  const sel = useMemo(() => {
+    const start = parseISODate(filters?.dataInicio);
+    const end = parseISODate(filters?.dataFim);
+    return {
+      canais: new Set(Array.isArray(filters?.canais) ? filters.canais : []),
+      jornadas: new Set(Array.isArray(filters?.jornadas) ? filters.jornadas : []),
+      segmentos: new Set(Array.isArray(filters?.segmentos) ? filters.segmentos : []),
+      parceiros: new Set(Array.isArray(filters?.parceiros) ? filters.parceiros : []),
+      subgrupos: new Set(Array.isArray(filters?.subgrupos) ? filters.subgrupos : []),
+      bu: new Set(Array.isArray(filters?.bu) ? filters.bu : []),
+      startMs: start ? normalizeDayStart(start).getTime() : null,
+      endMs: end ? normalizeDayEnd(end).getTime() : null,
+    };
+  }, [filters]);
+
   const matchActivity = (activity: Activity, omit: FilterKey[] = []) => {
-    const selectedCanais = Array.isArray(filters?.canais) ? filters.canais : [];
-    const selectedJornadas = Array.isArray(filters?.jornadas) ? filters.jornadas : [];
-    const selectedSegmentos = Array.isArray(filters?.segmentos) ? filters.segmentos : [];
-    const selectedParceiros = Array.isArray(filters?.parceiros) ? filters.parceiros : [];
-    const selectedSubgrupos = Array.isArray(filters?.subgrupos) ? filters.subgrupos : [];
-    const selectedBUs = Array.isArray(filters?.bu) ? filters.bu : [];
+    if (!omit.includes('canais') && sel.canais.size > 0 && !sel.canais.has(activity.canal)) return false;
+    if (!omit.includes('jornadas') && sel.jornadas.size > 0 && !sel.jornadas.has(activity.jornada)) return false;
+    if (!omit.includes('segmentos') && sel.segmentos.size > 0 && !sel.segmentos.has(activity.segmento)) return false;
+    if (!omit.includes('parceiros') && sel.parceiros.size > 0 && !sel.parceiros.has(activity.parceiro)) return false;
+    if (!omit.includes('subgrupos') && sel.subgrupos.size > 0 && !sel.subgrupos.has(activity.subgrupo ?? '')) return false;
+    if (sel.bu.size > 0 && !sel.bu.has(activity.bu)) return false;
 
-    if (!omit.includes('canais') && selectedCanais.length > 0 && !selectedCanais.includes(activity.canal)) {
-      return false;
-    }
-
-    if (!omit.includes('jornadas') && selectedJornadas.length > 0 && !selectedJornadas.includes(activity.jornada)) {
-      return false;
-    }
-
-    if (!omit.includes('segmentos') && selectedSegmentos.length > 0 && !selectedSegmentos.includes(activity.segmento)) {
-      return false;
-    }
-
-    if (!omit.includes('parceiros') && selectedParceiros.length > 0 && !selectedParceiros.includes(activity.parceiro)) {
-      return false;
-    }
-
-    if (!omit.includes('subgrupos') && selectedSubgrupos.length > 0 && !selectedSubgrupos.includes(activity.subgrupo ?? '')) {
-      return false;
-    }
-
-    if (selectedBUs.length > 0 && !selectedBUs.includes(activity.bu)) {
-      return false;
-    }
-
-    const startDate = parseISODate(filters?.dataInicio);
-    if (startDate) {
-      const activityDate = normalizeDayStart(new Date(activity.dataDisparo));
-      if (activityDate < normalizeDayStart(startDate)) return false;
-    }
-
-    const endDate = parseISODate(filters?.dataFim);
-    if (endDate) {
-      const activityDate = normalizeDayStart(new Date(activity.dataDisparo));
-      if (activityDate > normalizeDayEnd(endDate)) return false;
+    if (sel.startMs !== null || sel.endMs !== null) {
+      const activityMs = normalizeDayStart(new Date(activity.dataDisparo)).getTime();
+      if (sel.startMs !== null && activityMs < sel.startMs) return false;
+      if (sel.endMs !== null && activityMs > sel.endMs) return false;
     }
 
     return true;

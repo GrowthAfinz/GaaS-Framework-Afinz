@@ -31,7 +31,7 @@ interface FilterDropdownProps {
     onOpenChange?: (isOpen: boolean) => void;
 }
 
-const FilterDropdown: React.FC<FilterDropdownProps> = ({
+const FilterDropdownInner: React.FC<FilterDropdownProps> = ({
     title,
     icon: Icon,
     items,
@@ -42,8 +42,10 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
     searchPlaceholder = 'Buscar...',
     onOpenChange
 }) => {
-    const { viewSettings, setGlobalFilters } = useAppStore();
-    const filters = viewSettings.filtrosGlobais;
+    // Seletores granulares: só re-renderiza quando ESTE campo muda (não a cada
+    // mudança de dados na store — carga de activities, troca de frente, etc.).
+    const selectedList = useAppStore((s) => (s.viewSettings.filtrosGlobais[field] as string[]) ?? []);
+    const setGlobalFilters = useAppStore((s) => s.setGlobalFilters);
     const [isOpen, setIsOpen] = React.useState(false);
     const [searchTerm, setSearchTerm] = React.useState('');
     const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -80,7 +82,6 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
         return items.filter(item => item.toLowerCase().includes(q));
     }, [items, searchable, searchTerm]);
 
-    const selectedList = filters[field] as string[];
     const selectedSet = React.useMemo(() => new Set(selectedList), [selectedList]);
 
     const toggleItem = (value: string) => {
@@ -176,8 +177,7 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
                 <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 opacity-100' : 'opacity-50'}`} />
             </button>
 
-            <div className={`absolute top-full pt-2.5 min-w-[280px] max-w-sm z-50 transition-all duration-200 transform origin-top-left ${isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
-                } ${align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}>
+            {isOpen && <div className={`absolute top-full pt-2.5 min-w-[280px] max-w-sm z-50 ${align === 'right' ? 'right-0' : 'left-0'}`}>
 
                 <div className="bg-white border border-slate-200 rounded-xl shadow-[0_12px_45px_-8px_rgba(0,0,0,0.2)] p-2 relative overflow-hidden ring-1 ring-slate-900/5">
                     <div className="relative z-10 flex items-center justify-between px-3 py-2.5 mb-1.5 border-b border-slate-100 bg-slate-50/80 -mx-2 -mt-2">
@@ -246,10 +246,12 @@ const FilterDropdown: React.FC<FilterDropdownProps> = ({
                         })}
                     </div>
                 </div>
-            </div>
+            </div>}
         </div>
     );
 };
+
+const FilterDropdown = React.memo(FilterDropdownInner);
 
 export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
     availableCanais = [],
@@ -265,8 +267,8 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
     totalRemainingDisparos = 0,
     onMenuLockChange
 }) => {
-    const { viewSettings, setGlobalFilters } = useAppStore();
-    const filters = viewSettings.filtrosGlobais;
+    const filters = useAppStore((s) => s.viewSettings.filtrosGlobais);
+    const setGlobalFilters = useAppStore((s) => s.setGlobalFilters);
 
     const clearFilters = () => {
         setGlobalFilters({
