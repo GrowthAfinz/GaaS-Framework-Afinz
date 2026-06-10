@@ -5,6 +5,7 @@ export type BU = 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros';
 
 interface BUContextType {
     selectedBUs: BU[];
+    setSelectedBUs: React.Dispatch<React.SetStateAction<BU[]>>;
     toggleBU: (bu: BU) => void;
     selectAll: () => void;
     deselectAll: () => void;
@@ -83,6 +84,7 @@ export const BUProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     return (
         <BUContext.Provider value={{
             selectedBUs,
+            setSelectedBUs,
             toggleBU,
             selectAll,
             deselectAll,

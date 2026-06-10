@@ -28,16 +28,26 @@ const normalize = (jornada: string): string =>
 export const classifyRentabilizacao = (jornada: string): RentabilizacaoClass => {
     const u = normalize(jornada);
 
-    // 1) Seguros — qualquer jornada com SEGURO
+    // 1) Carrinho de Seguros: segmento operacional Abandonado.
+    if (u.includes('SEGURO') && u.includes('CARRINHO')) {
+        if (u.includes('RESIDENCIA')) {
+            return { segmento: 'Abandonado', subgrupo: 'Seguro Carrinho Residencial' };
+        }
+        if (u.includes('MULHER')) {
+            return { segmento: 'Abandonado', subgrupo: 'Carrinho Seguro Mulher' };
+        }
+        return { segmento: 'Abandonado', subgrupo: 'Carrinho Seguro' };
+    }
+
+    // 2) Demais jornadas de Seguros.
     if (u.includes('SEGURO')) {
         let subgrupo = 'Seguro';
-        if (u.includes('CARRINHO') && u.includes('MULHER')) subgrupo = 'Carrinho Seguro Mulher';
-        else if (u.includes('RESIDENCIA')) subgrupo = 'Seguro Residência 24h';
+        if (u.includes('RESIDENCIA')) subgrupo = 'Seguro Residência 24h';
         else if (u.includes('MULHER')) subgrupo = 'Seguro Mulher';
         return { segmento: 'Seguro', subgrupo };
     }
 
-    // 2) Copa — dilui no estágio; subgrupo sempre "Copa"
+    // 3) Copa — dilui no estágio; subgrupo sempre "Copa"
     if (u.includes('COPA')) {
         let segmento = 'Ativação';
         if (u.includes('CARTONISTAS')) segmento = 'Cartonistas';

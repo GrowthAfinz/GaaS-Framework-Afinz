@@ -53,8 +53,9 @@ const BU_DOT: Record<string, string> = {
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
     const { setTab, viewSettings, setFrente } = useAppStore();
     const activeTab = viewSettings.abaAtual;
-    const { isBUSelected } = useBU();
+    const { isBUSelected, setSelectedBUs, isBULocked } = useBU();
     const isSegurosSelected = isBUSelected('Seguros');
+    const previousFrenteRef = useRef(viewSettings.frente);
 
     // Seguros = Rentabilização: ao selecionar a BU Seguros, força a frente.
     useEffect(() => {
@@ -62,6 +63,18 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
             setFrente('rentabilizacao');
         }
     }, [isSegurosSelected, setFrente]);
+
+    // Não herda silenciosamente um filtro de Aquisição que esconda Seguros.
+    // Depois da entrada, o usuário continua podendo remover a BU manualmente.
+    useEffect(() => {
+        const enteredRentabilizacao =
+            previousFrenteRef.current !== 'rentabilizacao' &&
+            viewSettings.frente === 'rentabilizacao';
+        previousFrenteRef.current = viewSettings.frente;
+
+        if (!enteredRentabilizacao || isBULocked || isSegurosSelected) return;
+        setSelectedBUs((current) => [...current, 'Seguros']);
+    }, [viewSettings.frente, isBULocked, isSegurosSelected, setSelectedBUs]);
     const { canSeeTab } = useUserRole();
     const setPendingNavigation = useExplorerStore((s) => s.setPendingNavigation);
 
