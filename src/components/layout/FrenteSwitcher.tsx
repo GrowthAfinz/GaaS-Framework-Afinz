@@ -14,6 +14,15 @@ const FRENTES: { id: Frente; label: string; activeCls: string }[] = [
 export const FrenteSwitcher: React.FC = () => {
     const frente = useAppStore((s) => s.viewSettings.frente);
     const setFrente = useAppStore((s) => s.setFrente);
+    const setTransitioning = useAppStore((s) => s.setTransitioning);
+
+    const handleFrenteChange = (nextFrente: Frente) => {
+        if (nextFrente === frente) return;
+        setTransitioning(true);
+        setTimeout(() => {
+            setFrente(nextFrente);
+        }, 120);
+    };
 
     return (
         <div className="inline-flex items-center h-8 rounded-md border border-slate-300 overflow-hidden">
@@ -22,7 +31,7 @@ export const FrenteSwitcher: React.FC = () => {
                 return (
                     <button
                         key={f.id}
-                        onClick={() => setFrente(f.id)}
+                        onClick={() => handleFrenteChange(f.id)}
                         className={[
                             'h-full px-3 text-xs font-medium transition-colors',
                             i > 0 ? 'border-l border-slate-200' : '',

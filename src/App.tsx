@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
+import { useState, useMemo, useEffect, useRef, Component, ErrorInfo, ReactNode, useTransition } from 'react';
 import { Menu } from 'lucide-react';
 import { CSVUpload } from './components/CSVUpload';
 import { InlineFilterBar } from './components/InlineFilterBar';
@@ -76,6 +76,10 @@ function App() {
   const filterCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterShellRef = useRef<HTMLDivElement | null>(null);
 
+  const [isPending, startTransition] = useTransition();
+  const isTransitioning = useAppStore((s) => s.isTransitioning);
+  const setTransitioning = useAppStore((s) => s.setTransitioning);
+
   const openFilterDrop = () => {
     if (filterCloseTimeoutRef.current) {
       clearTimeout(filterCloseTimeoutRef.current);
@@ -132,10 +136,26 @@ function App() {
     };
   }, []);
 
+  const handleApplyFilters = (nextFilters: Partial<FilterState>) => {
+    startTransition(() => {
+      setGlobalFilters(nextFilters);
+    });
+  };
+
+  useEffect(() => {
+    if (isTransitioning) {
+      const timer = setTimeout(() => {
+        setTransitioning(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [viewSettings?.frente, isTransitioning, setTransitioning]);
+
   const {
     viewSettings,
     updateActivity,
-    setTab
+    setTab,
+    setGlobalFilters
   } = useAppStore();
   const storeFilters = viewSettings.filtrosGlobais;
   const activeTab = viewSettings.abaAtual;
@@ -268,9 +288,24 @@ function App() {
 
   return (
     <AppErrorBoundary>
-    <MainLayout
-      onHeaderMouseEnter={openFilterDrop}
-    >
+      {isTransitioning && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex flex-col items-center justify-center transition-all duration-300">
+          <div className="bg-white/95 px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border border-slate-100 max-w-sm mx-4">
+            <div className="relative w-10 h-10">
+              <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+              <div className="absolute inset-0 rounded-full border-4 border-cyan-500 border-t-transparent animate-spin" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-sm font-bold text-slate-800">Carregando dados</h3>
+              <p className="text-xs text-slate-400 mt-1">Atualizando painel operacional...</p>
+            </div>
+          </div>
+        </div>
+      )}
+      <MainLayout
+        onHeaderMouseEnter={openFilterDrop}
+        onContentMouseEnter={scheduleCloseFilterDrop}
+      >
       {hasData && (
         <div className="sticky top-0 z-30" ref={filterShellRef}>
           <div
@@ -296,6 +331,8 @@ function App() {
                 countBySubgrupo={countBySubgrupo}
                 totalRemainingDisparos={totalRemainingDisparos}
                 onMenuLockChange={setIsFilterMenuLocked}
+                onApplyFilters={handleApplyFilters}
+                isPending={isPending}
               />
             </div>
           </div>
@@ -312,7 +349,7 @@ function App() {
         </div>
       )}
 
-      <div className="flex-1 pb-10">
+      <div className={`flex-1 pb-10 transition-all duration-300 ${isPending ? 'opacity-60 blur-[0.5px] pointer-events-none' : 'opacity-100'}`}>
         {loading && !hasData && (
           <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <div className="text-center">

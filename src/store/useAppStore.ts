@@ -62,6 +62,8 @@ interface AppState {
     setPaidMediaData: (data: DailyAdMetrics[]) => void;
     budgets: Budget[];
     setBudgets: (bg: Budget[]) => void;
+    isTransitioning: boolean;
+    setTransitioning: (val: boolean) => void;
 }
 
 const INITIAL_FILTERS: FilterState = {
@@ -162,6 +164,9 @@ export const useAppStore = create<AppState>()(
             setPaidMediaData: (data) => set({ paidMediaData: data }),
             budgets: [],
             setBudgets: (bg) => set({ budgets: bg }),
+
+            isTransitioning: false,
+            setTransitioning: (val) => set({ isTransitioning: val }),
 
             alertConfig: {
                 share_crm_limiar: 10,
