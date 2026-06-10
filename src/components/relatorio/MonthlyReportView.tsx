@@ -12,9 +12,10 @@ import { MonthlyStackedBarChart } from './MonthlyStackedBarChart';
 interface MonthlyReportViewProps {
   data: CalendarData;
   selectedBU?: string;
+  rentabilizacao?: boolean;
 }
 
-export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({ data, selectedBU }) => {
+export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({ data, selectedBU, rentabilizacao = false }) => {
   const { startDate, endDate, setPeriod } = usePeriod();
   const monthlyTotals = useMemo(() => aggregateMonthlyTotals(data), [data]);
   const segmentRows = useMemo(() => aggregateMonthlyByDimension(data, 'segmento'), [data]);
@@ -78,15 +79,17 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({ data, sele
           title="Evolução mensal por segmento"
           rows={segmentRows}
           dimension="segmento"
+          rentabilizacao={rentabilizacao}
         />
         <MonthlyStackedBarChart
           title="Evolução mensal por canal"
           rows={channelRows}
           dimension="canal"
+          rentabilizacao={rentabilizacao}
         />
       </div>
 
-      <MonthlyResultsTable rows={monthlyTotals} />
+      <MonthlyResultsTable rows={monthlyTotals} rentabilizacao={rentabilizacao} />
     </div>
   );
 };

@@ -8,14 +8,17 @@ import {
 
 interface MonthlyResultsTableProps {
   rows: MonthlyTotalRow[];
+  rentabilizacao?: boolean;
 }
 
-const metrics: Array<{
+type MonthlyTableMetric = {
   key: MonthlyMetricKey | 'taxaEntrega' | 'taxaProposta' | 'taxaAprovacao' | 'taxaFinalizacao';
   label: string;
   invertPositive?: boolean;
   format: (value: number) => string;
-}> = [
+};
+
+const acquisitionMetrics: MonthlyTableMetric[] = [
   { key: 'baseEnviada', label: 'Base Enviada', format: value => value.toLocaleString('pt-BR') },
   { key: 'baseEntregue', label: 'Base Entregue', format: value => value.toLocaleString('pt-BR') },
   { key: 'taxaEntrega', label: '% Entrega', format: value => `${(value * 100).toFixed(2).replace('.', ',')}%` },
@@ -40,7 +43,24 @@ const metrics: Array<{
   { key: 'taxaConversaoBase', label: '% Conv da Base', format: value => `${(value * 100).toFixed(4).replace('.', ',')}%` },
 ];
 
-export const MonthlyResultsTable: React.FC<MonthlyResultsTableProps> = ({ rows }) => {
+const engagementMetrics: MonthlyTableMetric[] = [
+  { key: 'baseEnviada', label: 'Base Enviada', format: value => value.toLocaleString('pt-BR') },
+  { key: 'baseEntregue', label: 'Base Entregue', format: value => value.toLocaleString('pt-BR') },
+  { key: 'taxaEntrega', label: '% Entrega', format: value => `${(value * 100).toFixed(2).replace('.', ',')}%` },
+  { key: 'aberturas', label: 'Aberturas', format: value => value.toLocaleString('pt-BR') },
+  { key: 'taxaAbertura', label: '% Abertura', format: value => `${(value * 100).toFixed(2).replace('.', ',')}%` },
+  { key: 'cliques', label: 'Cliques', format: value => value.toLocaleString('pt-BR') },
+  { key: 'taxaClique', label: '% Clique', format: value => `${(value * 100).toFixed(2).replace('.', ',')}%` },
+  {
+    key: 'custoTotal',
+    label: 'Custo Total',
+    invertPositive: true,
+    format: value => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+  },
+];
+
+export const MonthlyResultsTable: React.FC<MonthlyResultsTableProps> = ({ rows, rentabilizacao = false }) => {
+  const metrics = rentabilizacao ? engagementMetrics : acquisitionMetrics;
   const previousByMonth = new Map<string, MonthlyTotalRow>();
   rows.forEach((row, index) => {
     if (index > 0) previousByMonth.set(row.monthKey, rows[index - 1]);

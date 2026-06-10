@@ -775,7 +775,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       </div>
 
       {reportMode === 'monthly' ? (
-        <MonthlyReportView data={data} selectedBU={selectedBU} />
+        <MonthlyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
       ) : (
       <>
       {/* ── PERFORMANCE CAMPANHAS ── */}

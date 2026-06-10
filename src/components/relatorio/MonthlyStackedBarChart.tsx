@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -22,6 +22,7 @@ interface MonthlyStackedBarChartProps {
   title: string;
   rows: MonthlyDimensionRow[];
   dimension: MonthlyDimension;
+  rentabilizacao?: boolean;
 }
 
 const METRIC_OPTIONS: MonthlyMetricKey[] = [
@@ -33,6 +34,16 @@ const METRIC_OPTIONS: MonthlyMetricKey[] = [
   'custoTotal',
   'custoPorCartao',
   'taxaConversaoBase',
+];
+
+const ENGAGEMENT_METRIC_OPTIONS: MonthlyMetricKey[] = [
+  'baseEnviada',
+  'baseEntregue',
+  'aberturas',
+  'taxaAbertura',
+  'cliques',
+  'taxaClique',
+  'custoTotal',
 ];
 
 const SERIES_COLORS = [
@@ -52,16 +63,22 @@ function formatChartValue(value: number, metric: MonthlyMetricKey): string {
   if (metric === 'custoTotal' || metric === 'custoPorCartao') {
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
-  if (metric === 'taxaConversaoBase') {
+  if (metric === 'taxaConversaoBase' || metric === 'taxaAbertura' || metric === 'taxaClique') {
     return `${(value * 100).toFixed(4).replace('.', ',')}%`;
   }
   return value.toLocaleString('pt-BR');
 }
 
-export const MonthlyStackedBarChart: React.FC<MonthlyStackedBarChartProps> = ({ title, rows, dimension }) => {
-  const [metric, setMetric] = useState<MonthlyMetricKey>('emissoes');
+export const MonthlyStackedBarChart: React.FC<MonthlyStackedBarChartProps> = ({ title, rows, dimension, rentabilizacao = false }) => {
+  const metricOptions = rentabilizacao ? ENGAGEMENT_METRIC_OPTIONS : METRIC_OPTIONS;
+  const [metric, setMetric] = useState<MonthlyMetricKey>(rentabilizacao ? 'cliques' : 'emissoes');
   const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
   const isStackable = !NON_STACKABLE_MONTHLY_METRICS.has(metric);
+
+  useEffect(() => {
+    setMetric(rentabilizacao ? 'cliques' : 'emissoes');
+    setFocusedSeries(null);
+  }, [rentabilizacao]);
 
   const { chartData, series, seriesTotals } = useMemo(() => {
     const months = Array.from(new Map(rows.map(row => [row.monthKey, row.monthLabel])).entries())
@@ -98,7 +115,7 @@ export const MonthlyStackedBarChart: React.FC<MonthlyStackedBarChartProps> = ({ 
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
           <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
-            {METRIC_OPTIONS.map(option => (
+            {metricOptions.map(option => (
               <button
                 key={option}
                 type="button"
@@ -173,7 +190,7 @@ export const MonthlyStackedBarChart: React.FC<MonthlyStackedBarChartProps> = ({ 
               tick={{ fill: '#94A3B8', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(value) => metric === 'taxaConversaoBase' ? `${(Number(value) * 100).toFixed(2)}%` : Number(value).toLocaleString('pt-BR', { notation: 'compact' })}
+              tickFormatter={(value) => ['taxaConversaoBase', 'taxaAbertura', 'taxaClique'].includes(metric) ? `${(Number(value) * 100).toFixed(2)}%` : Number(value).toLocaleString('pt-BR', { notation: 'compact' })}
             />
             <Tooltip
               cursor={{ fill: '#E2E8F0', opacity: 0.35 }}

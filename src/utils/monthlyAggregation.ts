@@ -5,6 +5,10 @@ export type MonthlyDimension = 'segmento' | 'canal';
 export type MonthlyMetricKey =
   | 'baseEnviada'
   | 'baseEntregue'
+  | 'aberturas'
+  | 'taxaAbertura'
+  | 'cliques'
+  | 'taxaClique'
   | 'propostas'
   | 'aprovados'
   | 'emissoes'
@@ -15,6 +19,10 @@ export type MonthlyMetricKey =
 export interface MonthlyMetrics {
   baseEnviada: number;
   baseEntregue: number;
+  aberturas: number;
+  taxaAbertura: number;
+  cliques: number;
+  taxaClique: number;
   propostas: number;
   aprovados: number;
   emissoes: number;
@@ -41,6 +49,10 @@ export interface MonthlyDimensionRow extends MonthlyTotalRow {
 export const MONTHLY_METRIC_LABELS: Record<MonthlyMetricKey, string> = {
   baseEnviada: 'Base enviada',
   baseEntregue: 'Base entregue',
+  aberturas: 'Aberturas',
+  taxaAbertura: '% Abertura',
+  cliques: 'Cliques',
+  taxaClique: '% Clique',
   propostas: 'Propostas',
   aprovados: 'Aprovados',
   emissoes: 'Emissões',
@@ -52,6 +64,8 @@ export const MONTHLY_METRIC_LABELS: Record<MonthlyMetricKey, string> = {
 export const NON_STACKABLE_MONTHLY_METRICS = new Set<MonthlyMetricKey>([
   'custoPorCartao',
   'taxaConversaoBase',
+  'taxaAbertura',
+  'taxaClique',
 ]);
 
 function getActivityMonthKey(activity: Activity, fallbackDateKey: string): string {
@@ -75,6 +89,8 @@ export function formatMonthLabel(monthKey: string): string {
 function computeMetrics(activities: Activity[]): MonthlyMetrics {
   const baseEnviada = activities.reduce((sum, activity) => sum + (activity.kpis.baseEnviada ?? 0), 0);
   const baseEntregue = activities.reduce((sum, activity) => sum + (activity.kpis.baseEntregue ?? 0), 0);
+  const aberturas = activities.reduce((sum, activity) => sum + (activity.kpis.aberturas ?? 0), 0);
+  const cliques = activities.reduce((sum, activity) => sum + (activity.kpis.cliques ?? 0), 0);
   const propostas = activities.reduce((sum, activity) => sum + (activity.kpis.propostas ?? 0), 0);
   const aprovados = activities.reduce((sum, activity) => sum + (activity.kpis.aprovados ?? 0), 0);
   const emissoes = activities.reduce((sum, activity) => sum + ((activity.kpis.emissoes ?? activity.kpis.cartoes) ?? 0), 0);
@@ -83,6 +99,10 @@ function computeMetrics(activities: Activity[]): MonthlyMetrics {
   return {
     baseEnviada,
     baseEntregue,
+    aberturas,
+    taxaAbertura: baseEntregue > 0 ? aberturas / baseEntregue : 0,
+    cliques,
+    taxaClique: baseEntregue > 0 ? cliques / baseEntregue : 0,
     propostas,
     aprovados,
     emissoes,
