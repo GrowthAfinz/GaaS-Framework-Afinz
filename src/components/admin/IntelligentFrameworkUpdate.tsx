@@ -1549,9 +1549,9 @@ const inferRentabilizacaoContext = (journey: unknown, activityName: unknown): Re
     const journeyText = normalizeKey(journey).toUpperCase();
     const activityText = normalizeKey(activityName).toUpperCase();
     const text = `${journeyText} ${activityText}`;
-    const isInsurance = text.includes('SEGURO') || text.includes('AFZ_SEG_');
     const isCopa = journeyText.includes('COPA');
     const semanticClass = classifyRentabilizacao(text);
+    const isInsurance = semanticClass.segmento === 'Seguro' || semanticClass.segmento === 'Abandonado';
 
     const bu = text.includes('PLURIX') || text.includes('MAISAMIGO') || text.includes('PLU_')
         ? 'Plurix'

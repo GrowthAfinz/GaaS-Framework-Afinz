@@ -28,6 +28,18 @@ const normalize = (jornada: string): string =>
 export const classifyRentabilizacao = (jornada: string): RentabilizacaoClass => {
     const u = normalize(jornada);
 
+    // A intenção explícita da jornada prevalece sobre termos do conteúdo.
+    // Ex.: uma ação de Incentivo ao Uso pode mencionar "seguros e assistências"
+    // sem pertencer ao segmento Seguro.
+    if (u.includes('JOR_INCENTIVO_AO_USO_')) {
+        const subgrupo = u.includes('PLURIX')
+            ? 'Plurix Mais Amigo'
+            : u.includes('AFINZ') || u.includes('_VC')
+                ? 'Afinz VC'
+                : '';
+        return { segmento: 'Incentivo ao Uso', subgrupo };
+    }
+
     // 1) Carrinho de Seguros: segmento operacional Abandonado.
     if (u.includes('SEGURO') && u.includes('CARRINHO')) {
         if (u.includes('RESIDENCIA')) {
