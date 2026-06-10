@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Download, BookOpen, Beaker } from 'lucide-react';
-import { DragDropContext, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { DayCell } from './DayCell';
 import { HoverCard } from './HoverCard';
 import { StatsCard } from './StatsCardTips';

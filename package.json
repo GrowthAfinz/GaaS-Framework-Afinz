@@ -10,9 +10,11 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "build:ontology": "python ../scripts/bundle_vault.py"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@supabase/supabase-js": "^2.93.1",
     "clsx": "^2.1.1",
     "date-fns": "^2.30.0",
@@ -22,7 +24,6 @@
     "lucide-react": "^0.563.0",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
-    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
     "recharts": "^3.5.0",
     "tailwind-merge": "^3.4.0",

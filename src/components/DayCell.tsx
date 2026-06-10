@@ -1,5 +1,5 @@
 import React from 'react';
-import { Droppable } from 'react-beautiful-dnd';
+import { Droppable } from '@hello-pangea/dnd';
 import { Activity, FilterState } from '../types/framework';
 import { DiaryEntry } from '../store/diaryStore';
 import { Beaker } from 'lucide-react';
