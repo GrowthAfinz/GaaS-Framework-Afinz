@@ -150,7 +150,7 @@ function App() {
   // sempre usam a frente de Aquisição (comportamento inalterado).
   const frente = viewSettings.frente;
   const sourceData = useMemo(() => {
-    const FRENTE_SCOPED_TABS = new Set(['launch', 'relatorio', 'resultados', 'jornada']);
+    const FRENTE_SCOPED_TABS = new Set(['launch', 'relatorio', 'resultados', 'jornada', 'explorador', 'orientador']);
     return frente === 'rentabilizacao' && FRENTE_SCOPED_TABS.has(activeTab)
       ? rentabilizacaoData
       : data;
@@ -416,12 +416,23 @@ function App() {
               )}
               {activeTab === 'orientador' && (
                 <PageTransition>
-                  <OrientadorView />
+                  <OrientadorView activities={Object.values(advancedFilteredData).flat()} />
                 </PageTransition>
               )}
               {activeTab === 'originacao-b2c' && (
                 <PageTransition>
-                  <OriginacaoB2CView />
+                  {frente === 'rentabilizacao' ? (
+                    <div className="flex min-h-[60vh] items-center justify-center p-8">
+                      <div className="max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                        <h2 className="text-xl font-bold text-slate-900">Originação B2C pertence à frente Aquisição</h2>
+                        <p className="mt-2 text-sm text-slate-500">
+                          Em Rentabilização, a leitura operacional termina em clique. Troque para Aquisição para consultar propostas, aprovações e emissões B2C.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <OriginacaoB2CView />
+                  )}
                 </PageTransition>
               )}
               {activeTab === 'configuracoes' && (

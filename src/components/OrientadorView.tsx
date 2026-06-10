@@ -10,11 +10,18 @@ import { Tooltip } from './Tooltip';
 
 import { usePeriod } from '../contexts/PeriodContext';
 import { isWithinInterval } from 'date-fns';
+import { Activity } from '../types/framework';
 
 type SortOption = 'score' | 'cac' | 'conversion' | 'volume' | 'recency';
 
-export const OrientadorView: React.FC = () => {
-    const { activities, viewSettings } = useAppStore();
+interface OrientadorViewProps {
+    activities?: Activity[];
+}
+
+export const OrientadorView: React.FC<OrientadorViewProps> = ({ activities: scopedActivities }) => {
+    const { activities: storeActivities, viewSettings } = useAppStore();
+    const activities = scopedActivities ?? storeActivities;
+    const rentab = viewSettings.frente === 'rentabilizacao';
     const { selectedBUs } = useBU();
     const { startDate, endDate } = usePeriod();
 
@@ -86,6 +93,62 @@ export const OrientadorView: React.FC = () => {
             }
         });
     }, [recommendations, viewSettings.filtrosGlobais, sortBy, selectedBUs]);
+
+    if (rentab) {
+        const summary = dateFilteredActivities.reduce((acc, activity) => {
+            acc.disparos += 1;
+            acc.base += activity.kpis.baseEnviada || 0;
+            acc.entregues += activity.kpis.baseEntregue || 0;
+            acc.aberturas += activity.kpis.aberturas || 0;
+            acc.cliques += activity.kpis.cliques || 0;
+            acc.custo += activity.kpis.custoTotal || 0;
+            return acc;
+        }, { disparos: 0, base: 0, entregues: 0, aberturas: 0, cliques: 0, custo: 0 });
+        const taxaEntrega = summary.base > 0 ? summary.entregues / summary.base : 0;
+        const taxaAbertura = summary.entregues > 0 ? summary.aberturas / summary.entregues : 0;
+        const taxaClique = summary.aberturas > 0 ? summary.cliques / summary.aberturas : 0;
+        const cards = [
+            ['Disparos', summary.disparos.toLocaleString('pt-BR')],
+            ['Base enviada', summary.base.toLocaleString('pt-BR')],
+            ['% Entrega', `${(taxaEntrega * 100).toFixed(1)}%`],
+            ['Aberturas', summary.aberturas.toLocaleString('pt-BR')],
+            ['Cliques', summary.cliques.toLocaleString('pt-BR')],
+            ['% Clique', `${(taxaClique * 100).toFixed(1)}%`],
+            ['Custo Total', summary.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })],
+        ];
+        return (
+            <div className="flex flex-col gap-6 bg-slate-50 p-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <Lightbulb className="text-amber-400" />
+                        Orientador de Engajamento
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Diagnóstico da frente Rentabilização limitado a entrega, abertura e clique.
+                    </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
+                    {cards.map(([label, value]) => (
+                        <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+                            <p className="mt-2 text-xl font-bold text-slate-900">{value}</p>
+                        </div>
+                    ))}
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                    <h3 className="font-bold text-slate-900">Leitura recomendada</h3>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                        <li>Entrega: {(taxaEntrega * 100).toFixed(1)}% da base enviada.</li>
+                        <li>Abertura: {(taxaAbertura * 100).toFixed(1)}% da base entregue.</li>
+                        <li>Clique: {(taxaClique * 100).toFixed(1)}% das aberturas.</li>
+                    </ul>
+                    <p className="mt-4 text-xs text-slate-400">
+                        Recomendações de CAC, conversão e emissão ficam desativadas nesta frente.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-full bg-slate-50 p-6 overflow-hidden">

@@ -5,6 +5,7 @@ import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
 import { Info } from 'lucide-react';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
+import { useAppStore } from '../../store/useAppStore';
 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -17,6 +18,7 @@ interface LaunchPlannerKPIsProps {
 
 export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities, goals, currentMonth }) => {
 
+    const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
     const { dailyAnalysis } = useB2CAnalysis();
     const { isBUSelected, selectedBUs } = useBU();
     const isOnlySeguros = selectedBUs.length === 1 && selectedBUs[0] === 'Seguros';
@@ -135,6 +137,28 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         });
     }, [dailyAnalysis]);
 
+    const engagementData = useMemo(() => {
+        const byDate = new Map<string, { data: string; displayDate: string; aberturas: number; cliques: number; custo: number }>();
+        activities.forEach((activity) => {
+            const data = format(activity.dataDisparo, 'yyyy-MM-dd');
+            const current = byDate.get(data) ?? {
+                data,
+                displayDate: format(activity.dataDisparo, 'dd/MM', { locale: ptBR }),
+                aberturas: 0,
+                cliques: 0,
+                custo: 0,
+            };
+            current.aberturas += activity.kpis.aberturas || 0;
+            current.cliques += activity.kpis.cliques || 0;
+            current.custo += activity.kpis.custoTotal || 0;
+            byDate.set(data, current);
+        });
+        return Array.from(byDate.values()).sort((a, b) => a.data.localeCompare(b.data)).map((item) => ({
+            ...item,
+            taxaClique: item.aberturas > 0 ? (item.cliques / item.aberturas) * 100 : 0,
+        }));
+    }, [activities]);
+
     const ChartTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
@@ -157,6 +181,55 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         }
         return null;
     };
+
+    if (rentab) {
+        const totalCliques = engagementData.reduce((sum, item) => sum + item.cliques, 0);
+        const totalAberturas = engagementData.reduce((sum, item) => sum + item.aberturas, 0);
+        const taxaClique = totalAberturas > 0 ? (totalCliques / totalAberturas) * 100 : 0;
+        const custoTotal = engagementData.reduce((sum, item) => sum + item.custo, 0);
+        return (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="bg-white border border-slate-200 rounded-lg p-4 h-64 shadow-sm">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <h3 className="text-xs font-bold uppercase text-slate-500">Cliques no período</h3>
+                            <p className="mt-1 text-2xl font-bold text-slate-800">{totalCliques.toLocaleString('pt-BR')}</p>
+                            <p className="text-xs text-slate-400">Taxa de clique: {taxaClique.toFixed(1)}%</p>
+                        </div>
+                        <p className="text-sm font-semibold text-slate-700">
+                            {custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </p>
+                    </div>
+                    <ResponsiveContainer width="100%" height="75%">
+                        <BarChart data={engagementData} onClick={handleChartClick}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                            <XAxis dataKey="displayDate" tick={{ fontSize: 9 }} />
+                            <YAxis tick={{ fontSize: 9 }} />
+                            <Tooltip />
+                            <Bar dataKey="cliques" name="Cliques" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-lg p-4 h-64 shadow-sm">
+                    <h3 className="text-xs font-bold uppercase text-slate-500">Evolução da taxa de clique</h3>
+                    <ResponsiveContainer width="100%" height="88%">
+                        <LineChart data={engagementData} onClick={handleChartClick}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                            <XAxis dataKey="displayDate" tick={{ fontSize: 9 }} />
+                            <YAxis tick={{ fontSize: 9 }} unit="%" />
+                            <Tooltip formatter={(value: number) => `${Number(value).toFixed(1)}%`} />
+                            <Line type="monotone" dataKey="taxaClique" name="% Clique" stroke="#10b981" strokeWidth={2} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+                <DailyDetailsModal
+                    date={selectedDate ? new Date(selectedDate + 'T12:00:00') : null}
+                    activities={selectedActivities}
+                    onClose={() => setSelectedDate(null)}
+                />
+            </div>
+        );
+    }
 
     return (
         <div className={`grid gap-4 mb-2 ${showCharts ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>

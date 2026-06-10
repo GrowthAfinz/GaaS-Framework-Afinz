@@ -14,6 +14,7 @@ interface KPIOverviewProps {
 
 export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousActivities = [], b2cData = [] }) => {
     const { viewSettings } = useAppStore();
+    const rentab = viewSettings.frente === 'rentabilizacao';
     const { selectedBUs } = useBU();
     const perspective = viewSettings.perspective;
 
@@ -24,6 +25,8 @@ export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousAc
     const calculateMetrics = (acts: Activity[], b2c: B2CDataRow[] = []) => {
         let baseEnviada = showCRM ? acts.reduce((sum, a) => sum + (a.kpis?.baseEnviada || 0), 0) : 0;
         let baseEntregue = showCRM ? acts.reduce((sum, a) => sum + (a.kpis?.baseEntregue || 0), 0) : 0;
+        let aberturas = showCRM ? acts.reduce((sum, a) => sum + (a.kpis?.aberturas || 0), 0) : 0;
+        let cliques = showCRM ? acts.reduce((sum, a) => sum + (a.kpis?.cliques || 0), 0) : 0;
         let propostas = showCRM ? acts.reduce((sum, a) => sum + (a.kpis?.propostas || 0), 0) : 0;
         let aprovados = showCRM ? acts.reduce((sum, a) => sum + (a.kpis?.aprovados || 0), 0) : 0;
         let emissoes = showCRM ? acts.reduce((sum, a) => sum + (a.kpis?.emissoes || 0), 0) : 0;
@@ -46,6 +49,8 @@ export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousAc
         }
 
         const taxaEntrega = baseEnviada > 0 ? (baseEntregue / baseEnviada) * 100 : 0;
+        const taxaAbertura = baseEntregue > 0 ? (aberturas / baseEntregue) * 100 : 0;
+        const taxaClique = aberturas > 0 ? (cliques / aberturas) * 100 : 0;
         const taxaPropostas = baseEntregue > 0 ? (propostas / baseEntregue) * 100 : 0;
         const taxaAprovacao = propostas > 0 ? (aprovados / propostas) * 100 : 0;
         const taxaEmissao = propostas > 0 ? (emissoes / propostas) * 100 : 0;
@@ -56,6 +61,10 @@ export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousAc
             baseEnviada,
             baseEntregue,
             taxaEntrega,
+            aberturas,
+            taxaAbertura,
+            cliques,
+            taxaClique,
             propostas,
             taxaPropostas,
             aprovados,
@@ -80,6 +89,10 @@ export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousAc
         baseEnviada: getVariation(currentMetrics.baseEnviada, previousMetrics.baseEnviada),
         baseEntregue: getVariation(currentMetrics.baseEntregue, previousMetrics.baseEntregue),
         taxaEntrega: getVariation(currentMetrics.taxaEntrega, previousMetrics.taxaEntrega),
+        aberturas: getVariation(currentMetrics.aberturas, previousMetrics.aberturas),
+        taxaAbertura: getVariation(currentMetrics.taxaAbertura, previousMetrics.taxaAbertura),
+        cliques: getVariation(currentMetrics.cliques, previousMetrics.cliques),
+        taxaClique: getVariation(currentMetrics.taxaClique, previousMetrics.taxaClique),
         propostas: getVariation(currentMetrics.propostas, previousMetrics.propostas),
         taxaPropostas: getVariation(currentMetrics.taxaPropostas, previousMetrics.taxaPropostas),
         aprovados: getVariation(currentMetrics.aprovados, previousMetrics.aprovados),
@@ -132,6 +145,21 @@ export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousAc
             </div>
         </div>
     );
+
+    if (rentab) {
+        return (
+            <div className="grid grid-cols-4 gap-2 mb-2">
+                <KPICard label="Base Enviada" value={currentMetrics.baseEnviada} variation={variations.baseEnviada} decimals={0} />
+                <KPICard label="Base Entregue" value={currentMetrics.baseEntregue} variation={variations.baseEntregue} decimals={0} />
+                <KPICard label="% Entrega" value={currentMetrics.taxaEntrega} suffix="%" variation={variations.taxaEntrega} />
+                <KPICard label="Aberturas" value={currentMetrics.aberturas} variation={variations.aberturas} decimals={0} />
+                <KPICard label="% Abertura" value={currentMetrics.taxaAbertura} suffix="%" variation={variations.taxaAbertura} />
+                <KPICard label="Cliques" value={currentMetrics.cliques} variation={variations.cliques} decimals={0} highlight />
+                <KPICard label="% Clique" value={currentMetrics.taxaClique} suffix="%" variation={variations.taxaClique} highlight />
+                <KPICard label="Custo Total" value={currentMetrics.custoTotal} prefix="R$ " isCurrency variation={variations.custoTotal} />
+            </div>
+        );
+    }
 
     return (
         <div className="grid grid-cols-6 gap-2 mb-2">

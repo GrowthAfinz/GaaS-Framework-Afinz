@@ -45,6 +45,14 @@ const getMetricValueFromActivity = (a: ActivityRow, metric: ExplorerMetric): num
       return a['Base Total'] ?? 0;
     case 'cartoes':
       return (a['Cartões Gerados'] ?? (a as unknown as Record<string, number>)['CartÃµes Gerados']) ?? 0;
+    case 'aberturas':
+      return Number(a['Aberturas'] ?? 0) || 0;
+    case 'cliques':
+      return Number(a['Cliques'] ?? 0) || 0;
+    case 'taxaClique': {
+      const aberturas = Number(a['Aberturas'] ?? 0) || 0;
+      return aberturas > 0 ? ((Number(a['Cliques'] ?? 0) || 0) / aberturas) * 100 : 0;
+    }
     case 'cac':
       return a.CAC ?? 0;
     case 'custo':
@@ -62,6 +70,11 @@ const getMetricValueFromRows = (rows: ActivityRow[], metric: ExplorerMetric): nu
     const vals = rows.map(r => r.CAC ?? 0).filter(v => v > 0);
     if (vals.length === 0) return 0;
     return vals.reduce((s, v) => s + v, 0) / vals.length;
+  }
+  if (metric === 'taxaClique') {
+    const aberturas = rows.reduce((sum, row) => sum + (Number(row['Aberturas'] ?? 0) || 0), 0);
+    const cliques = rows.reduce((sum, row) => sum + (Number(row['Cliques'] ?? 0) || 0), 0);
+    return aberturas > 0 ? (cliques / aberturas) * 100 : 0;
   }
   return rows.reduce((sum, r) => sum + getMetricValueFromActivity(r, metric), 0);
 };
@@ -96,6 +109,11 @@ export function formatMetricValue(value: number, metric: ExplorerMetric): string
       return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(Math.round(value));
     case 'cartoes':
       return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(Math.round(value));
+    case 'aberturas':
+    case 'cliques':
+      return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(Math.round(value));
+    case 'taxaClique':
+      return `${value.toFixed(1)}%`;
     case 'cac':
       return `R$ ${value.toFixed(2)}`;
     case 'custo':

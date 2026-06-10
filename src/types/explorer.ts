@@ -6,12 +6,15 @@ import { ActivityRow } from './activity';
 
 export type NodeType = 'bu' | 'segmento' | 'jornada' | 'canal' | 'disparo';
 
-export type ExplorerMetric = 'volume' | 'cartoes' | 'cac' | 'custo' | 'disparos';
+export type ExplorerMetric = 'volume' | 'cartoes' | 'cac' | 'custo' | 'disparos' | 'aberturas' | 'cliques' | 'taxaClique';
 export type DistributionLevel = 'bu' | 'segmento' | 'canal' | 'disparo';
 export type TemporalViewMode = 'simple' | 'stacked';
 
 export interface NodeMetrics {
   baseTotal: number;
+  aberturas: number;
+  cliques: number;
+  taxaClique: number;
   cartoes: number;
   propostas: number;
   aprovados: number;

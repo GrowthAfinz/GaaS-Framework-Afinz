@@ -796,11 +796,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             />
             <ColumnsCustomizer
               value={campanhasColumns}
-              defaults={[...DEFAULT_AGGREGATE_COLUMNS]}
-              available={METRIC_COLUMNS.filter(c => c.key !== 'participacaoEmissoes')}
+              defaults={[...aggregateDefaults]}
+              available={METRIC_COLUMNS.filter(c => aggregateDefaults.includes(c.key as MetricKey))}
               onChange={setCampanhasColumns}
             />
-            <button
+            {!rentab && <button
               onClick={exportAquisicaoCrm}
               disabled={isExportingAquisicao}
               className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 disabled:cursor-wait disabled:opacity-60 transition-colors font-medium"
@@ -808,7 +808,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             >
               <FileSpreadsheet size={14} />
               {isExportingAquisicao ? 'Gerando XLSX...' : 'Exportar XLSX Aquisição'}
-            </button>
+            </button>}
             <button
               onClick={exportRentabilizacaoCrm}
               disabled={isExportingRnt}
@@ -882,7 +882,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           totalRow={canalTotal}
           previousRowsByLabel={previousCanalRowsByLabel}
           previousTotal={previousCanalTotal}
-          visibleColumns={[...DEFAULT_AGGREGATE_COLUMNS, ...DEFAULT_CANAL_EXTRA_COLUMNS]}
+          visibleColumns={rentab ? ENGAGEMENT_AGGREGATE_COLUMNS : [...DEFAULT_AGGREGATE_COLUMNS, ...DEFAULT_CANAL_EXTRA_COLUMNS]}
           shouldShowComparison={shouldShowComparison}
           totalEmissoesForParticipation={totalCanalEmissoes}
           onRowClick={(label) => {
@@ -932,8 +932,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               />
               <ColumnsCustomizer
                 value={detailMetricCols}
-                defaults={[...DEFAULT_DETAIL_METRICS]}
-                available={METRIC_COLUMNS.filter(c => c.key !== 'participacaoEmissoes')}
+                defaults={[...detailMetricDefaults]}
+                available={METRIC_COLUMNS.filter(c => detailMetricDefaults.includes(c.key as MetricKey))}
                 onChange={setDetailMetricCols}
                 label="Métricas"
                 buttonLabel="Métricas"

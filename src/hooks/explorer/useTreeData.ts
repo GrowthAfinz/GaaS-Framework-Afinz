@@ -38,7 +38,7 @@ function slugify(text: string): string {
 }
 
 function emptyMetrics(): NodeMetrics {
-  return { baseTotal: 0, cartoes: 0, propostas: 0, aprovados: 0, custoTotal: 0, cac: 0, taxaConversao: 0 };
+  return { baseTotal: 0, aberturas: 0, cliques: 0, taxaClique: 0, cartoes: 0, propostas: 0, aprovados: 0, custoTotal: 0, cac: 0, taxaConversao: 0 };
 }
 
 function aggregateMetrics(rows: ActivityRow[]): NodeMetrics {
@@ -50,12 +50,15 @@ function aggregateMetrics(rows: ActivityRow[]): NodeMetrics {
     total.baseTotal += base;
     baseEnviada += base;
     total.cartoes += Number(r['Cartões Gerados'] ?? 0) || 0;
+    total.aberturas += Number(r['Aberturas'] ?? 0) || 0;
+    total.cliques += Number(r['Cliques'] ?? 0) || 0;
     total.propostas += Number(r['Propostas'] ?? 0) || 0;
     total.aprovados += Number(r['Aprovados'] ?? 0) || 0;
     total.custoTotal += rowCustoTotal(r);
   }
 
   total.cac = total.cartoes > 0 ? total.custoTotal / total.cartoes : 0;
+  total.taxaClique = total.aberturas > 0 ? (total.cliques / total.aberturas) * 100 : 0;
   // Conversão = Cartões ÷ Base Enviada (em %), consistente em todos os níveis.
   total.taxaConversao = baseEnviada > 0 ? (total.cartoes / baseEnviada) * 100 : 0;
 
@@ -85,6 +88,11 @@ function buildDisparoNodes(rows: ActivityRow[], parentId: string, parentColor: s
       parentId,
       metrics: {
         baseTotal: base,
+        aberturas: Number(activity['Aberturas'] ?? 0) || 0,
+        cliques: Number(activity['Cliques'] ?? 0) || 0,
+        taxaClique: Number(activity['Aberturas'] ?? 0) > 0
+          ? ((Number(activity['Cliques'] ?? 0) || 0) / Number(activity['Aberturas'])) * 100
+          : 0,
         cartoes,
         propostas: Number(activity['Propostas'] ?? 0) || 0,
         aprovados: Number(activity['Aprovados'] ?? 0) || 0,

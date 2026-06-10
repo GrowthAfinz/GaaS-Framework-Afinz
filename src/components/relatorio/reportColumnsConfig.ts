@@ -130,12 +130,14 @@ export const ENGAGEMENT_AGGREGATE_COLUMNS: MetricKey[] = [
   'baseEnviada', 'baseEntregue', 'taxaEntrega',
   'aberturas', 'taxaAbertura',
   'cliques', 'taxaClique',
+  'custoTotal',
 ];
 
 export const ENGAGEMENT_DETAIL_METRICS: MetricKey[] = [
   'baseEntregue',
   'aberturas', 'taxaAbertura',
   'cliques', 'taxaClique',
+  'custoTotal',
 ];
 
 export const DEFAULT_DETAIL_DIMENSIONS: DimensionKey[] = [

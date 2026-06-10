@@ -9,6 +9,7 @@ import {
 import { MetricToggle } from './MetricToggle';
 import { SegmentBarChart } from './SegmentBarChart';
 import { DailyTowerChart } from './DailyTowerChart';
+import { useAppStore } from '../../../store/useAppStore';
 
 const TEMPORAL_METRIC_OPTIONS: { value: ExplorerMetric; label: string }[] = [
   { value: 'disparos', label: 'Qtd Disparos' },
@@ -47,7 +48,17 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   onBarClick,
   onDayClick,
 }) => {
+  const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
   const [temporalMode, setTemporalMode] = React.useState<TemporalViewMode>('simple');
+  const temporalOptions = rentab
+    ? [
+        { value: 'disparos' as ExplorerMetric, label: 'Qtd Disparos' },
+        { value: 'aberturas' as ExplorerMetric, label: 'Aberturas' },
+        { value: 'cliques' as ExplorerMetric, label: 'Cliques' },
+        { value: 'taxaClique' as ExplorerMetric, label: '% Clique' },
+        { value: 'custo' as ExplorerMetric, label: 'Custo Total' },
+      ]
+    : TEMPORAL_METRIC_OPTIONS;
 
   const distributionLabel = distributionLevel === 'bu'
     ? 'Distribuidor por BU'
@@ -91,7 +102,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             {/* Temporal metric selector */}
             <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-md p-0.5">
-              {TEMPORAL_METRIC_OPTIONS.map((opt) => (
+              {temporalOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => onTemporalMetricChange(opt.value)}

@@ -34,6 +34,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
   const storeActivitiesRaw = useAppStore((state) => state.activities);
   const setStoreActivities = useAppStore((state) => state.setActivities);
   const filtrosGlobais = useAppStore((state) => state.viewSettings.filtrosGlobais);
+  const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
   const storeActivities = React.useMemo(() => {
     const sourceActivities = filteredActivities || storeActivitiesRaw;
     return sourceActivities.map((a) => {
@@ -85,6 +86,8 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
         'Perfil de Crédito': a.perfilCredito || a.raw['Perfil de Crédito'],
         'Ordem de disparo': a.ordemDisparo ?? a.raw['Ordem de disparo'],
         'Cartões Gerados': a.kpis?.cartoes ?? a.raw['Cartões Gerados'],
+        'Aberturas': a.kpis?.aberturas ?? a.raw['Aberturas'],
+        'Cliques': a.kpis?.cliques ?? a.raw['Cliques'],
         Propostas: a.kpis?.propostas ?? a.raw.Propostas,
         Aprovados: a.kpis?.aprovados ?? a.raw.Aprovados,
         'Custo Total Campanha': a.kpis?.custoTotal ?? a.raw['Custo Total Campanha'],
@@ -138,6 +141,13 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
     setDetailsPaneNode,
     setPendingNavigation,
   } = useExplorerStore();
+
+  useEffect(() => {
+    if (!rentab) return;
+    const allowed = new Set(['volume', 'custo', 'disparos', 'aberturas', 'cliques', 'taxaClique']);
+    if (!allowed.has(metric)) setMetric('cliques');
+    if (!allowed.has(temporalMetric)) setTemporalMetric('cliques');
+  }, [rentab, metric, temporalMetric, setMetric, setTemporalMetric]);
 
   useEffect(() => {
     setFilters({ periodo: { inicio: periodInicio, fim: periodFim } });
@@ -429,13 +439,15 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
       </div>
 
       {/* 3. Right Column: Details Pane */}
-      <aside className="w-80 shrink-0 flex flex-col gap-3 overflow-hidden h-full">
-        <DetailsPane
-          data={detailsData}
-          onClose={() => { deselectAll(); setDetailsPaneNode(null); }}
-          onViewAll={handleViewAll}
-        />
-      </aside>
+      {!rentab && (
+        <aside className="w-80 shrink-0 flex flex-col gap-3 overflow-hidden h-full">
+          <DetailsPane
+            data={detailsData}
+            onClose={() => { deselectAll(); setDetailsPaneNode(null); }}
+            onViewAll={handleViewAll}
+          />
+        </aside>
+      )}
 
       {/* Modal de detalhe do disparo individual (clique no nó da árvore) */}
       {disparoModalActivity && (

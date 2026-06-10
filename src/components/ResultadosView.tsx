@@ -109,13 +109,15 @@ export const ResultadosView: React.FC<ResultadosViewProps> = ({ resultados, data
 
   return (
     <div className="space-y-6">
-      <PeriodComparisonBanner
-        comparison={aggregatedComparison}
-        year={comparisonMonth.year}
-        month={comparisonMonth.month}
-      />
+      {!rentab && (
+        <PeriodComparisonBanner
+          comparison={aggregatedComparison}
+          year={comparisonMonth.year}
+          month={comparisonMonth.month}
+        />
+      )}
       {/* 1. Análise de Distribuição */}
-      <DistributionAnalysis data={data} />
+      {!rentab && <DistributionAnalysis data={data} />}
 
       {rentab ? (
         /* Frente Rentabilização: resumo de engajamento (sem metas/CAC nesta fase) */
