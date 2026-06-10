@@ -24,6 +24,7 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 import { intelligentUpdateService } from '../../services/intelligentUpdateService';
 import type { Activity } from '../../types/framework';
+import { classifyRentabilizacao } from '../../utils/rentabilizacaoClassify';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
@@ -1550,6 +1551,7 @@ const inferRentabilizacaoContext = (journey: unknown, activityName: unknown): Re
     const text = `${journeyText} ${activityText}`;
     const isInsurance = text.includes('SEGURO') || text.includes('AFZ_SEG_');
     const isCopa = journeyText.includes('COPA');
+    const semanticClass = classifyRentabilizacao(text);
 
     const bu = text.includes('PLURIX') || text.includes('MAISAMIGO') || text.includes('PLU_')
         ? 'Plurix'
@@ -1576,25 +1578,17 @@ const inferRentabilizacaoContext = (journey: unknown, activityName: unknown): Re
             family: `seguros:${normalizeKey(produto)}`,
             bu,
             parceiro: 'N/A',
-            segmento: 'Rentabilizacao',
-            subgrupo: 'N/A',
+            segmento: semanticClass.segmento,
+            subgrupo: semanticClass.subgrupo,
             produto,
             etapaAquisicao: 'Rentabilizacao',
             perfilCredito: 'N/A',
             oferta: 'Padrao',
-            evidence: 'jornada ou activity contem token explicito de seguro',
+            evidence: `árvore Seguros: ${semanticClass.segmento} > ${semanticClass.subgrupo}`,
         };
     }
 
-    const segmento = journeyText.includes('NOVOS')
-        ? 'Novos'
-        : journeyText.includes('REATIVACAO')
-            ? 'Reativacao'
-            : journeyText.includes('CARTONISTAS')
-                ? isCopa ? 'Ativacao' : 'Cartonistas'
-                : text.includes('ATIVACAO') || text.includes('WELCOME') || text.includes('DESBLOQUEIO') || (isCopa && text.includes('VISA'))
-                    ? 'Ativacao'
-                    : 'Rentabilizacao';
+    const segmento = semanticClass.segmento;
 
     if (isCopa) {
         return {
@@ -1602,7 +1596,7 @@ const inferRentabilizacaoContext = (journey: unknown, activityName: unknown): Re
             bu,
             parceiro: 'N/A',
             segmento,
-            subgrupo: 'N/A',
+            subgrupo: semanticClass.subgrupo || 'Copa',
             produto: 'Cartao',
             etapaAquisicao: 'Rentabilizacao',
             perfilCredito: 'N/A',
@@ -1650,7 +1644,7 @@ const inferRentabilizacaoContext = (journey: unknown, activityName: unknown): Re
         bu,
         parceiro: 'N/A',
         segmento,
-        subgrupo: 'N/A',
+        subgrupo: semanticClass.subgrupo || 'N/A',
         produto,
         etapaAquisicao: 'Rentabilizacao',
         perfilCredito: 'N/A',
@@ -2280,7 +2274,8 @@ const StatCard = ({ label, value, tone }: { label: string; value: number; tone: 
 );
 
 export const IntelligentFrameworkUpdate: React.FC = () => {
-    const { activities } = useAppStore();
+    const { activities, viewSettings } = useAppStore();
+    const activeDomain: UpdateDomain = viewSettings.frente === 'rentabilizacao' ? 'rentabilizacao' : 'aquisicao';
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [result, setResult] = useState<ProcessResult | null>(null);
     const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
@@ -2300,7 +2295,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
     const [uploadConfirmOpen, setUploadConfirmOpen] = useState(false);
     const [reviewSearchTerm, setReviewSearchTerm] = useState('');
-    const [activeDomain, setActiveDomain] = useState<UpdateDomain>('aquisicao');
     const [flowChooserOpen, setFlowChooserOpen] = useState(false);
     const [periodFilterOpen, setPeriodFilterOpen] = useState(false);
     const [reviewStartDate, setReviewStartDate] = useState('');
@@ -2311,6 +2305,18 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [bulkValue, setBulkValue] = useState('');
     const [bulkScope, setBulkScope] = useState<'selected' | 'filtered'>('selected');
     const [undoSnapshot, setUndoSnapshot] = useState<UpdateCandidate[] | null>(null);
+    const setActiveDomain = (_domain: UpdateDomain) => undefined;
+    const previousDomainRef = useRef<UpdateDomain>(activeDomain);
+
+    useEffect(() => {
+        if (previousDomainRef.current === activeDomain) return;
+        previousDomainRef.current = activeDomain;
+        setResult(null);
+        setFileMeta(null);
+        setSelectedKeys(new Set());
+        setReviewOpen(false);
+        setFlowChooserOpen(false);
+    }, [activeDomain]);
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
@@ -2755,19 +2761,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <div>
                             <h3 className="text-xl font-bold text-slate-900">Atualizacao Inteligente</h3>
                             <p className="text-sm text-slate-500">
-                                Fluxo atual: {DOMAIN_LABEL[activeDomain]}. Revise campos, gere Excel e envie para base de dados.
+                                Fluxo definido pelo toggle superior: {DOMAIN_LABEL[activeDomain]}. Destino: {DOMAIN_TARGET_TABLE[activeDomain]}.
                             </p>
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setFlowChooserOpen(true)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 transition hover:bg-cyan-100"
-                        >
-                            <Wand2 size={14} />
-                            Alterar fluxo
-                        </button>
                         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                             <Database size={14} />
                             Historico carregado: {activities.length} campanhas

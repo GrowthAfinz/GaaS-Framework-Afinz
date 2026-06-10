@@ -203,7 +203,8 @@ const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
 
 const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
   // Segmento/Subgrupo determinísticos a partir da jornada (taxonomia de Rentabilização).
-  const { segmento: segmentoClassificado, subgrupo: subgrupoClassificado } = classifyRentabilizacao(candidate.journey);
+  const { segmento: segmentoClassificado, subgrupo: subgrupoClassificado } =
+    classifyRentabilizacao(`${candidate.journey} ${candidate.activityName}`);
   return {
     prog_gaas: false,
     status: 'Enviado',
