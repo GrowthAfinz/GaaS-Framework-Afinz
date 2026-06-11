@@ -1239,16 +1239,29 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     {/* ── OVERLAY: TABELA COMPLETA (virtualizada) ── */}
     {showFullTable && (
       <div className="fixed inset-0 z-50 bg-white flex flex-col">
-        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-1 h-6 rounded-full shrink-0" style={{ background: TEAL }} />
-            <h2 className="text-base font-bold text-slate-800 whitespace-nowrap">Detalhamento por disparo</h2>
-            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full whitespace-nowrap">
-              {displayRows.length.toLocaleString('pt-BR')} disparos
-            </span>
+        {/* Header com controles: 2 linhas para melhor UX em telas menores */}
+        <div className="border-b border-slate-200 shadow-sm">
+          {/* Linha 1: Título e fechar */}
+          <div className="flex items-center justify-between gap-4 px-5 py-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-1 h-6 rounded-full shrink-0" style={{ background: TEAL }} />
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-slate-800">Detalhamento por disparo (tabela completa)</h2>
+                <p className="text-xs text-slate-500 mt-0.5">{displayRows.length.toLocaleString('pt-BR')} disparos · Navegue com scroll ou use filtros abaixo</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFullTable(false)}
+              className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
+              title="Fechar (Esc)"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <div className="relative w-64">
+          {/* Linha 2: Buscadores e customizadores */}
+          <div className="flex items-center gap-2 px-5 py-3 bg-slate-50 flex-wrap">
+            <div className="relative flex-1 min-w-[220px]">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -1256,40 +1269,35 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 onChange={(event) => setTableSearch(event.target.value)}
                 placeholder="Buscar campanha, jornada, segmento..."
                 className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                autoFocus
               />
             </div>
-            <ColumnsCustomizer
-              value={detailDimensionCols}
-              defaults={[...DEFAULT_DETAIL_DIMENSIONS]}
-              available={DIMENSION_COLUMNS}
-              onChange={setDetailDimensionCols}
-              label="Dimensões"
-              buttonLabel="Dimensões"
-            />
-            <ColumnsCustomizer
-              value={detailMetricCols}
-              defaults={[...detailMetricDefaults]}
-              available={METRIC_COLUMNS.filter(c => detailMetricDefaults.includes(c.key as MetricKey))}
-              onChange={setDetailMetricCols}
-              label="Métricas"
-              buttonLabel="Métricas"
-            />
-            <button
-              onClick={exportDetail}
-              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
-            >
-              <FileSpreadsheet size={14} />
-              Exportar CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowFullTable(false)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 transition-colors"
-              title="Fechar (Esc)"
-            >
-              <X size={14} />
-              Fechar
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <ColumnsCustomizer
+                value={detailDimensionCols}
+                defaults={[...DEFAULT_DETAIL_DIMENSIONS]}
+                available={DIMENSION_COLUMNS}
+                onChange={setDetailDimensionCols}
+                label="Dimensões"
+                buttonLabel="Dimensões"
+              />
+              <ColumnsCustomizer
+                value={detailMetricCols}
+                defaults={[...detailMetricDefaults]}
+                available={METRIC_COLUMNS.filter(c => detailMetricDefaults.includes(c.key as MetricKey))}
+                onChange={setDetailMetricCols}
+                label="Métricas"
+                buttonLabel="Métricas"
+              />
+              <button
+                onClick={exportDetail}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300"
+                title="Baixar dados em CSV"
+              >
+                <FileSpreadsheet size={14} />
+                Exportar CSV
+              </button>
+            </div>
           </div>
         </div>
         <div className="flex-1 min-h-0">
