@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Component, ErrorInfo, ReactNode, useDeferredValue } from 'react';
+import { useState, useMemo, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import { CSVUpload } from './components/CSVUpload';
 import { InlineFilterBar } from './components/InlineFilterBar';
@@ -29,6 +29,7 @@ import { AnimatePresence } from 'framer-motion';
 import { PageTransition } from './components/layout/PageTransition';
 import './App.css';
 import { useAuth } from './context/AuthContext';
+import { FilterState } from './types/framework';
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -67,27 +68,6 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
     return this.props.children;
   }
 }
-
-const areFiltersEqual = (a: any, b: any): boolean => {
-  if (a === b) return true;
-  if (!a || !b) return false;
-
-  if (a.dataInicio !== b.dataInicio) return false;
-  if (a.dataFim !== b.dataFim) return false;
-  if (a.disparado !== b.disparado) return false;
-
-  const arrayKeys = ['bu', 'canais', 'jornadas', 'segmentos', 'parceiros', 'subgrupos', 'ofertas'] as const;
-  for (const key of arrayKeys) {
-    const arrA = a[key] || [];
-    const arrB = b[key] || [];
-    if (arrA.length !== arrB.length) return false;
-    for (let i = 0; i < arrA.length; i++) {
-      if (arrA[i] !== arrB[i]) return false;
-    }
-  }
-
-  return true;
-};
 
 function App() {
   const { user, loading: authLoading } = useAuth();
@@ -201,9 +181,6 @@ function App() {
     bu: selectedBUs
   }), [storeFilters, startDate, endDate, selectedBUs]);
 
-  const deferredFilters = useDeferredValue(filters);
-  const isPending = !areFiltersEqual(filters, deferredFilters);
-
   const isFrameworkView = activeTab === 'framework';
   const isMidiaPaga = activeTab === 'midia-paga';
   const shouldRunFilters = !isFrameworkView && !isMidiaPaga;
@@ -223,10 +200,10 @@ function App() {
     totalRemainingDisparos
   } = useAdvancedFilters(
     shouldRunFilters ? sourceData : {},
-    deferredFilters
+    filters
   );
 
-  const { filteredData } = useCalendarFilter(advancedFilteredData, deferredFilters);
+  const { filteredData } = useCalendarFilter(advancedFilteredData, filters);
 
   const previousFilters = useMemo(() => {
     if (!compareMode) return null;
@@ -267,22 +244,21 @@ function App() {
     dataFim: ''
   }), [storeFilters, selectedBUs]);
 
-  const deferredLaunchPlannerFilters = useDeferredValue(launchPlannerFilters);
-  const deferredPreviousFilters = useDeferredValue(previousFilters);
-
   const { filteredData: launchPlannerData } = useAdvancedFilters(
     activeTab === 'launch' ? sourceData : {},
-    deferredLaunchPlannerFilters
+    launchPlannerFilters,
+    { computeFacets: false }
   );
 
   const { filteredData: previousAdvancedFilteredData } = useAdvancedFilters(
     (shouldRunFilters && previousFilters) ? sourceData : {},
-    deferredPreviousFilters || {}
+    previousFilters || {},
+    { computeFacets: false }
   );
 
   const { filteredData: previousFilteredData } = useCalendarFilter(
     (shouldRunFilters && previousFilters) ? previousAdvancedFilteredData : {},
-    deferredPreviousFilters || {}
+    previousFilters || {}
   );
 
   const resultados = useResultadosMetrics(filteredData);
@@ -356,7 +332,7 @@ function App() {
                 totalRemainingDisparos={totalRemainingDisparos}
                 onMenuLockChange={setIsFilterMenuLocked}
                 onApplyFilters={handleApplyFilters}
-                isPending={isPending}
+                isPending={false}
               />
             </div>
           </div>
@@ -373,7 +349,7 @@ function App() {
         </div>
       )}
 
-      <div className={`flex-1 pb-10 transition-all duration-300 ${isPending ? 'opacity-60 blur-[0.5px] pointer-events-none' : 'opacity-100'}`}>
+      <div className="flex-1 pb-10">
         {loading && !hasData && (
           <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
             <div className="text-center">

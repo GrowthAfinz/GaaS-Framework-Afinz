@@ -38,7 +38,30 @@ const parseISODate = (value?: string) => {
   return new Date(y, m - 1, d);
 };
 
-export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => {
+interface AdvancedFilterOptions {
+  computeFacets?: boolean;
+}
+
+const EMPTY_FACETS = {
+  availableCanais: [] as string[],
+  availableJornadas: [] as string[],
+  availableSegmentos: [] as string[],
+  availableParceiros: [] as string[],
+  availableSubgrupos: [] as string[],
+  countByCanal: {} as Record<string, number>,
+  countByJornada: {} as Record<string, number>,
+  countBySegmento: {} as Record<string, number>,
+  countByParceiro: {} as Record<string, number>,
+  countBySubgrupo: {} as Record<string, number>,
+  totalRemainingDisparos: 0
+};
+
+export const useAdvancedFilters = (
+  data: CalendarData,
+  filters: Partial<FilterState>,
+  options: AdvancedFilterOptions = {}
+) => {
+  const computeFacets = options.computeFacets ?? true;
   // Pre-computes timestamps once when data changes, avoiding thousands of Date instantiations in loops.
   const allActivities = useMemo(() => {
     return Object.values(data).flat().map(activity => {
@@ -75,29 +98,24 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
     };
   }, [filters]);
 
-  const matchActivity = (activity: Activity, omit: FilterKey[] = []) => {
-    if (!omit.includes('canais') && sel.canais.size > 0 && !sel.canais.has(activity.canal)) return false;
-    if (!omit.includes('jornadas') && sel.jornadas.size > 0 && !sel.jornadas.has(activity.jornada)) return false;
-    if (!omit.includes('segmentos') && sel.segmentos.size > 0 && !sel.segmentos.has(activity.segmento)) return false;
-    if (!omit.includes('parceiros') && sel.parceiros.size > 0 && !sel.parceiros.has(activity.parceiro)) return false;
-    if (!omit.includes('subgrupos') && sel.subgrupos.size > 0 && !sel.subgrupos.has(activity.subgrupo ?? '')) return false;
-    if (sel.bu.size > 0 && !sel.bu.has(activity.bu)) return false;
-
-    if (sel.startMs !== null || sel.endMs !== null) {
-      const activityMs = (activity as any)._dataDisparoMs;
-      if (sel.startMs !== null && activityMs !== undefined && activityMs < sel.startMs) return false;
-      if (sel.endMs !== null && activityMs !== undefined && activityMs > sel.endMs) return false;
-    }
-
-    return true;
-  };
-
   const filteredData = useMemo(() => {
     try {
       const result: CalendarData = {};
 
       Object.entries(data).forEach(([dateKey, activities]) => {
-        const filtered = activities.filter(activity => matchActivity(activity));
+        const filtered = activities.filter(activity => {
+          if (sel.canais.size > 0 && !sel.canais.has(activity.canal)) return false;
+          if (sel.jornadas.size > 0 && !sel.jornadas.has(activity.jornada)) return false;
+          if (sel.segmentos.size > 0 && !sel.segmentos.has(activity.segmento)) return false;
+          if (sel.parceiros.size > 0 && !sel.parceiros.has(activity.parceiro)) return false;
+          if (sel.subgrupos.size > 0 && !sel.subgrupos.has(activity.subgrupo ?? '')) return false;
+          if (sel.bu.size > 0 && !sel.bu.has(activity.bu)) return false;
+
+          const activityMs = (activity as any)._dataDisparoMs;
+          if (sel.startMs !== null && activityMs !== undefined && activityMs < sel.startMs) return false;
+          if (sel.endMs !== null && activityMs !== undefined && activityMs > sel.endMs) return false;
+          return true;
+        });
         if (filtered.length > 0) {
           result[dateKey] = filtered;
         }
@@ -108,17 +126,31 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
       console.error('Error in useAdvancedFilters:', e);
       return data;
     }
-  }, [data, filters]);
+  }, [data, sel]);
 
   // Faceted filter orchestrator:
   // Computes remaining possibilities in the chain by dimension (exclude-self semantics)
   // and keeps available options constrained by static context (BU + period).
   const orchestrator = useMemo(() => {
+    if (!computeFacets) {
+      return {
+        ...EMPTY_FACETS,
+        totalRemainingDisparos: Object.values(filteredData).reduce((acc, list) => acc + list.length, 0)
+      };
+    }
+
     const countByCanal: { [canal: string]: number } = {};
     const countByJornada: { [jornada: string]: number } = {};
     const countBySegmento: { [segmento: string]: number } = {};
     const countByParceiro: { [parceiro: string]: number } = {};
     const countBySubgrupo: { [subgrupo: string]: number } = {};
+    const countMaps: Record<FilterKey, Record<string, number>> = {
+      canais: countByCanal,
+      jornadas: countByJornada,
+      segmentos: countBySegmento,
+      parceiros: countByParceiro,
+      subgrupos: countBySubgrupo
+    };
 
     const available = {
       canais: new Set<string>(),
@@ -128,40 +160,44 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
       subgrupos: new Set<string>()
     };
 
-    const staticMatched = allActivities.filter(activity =>
-      matchActivity(activity, ['canais', 'jornadas', 'segmentos', 'parceiros', 'subgrupos'])
-    );
+    let totalRemainingDisparos = 0;
 
-    staticMatched.forEach(activity => {
+    allActivities.forEach(activity => {
+      const activityMs = (activity as any)._dataDisparoMs;
+      const matchesStatic =
+        (sel.bu.size === 0 || sel.bu.has(activity.bu)) &&
+        (sel.startMs === null || activityMs === undefined || activityMs >= sel.startMs) &&
+        (sel.endMs === null || activityMs === undefined || activityMs <= sel.endMs);
+
+      if (!matchesStatic) return;
+
       if (activity.canal) available.canais.add(activity.canal);
       if (activity.jornada) available.jornadas.add(activity.jornada);
       if (activity.segmento) available.segmentos.add(activity.segmento);
       if (activity.parceiro) available.parceiros.add(activity.parceiro);
       if (activity.subgrupo) available.subgrupos.add(activity.subgrupo);
-    });
 
-    const countMaps: Record<FilterKey, Record<string, number>> = {
-      canais: countByCanal,
-      jornadas: countByJornada,
-      segmentos: countBySegmento,
-      parceiros: countByParceiro,
-      subgrupos: countBySubgrupo
-    };
+      const matches = {
+        canais: sel.canais.size === 0 || sel.canais.has(activity.canal),
+        jornadas: sel.jornadas.size === 0 || sel.jornadas.has(activity.jornada),
+        segmentos: sel.segmentos.size === 0 || sel.segmentos.has(activity.segmento),
+        parceiros: sel.parceiros.size === 0 || sel.parceiros.has(activity.parceiro),
+        subgrupos: sel.subgrupos.size === 0 || sel.subgrupos.has(activity.subgrupo ?? '')
+      };
 
-    const otherKeys = (key: FilterKey) => FILTER_KEYS.filter(k => k !== key);
+      if (Object.values(matches).every(Boolean)) totalRemainingDisparos += 1;
 
-    staticMatched.forEach(activity => {
       FILTER_KEYS.forEach(key => {
-        if (matchActivity(activity, otherKeys(key))) {
-          const value = getFilterValue(activity, key);
-          if (value) {
-            countMaps[key][value] = (countMaps[key][value] || 0) + 1;
-          }
+        const matchesOtherDimensions = FILTER_KEYS.every(otherKey => otherKey === key || matches[otherKey]);
+        if (!matchesOtherDimensions) return;
+
+        const value = getFilterValue(activity, key);
+        if (value) {
+          const countMap = countMaps[key];
+          countMap[value] = (countMap[value] || 0) + 1;
         }
       });
     });
-
-    const totalRemainingDisparos = Object.values(filteredData).reduce((acc, list) => acc + list.length, 0);
 
     return {
       availableCanais: Array.from(available.canais).sort(),
@@ -176,7 +212,7 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
       countBySubgrupo,
       totalRemainingDisparos
     };
-  }, [allActivities, filters, filteredData]);
+  }, [allActivities, computeFacets, filteredData, sel]);
 
   return {
     filteredData,
