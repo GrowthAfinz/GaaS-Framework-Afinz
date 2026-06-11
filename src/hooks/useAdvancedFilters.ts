@@ -63,23 +63,32 @@ export const useAdvancedFilters = (
 ) => {
   const computeFacets = options.computeFacets ?? true;
   // Pre-computes timestamps once when data changes, avoiding thousands of Date instantiations in loops.
-  const allActivities = useMemo(() => {
-    return Object.values(data).flat().map(activity => {
-      if ((activity as any)._dataDisparoMs !== undefined) return activity;
+  // IMPORTANT: o resultado mantém o shape CalendarData e é a fonte tanto de
+  // filteredData quanto de allActivities — se o timestamp ficasse só na lista
+  // achatada, o filtro de período seria silenciosamente ignorado na filtragem.
+  const augmentedData = useMemo(() => {
+    const result: CalendarData = {};
+    Object.entries(data).forEach(([dateKey, activities]) => {
+      result[dateKey] = activities.map(activity => {
+        if ((activity as any)._dataDisparoMs !== undefined) return activity;
 
-      const dateObj = activity.dataDisparo instanceof Date 
-        ? activity.dataDisparo 
-        : new Date(activity.dataDisparo);
-      
-      const normalized = new Date(dateObj);
-      normalized.setHours(0, 0, 0, 0);
+        const dateObj = activity.dataDisparo instanceof Date
+          ? activity.dataDisparo
+          : new Date(activity.dataDisparo);
 
-      return {
-        ...activity,
-        _dataDisparoMs: normalized.getTime()
-      };
+        const normalized = new Date(dateObj);
+        normalized.setHours(0, 0, 0, 0);
+
+        return {
+          ...activity,
+          _dataDisparoMs: normalized.getTime()
+        };
+      });
     });
+    return result;
   }, [data]);
+
+  const allActivities = useMemo(() => Object.values(augmentedData).flat(), [augmentedData]);
 
   // Pré-computa os filtros selecionados como Sets + limites de período (uma vez
   // por mudança de filtro) — evita array.includes por atividade × dimensão.
@@ -102,7 +111,7 @@ export const useAdvancedFilters = (
     try {
       const result: CalendarData = {};
 
-      Object.entries(data).forEach(([dateKey, activities]) => {
+      Object.entries(augmentedData).forEach(([dateKey, activities]) => {
         const filtered = activities.filter(activity => {
           if (sel.canais.size > 0 && !sel.canais.has(activity.canal)) return false;
           if (sel.jornadas.size > 0 && !sel.jornadas.has(activity.jornada)) return false;
@@ -112,8 +121,12 @@ export const useAdvancedFilters = (
           if (sel.bu.size > 0 && !sel.bu.has(activity.bu)) return false;
 
           const activityMs = (activity as any)._dataDisparoMs;
-          if (sel.startMs !== null && activityMs !== undefined && activityMs < sel.startMs) return false;
-          if (sel.endMs !== null && activityMs !== undefined && activityMs > sel.endMs) return false;
+          // Datas inválidas (NaN) não são excluídas pelo período — mantém o
+          // comportamento das demais telas, que tratam isso individualmente.
+          if (activityMs !== undefined && !Number.isNaN(activityMs)) {
+            if (sel.startMs !== null && activityMs < sel.startMs) return false;
+            if (sel.endMs !== null && activityMs > sel.endMs) return false;
+          }
           return true;
         });
         if (filtered.length > 0) {
@@ -126,7 +139,7 @@ export const useAdvancedFilters = (
       console.error('Error in useAdvancedFilters:', e);
       return data;
     }
-  }, [data, sel]);
+  }, [augmentedData, data, sel]);
 
   // Faceted filter orchestrator:
   // Computes remaining possibilities in the chain by dimension (exclude-self semantics)

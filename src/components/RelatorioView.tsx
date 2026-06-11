@@ -1,6 +1,6 @@
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX } from 'lucide-react';
+import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X } from 'lucide-react';
 import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
@@ -130,6 +130,49 @@ function downloadBlob(blob: Blob, filename: string): void {
 const HIGHLIGHT_COLS_HEADER = `font-bold whitespace-nowrap text-slate-900`;
 const HIGHLIGHT_CELL = `font-semibold text-slate-800`;
 
+// Quantidade máxima de disparos renderizados inline; acima disso, a tabela
+// completa abre em overlay dedicado e virtualizado (performance da página).
+const INLINE_DETAIL_LIMIT = 50;
+
+// Mapeia Activity → ActivityRow para o detalhe do disparo (função pura).
+const toActivityRow = (a: Activity): ActivityRow => ({
+  id: a.id,
+  prog_gaas: false,
+  status: (a.status as ActivityRow['status']) ?? 'Enviado',
+  created_at: '',
+  updated_at: '',
+  BU: a.bu as ActivityRow['BU'],
+  jornada: a.jornada ?? '',
+  'Activity name / Taxonomia': a.id,
+  Canal: a.canal,
+  'Data de Disparo': a.dataDisparo ? format(a.dataDisparo, 'yyyy-MM-dd') : '',
+  'Data Fim': '',
+  Segmento: a.segmento ?? '',
+  Parceiro: a.parceiro,
+  Oferta: a.oferta,
+  Promocional: a.promocional,
+  Produto: (a.raw as Record<string, unknown>)?.['Produto'] as string | undefined,
+  'Oferta 2': (a.raw as Record<string, unknown>)?.['Oferta 2'] as string | undefined,
+  'Promocional 2': (a.raw as Record<string, unknown>)?.['Promocional 2'] as string | undefined,
+  'Etapa de aquisição': (a.raw as Record<string, unknown>)?.['Etapa de aquisição'] as string | undefined,
+  'Perfil de Crédito': (a.raw as Record<string, unknown>)?.['Perfil de Crédito'] as string | undefined,
+  'Ordem de disparo': a.ordemDisparo,
+  'Horário de Disparo': (a.raw as Record<string, unknown>)?.['Horário de Disparo'] as string | undefined,
+  'Base Total': a.kpis.baseEnviada,
+  'Base Acionável': a.kpis.baseEntregue,
+  'Taxa de Entrega': a.kpis.taxaEntrega,
+  'Taxa de Proposta': a.kpis.taxaPropostas,
+  'Taxa de Aprovação': a.kpis.taxaAprovacao,
+  'Taxa de Finalização': a.kpis.taxaFinalizacao,
+  'Taxa de Conversão': a.kpis.taxaConversao,
+  'Taxa de Abertura': a.kpis.taxaAbertura,
+  Propostas: a.kpis.propostas,
+  Aprovados: a.kpis.aprovados,
+  'Cartões Gerados': a.kpis.cartoes ?? a.kpis.emissoes,
+  CAC: a.kpis.cac,
+  'Custo Total Campanha': a.kpis.custoTotal,
+});
+
 const CANAL_COLORS: Record<string, string> = {
   'WhatsApp': 'bg-emerald-50 text-emerald-600 border-emerald-100',
   'SMS': 'bg-sky-50 text-sky-600 border-sky-100',
@@ -187,6 +230,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const [destaqueFilter, setDestaqueFilter] = useState<'top-conversores' | 'conversores' | 'aguardando' | null>(null);
   const [showDestaqueMenu, setShowDestaqueMenu] = useState(false);
   const [tableSearch, setTableSearch] = useState('');
+  // Deferir a busca mantém a digitação fluida: o input atualiza imediato e a
+  // re-filtragem da tabela roda em prioridade baixa (React 18).
+  const deferredTableSearch = useDeferredValue(tableSearch);
+  const [showFullTable, setShowFullTable] = useState(false);
   const [detailSegmentFilter, setDetailSegmentFilter] = useState<string | null>(null);
   const [detailCanalFilter, setDetailCanalFilter] = useState<string | null>(null);
   const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
@@ -226,45 +273,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     const visibleSet = new Set<ColumnKey>([...detailDimensionCols, ...detailMetricCols]);
     return [...DIMENSION_COLUMNS, ...METRIC_COLUMNS].filter(def => visibleSet.has(def.key));
   }, [detailDimensionCols, detailMetricCols]);
-
-  // Mapeia Activity → ActivityRow para o DisparoDetailModal
-  const toActivityRow = (a: Activity): ActivityRow => ({
-    id: a.id,
-    prog_gaas: false,
-    status: (a.status as ActivityRow['status']) ?? 'Enviado',
-    created_at: '',
-    updated_at: '',
-    BU: a.bu as ActivityRow['BU'],
-    jornada: a.jornada ?? '',
-    'Activity name / Taxonomia': a.id,
-    Canal: a.canal,
-    'Data de Disparo': a.dataDisparo ? format(a.dataDisparo, 'yyyy-MM-dd') : '',
-    'Data Fim': '',
-    Segmento: a.segmento ?? '',
-    Parceiro: a.parceiro,
-    Oferta: a.oferta,
-    Promocional: a.promocional,
-    Produto: (a.raw as Record<string, unknown>)?.['Produto'] as string | undefined,
-    'Oferta 2': (a.raw as Record<string, unknown>)?.['Oferta 2'] as string | undefined,
-    'Promocional 2': (a.raw as Record<string, unknown>)?.['Promocional 2'] as string | undefined,
-    'Etapa de aquisição': (a.raw as Record<string, unknown>)?.['Etapa de aquisição'] as string | undefined,
-    'Perfil de Crédito': (a.raw as Record<string, unknown>)?.['Perfil de Crédito'] as string | undefined,
-    'Ordem de disparo': a.ordemDisparo,
-    'Horário de Disparo': (a.raw as Record<string, unknown>)?.['Horário de Disparo'] as string | undefined,
-    'Base Total': a.kpis.baseEnviada,
-    'Base Acionável': a.kpis.baseEntregue,
-    'Taxa de Entrega': a.kpis.taxaEntrega,
-    'Taxa de Proposta': a.kpis.taxaPropostas,
-    'Taxa de Aprovação': a.kpis.taxaAprovacao,
-    'Taxa de Finalização': a.kpis.taxaFinalizacao,
-    'Taxa de Conversão': a.kpis.taxaConversao,
-    'Taxa de Abertura': a.kpis.taxaAbertura,
-    Propostas: a.kpis.propostas,
-    Aprovados: a.kpis.aprovados,
-    'Cartões Gerados': a.kpis.cartoes ?? a.kpis.emissoes,
-    CAC: a.kpis.cac,
-    'Custo Total Campanha': a.kpis.custoTotal,
-  });
 
   const segmentoRows = useMemo(
     () => groupActivitiesByDimension(reportActivities, campanhasGroupBy),
@@ -379,7 +387,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       rows = rows.filter(r => r.canal === detailCanalFilter);
     }
 
-    const search = tableSearch.trim().toLowerCase();
+    const search = deferredTableSearch.trim().toLowerCase();
     if (search) {
       rows = rows.filter(r => {
         const description = editingDescs[r.activityName] ?? descriptions[r.activityName] ?? '';
@@ -408,7 +416,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       return rows.filter(r => r.aguardando);
     }
     return rows;
-  }, [descriptions, detailCanalFilter, detailRows, detailSegmentFilter, destaqueFilter, editingDescs, tableSearch]);
+  }, [descriptions, detailCanalFilter, detailRows, detailSegmentFilter, destaqueFilter, editingDescs, deferredTableSearch]);
 
   // ── Ordenação sobre filteredRows ──
   const displayRows = useMemo((): DetailRow[] => {
@@ -419,6 +427,12 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       return sortDir === 'desc' ? bv - av : av - bv;
     });
   }, [filteredRows, sortKey, sortDir]);
+
+  // Recorte renderizado inline — a tabela completa abre no overlay dedicado.
+  const inlineRows = useMemo(
+    () => (displayRows.length > INLINE_DETAIL_LIMIT ? displayRows.slice(0, INLINE_DETAIL_LIMIT) : displayRows),
+    [displayRows]
+  );
 
   // ── Linha de totais ──
   const summaryRow = useMemo(() => {
@@ -475,8 +489,13 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       });
   }, [detailRows]);
 
-  const saveDescription = async (activityName: string) => {
-    const text = editingDescs[activityName] ?? '';
+  // Ref espelho mantém saveDescription com identidade estável (não quebra o
+  // React.memo da tabela a cada tecla digitada na descrição).
+  const editingDescsRef = useRef(editingDescs);
+  editingDescsRef.current = editingDescs;
+
+  const saveDescription = useCallback(async (activityName: string) => {
+    const text = editingDescsRef.current[activityName] ?? '';
     setSavingDesc(prev => new Set(prev).add(activityName));
     await supabase.from('dispatch_descriptions').upsert({
       activity_name: activityName,
@@ -485,7 +504,36 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     });
     setDescriptions(prev => ({ ...prev, [activityName]: text }));
     setSavingDesc(prev => { const s = new Set(prev); s.delete(activityName); return s; });
-  };
+  }, []);
+
+  const handleChangeDescription = useCallback((name: string, value: string) => {
+    setEditingDescs(prev => ({ ...prev, [name]: value }));
+  }, []);
+
+  const handleDetailSort = useCallback((key: string) => {
+    handleSort(key as keyof DetailRow);
+  }, [handleSort]);
+
+  const handleDetailRowClick = useCallback((activityName: string) => {
+    const act = allActivities.find((a: Activity) => a.id === activityName);
+    if (act) {
+      setSelectedActivityRow(toActivityRow(act));
+      setShowFullTable(false);
+    }
+  }, [allActivities]);
+
+  // Overlay da tabela completa: Esc fecha e trava o scroll do body.
+  useEffect(() => {
+    if (!showFullTable) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFullTable(false); };
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showFullTable]);
 
   const segmentColorMap = useMemo(() => {
     const map = new Map<string, (typeof SEGMENT_PALETTE)[0]>();
@@ -738,7 +786,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 {selectedBU ? ` · BU: ${selectedBU}` : ' · Todas as BUs'}
                 {' · '}
                 {segmentoRows.length} segmentos · {canalRows.length} canais
-                <span className="ml-2 opacity-70">· sem filtro de período</span>
+                <span className="ml-2 opacity-70">· {format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</span>
               </p>
             </div>
           </div>
@@ -1151,39 +1199,124 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             </div>
           </div>
           <DetailTable
-            rows={displayRows}
+            rows={inlineRows}
+            totalRowCount={displayRows.length}
             visibleDimensions={detailDimensionCols}
             visibleMetrics={detailMetricCols}
             sortKey={sortKey}
             sortDir={sortDir}
-            onSort={(key) => {
-              if (key === 'date') {
-                handleSort('date');
-              } else {
-                handleSort(key as keyof DetailRow);
-              }
-            }}
+            onSort={handleDetailSort}
             segmentColorMap={segmentColorMap}
             descriptions={descriptions}
             editingDescs={editingDescs}
             savingDesc={savingDesc}
-            onChangeDescription={(name, value) => setEditingDescs(prev => ({ ...prev, [name]: value }))}
+            onChangeDescription={handleChangeDescription}
             onSaveDescription={saveDescription}
             applyGlobalSegmentFilter={applyGlobalSegmentFilter}
             applyGlobalCanalFilter={applyGlobalCanalFilter}
-            onRowClick={(activityName) => {
-              const act = allActivities.find((a: Activity) => a.id === activityName);
-              if (act) setSelectedActivityRow(toActivityRow(act));
-            }}
+            onRowClick={handleDetailRowClick}
             summary={summaryRow}
             destaqueFilter={destaqueFilter}
           />
+          {displayRows.length > INLINE_DETAIL_LIMIT && (
+            <button
+              type="button"
+              onClick={() => setShowFullTable(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 text-xs font-semibold text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50/70 border-t border-slate-100 transition-colors"
+            >
+              <Maximize2 size={14} />
+              Ver tabela completa · {displayRows.length.toLocaleString('pt-BR')} disparos
+              <span className="font-normal text-slate-400">(exibindo os primeiros {INLINE_DETAIL_LIMIT})</span>
+            </button>
+          )}
         </div>}
       </section>
 
       </>
       )}
     </div>
+
+    {/* ── OVERLAY: TABELA COMPLETA (virtualizada) ── */}
+    {showFullTable && (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col">
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-1 h-6 rounded-full shrink-0" style={{ background: TEAL }} />
+            <h2 className="text-base font-bold text-slate-800 whitespace-nowrap">Detalhamento por disparo</h2>
+            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full whitespace-nowrap">
+              {displayRows.length.toLocaleString('pt-BR')} disparos
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="relative w-64">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={tableSearch}
+                onChange={(event) => setTableSearch(event.target.value)}
+                placeholder="Buscar campanha, jornada, segmento..."
+                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+              />
+            </div>
+            <ColumnsCustomizer
+              value={detailDimensionCols}
+              defaults={[...DEFAULT_DETAIL_DIMENSIONS]}
+              available={DIMENSION_COLUMNS}
+              onChange={setDetailDimensionCols}
+              label="Dimensões"
+              buttonLabel="Dimensões"
+            />
+            <ColumnsCustomizer
+              value={detailMetricCols}
+              defaults={[...detailMetricDefaults]}
+              available={METRIC_COLUMNS.filter(c => detailMetricDefaults.includes(c.key as MetricKey))}
+              onChange={setDetailMetricCols}
+              label="Métricas"
+              buttonLabel="Métricas"
+            />
+            <button
+              onClick={exportDetail}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
+            >
+              <FileSpreadsheet size={14} />
+              Exportar CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFullTable(false)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 transition-colors"
+              title="Fechar (Esc)"
+            >
+              <X size={14} />
+              Fechar
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0">
+          <DetailTable
+            rows={displayRows}
+            totalRowCount={displayRows.length}
+            visibleDimensions={detailDimensionCols}
+            visibleMetrics={detailMetricCols}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleDetailSort}
+            segmentColorMap={segmentColorMap}
+            descriptions={descriptions}
+            editingDescs={editingDescs}
+            savingDesc={savingDesc}
+            onChangeDescription={handleChangeDescription}
+            onSaveDescription={saveDescription}
+            applyGlobalSegmentFilter={applyGlobalSegmentFilter}
+            applyGlobalCanalFilter={applyGlobalCanalFilter}
+            onRowClick={handleDetailRowClick}
+            summary={summaryRow}
+            destaqueFilter={destaqueFilter}
+            virtualized
+          />
+        </div>
+      </div>
+    )}
     </>
   );
 };
