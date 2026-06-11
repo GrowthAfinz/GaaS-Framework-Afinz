@@ -331,7 +331,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                 <div>
                     <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        Análise Temporal
+                        Análise de Evolução
                         <InfoTooltip content="Evolução das métricas ao longo do tempo com comparação e agrupamento." />
                     </h2>
                 </div>

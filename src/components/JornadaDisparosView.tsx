@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart2, AlertTriangle, Filter, X } from 'lucide-react';
 import { CalendarData, AnomalyType } from '../types/framework';
-import { JornadaChart } from './JornadaChart';
 import { DailyDetailsModal } from './jornada/DailyDetailsModal';
 import { PerformanceEvolutionChart } from './jornada/PerformanceEvolutionChart';
-import { BottleneckAnalysis } from './jornada/BottleneckAnalysis';
+import { InsightDeckModal } from './jornada/InsightDeckModal';
 import { Tooltip } from './Tooltip';
 import { format } from 'date-fns';
 import { useAppStore } from '../store/useAppStore';
@@ -20,7 +19,6 @@ interface JornadaDisparosViewProps {
 
 export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
   data,
-  previousData,
   selectedBU,
   selectedCanais = [],
   selectedSegmentos = [],
@@ -309,38 +307,23 @@ export const JornadaDisparosView: React.FC<JornadaDisparosViewProps> = ({
         )}
       </div>
 
-      {/* Seção de Gráficos Lado a Lado (Salesforce style) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <JornadaChart
-          data={data}
-          mode={chartMode}
-          anomalyFilters={selectedAnomalyFilters}
-          onPointClick={setSelectedDate}
-        />
-
-        <PerformanceEvolutionChart
-          data={data}
-          selectedBU={selectedBU}
-          selectedCanais={selectedCanais}
-          selectedSegmentos={selectedSegmentos}
-          selectedParceiros={selectedParceiros}
-          onDayClick={(dateStr) => {
-            const date = new Date(`${dateStr}T00:00:00`);
-            setSelectedDate(date);
-          }}
-        />
-      </div>
-
-      {/* Análise de Gargalos (Funil de Jornada) */}
-      <BottleneckAnalysis
+      {/* Análise de Evolução (largura total) */}
+      <PerformanceEvolutionChart
         data={data}
-        previousData={previousData}
         selectedBU={selectedBU}
         selectedCanais={selectedCanais}
         selectedSegmentos={selectedSegmentos}
         selectedParceiros={selectedParceiros}
+        onDayClick={(dateStr) => {
+          const date = new Date(`${dateStr}T00:00:00`);
+          setSelectedDate(date);
+        }}
       />
+
+      {/* Insight Deck (botão flutuante + modal) — substitui a Análise de Gargalos */}
+      <InsightDeckModal />
     </div>
   );
 };
+
 

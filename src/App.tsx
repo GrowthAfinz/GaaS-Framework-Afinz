@@ -142,6 +142,13 @@ function App() {
     });
   };
 
+  const {
+    viewSettings,
+    updateActivity,
+    setTab,
+    setGlobalFilters
+  } = useAppStore();
+
   useEffect(() => {
     if (isTransitioning) {
       const timer = setTimeout(() => {
@@ -150,13 +157,6 @@ function App() {
       return () => clearTimeout(timer);
     }
   }, [viewSettings?.frente, isTransitioning, setTransitioning]);
-
-  const {
-    viewSettings,
-    updateActivity,
-    setTab,
-    setGlobalFilters
-  } = useAppStore();
   const storeFilters = viewSettings.filtrosGlobais;
   const activeTab = viewSettings.abaAtual;
 
