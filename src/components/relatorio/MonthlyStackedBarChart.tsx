@@ -17,6 +17,7 @@ import {
   MonthlyMetricKey,
   NON_STACKABLE_MONTHLY_METRICS,
 } from '../../utils/monthlyAggregation';
+import { useAppStore } from '../../store/useAppStore';
 
 interface MonthlyStackedBarChartProps {
   title: string;
@@ -74,6 +75,43 @@ export const MonthlyStackedBarChart: React.FC<MonthlyStackedBarChartProps> = ({ 
   const [metric, setMetric] = useState<MonthlyMetricKey>(rentabilizacao ? 'cliques' : 'emissoes');
   const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
   const isStackable = !NON_STACKABLE_MONTHLY_METRICS.has(metric);
+
+  const { viewSettings, setGlobalFilters } = useAppStore();
+  const globalFilters = viewSettings.filtrosGlobais;
+
+  const activeGlobalValues = useMemo(
+    () => (dimension === 'segmento' ? globalFilters.segmentos : globalFilters.canais),
+    [dimension, globalFilters.segmentos, globalFilters.canais],
+  );
+
+  // Sync local focused series with the global filter state
+  useEffect(() => {
+    if (activeGlobalValues.length === 1) {
+      setFocusedSeries(activeGlobalValues[0]);
+    } else if (activeGlobalValues.length === 0) {
+      setFocusedSeries(null);
+    }
+  }, [activeGlobalValues]);
+
+  const handleSeriesClick = (label: string) => {
+    const isActive = activeGlobalValues.length === 1 && activeGlobalValues[0] === label;
+    const next = isActive ? [] : [label];
+    if (dimension === 'segmento') {
+      setGlobalFilters({ segmentos: next });
+    } else {
+      setGlobalFilters({ canais: next });
+    }
+    setFocusedSeries(next.length > 0 ? label : null);
+  };
+
+  const handleClearFilter = () => {
+    if (dimension === 'segmento') {
+      setGlobalFilters({ segmentos: [] });
+    } else {
+      setGlobalFilters({ canais: [] });
+    }
+    setFocusedSeries(null);
+  };
 
   useEffect(() => {
     setMetric(rentabilizacao ? 'cliques' : 'emissoes');
@@ -144,36 +182,52 @@ export const MonthlyStackedBarChart: React.FC<MonthlyStackedBarChartProps> = ({ 
         </div>
       </div>
 
-      {/* Series Totals - Filter Buttons */}
+      {/* Series Totals - Filter Buttons (aplicam filtro global) */}
       {seriesTotals.size > 0 && (
         <div className="mb-4 flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <span className="w-full text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            Filtro rápido — clique para aplicar filtro global
+          </span>
           {Array.from(seriesTotals.entries())
             .sort((a, b) => b[1] - a[1])
-            .map(([label, total], idx) => (
-              <button
-                key={`filter-${label}`}
-                type="button"
-                onClick={() => setFocusedSeries(focusedSeries === label ? null : label)}
-                className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                  focusedSeries === label
-                    ? 'bg-slate-900 text-white border border-slate-700 shadow-md'
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
-                }`}
-                title={`Clique para focar em ${label}`}
-              >
-                <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: SERIES_COLORS[idx % SERIES_COLORS.length] }}
-                />
-                <span className="truncate">{label}</span>
-                <span className="text-[11px] opacity-75">({formatChartValue(total, metric)})</span>
-              </button>
-            ))}
-          {focusedSeries && (
+            .map(([label, total], idx) => {
+              const isGloballyActive = activeGlobalValues.includes(label);
+              return (
+                <button
+                  key={`filter-${label}`}
+                  type="button"
+                  onClick={() => handleSeriesClick(label)}
+                  className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    isGloballyActive
+                      ? 'bg-slate-900 text-white border border-slate-700 shadow-md ring-2 ring-offset-1 ring-slate-700'
+                      : focusedSeries && focusedSeries !== label
+                      ? 'bg-white text-slate-400 border border-slate-200 opacity-60'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 hover:border-slate-400 hover:shadow-sm'
+                  }`}
+                  title={isGloballyActive ? `Remover filtro: ${label}` : `Aplicar filtro global: ${label}`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: SERIES_COLORS[idx % SERIES_COLORS.length] }}
+                  />
+                  <span className="truncate">{label}</span>
+                  <span className="text-[11px] opacity-75">({formatChartValue(total, metric)})</span>
+                  {isGloballyActive && (
+                    <svg className="w-3 h-3 ml-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          {activeGlobalValues.length > 0 && (
             <button
               type="button"
-              onClick={() => setFocusedSeries(null)}
-              className="text-xs px-3 py-1.5 rounded-md font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-300 hover:border-slate-400 transition-all"
+              onClick={handleClearFilter}
+              className="text-xs px-3 py-1.5 rounded-md font-medium text-red-500 hover:text-red-700 bg-white border border-red-200 hover:border-red-400 transition-all"
             >
               ✕ Limpar filtro
             </button>
