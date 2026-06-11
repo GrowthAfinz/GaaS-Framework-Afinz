@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Component, ErrorInfo, ReactNode, useTransition } from 'react';
+import { useState, useMemo, useEffect, useRef, Component, ErrorInfo, ReactNode, useDeferredValue } from 'react';
 import { Menu } from 'lucide-react';
 import { CSVUpload } from './components/CSVUpload';
 import { InlineFilterBar } from './components/InlineFilterBar';
@@ -76,7 +76,6 @@ function App() {
   const filterCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filterShellRef = useRef<HTMLDivElement | null>(null);
 
-  const [isPending, startTransition] = useTransition();
   const isTransitioning = useAppStore((s) => s.isTransitioning);
   const setTransitioning = useAppStore((s) => s.setTransitioning);
 
@@ -137,9 +136,7 @@ function App() {
   }, []);
 
   const handleApplyFilters = (nextFilters: Partial<FilterState>) => {
-    startTransition(() => {
-      setGlobalFilters(nextFilters);
-    });
+    setGlobalFilters(nextFilters);
   };
 
   const {
@@ -183,6 +180,9 @@ function App() {
     bu: selectedBUs
   }), [storeFilters, startDate, endDate, selectedBUs]);
 
+  const deferredFilters = useDeferredValue(filters);
+  const isPending = filters !== deferredFilters;
+
   const isFrameworkView = activeTab === 'framework';
   const isMidiaPaga = activeTab === 'midia-paga';
   const shouldRunFilters = !isFrameworkView && !isMidiaPaga;
@@ -202,10 +202,10 @@ function App() {
     totalRemainingDisparos
   } = useAdvancedFilters(
     shouldRunFilters ? sourceData : {},
-    filters
+    deferredFilters
   );
 
-  const { filteredData } = useCalendarFilter(advancedFilteredData, filters);
+  const { filteredData } = useCalendarFilter(advancedFilteredData, deferredFilters);
 
   const previousFilters = useMemo(() => {
     if (!compareMode) return null;
@@ -246,19 +246,22 @@ function App() {
     dataFim: ''
   }), [storeFilters, selectedBUs]);
 
+  const deferredLaunchPlannerFilters = useDeferredValue(launchPlannerFilters);
+  const deferredPreviousFilters = useDeferredValue(previousFilters);
+
   const { filteredData: launchPlannerData } = useAdvancedFilters(
     activeTab === 'launch' ? sourceData : {},
-    launchPlannerFilters
+    deferredLaunchPlannerFilters
   );
 
   const { filteredData: previousAdvancedFilteredData } = useAdvancedFilters(
     (shouldRunFilters && previousFilters) ? sourceData : {},
-    previousFilters || {}
+    deferredPreviousFilters || {}
   );
 
   const { filteredData: previousFilteredData } = useCalendarFilter(
     (shouldRunFilters && previousFilters) ? previousAdvancedFilteredData : {},
-    previousFilters || {}
+    deferredPreviousFilters || {}
   );
 
   const resultados = useResultadosMetrics(filteredData);
