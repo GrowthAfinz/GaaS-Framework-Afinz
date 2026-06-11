@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useDeferredValue } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useFrameworkData } from './useFrameworkData';
 import { useAdvancedFilters } from './useAdvancedFilters';
@@ -224,30 +224,35 @@ export const useB2CAnalysis = () => {
     const { selectedBUs } = useBU();
     const [viewMode, setViewMode] = useState<ViewMode>('daily');
 
+    const deferredGlobalFilters = useDeferredValue(viewSettings.filtrosGlobais);
+    const deferredBUs = useDeferredValue(selectedBUs);
+    const deferredStartDate = useDeferredValue(startDate);
+    const deferredEndDate = useDeferredValue(endDate);
+
     // --- 1. Current Period Setup ---
     const filters = useMemo(() => ({
-        ...viewSettings.filtrosGlobais,
-        dataInicio: format(startDate, 'yyyy-MM-dd'),
-        dataFim: format(endDate, 'yyyy-MM-dd'),
-        bu: selectedBUs
-    }), [viewSettings.filtrosGlobais, startDate, endDate, selectedBUs]);
+        ...deferredGlobalFilters,
+        dataInicio: format(deferredStartDate, 'yyyy-MM-dd'),
+        dataFim: format(deferredEndDate, 'yyyy-MM-dd'),
+        bu: deferredBUs
+    }), [deferredGlobalFilters, deferredStartDate, deferredEndDate, deferredBUs]);
 
     const { filteredData: crmFiltered } = useAdvancedFilters(frameworkData, filters);
 
     // --- 2. Previous Period Setup ---
     const { prevStartDate, prevEndDate } = useMemo(() => {
-        const diff = differenceInDays(endDate, startDate) + 1; // inclusive
-        const pEnd = subDays(startDate, 1);
+        const diff = differenceInDays(deferredEndDate, deferredStartDate) + 1; // inclusive
+        const pEnd = subDays(deferredStartDate, 1);
         const pStart = subDays(pEnd, diff - 1);
         return { prevStartDate: pStart, prevEndDate: pEnd };
-    }, [startDate, endDate]);
+    }, [deferredStartDate, deferredEndDate]);
 
     const prevFilters = useMemo(() => ({
-        ...viewSettings.filtrosGlobais,
+        ...deferredGlobalFilters,
         dataInicio: format(prevStartDate, 'yyyy-MM-dd'),
         dataFim: format(prevEndDate, 'yyyy-MM-dd'),
-        bu: selectedBUs
-    }), [viewSettings.filtrosGlobais, prevStartDate, prevEndDate, selectedBUs]);
+        bu: deferredBUs
+    }), [deferredGlobalFilters, prevStartDate, prevEndDate, deferredBUs]);
 
     const { filteredData: prevCrmFiltered } = useAdvancedFilters(frameworkData, prevFilters);
 

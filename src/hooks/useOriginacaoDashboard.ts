@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useDeferredValue } from 'react';
 import {
     eachDayOfInterval,
     endOfMonth,
@@ -200,26 +200,31 @@ export const useOriginacaoDashboard = () => {
     const { startDate, endDate } = usePeriod();
     const { selectedBUs } = useBU();
 
+    const deferredGlobalFilters = useDeferredValue(viewSettings.filtrosGlobais);
+    const deferredBUs = useDeferredValue(selectedBUs);
+    const deferredStartDate = useDeferredValue(startDate);
+    const deferredEndDate = useDeferredValue(endDate);
+
     const allActivities = useMemo(() => groupActivitiesByDate(activities), [activities]);
 
     const baseFilters = useMemo(() => ({
-        ...viewSettings.filtrosGlobais,
-        bu: selectedBUs
-    }), [viewSettings.filtrosGlobais, selectedBUs]);
+        ...deferredGlobalFilters,
+        bu: deferredBUs
+    }), [deferredGlobalFilters, deferredBUs]);
 
     const analysisFilters = useMemo(() => ({
         ...baseFilters,
-        dataInicio: format(startDate, 'yyyy-MM-dd'),
-        dataFim: format(endDate, 'yyyy-MM-dd')
-    }), [baseFilters, startDate, endDate]);
+        dataInicio: format(deferredStartDate, 'yyyy-MM-dd'),
+        dataFim: format(deferredEndDate, 'yyyy-MM-dd')
+    }), [baseFilters, deferredStartDate, deferredEndDate]);
 
-    const goalMonthStart = useMemo(() => startOfMonth(endDate), [endDate]);
-    const goalMonthEnd = useMemo(() => endOfMonth(endDate), [endDate]);
+    const goalMonthStart = useMemo(() => startOfMonth(deferredEndDate), [deferredEndDate]);
+    const goalMonthEnd = useMemo(() => endOfMonth(deferredEndDate), [deferredEndDate]);
     const today = useMemo(() => new Date(), []);
     const paceCutoff = useMemo(() => {
-        const candidates = [goalMonthEnd, endDate, today].sort((a, b) => a.getTime() - b.getTime());
+        const candidates = [goalMonthEnd, deferredEndDate, today].sort((a, b) => a.getTime() - b.getTime());
         return candidates[0];
-    }, [goalMonthEnd, endDate, today]);
+    }, [goalMonthEnd, deferredEndDate, today]);
 
     const goalFilters = useMemo(() => ({
         ...baseFilters,

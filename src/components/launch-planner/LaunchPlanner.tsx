@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useDeferredValue } from 'react';
 import { CalendarData, FilterState, Activity } from '../../types/framework';
 import { DashboardLayout } from './DashboardLayout';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
@@ -27,9 +27,10 @@ export const LaunchPlanner: React.FC<LaunchPlannerProps> = ({ data, onActivityUp
     const viewSettings = useAppStore((state) => state.viewSettings);
     const addActivity = useAppStore((state) => state.addActivity); // Action to update store
     const filters: FilterState = viewSettings.filtrosGlobais;
+    const deferredFilters = useDeferredValue(filters);
 
     // Get available segmentos and determine active one
-    const { availableSegmentos } = useAdvancedFilters(data, filters);
+    const { availableSegmentos } = useAdvancedFilters(data, deferredFilters);
     const activeSegmento = filters.segmentos[0] || availableSegmentos[0] || 'Todos';
 
     const handleDayClick = (date: Date) => {

@@ -39,7 +39,24 @@ const parseISODate = (value?: string) => {
 };
 
 export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => {
-  const allActivities = useMemo(() => Object.values(data).flat(), [data]);
+  // Pre-computes timestamps once when data changes, avoiding thousands of Date instantiations in loops.
+  const allActivities = useMemo(() => {
+    return Object.values(data).flat().map(activity => {
+      if ((activity as any)._dataDisparoMs !== undefined) return activity;
+
+      const dateObj = activity.dataDisparo instanceof Date 
+        ? activity.dataDisparo 
+        : new Date(activity.dataDisparo);
+      
+      const normalized = new Date(dateObj);
+      normalized.setHours(0, 0, 0, 0);
+
+      return {
+        ...activity,
+        _dataDisparoMs: normalized.getTime()
+      };
+    });
+  }, [data]);
 
   // Pré-computa os filtros selecionados como Sets + limites de período (uma vez
   // por mudança de filtro) — evita array.includes por atividade × dimensão.
@@ -67,9 +84,9 @@ export const useAdvancedFilters = (data: CalendarData, filters: FilterState) => 
     if (sel.bu.size > 0 && !sel.bu.has(activity.bu)) return false;
 
     if (sel.startMs !== null || sel.endMs !== null) {
-      const activityMs = normalizeDayStart(new Date(activity.dataDisparo)).getTime();
-      if (sel.startMs !== null && activityMs < sel.startMs) return false;
-      if (sel.endMs !== null && activityMs > sel.endMs) return false;
+      const activityMs = (activity as any)._dataDisparoMs;
+      if (sel.startMs !== null && activityMs !== undefined && activityMs < sel.startMs) return false;
+      if (sel.endMs !== null && activityMs !== undefined && activityMs > sel.endMs) return false;
     }
 
     return true;

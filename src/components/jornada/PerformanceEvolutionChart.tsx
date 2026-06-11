@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
-    LineChart,
+    ComposedChart,
+    Bar,
     Line,
     XAxis,
     YAxis,
@@ -426,26 +427,53 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                 </div>
             </div>
 
-            <div className="h-[300px] w-full">
+            <div className="h-[340px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <ComposedChart data={chartData} margin={{ top: 12, right: 16, left: 8, bottom: 4 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                         <XAxis
                             dataKey="label"
-                            stroke="#94A3B8"
-                            tick={{ fill: '#94A3B8', fontSize: 10 }}
+                            tick={{ fill: '#64748B', fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
                         />
-                        <YAxis 
-                            stroke="#94A3B8" 
-                            tick={{ fill: '#94A3B8', fontSize: 10 }}
-                            tickFormatter={(value) => value.toLocaleString('pt-BR')}
+                        <YAxis
+                            yAxisId="left"
+                            tick={{ fill: '#94A3B8', fontSize: 11 }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(value) => Number(value).toLocaleString('pt-BR', { notation: 'compact' })}
                         />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                        {lineMetrics.length > 0 && barMetrics.length > 0 && (
+                            <YAxis
+                                yAxisId="right"
+                                orientation="right"
+                                tick={{ fill: '#94A3B8', fontSize: 11 }}
+                                axisLine={false}
+                                tickLine={false}
+                                tickFormatter={(value) => formatMetricValue(value, lineMetrics[0])}
+                            />
+                        )}
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: '#E2E8F0', opacity: 0.35 }} />
+                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
 
-                        {selectedMetrics.map((m) => (
+                        {barMetrics.map((m) => (
+                            <Bar
+                                key={m}
+                                yAxisId="left"
+                                dataKey={m}
+                                name={METRIC_CONFIGS[m].label}
+                                fill={METRIC_CONFIGS[m].color}
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={groupBy === 'daily' ? 26 : 48}
+                                cursor={groupBy === 'daily' ? 'pointer' : undefined}
+                                onClick={(state: any) => handleDotClick(state)}
+                            />
+                        ))}
+                        {lineMetrics.map((m) => (
                             <Line
                                 key={m}
+                                yAxisId={barMetrics.length > 0 ? 'right' : 'left'}
                                 type="monotone"
                                 dataKey={m}
                                 name={METRIC_CONFIGS[m].label}
@@ -456,7 +484,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                                 onClick={(state: any) => handleDotClick(state)}
                             />
                         ))}
-                    </LineChart>
+                    </ComposedChart>
                 </ResponsiveContainer>
             </div>
 
