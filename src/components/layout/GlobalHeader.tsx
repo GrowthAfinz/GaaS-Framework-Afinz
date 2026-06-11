@@ -20,7 +20,6 @@ import { useAppStore } from '../../store/useAppStore';
 import { NavDropdown } from './NavDropdown';
 import { FrenteSwitcher } from './FrenteSwitcher';
 import { BUDropdown } from './BUDropdown';
-import { useBU } from '../../contexts/BUContext';
 import { useUserRole } from '../../context/UserRoleContext';
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { useGlobalSearch, GlobalSearchResult, GlobalSearchResultType } from '../../hooks/useGlobalSearch';
@@ -51,30 +50,8 @@ const BU_DOT: Record<string, string> = {
 };
 
 export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
-    const { setTab, viewSettings, setFrente } = useAppStore();
+    const { setTab, viewSettings } = useAppStore();
     const activeTab = viewSettings.abaAtual;
-    const { isBUSelected, setSelectedBUs, isBULocked } = useBU();
-    const isSegurosSelected = isBUSelected('Seguros');
-    const previousFrenteRef = useRef(viewSettings.frente);
-
-    // Seguros = Rentabilização: ao selecionar a BU Seguros, força a frente.
-    useEffect(() => {
-        if (isSegurosSelected) {
-            setFrente('rentabilizacao');
-        }
-    }, [isSegurosSelected, setFrente]);
-
-    // Não herda silenciosamente um filtro de Aquisição que esconda Seguros.
-    // Depois da entrada, o usuário continua podendo remover a BU manualmente.
-    useEffect(() => {
-        const enteredRentabilizacao =
-            previousFrenteRef.current !== 'rentabilizacao' &&
-            viewSettings.frente === 'rentabilizacao';
-        previousFrenteRef.current = viewSettings.frente;
-
-        if (!enteredRentabilizacao || isBULocked || isSegurosSelected) return;
-        setSelectedBUs((current) => [...current, 'Seguros']);
-    }, [viewSettings.frente, isBULocked, isSegurosSelected, setSelectedBUs]);
     const { canSeeTab } = useUserRole();
     const setPendingNavigation = useExplorerStore((s) => s.setPendingNavigation);
 

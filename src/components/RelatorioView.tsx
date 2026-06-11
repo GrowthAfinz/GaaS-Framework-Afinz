@@ -35,6 +35,7 @@ import { GroupBySelector } from './relatorio/GroupBySelector';
 import { fmtN, fmtPct, fmtPct4, fmtBRL, formatMetric } from './relatorio/reportFormatters';
 import { AggregateTable } from './relatorio/AggregateTable';
 import { DetailTable } from './relatorio/DetailTable';
+import { activityMatchesFrente } from '../utils/activityFrente';
 
 interface RelatorioViewProps {
   data: CalendarData;
@@ -150,6 +151,9 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const previousAllActivities = useMemo(() => Object.values(previousData ?? {}).flat(), [previousData]);
   const filterReportActivities = useCallback((activities: Activity[]) => (
     activities.filter((activity) => {
+      if (!activityMatchesFrente(activity, viewSettings.frente)) {
+        return false;
+      }
       // Filtro de BU — respeita seleção do painel superior
       if (selectedBUs.length > 0 && !selectedBUs.includes(activity.bu as import('../contexts/BUContext').BU)) {
         return false;
@@ -168,7 +172,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       }
       return true;
     })
-  ), [globalFilters, selectedBUs]);
+  ), [globalFilters, selectedBUs, viewSettings.frente]);
   const reportActivities = useMemo(() => filterReportActivities(allActivities), [allActivities, filterReportActivities]);
   const previousReportActivities = useMemo(() => filterReportActivities(previousAllActivities), [filterReportActivities, previousAllActivities]);
   const shouldShowComparison = compareMode !== null && previousData !== undefined;

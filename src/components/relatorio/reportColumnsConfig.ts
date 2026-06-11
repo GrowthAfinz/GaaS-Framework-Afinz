@@ -141,7 +141,7 @@ export const ENGAGEMENT_DETAIL_METRICS: MetricKey[] = [
 ];
 
 export const DEFAULT_DETAIL_DIMENSIONS: DimensionKey[] = [
-  'segmento', 'parceiro', 'canal', 'descricao',
+  'segmento', 'parceiro', 'canal',
 ];
 
 export const DEFAULT_DETAIL_METRICS: MetricKey[] = [

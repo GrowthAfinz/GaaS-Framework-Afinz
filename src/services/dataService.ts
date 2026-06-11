@@ -5,6 +5,7 @@ import { B2CDataRow } from '../types/b2c';
 import { parseDate } from '../utils/formatters';
 import { getCustoUnitarioCanal, CUSTO_UNITARIO_OFERTA } from '../constants/frameworkFields';
 import { classifyRentabilizacao } from '../utils/rentabilizacaoClassify';
+import { activityMatchesFrente } from '../utils/activityFrente';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 1000;
@@ -263,7 +264,7 @@ export const dataService = {
         // (As campanhas de Seguros vivem em rentabilizacao_activities; sem perda.)
         return allRows
             .map(mapSqlToActivity)
-            .filter((a) => a.bu !== 'Seguros');
+            .filter((a) => a.bu !== 'Seguros' && activityMatchesFrente(a, 'aquisicao'));
     },
 
     /** Frente de Rentabilização: lê a tabela `rentabilizacao_activities`.
@@ -294,11 +295,13 @@ export const dataService = {
 
         // Classificação determinística Segmento/Subgrupo a partir da jornada
         // (garante exibição correta independentemente do estado do banco).
-        return allRows.map((row) => {
-            const activity = mapSqlToActivity(row);
-            const { segmento, subgrupo } = classifyRentabilizacao(activity.jornada);
-            return { ...activity, segmento, subgrupo };
-        });
+        return allRows
+            .map((row) => {
+                const activity = mapSqlToActivity(row);
+                const { segmento, subgrupo } = classifyRentabilizacao(activity.jornada);
+                return { ...activity, segmento, subgrupo };
+            })
+            .filter((activity) => activityMatchesFrente(activity, 'rentabilizacao'));
     },
 
     async fetchB2CMetrics(): Promise<B2CDataRow[]> {
