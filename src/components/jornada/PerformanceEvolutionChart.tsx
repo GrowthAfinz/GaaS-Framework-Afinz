@@ -44,6 +44,17 @@ type MetricType =
 
 type GroupBy = 'daily' | 'weekly' | 'monthly';
 
+const BAR_METRICS = new Set<MetricType>([
+    'envios',
+    'entregas',
+    'disparos',
+    'propostas',
+    'aprovados',
+    'cartoes',
+    'aberturasQtd',
+    'cliques'
+]);
+
 const METRIC_CONFIGS: Record<MetricType, { label: string; color: string; group: string }> = {
     conversao: { label: 'Taxa de Conversão', color: '#3b82f6', group: 'Taxas & Eficiência' }, // Blue
     entrega: { label: 'Taxa de Entrega', color: '#10b981', group: 'Taxas & Eficiência' }, // Emerald
@@ -301,6 +312,21 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
         });
     }, [chartData, selectedMetrics]);
 
+    const { barMetrics, lineMetrics } = useMemo(() => {
+        const bars: MetricType[] = [];
+        const lines: MetricType[] = [];
+
+        selectedMetrics.forEach(metric => {
+            if (BAR_METRICS.has(metric)) {
+                bars.push(metric);
+            } else {
+                lines.push(metric);
+            }
+        });
+
+        return { barMetrics: bars, lineMetrics: lines };
+    }, [selectedMetrics]);
+
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
@@ -451,7 +477,7 @@ export const PerformanceEvolutionChart: React.FC<PerformanceEvolutionChartProps>
                                 tick={{ fill: '#94A3B8', fontSize: 11 }}
                                 axisLine={false}
                                 tickLine={false}
-                                tickFormatter={(value) => formatMetricValue(value, lineMetrics[0])}
+                                tickFormatter={(value) => String(formatMetricValue(value, lineMetrics[0] ?? 'conversao'))}
                             />
                         )}
                         <Tooltip content={<CustomTooltip />} cursor={{ fill: '#E2E8F0', opacity: 0.35 }} />
