@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useUserRole } from '../context/UserRoleContext';
 
 export type BU = 'B2C' | 'B2B2C' | 'Plurix' | 'Seguros';
@@ -56,7 +56,7 @@ export const BUProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         }
     }, [isRoleLocked, lockedBUs, selectedBUs]);
 
-    const toggleBU = (bu: BU) => {
+    const toggleBU = useCallback((bu: BU) => {
         // Prevent toggling if BU is locked
         if (isRoleLocked) return;
 
@@ -67,30 +67,32 @@ export const BUProvider: React.FC<{ children: React.ReactNode }> = ({ children }
                 return [...prev, bu];
             }
         });
-    };
+    }, [isRoleLocked]);
 
-    const selectAll = () => {
+    const selectAll = useCallback(() => {
         if (isRoleLocked) return;
         setSelectedBUs(ALL_BUS);
-    };
+    }, [isRoleLocked]);
 
-    const deselectAll = () => {
+    const deselectAll = useCallback(() => {
         if (isRoleLocked) return;
         setSelectedBUs([]);
-    };
+    }, [isRoleLocked]);
 
-    const isBUSelected = (bu: BU) => selectedBUs.includes(bu);
+    const isBUSelected = useCallback((bu: BU) => selectedBUs.includes(bu), [selectedBUs]);
+
+    const value = useMemo(() => ({
+        selectedBUs,
+        setSelectedBUs,
+        toggleBU,
+        selectAll,
+        deselectAll,
+        isBUSelected,
+        isBULocked: isRoleLocked
+    }), [selectedBUs, toggleBU, selectAll, deselectAll, isBUSelected, isRoleLocked]);
 
     return (
-        <BUContext.Provider value={{
-            selectedBUs,
-            setSelectedBUs,
-            toggleBU,
-            selectAll,
-            deselectAll,
-            isBUSelected,
-            isBULocked: isRoleLocked
-        }}>
+        <BUContext.Provider value={value}>
             {children}
         </BUContext.Provider>
     );

@@ -68,6 +68,27 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
   }
 }
 
+const areFiltersEqual = (a: any, b: any): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  if (a.dataInicio !== b.dataInicio) return false;
+  if (a.dataFim !== b.dataFim) return false;
+  if (a.disparado !== b.disparado) return false;
+
+  const arrayKeys = ['bu', 'canais', 'jornadas', 'segmentos', 'parceiros', 'subgrupos', 'ofertas'] as const;
+  for (const key of arrayKeys) {
+    const arrA = a[key] || [];
+    const arrB = b[key] || [];
+    if (arrA.length !== arrB.length) return false;
+    for (let i = 0; i < arrA.length; i++) {
+      if (arrA[i] !== arrB[i]) return false;
+    }
+  }
+
+  return true;
+};
+
 function App() {
   const { user, loading: authLoading } = useAuth();
   const [urlHash, setUrlHash] = useState(window.location.hash);
@@ -181,7 +202,7 @@ function App() {
   }), [storeFilters, startDate, endDate, selectedBUs]);
 
   const deferredFilters = useDeferredValue(filters);
-  const isPending = filters !== deferredFilters;
+  const isPending = !areFiltersEqual(filters, deferredFilters);
 
   const isFrameworkView = activeTab === 'framework';
   const isMidiaPaga = activeTab === 'midia-paga';

@@ -11,23 +11,42 @@ const BU_OPTIONS: { id: BU; label: string; color: string }[] = [
 
 /**
  * Seletor de BU compacto: um botão único com mini-bolinhas das BUs ativas + contador.
- * Clica e abre um popover com os 4 toggles (multi-seleção) + Todas/Limpar.
- * Reutiliza o contexto useBU (mantém o efeito Seguros→Rentabilização no GlobalHeader).
+ * Clica e abre um popover com os 4 toggles (multi-seleção) com confirmação (Batch Apply).
+ * Reutiliza o contexto useBU.
  */
 export const BUDropdown: React.FC = () => {
-    const { toggleBU, isBUSelected, selectAll, deselectAll, isBULocked, selectedBUs } = useBU();
+    const { setSelectedBUs, isBULocked, selectedBUs } = useBU();
     const [open, setOpen] = useState(false);
+    const [tempSelected, setTempSelected] = useState<BU[]>([]);
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+            if (ref.current && !ref.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    // Sincroniza a seleção temporária com o estado global ao abrir o dropdown
+    useEffect(() => {
+        if (open) {
+            setTempSelected(selectedBUs);
+        }
+    }, [open, selectedBUs]);
+
     const selectedCount = selectedBUs.length;
+
+    const handleApply = () => {
+        setSelectedBUs(tempSelected);
+        setOpen(false);
+    };
+
+    const handleCancel = () => {
+        setOpen(false);
+    };
 
     return (
         <div ref={ref} className="relative">
@@ -43,7 +62,7 @@ export const BUDropdown: React.FC = () => {
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">BU</span>
                 {isBULocked && <Lock size={11} className="text-amber-500" />}
                 <div className="flex items-center gap-0.5">
-                    {BU_OPTIONS.filter((bu) => isBUSelected(bu.id)).map((bu) => (
+                    {BU_OPTIONS.filter((bu) => selectedBUs.includes(bu.id)).map((bu) => (
                         <span key={bu.id} className={`w-1.5 h-1.5 rounded-full ${bu.color}`} />
                     ))}
                     {selectedCount === 0 && <span className="text-[11px] text-slate-400">nenhuma</span>}
@@ -54,12 +73,21 @@ export const BUDropdown: React.FC = () => {
 
             {open && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-[9999] py-1">
+                    <div className="px-3 py-1 text-[10px] font-extrabold text-slate-405 uppercase tracking-wider border-b border-slate-100 pb-1.5 mb-1 bg-slate-50/50 -mx-1 -mt-1">
+                        Selecionar BUs
+                    </div>
                     {BU_OPTIONS.map((bu) => {
-                        const active = isBUSelected(bu.id);
+                        const active = tempSelected.includes(bu.id);
                         return (
                             <button
                                 key={bu.id}
-                                onClick={() => toggleBU(bu.id)}
+                                onClick={() => {
+                                    setTempSelected(prev =>
+                                        prev.includes(bu.id)
+                                            ? prev.filter((b) => b !== bu.id)
+                                            : [...prev, bu.id]
+                                    );
+                                }}
                                 className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 transition-colors text-left"
                             >
                                 <span className={`w-4 h-4 rounded border flex items-center justify-center ${active ? 'bg-cyan-500 border-cyan-500' : 'border-slate-300'}`}>
@@ -70,9 +98,36 @@ export const BUDropdown: React.FC = () => {
                             </button>
                         );
                     })}
-                    <div className="flex items-center justify-between border-t border-slate-100 mt-1 px-3 pt-1.5">
-                        <button onClick={selectAll} className="text-[11px] font-semibold text-cyan-600 hover:text-cyan-700">Todas</button>
-                        <button onClick={deselectAll} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600">Limpar</button>
+                    <div className="flex items-center justify-between border-t border-slate-100 mt-1 px-3 pt-1.5 pb-1">
+                        <button
+                            onClick={() => setTempSelected(BU_OPTIONS.map((bu) => bu.id))}
+                            className="text-[11px] font-semibold text-cyan-600 hover:text-cyan-700"
+                        >
+                            Todas
+                        </button>
+                        <button
+                            onClick={() => setTempSelected([])}
+                            className="text-[11px] font-semibold text-slate-400 hover:text-slate-655"
+                        >
+                            Limpar
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1 px-2.5 pt-2 pb-1 bg-slate-50/50 border-t border-slate-100 mt-1.5">
+                        <button
+                            type="button"
+                            onClick={handleCancel}
+                            className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-[10px] font-bold text-slate-500 hover:text-slate-600 transition"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleApply}
+                            className="px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-[10px] font-bold text-white shadow-sm hover:shadow transition"
+                        >
+                            Aplicar
+                        </button>
                     </div>
                 </div>
             )}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from './AuthContext';
 
@@ -68,7 +68,9 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const isGrowthB2C = role === 'growth_b2c';
   const isPlurixAnalyst = role === 'analista_plurix';
   const isBULocked = isPlurixAnalyst;
-  const lockedBUs: BU[] = isPlurixAnalyst ? ['Plurix'] : [];
+  const lockedBUs = useMemo<BU[]>(() => {
+    return isPlurixAnalyst ? ['Plurix'] : [];
+  }, [isPlurixAnalyst]);
 
   const canSeeTab = (tabId: string): boolean => {
     // Analista Plurix não vê a aba de Originação B2C
