@@ -197,7 +197,42 @@ type CopaPartner = typeof COPA_PARTNERS[number];
 type CopaBlock = typeof COPA_BLOCKS[number];
 type CopaChannel = typeof COPA_CHANNELS[number];
 
-const COPA_FIXED_COLS = 7;
+// ── Colunas fixas (LP Looker + BI Visa + Mídia Paga) ──────────────────────────
+// Universos integrados (ver vault: Export-XLSX-Renta-Copa):
+//   LP (GA4/Looker)  → copa_lp_daily (origem='__total__'): tráfego e etapa opt-in (proxy)
+//   BI Visa (oficial) → copa_visa_daily: clientes (opt-ins) e cartões por dia
+//   Mídia Paga       → paid_media_metrics × mappings (objective='rentabilizacao')
+type CopaMediaAgg = { spend: number; clicks: number; impressions: number };
+type CopaMediaChannel = 'total' | 'google' | 'meta';
+type CopaFixedDay = {
+  trafegoLp: number | null;
+  optinsGa4: number | null;
+  optinsVisa: number | null;
+  cartoesVisa: number | null;
+  media: Record<CopaMediaChannel, CopaMediaAgg>;
+};
+type CopaFixedIndex = Map<string, CopaFixedDay>;
+
+const MEDIA_SUB_HEADERS = ['Invt. (R$)', 'Cliques', 'CPC (R$)', 'Impressoes', 'CTR', 'CPM (R$)'];
+const COPA_FIXED_HEADERS = [
+  'Data', 'Dia',
+  'Trafego LP', 'Optins LP (GA4)',
+  'Optins Visa', 'Cartoes Visa',
+  'Invt. Midia (R$)', 'Cliques Midia', 'CPC (R$)', 'Impressoes', 'CTR', 'CPM (R$)', 'Custo/Opt-in (R$)',
+  ...MEDIA_SUB_HEADERS,
+  ...MEDIA_SUB_HEADERS,
+];
+
+// Grupos visuais do cabeçalho fixo (colunas 1-based, inclusivas)
+const COPA_FIXED_GROUPS: Array<{ from: number; to: number; label: string; fill: string }> = [
+  { from: 3, to: 4,   label: 'LP Visa (GA4)',      fill: '2E75B6' },
+  { from: 5, to: 6,   label: 'BI Visa (oficial)',  fill: '1F3864' },
+  { from: 7, to: 13,  label: 'Midia Paga — Total', fill: '4472C4' },
+  { from: 14, to: 19, label: 'Midia — Google',     fill: '1D7B2B' },
+  { from: 20, to: 25, label: 'Midia — Meta',       fill: '7030A0' },
+];
+
+const COPA_FIXED_COLS = 25;
 const COPA_BLOCK_WIDTH = 14;
 const COPA_HEADER = [
   'wpp', 'entregas', 'cliques',
@@ -611,7 +646,7 @@ function normalizeCanal(value: unknown): string {
 
 // ── Escrita de seção no worksheet ─────────────────────────────────────────────
 
-function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date, end: Date): void {
+function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date, end: Date, fixedIdx: CopaFixedIndex): void {
   const idx = buildCopaIndex(rows, start, end);
   const totalBlocks = COPA_PARTNERS.length * COPA_BLOCKS.length;
   const maxCol = COPA_FIXED_COLS + totalBlocks * COPA_BLOCK_WIDTH;
@@ -619,17 +654,30 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
     views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', activeCell: 'A5', showGridLines: false }],
   });
 
+  // Linha 1: totais do período (fórmulas sobre as linhas de dados)
+  const lastDataRow = 4 + dates.length;
   ws.mergeCells('A1:B1');
-  ws.mergeCells('C1:D1');
-  ws.mergeCells('E1:F1');
-  for (let col = 1; col <= maxCol; col++) {
-    const fillColor = col <= 2 ? COLORS.copaAtivacao : col <= 4 ? '2E75B6' : col <= 6 ? '1D7B2B' : col === 7 ? '7F6000' : COLORS.copaHeader;
-    setCell(ws.getCell(1, col), '', { bold: col <= 7, fillColor, fontColor: col <= 7 ? 'FFFFFF' : '000000', size: 11 });
+  setCell(ws.getCell(1, 1), 'TOTAL PERÍODO', { bold: true, fillColor: COLORS.copaAtivacao, fontColor: 'FFFFFF', size: 11 });
+  const FIXED_SUM_COLS = [3, 4, 5, 6, 7, 8, 10, 14, 15, 17, 20, 21, 23];
+  for (let col = 3; col <= maxCol; col++) {
+    const group = COPA_FIXED_GROUPS.find((g) => col >= g.from && col <= g.to);
+    setCell(ws.getCell(1, col), '', { bold: true, fillColor: group?.fill ?? COLORS.copaHeader, fontColor: 'FFFFFF', size: 10 });
+    if (FIXED_SUM_COLS.includes(col) && dates.length > 0) {
+      const letter = colLetter(col);
+      const c = ws.getCell(1, col);
+      c.value = { formula: `SUM(${letter}5:${letter}${lastDataRow})` };
+      c.numFmt = col === 7 || col === 14 || col === 20 ? '#,##0.00' : '#,##0';
+    }
   }
 
+  // Linhas 2-3 (colunas fixas): grupos de universo
   for (let col = 1; col <= COPA_FIXED_COLS; col++) {
     setCell(ws.getCell(2, col), '', { fillColor: COLORS.copaHeader });
     setCell(ws.getCell(3, col), '', { fillColor: COLORS.copaHeader });
+  }
+  for (const g of COPA_FIXED_GROUPS) {
+    ws.mergeCells(2, g.from, 3, g.to);
+    setCell(ws.getCell(2, g.from), g.label, { bold: true, fillColor: g.fill, fontColor: 'FFFFFF', size: 9 });
   }
 
   let blockStart = COPA_FIXED_COLS + 1;
@@ -659,10 +707,12 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
     }
   }
 
-  ['Data', 'Dia', 'Trafego LP', 'Optins LP', 'Invt. Midia (R$)', 'Cliques Midia', 'CPC (R$)'].forEach((label, idxLabel) => {
-    setCell(ws.getCell(4, idxLabel + 1), label, {
+  COPA_FIXED_HEADERS.forEach((label, idxLabel) => {
+    const col = idxLabel + 1;
+    const group = COPA_FIXED_GROUPS.find((g) => col >= g.from && col <= g.to);
+    setCell(ws.getCell(4, col), label, {
       bold: true,
-      fillColor: idxLabel < 2 ? COLORS.copaHeader : COLORS.copaMedia,
+      fillColor: group?.fill ?? COLORS.copaHeader,
       fontColor: 'FFFFFF',
       size: 8,
     });
@@ -691,6 +741,36 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
 
     setCell(ws.getCell(row, 1), day.toLocaleDateString('pt-BR'), { fillColor: baseFill, size: 9 });
     setCell(ws.getCell(row, 2), DAY_NAMES[day.getDay()], { fillColor: baseFill, size: 9 });
+
+    // Colunas fixas: LP (GA4) + BI Visa + Mídia Paga
+    const fixed = fixedIdx.get(ds);
+    if (fixed) {
+      const num = (col: number, value: number | null | undefined, fmt: string = '#,##0') => {
+        if (!value) return;
+        const c = ws.getCell(row, col);
+        setCell(c, value, { fillColor: baseFill, size: 9, align: 'right' });
+        c.numFmt = fmt;
+      };
+      num(3, fixed.trafegoLp);
+      num(4, fixed.optinsGa4);
+      num(5, fixed.optinsVisa);
+      num(6, fixed.cartoesVisa);
+      const mediaCols: Array<[CopaMediaChannel, number]> = [['total', 7], ['google', 14], ['meta', 20]];
+      for (const [ch, base] of mediaCols) {
+        const m = fixed.media[ch];
+        if (!m || (m.spend === 0 && m.clicks === 0 && m.impressions === 0)) continue;
+        num(base, m.spend, '#,##0.00');
+        num(base + 1, m.clicks);
+        num(base + 2, m.clicks > 0 ? m.spend / m.clicks : 0, '#,##0.00');
+        num(base + 3, m.impressions);
+        num(base + 4, m.impressions > 0 ? m.clicks / m.impressions : 0, '0.00%');
+        num(base + 5, m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0, '#,##0.00');
+      }
+      // Custo por Opt-in = spend / Optins Visa (nunca chamar de CAC — regra Copa-2026)
+      if (fixed.optinsVisa && fixed.media.total.spend > 0) {
+        num(13, fixed.media.total.spend / fixed.optinsVisa, '#,##0.00');
+      }
+    }
 
     let startCol = COPA_FIXED_COLS + 1;
     for (const partner of COPA_PARTNERS) {
@@ -743,6 +823,16 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
   for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(totalRow, col), '', { bold: true, fillColor: COLORS.copaTotal, size: 9 });
   setCell(ws.getCell(totalRow, 1), 'total', { bold: true, fillColor: COLORS.copaTotal, size: 9 });
 
+  // Totais das colunas fixas
+  const writeFixedTotal = (col: number, fmt: string = '#,##0') => {
+    const letter = colLetter(col);
+    const c = ws.getCell(totalRow, col);
+    setCell(c, { formula: `SUM(${letter}5:${letter}${totalRow - 1})` }, { bold: true, fillColor: COLORS.copaTotal, size: 9 });
+    c.numFmt = fmt;
+  };
+  [3, 4, 5, 6, 8, 10, 15, 17, 21, 23].forEach((c) => writeFixedTotal(c));
+  [7, 14, 20].forEach((c) => writeFixedTotal(c, '#,##0.00'));
+
   let startCol = COPA_FIXED_COLS + 1;
   for (const partner of COPA_PARTNERS) {
     for (const block of COPA_BLOCKS) {
@@ -783,7 +873,7 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
   }
   copaBorder(ws, totalRow, maxCol, 'medium');
 
-  [11, 5, 11, 9, 12, 13, 9].forEach((width, idxWidth) => { ws.getColumn(idxWidth + 1).width = width; });
+  [11, 5, 10, 12, 10, 11, 12, 11, 9, 11, 8, 9, 13, 10, 9, 8, 10, 8, 9, 10, 9, 8, 10, 8, 9].forEach((width, idxWidth) => { ws.getColumn(idxWidth + 1).width = width; });
   for (let col = COPA_FIXED_COLS + 1; col <= maxCol; col++) {
     const rel = (col - COPA_FIXED_COLS - 1) % COPA_BLOCK_WIDTH;
     ws.getColumn(col).width = [0, 3, 10, 12].includes(rel) ? 10 : rel >= 7 && rel <= 9 ? 11 : 13;
@@ -1038,7 +1128,7 @@ function writeAuditSheet(
 
 // ── Workbook principal ────────────────────────────────────────────────────────
 
-function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: RawRow[], start: Date, end: Date): Workbook {
+function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: RawRow[], start: Date, end: Date, fixedIdx: CopaFixedIndex): Workbook {
   const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
   const copaStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
   const copaDates = copaStart <= end ? allDates(copaStart, end) : [];
@@ -1048,7 +1138,7 @@ function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: R
   wb.creator = 'GaaS AFINZ — Rentabilização';
   wb.created = new Date();
 
-  writeCopaSheet(wb, rows, copaDates, copaStart, end);
+  writeCopaSheet(wb, rows, copaDates, copaStart, end, fixedIdx);
 
   // Aba 1: Seguros (cross-sell BU Seguros)
   buildTabSheet(wb, 'Seguros', seguros, dates, 'seguros');
@@ -1086,6 +1176,110 @@ async function fetchRntRows(start: Date, end: Date): Promise<RawRow[]> {
   return rows;
 }
 
+function emptyMediaAgg(): CopaMediaAgg {
+  return { spend: 0, clicks: 0, impressions: 0 };
+}
+
+function emptyFixedDay(): CopaFixedDay {
+  return {
+    trafegoLp: null,
+    optinsGa4: null,
+    optinsVisa: null,
+    cartoesVisa: null,
+    media: { total: emptyMediaAgg(), google: emptyMediaAgg(), meta: emptyMediaAgg() },
+  };
+}
+
+/**
+ * Busca e indexa por data os 3 universos das colunas fixas da aba Copa:
+ * LP (copa_lp_daily), BI Visa (copa_visa_daily) e Mídia Paga (paid_media_metrics
+ * filtrada pelas campanhas com objective='rentabilizacao').
+ * Falha de uma fonte não derruba o export — a coluna fica vazia (console.warn).
+ */
+async function fetchCopaFixedDaily(start: Date, end: Date): Promise<CopaFixedIndex> {
+  const idx: CopaFixedIndex = new Map();
+  const day = (ds: string): CopaFixedDay => {
+    const cur = idx.get(ds) ?? emptyFixedDay();
+    idx.set(ds, cur);
+    return cur;
+  };
+  const startIso = isoDate(start);
+  const endExclusiveIso = isoDate(addDays(end, 1));
+
+  // 1. LP Visa (GA4/Looker) — linha __total__ tem tráfego diário + funil
+  try {
+    const { data, error } = await supabase
+      .from('copa_lp_daily')
+      .select('data, usuarios, etapa_optin')
+      .eq('origem', '__total__')
+      .gte('data', startIso)
+      .lt('data', endExclusiveIso);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const d = day(String(row.data).slice(0, 10));
+      d.trafegoLp = asInt(row.usuarios);
+      d.optinsGa4 = asInt(row.etapa_optin);
+    }
+  } catch (err) {
+    console.warn('[renta-copa] copa_lp_daily indisponível:', err);
+  }
+
+  // 2. BI Visa (oficial) — clientes/cartões por dia (delta do acumulado)
+  try {
+    const { data, error } = await supabase
+      .from('copa_visa_daily')
+      .select('data, clientes_dia, cartoes_dia')
+      .gte('data', startIso)
+      .lt('data', endExclusiveIso);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const d = day(String(row.data).slice(0, 10));
+      if (row.clientes_dia !== null && row.clientes_dia !== undefined) d.optinsVisa = asInt(row.clientes_dia);
+      if (row.cartoes_dia !== null && row.cartoes_dia !== undefined) d.cartoesVisa = asInt(row.cartoes_dia);
+    }
+  } catch (err) {
+    console.warn('[renta-copa] copa_visa_daily indisponível:', err);
+  }
+
+  // 3. Mídia Paga — campanhas mapeadas como rentabilizacao (Copa LP Visa)
+  try {
+    const { data: maps, error: mapErr } = await supabase
+      .from('paid_media_campaign_mappings')
+      .select('campaign_name')
+      .eq('objective', 'rentabilizacao');
+    if (mapErr) throw mapErr;
+    const campaigns = (maps ?? []).map((m) => String(m.campaign_name));
+    if (campaigns.length > 0) {
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('paid_media_metrics')
+          .select('date, channel, spend, clicks, impressions')
+          .in('campaign', campaigns)
+          .gte('date', startIso)
+          .lt('date', endExclusiveIso)
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        for (const row of data ?? []) {
+          const d = day(String(row.date).slice(0, 10));
+          const channel = String(row.channel ?? '').toLowerCase() === 'google' ? 'google' : 'meta';
+          for (const target of ['total', channel] as CopaMediaChannel[]) {
+            const agg = d.media[target];
+            agg.spend += Number(row.spend) || 0;
+            agg.clicks += asInt(row.clicks);
+            agg.impressions += asInt(row.impressions);
+          }
+        }
+        if (!data || data.length < pageSize) break;
+      }
+    }
+  } catch (err) {
+    console.warn('[renta-copa] paid_media_metrics indisponível:', err);
+  }
+
+  return idx;
+}
+
 function downloadBuffer(buffer: BlobPart, filename: string): void {
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -1102,15 +1296,20 @@ export async function exportRentabilizacaoCrmXlsx(
   start: Date,
   end: Date,
 ): Promise<{ rows: number; filename: string }> {
-  const rawRows = await fetchRntRows(start, end);
-  const ExcelJSModule = await import('exceljs');
-  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, start, end);
+  const copaFixedStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
+  const [rawRows, fixedIdx, ExcelJSModule] = await Promise.all([
+    fetchRntRows(start, end),
+    fetchCopaFixedDaily(copaFixedStart, end),
+    import('exceljs'),
+  ]);
+  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, start, end, fixedIdx);
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = `rentabilizacao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(end).replace(/-/g, '')}.xlsx`;
   downloadBuffer(buffer, filename);
   return { rows: rawRows.length, filename };
 }
 
+// v2 (2026-06-11): colunas fixas integradas — LP Looker + BI Visa + Mídia Paga (vault: Export-XLSX-Renta-Copa)
 export function getCurrentMonthRange(): { start: Date; end: Date } {
   const now = new Date();
   return {
