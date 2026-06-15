@@ -1530,26 +1530,15 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
     return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, mergedEcred, ignoredPerformance };
 };
 
-const isRentabilizacaoJourney = (journey: unknown) => {
-    const j = normalizeKey(journey).toUpperCase();
-    return j.startsWith('JOR_RENTABILIZACAO_')
-        || j.startsWith('JOR_ATIVACAO_')
-        || j.startsWith('JOR_ATIVACAO')
-        || j.startsWith('JOR_INCENTIVO_AO_USO_')
-        || j.startsWith('JOR_POS_TOMBAMENTO_DESBLOQUEIO_')
-        || j.startsWith('JOR_CARTAO_VC_WELCOME')
-        || j.includes('SEGURO');
+const hasAquisicaoJourneyPrefix = (journey: unknown) => {
+    const j = normalizeKey(journey);
+    return j.startsWith('jor_aquisicao')
+        || j.startsWith('disp_aquisicao')
+        || j.startsWith('disparo_aquisicao');
 };
 
 const isAquisicaoMetric = (metric: MetricRow) => {
-    if (isRentabilizacaoJourney(metric.journey)) return false;
-
-    const journey = normalizeKey(metric.journey);
-    const activityTokens = taxonomyTokens(metric.activityName);
-    return journey.includes('aquisicao')
-        || journey.startsWith('disparo_aquisicao')
-        || journey.startsWith('jor_aqs_')
-        || activityTokens.includes('aqs');
+    return hasAquisicaoJourneyPrefix(metric.journey);
 };
 
 interface RentabilizacaoTaxonomy {
@@ -1945,9 +1934,11 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
         { key: 'performance', label: 'Performance', detected: false, rows: 0 },
     ];
     const rawRows = [...whatsappRows, ...emailRows, ...smsRows, ...pushRows];
-    const scopedRows = rawRows.filter((row) => isRentabilizacaoJourney(row.journey));
+    const scopedRows = rawRows.filter((row) => !hasAquisicaoJourneyPrefix(row.journey));
     const ignoredOutOfScope = rawRows.length - scopedRows.length;
-    if (ignoredOutOfScope > 0) warnings.push(`${ignoredOutOfScope} linhas fora do escopo de rentabilizacao foram ignoradas.`);
+    if (ignoredOutOfScope > 0) {
+        warnings.push(`${ignoredOutOfScope} linhas JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo rentabilizacao.`);
+    }
 
     const metricMap = new Map<string, MetricRow>();
     scopedRows.forEach((row) => {
@@ -2028,7 +2019,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const scopedRows = allRows.filter(isAquisicaoMetric);
     const ignoredOutOfScope = allRows.length - scopedRows.length;
     if (ignoredOutOfScope > 0) {
-        warnings.push(`${ignoredOutOfScope} linhas fora do escopo de aquisicao foram ignoradas.`);
+        warnings.push(`${ignoredOutOfScope} linhas sem prefixo JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo aquisicao.`);
     }
     if (attribution.mergedResidual > 0 || attribution.ignoredResidual > 0) {
         warnings.push(`${attribution.mergedResidual} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignoredResidual} linhas sem Base Total e Base Acionavel validas foram ignoradas.`);
@@ -2177,6 +2168,21 @@ const safeProcessDinamicaBI = (
 const nextFrame = () => new Promise<void>((resolve) => {
     window.requestAnimationFrame(() => resolve());
 });
+
+const sleep = (ms: number) => new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+});
+
+const waitForLoadingPaint = async () => {
+    await nextFrame();
+    await nextFrame();
+    await sleep(80);
+};
+
+const keepLoadingVisible = async (startedAt: number, minimumMs = 900) => {
+    const elapsed = performance.now() - startedAt;
+    if (elapsed < minimumMs) await sleep(minimumMs - elapsed);
+};
 
 const suggestionGroup = (suggestion: FieldSuggestion) => {
     if (suggestion.deterministic || suggestion.confidence >= 90) return 'Recomendadas';
@@ -2483,6 +2489,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             return;
         }
 
+        const processingStartedAt = performance.now();
         setProcessing(true);
         setDragError(null);
         setDebugInfo(null);
@@ -2500,10 +2507,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setProcessingStage('reading');
 
         try {
+            await waitForLoadingPaint();
             const matrix = await parseFileToMatrix(file);
             if (matrix.length === 0) throw new Error('Arquivo vazio.');
             setProcessingStage('indexing');
             await nextFrame();
+            await sleep(40);
             // Para rentabilizacao, carrega o historico completo da base para (1) deduplicar
             // o que ja existe e (2) herdar dimensoes (BU/Segmento/Etapa) por jornada/segmento.
             let rentHistory = emptyRentHistoryIndex();
@@ -2517,6 +2526,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             }
             setProcessingStage('detecting');
             await nextFrame();
+            await sleep(40);
             const processedResult = safeProcessDinamicaBI(matrix, activities, activeDomain, rentHistory);
             if (!processedResult.result) {
                 const debug = {
@@ -2534,6 +2544,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             const processed = processedResult.result;
             setProcessingStage('reviewing');
             await nextFrame();
+            await sleep(40);
             setResult(processed);
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewPage(1);
@@ -2553,6 +2564,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setDebugInfo(debug);
             setDragError(`${debug.stage}: ${debug.message}`);
         } finally {
+            await keepLoadingVisible(processingStartedAt);
             setProcessing(false);
             setProcessingStage('idle');
         }
