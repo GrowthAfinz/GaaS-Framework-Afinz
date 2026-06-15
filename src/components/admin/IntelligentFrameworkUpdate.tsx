@@ -28,6 +28,7 @@ import { classifyRentabilizacao } from '../../utils/rentabilizacaoClassify';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
+type CandidateFilter = CandidateStatus | 'update' | 'all';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type UpdateDomain = 'aquisicao' | 'rentabilizacao';
 type TextReviewField = 'bu' | 'parceiro' | 'segmento' | 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'produto' | 'oferta' | 'promocional';
@@ -267,6 +268,10 @@ const STATUS_CLASS: Record<CandidateStatus, string> = {
     error: 'bg-red-50 text-red-700 border-red-200',
     ignored: 'bg-slate-100 text-slate-500 border-slate-200',
 };
+const UPDATE_STATUS_CLASS = 'bg-cyan-50 text-cyan-700 border-cyan-200';
+
+const candidateStatusLabel = (candidate: UpdateCandidate) =>
+    candidate.metricRefresh ? 'Atualização' : STATUS_LABEL[candidate.status];
 
 const REVIEW_FIELDS: Array<{ key: ReviewField; label: string; type?: 'number' }> = [
     { key: 'bu', label: 'BU' },
@@ -1136,11 +1141,15 @@ const buildCandidate = (
         (activity) => isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
     );
 
-    // Disparo ja existe na base (mesma activity+canal+data, qualquer jornada).
+    // Atualizacao automatica exige a mesma jornada canonica. A mesma
+    // activity+canal+data em outra jornada pode ser um novo disparo criado a
+    // partir de uma duplicacao, portanto nao deve herdar o registro anterior.
     const existingDispatch = [...compatibleHistoricalMatches].sort((left, right) => {
         const target = normalizeKey(metric.journey);
         const score = (activity: Activity) => {
+            const canonicalJourney = normalizeKey(canonicalActivityJourney(activity));
             const rawJourney = normalizeKey(activity.jornada);
+            if (canonicalJourney === target) return 4;
             if (rawJourney === target) return 3;
             if (
                 target === normalizeKey(PLURIX_CART_ASSISTED_JOURNEY)
@@ -1148,12 +1157,16 @@ const buildCandidate = (
             ) return 2;
             return 1;
         };
-        return score(right) - score(left);
+        const scoreDiff = score(right) - score(left);
+        if (scoreDiff !== 0) return scoreDiff;
+        const rightUpdatedAt = String(right.raw?.updated_at ?? right.raw?.created_at ?? '');
+        const leftUpdatedAt = String(left.raw?.updated_at ?? left.raw?.created_at ?? '');
+        return rightUpdatedAt.localeCompare(leftUpdatedAt);
     })[0];
     const existsInBase = Boolean(existingDispatch);
     const refreshDetails = metricRefreshDetails(metric, existingDispatch);
     const hasMetricRefresh = refreshDetails.length > 0;
-    const baseJourneyDiffers = Boolean(historicalSignatureMatches.length > 0 && compatibleHistoricalMatches.length === 0);
+    const collidesWithAnotherJourney = historicalSignatureMatches.length > 0 && !existsInBase;
 
     // Duplicacao do BI: a mesma activity+canal+data vem com varios nomes de jornada
     // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
@@ -1183,9 +1196,7 @@ const buildCandidate = (
                 // Nome antigo/variante do BI, ou colisao sem vencedor claro => conflito (nunca grava no escuro)
                 ? 'conflict'
                 : existsInBase
-                    // Ja existe na base: jornada diferente => conflito (renomeacao); mesma => duplicado.
-                    // matchedActivity garante UPDATE em vez de INSERT.
-                    ? (baseJourneyDiffers ? 'conflict' : hasMetricRefresh ? 'ready' : 'duplicate')
+                    ? (hasMetricRefresh ? 'ready' : 'duplicate')
                     : missingHumanSuggestion
                         ? 'new'
                         // BP/Base Propria e deterministico (taxonomia forca BU/Parceiro/Segmento);
@@ -1208,7 +1219,9 @@ const buildCandidate = (
                     : fileAmbiguous
                         ? 'Colisao de jornada'
                         : existsInBase
-                            ? (baseJourneyDiffers ? 'Jornada renomeada' : hasMetricRefresh ? 'Atualizar resultados' : 'Ja existe na base')
+                            ? (hasMetricRefresh ? 'Atualizar resultados' : 'Ja existe na base')
+                            : collidesWithAnotherJourney
+                                ? 'Novo disparo em outra jornada'
                             : missingHumanSuggestion
                                 ? 'Campos humanos'
                                 : status === 'ready'
@@ -1219,15 +1232,15 @@ const buildCandidate = (
             : fileAmbiguous
                 ? 'Colisao de jornada sem vencedor claro'
                 : existsInBase
-                    ? (baseJourneyDiffers
-                        ? 'Disparo ja existe na base com outra jornada (renomeacao)'
-                        : hasMetricRefresh
-                            ? `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`
-                            : 'Disparo ja existe na base de dados')
+                    ? (hasMetricRefresh
+                        ? `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`
+                        : 'Disparo ja existe na base de dados')
+                    : collidesWithAnotherJourney
+                        ? 'Mesma activity, canal e data existem em outra jornada; tratado como novo disparo'
                     : status === 'ready'
                         ? 'Sugestoes historicas fortes'
                         : 'Revisar campos sugeridos',
-        confidence: hasMetricRefresh && !baseJourneyDiffers
+        confidence: hasMetricRefresh
             ? 100
             : missingCritical || duplicateCount > 1 || fileSuperseded || fileAmbiguous || existsInBase ? 0 : averageConfidence,
         basis: missingCritical
@@ -1238,12 +1251,12 @@ const buildCandidate = (
                     ? `jornada substituida pela mais recente: ${winnerJourney ?? '-'}`
                     : fileAmbiguous
                         ? `colisao de jornada sem vencedor claro: ${conflictJourneys.join(', ')}`
-                        : existsInBase
-                            ? (baseJourneyDiffers
-                                ? `disparo ja existe na base; jornada na base: ${existingDispatch?.jornada ?? '-'} | jornada no arquivo: ${metric.journey}`
-                                : hasMetricRefresh
-                                    ? refreshDetails.map(({ field, previous, next }) => `${String(field)}: ${previous} -> ${next}`).join(' | ')
-                                    : 'activity, canal e data ja existem na base de dados')
+                : existsInBase
+                            ? (hasMetricRefresh
+                                ? refreshDetails.map(({ field, previous, next }) => `${String(field)}: ${previous} -> ${next}`).join(' | ')
+                                : 'activity, canal, data e jornada ja existem na base de dados')
+                            : collidesWithAnotherJourney
+                                ? `assinatura operacional ja usada em outra jornada: ${historicalSignatureMatches.map((activity) => activity.jornada).join(', ')}`
                             : 'sugestoes por taxonomia e historico',
         accepted: false,
         domain: metric.domain,
@@ -1263,13 +1276,13 @@ const buildCandidate = (
         // evitando duplicar disparo que ja existe na base. Nao setar para nomes
         // antigos/variantes (superseded) ou colisoes ambiguas: esses nunca devem gravar.
         matchedActivity: (fileSuperseded || fileAmbiguous) ? undefined : existingDispatch,
-        metricRefresh: hasMetricRefresh && !baseJourneyDiffers,
+        metricRefresh: hasMetricRefresh,
         conflictReason: fileSuperseded
             ? 'superseded_file_journey'
             : fileAmbiguous
                 ? 'ambiguous_file_journey'
                 : existsInBase
-                    ? (baseJourneyDiffers ? 'renamed_journey_existing_dispatch' : 'existing_dispatch')
+                    ? 'existing_dispatch'
                     : undefined,
     };
 };
@@ -1526,6 +1539,17 @@ const isRentabilizacaoJourney = (journey: unknown) => {
         || j.startsWith('JOR_POS_TOMBAMENTO_DESBLOQUEIO_')
         || j.startsWith('JOR_CARTAO_VC_WELCOME')
         || j.includes('SEGURO');
+};
+
+const isAquisicaoMetric = (metric: MetricRow) => {
+    if (isRentabilizacaoJourney(metric.journey)) return false;
+
+    const journey = normalizeKey(metric.journey);
+    const activityTokens = taxonomyTokens(metric.activityName);
+    return journey.includes('aquisicao')
+        || journey.startsWith('disparo_aquisicao')
+        || journey.startsWith('jor_aqs_')
+        || activityTokens.includes('aqs');
 };
 
 interface RentabilizacaoTaxonomy {
@@ -2001,6 +2025,11 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const rawRows = [...dispatchRows, ...collapsedPerformanceRows];
     const attribution = consolidateOperationalRows(dispatchRows, collapsedPerformanceRows);
     const allRows = attribution.rows;
+    const scopedRows = allRows.filter(isAquisicaoMetric);
+    const ignoredOutOfScope = allRows.length - scopedRows.length;
+    if (ignoredOutOfScope > 0) {
+        warnings.push(`${ignoredOutOfScope} linhas fora do escopo de aquisicao foram ignoradas.`);
+    }
     if (attribution.mergedResidual > 0 || attribution.ignoredResidual > 0) {
         warnings.push(`${attribution.mergedResidual} linhas residuais D0-D2 consolidadas no disparo real; ${attribution.ignoredResidual} linhas sem Base Total e Base Acionavel validas foram ignoradas.`);
     }
@@ -2010,11 +2039,11 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     if (attribution.mergedEcred > 0) {
         warnings.push(`${attribution.mergedEcred} linhas ECRED-API consolidadas via caminho ecred (cartoes emitidos pelo canal ECRED atribuidos ao disparo de origem).`);
     }
-    const importedKeyCount = allRows.reduce((map, row) => {
+    const importedKeyCount = scopedRows.reduce((map, row) => {
         map.set(row.key, (map.get(row.key) ?? 0) + 1);
         return map;
     }, new Map<string, number>());
-    const journeyDayActivityCount = allRows.reduce((map, row) => {
+    const journeyDayActivityCount = scopedRows.reduce((map, row) => {
         const key = buildJourneyDayKey(row.journey, row.channel, row.date);
         if (!map.has(key)) map.set(key, new Set<string>());
         map.get(key)!.add(normalizeKey(row.activityName));
@@ -2024,7 +2053,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     if (multiActivityGroups > 0) {
         warnings.push(`${multiActivityGroups} grupos jornada/canal/data tinham multiplas activities e foram preservados como disparos separados.`);
     }
-    const importedSignatureJourneys = allRows.reduce((map, row) => {
+    const importedSignatureJourneys = scopedRows.reduce((map, row) => {
         if (!map.has(row.dispatchSignature)) map.set(row.dispatchSignature, new Set<string>());
         map.get(row.dispatchSignature)!.add(row.journey);
         return map;
@@ -2032,7 +2061,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
 
     let ignoredExisting = 0;
     const metricMap = new Map<string, MetricRow>();
-    allRows.forEach((row) => {
+    scopedRows.forEach((row) => {
         if (historyIndex.existingKeys.has(row.key)) {
             ignoredExisting += 1;
         }
@@ -2065,7 +2094,7 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
         tsv,
         warnings,
         insights: buildProcessInsights(
-            rawRows,
+            scopedRows,
             metrics,
             candidates,
             ignoredExisting,
@@ -2284,7 +2313,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [result, setResult] = useState<ProcessResult | null>(null);
     const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
-    const [statusFilter, setStatusFilter] = useState<CandidateStatus | 'all'>('all');
+    const [statusFilter, setStatusFilter] = useState<CandidateFilter>('all');
     const [processing, setProcessing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -2336,7 +2365,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     );
 
     const summary = useMemo(() => ({
-        ready: candidates.filter((candidate) => candidate.status === 'ready').length,
+        ready: candidates.filter((candidate) => candidate.status === 'ready' && !candidate.metricRefresh).length,
+        update: candidates.filter((candidate) => candidate.metricRefresh).length,
         review: candidates.filter((candidate) => candidate.status === 'review').length,
         fresh: candidates.filter((candidate) => candidate.status === 'new').length,
         duplicate: candidates.filter((candidate) => candidate.status === 'duplicate').length,
@@ -2354,7 +2384,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const filteredCandidates = useMemo(() => {
         const term = normalizeKey(reviewSearchTerm);
         return candidates.filter((candidate) => {
-            const statusMatches = statusFilter === 'all' || candidate.status === statusFilter;
+            const statusMatches = statusFilter === 'all'
+                || (statusFilter === 'update' && candidate.metricRefresh)
+                || (statusFilter === 'ready' && candidate.status === 'ready' && !candidate.metricRefresh)
+                || (statusFilter !== 'update' && statusFilter !== 'ready' && candidate.status === statusFilter);
             if (!statusMatches) return false;
             if (reviewStartDate && candidate.date < reviewStartDate) return false;
             if (reviewEndDate && candidate.date > reviewEndDate) return false;
@@ -2905,8 +2938,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
                             <StatCard label="Prontas" value={summary.ready} tone="text-emerald-700" />
+                            <StatCard label="Atualizações" value={summary.update} tone="text-cyan-700" />
                             <StatCard label="Revisao" value={summary.review} tone="text-amber-700" />
                             <StatCard label="Novas" value={summary.fresh} tone="text-blue-700" />
                             <StatCard label="Duplicadas" value={summary.duplicate} tone="text-purple-700" />
@@ -3155,7 +3189,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {(['all', 'ready', 'review', 'new', 'conflict', 'duplicate', 'error', 'ignored'] as const).map((status) => (
+                                {(['all', 'update', 'ready', 'review', 'new', 'conflict', 'duplicate', 'error', 'ignored'] as const).map((status) => (
                                     <button
                                         key={status}
                                         type="button"
@@ -3169,7 +3203,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                                         }`}
                                     >
-                                        {status === 'all' ? 'Todos' : STATUS_LABEL[status]}
+                                        {status === 'all' ? 'Todos' : status === 'update' ? 'Atualização' : STATUS_LABEL[status]}
                                     </button>
                                 ))}
                             </div>
@@ -3301,8 +3335,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 />
                                             </td>
                                             <td className="px-3 py-3 align-top">
-                                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[candidate.status]}`}>
-                                                    {candidate.accepted ? 'Aceito' : STATUS_LABEL[candidate.status]}
+                                                <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${candidate.metricRefresh ? UPDATE_STATUS_CLASS : STATUS_CLASS[candidate.status]}`}>
+                                                    {candidate.accepted ? 'Aceito' : candidateStatusLabel(candidate)}
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 align-top">
@@ -3575,8 +3609,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <header className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_CLASS[selectedCandidate.status]}`}>
-                                        {selectedCandidate.accepted ? 'Aceito' : STATUS_LABEL[selectedCandidate.status]}
+                                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${selectedCandidate.metricRefresh ? UPDATE_STATUS_CLASS : STATUS_CLASS[selectedCandidate.status]}`}>
+                                        {selectedCandidate.accepted ? 'Aceito' : candidateStatusLabel(selectedCandidate)}
                                     </span>
                                     <span className="text-xs font-bold text-slate-400">{selectedCandidate.channel} - {formatDateBR(selectedCandidate.date)}</span>
                                 </div>

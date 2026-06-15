@@ -288,6 +288,16 @@ const applyConfirmedActivityChanges = async (
 
     for (const candidate of confirmedCandidates) {
         const activityId = asDbActivityId(candidate.matchedActivity);
+        const requiresExistingTarget = candidate.metricRefresh
+            || candidate.conflictReason === 'existing_dispatch'
+            || candidate.conflictReason === 'renamed_journey_existing_dispatch';
+
+        if (requiresExistingTarget && !activityId) {
+            throw new Error(
+                `Atualizacao bloqueada para ${candidate.activityName}: o disparo existe na base, mas o id do registro nao foi resolvido.`
+            );
+        }
+
         if (activityId) {
             const { error } = await supabase
                 .from('activities')
