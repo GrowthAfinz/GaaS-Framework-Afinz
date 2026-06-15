@@ -8,6 +8,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useBU } from '../contexts/BUContext';
 import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
+import { formatMonthLabel } from '../utils/monthlyAggregation';
 import { exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
@@ -234,8 +235,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   // re-filtragem da tabela roda em prioridade baixa (React 18).
   const deferredTableSearch = useDeferredValue(tableSearch);
   const [showFullTable, setShowFullTable] = useState(false);
-  const [detailSegmentFilter, setDetailSegmentFilter] = useState<string | null>(null);
-  const [detailCanalFilter, setDetailCanalFilter] = useState<string | null>(null);
   const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
   const [isExportingRnt, setIsExportingRnt] = useState(false);
 
@@ -261,8 +260,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     setSortKey(null);
     setSortDir('desc');
     setTableSearch('');
-    setDetailSegmentFilter(null);
-    setDetailCanalFilter(null);
   }, [data]);
 
   // ── Ordenação ──
@@ -379,14 +376,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const filteredRows = useMemo((): DetailRow[] => {
     let rows = detailRows;
 
-    if (detailSegmentFilter) {
-      rows = rows.filter(r => r.segmento === detailSegmentFilter);
-    }
-
-    if (detailCanalFilter) {
-      rows = rows.filter(r => r.canal === detailCanalFilter);
-    }
-
     const search = deferredTableSearch.trim().toLowerCase();
     if (search) {
       rows = rows.filter(r => {
@@ -416,7 +405,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       return rows.filter(r => r.aguardando);
     }
     return rows;
-  }, [descriptions, detailCanalFilter, detailRows, detailSegmentFilter, destaqueFilter, editingDescs, deferredTableSearch]);
+  }, [descriptions, detailRows, destaqueFilter, editingDescs, deferredTableSearch]);
 
   // ── Ordenação sobre filteredRows ──
   const displayRows = useMemo((): DetailRow[] => {
@@ -559,10 +548,9 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
 
   const clearDetailQuickFilters = useCallback(() => {
     setTableSearch('');
-    setDetailSegmentFilter(null);
-    setDetailCanalFilter(null);
+    setGlobalFilters({ segmentos: [], canais: [] });
     setDestaqueFilter(null);
-  }, []);
+  }, [setGlobalFilters]);
 
   const destaqueOptions = [
     { key: 'top-conversores' as const, label: 'Top Conversores', desc: 'Top 40% por taxa de conversão entre os disparos conversores' },
@@ -849,7 +837,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             <ColumnsCustomizer
               value={campanhasColumns}
               defaults={[...aggregateDefaults]}
-              available={METRIC_COLUMNS.filter(c => aggregateDefaults.includes(c.key as MetricKey))}
+              available={METRIC_COLUMNS}
               onChange={setCampanhasColumns}
             />
             {!rentab && <button
@@ -885,6 +873,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           groupCellLabel={(label) => (
             campanhasGroupBy === 'segmento'
               ? <SegmentLabel value={label} />
+              : campanhasGroupBy === 'safraKey' && /^\d{4}-\d{2}$/.test(label)
+              ? <>{formatMonthLabel(label)}</>
               : <>{label}</>
           )}
           rows={segmentoRows}
@@ -896,11 +886,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           totalEmissoesForParticipation={segmentoTotal.emissoes}
           segmentColorMap={campanhasGroupBy === 'segmento' ? segmentColorMap : undefined}
           onRowClick={campanhasGroupBy === 'segmento' ? (label) => {
-            setDetailSegmentFilter(current => current === label ? null : label);
+            applyGlobalSegmentFilter(label);
             setSelectedActivityRow(null);
           } : undefined}
           onGroupCellClick={campanhasGroupBy === 'segmento' ? applyGlobalSegmentFilter : undefined}
-          rowTitle={campanhasGroupBy === 'segmento' ? 'Filtrar detalhamento por este segmento' : undefined}
+          rowTitle={campanhasGroupBy === 'segmento' ? 'Aplicar este segmento no filtro global' : undefined}
           groupCellTitle={campanhasGroupBy === 'segmento' ? 'Aplicar este segmento no filtro global' : undefined}
           MetricValue={MetricValue}
         />
@@ -938,11 +928,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           shouldShowComparison={shouldShowComparison}
           totalEmissoesForParticipation={totalCanalEmissoes}
           onRowClick={(label) => {
-            setDetailCanalFilter(current => current === label ? null : label);
+            applyGlobalCanalFilter(label);
             setSelectedActivityRow(null);
           }}
           onGroupCellClick={applyGlobalCanalFilter}
-          rowTitle="Filtrar detalhamento por este canal"
+          rowTitle="Aplicar este canal no filtro global"
           groupCellTitle="Aplicar este canal no filtro global"
           MetricValue={MetricValue}
         />
@@ -985,7 +975,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               <ColumnsCustomizer
                 value={detailMetricCols}
                 defaults={[...detailMetricDefaults]}
-                available={METRIC_COLUMNS.filter(c => detailMetricDefaults.includes(c.key as MetricKey))}
+                available={METRIC_COLUMNS}
                 onChange={setDetailMetricCols}
                 label="Métricas"
                 buttonLabel="Métricas"
@@ -1163,25 +1153,37 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                   className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
                 />
               </div>
-              {detailSegmentFilter && (
+              {globalFilters.segmentos.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setDetailSegmentFilter(null)}
+                  onClick={() => setGlobalFilters({ segmentos: [] })}
                   className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700"
+                  title="Remover filtro de segmento"
                 >
-                  Segmento: {detailSegmentFilter}
+                  Segmento: {globalFilters.segmentos.join(', ')} ✕
                 </button>
               )}
-              {detailCanalFilter && (
+              {globalFilters.canais.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setDetailCanalFilter(null)}
+                  onClick={() => setGlobalFilters({ canais: [] })}
                   className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700"
+                  title="Remover filtro de canal"
                 >
-                  Canal: {detailCanalFilter}
+                  Canal: {globalFilters.canais.join(', ')} ✕
                 </button>
               )}
-              {(detailSegmentFilter || detailCanalFilter || tableSearch || destaqueFilter) && (
+              {globalFilters.parceiros.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setGlobalFilters({ parceiros: [] })}
+                  className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700"
+                  title="Remover filtro de parceiro"
+                >
+                  Parceiro: {globalFilters.parceiros.join(', ')} ✕
+                </button>
+              )}
+              {(globalFilters.segmentos.length > 0 || globalFilters.canais.length > 0 || globalFilters.parceiros.length > 0 || tableSearch || destaqueFilter) && (
                 <button
                   type="button"
                   onClick={clearDetailQuickFilters}
@@ -1194,8 +1196,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
               <span className="font-medium">Atalhos:</span>
-              <span>Clique em um segmento ou canal nos blocos acima para filtrar o detalhamento.</span>
-              <span>Clique nos chips da tabela para aplicar o filtro global da tela.</span>
+              <span>Clique em um segmento ou canal nos blocos acima para aplicar filtro global.</span>
+              <span>Clique nos chips da tabela para ativar ou remover filtros globais.</span>
             </div>
           </div>
           <DetailTable
@@ -1284,7 +1286,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               <ColumnsCustomizer
                 value={detailMetricCols}
                 defaults={[...detailMetricDefaults]}
-                available={METRIC_COLUMNS.filter(c => detailMetricDefaults.includes(c.key as MetricKey))}
+                available={METRIC_COLUMNS}
                 onChange={setDetailMetricCols}
                 label="Métricas"
                 buttonLabel="Métricas"

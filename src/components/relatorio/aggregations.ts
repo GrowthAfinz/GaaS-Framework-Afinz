@@ -78,6 +78,15 @@ export function groupActivitiesByDimension(
   });
   const rows: AggregatedRow[] = [];
   groups.forEach((acts, label) => rows.push(computeRow(acts, label)));
+  // Safra: sort chronologically (YYYY-MM labels sort correctly as strings).
+  // Everything else: sort by emissões desc.
+  if (dim === 'safraKey') {
+    return rows.sort((a, b) => {
+      if (a.label === fallback) return 1;
+      if (b.label === fallback) return -1;
+      return a.label.localeCompare(b.label);
+    });
+  }
   return rows.sort((a, b) => b.emissoes - a.emissoes);
 }
 
