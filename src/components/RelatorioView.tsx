@@ -8,6 +8,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useBU } from '../contexts/BUContext';
 import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
+import { DailyReportView } from './relatorio/DailyReportView';
 import { formatMonthLabel } from '../utils/monthlyAggregation';
 import { exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
@@ -190,7 +191,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const globalFilters = viewSettings.filtrosGlobais;
   const rentab = viewSettings.frente === 'rentabilizacao';
   const { selectedBUs } = useBU();
-  const [reportMode, setReportMode] = useState<'performance' | 'monthly'>('performance');
+  const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly'>('performance');
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
   const previousAllActivities = useMemo(() => Object.values(previousData ?? {}).flat(), [previousData]);
   const filterReportActivities = useCallback((activities: Activity[]) => (
@@ -750,8 +751,9 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               <div className="flex items-center gap-3 mb-1">
                 <h1 className="text-2xl font-bold text-white tracking-tight">Relatório de Performance</h1>
                 <div className="ml-2 flex rounded-xl border border-white/30 bg-white/15 p-1">
-                  {[ 
+                  {[
                     { key: 'performance' as const, label: 'Overview' },
+                    { key: 'daily' as const, label: 'Diário' },
                     { key: 'monthly' as const, label: 'Mensal' },
                   ].map((option) => (
                     <button
@@ -816,6 +818,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
 
       {reportMode === 'monthly' ? (
         <MonthlyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
+      ) : reportMode === 'daily' ? (
+        <DailyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
       ) : (
       <>
       {/* ── PERFORMANCE CAMPANHAS ── */}
@@ -849,7 +853,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               <FileSpreadsheet size={14} />
               {isExportingAquisicao ? 'Gerando XLSX...' : 'Exportar XLSX Aquisição'}
             </button>}
-            <button
+            {rentab && <button
               onClick={exportRentabilizacaoCrm}
               disabled={isExportingRnt}
               className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-orange-500 disabled:cursor-wait disabled:opacity-60 transition-colors font-medium"
@@ -857,7 +861,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             >
               <FileSpreadsheet size={14} />
               {isExportingRnt ? 'Gerando XLSX...' : 'Exportar XLSX Rentabilização'}
-            </button>
+            </button>}
             <button
               onClick={exportSegmento}
               className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"

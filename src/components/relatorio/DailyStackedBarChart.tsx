@@ -1,0 +1,278 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
+  getMonthlyMetricValue,
+  MONTHLY_METRIC_LABELS,
+  MonthlyMetricKey,
+  NON_STACKABLE_MONTHLY_METRICS,
+} from '../../utils/monthlyAggregation';
+import { DailyDimension, DailyDimensionRow } from '../../utils/dailyAggregation';
+import { useAppStore } from '../../store/useAppStore';
+
+interface DailyStackedBarChartProps {
+  title: string;
+  rows: DailyDimensionRow[];
+  dimension: DailyDimension;
+  rentabilizacao?: boolean;
+  accumulated?: boolean;
+}
+
+const METRIC_OPTIONS: MonthlyMetricKey[] = [
+  'baseEnviada',
+  'baseEntregue',
+  'propostas',
+  'aprovados',
+  'emissoes',
+  'custoTotal',
+  'custoPorCartao',
+  'taxaConversaoBase',
+];
+
+const ENGAGEMENT_METRIC_OPTIONS: MonthlyMetricKey[] = [
+  'baseEnviada',
+  'baseEntregue',
+  'aberturas',
+  'taxaAbertura',
+  'cliques',
+  'taxaClique',
+  'custoTotal',
+];
+
+const SERIES_COLORS = [
+  '#2563EB',
+  '#10B981',
+  '#A855F7',
+  '#F97316',
+  '#EC4899',
+  '#14B8A6',
+  '#F59E0B',
+  '#64748B',
+  '#0EA5E9',
+  '#84CC16',
+];
+
+function formatChartValue(value: number, metric: MonthlyMetricKey): string {
+  if (metric === 'custoTotal' || metric === 'custoPorCartao') {
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+  if (metric === 'taxaConversaoBase' || metric === 'taxaAbertura' || metric === 'taxaClique') {
+    return `${(value * 100).toFixed(4).replace('.', ',')}%`;
+  }
+  return value.toLocaleString('pt-BR');
+}
+
+export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ title, rows, dimension, rentabilizacao = false, accumulated = false }) => {
+  const metricOptions = rentabilizacao ? ENGAGEMENT_METRIC_OPTIONS : METRIC_OPTIONS;
+  const [metric, setMetric] = useState<MonthlyMetricKey>(rentabilizacao ? 'cliques' : 'emissoes');
+  const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
+  // No modo acumulado as taxas viram cumulativas; empilhar não faz sentido para
+  // métricas não somáveis (continuam como barras independentes).
+  const isStackable = !NON_STACKABLE_MONTHLY_METRICS.has(metric);
+
+  const { viewSettings, setGlobalFilters } = useAppStore();
+  const globalFilters = viewSettings.filtrosGlobais;
+
+  const activeGlobalValues = useMemo(
+    () => (dimension === 'segmento' ? globalFilters.segmentos : globalFilters.canais),
+    [dimension, globalFilters.segmentos, globalFilters.canais],
+  );
+
+  useEffect(() => {
+    if (activeGlobalValues.length === 1) {
+      setFocusedSeries(activeGlobalValues[0]);
+    } else if (activeGlobalValues.length === 0) {
+      setFocusedSeries(null);
+    }
+  }, [activeGlobalValues]);
+
+  const handleSeriesClick = (label: string) => {
+    const isActive = activeGlobalValues.length === 1 && activeGlobalValues[0] === label;
+    const next = isActive ? [] : [label];
+    if (dimension === 'segmento') {
+      setGlobalFilters({ segmentos: next });
+    } else {
+      setGlobalFilters({ canais: next });
+    }
+    setFocusedSeries(next.length > 0 ? label : null);
+  };
+
+  const handleClearFilter = () => {
+    if (dimension === 'segmento') {
+      setGlobalFilters({ segmentos: [] });
+    } else {
+      setGlobalFilters({ canais: [] });
+    }
+    setFocusedSeries(null);
+  };
+
+  useEffect(() => {
+    setMetric(rentabilizacao ? 'cliques' : 'emissoes');
+    setFocusedSeries(null);
+  }, [rentabilizacao]);
+
+  const { chartData, series, seriesTotals } = useMemo(() => {
+    const days = Array.from(new Map(rows.map(row => [row.dayKey, row.dayLabel])).entries())
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    const totalsBySeries = new Map<string, number>();
+    rows.forEach((row) => {
+      // No acumulado, o "total" representativo da série é o último valor (já cumulativo);
+      // no diário, é a soma simples. Em ambos basta usar o maior valor encontrado.
+      const value = getMonthlyMetricValue(row, metric);
+      const current = totalsBySeries.get(row.label) ?? 0;
+      totalsBySeries.set(row.label, accumulated ? Math.max(current, value) : current + value);
+    });
+
+    const sortedSeries = Array.from(totalsBySeries.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label]) => label);
+
+    const visibleSeries = focusedSeries ? [focusedSeries] : sortedSeries;
+
+    const data = days.map(([dayKey, dayLabel]) => {
+      const item: Record<string, string | number> = { dayKey, dayLabel };
+      rows
+        .filter(row => row.dayKey === dayKey && (!focusedSeries || row.label === focusedSeries))
+        .forEach((row) => {
+          item[row.label] = getMonthlyMetricValue(row, metric);
+        });
+      return item;
+    });
+
+    return { chartData: data, series: visibleSeries, seriesTotals: totalsBySeries };
+  }, [metric, rows, focusedSeries, accumulated]);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+            {metricOptions.map(option => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setMetric(option)}
+                className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  metric === option
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+              >
+                {MONTHLY_METRIC_LABELS[option]}
+              </button>
+            ))}
+          </div>
+          {accumulated && (
+            <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
+              Acumulado
+            </span>
+          )}
+          {!isStackable && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              Métrica não empilhável
+            </span>
+          )}
+        </div>
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            {dimension === 'segmento' ? 'Segmentos por dia' : 'Canais por dia'}
+          </p>
+          <h3 className="text-base font-bold text-slate-900">{title}</h3>
+        </div>
+      </div>
+
+      {seriesTotals.size > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <span className="w-full text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            Filtro rápido — clique para aplicar filtro global
+          </span>
+          {Array.from(seriesTotals.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, total], idx) => {
+              const isGloballyActive = activeGlobalValues.includes(label);
+              return (
+                <button
+                  key={`filter-${label}`}
+                  type="button"
+                  onClick={() => handleSeriesClick(label)}
+                  className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                    isGloballyActive
+                      ? 'bg-slate-900 text-white border border-slate-700 shadow-md ring-2 ring-offset-1 ring-slate-700'
+                      : focusedSeries && focusedSeries !== label
+                      ? 'bg-white text-slate-400 border border-slate-200 opacity-60'
+                      : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300 hover:border-slate-400 hover:shadow-sm'
+                  }`}
+                  title={isGloballyActive ? `Remover filtro: ${label}` : `Aplicar filtro global: ${label}`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: SERIES_COLORS[idx % SERIES_COLORS.length] }}
+                  />
+                  <span className="truncate">{label}</span>
+                  <span className="text-[11px] opacity-75">({formatChartValue(total, metric)})</span>
+                  {isGloballyActive && (
+                    <svg className="w-3 h-3 ml-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          {activeGlobalValues.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearFilter}
+              className="text-xs px-3 py-1.5 rounded-md font-medium text-red-500 hover:text-red-700 bg-white border border-red-200 hover:border-red-400 transition-all"
+            >
+              ✕ Limpar filtro
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="h-[340px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 12, right: 16, left: 8, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+            <XAxis dataKey="dayLabel" tick={{ fill: '#64748B', fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={12} />
+            <YAxis
+              tick={{ fill: '#94A3B8', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(value) => ['taxaConversaoBase', 'taxaAbertura', 'taxaClique'].includes(metric) ? `${(Number(value) * 100).toFixed(2)}%` : Number(value).toLocaleString('pt-BR', { notation: 'compact' })}
+            />
+            <Tooltip
+              cursor={{ fill: '#E2E8F0', opacity: 0.35 }}
+              formatter={(value: number, name: string) => [formatChartValue(value, metric), name]}
+              labelFormatter={(label) => `Dia: ${label}`}
+              contentStyle={{ borderColor: '#E2E8F0', borderRadius: 12, boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)' }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12, cursor: 'pointer' }} />
+            {series.map((label, index) => (
+              <Bar
+                key={label}
+                dataKey={label}
+                stackId={isStackable ? 'daily' : undefined}
+                fill={SERIES_COLORS[index % SERIES_COLORS.length]}
+                radius={isStackable ? [0, 0, 0, 0] : [4, 4, 0, 0]}
+                maxBarSize={isStackable ? 48 : 28}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};

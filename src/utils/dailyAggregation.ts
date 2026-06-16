@@ -1,0 +1,154 @@
+import { CalendarData, Activity } from '../types/framework';
+import {
+  MetricVolumes,
+  MonthlyDimension,
+  MonthlyMetrics,
+  computeMetrics,
+  metricsFromVolumes,
+} from './monthlyAggregation';
+
+export type DailyDimension = MonthlyDimension;
+
+export interface DailyTotalRow extends MonthlyMetrics {
+  dayKey: string;   // yyyy-MM-dd
+  dayLabel: string; // dd/MM
+  activitiesCount: number;
+}
+
+export interface DailyDimensionRow extends DailyTotalRow {
+  dimension: DailyDimension;
+  label: string;
+}
+
+function getActivityDayKey(activity: Activity, fallbackDateKey: string): string {
+  const source = activity.dataDisparo instanceof Date && !Number.isNaN(activity.dataDisparo.getTime())
+    ? activity.dataDisparo
+    : new Date(`${fallbackDateKey}T00:00:00`);
+
+  const year = source.getFullYear();
+  const month = String(source.getMonth() + 1).padStart(2, '0');
+  const day = String(source.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function formatDayLabel(dayKey: string): string {
+  const [, month, day] = dayKey.split('-');
+  if (!month || !day) return dayKey;
+  return `${day}/${month}`;
+}
+
+function groupActivitiesByDay(data: CalendarData): Map<string, Activity[]> {
+  const groups = new Map<string, Activity[]>();
+  Object.entries(data).forEach(([dateKey, activities]) => {
+    activities.forEach((activity) => {
+      const dayKey = getActivityDayKey(activity, dateKey);
+      if (!groups.has(dayKey)) groups.set(dayKey, []);
+      groups.get(dayKey)!.push(activity);
+    });
+  });
+  return groups;
+}
+
+export function aggregateDailyTotals(data: CalendarData): DailyTotalRow[] {
+  const groups = groupActivitiesByDay(data);
+  return Array.from(groups.entries())
+    .map(([dayKey, activities]) => ({
+      dayKey,
+      dayLabel: formatDayLabel(dayKey),
+      activitiesCount: activities.length,
+      ...computeMetrics(activities),
+    }))
+    .sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+}
+
+export function aggregateDailyByDimension(
+  data: CalendarData,
+  dimension: DailyDimension,
+): DailyDimensionRow[] {
+  const dayGroups = groupActivitiesByDay(data);
+  const rows: DailyDimensionRow[] = [];
+
+  dayGroups.forEach((activities, dayKey) => {
+    const dimensionGroups = new Map<string, Activity[]>();
+    activities.forEach((activity) => {
+      const label = dimension === 'segmento'
+        ? activity.segmento || 'Sem Segmento'
+        : activity.canal || 'Sem Canal';
+      if (!dimensionGroups.has(label)) dimensionGroups.set(label, []);
+      dimensionGroups.get(label)!.push(activity);
+    });
+
+    dimensionGroups.forEach((dimensionActivities, label) => {
+      rows.push({
+        dayKey,
+        dayLabel: formatDayLabel(dayKey),
+        activitiesCount: dimensionActivities.length,
+        dimension,
+        label,
+        ...computeMetrics(dimensionActivities),
+      });
+    });
+  });
+
+  return rows.sort((a, b) => (
+    a.dayKey.localeCompare(b.dayKey) || b.emissoes - a.emissoes || a.label.localeCompare(b.label)
+  ));
+}
+
+const VOLUME_KEYS: (keyof MetricVolumes)[] = [
+  'baseEnviada', 'baseEntregue', 'aberturas', 'cliques', 'propostas', 'aprovados', 'emissoes', 'custoTotal',
+];
+
+function emptyVolumes(): MetricVolumes {
+  return { baseEnviada: 0, baseEntregue: 0, aberturas: 0, cliques: 0, propostas: 0, aprovados: 0, emissoes: 0, custoTotal: 0 };
+}
+
+/**
+ * Transforma totais diários em série acumulada: cada dia carrega a soma de
+ * volumes dos dias anteriores + o próprio, e as taxas são recalculadas sobre
+ * os volumes acumulados.
+ */
+export function accumulateDailyTotals(rows: DailyTotalRow[]): DailyTotalRow[] {
+  const running = emptyVolumes();
+  let runningCount = 0;
+  return [...rows]
+    .sort((a, b) => a.dayKey.localeCompare(b.dayKey))
+    .map((row) => {
+      VOLUME_KEYS.forEach((k) => { running[k] += row[k]; });
+      runningCount += row.activitiesCount;
+      return {
+        dayKey: row.dayKey,
+        dayLabel: row.dayLabel,
+        activitiesCount: runningCount,
+        ...metricsFromVolumes(running),
+      };
+    });
+}
+
+/**
+ * Versão acumulada por dimensão: cada série acumula seus próprios volumes ao
+ * longo dos dias (mantém um total corrente por label).
+ */
+export function accumulateDailyDimensionRows(rows: DailyDimensionRow[]): DailyDimensionRow[] {
+  const runningByLabel = new Map<string, MetricVolumes>();
+  const countByLabel = new Map<string, number>();
+  const dimension = rows[0]?.dimension ?? 'segmento';
+
+  return [...rows]
+    .sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.label.localeCompare(b.label))
+    .map((row) => {
+      const running = runningByLabel.get(row.label) ?? emptyVolumes();
+      VOLUME_KEYS.forEach((k) => { running[k] += row[k]; });
+      runningByLabel.set(row.label, running);
+      const count = (countByLabel.get(row.label) ?? 0) + row.activitiesCount;
+      countByLabel.set(row.label, count);
+      return {
+        dayKey: row.dayKey,
+        dayLabel: row.dayLabel,
+        activitiesCount: count,
+        dimension,
+        label: row.label,
+        ...metricsFromVolumes({ ...running }),
+      };
+    });
+}

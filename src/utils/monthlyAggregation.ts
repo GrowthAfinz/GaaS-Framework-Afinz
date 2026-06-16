@@ -86,16 +86,20 @@ export function formatMonthLabel(monthKey: string): string {
     .replace('.', '');
 }
 
-function computeMetrics(activities: Activity[]): MonthlyMetrics {
-  const baseEnviada = activities.reduce((sum, activity) => sum + (activity.kpis.baseEnviada ?? 0), 0);
-  const baseEntregue = activities.reduce((sum, activity) => sum + (activity.kpis.baseEntregue ?? 0), 0);
-  const aberturas = activities.reduce((sum, activity) => sum + (activity.kpis.aberturas ?? 0), 0);
-  const cliques = activities.reduce((sum, activity) => sum + (activity.kpis.cliques ?? 0), 0);
-  const propostas = activities.reduce((sum, activity) => sum + (activity.kpis.propostas ?? 0), 0);
-  const aprovados = activities.reduce((sum, activity) => sum + (activity.kpis.aprovados ?? 0), 0);
-  const emissoes = activities.reduce((sum, activity) => sum + ((activity.kpis.emissoes ?? activity.kpis.cartoes) ?? 0), 0);
-  const custoTotal = activities.reduce((sum, activity) => sum + (activity.kpis.custoTotal ?? 0), 0);
+export interface MetricVolumes {
+  baseEnviada: number;
+  baseEntregue: number;
+  aberturas: number;
+  cliques: number;
+  propostas: number;
+  aprovados: number;
+  emissoes: number;
+  custoTotal: number;
+}
 
+/** Deriva todas as taxas a partir de volumes brutos (reutilizado em acumulados). */
+export function metricsFromVolumes(v: MetricVolumes): MonthlyMetrics {
+  const { baseEnviada, baseEntregue, aberturas, cliques, propostas, aprovados, emissoes, custoTotal } = v;
   return {
     baseEnviada,
     baseEntregue,
@@ -114,6 +118,19 @@ function computeMetrics(activities: Activity[]): MonthlyMetrics {
     custoPorCartao: emissoes > 0 ? custoTotal / emissoes : 0,
     taxaConversaoBase: baseEnviada > 0 ? emissoes / baseEnviada : 0,
   };
+}
+
+export function computeMetrics(activities: Activity[]): MonthlyMetrics {
+  return metricsFromVolumes({
+    baseEnviada: activities.reduce((sum, activity) => sum + (activity.kpis.baseEnviada ?? 0), 0),
+    baseEntregue: activities.reduce((sum, activity) => sum + (activity.kpis.baseEntregue ?? 0), 0),
+    aberturas: activities.reduce((sum, activity) => sum + (activity.kpis.aberturas ?? 0), 0),
+    cliques: activities.reduce((sum, activity) => sum + (activity.kpis.cliques ?? 0), 0),
+    propostas: activities.reduce((sum, activity) => sum + (activity.kpis.propostas ?? 0), 0),
+    aprovados: activities.reduce((sum, activity) => sum + (activity.kpis.aprovados ?? 0), 0),
+    emissoes: activities.reduce((sum, activity) => sum + ((activity.kpis.emissoes ?? activity.kpis.cartoes) ?? 0), 0),
+    custoTotal: activities.reduce((sum, activity) => sum + (activity.kpis.custoTotal ?? 0), 0),
+  });
 }
 
 function groupActivitiesByMonth(data: CalendarData): Map<string, Activity[]> {
