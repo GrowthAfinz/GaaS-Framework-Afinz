@@ -427,6 +427,7 @@ export const intelligentUpdateService = {
         if (runError) throw runError;
         if (!run?.id) throw new Error('Execucao criada sem identificador.');
 
+        try {
         const metricRows = payload.metrics.map((metric) => ({
             domain: metric.domain ?? payload.domain,
             run_id: run.id,
@@ -539,5 +540,24 @@ export const intelligentUpdateService = {
             candidateCount: payload.candidates.length,
             appliedCount,
         };
+        } catch (error: any) {
+            const now = new Date().toISOString();
+            await supabase
+                .from('gaas_update_runs')
+                .update({
+                    status: 'failed',
+                    error_message: error?.message || 'Falha ao aplicar atualizacao inteligente.',
+                    summary: {
+                        ...payload.summary,
+                        domain: payload.domain,
+                        targetTable: targetTableForDomain(payload.domain),
+                        metrics: payload.metrics.length,
+                        candidates: payload.candidates.length,
+                    },
+                    updated_at: now,
+                })
+                .eq('id', run.id);
+            throw error;
+        }
     },
 };

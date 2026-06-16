@@ -140,6 +140,10 @@ interface UpdateCandidate extends MetricRow {
     manualOverrides?: ManualOverride[];
 }
 
+const BLOCKED_UPLOAD_STATUSES: CandidateStatus[] = ['duplicate', 'error', 'ignored', 'conflict'];
+const canUploadCandidate = (candidate: Pick<UpdateCandidate, 'status'>) =>
+    !BLOCKED_UPLOAD_STATUSES.includes(candidate.status);
+
 interface ProcessResult {
     domain: UpdateDomain;
     blocks: BlockSummary[];
@@ -1957,7 +1961,7 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
         .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status));
     const ignoredExisting = candidates.filter((candidate) => candidate.status === 'ignored').length;
     const tsv = candidates
-        .filter((candidate) => !['duplicate', 'error', 'ignored'].includes(candidate.status))
+        .filter(canUploadCandidate)
         .map(buildExcelRow)
         .join('\n');
 
@@ -2443,13 +2447,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const exportableCandidates = useMemo(() =>
         candidates.filter((candidate) =>
             candidate.accepted
-            && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+            && canUploadCandidate(candidate)
         ), [candidates]);
 
     const selectedCandidatesForCopy = useMemo(() =>
         candidates.filter((candidate) =>
             selectedKeys.has(candidate.key)
-            && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+            && canUploadCandidate(candidate)
         ), [candidates, selectedKeys]);
     const copyCandidates = selectedCandidatesForCopy.length > 0 ? selectedCandidatesForCopy : exportableCandidates;
     // Disparos que ja existem na base (matchedActivity) ou em conflito (nome antigo do BI,
@@ -2479,7 +2483,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const selectedReadyCount = readyFilteredKeys.filter((key) => selectedKeys.has(key)).length;
     const blockingCount = candidates.filter((candidate) =>
         candidate.status !== 'ignored'
-        && (candidate.status === 'duplicate' || candidate.status === 'error' || !candidate.accepted)
+        && (!canUploadCandidate(candidate) || !candidate.accepted)
     ).length;
 
     const processFile = async (file: File) => {
@@ -2687,7 +2691,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
-                selectedKeys.has(candidate.key) && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+                selectedKeys.has(candidate.key) && canUploadCandidate(candidate)
                     ? { ...applyApprovalDefaults(candidate), accepted: true }
                     : candidate
             );
@@ -2699,7 +2703,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
-                candidate.confidence >= 80 && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+                candidate.confidence >= 80 && canUploadCandidate(candidate)
                     ? { ...applyApprovalDefaults(candidate), accepted: true }
                     : candidate
             );
@@ -2736,7 +2740,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             const candidateKeysForRun = new Set(candidatesForRun.map((candidate) => candidate.key));
             const metricsForRun = result.metrics.filter((metric) => candidateKeysForRun.has(metric.key));
             const acceptedCount = candidatesForRun.filter((candidate) =>
-                candidate.accepted && !['duplicate', 'error', 'ignored'].includes(candidate.status)
+                candidate.accepted && canUploadCandidate(candidate)
             ).length;
             const saved = await intelligentUpdateService.saveRun({
                 domain: result.domain,
@@ -3402,7 +3406,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                             event.stopPropagation();
                                                             acceptCandidate(candidate.key);
                                                         }}
-                                                        disabled={candidate.status === 'duplicate' || candidate.status === 'error' || candidate.status === 'ignored'}
+                                                        disabled={!canUploadCandidate(candidate)}
                                                         className="rounded-md bg-emerald-600 px-2 py-1.5 text-[10px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                                                         title="Aceitar"
                                                     >
@@ -3827,7 +3831,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     acceptCandidate(selectedCandidate.key);
                                     setSelectedCandidate(null);
                                 }}
-                                disabled={selectedCandidate.status === 'duplicate' || selectedCandidate.status === 'error' || selectedCandidate.status === 'ignored'}
+                                disabled={!canUploadCandidate(selectedCandidate)}
                                 className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                             >
                                 Aceitar disparo
