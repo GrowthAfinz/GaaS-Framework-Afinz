@@ -6,9 +6,7 @@ import {
   aggregateDailyByDimension,
   aggregateDailyTotals,
   accumulateDailyDimensionRows,
-  accumulateDailyTotals,
 } from '../../utils/dailyAggregation';
-import { DailyResultsTable } from './DailyResultsTable';
 import { DailyStackedBarChart } from './DailyStackedBarChart';
 
 interface DailyReportViewProps {
@@ -25,10 +23,6 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({ data, selected
   const segmentRowsRaw = useMemo(() => aggregateDailyByDimension(data, 'segmento'), [data]);
   const channelRowsRaw = useMemo(() => aggregateDailyByDimension(data, 'canal'), [data]);
 
-  const dailyTotals = useMemo(
-    () => (accumulated ? accumulateDailyTotals(dailyTotalsRaw) : dailyTotalsRaw),
-    [accumulated, dailyTotalsRaw],
-  );
   const segmentRows = useMemo(
     () => (accumulated ? accumulateDailyDimensionRows(segmentRowsRaw) : segmentRowsRaw),
     [accumulated, segmentRowsRaw],
@@ -122,8 +116,6 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({ data, selected
           accumulated={accumulated}
         />
       </div>
-
-      <DailyResultsTable rows={dailyTotals} rentabilizacao={rentabilizacao} accumulated={accumulated} />
     </div>
   );
 };

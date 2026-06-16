@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X } from 'lucide-react';
+import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX } from 'lucide-react';
 import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
@@ -132,10 +132,6 @@ function downloadBlob(blob: Blob, filename: string): void {
 const HIGHLIGHT_COLS_HEADER = `font-bold whitespace-nowrap text-slate-900`;
 const HIGHLIGHT_CELL = `font-semibold text-slate-800`;
 
-// Quantidade máxima de disparos renderizados inline; acima disso, a tabela
-// completa abre em overlay dedicado e virtualizado (performance da página).
-const INLINE_DETAIL_LIMIT = 50;
-
 // Mapeia Activity → ActivityRow para o detalhe do disparo (função pura).
 const toActivityRow = (a: Activity): ActivityRow => ({
   id: a.id,
@@ -235,7 +231,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   // Deferir a busca mantém a digitação fluida: o input atualiza imediato e a
   // re-filtragem da tabela roda em prioridade baixa (React 18).
   const deferredTableSearch = useDeferredValue(tableSearch);
-  const [showFullTable, setShowFullTable] = useState(false);
   const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
   const [isExportingRnt, setIsExportingRnt] = useState(false);
 
@@ -418,12 +413,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     });
   }, [filteredRows, sortKey, sortDir]);
 
-  // Recorte renderizado inline — a tabela completa abre no overlay dedicado.
-  const inlineRows = useMemo(
-    () => (displayRows.length > INLINE_DETAIL_LIMIT ? displayRows.slice(0, INLINE_DETAIL_LIMIT) : displayRows),
-    [displayRows]
-  );
-
   // ── Linha de totais ──
   const summaryRow = useMemo(() => {
     const totalEnviadas = displayRows.reduce((s, r) => s + r.baseEnviada, 0);
@@ -508,22 +497,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     const act = allActivities.find((a: Activity) => a.id === activityName);
     if (act) {
       setSelectedActivityRow(toActivityRow(act));
-      setShowFullTable(false);
     }
   }, [allActivities]);
-
-  // Overlay da tabela completa: Esc fecha e trava o scroll do body.
-  useEffect(() => {
-    if (!showFullTable) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFullTable(false); };
-    window.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [showFullTable]);
 
   const segmentColorMap = useMemo(() => {
     const map = new Map<string, (typeof SEGMENT_PALETTE)[0]>();
@@ -818,9 +793,13 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
 
       {reportMode === 'monthly' ? (
         <MonthlyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
-      ) : reportMode === 'daily' ? (
-        <DailyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
       ) : (
+      <>
+      {reportMode === 'daily' && (
+        <DailyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
+      )}
+
+      {reportMode === 'performance' && (
       <>
       {/* ── PERFORMANCE CAMPANHAS ── */}
       <section>
@@ -941,7 +920,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           MetricValue={MetricValue}
         />
       </section>
+      </>
+      )}
 
+      {reportMode === 'daily' && (
+      <>
       {/* ── DETALHAMENTO POR DISPARO ── */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -1204,133 +1187,37 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               <span>Clique nos chips da tabela para ativar ou remover filtros globais.</span>
             </div>
           </div>
-          <DetailTable
-            rows={inlineRows}
-            totalRowCount={displayRows.length}
-            visibleDimensions={detailDimensionCols}
-            visibleMetrics={detailMetricCols}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleDetailSort}
-            segmentColorMap={segmentColorMap}
-            descriptions={descriptions}
-            editingDescs={editingDescs}
-            savingDesc={savingDesc}
-            onChangeDescription={handleChangeDescription}
-            onSaveDescription={saveDescription}
-            applyGlobalSegmentFilter={applyGlobalSegmentFilter}
-            applyGlobalCanalFilter={applyGlobalCanalFilter}
-            onRowClick={handleDetailRowClick}
-            summary={summaryRow}
-            destaqueFilter={destaqueFilter}
-          />
-          {displayRows.length > INLINE_DETAIL_LIMIT && (
-            <button
-              type="button"
-              onClick={() => setShowFullTable(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 text-xs font-semibold text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50/70 border-t border-slate-100 transition-colors"
-            >
-              <Maximize2 size={14} />
-              Ver tabela completa · {displayRows.length.toLocaleString('pt-BR')} disparos
-              <span className="font-normal text-slate-400">(exibindo os primeiros {INLINE_DETAIL_LIMIT})</span>
-            </button>
-          )}
+          <div className="h-[68vh] min-h-[420px]">
+            <DetailTable
+              rows={displayRows}
+              totalRowCount={displayRows.length}
+              visibleDimensions={detailDimensionCols}
+              visibleMetrics={detailMetricCols}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleDetailSort}
+              segmentColorMap={segmentColorMap}
+              descriptions={descriptions}
+              editingDescs={editingDescs}
+              savingDesc={savingDesc}
+              onChangeDescription={handleChangeDescription}
+              onSaveDescription={saveDescription}
+              applyGlobalSegmentFilter={applyGlobalSegmentFilter}
+              applyGlobalCanalFilter={applyGlobalCanalFilter}
+              onRowClick={handleDetailRowClick}
+              summary={summaryRow}
+              destaqueFilter={destaqueFilter}
+              virtualized
+            />
+          </div>
         </div>}
       </section>
+      </>
+      )}
 
       </>
       )}
     </div>
-
-    {/* ── OVERLAY: TABELA COMPLETA (virtualizada) ── */}
-    {showFullTable && (
-      <div className="fixed inset-0 z-50 bg-white flex flex-col">
-        {/* Header com controles: 2 linhas para melhor UX em telas menores */}
-        <div className="border-b border-slate-200 shadow-sm">
-          {/* Linha 1: Título e fechar */}
-          <div className="flex items-center justify-between gap-4 px-5 py-3">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-1 h-6 rounded-full shrink-0" style={{ background: TEAL }} />
-              <div className="min-w-0">
-                <h2 className="text-base font-bold text-slate-800">Detalhamento por disparo (tabela completa)</h2>
-                <p className="text-xs text-slate-500 mt-0.5">{displayRows.length.toLocaleString('pt-BR')} disparos · Navegue com scroll ou use filtros abaixo</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowFullTable(false)}
-              className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors shrink-0"
-              title="Fechar (Esc)"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          {/* Linha 2: Buscadores e customizadores */}
-          <div className="flex items-center gap-2 px-5 py-3 bg-slate-50 flex-wrap">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={tableSearch}
-                onChange={(event) => setTableSearch(event.target.value)}
-                placeholder="Buscar campanha, jornada, segmento..."
-                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
-                autoFocus
-              />
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <ColumnsCustomizer
-                value={detailDimensionCols}
-                defaults={[...DEFAULT_DETAIL_DIMENSIONS]}
-                available={DIMENSION_COLUMNS}
-                onChange={setDetailDimensionCols}
-                label="Dimensões"
-                buttonLabel="Dimensões"
-              />
-              <ColumnsCustomizer
-                value={detailMetricCols}
-                defaults={[...detailMetricDefaults]}
-                available={METRIC_COLUMNS}
-                onChange={setDetailMetricCols}
-                label="Métricas"
-                buttonLabel="Métricas"
-              />
-              <button
-                onClick={exportDetail}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300"
-                title="Baixar dados em CSV"
-              >
-                <FileSpreadsheet size={14} />
-                Exportar CSV
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 min-h-0">
-          <DetailTable
-            rows={displayRows}
-            totalRowCount={displayRows.length}
-            visibleDimensions={detailDimensionCols}
-            visibleMetrics={detailMetricCols}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleDetailSort}
-            segmentColorMap={segmentColorMap}
-            descriptions={descriptions}
-            editingDescs={editingDescs}
-            savingDesc={savingDesc}
-            onChangeDescription={handleChangeDescription}
-            onSaveDescription={saveDescription}
-            applyGlobalSegmentFilter={applyGlobalSegmentFilter}
-            applyGlobalCanalFilter={applyGlobalCanalFilter}
-            onRowClick={handleDetailRowClick}
-            summary={summaryRow}
-            destaqueFilter={destaqueFilter}
-            virtualized
-          />
-        </div>
-      </div>
-    )}
     </>
   );
 };

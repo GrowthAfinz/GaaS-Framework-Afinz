@@ -160,6 +160,8 @@ interface DetailRowProps {
   applyGlobalSegmentFilter: (segmento: string) => void;
   applyGlobalCanalFilter: (canal: string) => void;
   onRowClick: (activityName: string) => void;
+  /** Altura fixa da linha — mantém o cálculo de virtualização preciso. */
+  rowHeight: number;
 }
 
 const DetailRowComponent: React.FC<DetailRowProps> = ({
@@ -176,6 +178,7 @@ const DetailRowComponent: React.FC<DetailRowProps> = ({
   applyGlobalSegmentFilter,
   applyGlobalCanalFilter,
   onRowClick,
+  rowHeight,
 }) => {
   const leadBg = color?.bg ?? (isBanded ? 'bg-slate-50/40' : 'bg-white');
   const leadText = color?.text ?? 'text-slate-700';
@@ -258,6 +261,7 @@ const DetailRowComponent: React.FC<DetailRowProps> = ({
   return (
     <tr
       className={`border-t border-slate-100 hover:bg-slate-50 cursor-pointer ${isBanded ? 'bg-slate-50/40' : 'bg-white'}`}
+      style={{ height: rowHeight }}
       onClick={() => onRowClick(row.activityName)}
       title="Clique para ver detalhes do disparo"
     >
@@ -265,13 +269,13 @@ const DetailRowComponent: React.FC<DetailRowProps> = ({
         {format(row.date, 'dd/MM')}
       </td>
       <td className={`px-2 py-1.5 ${leadBg} ${leadText}`} style={{ minWidth: 140, maxWidth: 180 }}>
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5 overflow-hidden">
           {row.jornada && (
             <span className={`text-[11px] font-semibold truncate ${color?.text ?? 'text-slate-600'}`} style={{ maxWidth: 160 }} title={row.jornada}>
               {row.jornada}
             </span>
           )}
-          <span className="text-[10px] font-mono text-slate-400 break-all leading-tight" title={row.activityName}>
+          <span className="block text-[10px] font-mono text-slate-400 truncate leading-tight" style={{ maxWidth: 170 }} title={row.activityName}>
             {row.activityName}
           </span>
         </div>
@@ -480,6 +484,7 @@ const DetailTableComponent: React.FC<DetailTableProps> = ({
                 applyGlobalSegmentFilter={applyGlobalSegmentFilter}
                 applyGlobalCanalFilter={applyGlobalCanalFilter}
                 onRowClick={onRowClick}
+                rowHeight={rowEstimate}
               />
             );
           })}
