@@ -423,7 +423,7 @@ export const ConfiguracoesView: React.FC = () => {
     const [isSending, setIsSending] = useState(false);
     const [sent, setSent] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users'>('goals');
+    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users'>('intelligent-update');
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -552,7 +552,7 @@ export const ConfiguracoesView: React.FC = () => {
                             </button>
                             <button
                                 onClick={() => setActiveTab('intelligent-update')}
-                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'intelligent-update'
+                                className={`order-first flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'intelligent-update'
                                     ? 'border-blue-500 text-blue-500'
                                     : 'border-transparent text-slate-500 hover:text-slate-800'
                                     }`}
