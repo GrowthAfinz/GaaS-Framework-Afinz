@@ -236,19 +236,21 @@ const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidateP
 };
 
 type AppliedTarget = { id: string; table: string };
+const BLOCKED_UPLOAD_STATUSES: CandidateStatus[] = ['duplicate', 'error', 'ignored', 'conflict'];
+
+const canApplyCandidate = (candidate: Pick<IntelligentUpdateCandidatePayload, 'accepted' | 'status'>) =>
+    candidate.accepted && !BLOCKED_UPLOAD_STATUSES.includes(candidate.status);
 
 const applyConfirmedActivityChanges = async (
     candidates: IntelligentUpdateCandidatePayload[],
     domain: UpdateDomain
 ) => {
-    const confirmedCandidates = candidates.filter((candidate) =>
-        candidate.accepted
-        && !['duplicate', 'error', 'ignored'].includes(candidate.status)
-    );
+    const confirmedCandidates = candidates.filter(canApplyCandidate);
     const appliedByKey = new Map<string, AppliedTarget>();
     const targetTable = targetTableForDomain(domain);
     const now = new Date().toISOString();
     const insertRows: Array<Record<string, any> & { __candidateKey: string }> = [];
+    const updateRows: Array<Record<string, any> & { id: string; __candidateKey: string }> = [];
 
     if (domain === 'rentabilizacao') {
         const rows = confirmedCandidates.map((candidate) => ({
@@ -299,19 +301,47 @@ const applyConfirmedActivityChanges = async (
         }
 
         if (activityId) {
-            const { error } = await supabase
-                .from('activities')
-                .update(numericPatch(candidate))
-                .eq('id', activityId);
-
-            if (error) throw error;
-            appliedByKey.set(candidate.key, { id: activityId, table: targetTable });
+            updateRows.push({
+                id: activityId,
+                ...numericPatch(candidate),
+                __candidateKey: candidate.key,
+            });
         } else {
             insertRows.push({
                 ...buildInsertPayload(candidate),
                 __candidateKey: candidate.key,
                 updated_at: now,
             });
+        }
+    }
+
+    for (const chunk of chunkArray(updateRows, 100)) {
+        const rows = chunk.map(({ __candidateKey, ...row }) => row);
+        const keyById = new Map(chunk.map((row) => [row.id, row.__candidateKey]));
+
+        const { data, error } = await supabase
+            .from('activities')
+            .upsert(rows, { onConflict: 'id' })
+            .select('id');
+
+        if (error) throw error;
+
+        (data || []).forEach((row: any) => {
+            const id = row?.id;
+            const key = id ? keyById.get(id) : null;
+            if (id && key) {
+                appliedByKey.set(key, { id, table: targetTable });
+            }
+        });
+
+        chunk.forEach((row) => {
+            if (!appliedByKey.has(row.__candidateKey)) {
+                appliedByKey.set(row.__candidateKey, { id: row.id, table: targetTable });
+            }
+        });
+
+        if (updateRows.length > 100) {
+            await new Promise((resolve) => setTimeout(resolve, 50));
         }
     }
 
