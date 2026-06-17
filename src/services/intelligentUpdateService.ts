@@ -319,10 +319,9 @@ const applyConfirmedActivityChanges = async (
         const rows = chunk.map(({ __candidateKey, ...row }) => row);
         const keyById = new Map(chunk.map((row) => [row.id, row.__candidateKey]));
 
-        const { data, error } = await supabase
-            .from('activities')
-            .upsert(rows, { onConflict: 'id' })
-            .select('id');
+        const { data, error } = await supabase.rpc('bulk_update_activities_from_json', {
+            p_updates: rows,
+        });
 
         if (error) throw error;
 
