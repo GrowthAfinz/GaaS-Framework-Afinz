@@ -213,6 +213,16 @@ type CopaFixedDay = {
 };
 type CopaFixedIndex = Map<string, CopaFixedDay>;
 
+type CopaWindow = { start: number; end: number; days: number };
+type CopaChartImages = Record<'funnel' | 'spend' | 'traffic' | 'efficiency' | 'deliveries' | 'openings', string>;
+type CopaCrmSummary = {
+  partner: CopaPartner;
+  block: CopaBlock;
+  entregues: number;
+  aberturas: number;
+  taxaAbertura: number;
+};
+
 const MEDIA_SUB_HEADERS = ['Invt. (R$)', 'Cliques', 'CPC (R$)', 'Impressoes', 'CTR', 'CPM (R$)'];
 const COPA_FIXED_HEADERS = [
   'Data', 'Dia',
@@ -286,7 +296,42 @@ const COLORS = {
   copaPushFill:  'FCE4D6',
   copaPushFont:  '843C0C',
   copaTotal:     'D9EAD3',
+  copaCurrent:   'DDEBF7',
+  copaPrevious:  'E7E6E6',
+  copaVariation: 'FFF2CC',
+  peakGood:      'C6E0B4',
+  peakWarn:      'FFD966',
+  peakBad:       'F4B084',
 };
+
+function closedEnd(requestedEnd: Date): Date {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = addDays(today, -1);
+  return requestedEnd < yesterday ? requestedEnd : yesterday;
+}
+
+function comparisonWindows(dates: Date[]): { current: CopaWindow; previous: CopaWindow } {
+  const currentDays = Math.min(7, Math.max(0, Math.floor(dates.length / 2)) || dates.length);
+  const currentStart = Math.max(0, dates.length - currentDays);
+  const previousEnd = currentStart - 1;
+  const previousStart = Math.max(0, previousEnd - currentDays + 1);
+  return {
+    current: { start: currentStart, end: dates.length - 1, days: currentDays },
+    previous: { start: previousStart, end: previousEnd, days: Math.max(0, previousEnd - previousStart + 1) },
+  };
+}
+
+function sumRangeFormula(col: number, fromRow: number, toRow: number): string {
+  const letter = colLetter(col);
+  return fromRow <= toRow ? `SUM(${letter}${fromRow}:${letter}${toRow})` : '0';
+}
+
+function ratioFormula(numeratorCol: number, denominatorCol: number, row: number, multiplier = 1): string {
+  const numerator = `${colLetter(numeratorCol)}${row}`;
+  const denominator = `${colLetter(denominatorCol)}${row}`;
+  return `IFERROR(${numerator}/${denominator}${multiplier === 1 ? '' : `*${multiplier}`},\"\")`;
+}
 
 /** Determina em qual aba o registro vai */
 function getTab(row: RawRow): 'seguros' | 'rentabilizacao' {
@@ -644,9 +689,262 @@ function normalizeCanal(value: unknown): string {
   return raw.trim() || 'N/A';
 }
 
+function aggregateCopaCrm(
+  idx: Map<string, CopaMetrics>,
+  dates: Date[],
+  window?: CopaWindow,
+): Map<string, CopaMetrics> {
+  const result = new Map<string, CopaMetrics>();
+  const selected = window ? dates.slice(window.start, window.end + 1) : dates;
+  for (const day of selected) {
+    const ds = isoDate(day);
+    for (const partner of COPA_PARTNERS) {
+      for (const block of COPA_BLOCKS) {
+        for (const channel of COPA_CHANNELS) {
+          const source = idx.get(copaKey(ds, partner, block, channel));
+          if (!source) continue;
+          const key = [partner, block, channel].join(SEP);
+          const target = result.get(key) ?? emptyCopaMetrics();
+          target.enviados += source.enviados;
+          target.entregues += source.entregues;
+          target.abertura += source.abertura;
+          target.cliques += source.cliques;
+          result.set(key, target);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+function copaCrmChartSummary(idx: Map<string, CopaMetrics>, dates: Date[]): CopaCrmSummary[] {
+  const totals = aggregateCopaCrm(idx, dates);
+  const rows: CopaCrmSummary[] = [];
+  for (const partner of COPA_PARTNERS) {
+    for (const block of COPA_BLOCKS) {
+      let entregues = 0;
+      let aberturas = 0;
+      for (const channel of COPA_CHANNELS) {
+        const metric = totals.get([partner, block, channel].join(SEP));
+        entregues += metric?.entregues ?? 0;
+        if (channel === 'E-MAIL') aberturas += metric?.abertura ?? 0;
+      }
+      rows.push({ partner, block, entregues, aberturas, taxaAbertura: entregues > 0 ? aberturas / entregues : 0 });
+    }
+  }
+  return rows;
+}
+
+function applyTopThreeHighlights(ws: Worksheet, dates: Date[], maxCol: number): void {
+  const dataStart = 5;
+  const positiveCols = [3, 4, 5, 6, 8, 10, 11, 15, 17, 18, 21, 23, 24];
+  const costCols = [9, 12, 13, 16, 19, 22, 25];
+  const crmRateRels = [8, 9];
+  const columns = new Set<number>([...positiveCols, ...costCols]);
+  for (let start = COPA_FIXED_COLS + 1; start <= maxCol; start += COPA_BLOCK_WIDTH) {
+    [1, 2, 4, 5, 6, 8, 9, 11, 13].forEach((rel) => columns.add(start + rel));
+  }
+
+  for (const col of columns) {
+    const ranked = dates
+      .map((_, i) => ({ row: dataStart + i, value: Number(ws.getCell(dataStart + i, col).value) }))
+      .filter((item) => Number.isFinite(item.value) && item.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3);
+    ranked.forEach((item, rank) => {
+      const rel = col > COPA_FIXED_COLS ? (col - COPA_FIXED_COLS - 1) % COPA_BLOCK_WIDTH : -1;
+      const isCost = costCols.includes(col);
+      const isPositiveRate = crmRateRels.includes(rel) || positiveCols.includes(col);
+      const fill = rank === 2 ? COLORS.peakWarn : isCost && !isPositiveRate ? COLORS.peakBad : COLORS.peakGood;
+      ws.getCell(item.row, col).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${fill}` } };
+      ws.getCell(item.row, col).font = { ...ws.getCell(item.row, col).font, bold: true };
+    });
+  }
+}
+
+function addDashboardDataSheet(
+  wb: Workbook,
+  dates: Date[],
+  fixedIdx: CopaFixedIndex,
+  crmSummary: CopaCrmSummary[],
+): void {
+  const ws = wb.addWorksheet('_Copa Dashboard Data');
+  ws.state = 'veryHidden';
+  ['Data', 'Acessos LP', 'Etapa GA4', 'Opt-ins Visa', 'Spend Google', 'Spend Meta', 'Cliques Google', 'Cliques Meta', 'CPC Total', 'Custo/Opt-in Visa']
+    .forEach((value, col) => setCell(ws.getCell(1, col + 1), value, { bold: true }));
+  dates.forEach((date, index) => {
+    const row = index + 2;
+    const fixed = fixedIdx.get(isoDate(date)) ?? emptyFixedDay();
+    const totalSpend = fixed.media.total.spend;
+    const totalClicks = fixed.media.total.clicks;
+    [
+      isoDate(date), fixed.trafegoLp ?? '', fixed.optinsGa4 ?? '', fixed.optinsVisa ?? '',
+      fixed.media.google.spend, fixed.media.meta.spend, fixed.media.google.clicks, fixed.media.meta.clicks,
+      totalClicks > 0 ? totalSpend / totalClicks : '', fixed.optinsVisa ? totalSpend / fixed.optinsVisa : '',
+    ].forEach((value, col) => setCell(ws.getCell(row, col + 1), value as string | number));
+  });
+  const start = dates.length + 4;
+  ['Parceiro', 'Segmento', 'Entregas', 'Aberturas E-mail', 'Taxa abertura'].forEach((value, col) => setCell(ws.getCell(start, col + 1), value, { bold: true }));
+  crmSummary.forEach((item, index) => {
+    [item.partner, item.block, item.entregues, item.aberturas, item.taxaAbertura]
+      .forEach((value, col) => setCell(ws.getCell(start + 1 + index, col + 1), value));
+  });
+}
+
+function chartCanvas(title: string): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1240;
+  canvas.height = 640;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0F172A';
+  ctx.font = 'bold 30px Calibri, Arial';
+  ctx.fillText(title, 45, 50);
+  return { canvas, ctx };
+}
+
+function drawLegend(ctx: CanvasRenderingContext2D, series: Array<{ label: string; color: string }>): void {
+  let x = 45;
+  ctx.font = '20px Calibri, Arial';
+  series.forEach((item) => {
+    ctx.fillStyle = item.color;
+    ctx.fillRect(x, 72, 22, 10);
+    ctx.fillStyle = '#334155';
+    ctx.fillText(item.label, x + 30, 84);
+    x += 190;
+  });
+}
+
+function drawLineChart(
+  title: string,
+  labels: string[],
+  series: Array<{ label: string; color: string; values: number[] }>,
+): string {
+  const target = chartCanvas(title);
+  if (!target) return '';
+  const { canvas, ctx } = target;
+  drawLegend(ctx, series);
+  const plot = { x: 70, y: 115, w: 1120, h: 450 };
+  const max = Math.max(1, ...series.flatMap((item) => item.values));
+  ctx.strokeStyle = '#CBD5E1';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = plot.y + (plot.h * i) / 5;
+    ctx.beginPath(); ctx.moveTo(plot.x, y); ctx.lineTo(plot.x + plot.w, y); ctx.stroke();
+  }
+  series.forEach((item) => {
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    item.values.forEach((value, index) => {
+      const x = plot.x + (plot.w * index) / Math.max(1, labels.length - 1);
+      const y = plot.y + plot.h - (value / max) * plot.h;
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  });
+  ctx.fillStyle = '#64748B';
+  ctx.font = '16px Calibri, Arial';
+  labels.forEach((label, index) => {
+    if (labels.length > 16 && index % Math.ceil(labels.length / 12) !== 0) return;
+    const x = plot.x + (plot.w * index) / Math.max(1, labels.length - 1);
+    ctx.fillText(label, x - 14, plot.y + plot.h + 30);
+  });
+  return canvas.toDataURL('image/png');
+}
+
+function drawBarChart(
+  title: string,
+  labels: string[],
+  series: Array<{ label: string; color: string; values: number[] }>,
+  stacked = false,
+): string {
+  const target = chartCanvas(title);
+  if (!target) return '';
+  const { canvas, ctx } = target;
+  drawLegend(ctx, series);
+  const plot = { x: 70, y: 115, w: 1120, h: 450 };
+  const totals = labels.map((_, index) => stacked
+    ? series.reduce((sum, item) => sum + (item.values[index] ?? 0), 0)
+    : Math.max(...series.map((item) => item.values[index] ?? 0)));
+  const max = Math.max(1, ...totals);
+  const groupWidth = plot.w / Math.max(1, labels.length);
+  labels.forEach((label, index) => {
+    let stackHeight = 0;
+    series.forEach((item, seriesIndex) => {
+      const value = item.values[index] ?? 0;
+      const height = (value / max) * plot.h;
+      const width = stacked ? groupWidth * 0.64 : (groupWidth * 0.72) / series.length;
+      const x = plot.x + index * groupWidth + groupWidth * 0.14 + (stacked ? 0 : seriesIndex * width);
+      const y = plot.y + plot.h - height - stackHeight;
+      ctx.fillStyle = item.color;
+      ctx.fillRect(x, y, width, height);
+      if (stacked) stackHeight += height;
+    });
+    if (labels.length <= 14 || index % Math.ceil(labels.length / 12) === 0) {
+      ctx.fillStyle = '#64748B';
+      ctx.font = '14px Calibri, Arial';
+      ctx.save();
+      ctx.translate(plot.x + index * groupWidth + groupWidth * 0.4, plot.y + plot.h + 20);
+      ctx.rotate(-0.55);
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    }
+  });
+  return canvas.toDataURL('image/png');
+}
+
+function createCopaChartImages(
+  dates: Date[],
+  fixedIdx: CopaFixedIndex,
+  crmSummary: CopaCrmSummary[],
+): CopaChartImages | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const labels = dates.map((date) => `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`);
+  const fixed = dates.map((date) => fixedIdx.get(isoDate(date)) ?? emptyFixedDay());
+  const crmLabels = crmSummary.map((item) => `${item.partner} | ${item.block}`);
+  return {
+    funnel: drawLineChart('Funil LP: comportamento x oficial', labels, [
+      { label: 'Acessos LP', color: '#F97316', values: fixed.map((item) => item.trafegoLp ?? 0) },
+      { label: 'Etapa GA4', color: '#22C55E', values: fixed.map((item) => item.optinsGa4 ?? 0) },
+      { label: 'Opt-ins Visa', color: '#1D4ED8', values: fixed.map((item) => item.optinsVisa ?? 0) },
+    ]),
+    spend: drawBarChart('Investimento de midia paga', labels, [
+      { label: 'Google', color: '#15803D', values: fixed.map((item) => item.media.google.spend) },
+      { label: 'Meta', color: '#7E22CE', values: fixed.map((item) => item.media.meta.spend) },
+    ], true),
+    traffic: drawLineChart('Cliques pagos por canal', labels, [
+      { label: 'Google', color: '#15803D', values: fixed.map((item) => item.media.google.clicks) },
+      { label: 'Meta', color: '#7E22CE', values: fixed.map((item) => item.media.meta.clicks) },
+    ]),
+    efficiency: drawLineChart('Eficiencia de midia', labels, [
+      { label: 'CPC total', color: '#0EA5E9', values: fixed.map((item) => item.media.total.clicks > 0 ? item.media.total.spend / item.media.total.clicks : 0) },
+      { label: 'Custo/Opt-in Visa', color: '#DC2626', values: fixed.map((item) => item.optinsVisa ? item.media.total.spend / item.optinsVisa : 0) },
+    ]),
+    deliveries: drawBarChart('Entregas CRM por parceiro e segmento', crmLabels, [
+      { label: 'Entregas', color: '#15803D', values: crmSummary.map((item) => item.entregues) },
+    ]),
+    openings: drawBarChart('Aberturas de e-mail por parceiro e segmento', crmLabels, [
+      { label: 'Aberturas', color: '#2563EB', values: crmSummary.map((item) => item.aberturas) },
+      { label: 'Taxa x100', color: '#F59E0B', values: crmSummary.map((item) => item.taxaAbertura * 100) },
+    ]),
+  };
+}
+
 // ── Escrita de seção no worksheet ─────────────────────────────────────────────
 
-function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date, end: Date, fixedIdx: CopaFixedIndex): void {
+function writeCopaSheet(
+  wb: Workbook,
+  rows: RawRow[],
+  dates: Date[],
+  start: Date,
+  end: Date,
+  fixedIdx: CopaFixedIndex,
+  chartImages?: CopaChartImages,
+): void {
   const idx = buildCopaIndex(rows, start, end);
   const totalBlocks = COPA_PARTNERS.length * COPA_BLOCKS.length;
   const maxCol = COPA_FIXED_COLS + totalBlocks * COPA_BLOCK_WIDTH;
@@ -735,7 +1033,8 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
   dates.forEach((day, dayIndex) => {
     const row = 5 + dayIndex;
     const ds = isoDate(day);
-    const baseFill = dayIndex % 2 === 0 ? 'FFFFFF' : 'F2F2F2';
+    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+    const baseFill = isWeekend ? 'E2E8F0' : dayIndex % 2 === 0 ? 'FFFFFF' : 'F2F2F2';
     ws.getRow(row).height = 15;
     for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), '', { fillColor: baseFill, size: 9 });
 
@@ -819,59 +1118,140 @@ function writeCopaSheet(wb: Workbook, rows: RawRow[], dates: Date[], start: Date
   });
 
   const totalRow = 5 + dates.length;
-  ws.getRow(totalRow).height = 15;
-  for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(totalRow, col), '', { bold: true, fillColor: COLORS.copaTotal, size: 9 });
-  setCell(ws.getCell(totalRow, 1), 'total', { bold: true, fillColor: COLORS.copaTotal, size: 9 });
+  const { current, previous } = comparisonWindows(dates);
+  const summaryRows = [totalRow, totalRow + 1, totalRow + 2, totalRow + 3];
+  const summaryLabels = [
+    'Total do periodo',
+    `Ultimos ${current.days} dias fechados`,
+    `${previous.days} dias anteriores`,
+    'Variacao %',
+  ];
+  const summaryFills = [COLORS.copaTotal, COLORS.copaCurrent, COLORS.copaPrevious, COLORS.copaVariation];
+  const dataRanges = [
+    { from: 5, to: totalRow - 1 },
+    { from: 5 + current.start, to: 5 + current.end },
+    { from: 5 + previous.start, to: 5 + previous.end },
+  ];
+  const sumCols = [3, 4, 5, 6, 7, 8, 10, 14, 15, 17, 20, 21, 23];
+  const derivedCols: Array<[number, number, number, number?]> = [
+    [9, 7, 8], [11, 8, 10], [12, 7, 10, 1000], [13, 7, 5],
+    [16, 14, 15], [18, 15, 17], [19, 14, 17, 1000],
+    [22, 20, 21], [24, 21, 23], [25, 20, 23, 1000],
+  ];
 
-  // Totais das colunas fixas
-  const writeFixedTotal = (col: number, fmt: string = '#,##0') => {
-    const letter = colLetter(col);
-    const c = ws.getCell(totalRow, col);
-    setCell(c, { formula: `SUM(${letter}5:${letter}${totalRow - 1})` }, { bold: true, fillColor: COLORS.copaTotal, size: 9 });
-    c.numFmt = fmt;
-  };
-  [3, 4, 5, 6, 8, 10, 15, 17, 21, 23].forEach((c) => writeFixedTotal(c));
-  [7, 14, 20].forEach((c) => writeFixedTotal(c, '#,##0.00'));
+  summaryRows.forEach((row, index) => {
+    ws.getRow(row).height = 17;
+    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), '', { bold: true, fillColor: summaryFills[index], size: 9 });
+    setCell(ws.getCell(row, 1), summaryLabels[index], { bold: true, fillColor: summaryFills[index], align: 'left', size: 9 });
+  });
 
+  dataRanges.forEach((range, index) => {
+    const row = summaryRows[index];
+    sumCols.forEach((col) => {
+      const cell = ws.getCell(row, col);
+      cell.value = { formula: sumRangeFormula(col, range.from, range.to) };
+      cell.numFmt = [7, 14, 20].includes(col) ? 'R$ #,##0.00' : '#,##0';
+    });
+    derivedCols.forEach(([col, numerator, denominator, multiplier]) => {
+      const cell = ws.getCell(row, col);
+      cell.value = { formula: ratioFormula(numerator, denominator, row, multiplier) };
+      cell.numFmt = [11, 18, 24].includes(col) ? '0.00%' : 'R$ #,##0.00';
+    });
+  });
+  for (let col = 3; col <= maxCol; col++) {
+    const currentCell = `${colLetter(col)}${summaryRows[1]}`;
+    const previousCell = `${colLetter(col)}${summaryRows[2]}`;
+    ws.getCell(summaryRows[3], col).value = { formula: `IFERROR(${currentCell}/${previousCell}-1,\"\")` };
+    ws.getCell(summaryRows[3], col).numFmt = '0.0%';
+  }
+
+  const crmWindows = [
+    aggregateCopaCrm(idx, dates),
+    aggregateCopaCrm(idx, dates, current),
+    aggregateCopaCrm(idx, dates, previous),
+  ];
   let startCol = COPA_FIXED_COLS + 1;
   for (const partner of COPA_PARTNERS) {
     for (const block of COPA_BLOCKS) {
       for (const channel of COPA_CHANNELS) {
         const layout = COPA_CHANNEL_LAYOUT[channel];
-        const total = totals.get([partner, block, channel].join(SEP));
-        if (hasCopaData(total)) {
-          const { fill, font } = copaChannelStyle(channel);
-          setCell(ws.getCell(totalRow, startCol + layout.labelRel), layout.label, { bold: true, fillColor: fill, fontColor: font, size: 8 });
-
-          const writeTotalFormula = (rel: number | undefined) => {
-            if (rel === undefined) return;
-            const letter = colLetter(startCol + rel);
-            const c = ws.getCell(totalRow, startCol + rel);
-            setCell(c, { formula: `SUM(${letter}5:${letter}${totalRow - 1})` }, { bold: true, fillColor: fill, fontColor: font, size: 9 });
-            c.numFmt = '#,##0';
-          };
-          writeTotalFormula(layout.metricRels.entregues);
-          writeTotalFormula(layout.metricRels.abertura);
-          writeTotalFormula(layout.metricRels.cliques);
-
-          if (channel === 'E-MAIL') {
-            [
-              [layout.metricRels.bounce, safeRate(Math.max(0, total!.enviados - total!.entregues), total!.enviados)],
-              [layout.metricRels.txAbertura, safeRate(total!.abertura, total!.entregues)],
-              [layout.metricRels.txClique, safeRate(total!.cliques, total!.entregues)],
-            ].forEach(([rel, value]) => {
-              if (rel === undefined) return;
-              const c = ws.getCell(totalRow, startCol + Number(rel));
-              setCell(c, value, { bold: true, fillColor: fill, fontColor: font, size: 9 });
-              if (value !== '') c.numFmt = '0.0%';
-            });
-          }
-        }
+        const { fill, font } = copaChannelStyle(channel);
+        crmWindows.forEach((windowTotals, index) => {
+          const row = summaryRows[index];
+          const metric = windowTotals.get([partner, block, channel].join(SEP));
+          if (!metric) return;
+          setCell(ws.getCell(row, startCol + layout.labelRel), layout.label, { bold: true, fillColor: fill, fontColor: font, size: 8 });
+          const values: Array<[number | undefined, number | '' , boolean?]> = [
+            [layout.metricRels.entregues, metric.entregues],
+            [layout.metricRels.abertura, metric.abertura],
+            [layout.metricRels.cliques, metric.cliques],
+            [layout.metricRels.bounce, safeRate(Math.max(0, metric.enviados - metric.entregues), metric.enviados), true],
+            [layout.metricRels.txAbertura, safeRate(metric.abertura, metric.entregues), true],
+            [layout.metricRels.txClique, safeRate(metric.cliques, metric.entregues), true],
+          ];
+          values.forEach(([rel, value, rate]) => {
+            if (rel === undefined || value === '') return;
+            setCell(ws.getCell(row, startCol + rel), value, { bold: true, fillColor: fill, fontColor: font, size: 9 });
+            ws.getCell(row, startCol + rel).numFmt = rate ? '0.0%' : '#,##0';
+          });
+        });
       }
       startCol += COPA_BLOCK_WIDTH;
     }
   }
-  copaBorder(ws, totalRow, maxCol, 'medium');
+
+  summaryRows.forEach((row) => copaBorder(ws, row, maxCol, 'medium'));
+  applyTopThreeHighlights(ws, dates, maxCol);
+
+  const legendRow = totalRow + 5;
+  setCell(ws.getCell(legendRow, 1), 'LEGENDA', { bold: true, fillColor: COLORS.copaHeader, fontColor: 'FFFFFF', align: 'left' });
+  [[3, 'Top 1-2 volume/taxa', COLORS.peakGood], [7, 'Top 3 / atencao', COLORS.peakWarn], [11, 'Top 1-2 custo', COLORS.peakBad], [15, 'Cinza = fim de semana', 'E2E8F0']]
+    .forEach(([col, label, fill]) => {
+      ws.mergeCells(legendRow, Number(col), legendRow, Number(col) + 2);
+      setCell(ws.getCell(legendRow, Number(col)), String(label), { bold: true, fillColor: String(fill), size: 9 });
+    });
+
+  const cardRow = legendRow + 3;
+  const crmDeliveryCols: number[] = [];
+  for (let start = COPA_FIXED_COLS + 1; start <= maxCol; start += COPA_BLOCK_WIDTH) {
+    [1, 4, 11, 13].forEach((rel) => crmDeliveryCols.push(start + rel));
+  }
+  const crmDeliveriesFormula = (row: number) => `SUM(${crmDeliveryCols.map((col) => `${colLetter(col)}${row}`).join(',')})`;
+  const emailOpenRateFormula = (row: number) => `IFERROR(SUM(AE${row},AS${row},BG${row},BU${row},CI${row},CW${row},DK${row},DY${row},EM${row})/SUM(AD${row},AR${row},BF${row},BT${row},CH${row},CV${row},DJ${row},DX${row},EL${row}),\"\")`;
+  const cards: Array<{ label: string; formula: string; currentFormula: string; previousFormula: string; format: string; fill: string; coverage: string; coverageCol: string }> = [
+    { label: 'ACESSOS LP', formula: `C${totalRow}`, currentFormula: `C${totalRow + 1}`, previousFormula: `C${totalRow + 2}`, format: '#,##0', fill: '2E75B6', coverage: 'GA4 / Looker', coverageCol: 'C' },
+    { label: 'OPT-INS VISA', formula: `E${totalRow}`, currentFormula: `E${totalRow + 1}`, previousFormula: `E${totalRow + 2}`, format: '#,##0', fill: '1F3864', coverage: 'BI Visa oficial', coverageCol: 'E' },
+    { label: 'TX LP -> OPT-IN', formula: `IFERROR(E${totalRow}/C${totalRow},\"\")`, currentFormula: `IFERROR(E${totalRow + 1}/C${totalRow + 1},\"\")`, previousFormula: `IFERROR(E${totalRow + 2}/C${totalRow + 2},\"\")`, format: '0.0%', fill: '0F766E', coverage: 'Visa / acessos LP', coverageCol: 'E' },
+    { label: 'CARTOES VISA', formula: `F${totalRow}`, currentFormula: `F${totalRow + 1}`, previousFormula: `F${totalRow + 2}`, format: '#,##0', fill: '334155', coverage: 'BI Visa oficial', coverageCol: 'F' },
+    { label: 'INVESTIMENTO', formula: `G${totalRow}`, currentFormula: `G${totalRow + 1}`, previousFormula: `G${totalRow + 2}`, format: 'R$ #,##0.00', fill: '4472C4', coverage: 'Google + Meta', coverageCol: 'G' },
+    { label: 'CUSTO / OPT-IN', formula: `M${totalRow}`, currentFormula: `M${totalRow + 1}`, previousFormula: `M${totalRow + 2}`, format: 'R$ #,##0.00', fill: '7C3AED', coverage: 'Nunca CAC', coverageCol: 'M' },
+    { label: 'ENTREGAS CRM', formula: crmDeliveriesFormula(totalRow), currentFormula: crmDeliveriesFormula(totalRow + 1), previousFormula: crmDeliveriesFormula(totalRow + 2), format: '#,##0', fill: '15803D', coverage: 'Canais CRM', coverageCol: 'AA' },
+    { label: 'TX ABERTURA EMAIL', formula: emailOpenRateFormula(totalRow), currentFormula: emailOpenRateFormula(totalRow + 1), previousFormula: emailOpenRateFormula(totalRow + 2), format: '0.0%', fill: '0369A1', coverage: 'E-mail CRM', coverageCol: 'AE' },
+  ];
+  cards.forEach((card, index) => {
+    const col = 1 + index * 4;
+    ws.mergeCells(cardRow, col, cardRow, col + 2);
+    ws.mergeCells(cardRow + 1, col, cardRow + 2, col + 2);
+    ws.mergeCells(cardRow + 3, col, cardRow + 3, col + 2);
+    ws.mergeCells(cardRow + 4, col, cardRow + 4, col + 2);
+    setCell(ws.getCell(cardRow, col), card.label, { bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 9 });
+    setCell(ws.getCell(cardRow + 1, col), { formula: card.formula }, { bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 16 });
+    ws.getCell(cardRow + 1, col).numFmt = card.format;
+    setCell(ws.getCell(cardRow + 3, col), { formula: `\"7d: \"&TEXT(${card.currentFormula},\"${card.format.replace('R$ ', '')}\")&\" | vs ant.: \"&TEXT(IFERROR(${card.currentFormula}/${card.previousFormula}-1,0),\"0.0%\")` }, { bold: true, fillColor: 'F8FAFC', size: 8 });
+    setCell(ws.getCell(cardRow + 4, col), { formula: `\"${card.coverage} | cobertura: \"&COUNT(${card.coverageCol}5:${card.coverageCol}${totalRow - 1})&\"/${dates.length} dias\"` }, { fillColor: 'F8FAFC', size: 8 });
+  });
+
+  if (chartImages) {
+    const chartRow = cardRow + 6;
+    const placements: Array<[keyof CopaChartImages, number, number]> = [
+      ['funnel', 1, chartRow], ['spend', 14, chartRow], ['traffic', 27, chartRow],
+      ['efficiency', 1, chartRow + 20], ['deliveries', 14, chartRow + 20], ['openings', 27, chartRow + 20],
+    ];
+    placements.forEach(([key, col, row]) => {
+      const imageId = wb.addImage({ base64: chartImages[key], extension: 'png' });
+      ws.addImage(imageId, { tl: { col: col - 1, row: row - 1 }, ext: { width: 620, height: 320 } });
+    });
+  }
 
   [11, 5, 10, 12, 10, 11, 12, 11, 9, 11, 8, 9, 13, 10, 9, 8, 10, 8, 9, 10, 9, 8, 10, 8, 9].forEach((width, idxWidth) => { ws.getColumn(idxWidth + 1).width = width; });
   for (let col = COPA_FIXED_COLS + 1; col <= maxCol; col++) {
@@ -1128,7 +1508,14 @@ function writeAuditSheet(
 
 // ── Workbook principal ────────────────────────────────────────────────────────
 
-function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: RawRow[], start: Date, end: Date, fixedIdx: CopaFixedIndex): Workbook {
+function buildWorkbook(
+  ExcelJSRuntime: { Workbook: new () => Workbook },
+  rows: RawRow[],
+  start: Date,
+  end: Date,
+  fixedIdx: CopaFixedIndex,
+  chartImages?: CopaChartImages,
+): Workbook {
   const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
   const copaStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
   const copaDates = copaStart <= end ? allDates(copaStart, end) : [];
@@ -1138,7 +1525,10 @@ function buildWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rows: R
   wb.creator = 'GaaS AFINZ — Rentabilização';
   wb.created = new Date();
 
-  writeCopaSheet(wb, rows, copaDates, copaStart, end, fixedIdx);
+  const copaIdx = buildCopaIndex(rows, copaStart, end);
+  const crmSummary = copaCrmChartSummary(copaIdx, copaDates);
+  writeCopaSheet(wb, rows, copaDates, copaStart, end, fixedIdx, chartImages);
+  addDashboardDataSheet(wb, copaDates, fixedIdx, crmSummary);
 
   // Aba 1: Seguros (cross-sell BU Seguros)
   buildTabSheet(wb, 'Seguros', seguros, dates, 'seguros');
@@ -1296,15 +1686,20 @@ export async function exportRentabilizacaoCrmXlsx(
   start: Date,
   end: Date,
 ): Promise<{ rows: number; filename: string }> {
+  const effectiveEnd = closedEnd(end);
+  if (effectiveEnd < start) throw new Error('O periodo selecionado ainda nao possui dias fechados.');
   const copaFixedStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
   const [rawRows, fixedIdx, ExcelJSModule] = await Promise.all([
-    fetchRntRows(start, end),
-    fetchCopaFixedDaily(copaFixedStart, end),
+    fetchRntRows(start, effectiveEnd),
+    fetchCopaFixedDaily(copaFixedStart, effectiveEnd),
     import('exceljs'),
   ]);
-  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, start, end, fixedIdx);
+  const copaDates = copaFixedStart <= effectiveEnd ? allDates(copaFixedStart, effectiveEnd) : [];
+  const crmSummary = copaCrmChartSummary(buildCopaIndex(rawRows, copaFixedStart, effectiveEnd), copaDates);
+  const chartImages = createCopaChartImages(copaDates, fixedIdx, crmSummary);
+  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, start, effectiveEnd, fixedIdx, chartImages);
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `rentabilizacao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(end).replace(/-/g, '')}.xlsx`;
+  const filename = `rentabilizacao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(effectiveEnd).replace(/-/g, '')}.xlsx`;
   downloadBuffer(buffer, filename);
   return { rows: rawRows.length, filename };
 }
