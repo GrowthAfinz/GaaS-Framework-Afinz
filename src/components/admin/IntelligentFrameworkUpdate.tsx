@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -22,7 +22,13 @@ import {
     X,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { dataService } from '../../services/dataService';
 import { intelligentUpdateService } from '../../services/intelligentUpdateService';
+import type {
+    UpdateRunHistoryItem,
+    UpdateRunHistoryDetail,
+    UpdateRunCandidateRow,
+} from '../../services/intelligentUpdateService';
 import type { Activity } from '../../types/framework';
 import { classifyRentabilizacao } from '../../utils/rentabilizacaoClassify';
 
@@ -769,13 +775,23 @@ const REFRESHABLE_METRIC_FIELDS: Array<keyof MetricRow> = [
     'independent',
 ];
 
+// Compara metrica gravada vs metrica do BI tolerando null/undefined/0 e ruido de
+// arredondamento. Igualdade exata (===) gerava falso positivo permanente de
+// "Atualizar metricas" para taxas/consolidacoes com diferenca insignificante.
+const metricEquals = (previous: unknown, next: unknown) => {
+    const a = Number(previous ?? 0);
+    const b = Number(next ?? 0);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return a === b;
+    return Math.abs(a - b) < 0.0001;
+};
+
 const metricRefreshDetails = (metric: MetricRow, existing?: Activity) => {
     if (!existing) return [];
     return REFRESHABLE_METRIC_FIELDS.flatMap((field) => {
         const next = metric[field];
         if (typeof next !== 'number' || !Number.isFinite(next)) return [];
         const previous = activityMetricValue(existing, field);
-        return previous === next ? [] : [{ field, previous, next }];
+        return metricEquals(previous, next) ? [] : [{ field, previous, next }];
     });
 };
 
@@ -1304,7 +1320,9 @@ const buildCandidate = (
         // evitando duplicar disparo que ja existe na base. Nao setar para nomes
         // antigos/variantes (superseded) ou colisoes ambiguas: esses nunca devem gravar.
         matchedActivity: (fileSuperseded || fileAmbiguous) ? undefined : existingDispatch,
-        metricRefresh: hasMetricRefresh,
+        // Conflito de jornada (superseded/ambiguo) nunca e update seguro: nao deve
+        // aparecer no rotulo/filtro "Atualizar metricas", mesmo que as metricas tenham mudado.
+        metricRefresh: hasMetricRefresh && !fileSuperseded && !fileAmbiguous,
         conflictReason: fileSuperseded
             ? 'superseded_file_journey'
             : fileAmbiguous
@@ -2401,6 +2419,354 @@ const StatCard = ({ label, value, tone }: { label: string; value: number; tone: 
     </div>
 );
 
+// ── Historico de atualizacoes ──
+type HistoryDomainFilter = 'all' | 'aquisicao' | 'rentabilizacao';
+type HistoryOperationFilter = 'all' | 'new' | 'metrics' | 'blocked';
+
+const OPERATION_META: Record<string, { label: string; className: string }> = {
+    insert: { label: 'Novo', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+    upsert: { label: 'Upsert', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    update_metrics: { label: 'Metricas', className: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+    blocked: { label: 'Bloqueado', className: 'bg-slate-100 text-slate-500 border-slate-200' },
+    pending: { label: 'Pendente', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+};
+
+const OperationBadge = ({ operation }: { operation: string }) => {
+    const meta = OPERATION_META[operation] ?? { label: operation || '-', className: 'bg-slate-100 text-slate-500 border-slate-200' };
+    return (
+        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.className}`}>
+            {meta.label}
+        </span>
+    );
+};
+
+const formatRunDateTime = (iso: string) => {
+    if (!iso) return '-';
+    const date = new Date(iso);
+    if (!Number.isFinite(date.getTime())) return iso;
+    return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+};
+
+const DIFF_METRIC_KEYS = [
+    'Base Total',
+    'Base Acionável',
+    'Abertura',
+    'Cliques',
+    'Propostas',
+    'Aprovados',
+    'Cartões Gerados',
+    'Emissões Assistidas',
+    'Emissões Independentes',
+];
+
+const formatDiffValue = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return '—';
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toLocaleString('pt-BR') : String(value);
+};
+
+const MetricDiffList = ({ before, after }: { before: any; after: any }) => {
+    const rows = DIFF_METRIC_KEYS
+        .filter((key) => after && Object.prototype.hasOwnProperty.call(after, key))
+        .map((key) => ({ key, previous: before?.[key], next: after?.[key] }))
+        .filter(({ previous, next }) => formatDiffValue(previous) !== formatDiffValue(next));
+
+    if (rows.length === 0) {
+        return <span className="text-[11px] text-slate-400">sem diferenca de metricas</span>;
+    }
+
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {rows.map(({ key, previous, next }) => (
+                <span key={key} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
+                    <span className="font-semibold text-slate-500">{key}</span>
+                    <span className="text-slate-400">{formatDiffValue(previous)}</span>
+                    <span className="text-cyan-600">→</span>
+                    <span className="font-bold text-slate-800">{formatDiffValue(next)}</span>
+                </span>
+            ))}
+        </div>
+    );
+};
+
+const HISTORY_DOMAIN_LABEL: Record<string, string> = {
+    total_crm: 'Total CRM',
+    aquisicao: 'Aquisição',
+    rentabilizacao: 'Rentabilização',
+};
+
+const matchesOperationFilter = (row: UpdateRunCandidateRow, filter: HistoryOperationFilter) => {
+    if (filter === 'all') return true;
+    if (filter === 'metrics') return row.operationType === 'update_metrics';
+    if (filter === 'new') return row.operationType === 'insert' || row.operationType === 'upsert';
+    if (filter === 'blocked') return row.status !== 'applied';
+    return true;
+};
+
+const UpdateRunDrawer = ({
+    detail,
+    loading,
+    onClose,
+}: {
+    detail: UpdateRunHistoryDetail | null;
+    loading: boolean;
+    onClose: () => void;
+}) => {
+    const [search, setSearch] = useState('');
+    const [operationFilter, setOperationFilter] = useState<HistoryOperationFilter>('all');
+
+    const allRows = useMemo(
+        () => (detail ? [...detail.applied, ...detail.blocked] : []),
+        [detail]
+    );
+
+    const filteredRows = useMemo(() => {
+        const term = normalizeKey(search);
+        return allRows
+            .filter((row) => matchesOperationFilter(row, operationFilter))
+            .filter((row) => !term
+                || normalizeKey(row.journey).includes(term)
+                || normalizeKey(row.activityName).includes(term));
+    }, [allRows, operationFilter, search]);
+
+    return createPortal(
+        <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/40 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="flex h-full w-full max-w-3xl flex-col bg-white shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                    <div>
+                        <h4 className="text-sm font-bold text-slate-900">Detalhe da atualizacao</h4>
+                        {detail && (
+                            <p className="mt-0.5 text-xs text-slate-500">
+                                {formatRunDateTime(detail.run.createdAt)} · {detail.run.sourceLabel} · {HISTORY_DOMAIN_LABEL[detail.run.domain] ?? detail.run.domain}
+                            </p>
+                        )}
+                    </div>
+                    <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                        <X size={16} />
+                    </button>
+                </header>
+
+                {loading || !detail ? (
+                    <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
+                        <Loader2 size={18} className="mr-2 animate-spin" /> Carregando detalhe...
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-4 gap-2 border-b border-slate-100 px-5 py-3">
+                            <StatCard label="Aplicadas" value={detail.appliedTotal} tone="text-emerald-700" />
+                            <StatCard label="Novas" value={detail.applied.filter((row) => row.operationType === 'insert' || row.operationType === 'upsert').length} tone="text-blue-700" />
+                            <StatCard label="Metricas" value={detail.applied.filter((row) => row.operationType === 'update_metrics').length} tone="text-cyan-700" />
+                            <StatCard label="Bloqueadas" value={detail.blockedTotal} tone="text-amber-700" />
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3">
+                            <div className="relative flex-1 min-w-[180px]">
+                                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    value={search}
+                                    onChange={(event) => setSearch(event.target.value)}
+                                    placeholder="Buscar jornada ou activity"
+                                    className="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-3 text-xs text-slate-700 focus:border-cyan-400 focus:outline-none"
+                                />
+                            </div>
+                            {([
+                                ['all', 'Todos'],
+                                ['new', 'Novos'],
+                                ['metrics', 'Metricas'],
+                                ['blocked', 'Bloqueados'],
+                            ] as Array<[HistoryOperationFilter, string]>).map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => setOperationFilter(value)}
+                                    className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
+                                        operationFilter === value
+                                            ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
+                                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-5 py-3">
+                            {(detail.appliedCapped || detail.blockedCapped) && (
+                                <p className="mb-2 rounded-md bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700">
+                                    Mostrando amostra: {detail.applied.length} de {detail.appliedTotal} aplicadas e {detail.blocked.length} de {detail.blockedTotal} bloqueadas.
+                                </p>
+                            )}
+                            {filteredRows.length === 0 ? (
+                                <div className="py-10 text-center text-xs text-slate-400">Nenhuma linha para o filtro atual.</div>
+                            ) : (
+                                <table className="w-full border-collapse text-left text-[11px]">
+                                    <thead className="sticky top-0 bg-white">
+                                        <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
+                                            <th className="py-2 pr-2 font-bold">Operacao</th>
+                                            <th className="py-2 pr-2 font-bold">Jornada / Activity</th>
+                                            <th className="py-2 pr-2 font-bold">Canal / Data</th>
+                                            <th className="py-2 font-bold">Diff / Motivo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredRows.map((row) => (
+                                            <tr key={row.id} className="border-b border-slate-100 align-top">
+                                                <td className="py-2 pr-2"><OperationBadge operation={row.operationType} /></td>
+                                                <td className="py-2 pr-2">
+                                                    <div className="font-semibold text-slate-700">{row.journey || '—'}</div>
+                                                    <div className="font-mono text-[10px] text-slate-400">{row.activityName || '—'}</div>
+                                                </td>
+                                                <td className="py-2 pr-2 text-slate-500">
+                                                    <div>{row.channel || '—'}</div>
+                                                    <div className="text-[10px] text-slate-400">{row.date ? formatDateBR(row.date) : '—'}</div>
+                                                </td>
+                                                <td className="py-2">
+                                                    {row.operationType === 'update_metrics' ? (
+                                                        <MetricDiffList before={row.beforePayload} after={row.afterPayload} />
+                                                    ) : row.status !== 'applied' ? (
+                                                        <span className="text-[11px] text-slate-500">{row.conflictReason || row.fieldToReview || row.suggestion || 'bloqueado'}</span>
+                                                    ) : (
+                                                        <span className="text-[11px] text-emerald-600">{row.targetTable}</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>,
+        document.body
+    );
+};
+
+const UpdateHistoryPanel = ({
+    items,
+    loading,
+    error,
+    onRefresh,
+    onSelect,
+}: {
+    items: UpdateRunHistoryItem[];
+    loading: boolean;
+    error: string | null;
+    onRefresh: () => void;
+    onSelect: (runId: string) => void;
+}) => {
+    const [domainFilter, setDomainFilter] = useState<HistoryDomainFilter>('all');
+
+    const visibleItems = useMemo(
+        () => items.filter((item) => domainFilter === 'all' || item.domain === domainFilter),
+        [items, domainFilter]
+    );
+
+    return (
+        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h4 className="text-sm font-bold text-slate-800">Historico de atualizacoes</h4>
+                    <p className="text-xs text-slate-500">O que foi aplicado, atualizado e bloqueado em cada envio para a base de dados.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    {([
+                        ['all', 'Todos'],
+                        ['aquisicao', 'Aquisição'],
+                        ['rentabilizacao', 'Rentabilização'],
+                    ] as Array<[HistoryDomainFilter, string]>).map(([value, label]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            onClick={() => setDomainFilter(value)}
+                            className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
+                                domainFilter === value
+                                    ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
+                                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={onRefresh}
+                        disabled={loading}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+                        Atualizar
+                    </button>
+                </div>
+            </div>
+
+            {error ? (
+                <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+                    <span>{error}</span>
+                    <button type="button" onClick={onRefresh} className="font-bold underline">Tentar novamente</button>
+                </div>
+            ) : loading && items.length === 0 ? (
+                <div className="space-y-2">
+                    {[0, 1, 2].map((index) => (
+                        <div key={index} className="h-12 animate-pulse rounded-lg bg-slate-100" />
+                    ))}
+                </div>
+            ) : visibleItems.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">
+                    Nenhuma atualizacao registrada ainda.
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                        <thead>
+                            <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
+                                <th className="py-2 pr-3 font-bold">Quando</th>
+                                <th className="py-2 pr-3 font-bold">Arquivo</th>
+                                <th className="py-2 pr-3 font-bold">Fluxo</th>
+                                <th className="py-2 pr-3 text-right font-bold">Lido</th>
+                                <th className="py-2 pr-3 text-right font-bold">Aplicadas</th>
+                                <th className="py-2 pr-3 text-right font-bold">Bloqueadas</th>
+                                <th className="py-2 font-bold">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {visibleItems.map((item) => (
+                                <tr
+                                    key={item.id}
+                                    onClick={() => onSelect(item.id)}
+                                    className="cursor-pointer border-b border-slate-100 transition hover:bg-slate-50"
+                                >
+                                    <td className="py-2.5 pr-3 text-slate-600">{formatRunDateTime(item.createdAt)}</td>
+                                    <td className="py-2.5 pr-3 max-w-[220px] truncate text-slate-700" title={item.sourceLabel}>{item.sourceLabel}</td>
+                                    <td className="py-2.5 pr-3 text-slate-500">{HISTORY_DOMAIN_LABEL[item.domain] ?? item.domain}</td>
+                                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-600">{item.pastedRowCount.toLocaleString('pt-BR')}</td>
+                                    <td className="py-2.5 pr-3 text-right tabular-nums font-bold text-emerald-700">{item.applied.toLocaleString('pt-BR')}</td>
+                                    <td className="py-2.5 pr-3 text-right tabular-nums text-amber-700">{item.blocked.toLocaleString('pt-BR')}</td>
+                                    <td className="py-2.5">
+                                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                                            item.status === 'applied'
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                : item.status === 'failed'
+                                                    ? 'bg-red-50 text-red-700 border-red-200'
+                                                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                                        }`}>
+                                            {item.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </section>
+    );
+};
+
 export const IntelligentFrameworkUpdate: React.FC = () => {
     const { activities } = useAppStore();
     const [activeFlow, setActiveFlow] = useState<UpdateFlow>('total_crm');
@@ -2417,6 +2783,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [debugInfo, setDebugInfo] = useState<ParseDebugInfo | null>(null);
     const [saveMessage, setSaveMessage] = useState<SaveReceipt | null>(null);
     const [lastRunId, setLastRunId] = useState<string | null>(null);
+    const [historyItems, setHistoryItems] = useState<UpdateRunHistoryItem[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+    const [runDetail, setRunDetail] = useState<UpdateRunHistoryDetail | null>(null);
+    const [runDetailLoading, setRunDetailLoading] = useState(false);
     const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
     const [reviewPage, setReviewPage] = useState(1);
     const [selectedCandidate, setSelectedCandidate] = useState<UpdateCandidate | null>(null);
@@ -2827,6 +3199,38 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+    const loadHistory = useCallback(async () => {
+        setHistoryLoading(true);
+        setHistoryError(null);
+        try {
+            const runs = await intelligentUpdateService.fetchUpdateRunHistory(20);
+            setHistoryItems(runs);
+        } catch (error: any) {
+            setHistoryError(error?.message ? `Falha ao carregar historico: ${error.message}` : 'Falha ao carregar historico.');
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadHistory();
+    }, [loadHistory]);
+
+    const handleSelectRun = useCallback(async (runId: string) => {
+        setSelectedRunId(runId);
+        setRunDetail(null);
+        setRunDetailLoading(true);
+        try {
+            const detail = await intelligentUpdateService.fetchUpdateRunDetail(runId);
+            setRunDetail(detail);
+        } catch (error) {
+            console.error('Falha ao carregar detalhe do run:', error);
+            setSelectedRunId(null);
+        } finally {
+            setRunDetailLoading(false);
+        }
+    }, []);
+
     const handleSaveRun = async (candidatesForRun = result?.candidates ?? []) => {
         if (!result) return;
         setSaving(true);
@@ -2879,6 +3283,23 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             });
             setReviewOpen(false);
             setUploadConfirmOpen(false);
+
+            // PILAR: apos gravar, o snapshot do Zustand fica defasado (ainda tem os
+            // valores antigos). Sem este reload, reprocessar o mesmo arquivo na mesma
+            // sessao compara contra a base velha e os disparos ja aplicados reaparecem
+            // como "Atualizar metricas". Recarrega as duas frentes da base.
+            try {
+                const [freshActivities, freshRentab] = await Promise.all([
+                    dataService.fetchActivities(),
+                    dataService.fetchRentabilizacaoActivities(),
+                ]);
+                useAppStore.getState().setActivities(freshActivities);
+                useAppStore.getState().setRentabilizacaoActivities(freshRentab);
+            } catch (refreshError) {
+                console.error('Falha ao recarregar base apos atualizacao inteligente:', refreshError);
+            }
+
+            void loadHistory();
         } catch (error: any) {
             setSaveMessage({
                 type: 'error',
@@ -3106,7 +3527,26 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         )}
                     </section>
                 )}
+
+                <UpdateHistoryPanel
+                    items={historyItems}
+                    loading={historyLoading}
+                    error={historyError}
+                    onRefresh={loadHistory}
+                    onSelect={handleSelectRun}
+                />
             </div>
+
+            {selectedRunId && (
+                <UpdateRunDrawer
+                    detail={runDetail}
+                    loading={runDetailLoading}
+                    onClose={() => {
+                        setSelectedRunId(null);
+                        setRunDetail(null);
+                    }}
+                />
+            )}
 
             {flowChooserOpen && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">

@@ -418,6 +418,98 @@ const applyConfirmedActivityChanges = async (
 const candidateStatusForDb = (status: CandidateStatus) =>
     status === 'conflict' ? 'review' : status;
 
+// ── Historico de atualizacoes (leitura) ──
+export interface UpdateRunHistoryItem {
+    id: string;
+    createdAt: string;
+    sourceLabel: string;
+    domain: string;
+    status: string;
+    pastedRowCount: number;
+    summary: Record<string, any>;
+    metrics: number;
+    applied: number;
+    blocked: number;
+}
+
+export interface UpdateRunCandidateRow {
+    id: string;
+    operationType: string;
+    status: string;
+    domain: string;
+    targetTable: string;
+    targetRecordId: string | null;
+    journey: string;
+    activityName: string;
+    channel: string;
+    date: string;
+    fieldToReview: string;
+    suggestion: string;
+    basis: string;
+    conflictReason: string | null;
+    beforePayload: any;
+    afterPayload: any;
+}
+
+export interface UpdateRunHistoryDetail {
+    run: UpdateRunHistoryItem;
+    applied: UpdateRunCandidateRow[];
+    blocked: UpdateRunCandidateRow[];
+    appliedTotal: number;
+    blockedTotal: number;
+    appliedCapped: boolean;
+    blockedCapped: boolean;
+}
+
+const numberFromSummary = (summary: Record<string, any> | null | undefined, ...keys: string[]) => {
+    for (const key of keys) {
+        const value = summary?.[key];
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+    }
+    return 0;
+};
+
+const mapRunRow = (row: any): UpdateRunHistoryItem => {
+    const summary = (row?.summary ?? {}) as Record<string, any>;
+    const candidates = numberFromSummary(summary, 'candidates');
+    const applied = numberFromSummary(summary, 'applied', 'accepted');
+    return {
+        id: row?.id,
+        createdAt: row?.created_at ?? '',
+        sourceLabel: row?.source_label ?? 'Dinamica BI',
+        domain: row?.domain ?? summary?.domain ?? 'aquisicao',
+        status: row?.status ?? 'reviewing',
+        pastedRowCount: row?.pasted_row_count ?? 0,
+        summary,
+        metrics: numberFromSummary(summary, 'metrics'),
+        applied,
+        blocked: Math.max(0, candidates - applied),
+    };
+};
+
+const mapCandidateRow = (row: any): UpdateRunCandidateRow => {
+    const proposed = (row?.proposed_activity_update ?? {}) as Record<string, any>;
+    return {
+        id: row?.id,
+        operationType: row?.operation_type ?? 'pending',
+        status: row?.status ?? 'pending',
+        domain: row?.domain ?? proposed?.domain ?? '',
+        targetTable: row?.target_table ?? proposed?.target_table ?? '',
+        targetRecordId: row?.target_record_id ?? proposed?.target_record_id ?? null,
+        journey: proposed?.journey ?? '',
+        activityName: proposed?.activity_name ?? '',
+        channel: proposed?.channel ?? '',
+        date: proposed?.metric_date ?? '',
+        fieldToReview: row?.field_to_review ?? '',
+        suggestion: row?.suggestion ?? '',
+        basis: row?.dispatch_order_basis ?? '',
+        conflictReason: proposed?.conflict_reason ?? null,
+        beforePayload: row?.before_payload ?? null,
+        afterPayload: row?.after_payload ?? null,
+    };
+};
+
 export const intelligentUpdateService = {
     // Busca os disparos ja gravados na tabela do dominio (activity name, canal, data)
     // para deduplicar contra a base e nao reinserir o que ja existe.
@@ -462,6 +554,79 @@ export const intelligentUpdateService = {
             if (batch.length < pageSize) break;
         }
         return rows;
+    },
+
+    // Lista os ultimos runs de atualizacao (gaas_update_runs). Numeros agregados
+    // vem do summary do proprio run (1 query, sem varrer candidates).
+    async fetchUpdateRunHistory(limit = 20): Promise<UpdateRunHistoryItem[]> {
+        const { data, error } = await supabase
+            .from('gaas_update_runs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit);
+        if (error) throw error;
+        return (data ?? []).map(mapRunRow);
+    },
+
+    // Detalhe de um run: candidatos aplicados (insert/upsert/update_metrics) na integra
+    // ate um teto, e uma amostra dos bloqueados com o total real. Le proposed_activity_update
+    // para jornada/activity/canal/data sem join na tabela de metricas.
+    async fetchUpdateRunDetail(
+        runId: string,
+        options?: { appliedCap?: number; blockedCap?: number }
+    ): Promise<UpdateRunHistoryDetail> {
+        const appliedCap = options?.appliedCap ?? 500;
+        const blockedCap = options?.blockedCap ?? 200;
+        const candidateColumns =
+            'id, operation_type, status, domain, target_table, target_record_id, field_to_review, suggestion, dispatch_order_basis, before_payload, after_payload, proposed_activity_update';
+
+        const runResult = await supabase
+            .from('gaas_update_runs')
+            .select('*')
+            .eq('id', runId)
+            .single();
+        if (runResult.error) throw runResult.error;
+
+        const appliedResult = await supabase
+            .from('gaas_update_candidates')
+            .select(candidateColumns)
+            .eq('run_id', runId)
+            .eq('status', 'applied')
+            .order('operation_type', { ascending: true })
+            .limit(appliedCap + 1);
+        if (appliedResult.error) throw appliedResult.error;
+
+        const blockedResult = await supabase
+            .from('gaas_update_candidates')
+            .select(candidateColumns)
+            .eq('run_id', runId)
+            .neq('status', 'applied')
+            .limit(blockedCap + 1);
+        if (blockedResult.error) throw blockedResult.error;
+
+        const blockedCountResult = await supabase
+            .from('gaas_update_candidates')
+            .select('id', { count: 'exact', head: true })
+            .eq('run_id', runId)
+            .neq('status', 'applied');
+        const appliedCountResult = await supabase
+            .from('gaas_update_candidates')
+            .select('id', { count: 'exact', head: true })
+            .eq('run_id', runId)
+            .eq('status', 'applied');
+
+        const appliedRows = (appliedResult.data ?? []).map(mapCandidateRow);
+        const blockedRows = (blockedResult.data ?? []).map(mapCandidateRow);
+
+        return {
+            run: mapRunRow(runResult.data),
+            applied: appliedRows.slice(0, appliedCap),
+            blocked: blockedRows.slice(0, blockedCap),
+            appliedTotal: appliedCountResult.count ?? appliedRows.length,
+            blockedTotal: blockedCountResult.count ?? blockedRows.length,
+            appliedCapped: appliedRows.length > appliedCap,
+            blockedCapped: blockedRows.length > blockedCap,
+        };
     },
 
     async saveRun(payload: IntelligentUpdateRunPayload): Promise<IntelligentUpdateRunResult> {
