@@ -13,6 +13,7 @@ import {
     FolderOpen,
     GitBranch,
     Tag,
+    Mail,
     X,
 } from 'lucide-react';
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
@@ -121,6 +122,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
                 { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => setTab('relatorio') },
                 { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => setTab('jornada') },
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => setTab('orientador') },
+            ]
+        },
+        {
+            title: 'Comunicações',
+            direct: true,
+            items: [
+                { id: 'comunicacoes', label: 'Comunicações', icon: Mail, onClick: () => setTab('comunicacoes') },
             ]
         },
         {

@@ -7,6 +7,7 @@ export type ActivityStatus = 'Rascunho' | 'Scheduled' | 'Enviado' | 'Realizado';
 export interface ActivityRow {
     // Identificadores
     id: string; // UUID
+    template_id?: string | null; // Identidade estável do conteúdo reutilizável
 
     // Controle Interno GaaS
     prog_gaas: boolean;

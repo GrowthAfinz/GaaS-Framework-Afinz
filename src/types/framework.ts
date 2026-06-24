@@ -23,6 +23,7 @@ export interface KPIs {
 
 export interface Activity {
   id: string; // Taxonomy name or UUID (see raw.id for DB primary key)
+  templateId?: string; // Identidade estável do conteúdo; não identifica a execução
   dataDisparo: Date;
   canal: string;
   bu: BU;
@@ -115,7 +116,7 @@ export type Frente = "aquisicao" | "rentabilizacao";
 
 export interface ViewSettings {
   periodo: { inicio: string; fim: string };
-  abaAtual: "launch" | "resultados" | "jornada" | "framework" | "diario" | "orientador" | "configuracoes" | "originacao-b2c" | "midia-paga" | "explorador" | "relatorio";
+  abaAtual: "launch" | "resultados" | "jornada" | "framework" | "diario" | "orientador" | "configuracoes" | "originacao-b2c" | "midia-paga" | "explorador" | "relatorio" | "comunicacoes";
   filtrosGlobais: FilterState;
   modoTempoJornada: "diario" | "semanal";
   perspective: "total" | "crm" | "b2c";
@@ -130,6 +131,7 @@ export interface FrameworkRow {
   'Disparado?'?: string;
   'Jornada'?: string;
   'Activity name / Taxonomia': string;
+  template_id?: string;
   'Canal': string;
   'Data de Disparo': string;
   'Data Fim': string;

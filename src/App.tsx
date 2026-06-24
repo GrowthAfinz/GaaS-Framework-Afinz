@@ -13,6 +13,7 @@ import { FrameworkView } from './components/FrameworkView';
 import { OrientadorView } from './components/OrientadorView';
 import { ConfiguracoesView } from './components/ConfiguracoesView';
 import { OriginacaoB2CView } from './components/OriginacaoB2CView';
+import { CommunicationsView } from './components/communications/CommunicationsView';
 import { DisparoExplorer } from './components/explorer/DisparoExplorer';
 import { useFrameworkData } from './hooks/useFrameworkData';
 import { useAdvancedFilters } from './hooks/useAdvancedFilters';
@@ -477,7 +478,12 @@ function App() {
                   <ConfiguracoesView />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga', 'relatorio'].includes(activeTab) && (
+              {activeTab === 'comunicacoes' && (
+                <PageTransition>
+                  <CommunicationsView />
+                </PageTransition>
+              )}
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga', 'relatorio', 'comunicacoes'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>
