@@ -6,6 +6,7 @@ type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinid
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type UpdateDomain = 'aquisicao' | 'rentabilizacao';
+type UpdateFlow = 'total_crm' | UpdateDomain;
 
 export interface IntelligentUpdateMetricPayload {
     domain?: UpdateDomain;
@@ -63,7 +64,7 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
 }
 
 export interface IntelligentUpdateRunPayload {
-    domain: UpdateDomain;
+    domain: UpdateFlow;
     sourceLabel?: string;
     sourceType?: 'paste' | 'csv' | 'xlsx' | 'manual';
     inputLineCount: number;
@@ -107,6 +108,35 @@ const chunkArray = <T,>(items: T[], size: number) => {
 
 const targetTableForDomain = (domain: UpdateDomain) =>
     domain === 'rentabilizacao' ? 'rentabilizacao_activities' : 'activities';
+
+const canonicalKeyPart = (value: unknown) =>
+    String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
+const operationTypeForCandidate = (
+    candidate: IntelligentUpdateCandidatePayload,
+    wasApplied: boolean,
+    candidateDomain: UpdateDomain
+) => {
+    if (!candidate.accepted || !canApplyCandidate(candidate)) return 'blocked';
+    if (!wasApplied) return 'pending';
+    if (candidateDomain === 'aquisicao' && asDbActivityId(candidate.matchedActivity)) return 'update_metrics';
+    if (candidateDomain === 'rentabilizacao') return 'upsert';
+    return 'insert';
+};
+
+const idempotencyKeyForCandidate = (candidate: IntelligentUpdateCandidatePayload, candidateDomain: UpdateDomain) =>
+    [
+        candidateDomain,
+        canonicalKeyPart(candidate.activityName),
+        canonicalKeyPart(candidate.channel),
+        String(candidate.date ?? '').slice(0, 10),
+    ].join('|');
 
 const optionalAuditColumnError = (error: any) => {
     const message = `${error?.message ?? ''} ${error?.details ?? ''} ${error?.hint ?? ''}`;
@@ -243,9 +273,19 @@ const canApplyCandidate = (candidate: Pick<IntelligentUpdateCandidatePayload, 'a
 
 const applyConfirmedActivityChanges = async (
     candidates: IntelligentUpdateCandidatePayload[],
-    domain: UpdateDomain
+    domain: UpdateFlow
 ) => {
     const confirmedCandidates = candidates.filter(canApplyCandidate);
+    if (domain === 'total_crm') {
+        const appliedByKey = new Map<string, AppliedTarget>();
+        for (const targetDomain of ['aquisicao', 'rentabilizacao'] as const) {
+            const domainCandidates = confirmedCandidates.filter((candidate) => candidate.domain === targetDomain);
+            if (domainCandidates.length === 0) continue;
+            const domainApplied = await applyConfirmedActivityChanges(domainCandidates, targetDomain);
+            domainApplied.forEach((target, key) => appliedByKey.set(key, target));
+        }
+        return appliedByKey;
+    }
     const appliedByKey = new Map<string, AppliedTarget>();
     const targetTable = targetTableForDomain(domain);
     const now = new Date().toISOString();
@@ -496,19 +536,23 @@ export const intelligentUpdateService = {
         const now = new Date().toISOString();
 
         const candidateRows = payload.candidates.map((candidate) => {
-            const existingActivityId = payload.domain === 'aquisicao' ? asDbActivityId(candidate.matchedActivity) : null;
+            const candidateDomain = candidate.domain ?? (payload.domain === 'rentabilizacao' ? 'rentabilizacao' : 'aquisicao');
+            const candidateTargetTable = targetTableForDomain(candidateDomain);
+            const existingActivityId = candidateDomain === 'aquisicao' ? asDbActivityId(candidate.matchedActivity) : null;
             const appliedTarget = appliedByKey.get(candidate.key);
             const targetRecordId = appliedTarget?.id ?? existingActivityId ?? null;
             const wasApplied = Boolean(appliedTarget);
 
             return {
                 domain: candidate.domain ?? payload.domain,
-                target_table: appliedTarget?.table ?? targetTableForDomain(payload.domain),
+                target_table: appliedTarget?.table ?? candidateTargetTable,
                 target_record_id: targetRecordId,
                 run_id: run.id,
                 metric_id: metricIdByKey.get(candidate.key) ?? null,
-                activity_id: payload.domain === 'aquisicao' ? targetRecordId : null,
+                activity_id: candidateDomain === 'aquisicao' ? targetRecordId : null,
                 status: wasApplied ? 'applied' : candidateStatusForDb(candidate.status),
+                operation_type: operationTypeForCandidate(candidate, wasApplied, candidateDomain),
+                idempotency_key: idempotencyKeyForCandidate(candidate, candidateDomain),
                 match_count: candidate.matchCount,
                 field_to_review: candidate.fieldToReview,
                 suggestion: candidate.suggestion,
@@ -517,10 +561,17 @@ export const intelligentUpdateService = {
                 suggested_dispatch_order: candidate.suggestedOrder ?? null,
                 dispatch_order_basis: candidate.basis,
                 excel_tsv_row: candidate.excelTsvRow,
+                before_payload: candidateDomain === 'aquisicao' ? candidate.matchedActivity?.raw ?? null : null,
+                after_payload: numericPatch(candidate),
+                validation_after_save: wasApplied ? {
+                    target_table: appliedTarget?.table ?? candidateTargetTable,
+                    target_record_id: targetRecordId,
+                    confirmed_by_write_return: true,
+                } : null,
                 proposed_activity_update: {
                     ...numericPatch(candidate),
                     domain: candidate.domain ?? payload.domain,
-                    target_table: appliedTarget?.table ?? targetTableForDomain(payload.domain),
+                    target_table: appliedTarget?.table ?? candidateTargetTable,
                     target_record_id: targetRecordId,
                     activity_name: candidate.activityName,
                     journey: candidate.journey,
@@ -552,7 +603,7 @@ export const intelligentUpdateService = {
                 summary: {
                     ...payload.summary,
                     domain: payload.domain,
-                    targetTable: targetTableForDomain(payload.domain),
+                    targetTable: payload.domain === 'total_crm' ? 'roteamento automatico' : targetTableForDomain(payload.domain),
                     metrics: payload.metrics.length,
                     candidates: payload.candidates.length,
                     applied: appliedCount,
@@ -579,7 +630,7 @@ export const intelligentUpdateService = {
                     summary: {
                         ...payload.summary,
                         domain: payload.domain,
-                        targetTable: targetTableForDomain(payload.domain),
+                        targetTable: payload.domain === 'total_crm' ? 'roteamento automatico' : targetTableForDomain(payload.domain),
                         metrics: payload.metrics.length,
                         candidates: payload.candidates.length,
                     },

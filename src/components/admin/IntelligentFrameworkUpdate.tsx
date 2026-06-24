@@ -31,6 +31,7 @@ type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | '
 type CandidateFilter = CandidateStatus | 'update' | 'all';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type UpdateDomain = 'aquisicao' | 'rentabilizacao';
+type UpdateFlow = 'total_crm' | UpdateDomain;
 type TextReviewField = 'bu' | 'parceiro' | 'segmento' | 'subgrupo' | 'etapaAquisicao' | 'perfilCredito' | 'produto' | 'oferta' | 'promocional';
 type NumericReviewField = 'ordemDisparo';
 type ReviewField = TextReviewField | NumericReviewField;
@@ -145,7 +146,7 @@ const canUploadCandidate = (candidate: Pick<UpdateCandidate, 'status'>) =>
     !BLOCKED_UPLOAD_STATUSES.includes(candidate.status);
 
 interface ProcessResult {
-    domain: UpdateDomain;
+    domain: UpdateFlow;
     blocks: BlockSummary[];
     metrics: MetricRow[];
     candidates: UpdateCandidate[];
@@ -171,6 +172,17 @@ interface ParseDebugInfo {
     firstRowColumns?: number;
     message: string;
     stack?: string;
+}
+
+interface SaveReceipt {
+    type: 'success' | 'error';
+    text: string;
+    runId?: string;
+    audited?: number;
+    applied?: number;
+    acquisition?: number;
+    rentabilizacao?: number;
+    blocked?: number;
 }
 
 const buildProcessInsights = (
@@ -255,13 +267,13 @@ const FRAMEWORK_HEADERS = [
 ];
 
 const STATUS_LABEL: Record<CandidateStatus, string> = {
-    ready: 'Pronto',
+    ready: 'Novo pronto',
     review: 'Revisar',
-    new: 'Novo',
-    duplicate: 'Duplicado',
+    new: 'Sem historico',
+    duplicate: 'Ja existe',
     conflict: 'Conflito',
     error: 'Erro',
-    ignored: 'Ignorado',
+    ignored: 'Sem volume',
 };
 const STATUS_CLASS: Record<CandidateStatus, string> = {
     ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -275,7 +287,7 @@ const STATUS_CLASS: Record<CandidateStatus, string> = {
 const UPDATE_STATUS_CLASS = 'bg-cyan-50 text-cyan-700 border-cyan-200';
 
 const candidateStatusLabel = (candidate: UpdateCandidate) =>
-    candidate.metricRefresh ? 'Atualização' : STATUS_LABEL[candidate.status];
+    candidate.metricRefresh ? 'Atualizar metricas' : STATUS_LABEL[candidate.status];
 
 const REVIEW_FIELDS: Array<{ key: ReviewField; label: string; type?: 'number' }> = [
     { key: 'bu', label: 'BU' },
@@ -317,9 +329,21 @@ const DOMAIN_LABEL: Record<UpdateDomain, string> = {
     rentabilizacao: 'Rentabilização',
 };
 
+const FLOW_LABEL: Record<UpdateFlow, string> = {
+    total_crm: 'Total CRM',
+    aquisicao: DOMAIN_LABEL.aquisicao,
+    rentabilizacao: DOMAIN_LABEL.rentabilizacao,
+};
+
 const DOMAIN_TARGET_TABLE: Record<UpdateDomain, string> = {
     aquisicao: 'activities',
     rentabilizacao: 'rentabilizacao_activities',
+};
+
+const FLOW_TARGET_LABEL: Record<UpdateFlow, string> = {
+    total_crm: 'roteamento automatico',
+    aquisicao: DOMAIN_TARGET_TABLE.aquisicao,
+    rentabilizacao: DOMAIN_TARGET_TABLE.rentabilizacao,
 };
 
 const SEGMENT_BY_TAXONOMY_CODE: Record<string, string> = {
@@ -2099,6 +2123,60 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     };
 };
 
+const mergeBlockSummaries = (left: BlockSummary[], right: BlockSummary[]): BlockSummary[] => {
+    const byKey = new Map<SourceBlock, BlockSummary>();
+    [...left, ...right].forEach((block) => {
+        const current = byKey.get(block.key);
+        byKey.set(block.key, {
+            ...block,
+            detected: Boolean(current?.detected || block.detected),
+            rows: (current?.rows ?? 0) + block.rows,
+        });
+    });
+    return Array.from(byKey.values());
+};
+
+const processTotalCrmDinamicaBI = (
+    matrix: string[][],
+    activities: Activity[],
+    rentHistory: RentHistoryIndex
+): ProcessResult => {
+    const aquisicao = processDinamicaBI(matrix, activities);
+    const rentabilizacao = processRentabilizacaoDinamicaBI(matrix, rentHistory);
+    const candidates = [...aquisicao.candidates, ...rentabilizacao.candidates]
+        .sort((a, b) =>
+            a.date.localeCompare(b.date)
+            || a.domain.localeCompare(b.domain)
+            || a.status.localeCompare(b.status)
+            || b.confidence - a.confidence
+        );
+    const metrics = [...aquisicao.metrics, ...rentabilizacao.metrics];
+    const insights = buildProcessInsights(
+        metrics,
+        metrics,
+        candidates,
+        aquisicao.ignoredExisting + rentabilizacao.ignoredExisting,
+        aquisicao.insights.orphanPerformanceRows + rentabilizacao.insights.orphanPerformanceRows,
+        aquisicao.insights.invalidVolumeRows + rentabilizacao.insights.invalidVolumeRows
+    );
+
+    return {
+        domain: 'total_crm',
+        blocks: mergeBlockSummaries(aquisicao.blocks, rentabilizacao.blocks),
+        metrics,
+        candidates,
+        ignoredExisting: aquisicao.ignoredExisting + rentabilizacao.ignoredExisting,
+        importedRows: aquisicao.importedRows + rentabilizacao.importedRows,
+        tsv: candidates.filter(canUploadCandidate).map(buildExcelRow).join('\n'),
+        warnings: [...aquisicao.warnings, ...rentabilizacao.warnings],
+        insights: {
+            ...insights,
+            rawRows: aquisicao.insights.rawRows + rentabilizacao.insights.rawRows,
+            actionableDispatches: aquisicao.insights.actionableDispatches + rentabilizacao.insights.actionableDispatches,
+        },
+    };
+};
+
 const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((resolve, reject) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
@@ -2150,11 +2228,17 @@ const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((reso
 const safeProcessDinamicaBI = (
     matrix: string[][],
     activities: Activity[],
-    domain: UpdateDomain,
+    domain: UpdateFlow,
     rentHistory: RentHistoryIndex
 ): { result: ProcessResult | null; error?: ParseDebugInfo } => {
     try {
-        return { result: domain === 'rentabilizacao' ? processRentabilizacaoDinamicaBI(matrix, rentHistory) : processDinamicaBI(matrix, activities) };
+        return {
+            result: domain === 'total_crm'
+                ? processTotalCrmDinamicaBI(matrix, activities, rentHistory)
+                : domain === 'rentabilizacao'
+                    ? processRentabilizacaoDinamicaBI(matrix, rentHistory)
+                    : processDinamicaBI(matrix, activities),
+        };
     } catch (error: any) {
         return {
             result: null,
@@ -2311,15 +2395,15 @@ const HistoryCombobox = ({
 };
 
 const StatCard = ({ label, value, tone }: { label: string; value: number; tone: string }) => (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className={`text-2xl font-bold ${tone}`}>{value}</div>
-        <div className="mt-1 text-xs font-medium text-slate-500">{label}</div>
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+        <div className={`text-xl font-bold leading-tight ${tone}`}>{value.toLocaleString('pt-BR')}</div>
+        <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
     </div>
 );
 
 export const IntelligentFrameworkUpdate: React.FC = () => {
-    const { activities, viewSettings } = useAppStore();
-    const activeDomain: UpdateDomain = viewSettings.frente === 'rentabilizacao' ? 'rentabilizacao' : 'aquisicao';
+    const { activities } = useAppStore();
+    const [activeFlow, setActiveFlow] = useState<UpdateFlow>('total_crm');
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [result, setResult] = useState<ProcessResult | null>(null);
     const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
@@ -2331,7 +2415,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [dragError, setDragError] = useState<string | null>(null);
     const [debugInfo, setDebugInfo] = useState<ParseDebugInfo | null>(null);
-    const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [saveMessage, setSaveMessage] = useState<SaveReceipt | null>(null);
     const [lastRunId, setLastRunId] = useState<string | null>(null);
     const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
     const [reviewPage, setReviewPage] = useState(1);
@@ -2349,22 +2433,21 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [bulkValue, setBulkValue] = useState('');
     const [bulkScope, setBulkScope] = useState<'selected' | 'filtered'>('selected');
     const [undoSnapshot, setUndoSnapshot] = useState<UpdateCandidate[] | null>(null);
-    const setActiveDomain = (_domain: UpdateDomain) => undefined;
-    const previousDomainRef = useRef<UpdateDomain>(activeDomain);
+    const previousFlowRef = useRef<UpdateFlow>(activeFlow);
 
     useEffect(() => {
-        if (previousDomainRef.current === activeDomain) return;
-        previousDomainRef.current = activeDomain;
+        if (previousFlowRef.current === activeFlow) return;
+        previousFlowRef.current = activeFlow;
         setResult(null);
         setFileMeta(null);
         setSelectedKeys(new Set());
         setReviewOpen(false);
         setFlowChooserOpen(false);
-    }, [activeDomain]);
+    }, [activeFlow]);
 
     const candidates = result?.candidates ?? [];
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
-    const isRentReview = (result?.domain ?? activeDomain) === 'rentabilizacao';
+    const isRentReview = (result?.domain ?? activeFlow) === 'rentabilizacao';
     // A tabela permanece compacta, mas o drawer permite revisar todas as dimensoes
     // relevantes para Rentabilizacao e Seguros.
     const reviewFields = useMemo(
@@ -2475,6 +2558,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         uploadCandidates.forEach((candidate) => candidate.sourceBlocks.forEach((block) => unique.add(block)));
         return Array.from(unique);
     }, [uploadCandidates]);
+    const uploadDomainCounts = useMemo(() => ({
+        aquisicao: uploadCandidates.filter((candidate) => candidate.domain === 'aquisicao').length,
+        rentabilizacao: uploadCandidates.filter((candidate) => candidate.domain === 'rentabilizacao').length,
+    }), [uploadCandidates]);
+    const uploadOperationCounts = useMemo(() => ({
+        metricUpdates: uploadCandidates.filter((candidate) => candidate.metricRefresh || candidate.matchedActivity).length,
+        upserts: uploadCandidates.filter((candidate) => !candidate.metricRefresh && !candidate.matchedActivity).length,
+        blocked: Math.max(0, candidates.length - uploadCandidates.length - summary.ignored),
+    }), [candidates.length, summary.ignored, uploadCandidates]);
+    const filteredDomainCounts = useMemo(() => ({
+        aquisicao: filteredCandidates.filter((candidate) => candidate.domain === 'aquisicao').length,
+        rentabilizacao: filteredCandidates.filter((candidate) => candidate.domain === 'rentabilizacao').length,
+    }), [filteredCandidates]);
     const readyFilteredKeys = useMemo(() =>
         filteredCandidates
             .filter((candidate) => candidate.status === 'ready')
@@ -2520,7 +2616,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             // Para rentabilizacao, carrega o historico completo da base para (1) deduplicar
             // o que ja existe e (2) herdar dimensoes (BU/Segmento/Etapa) por jornada/segmento.
             let rentHistory = emptyRentHistoryIndex();
-            if (activeDomain === 'rentabilizacao') {
+            if (activeFlow === 'rentabilizacao' || activeFlow === 'total_crm') {
                 try {
                     const historyRows = await intelligentUpdateService.fetchDomainHistory('rentabilizacao');
                     rentHistory = buildRentHistoryIndex(historyRows);
@@ -2531,7 +2627,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setProcessingStage('detecting');
             await nextFrame();
             await sleep(40);
-            const processedResult = safeProcessDinamicaBI(matrix, activities, activeDomain, rentHistory);
+            const processedResult = safeProcessDinamicaBI(matrix, activities, activeFlow, rentHistory);
             if (!processedResult.result) {
                 const debug = {
                     ...processedResult.error,
@@ -2765,14 +2861,21 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     ignoredExisting: result.ignoredExisting,
                     accepted: acceptedCount,
                     domain: result.domain,
-                    targetTable: DOMAIN_TARGET_TABLE[result.domain],
+                    targetTable: FLOW_TARGET_LABEL[result.domain],
                 },
             });
 
             setLastRunId(saved.runId);
+            const appliedCandidates = candidatesForRun.filter((candidate) => candidate.accepted && canUploadCandidate(candidate));
             setSaveMessage({
                 type: 'success',
-                text: `${saved.candidateCount} candidatos auditados. ${saved.appliedCount} linhas confirmadas na base de dados.`,
+                text: `${saved.candidateCount} candidatos auditados. ${saved.appliedCount} linhas confirmadas na base de dados. Retorno da gravacao validado.`,
+                runId: saved.runId,
+                audited: saved.candidateCount,
+                applied: saved.appliedCount,
+                acquisition: appliedCandidates.filter((candidate) => candidate.domain === 'aquisicao').length,
+                rentabilizacao: appliedCandidates.filter((candidate) => candidate.domain === 'rentabilizacao').length,
+                blocked: Math.max(0, saved.candidateCount - saved.appliedCount),
             });
             setReviewOpen(false);
             setUploadConfirmOpen(false);
@@ -2799,14 +2902,14 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             candidates: candidatesForRun,
             tsv: candidatesForRun.filter((candidate) => candidate.accepted).map(buildExcelRow).join('\n'),
         } : current);
-        await handleSaveRun(candidatesForRun.filter((candidate) => uploadKeys.has(candidate.key)));
+        await handleSaveRun(candidatesForRun);
     };
 
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
             <div className="pointer-events-none absolute right-0 top-0 h-96 w-96 rounded-full bg-cyan-500/5 blur-3xl -mr-32 -mt-32" />
 
-            <div className="relative z-10 space-y-8">
+            <div className="relative z-10 space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-center gap-4">
                         <div className="rounded-xl bg-cyan-50 p-3 text-cyan-700 shadow-inner">
@@ -2815,11 +2918,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         <div>
                             <h3 className="text-xl font-bold text-slate-900">Atualizacao Inteligente</h3>
                             <p className="text-sm text-slate-500">
-                                Fluxo definido pelo toggle superior: {DOMAIN_LABEL[activeDomain]}. Destino: {DOMAIN_TARGET_TABLE[activeDomain]}.
+                                Upload assistido para {FLOW_LABEL[activeFlow]} com validacao antes da base de dados.
                             </p>
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setFlowChooserOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 transition hover:bg-cyan-100"
+                        >
+                            <Sparkles size={14} />
+                            Alterar fluxo
+                        </button>
                         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                             <Database size={14} />
                             Historico carregado: {activities.length} campanhas
@@ -2851,13 +2962,25 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     )}
 
                     {saveMessage && (
-                        <div className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-xs ${
+                        <div className={`rounded-xl border px-4 py-3 text-xs ${
                             saveMessage.type === 'success'
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                                 : 'border-red-200 bg-red-50 text-red-700'
                         }`}>
-                            {saveMessage.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-                            <span>{saveMessage.text}</span>
+                            <div className="flex items-center gap-2 font-bold">
+                                {saveMessage.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                                <span>{saveMessage.type === 'success' ? 'Recibo da atualizacao' : 'Falha na atualizacao'}</span>
+                            </div>
+                            <p className="mt-1 text-slate-600">{saveMessage.text}</p>
+                            {saveMessage.type === 'success' && (
+                                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                    <StatCard label="Auditadas" value={saveMessage.audited ?? 0} tone="text-slate-800" />
+                                    <StatCard label="Aplicadas" value={saveMessage.applied ?? 0} tone="text-emerald-700" />
+                                    <StatCard label="Aquisicao" value={saveMessage.acquisition ?? 0} tone="text-blue-700" />
+                                    <StatCard label="Rentabilizacao" value={saveMessage.rentabilizacao ?? 0} tone="text-cyan-700" />
+                                    <StatCard label="Fora do envio" value={saveMessage.blocked ?? 0} tone="text-amber-700" />
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -2956,10 +3079,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
                             <StatCard label="Prontas" value={summary.ready} tone="text-emerald-700" />
-                            <StatCard label="Atualizações" value={summary.update} tone="text-cyan-700" />
+                            <StatCard label="Atualizar metricas" value={summary.update} tone="text-cyan-700" />
                             <StatCard label="Revisao" value={summary.review} tone="text-amber-700" />
                             <StatCard label="Novas" value={summary.fresh} tone="text-blue-700" />
-                            <StatCard label="Duplicadas" value={summary.duplicate} tone="text-purple-700" />
+                            <StatCard label="Ja existem" value={summary.duplicate} tone="text-purple-700" />
                             <StatCard label="Conflitos" value={summary.conflict} tone="text-orange-700" />
                             <StatCard label="Existentes analisadas" value={result.ignoredExisting} tone="text-slate-700" />
                         </div>
@@ -3003,31 +3126,33 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </button>
                         </header>
                         <main className="grid gap-3 p-5">
-                            {(['aquisicao', 'rentabilizacao'] as const).map((domain) => (
+                            {(['total_crm', 'aquisicao', 'rentabilizacao'] as const).map((domain) => (
                                 <button
                                     key={domain}
                                     type="button"
                                     onClick={() => {
-                                        setActiveDomain(domain);
+                                        setActiveFlow(domain);
                                         setResult(null);
                                         setFileMeta(null);
                                         setSelectedKeys(new Set());
                                         setFlowChooserOpen(false);
                                     }}
                                     className={`rounded-xl border px-4 py-4 text-left transition ${
-                                        activeDomain === domain
+                                        activeFlow === domain
                                             ? 'border-cyan-500 bg-cyan-50'
                                             : 'border-slate-200 bg-white hover:bg-slate-50'
                                     }`}
                                 >
                                     <div className="flex items-center justify-between gap-3">
-                                        <div className="text-sm font-bold text-slate-900">Atualizar {DOMAIN_LABEL[domain]}</div>
+                                        <div className="text-sm font-bold text-slate-900">Atualizar {FLOW_LABEL[domain]}</div>
                                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                                            {DOMAIN_TARGET_TABLE[domain]}
+                                            {FLOW_TARGET_LABEL[domain]}
                                         </span>
                                     </div>
                                     <p className="mt-1 text-xs text-slate-500">
-                                        {domain === 'aquisicao'
+                                        {domain === 'total_crm'
+                                            ? 'Lê todo o CRM da Dinâmica BI, separa aquisição e restante CRM, e grava cada disparo na base correta.'
+                                            : domain === 'aquisicao'
                                             ? 'Campanhas do framework de aquisição, com revisão completa das dimensões antes de gravar.'
                                             : 'Réguas de rentabilização, seguros, Copa e ativações mapeáveis para a base de rentabilização.'}
                                     </p>
@@ -3049,8 +3174,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                             <FileSpreadsheet size={18} />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-slate-900">Revisao de {DOMAIN_LABEL[result.domain]}</h3>
-                                            <p className="text-xs text-slate-500">{fileMeta.name} - destino: {DOMAIN_TARGET_TABLE[result.domain]}</p>
+                                            <h3 className="text-lg font-bold text-slate-900">Revisao de {FLOW_LABEL[result.domain]}</h3>
+                                            <p className="text-xs text-slate-500">{fileMeta.name} - destino: {FLOW_TARGET_LABEL[result.domain]}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -3063,13 +3188,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <X size={18} />
                                 </button>
                             </div>
-                            <div className="mt-3 rounded-lg border border-cyan-100 bg-cyan-50 px-4 py-2.5 text-sm text-cyan-950">
+                            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
                                 <strong>{result.insights.rawRows.toLocaleString('pt-BR')} linhas</strong> da Dinâmica BI foram consolidadas em{' '}
                                 <strong>{result.insights.uniqueJourneys} jornadas</strong>,{' '}
                                 <strong>{result.insights.uniqueActivities} activities</strong> e{' '}
                                 <strong>{result.insights.newDispatches} novos disparos</strong>.
                             </div>
-                            <div className="mt-3 grid grid-cols-3 gap-2 lg:grid-cols-8">
+                            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
                                 {[
                                     ['Linhas BI', result.insights.rawRows],
                                     ['Métricas válidas', result.insights.validMetricRows],
@@ -3219,10 +3344,20 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                                         }`}
                                     >
-                                        {status === 'all' ? 'Todos' : status === 'update' ? 'Atualização' : STATUS_LABEL[status]}
+                                        {status === 'all' ? 'Todos' : status === 'update' ? 'Atualizar metricas' : STATUS_LABEL[status]}
                                     </button>
                                 ))}
                             </div>
+                            {result.domain === 'total_crm' && (
+                                <div className="flex flex-wrap gap-2 text-[10px] font-bold">
+                                    <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-blue-700">
+                                        Aquisição: {filteredDomainCounts.aquisicao}
+                                    </span>
+                                    <span className="rounded-full border border-cyan-100 bg-cyan-50 px-2 py-1 text-cyan-700">
+                                        Rentabilização: {filteredDomainCounts.rentabilizacao}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className={`flex flex-col gap-2 border-b px-6 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
@@ -3321,7 +3456,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         <th className="w-[32%] px-3 py-3 font-bold">Disparo</th>
                                         {reviewMode === 'operation' && <>
                                             <th className="w-[31%] px-3 py-3 font-bold">Classificação</th>
-                                            <th className="w-[18%] px-3 py-3 font-bold">Revisão</th>
+                                            <th className="w-[18%] px-3 py-3 font-bold">Decisao</th>
                                         </>}
                                         {reviewMode === 'dimensions' && <>
                                             <th className="w-[38%] px-3 py-3 font-bold">Dimensões</th>
@@ -3356,6 +3491,18 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3 align-top">
+                                                <div className="mb-1 flex items-center gap-2">
+                                                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                                        candidate.domain === 'aquisicao'
+                                                            ? 'bg-blue-50 text-blue-700'
+                                                            : 'bg-cyan-50 text-cyan-700'
+                                                    }`}>
+                                                        {DOMAIN_LABEL[candidate.domain]}
+                                                    </span>
+                                                    <span className="text-[9px] font-semibold text-slate-400">
+                                                        {DOMAIN_TARGET_TABLE[candidate.domain]}
+                                                    </span>
+                                                </div>
                                                 <div className="truncate font-semibold text-slate-900" title={candidate.journey}>{candidate.journey}</div>
                                                 <div className="mt-1 truncate text-slate-500" title={candidate.activityName}>{candidate.activityName}</div>
                                                 <div className="mt-2 flex gap-2 text-[10px] font-bold text-slate-500">
@@ -3523,10 +3670,25 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <StatCard label="Serão gravadas" value={uploadCandidates.length} tone="text-blue-700" />
-                                <StatCard label="Pendentes fora" value={Math.max(0, candidates.length - uploadCandidates.length - summary.ignored)} tone="text-amber-700" />
+                                <StatCard label="Serao gravadas" value={uploadCandidates.length} tone="text-blue-700" />
+                                <StatCard label="Fora do envio" value={uploadOperationCounts.blocked} tone="text-amber-700" />
+                                <StatCard label="Novos / upsert" value={uploadOperationCounts.upserts} tone="text-emerald-700" />
+                                <StatCard label="Atualizar metricas" value={uploadOperationCounts.metricUpdates} tone="text-cyan-700" />
                                 <StatCard label="Duplicadas" value={summary.duplicate} tone="text-purple-700" />
                                 <StatCard label="Erros" value={summary.error} tone="text-red-700" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
+                                    <div className="text-[10px] font-bold uppercase tracking-wide text-blue-500">Aquisição</div>
+                                    <div className="mt-1 text-xl font-bold text-blue-800">{uploadDomainCounts.aquisicao}</div>
+                                    <div className="text-xs text-blue-700">destino: activities</div>
+                                </div>
+                                <div className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-3">
+                                    <div className="text-[10px] font-bold uppercase tracking-wide text-cyan-500">Rentabilização</div>
+                                    <div className="mt-1 text-xl font-bold text-cyan-800">{uploadDomainCounts.rentabilizacao}</div>
+                                    <div className="text-xs text-cyan-700">destino: rentabilizacao_activities</div>
+                                </div>
                             </div>
 
                             {uploadUsesSelection && (
@@ -3543,7 +3705,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <span>Defaults aplicados:</span>
                                     <span className="font-semibold text-slate-800">N/A, Padrao, Cartao</span>
                                     <span>Auditoria:</span>
-                                    <span className="font-semibold text-slate-800">run, métricas e candidatos</span>
+                                    <span className="font-semibold text-slate-800">run, métricas, candidatos e validação do retorno</span>
                                 </div>
                             </div>
                         </main>
