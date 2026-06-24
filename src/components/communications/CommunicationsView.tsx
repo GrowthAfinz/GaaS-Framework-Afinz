@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, LayoutList, BarChart3, type LucideIcon } from 'lucide-react';
+import { CadastroCobertura } from './CadastroCobertura';
+import { TemplatePerformanceGrid } from './TemplatePerformanceGrid';
 
 type CommunicationsSubTab = 'cadastro' | 'performance';
 
@@ -52,16 +54,8 @@ export const CommunicationsView: React.FC = () => {
 
             {/* Conteúdo */}
             <div className="flex-1 overflow-y-auto p-6">
-                {subTab === 'cadastro' && (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-400">
-                        Cadastro / Cobertura — em construção (Fase 2)
-                    </div>
-                )}
-                {subTab === 'performance' && (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-400">
-                        Performance por template — em construção (Fase 3)
-                    </div>
-                )}
+                {subTab === 'cadastro' && <CadastroCobertura />}
+                {subTab === 'performance' && <TemplatePerformanceGrid />}
             </div>
         </div>
     );

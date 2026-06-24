@@ -1,0 +1,123 @@
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from '../services/supabaseClient';
+import type { CommunicationTemplate } from '../types/communication';
+
+/** Performance agregada de um template (soma de todas as execuções vinculadas). */
+export interface TemplatePerformance {
+  template: CommunicationTemplate;
+  activityNames: string[];
+  executions: number;
+  baseEnviada: number;
+  cliques: number;
+  cartoes: number;
+  propostas: number;
+  custoTotal: number;
+  ctr: number;             // cliques / baseEnviada
+  taxaConversao: number;   // cartoes / baseEnviada
+  cac: number;             // custoTotal / cartoes
+}
+
+interface ActivityMetricRow {
+  template_id: string | null;
+  'Activity name / Taxonomia': string | null;
+  'Base Total': number | null;
+  Cliques: number | null;
+  'Cartões Gerados': number | null;
+  Propostas: number | null;
+  'Custo Total Campanha': number | null;
+}
+
+const num = (v: number | null | undefined) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
+
+/**
+ * Performance por template — JOIN 100% local no GaaS:
+ * `activities` (resultado já extraído) agregado por `template_id`,
+ * enriquecido com `communication_templates` (preview). NÃO chama AppsFlyer.
+ * Lista só templates com ≥1 execução vinculada que tenha resultado.
+ */
+export function useTemplatePerformance() {
+  const [data, setData] = useState<TemplatePerformance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPerformance = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [{ data: acts, error: aErr }, { data: tmpls, error: tErr }] = await Promise.all([
+        supabase
+          .from('activities')
+          .select('template_id, "Activity name / Taxonomia", "Base Total", "Cliques", "Cartões Gerados", "Propostas", "Custo Total Campanha"')
+          .not('template_id', 'is', null),
+        supabase.from('communication_templates').select('*'),
+      ]);
+      if (aErr) throw aErr;
+      if (tErr) throw tErr;
+
+      const templateById = new Map<string, CommunicationTemplate>();
+      for (const t of (tmpls ?? []) as CommunicationTemplate[]) templateById.set(t.template_id, t);
+
+      const acc = new Map<string, TemplatePerformance & { _names: Set<string> }>();
+      for (const r of (acts ?? []) as ActivityMetricRow[]) {
+        const id = r.template_id;
+        if (!id) continue;
+        const template = templateById.get(id);
+        if (!template) continue; // vínculo órfão — ignora
+
+        let p = acc.get(id);
+        if (!p) {
+          p = {
+            template,
+            activityNames: [],
+            executions: 0,
+            baseEnviada: 0,
+            cliques: 0,
+            cartoes: 0,
+            propostas: 0,
+            custoTotal: 0,
+            ctr: 0,
+            taxaConversao: 0,
+            cac: 0,
+            _names: new Set<string>(),
+          };
+          acc.set(id, p);
+        }
+        p.executions += 1;
+        p.baseEnviada += num(r['Base Total']);
+        p.cliques += num(r.Cliques);
+        p.cartoes += num(r['Cartões Gerados']);
+        p.propostas += num(r.Propostas);
+        p.custoTotal += num(r['Custo Total Campanha']);
+        const name = r['Activity name / Taxonomia'];
+        if (name) p._names.add(name);
+      }
+
+      const result: TemplatePerformance[] = [];
+      for (const p of acc.values()) {
+        // só templates com resultado registrado
+        const hasResult = p.cliques > 0 || p.cartoes > 0 || p.propostas > 0;
+        if (!hasResult) continue;
+        p.activityNames = Array.from(p._names);
+        p.ctr = p.baseEnviada > 0 ? p.cliques / p.baseEnviada : 0;
+        p.taxaConversao = p.baseEnviada > 0 ? p.cartoes / p.baseEnviada : 0;
+        p.cac = p.cartoes > 0 ? p.custoTotal / p.cartoes : 0;
+        const { _names, ...clean } = p;
+        void _names;
+        result.push(clean);
+      }
+
+      result.sort((a, b) => b.cartoes - a.cartoes);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao carregar a performance por template.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPerformance();
+  }, [fetchPerformance]);
+
+  return { data, loading, error, refetch: fetchPerformance };
+}
