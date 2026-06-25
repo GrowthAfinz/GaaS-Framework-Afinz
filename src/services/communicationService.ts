@@ -140,7 +140,7 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
     const { data: linked, error: linkError } = await supabase
       .from('activities')
       .update({ template_id: templateId, updated_at: new Date().toISOString() })
-      .eq('Activity name / Taxonomia', input.activityName)
+      .eq('"Activity name / Taxonomia"', input.activityName)
       .select('id');
     if (linkError) throw linkError;
 

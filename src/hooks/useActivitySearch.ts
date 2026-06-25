@@ -75,15 +75,15 @@ export function useActivitySearch(filters: ActivitySearchFilters, debounceMs = 3
         let query = supabase
           .from('activities')
           .select('id, "Activity name / Taxonomia", jornada, "Canal", "Segmento", "Data de Disparo", BU, template_id')
-          .not('Activity name / Taxonomia', 'is', null)
-          .order('Data de Disparo', { ascending: false })
+          .not('"Activity name / Taxonomia"', 'is', null)
+          .order('"Data de Disparo"', { ascending: false })
           .limit(MAX_ROWS);
 
         if (filters.jornada) query = query.ilike('jornada', `%${filters.jornada}%`);
-        if (filters.segmento) query = query.ilike('Segmento', `%${filters.segmento}%`);
-        if (filters.canal) query = query.eq('Canal', filters.canal);
-        if (filters.activityName) query = query.ilike('Activity name / Taxonomia', `%${filters.activityName}%`);
-        if (filters.data) query = query.eq('Data de Disparo', filters.data);
+        if (filters.segmento) query = query.ilike('"Segmento"', `%${filters.segmento}%`);
+        if (filters.canal) query = query.eq('"Canal"', filters.canal);
+        if (filters.activityName) query = query.ilike('"Activity name / Taxonomia"', `%${filters.activityName}%`);
+        if (filters.data) query = query.eq('"Data de Disparo"', filters.data);
 
         const { data, error: qError } = await query;
         if (qError) throw qError;
