@@ -17,6 +17,7 @@ const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) =>
 
 const TemplatePreview: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
   const [url, setUrl] = useState<string | null>(null);
+  const [html, setHtml] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const path = item.template.original_path;
   const email = isEmailChannel(item.template.channel);
@@ -24,9 +25,20 @@ const TemplatePreview: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
   useEffect(() => {
     let active = true;
     if (!path) return;
-    getSignedUrl(path).then((u) => { if (active) setUrl(u); }).catch(() => { if (active) setFailed(true); });
+    getSignedUrl(path)
+      .then(async (u) => {
+        if (!active) return;
+        if (email) {
+          // Renderiza o HTML via srcDoc (não depende do content-type do storage).
+          const text = await fetch(u).then((r) => r.text());
+          if (active) setHtml(text);
+        } else {
+          setUrl(u);
+        }
+      })
+      .catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
-  }, [path]);
+  }, [path, email]);
 
   if (!path || failed) {
     return (
@@ -35,6 +47,25 @@ const TemplatePreview: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
       </div>
     );
   }
+
+  if (email) {
+    if (html === null) {
+      return (
+        <div className="flex h-40 items-center justify-center bg-slate-50 text-slate-300">
+          <Loader2 size={20} className="animate-spin" />
+        </div>
+      );
+    }
+    return (
+      <iframe
+        title={`Preview ${item.template.template_id}`}
+        sandbox=""
+        srcDoc={html}
+        className="h-40 w-full bg-white"
+      />
+    );
+  }
+
   if (!url) {
     return (
       <div className="flex h-40 items-center justify-center bg-slate-50 text-slate-300">
@@ -42,9 +73,7 @@ const TemplatePreview: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
       </div>
     );
   }
-  return email ? (
-    <iframe title={`Preview ${item.template.template_id}`} sandbox="" src={url} className="h-40 w-full bg-white" />
-  ) : (
+  return (
     <div className="flex h-40 items-center justify-center overflow-hidden bg-slate-50">
       <img src={url} alt={item.template.template_id} className="max-h-full max-w-full object-contain" />
     </div>
