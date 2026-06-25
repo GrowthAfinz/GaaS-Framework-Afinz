@@ -30,7 +30,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose }) => 
 
   const subject = typeof template.metadata?.subject === 'string' ? template.metadata.subject : '';
   const preheader = typeof template.metadata?.preheader === 'string' ? template.metadata.preheader : '';
-  const hasRealCac = item.cac > 0;
+  const estimado = item.custoEstimado;
 
   useEffect(() => {
     let active = true;
@@ -130,23 +130,24 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose }) => 
               <Stat label="Cartões" value={int(item.cartoes)} />
               <Stat label="Propostas" value={int(item.propostas)} />
               <Stat
-                label="CAC"
-                value={hasRealCac ? brl(item.cac) : '—'}
-                hint={hasRealCac ? 'custo real / cartões' : 'sem dados de custo'}
+                label={estimado ? 'Gasto estimado' : 'Gasto'}
+                value={item.custoEfetivo > 0 ? `${estimado ? '~' : ''}${brl(item.custoEfetivo)}` : '—'}
+                hint={estimado ? 'base × custo de canal' : 'Custo Total Campanha'}
               />
               <Stat
-                label="CAC estimado"
-                value={item.cacEstimado > 0 ? brl(item.cacEstimado) : '—'}
-                hint="custo de canal / cartões"
+                label={estimado ? 'CAC estimado' : 'CAC'}
+                value={item.cacEfetivo > 0 ? `${estimado ? '~' : ''}${brl(item.cacEfetivo)}` : '—'}
+                hint="gasto / cartões"
               />
             </div>
 
-            {!hasRealCac && (
+            {estimado && (
               <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
                 <Info size={14} className="mt-0.5 shrink-0" />
                 <span>
-                  CAC real indisponível: os disparos vinculados não têm custo preenchido em <em>Custo Total Campanha</em>.
-                  O CAC estimado usa só o custo unitário do canal ({brl(item.custoCanalEstimado)} no total) e ignora o custo de oferta.
+                  Gasto e CAC <strong>estimados</strong>: os disparos vinculados não têm <em>Custo Total Campanha</em> preenchido,
+                  então o valor usa só o custo unitário do canal ({item.template.channel}) e <strong>ignora o custo de oferta</strong>.
+                  Quando o custo real for extraído para as activities, os valores reais passam a aparecer automaticamente.
                 </span>
               </div>
             )}

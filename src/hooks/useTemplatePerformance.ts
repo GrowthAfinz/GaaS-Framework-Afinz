@@ -12,12 +12,16 @@ export interface TemplatePerformance {
   cliques: number;
   cartoes: number;
   propostas: number;
-  custoTotal: number;        // soma real de "Custo Total Campanha" (pode ser 0 se não preenchido)
+  custoTotal: number;        // soma real de "Custo Total Campanha" (0 se não preenchido)
   ctr: number;               // cliques / baseEnviada
   taxaConversao: number;     // cartoes / baseEnviada
   cac: number;               // custoTotal / cartoes (CAC real; 0 se sem custo)
   custoCanalEstimado: number; // baseEnviada * custo unitário do canal
   cacEstimado: number;       // custoCanalEstimado / cartoes (estimativa de canal)
+  // Valores "efetivos": usam o custo real quando existe, senão caem no custo de canal.
+  custoEfetivo: number;      // gasto exibido (real ou estimado pelo canal)
+  cacEfetivo: number;        // CAC exibido (real ou estimado pelo canal)
+  custoEstimado: boolean;    // true quando custoEfetivo veio do custo de canal (sem custo real)
 }
 
 interface ActivityMetricRow {
@@ -83,6 +87,9 @@ export function useTemplatePerformance() {
             cac: 0,
             custoCanalEstimado: 0,
             cacEstimado: 0,
+            custoEfetivo: 0,
+            cacEfetivo: 0,
+            custoEstimado: false,
             _names: new Set<string>(),
           };
           acc.set(id, p);
@@ -108,6 +115,10 @@ export function useTemplatePerformance() {
         p.cac = p.cartoes > 0 ? p.custoTotal / p.cartoes : 0;
         p.custoCanalEstimado = p.baseEnviada * channelUnitCost(p.template.channel);
         p.cacEstimado = p.cartoes > 0 ? p.custoCanalEstimado / p.cartoes : 0;
+        // Efetivo: prioriza custo real; cai no custo de canal quando não há custo real.
+        p.custoEstimado = p.custoTotal <= 0;
+        p.custoEfetivo = p.custoEstimado ? p.custoCanalEstimado : p.custoTotal;
+        p.cacEfetivo = p.cartoes > 0 ? p.custoEfetivo / p.cartoes : 0;
         const { _names, ...clean } = p;
         void _names;
         result.push(clean);

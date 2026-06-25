@@ -139,10 +139,13 @@ export const TemplatePerformanceGrid: React.FC = () => {
                 <Metric label="CTR" value={pct(item.ctr)} />
                 <Metric label="Cartões" value={int(item.cartoes)} />
                 <Metric label="Conversão" value={pct(item.taxaConversao)} />
-                <Metric label="Propostas" value={int(item.propostas)} />
                 <Metric
-                  label={item.cac > 0 ? 'CAC' : 'CAC est.'}
-                  value={item.cac > 0 ? brl(item.cac) : (item.cacEstimado > 0 ? `~${brl(item.cacEstimado)}` : '—')}
+                  label={item.custoEstimado ? 'Gasto est.' : 'Gasto'}
+                  value={item.custoEfetivo > 0 ? `${item.custoEstimado ? '~' : ''}${brl(item.custoEfetivo)}` : '—'}
+                />
+                <Metric
+                  label={item.custoEstimado ? 'CAC est.' : 'CAC'}
+                  value={item.cacEfetivo > 0 ? `${item.custoEstimado ? '~' : ''}${brl(item.cacEfetivo)}` : '—'}
                 />
               </div>
             </div>
