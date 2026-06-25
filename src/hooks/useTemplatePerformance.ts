@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
 import { supabase } from '../services/supabaseClient';
 import type { CommunicationTemplate } from '../types/communication';
 import { channelUnitCost } from '../utils/inferChannel';
+import { usePeriod } from '../contexts/PeriodContext';
+import { useBU } from '../contexts/BUContext';
+import { useAppStore } from '../store/useAppStore';
 
 /** Performance agregada de um template (soma de todas as execuções vinculadas). */
 export interface TemplatePerformance {
@@ -47,15 +51,40 @@ export function useTemplatePerformance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Filtros globais (mesma fonte das outras abas).
+  const { startDate, endDate } = usePeriod();
+  const { selectedBUs } = useBU();
+  const f = useAppStore((s) => s.viewSettings.filtrosGlobais);
+
+  const dataInicio = format(startDate, 'yyyy-MM-dd');
+  const dataFim = format(endDate, 'yyyy-MM-dd');
+
+  // Chave estável para refazer a busca quando qualquer filtro mudar.
+  const filterKey = useMemo(
+    () => JSON.stringify([dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros, f.subgrupos]),
+    [dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros, f.subgrupos]
+  );
+
   const fetchPerformance = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      let actQuery = supabase
+        .from('activities')
+        .select('template_id, "Activity name / Taxonomia", "Base Total", "Cliques", "Cartões Gerados", "Propostas", "Custo Total Campanha"')
+        .not('template_id', 'is', null)
+        .gte('"Data de Disparo"', dataInicio)
+        .lte('"Data de Disparo"', `${dataFim} 23:59:59`);
+
+      if (selectedBUs.length) actQuery = actQuery.in('BU', selectedBUs);
+      if (f.canais?.length) actQuery = actQuery.in('"Canal"', f.canais);
+      if (f.jornadas?.length) actQuery = actQuery.in('jornada', f.jornadas);
+      if (f.segmentos?.length) actQuery = actQuery.in('"Segmento"', f.segmentos);
+      if (f.parceiros?.length) actQuery = actQuery.in('"Parceiro"', f.parceiros);
+      if (f.subgrupos?.length) actQuery = actQuery.in('"Subgrupos"', f.subgrupos);
+
       const [{ data: acts, error: aErr }, { data: tmpls, error: tErr }] = await Promise.all([
-        supabase
-          .from('activities')
-          .select('template_id, "Activity name / Taxonomia", "Base Total", "Cliques", "Cartões Gerados", "Propostas", "Custo Total Campanha"')
-          .not('template_id', 'is', null),
+        actQuery,
         supabase.from('communication_templates').select('*'),
       ]);
       if (aErr) throw aErr;
@@ -131,7 +160,8 @@ export function useTemplatePerformance() {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]);
 
   useEffect(() => {
     fetchPerformance();

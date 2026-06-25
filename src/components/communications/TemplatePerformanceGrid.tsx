@@ -75,8 +75,8 @@ const TemplatePreview: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
     );
   }
   return (
-    <div className="flex h-40 items-center justify-center overflow-hidden bg-slate-50">
-      <img src={url} alt={item.template.template_id} className="max-h-full max-w-full object-contain" />
+    <div className="h-40 w-full overflow-hidden bg-slate-50">
+      <img src={url} alt={item.template.template_id} className="h-full w-full object-cover object-top" />
     </div>
   );
 };
