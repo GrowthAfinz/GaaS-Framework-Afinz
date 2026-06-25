@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Loader2, FileImage, Info } from 'lucide-react';
+import { X, Loader2, FileImage } from 'lucide-react';
 import type { TemplatePerformance } from '../../hooks/useTemplatePerformance';
 import { getSignedUrl } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
@@ -140,17 +140,6 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose }) => 
                 hint="gasto / cartões"
               />
             </div>
-
-            {estimado && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                <Info size={14} className="mt-0.5 shrink-0" />
-                <span>
-                  Gasto e CAC <strong>estimados</strong>: os disparos vinculados não têm <em>Custo Total Campanha</em> preenchido,
-                  então o valor usa só o custo unitário do canal ({item.template.channel}) e <strong>ignora o custo de oferta</strong>.
-                  Quando o custo real for extraído para as activities, os valores reais passam a aparecer automaticamente.
-                </span>
-              </div>
-            )}
 
             <p className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               Activity names ({item.activityNames.length})
