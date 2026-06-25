@@ -3,7 +3,7 @@ import { X, Link2, Plus, UploadCloud, Loader2, AlertCircle } from 'lucide-react'
 import type { CommunicationTemplate } from '../../types/communication';
 import { COMMUNICATION_CHANNELS, isEmailChannel } from '../../utils/inferChannel';
 import { normalizeTemplateId, isValidTemplateId } from '../../utils/templateId';
-import { saveCommunication } from '../../services/communicationService';
+import { saveCommunication, describeError } from '../../services/communicationService';
 
 export interface DispatchSelection {
   activityName: string;
@@ -75,7 +75,8 @@ export const CommunicationUploadModal: React.FC<Props> = ({ selection, templates
       });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao salvar.');
+      console.error('[saveCommunication] falhou:', err);
+      setError(describeError(err));
     } finally {
       setSaving(false);
     }

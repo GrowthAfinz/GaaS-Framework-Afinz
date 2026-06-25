@@ -5,6 +5,25 @@ import { channelSlug, isEmailChannel } from '../utils/inferChannel';
 
 const BUCKET = 'crm-communications';
 
+/**
+ * Extrai uma mensagem legível de qualquer erro (Error, PostgrestError, StorageError
+ * ou objeto cru do Supabase). Erros do Supabase NÃO são instâncias de Error.
+ */
+export function describeError(err: unknown): string {
+  if (!err) return 'Erro desconhecido.';
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object') {
+    const e = err as Record<string, unknown>;
+    const parts = [e.message, e.error, e.details, e.hint, e.code, e.statusCode]
+      .filter((v): v is string | number => v != null && v !== '')
+      .map(String);
+    if (parts.length) return Array.from(new Set(parts)).join(' · ');
+    try { return JSON.stringify(err); } catch { /* noop */ }
+  }
+  return 'Erro desconhecido.';
+}
+
 export interface SaveCommunicationInput {
   /** 'new' cria o template (cola id da planilha); 'existing' reutiliza um já cadastrado. */
   mode: 'new' | 'existing';
