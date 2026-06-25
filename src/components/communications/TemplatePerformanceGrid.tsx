@@ -3,6 +3,7 @@ import { Loader2, AlertCircle, BarChart3, FileImage } from 'lucide-react';
 import { useTemplatePerformance, type TemplatePerformance } from '../../hooks/useTemplatePerformance';
 import { getSignedUrl } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
+import { CommunicationDetailModal } from './CommunicationDetailModal';
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const int = (v: number) => v.toLocaleString('pt-BR');
@@ -82,6 +83,7 @@ const TemplatePreview: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
 
 export const TemplatePerformanceGrid: React.FC = () => {
   const { data, loading, error } = useTemplatePerformance();
+  const [selected, setSelected] = useState<TemplatePerformance | null>(null);
 
   if (loading) {
     return (
@@ -109,34 +111,46 @@ export const TemplatePerformanceGrid: React.FC = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {data.map((item) => (
-        <div key={item.template.template_id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <TemplatePreview item={item} />
-          <div className="border-t border-slate-100 px-4 py-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate font-mono text-xs font-semibold text-slate-700" title={item.template.template_id}>
-                {item.template.template_id}
+    <>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {data.map((item) => (
+          <button
+            key={item.template.template_id}
+            type="button"
+            onClick={() => setSelected(item)}
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition-shadow hover:border-cyan-300 hover:shadow-md"
+          >
+            <TemplatePreview item={item} />
+            <div className="border-t border-slate-100 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-mono text-xs font-semibold text-slate-700" title={item.template.template_id}>
+                  {item.template.template_id}
+                </p>
+                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  {item.template.channel}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-slate-400">
+                {item.activityNames.length} activity_name{item.activityNames.length === 1 ? '' : 's'} · {int(item.executions)} execuções
               </p>
-              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                {item.template.channel}
-              </span>
-            </div>
-            <p className="mt-0.5 text-xs text-slate-400">
-              {item.activityNames.length} activity_name{item.activityNames.length === 1 ? '' : 's'} · {int(item.executions)} execuções
-            </p>
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Metric label="Base enviada" value={int(item.baseEnviada)} />
-              <Metric label="CTR" value={pct(item.ctr)} />
-              <Metric label="Cartões" value={int(item.cartoes)} />
-              <Metric label="Conversão" value={pct(item.taxaConversao)} />
-              <Metric label="Propostas" value={int(item.propostas)} />
-              <Metric label="CAC" value={item.cac > 0 ? brl(item.cac) : '—'} />
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <Metric label="Base enviada" value={int(item.baseEnviada)} />
+                <Metric label="CTR" value={pct(item.ctr)} />
+                <Metric label="Cartões" value={int(item.cartoes)} />
+                <Metric label="Conversão" value={pct(item.taxaConversao)} />
+                <Metric label="Propostas" value={int(item.propostas)} />
+                <Metric
+                  label={item.cac > 0 ? 'CAC' : 'CAC est.'}
+                  value={item.cac > 0 ? brl(item.cac) : (item.cacEstimado > 0 ? `~${brl(item.cacEstimado)}` : '—')}
+                />
+              </div>
             </div>
-          </div>
-        </div>
-      ))}
-    </div>
+          </button>
+        ))}
+      </div>
+
+      {selected && <CommunicationDetailModal item={selected} onClose={() => setSelected(null)} />}
+    </>
   );
 };

@@ -46,6 +46,18 @@ export function isEmailChannel(channel: string | null | undefined): boolean {
   return !!channel && /e-?mail/i.test(channel);
 }
 
+/** Custo unitário por envio, por canal (R$). Fonte: CLAUDE.md (custos por canal). */
+export function channelUnitCost(channel: string | null | undefined): number {
+  const canonical = toCanonicalChannel(channel);
+  switch (canonical) {
+    case 'E-mail': return 0.001;
+    case 'Push': return 0.001;
+    case 'SMS': return 0.064;
+    case 'WhatsApp': return 0.420;
+    default: return 0;
+  }
+}
+
 /** Slug seguro para path de storage: email | sms | whatsapp | push. */
 export function channelSlug(channel: string): string {
   const c = channel.toLowerCase();

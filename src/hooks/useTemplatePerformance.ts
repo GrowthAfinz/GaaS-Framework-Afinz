@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import type { CommunicationTemplate } from '../types/communication';
+import { channelUnitCost } from '../utils/inferChannel';
 
 /** Performance agregada de um template (soma de todas as execuções vinculadas). */
 export interface TemplatePerformance {
@@ -11,10 +12,12 @@ export interface TemplatePerformance {
   cliques: number;
   cartoes: number;
   propostas: number;
-  custoTotal: number;
-  ctr: number;             // cliques / baseEnviada
-  taxaConversao: number;   // cartoes / baseEnviada
-  cac: number;             // custoTotal / cartoes
+  custoTotal: number;        // soma real de "Custo Total Campanha" (pode ser 0 se não preenchido)
+  ctr: number;               // cliques / baseEnviada
+  taxaConversao: number;     // cartoes / baseEnviada
+  cac: number;               // custoTotal / cartoes (CAC real; 0 se sem custo)
+  custoCanalEstimado: number; // baseEnviada * custo unitário do canal
+  cacEstimado: number;       // custoCanalEstimado / cartoes (estimativa de canal)
 }
 
 interface ActivityMetricRow {
@@ -78,6 +81,8 @@ export function useTemplatePerformance() {
             ctr: 0,
             taxaConversao: 0,
             cac: 0,
+            custoCanalEstimado: 0,
+            cacEstimado: 0,
             _names: new Set<string>(),
           };
           acc.set(id, p);
@@ -101,6 +106,8 @@ export function useTemplatePerformance() {
         p.ctr = p.baseEnviada > 0 ? p.cliques / p.baseEnviada : 0;
         p.taxaConversao = p.baseEnviada > 0 ? p.cartoes / p.baseEnviada : 0;
         p.cac = p.cartoes > 0 ? p.custoTotal / p.cartoes : 0;
+        p.custoCanalEstimado = p.baseEnviada * channelUnitCost(p.template.channel);
+        p.cacEstimado = p.cartoes > 0 ? p.custoCanalEstimado / p.cartoes : 0;
         const { _names, ...clean } = p;
         void _names;
         result.push(clean);
