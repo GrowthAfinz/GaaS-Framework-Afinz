@@ -245,6 +245,41 @@ export async function addAssetToTemplate(input: AddAssetInput): Promise<{ storag
   }
 }
 
+/** Vincula (marca) um activity_name a um template — todas as execuções do nome. */
+export async function linkActivityToTemplate(activityName: string, templateId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('activities')
+    .update({ template_id: templateId, updated_at: new Date().toISOString() })
+    .eq('"Activity name / Taxonomia"', activityName)
+    .select('id');
+  if (error) throw error;
+  return data?.length ?? 0;
+}
+
+/** Desvincula um activity_name (volta a template_id nulo). */
+export async function unlinkActivity(activityName: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('activities')
+    .update({ template_id: null, updated_at: new Date().toISOString() })
+    .eq('"Activity name / Taxonomia"', activityName)
+    .select('id');
+  if (error) throw error;
+  return data?.length ?? 0;
+}
+
+/**
+ * Renomeia o template_id (PK). O FK activities.template_id e
+ * communication_slots.current_template_id têm ON UPDATE CASCADE, então o vínculo
+ * é reapontado pelo banco. Não move o asset no storage (original_path é preservado).
+ */
+export async function renameTemplate(oldId: string, newId: string): Promise<void> {
+  const { error } = await supabase
+    .from('communication_templates')
+    .update({ template_id: newId, updated_at: new Date().toISOString() })
+    .eq('template_id', oldId);
+  if (error) throw error;
+}
+
 /** Signed URL temporária para preview de asset no bucket privado. */
 export async function getSignedUrl(path: string, expiresInSeconds = 60 * 60): Promise<string> {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresInSeconds);

@@ -3,6 +3,7 @@ import { X, UploadCloud, Loader2, AlertCircle } from 'lucide-react';
 import { addAssetToTemplate, describeError } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
 import type { CatalogTemplate } from '../../hooks/useTemplateCatalog';
+import { ActivityLinkManager } from './ActivityLinkManager';
 
 interface Props {
   template: CatalogTemplate;
@@ -34,7 +35,6 @@ export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) =
         channel: template.channel,
         email: isEmail ? { html, subject, preheader } : null,
         imageFile: !isEmail ? imageFile : null,
-        linkActivityNames: template.activityNamesPlanejados,
       });
       onSaved();
     } catch (err) {
@@ -59,12 +59,6 @@ export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) =
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {template.activityNamesPlanejados.length > 0 && (
-            <div className="mb-4 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              Ao salvar, vincula {template.activityNamesPlanejados.length} disparo(s) planejado(s) deste template.
-            </div>
-          )}
-
           {isEmail ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -98,6 +92,10 @@ export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) =
               </div>
             </div>
           )}
+
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <ActivityLinkManager template={template} />
+          </div>
 
           {error && (
             <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

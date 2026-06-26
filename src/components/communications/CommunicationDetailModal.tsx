@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { X, Loader2, FileImage } from 'lucide-react';
+import { X, Loader2, FileImage, Pencil, Check } from 'lucide-react';
 import type { TemplatePerformance } from '../../hooks/useTemplatePerformance';
-import { getSignedUrl } from '../../services/communicationService';
+import { getSignedUrl, renameTemplate, describeError } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
+import { normalizeTemplateId, isValidTemplateId } from '../../utils/templateId';
+import { ActivityLinkManager } from './ActivityLinkManager';
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const int = (v: number) => v.toLocaleString('pt-BR');
@@ -11,6 +13,8 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 interface Props {
   item: TemplatePerformance;
   onClose: () => void;
+  /** Chamado após mudanças (vínculo, rename) para o pai recarregar. */
+  onChanged?: () => void;
 }
 
 const Stat: React.FC<{ label: string; value: string; hint?: string }> = ({ label, value, hint }) => (
@@ -21,12 +25,35 @@ const Stat: React.FC<{ label: string; value: string; hint?: string }> = ({ label
   </div>
 );
 
-export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose }) => {
+export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onChanged }) => {
   const { template } = item;
   const email = isEmailChannel(template.channel);
   const [html, setHtml] = useState<string | null>(null);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+
+  // Rename do template_id (PK, FK ON UPDATE CASCADE)
+  const [renaming, setRenaming] = useState(false);
+  const [newId, setNewId] = useState(template.template_id);
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+
+  const handleRename = async () => {
+    const next = normalizeTemplateId(newId);
+    if (next === template.template_id) { setRenaming(false); return; }
+    if (!isValidTemplateId(next)) { setRenameError('Formato inválido (3-80 chars A-Za-z 0-9 _ -).'); return; }
+    setRenameBusy(true);
+    setRenameError(null);
+    try {
+      await renameTemplate(template.template_id, next);
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      setRenameError(describeError(err));
+    } finally {
+      setRenameBusy(false);
+    }
+  };
 
   const subject = typeof template.metadata?.subject === 'string' ? template.metadata.subject : '';
   const preheader = typeof template.metadata?.preheader === 'string' ? template.metadata.preheader : '';
@@ -58,12 +85,35 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose }) => 
       >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="truncate font-mono text-lg font-bold text-slate-800">{template.template_id}</h3>
+              {renaming ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    value={newId}
+                    onChange={(e) => setNewId(e.target.value)}
+                    autoFocus
+                    className="w-72 rounded-lg border border-cyan-400 px-2 py-1 font-mono text-sm text-slate-700 focus:outline-none"
+                  />
+                  <button onClick={handleRename} disabled={renameBusy}
+                    className="rounded-md bg-cyan-600 p-1.5 text-white hover:bg-cyan-500 disabled:opacity-50" title="Salvar id">
+                    {renameBusy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  </button>
+                  <button onClick={() => { setRenaming(false); setNewId(template.template_id); setRenameError(null); }}
+                    className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100" title="Cancelar"><X size={14} /></button>
+                </div>
+              ) : (
+                <>
+                  <h3 className="truncate font-mono text-lg font-bold text-slate-800">{template.template_id}</h3>
+                  <button onClick={() => setRenaming(true)} className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-cyan-600" title="Renomear template_id">
+                    <Pencil size={14} />
+                  </button>
+                </>
+              )}
               <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{template.channel}</span>
               <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">{template.status}</span>
             </div>
+            {renameError && <p className="mt-1 text-xs text-red-500">{renameError}</p>}
             <p className="mt-0.5 text-sm text-slate-500">
               {template.title && template.title !== template.template_id ? `${template.title} · ` : ''}
               {item.activityNames.length} activity_name{item.activityNames.length === 1 ? '' : 's'} · {int(item.executions)} execuções
@@ -141,16 +191,9 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose }) => 
               />
             </div>
 
-            <p className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Activity names ({item.activityNames.length})
-            </p>
-            <ul className="space-y-1">
-              {item.activityNames.map((name) => (
-                <li key={name} className="truncate rounded bg-slate-50 px-2 py-1 font-mono text-xs text-slate-600" title={name}>
-                  {name}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <ActivityLinkManager template={template} onChanged={onChanged} />
+            </div>
           </div>
         </div>
       </div>

@@ -82,7 +82,7 @@ const TemplatePreview: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
 };
 
 export const TemplatePerformanceGrid: React.FC = () => {
-  const { data, loading, error } = useTemplatePerformance();
+  const { data, loading, error, refetch } = useTemplatePerformance();
   const [selected, setSelected] = useState<TemplatePerformance | null>(null);
 
   if (loading) {
@@ -153,7 +153,7 @@ export const TemplatePerformanceGrid: React.FC = () => {
         ))}
       </div>
 
-      {selected && <CommunicationDetailModal item={selected} onClose={() => setSelected(null)} />}
+      {selected && <CommunicationDetailModal item={selected} onClose={() => setSelected(null)} onChanged={refetch} />}
     </>
   );
 };

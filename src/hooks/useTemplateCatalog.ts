@@ -7,7 +7,12 @@ export interface CatalogTemplate extends CommunicationTemplate {
   app: string;
   campanha: string;
   semana: string;
+  segmento_af_sub1: string;
   activityNamesPlanejados: string[];
+}
+
+export function decorateTemplate(t: CommunicationTemplate): CatalogTemplate {
+  return decorate(t);
 }
 
 function decorate(t: CommunicationTemplate): CatalogTemplate {
@@ -19,6 +24,7 @@ function decorate(t: CommunicationTemplate): CatalogTemplate {
     app: typeof m.app === 'string' ? m.app : '',
     campanha: typeof m.campanha === 'string' ? m.campanha : '',
     semana: typeof m.semana === 'string' ? m.semana : '',
+    segmento_af_sub1: typeof m.segmento_af_sub1 === 'string' ? m.segmento_af_sub1 : '',
     activityNamesPlanejados: planned,
   };
 }
