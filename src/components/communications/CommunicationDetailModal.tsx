@@ -1,6 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Loader2, FileImage, Pencil, Check, Settings2, Trash2, AlertCircle, UploadCloud } from 'lucide-react';
-import type { TemplatePerformance } from '../../hooks/useTemplatePerformance';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type { TemplatePerformance, TemplateTimelinePoint } from '../../hooks/useTemplatePerformance';
 import { getSignedUrl, renameTemplate, deleteTemplateAsset, describeError } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
 import { normalizeTemplateId, isValidTemplateId } from '../../utils/templateId';
@@ -11,6 +20,25 @@ import { AddAssetModal } from './AddAssetModal';
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const int = (v: number) => v.toLocaleString('pt-BR');
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+type TimelineMetric = 'baseEnviada' | 'cliques' | 'cartoes' | 'propostas' | 'ctr' | 'taxaConversao' | 'custoEfetivo' | 'cacEfetivo';
+
+const TIMELINE_METRICS: Array<{ key: TimelineMetric; label: string; kind: 'int' | 'pct' | 'brl' }> = [
+  { key: 'baseEnviada', label: 'Base', kind: 'int' },
+  { key: 'cliques', label: 'Cliques', kind: 'int' },
+  { key: 'cartoes', label: 'Cartoes', kind: 'int' },
+  { key: 'propostas', label: 'Propostas', kind: 'int' },
+  { key: 'ctr', label: 'CTR', kind: 'pct' },
+  { key: 'taxaConversao', label: 'Conv.', kind: 'pct' },
+  { key: 'custoEfetivo', label: 'Gasto', kind: 'brl' },
+  { key: 'cacEfetivo', label: 'CAC', kind: 'brl' },
+];
+
+const formatTimelineValue = (value: number, kind: 'int' | 'pct' | 'brl') => {
+  if (kind === 'pct') return pct(value);
+  if (kind === 'brl') return brl(value);
+  return int(Math.round(value));
+};
 
 interface Props {
   item: TemplatePerformance;
@@ -26,6 +54,96 @@ const Stat: React.FC<{ label: string; value: string; hint?: string }> = ({ label
     {hint && <p className="mt-0.5 text-[10px] text-slate-400">{hint}</p>}
   </div>
 );
+
+const TimelineTooltip: React.FC<{
+  active?: boolean;
+  payload?: Array<{ value?: number; payload?: TemplateTimelinePoint }>;
+  label?: string;
+  metric: (typeof TIMELINE_METRICS)[number];
+}> = ({ active, payload, label, metric }) => {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload;
+  const value = Number(payload[0]?.value ?? 0);
+  return (
+    <div className="min-w-[170px] rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-lg">
+      <p className="mb-1 font-semibold text-slate-700">Dia {label}</p>
+      <p className="text-base font-bold text-cyan-700">{formatTimelineValue(value, metric.kind)}</p>
+      {point && (
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+          <span>Execucoes</span><span className="text-right font-semibold">{int(point.executions)}</span>
+          <span>Base</span><span className="text-right font-semibold">{int(point.baseEnviada)}</span>
+          <span>Cliques</span><span className="text-right font-semibold">{int(point.cliques)}</span>
+          <span>Cartoes</span><span className="text-right font-semibold">{int(point.cartoes)}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ContentTimeline: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
+  const [metricKey, setMetricKey] = useState<TimelineMetric>('cartoes');
+  const metric = TIMELINE_METRICS.find((m) => m.key === metricKey) ?? TIMELINE_METRICS[2];
+  const data = useMemo(() => item.timeline.filter((point) => point.date !== 'sem-data'), [item.timeline]);
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Linha do tempo</p>
+          <p className="text-xs text-slate-400">Evolucao diaria das activity_names vinculadas ao template.</p>
+        </div>
+        <div className="flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+          {TIMELINE_METRICS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => setMetricKey(option.key)}
+              className={[
+                'rounded-md px-2 py-1 text-[10px] font-semibold transition-colors',
+                metricKey === option.key
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:bg-white hover:text-slate-700',
+              ].join(' ')}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {data.length === 0 ? (
+        <div className="flex h-40 items-center justify-center rounded-lg bg-slate-50 text-xs text-slate-400">
+          Sem serie temporal para o periodo filtrado.
+        </div>
+      ) : (
+        <div className="h-48 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: '#64748B', fontSize: 10 }} tickLine={false} axisLine={false} />
+              <YAxis
+                width={54}
+                tick={{ fill: '#94A3B8', fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => formatTimelineValue(Number(v), metric.kind)}
+              />
+              <Tooltip content={(props) => <TimelineTooltip {...props} metric={metric} />} />
+              <Line
+                type="monotone"
+                dataKey={metric.key}
+                stroke="#0891B2"
+                strokeWidth={2.5}
+                dot={{ r: 3, strokeWidth: 2, fill: '#fff' }}
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onChanged }) => {
   const { template } = item;
@@ -102,7 +220,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -178,9 +296,9 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
           </button>
         </div>
 
-        <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-5">
+        <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-7">
           {/* Preview (e-mail completo / imagem) */}
-          <div className="flex flex-col border-b border-slate-200 md:col-span-3 md:border-b-0 md:border-r">
+          <div className="flex flex-col border-b border-slate-200 md:col-span-4 md:border-b-0 md:border-r">
             <div className="bg-slate-100 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Peça {email ? '(e-mail completo)' : ''}
             </div>
@@ -195,7 +313,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
                     <Loader2 size={22} className="animate-spin" />
                   </div>
                 ) : (
-                  <iframe title={`Preview ${template.template_id}`} sandbox="" srcDoc={html} className="h-[60vh] w-full bg-white" />
+                  <iframe title={`Preview ${template.template_id}`} sandbox="" srcDoc={html} className="h-[68vh] w-full bg-white" />
                 )
               ) : imgUrl ? (
                 <div className="flex items-center justify-center p-4">
@@ -210,7 +328,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
           </div>
 
           {/* Detalhes + métricas */}
-          <div className="overflow-y-auto p-5 md:col-span-2">
+          <div className="overflow-y-auto p-5 md:col-span-3">
             {email && (
               <div className="mb-4 space-y-3">
                 <div>
@@ -243,6 +361,8 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
                 hint="gasto / cartões"
               />
             </div>
+
+            <ContentTimeline item={item} />
 
             <div className="mt-5 border-t border-slate-100 pt-4">
               <ActivityLinkManager template={template} onChanged={onChanged} />

@@ -7,22 +7,38 @@ import { usePeriod } from '../contexts/PeriodContext';
 import { useBU } from '../contexts/BUContext';
 import { useAppStore } from '../store/useAppStore';
 
-/** Performance agregada de um template (soma de todas as execuções vinculadas). */
-export interface TemplatePerformance {
-  template: CommunicationTemplate;
-  activityNames: string[];
+export interface TemplateTimelinePoint {
+  date: string;
+  label: string;
   executions: number;
   baseEnviada: number;
   cliques: number;
   cartoes: number;
   propostas: number;
-  custoTotal: number;        // soma real de "Custo Total Campanha" (0 se não preenchido)
+  custoTotal: number;
+  custoEfetivo: number;
+  ctr: number;
+  taxaConversao: number;
+  cacEfetivo: number;
+}
+
+/** Performance agregada de um template (soma de todas as execucoes vinculadas). */
+export interface TemplatePerformance {
+  template: CommunicationTemplate;
+  activityNames: string[];
+  timeline: TemplateTimelinePoint[];
+  executions: number;
+  baseEnviada: number;
+  cliques: number;
+  cartoes: number;
+  propostas: number;
+  custoTotal: number;        // soma real de "Custo Total Campanha" (0 se nao preenchido)
   ctr: number;               // cliques / baseEnviada
   taxaConversao: number;     // cartoes / baseEnviada
   cac: number;               // custoTotal / cartoes (CAC real; 0 se sem custo)
-  custoCanalEstimado: number; // baseEnviada * custo unitário do canal
+  custoCanalEstimado: number; // baseEnviada * custo unitario do canal
   cacEstimado: number;       // custoCanalEstimado / cartoes (estimativa de canal)
-  // Valores "efetivos": usam o custo real quando existe, senão caem no custo de canal.
+  // Valores "efetivos": usam o custo real quando existe, senao caem no custo de canal.
   custoEfetivo: number;      // gasto exibido (real ou estimado pelo canal)
   cacEfetivo: number;        // CAC exibido (real ou estimado pelo canal)
   custoEstimado: boolean;    // true quando custoEfetivo veio do custo de canal (sem custo real)
@@ -31,20 +47,67 @@ export interface TemplatePerformance {
 interface ActivityMetricRow {
   template_id: string | null;
   'Activity name / Taxonomia': string | null;
+  'Data de Disparo': string | null;
   'Base Total': number | null;
   Cliques: number | null;
-  'Cartões Gerados': number | null;
+  'Cartões Gerados'?: number | null;
+  'CartÃµes Gerados'?: number | null;
   Propostas: number | null;
   'Custo Total Campanha': number | null;
 }
 
 const num = (v: number | null | undefined) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
 
+type Accumulator = TemplatePerformance & {
+  _names: Set<string>;
+  _timeline: Map<string, TemplateTimelinePoint>;
+};
+
+function emptyTimelinePoint(date: string): TemplateTimelinePoint {
+  return {
+    date,
+    label: date === 'sem-data' ? 's/d' : `${date.slice(8, 10)}/${date.slice(5, 7)}`,
+    executions: 0,
+    baseEnviada: 0,
+    cliques: 0,
+    cartoes: 0,
+    propostas: 0,
+    custoTotal: 0,
+    custoEfetivo: 0,
+    ctr: 0,
+    taxaConversao: 0,
+    cacEfetivo: 0,
+  };
+}
+
+function createAccumulator(template: CommunicationTemplate): Accumulator {
+  return {
+    template,
+    activityNames: [],
+    timeline: [],
+    executions: 0,
+    baseEnviada: 0,
+    cliques: 0,
+    cartoes: 0,
+    propostas: 0,
+    custoTotal: 0,
+    ctr: 0,
+    taxaConversao: 0,
+    cac: 0,
+    custoCanalEstimado: 0,
+    cacEstimado: 0,
+    custoEfetivo: 0,
+    cacEfetivo: 0,
+    custoEstimado: false,
+    _names: new Set<string>(),
+    _timeline: new Map<string, TemplateTimelinePoint>(),
+  };
+}
+
 /**
- * Performance por template — JOIN 100% local no GaaS:
- * `activities` (resultado já extraído) agregado por `template_id`,
- * enriquecido com `communication_templates` (preview). NÃO chama AppsFlyer.
- * Lista só templates com ≥1 execução vinculada que tenha resultado.
+ * Performance por template - JOIN 100% local no GaaS:
+ * `activities` agregado por `template_id`, enriquecido com `communication_templates`.
+ * Nao chama AppsFlyer. A timeline usa as mesmas activity_names vinculadas.
  */
 export function useTemplatePerformance() {
   const [data, setData] = useState<TemplatePerformance[]>([]);
@@ -59,7 +122,6 @@ export function useTemplatePerformance() {
   const dataInicio = format(startDate, 'yyyy-MM-dd');
   const dataFim = format(endDate, 'yyyy-MM-dd');
 
-  // Chave estável para refazer a busca quando qualquer filtro mudar.
   const filterKey = useMemo(
     () => JSON.stringify([dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros, f.subgrupos]),
     [dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros, f.subgrupos]
@@ -71,7 +133,7 @@ export function useTemplatePerformance() {
     try {
       let actQuery = supabase
         .from('activities')
-        .select('template_id, "Activity name / Taxonomia", "Base Total", "Cliques", "Cartões Gerados", "Propostas", "Custo Total Campanha"')
+        .select('template_id, "Activity name / Taxonomia", "Data de Disparo", "Base Total", "Cliques", "Cartões Gerados", "Propostas", "Custo Total Campanha"')
         .not('template_id', 'is', null)
         .gte('"Data de Disparo"', dataInicio)
         .lte('"Data de Disparo"', `${dataFim} 23:59:59`);
@@ -93,63 +155,73 @@ export function useTemplatePerformance() {
       const templateById = new Map<string, CommunicationTemplate>();
       for (const t of (tmpls ?? []) as CommunicationTemplate[]) templateById.set(t.template_id, t);
 
-      const acc = new Map<string, TemplatePerformance & { _names: Set<string> }>();
+      const acc = new Map<string, Accumulator>();
       for (const r of (acts ?? []) as ActivityMetricRow[]) {
         const id = r.template_id;
         if (!id) continue;
         const template = templateById.get(id);
-        if (!template) continue; // vínculo órfão — ignora
+        if (!template) continue;
 
         let p = acc.get(id);
         if (!p) {
-          p = {
-            template,
-            activityNames: [],
-            executions: 0,
-            baseEnviada: 0,
-            cliques: 0,
-            cartoes: 0,
-            propostas: 0,
-            custoTotal: 0,
-            ctr: 0,
-            taxaConversao: 0,
-            cac: 0,
-            custoCanalEstimado: 0,
-            cacEstimado: 0,
-            custoEfetivo: 0,
-            cacEfetivo: 0,
-            custoEstimado: false,
-            _names: new Set<string>(),
-          };
+          p = createAccumulator(template);
           acc.set(id, p);
         }
+
+        const base = num(r['Base Total']);
+        const cliques = num(r.Cliques);
+        const cartoes = num(r['Cartões Gerados'] ?? r['CartÃµes Gerados']);
+        const propostas = num(r.Propostas);
+        const custoTotal = num(r['Custo Total Campanha']);
+        const custoEstimadoDia = base * channelUnitCost(template.channel);
+
         p.executions += 1;
-        p.baseEnviada += num(r['Base Total']);
-        p.cliques += num(r.Cliques);
-        p.cartoes += num(r['Cartões Gerados']);
-        p.propostas += num(r.Propostas);
-        p.custoTotal += num(r['Custo Total Campanha']);
+        p.baseEnviada += base;
+        p.cliques += cliques;
+        p.cartoes += cartoes;
+        p.propostas += propostas;
+        p.custoTotal += custoTotal;
         const name = r['Activity name / Taxonomia'];
         if (name) p._names.add(name);
+
+        const dateKey = r['Data de Disparo'] ? String(r['Data de Disparo']).slice(0, 10) : 'sem-data';
+        const day = p._timeline.get(dateKey) ?? emptyTimelinePoint(dateKey);
+        day.executions += 1;
+        day.baseEnviada += base;
+        day.cliques += cliques;
+        day.cartoes += cartoes;
+        day.propostas += propostas;
+        day.custoTotal += custoTotal;
+        day.custoEfetivo += custoTotal > 0 ? custoTotal : custoEstimadoDia;
+        p._timeline.set(dateKey, day);
       }
 
       const result: TemplatePerformance[] = [];
       for (const p of acc.values()) {
-        // só templates com resultado registrado
         const hasResult = p.cliques > 0 || p.cartoes > 0 || p.propostas > 0;
         if (!hasResult) continue;
+
         p.activityNames = Array.from(p._names);
         p.ctr = p.baseEnviada > 0 ? p.cliques / p.baseEnviada : 0;
         p.taxaConversao = p.baseEnviada > 0 ? p.cartoes / p.baseEnviada : 0;
         p.cac = p.cartoes > 0 ? p.custoTotal / p.cartoes : 0;
         p.custoCanalEstimado = p.baseEnviada * channelUnitCost(p.template.channel);
         p.cacEstimado = p.cartoes > 0 ? p.custoCanalEstimado / p.cartoes : 0;
-        // Efetivo: prioriza custo real; cai no custo de canal quando não há custo real.
         p.custoEstimado = p.custoTotal <= 0;
         p.custoEfetivo = p.custoEstimado ? p.custoCanalEstimado : p.custoTotal;
         p.cacEfetivo = p.cartoes > 0 ? p.custoEfetivo / p.cartoes : 0;
-        const { _names, ...clean } = p;
+        p.timeline = Array.from(p._timeline.values())
+          .map((point) => ({
+            ...point,
+            ctr: point.baseEnviada > 0 ? point.cliques / point.baseEnviada : 0,
+            taxaConversao: point.baseEnviada > 0 ? point.cartoes / point.baseEnviada : 0,
+            cacEfetivo: point.cartoes > 0 ? point.custoEfetivo / point.cartoes : 0,
+          }))
+          .sort((a, b) => a.date.localeCompare(b.date));
+
+        const { _names, _timeline, ...clean } = p;
         void _names;
+        void _timeline;
         result.push(clean);
       }
 
