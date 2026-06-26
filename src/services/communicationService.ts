@@ -175,6 +175,76 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
   }
 }
 
+export interface AddAssetInput {
+  templateId: string;
+  channel: string;
+  email?: { html: string; subject: string; preheader: string } | null;
+  imageFile?: File | null;
+  /** activity_names planejados a vincular (best-effort) ao gravar o asset. */
+  linkActivityNames?: string[];
+}
+
+/**
+ * Adiciona o asset a um template DRAFT já existente (fluxo da governança):
+ * sobe o arquivo, marca status='active' + original_path, e vincula os
+ * activity_names planejados que existirem em activities. Rollback do upload em falha.
+ */
+export async function addAssetToTemplate(input: AddAssetInput): Promise<{ storagePath: string; activitiesLinked: number }> {
+  const isEmail = isEmailChannel(input.channel);
+  const slug = channelSlug(input.channel);
+  let uploadedPath: string | null = null;
+
+  try {
+    if (isEmail) {
+      if (!input.email?.html?.trim()) throw new Error('HTML do e-mail é obrigatório.');
+      const path = `crm/${slug}/${input.templateId}/email.html`;
+      const blob = new Blob([input.email.html], { type: 'text/html' });
+      const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: 'text/html' });
+      if (error) throw error;
+      uploadedPath = path;
+    } else {
+      if (!input.imageFile) throw new Error('Imagem/print é obrigatório para este canal.');
+      const ext = fileExtension(input.imageFile.name);
+      const path = `crm/${slug}/${input.templateId}/original.${ext}`;
+      const { error } = await supabase.storage.from(BUCKET).upload(path, input.imageFile, { upsert: true, contentType: input.imageFile.type || undefined });
+      if (error) throw error;
+      uploadedPath = path;
+    }
+
+    // Lê metadata atual para preservar os campos da governança e mesclar subject/preheader.
+    const { data: current } = await supabase
+      .from('communication_templates').select('metadata').eq('template_id', input.templateId).single();
+    const metadata: Record<string, unknown> = { ...(current?.metadata ?? {}) };
+    if (isEmail && input.email) {
+      metadata.subject = input.email.subject ?? '';
+      metadata.preheader = input.email.preheader ?? '';
+    }
+
+    const { error: upErr } = await supabase.from('communication_templates').update({
+      original_path: uploadedPath,
+      mime_type: isEmail ? 'text/html' : (input.imageFile?.type || null),
+      file_size_bytes: isEmail ? new Blob([input.email!.html]).size : (input.imageFile?.size ?? null),
+      status: 'active',
+      metadata,
+      updated_at: new Date().toISOString(),
+    }).eq('template_id', input.templateId);
+    if (upErr) throw upErr;
+
+    // Vincula os activity_names planejados (best-effort; só os que existirem são afetados).
+    let linked = 0;
+    for (const an of input.linkActivityNames ?? []) {
+      const { data } = await supabase.from('activities')
+        .update({ template_id: input.templateId, updated_at: new Date().toISOString() })
+        .eq('"Activity name / Taxonomia"', an).select('id');
+      linked += data?.length ?? 0;
+    }
+    return { storagePath: uploadedPath, activitiesLinked: linked };
+  } catch (err) {
+    if (uploadedPath) await supabase.storage.from(BUCKET).remove([uploadedPath]);
+    throw err;
+  }
+}
+
 /** Signed URL temporária para preview de asset no bucket privado. */
 export async function getSignedUrl(path: string, expiresInSeconds = 60 * 60): Promise<string> {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresInSeconds);
@@ -194,6 +264,7 @@ export async function listTemplates(): Promise<CommunicationTemplate[]> {
 
 export const communicationService = {
   saveCommunication,
+  addAssetToTemplate,
   getSignedUrl,
   listTemplates,
 };

@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Mail, LayoutList, BarChart3, type LucideIcon } from 'lucide-react';
+import { Mail, LayoutList, BarChart3, LayoutGrid, type LucideIcon } from 'lucide-react';
 import { CadastroCobertura } from './CadastroCobertura';
 import { TemplatePerformanceGrid } from './TemplatePerformanceGrid';
+import { TemplateCatalogView } from './TemplateCatalogView';
 
-type CommunicationsSubTab = 'cadastro' | 'performance';
+type CommunicationsSubTab = 'catalogo' | 'cadastro' | 'performance';
 
 const SUB_TABS: { id: CommunicationsSubTab; label: string; icon: LucideIcon }[] = [
+    { id: 'catalogo', label: 'Templates', icon: LayoutGrid },
     { id: 'cadastro', label: 'Cadastro / Cobertura', icon: LayoutList },
     { id: 'performance', label: 'Performance', icon: BarChart3 },
 ];
 
 export const CommunicationsView: React.FC = () => {
-    const [subTab, setSubTab] = useState<CommunicationsSubTab>('cadastro');
+    const [subTab, setSubTab] = useState<CommunicationsSubTab>('catalogo');
 
     return (
         <div className="flex flex-col h-full">
@@ -54,6 +56,7 @@ export const CommunicationsView: React.FC = () => {
 
             {/* Conteúdo */}
             <div className="flex-1 overflow-y-auto p-6">
+                {subTab === 'catalogo' && <TemplateCatalogView />}
                 {subTab === 'cadastro' && <CadastroCobertura />}
                 {subTab === 'performance' && <TemplatePerformanceGrid />}
             </div>
