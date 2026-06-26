@@ -165,18 +165,27 @@ function rowText(r: Row): string {
   ].filter(Boolean).join(' '));
 }
 
+function rowTaxonomyText(r: Row): string {
+  return normalize([
+    r['Activity name / Taxonomia'],
+    r.jornada,
+  ].filter(Boolean).join(' '));
+}
+
 function partnerMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
   if (!ctx.partnerKey) return null;
   const text = rowText(r);
+  const taxonomyText = rowTaxonomyText(r);
   const parceiro = normalize(r.Parceiro);
   const bu = normalize(r.BU);
-  const jornada = normalize(r.jornada);
 
   switch (ctx.partnerKey) {
     case 'dia':
-      return parceiro.includes('dia') || jornada.includes('dia') || includesToken(text, 'dia');
+      if (includesToken(taxonomyText, 'bb') || taxonomyText.includes('bem barato') || taxonomyText.includes('plurix')) return false;
+      return includesToken(taxonomyText, 'dia') || parceiro.includes('dia');
     case 'bb':
-      return parceiro.includes('bem barato') || parceiro === 'bb' || jornada.includes('bb') || includesToken(text, 'bb');
+      if (includesToken(taxonomyText, 'dia') || taxonomyText.includes('plurix')) return false;
+      return includesToken(taxonomyText, 'bb') || taxonomyText.includes('bem barato') || parceiro.includes('bem barato') || parceiro === 'bb';
     case 'plurix':
       return parceiro.includes('plurix') || bu.includes('plurix') || text.includes('plurix') || includesToken(text, 'plu');
     case 'b2c': {
@@ -228,7 +237,6 @@ function channelMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
 function isStronglyIncompatible(ctx: TemplateMatchContext, r: Row): boolean {
   if (partnerMatches(ctx, r) === false) return true;
   if (channelMatches(ctx, r) === false) return true;
-  if (segmentMatches(ctx, r) === false) return true;
   if (campaignMatches(ctx, r) === false) return true;
   return false;
 }
@@ -248,6 +256,7 @@ function scoreRow(ctx: TemplateMatchContext, r: Row): { score: number; reasons: 
   const segment = segmentMatches(ctx, r);
   if (segment === true && ctx.segment) add(25, `Segmento ${ctx.segment.canonical}`);
   else if (segment === null && ctx.segment) warn(`Segmento ${ctx.segment.canonical} nao confirmado`);
+  else if (segment === false && ctx.segment) warn(`Segmento atual: ${r.Segmento ?? '-'}`);
 
   const campaign = campaignMatches(ctx, r);
   if (campaign === true && ctx.campaignTokens.length) add(20, ctx.campaignTokens.includes('copa') ? 'Campanha Copa' : 'Campanha compativel');
