@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, Loader2, FileImage, Pencil, Check } from 'lucide-react';
+import { X, Loader2, FileImage, Pencil, Check, Settings2, Trash2, AlertCircle } from 'lucide-react';
 import type { TemplatePerformance } from '../../hooks/useTemplatePerformance';
-import { getSignedUrl, renameTemplate, describeError } from '../../services/communicationService';
+import { getSignedUrl, renameTemplate, deleteTemplateAsset, describeError } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
 import { normalizeTemplateId, isValidTemplateId } from '../../utils/templateId';
 import { ActivityLinkManager } from './ActivityLinkManager';
@@ -37,6 +37,9 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
   const [newId, setNewId] = useState(template.template_id);
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleRename = async () => {
     const next = normalizeTemplateId(newId);
@@ -52,6 +55,22 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
       setRenameError(describeError(err));
     } finally {
       setRenameBusy(false);
+    }
+  };
+
+  const handleDeleteAsset = async () => {
+    const confirmed = window.confirm('Excluir o asset deste template? O template e os vínculos continuam, mas ele volta para "sem asset".');
+    if (!confirmed) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await deleteTemplateAsset(template);
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      setDeleteError(describeError(err));
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -108,12 +127,35 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
                   <button onClick={() => setRenaming(true)} className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-cyan-600" title="Renomear template_id">
                     <Pencil size={14} />
                   </button>
+                  <button onClick={() => setEditing((v) => !v)} className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-cyan-600" title="Editar template">
+                    <Settings2 size={14} />
+                  </button>
                 </>
               )}
               <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{template.channel}</span>
               <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">{template.status}</span>
             </div>
             {renameError && <p className="mt-1 text-xs text-red-500">{renameError}</p>}
+            {editing && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <button
+                  onClick={handleDeleteAsset}
+                  disabled={deleteBusy || !template.original_path}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={template.original_path ? 'Excluir asset do template' : 'Este template já está sem asset'}
+                >
+                  {deleteBusy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  Excluir asset
+                </button>
+                <span className="text-xs text-slate-400">Remove o HTML/imagem e mantém template_id, vínculos e histórico.</span>
+              </div>
+            )}
+            {deleteError && (
+              <div className="mt-2 flex items-start gap-1.5 text-xs text-red-600">
+                <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
             <p className="mt-0.5 text-sm text-slate-500">
               {template.title && template.title !== template.template_id ? `${template.title} · ` : ''}
               {item.activityNames.length} activity_name{item.activityNames.length === 1 ? '' : 's'} · {int(item.executions)} execuções

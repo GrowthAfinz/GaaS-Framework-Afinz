@@ -41,11 +41,21 @@ export const CommunicationUploadModal: React.FC<Props> = ({ selection, templates
   const [error, setError] = useState<string | null>(null);
 
   const isEmail = isEmailChannel(channel);
+  const selectedTemplate = useMemo(
+    () => templates.find((t) => t.template_id === existingId) ?? null,
+    [templates, existingId]
+  );
 
   // Se não há templates, força modo "novo".
   useEffect(() => {
     if (templates.length === 0) setMode('new');
   }, [templates.length]);
+
+  useEffect(() => {
+    if (mode !== 'existing' || !selectedTemplate) return;
+    setChannel(selectedTemplate.channel || selection.channel || 'E-mail');
+    setTitle(selectedTemplate.title && selectedTemplate.title !== selectedTemplate.template_id ? selectedTemplate.title : '');
+  }, [mode, selectedTemplate, selection.channel]);
 
   const imageUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
@@ -70,8 +80,8 @@ export const CommunicationUploadModal: React.FC<Props> = ({ selection, templates
         activityName: selection.activityName,
         slotId: selection.slotId ?? null,
         title: title || null,
-        email: isEmail && mode === 'new' ? { html, subject, preheader } : null,
-        imageFile: !isEmail && mode === 'new' ? imageFile : null,
+        email: isEmail && (mode === 'new' || html.trim()) ? { html, subject, preheader } : null,
+        imageFile: !isEmail ? imageFile : null,
       });
       onSaved();
     } catch (err) {
@@ -178,9 +188,16 @@ export const CommunicationUploadModal: React.FC<Props> = ({ selection, templates
             )}
           </div>
 
-          {/* Conteúdo (somente ao criar novo) */}
-          {mode === 'new' && (
+          {/* Conteúdo / asset */}
+          {(mode === 'new' || (mode === 'existing' && existingId)) && (
             <div className="mb-2">
+              {mode === 'existing' && (
+                <div className="mb-3 rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
+                  {selectedTemplate?.original_path
+                    ? 'Opcional: cole/envie um novo asset para substituir o atual deste template. Se deixar vazio, apenas o vínculo com o disparo será salvo.'
+                    : 'Este template ainda não tem asset. Cole o HTML ou envie a imagem para preencher o preview.'}
+                </div>
+              )}
               {isEmail ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">

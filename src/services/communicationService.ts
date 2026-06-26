@@ -83,8 +83,10 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
   let templateCreated = false;
 
   try {
-    // ── 1. Upload (somente em mode 'new'; existing reaproveita o asset já gravado) ──
-    if (input.mode === 'new') {
+    // ── 1. Upload (novo template ou template existente recebendo/atualizando asset) ──
+    const shouldUploadAsset = input.mode === 'new'
+      || (isEmail ? !!input.email?.html?.trim() : !!input.imageFile);
+    if (shouldUploadAsset) {
       const slug = channelSlug(input.channel);
 
       if (isEmail) {
@@ -108,8 +110,10 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
         if (error) throw error;
         uploadedPath = path;
       }
+    }
 
       // ── 2. Insert do template ──
+    if (input.mode === 'new') {
       const metadata: Record<string, unknown> = {};
       if (isEmail && input.email) {
         metadata.subject = input.email.subject ?? '';
@@ -134,6 +138,38 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
       const { error: insertError } = await supabase.from('communication_templates').insert(row);
       if (insertError) throw insertError;
       templateCreated = true;
+    } else if (uploadedPath) {
+      // Template existente: grava/atualiza o asset sem criar outro template.
+      const { data: current } = await supabase
+        .from('communication_templates')
+        .select('metadata')
+        .eq('template_id', templateId)
+        .single();
+      const metadata: Record<string, unknown> = { ...(current?.metadata ?? {}) };
+      if (isEmail && input.email) {
+        metadata.subject = input.email.subject ?? '';
+        metadata.preheader = input.email.preheader ?? '';
+      }
+
+      const { error: updateTemplateError } = await supabase
+        .from('communication_templates')
+        .update({
+          channel: input.channel,
+          title: input.title?.trim() || undefined,
+          status: 'active',
+          storage_bucket: BUCKET,
+          original_path: uploadedPath,
+          preview_path: null,
+          thumbnail_path: null,
+          mime_type: isEmail ? 'text/html' : (input.imageFile?.type || null),
+          file_size_bytes: isEmail
+            ? new Blob([input.email!.html]).size
+            : (input.imageFile?.size ?? null),
+          metadata,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('template_id', templateId);
+      if (updateTemplateError) throw updateTemplateError;
     }
 
     // ── 3. Liga todas as execuções do activity_name ao template ──
@@ -280,6 +316,35 @@ export async function renameTemplate(oldId: string, newId: string): Promise<void
   if (error) throw error;
 }
 
+/** Remove o asset visual/HTML de um template, mantendo o template e seus vínculos. */
+export async function deleteTemplateAsset(template: Pick<CommunicationTemplate, 'template_id' | 'original_path' | 'preview_path' | 'thumbnail_path'>): Promise<void> {
+  const paths = [template.original_path, template.preview_path, template.thumbnail_path]
+    .filter((path): path is string => !!path);
+
+  const { error } = await supabase
+    .from('communication_templates')
+    .update({
+      original_path: null,
+      preview_path: null,
+      thumbnail_path: null,
+      mime_type: null,
+      file_size_bytes: null,
+      content_hash: null,
+      status: 'draft',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('template_id', template.template_id);
+  if (error) throw error;
+
+  if (paths.length) {
+    const { error: storageError } = await supabase.storage.from(BUCKET).remove(paths);
+    if (storageError) {
+      // O banco já voltou para "sem asset"; a remoção física é best-effort.
+      console.warn('[deleteTemplateAsset] falha ao remover arquivo do storage:', storageError);
+    }
+  }
+}
+
 /** Signed URL temporária para preview de asset no bucket privado. */
 export async function getSignedUrl(path: string, expiresInSeconds = 60 * 60): Promise<string> {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresInSeconds);
@@ -300,6 +365,7 @@ export async function listTemplates(): Promise<CommunicationTemplate[]> {
 export const communicationService = {
   saveCommunication,
   addAssetToTemplate,
+  deleteTemplateAsset,
   getSignedUrl,
   listTemplates,
 };
