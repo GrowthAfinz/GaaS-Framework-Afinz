@@ -152,3 +152,41 @@ export function accumulateDailyDimensionRows(rows: DailyDimensionRow[]): DailyDi
       };
     });
 }
+
+/**
+ * Preenche dias faltantes no intervalo com zeros para totais diários.
+ * Se um dia está no período mas sem atividades, adiciona uma linha com todos os metrics = 0.
+ */
+export function fillMissingDays(rows: DailyTotalRow[], startDate: Date, endDate: Date): DailyTotalRow[] {
+  const allDays = new Map<string, DailyTotalRow>(rows.map(r => [r.dayKey, r]));
+  const current = new Date(startDate);
+  current.setHours(0, 0, 0, 0);
+
+  while (current <= endDate) {
+    const year = current.getFullYear();
+    const month = String(current.getMonth() + 1).padStart(2, '0');
+    const day = String(current.getDate()).padStart(2, '0');
+    const dayKey = `${year}-${month}-${day}`;
+
+    if (!allDays.has(dayKey)) {
+      allDays.set(dayKey, {
+        dayKey,
+        dayLabel: formatDayLabel(dayKey),
+        activitiesCount: 0,
+        ...emptyVolumes(),
+        taxaEntrega: 0,
+        taxaAbertura: 0,
+        taxaClique: 0,
+        taxaProposta: 0,
+        taxaAprovacao: 0,
+        taxaFinalizacao: 0,
+        taxaConversaoBase: 0,
+        custoPorCartao: 0,
+        cac: 0,
+      });
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return Array.from(allDays.values()).sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+}

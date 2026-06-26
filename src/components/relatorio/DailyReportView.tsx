@@ -2,10 +2,13 @@ import React, { useMemo, useState } from 'react';
 import { format, subDays } from 'date-fns';
 import { CalendarData } from '../../types/framework';
 import { usePeriod } from '../../contexts/PeriodContext';
+import { useAppStore } from '../../store/useAppStore';
+import { useAdvancedFilters } from '../../hooks/useAdvancedFilters';
 import {
   aggregateDailyByDimension,
   aggregateDailyTotals,
   accumulateDailyDimensionRows,
+  fillMissingDays,
 } from '../../utils/dailyAggregation';
 import { DailyStackedBarChart } from './DailyStackedBarChart';
 
@@ -18,10 +21,16 @@ interface DailyReportViewProps {
 export const DailyReportView: React.FC<DailyReportViewProps> = ({ data, selectedBU, rentabilizacao = false }) => {
   const { startDate, endDate, setPeriod } = usePeriod();
   const [accumulated, setAccumulated] = useState(false);
+  const { viewSettings } = useAppStore();
+  const { filteredData } = useAdvancedFilters(data, viewSettings.filtrosGlobais, { computeFacets: false });
 
-  const dailyTotalsRaw = useMemo(() => aggregateDailyTotals(data), [data]);
-  const segmentRowsRaw = useMemo(() => aggregateDailyByDimension(data, 'segmento'), [data]);
-  const channelRowsRaw = useMemo(() => aggregateDailyByDimension(data, 'canal'), [data]);
+  const dailyTotalsRaw = useMemo(() => {
+    const totals = aggregateDailyTotals(filteredData);
+    return fillMissingDays(totals, startDate, endDate);
+  }, [filteredData, startDate, endDate]);
+
+  const segmentRowsRaw = useMemo(() => aggregateDailyByDimension(filteredData, 'segmento'), [filteredData]);
+  const channelRowsRaw = useMemo(() => aggregateDailyByDimension(filteredData, 'canal'), [filteredData]);
 
   const segmentRows = useMemo(
     () => (accumulated ? accumulateDailyDimensionRows(segmentRowsRaw) : segmentRowsRaw),
