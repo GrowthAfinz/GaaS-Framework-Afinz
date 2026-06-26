@@ -62,6 +62,13 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         // BUs não-Seguros ativas
         const activeCoreB2Us = ['B2C', 'B2B2C', 'Plurix'].filter(bu => hasBU(bu));
 
+        // Cartões B2C: preferimos a originação real (b2c_daily_metrics via dailyAnalysis),
+        // mas caímos para as emissões do CRM quando não há dado B2C no período — caso
+        // contrário a meta mostra 0 mesmo havendo cartões reais (ex.: mês sem b2c_daily_metrics).
+        const b2cFromDaily = dailyAnalysis.reduce((sum, d) => sum + d.emissoes_b2c_total, 0);
+        const b2cFromCrm = activities.filter(a => a.bu === 'B2C').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
+        const b2cCards = b2cFromDaily > 0 ? b2cFromDaily : b2cFromCrm;
+
         // ── Seguros isolado ──────────────────────────────────────────────────
         if (isOnlySeguros) {
             const totalCards = segurosActivities.reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
@@ -71,7 +78,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
         // ── B2C sozinho ou nenhuma BU especial filtrada (estado padrão) ─────
         if (isOnlyBU('B2C') || activeCoreB2Us.every(bu => bu === 'B2C')) {
-            const totalCards = dailyAnalysis.reduce((sum, d) => sum + d.emissoes_b2c_total, 0);
+            const totalCards = b2cCards;
             const goalCards  = currentGoal?.b2c_meta || 0;
             return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (B2C)' };
         }
@@ -96,7 +103,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         const labelParts: string[] = [];
 
         if (hasBU('B2C')) {
-            totalCards += dailyAnalysis.reduce((sum, d) => sum + d.emissoes_b2c_total, 0);
+            totalCards += b2cCards;
             const g = currentGoal?.b2c_meta || 0;
             goalCards += g;
             if (g > 0) labelParts.push('B2C');
