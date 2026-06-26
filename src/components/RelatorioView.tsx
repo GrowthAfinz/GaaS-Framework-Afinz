@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX } from 'lucide-react';
+import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X } from 'lucide-react';
 import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
@@ -223,6 +223,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const [editingDescs, setEditingDescs] = useState<Record<string, string>>({});
   const [savingDesc, setSavingDesc] = useState<Set<string>>(new Set());
   const [selectedActivityRow, setSelectedActivityRow] = useState<ActivityRow | null>(null);
+  const [showFullTable, setShowFullTable] = useState(false);
 
   // ── Filtros Destaque ──
   const [destaqueFilter, setDestaqueFilter] = useState<'top-conversores' | 'conversores' | 'aguardando' | null>(null);
@@ -257,6 +258,14 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     setSortDir('desc');
     setTableSearch('');
   }, [data]);
+
+  // Esc fecha o overlay de tela cheia da tabela
+  useEffect(() => {
+    if (!showFullTable) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowFullTable(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showFullTable]);
 
   // ── Ordenação ──
   const [sortKey, setSortKey] = useState<keyof DetailRow | null>(null);
@@ -1022,6 +1031,15 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 <FileSpreadsheet size={14} />
                 Exportar CSV
               </button>
+              {/* Tela cheia */}
+              <button
+                onClick={() => setShowFullTable(true)}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 hover:border-cyan-300 transition-colors font-semibold"
+                title="Expandir a tabela em tela cheia"
+              >
+                <Maximize2 size={14} />
+                Tela cheia
+              </button>
             </div>
           )}
         </div>
@@ -1218,6 +1236,93 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       </>
       )}
     </div>
+
+    {/* ── Overlay de tabela em tela cheia ── */}
+    {showFullTable && (
+      <div className="fixed inset-0 z-[60] bg-white flex flex-col">
+        {/* Linha 1: título + contador + fechar */}
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-6 rounded-full" style={{ background: TEAL }} />
+            <h2 className="text-base font-bold text-slate-800">Detalhamento por disparo — tela cheia</h2>
+            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+              {displayRows.length} disparos · {format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowFullTable(false)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+            title="Fechar (Esc)"
+          >
+            <X size={16} />
+            Fechar
+          </button>
+        </div>
+
+        {/* Linha 2: busca + colunas + export */}
+        <div className="flex items-center gap-2 flex-wrap px-5 py-2.5 border-b border-slate-100 bg-slate-50">
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              autoFocus
+              type="text"
+              value={tableSearch}
+              onChange={(e) => setTableSearch(e.target.value)}
+              placeholder="Buscar campanha, jornada, segmento ou descrição..."
+              className="w-full pl-9 pr-3 py-1.5 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:border-cyan-400"
+            />
+          </div>
+          <ColumnsCustomizer
+            value={detailDimensionCols}
+            defaults={[...DEFAULT_DETAIL_DIMENSIONS]}
+            available={DIMENSION_COLUMNS}
+            onChange={setDetailDimensionCols}
+            label="Dimensões"
+            buttonLabel="Dimensões"
+          />
+          <ColumnsCustomizer
+            value={detailMetricCols}
+            defaults={[...detailMetricDefaults]}
+            available={METRIC_COLUMNS}
+            onChange={setDetailMetricCols}
+            label="Métricas"
+            buttonLabel="Métricas"
+          />
+          <button
+            onClick={exportDetail}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
+          >
+            <FileSpreadsheet size={14} />
+            Exportar CSV
+          </button>
+        </div>
+
+        {/* Tabela ocupa o resto da tela */}
+        <div className="flex-1 min-h-0 px-5 py-3">
+          <DetailTable
+            rows={displayRows}
+            totalRowCount={displayRows.length}
+            visibleDimensions={detailDimensionCols}
+            visibleMetrics={detailMetricCols}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleDetailSort}
+            segmentColorMap={segmentColorMap}
+            descriptions={descriptions}
+            editingDescs={editingDescs}
+            savingDesc={savingDesc}
+            onChangeDescription={handleChangeDescription}
+            onSaveDescription={saveDescription}
+            applyGlobalSegmentFilter={applyGlobalSegmentFilter}
+            applyGlobalCanalFilter={applyGlobalCanalFilter}
+            onRowClick={handleDetailRowClick}
+            summary={summaryRow}
+            destaqueFilter={destaqueFilter}
+            virtualized
+          />
+        </div>
+      </div>
+    )}
     </>
   );
 };

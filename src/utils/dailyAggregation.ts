@@ -173,16 +173,7 @@ export function fillMissingDays(rows: DailyTotalRow[], startDate: Date, endDate:
         dayKey,
         dayLabel: formatDayLabel(dayKey),
         activitiesCount: 0,
-        ...emptyVolumes(),
-        taxaEntrega: 0,
-        taxaAbertura: 0,
-        taxaClique: 0,
-        taxaProposta: 0,
-        taxaAprovacao: 0,
-        taxaFinalizacao: 0,
-        taxaConversaoBase: 0,
-        custoPorCartao: 0,
-        cac: 0,
+        ...metricsFromVolumes(emptyVolumes()),
       });
     }
     current.setDate(current.getDate() + 1);
