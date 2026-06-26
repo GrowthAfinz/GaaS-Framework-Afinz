@@ -126,6 +126,7 @@ const operationTypeForCandidate = (
     if (!candidate.accepted || !canApplyCandidate(candidate)) return 'blocked';
     if (!wasApplied) return 'pending';
     if (candidateDomain === 'aquisicao' && asDbActivityId(candidate.matchedActivity)) return 'update_metrics';
+    if (candidateDomain === 'rentabilizacao' && candidate.metricRefresh) return 'update_metrics';
     if (candidateDomain === 'rentabilizacao') return 'upsert';
     return 'insert';
 };

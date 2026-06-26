@@ -554,7 +554,12 @@ const canonicalPlurixCartJourney = (journey: unknown, activityName: unknown) => 
     const isPlurixCartJourney = journeyKey.includes('aquisicao_plurix_carrinho_abandonado');
     if (!isPlurixCartJourney || journeyKey.includes('teste')) return String(journey ?? '').trim();
 
-    return normalizeKey(activityName).includes('carrinhoabandonadoassistido')
+    const activityKey = normalizeKey(activityName);
+    const isAssistedOrLojista = activityKey.includes('carrinhoabandonadoassistido')
+        || journeyKey.includes('assistido')
+        || journeyKey.includes('lojista');
+
+    return isAssistedOrLojista
         ? PLURIX_CART_ASSISTED_JOURNEY
         : PLURIX_CART_INDEPENDENT_JOURNEY;
 };
@@ -791,6 +796,40 @@ const metricRefreshDetails = (metric: MetricRow, existing?: Activity) => {
         const next = metric[field];
         if (typeof next !== 'number' || !Number.isFinite(next)) return [];
         const previous = activityMetricValue(existing, field);
+        return metricEquals(previous, next) ? [] : [{ field, previous, next }];
+    });
+};
+
+const RENT_REFRESH_FIELD_ALIASES: Partial<Record<keyof MetricRow, string[]>> = {
+    sent: ['Base Total'],
+    delivered: ['Base Acionavel'],
+    opens: ['Abertura'],
+    clicks: ['Cliques'],
+    proposals: ['Propostas'],
+    approved: ['Aprovados'],
+    finalized: ['Cartoes Gerados'],
+    assisted: ['Emissoes Assistidas'],
+    independent: ['Emissoes Independentes'],
+};
+
+const rawValueByNormalizedColumn = (row: Record<string, any>, aliases: string[]) => {
+    const wanted = new Set(aliases.map(normalizeKey));
+    const key = Object.keys(row).find((column) => wanted.has(normalizeKey(column)));
+    return key ? row[key] : undefined;
+};
+
+const rentActivityMetricValue = (row: Record<string, any>, field: keyof MetricRow) => {
+    const aliases = RENT_REFRESH_FIELD_ALIASES[field];
+    if (!aliases) return 0;
+    return parseNumber(rawValueByNormalizedColumn(row, aliases)) ?? 0;
+};
+
+const rentMetricRefreshDetails = (metric: MetricRow, existing?: Record<string, any>) => {
+    if (!existing) return [];
+    return REFRESHABLE_METRIC_FIELDS.flatMap((field) => {
+        const next = metric[field];
+        if (typeof next !== 'number' || !Number.isFinite(next)) return [];
+        const previous = rentActivityMetricValue(existing, field);
         return metricEquals(previous, next) ? [] : [{ field, previous, next }];
     });
 };
@@ -1140,6 +1179,41 @@ const collapsePlurixCartDuplicates = (rows: MetricRow[]) => {
     });
 
     return [...result, ...grouped.values()];
+};
+
+const rentRenamedJourneyScore = (row: MetricRow) => {
+    const journeyKey = normalizeKey(row.journey);
+    let score = journeyPeriodRank(row.journey) * 10;
+    if (journeyKey.includes('teste')) score -= 100000;
+    if (hasDispatchVolume(row)) score += 5;
+    if (hasConversionMetric(row) || hasEngagementMetric(row)) score += 2;
+    return score;
+};
+
+const collapseRentRenamedDuplicates = (rows: MetricRow[]) => {
+    const groups = new Map<string, MetricRow[]>();
+    rows.forEach((row) => {
+        const list = groups.get(row.dispatchSignature);
+        if (list) list.push(row); else groups.set(row.dispatchSignature, [row]);
+    });
+
+    const result: MetricRow[] = [];
+    groups.forEach((group) => {
+        const uniqueJourneys = Array.from(new Set(group.map((row) => normalizeKey(row.journey)).filter(Boolean)));
+        if (uniqueJourneys.length <= 1) {
+            result.push(...group);
+            return;
+        }
+
+        const ranked = [...group].sort((left, right) => {
+            const scoreDiff = rentRenamedJourneyScore(right) - rentRenamedJourneyScore(left);
+            if (scoreDiff !== 0) return scoreDiff;
+            return normalizeKey(right.journey).localeCompare(normalizeKey(left.journey));
+        });
+        const winnerJourney = normalizeKey(ranked[0]?.journey);
+        result.push(...group.filter((row) => normalizeKey(row.journey) === winnerJourney));
+    });
+    return result;
 };
 
 const propagateGroupEmissions = (candidates: UpdateCandidate[]): UpdateCandidate[] => {
@@ -1733,6 +1807,7 @@ interface RentHistoryIndex {
     byToken: Map<string, SuggestionBucket>;
     global: SuggestionBucket;
     existingSignatures: Set<string>;
+    bySignature: Map<string, Record<string, any>>;
     rowCount: number;
 }
 
@@ -1773,6 +1848,7 @@ const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryInd
         byToken: new Map(),
         global: createBucket(),
         existingSignatures: new Set(),
+        bySignature: new Map(),
         rowCount: rows.length,
     };
     rows.forEach((row) => {
@@ -1782,7 +1858,9 @@ const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryInd
         const channel = normalizeChannel(rawCanal);
         const journeyKey = normalizeKey(journey);
         const taxonomy = inferRentabilizacaoContext(journey, activityName);
-        index.existingSignatures.add(buildDispatchSignature(activityName, rawCanal, row['Data de Disparo']));
+        const dispatchSignature = buildDispatchSignature(activityName, rawCanal, row['Data de Disparo']);
+        index.existingSignatures.add(dispatchSignature);
+        if (!index.bySignature.has(dispatchSignature)) index.bySignature.set(dispatchSignature, row);
         if (journeyKey) {
             addRawRowToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), row);
             addRawRowToBucket(bucketFor(index.byJourney, journeyKey), row);
@@ -1810,6 +1888,7 @@ const emptyRentHistoryIndex = (): RentHistoryIndex => ({
     byToken: new Map(),
     global: createBucket(),
     existingSignatures: new Set(),
+    bySignature: new Map(),
     rowCount: 0,
 });
 
@@ -1893,7 +1972,10 @@ const buildRentabilizacaoCandidate = (
     const fieldSuggestions = suggestRentFields(metric, history, taxonomy);
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     // Ja existe na tabela rentabilizacao_activities (mesma activity+canal+data)?
-    const existsInBase = history.existingSignatures.has(metric.dispatchSignature);
+    const existingRow = history.bySignature.get(metric.dispatchSignature);
+    const existsInBase = Boolean(existingRow);
+    const refreshDetails = rentMetricRefreshDetails(metric, existingRow);
+    const hasMetricRefresh = refreshDetails.length > 0;
     const missingCritical = !metric.journey || !metric.activityName || !metric.date || metric.channel === 'Indefinido';
     const missingDispatchVolume = !hasDispatchVolume(metric);
     const status: CandidateStatus = missingCritical
@@ -1904,7 +1986,7 @@ const buildRentabilizacaoCandidate = (
                 ? 'ignored'
                 : existsInBase
                     // Ja gravado na base de rentabilizacao: nao reinserir.
-                    ? 'duplicate'
+                    ? (hasMetricRefresh ? 'ready' : 'duplicate')
                     : 'ready';
 
     return {
@@ -1918,12 +2000,14 @@ const buildRentabilizacaoCandidate = (
                 : missingDispatchVolume
                     ? 'Disparo sem volume acionavel'
                     : existsInBase
-                        ? 'Ja existe na base'
+                        ? (hasMetricRefresh ? 'Atualizar resultados' : 'Ja existe na base')
                         : 'Aprovar',
         suggestion: existsInBase
-            ? 'Disparo ja existe na base de rentabilizacao'
+            ? (hasMetricRefresh
+                ? `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`
+                : 'Disparo ja existe na base de rentabilizacao')
             : status === 'ready' ? 'Classificacao por regra de rentabilizacao' : 'Linha fora do upload automatico',
-        confidence: status === 'ready' ? 86 : 0,
+        confidence: hasMetricRefresh ? 100 : status === 'ready' ? 86 : 0,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
             : duplicateCount > 1
@@ -1931,7 +2015,9 @@ const buildRentabilizacaoCandidate = (
                 : missingDispatchVolume
                     ? 'Base Total e Base Acionavel precisam ser maiores que zero'
                     : existsInBase
-                        ? 'activity, canal e data ja existem em rentabilizacao_activities'
+                        ? (hasMetricRefresh
+                            ? refreshDetails.map(({ field, previous, next }) => `${String(field)}: ${previous} -> ${next}`).join(' | ')
+                            : 'activity, canal e data ja existem em rentabilizacao_activities')
                         : 'regras portadas do upload de rentabilizacao',
         accepted: false,
         // Dimensoes estruturais seguem a taxonomia deterministica. O historico
@@ -1949,6 +2035,7 @@ const buildRentabilizacaoCandidate = (
         suggestions: fieldSuggestions,
         conflictJourneys: [],
         conflictReason: undefined,
+        metricRefresh: hasMetricRefresh,
     };
 };
 
@@ -1986,16 +2073,27 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
         warnings.push(`${ignoredOutOfScope} linhas JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo rentabilizacao.`);
     }
 
+    const canonicalRows = collapseRentRenamedDuplicates(scopedRows);
+    const collapsedRenamedRows = scopedRows.length - canonicalRows.length;
+    if (collapsedRenamedRows > 0) {
+        warnings.push(`${collapsedRenamedRows} linhas de rentabilizacao foram consolidadas por renomeacao de jornada.`);
+    }
+
     const metricMap = new Map<string, MetricRow>();
-    scopedRows.forEach((row) => {
+    canonicalRows.forEach((row) => {
         mergeMetric(metricMap, {
             ...row,
             key: row.dispatchSignature,
         });
     });
     const metrics = Array.from(metricMap.values());
-    const importedKeyCount = scopedRows.reduce((map, row) => {
-        map.set(row.dispatchSignature, (map.get(row.dispatchSignature) ?? 0) + 1);
+    const importedSignatureJourneys = canonicalRows.reduce((map, row) => {
+        if (!map.has(row.dispatchSignature)) map.set(row.dispatchSignature, new Set<string>());
+        map.get(row.dispatchSignature)!.add(normalizeKey(row.journey));
+        return map;
+    }, new Map<string, Set<string>>());
+    const importedKeyCount = Array.from(importedSignatureJourneys.entries()).reduce((map, [signature, journeys]) => {
+        map.set(signature, journeys.size);
         return map;
     }, new Map<string, number>());
     const candidates = metrics
