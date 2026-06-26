@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { X, Loader2, FileImage, Pencil, Check, Settings2, Trash2, AlertCircle } from 'lucide-react';
+import { X, Loader2, FileImage, Pencil, Check, Settings2, Trash2, AlertCircle, UploadCloud } from 'lucide-react';
 import type { TemplatePerformance } from '../../hooks/useTemplatePerformance';
 import { getSignedUrl, renameTemplate, deleteTemplateAsset, describeError } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
 import { normalizeTemplateId, isValidTemplateId } from '../../utils/templateId';
+import { decorateTemplate } from '../../hooks/useTemplateCatalog';
 import { ActivityLinkManager } from './ActivityLinkManager';
+import { AddAssetModal } from './AddAssetModal';
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const int = (v: number) => v.toLocaleString('pt-BR');
@@ -40,6 +42,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
   const [editing, setEditing] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [replacingAsset, setReplacingAsset] = useState(false);
 
   const handleRename = async () => {
     const next = normalizeTemplateId(newId);
@@ -147,7 +150,15 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
                   {deleteBusy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                   Excluir asset
                 </button>
-                <span className="text-xs text-slate-400">Remove o HTML/imagem e mantém template_id, vínculos e histórico.</span>
+                <button
+                  onClick={() => setReplacingAsset(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-cyan-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-50"
+                  title="Substituir ou adicionar asset neste template"
+                >
+                  <UploadCloud size={13} />
+                  Substituir asset
+                </button>
+                <span className="text-xs text-slate-400">Troque o HTML/imagem ou remova o asset mantendo template_id, vínculos e histórico.</span>
               </div>
             )}
             {deleteError && (
@@ -239,6 +250,17 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
           </div>
         </div>
       </div>
+      {replacingAsset && (
+        <AddAssetModal
+          template={decorateTemplate(template)}
+          onClose={() => setReplacingAsset(false)}
+          onSaved={() => {
+            setReplacingAsset(false);
+            onChanged?.();
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 };

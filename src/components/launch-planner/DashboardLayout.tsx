@@ -7,16 +7,14 @@ import { useAppStore } from '../../store/useAppStore';
 import { usePeriod } from '../../contexts/PeriodContext';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { differenceInDays, subDays, isWithinInterval } from 'date-fns';
-import { Send } from 'lucide-react';
 
 interface DashboardLayoutProps {
     data: CalendarData;
     onActivityUpdate?: (activityId: string, newDate: Date) => void;
     onDayClick?: (date: Date) => void;
-    onProgramDispatch?: () => void;
 }
 
-export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ data, onDayClick, onProgramDispatch }) => {
+export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ data, onDayClick }) => {
     const [displayDate, setDisplayDate] = React.useState(new Date());
     const { goals, b2cData } = useAppStore();
     const { startDate, endDate, compareEnabled, setPeriod } = usePeriod();
@@ -73,14 +71,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ data, onDayCli
                         onMonthChange={handleMonthChange}
                     />
                 </div>
-
-                <button
-                    onClick={onProgramDispatch}
-                    className="w-full py-2 px-4 bg-cyan-600 hover:bg-cyan-500 border border-cyan-600 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-colors text-sm shadow-sm"
-                >
-                    <Send size={16} />
-                    Programar disparo
-                </button>
             </div>
 
             <div className="flex-1 flex flex-col overflow-y-auto pr-1 gap-3">
