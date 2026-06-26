@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { inferChannelFromActivityName } from '../utils/inferChannel';
 
@@ -43,7 +43,8 @@ function hasAnyFilter(f: ActivitySearchFilters): boolean {
 
 /**
  * Busca multidimensional em `activities`. Combina filtros (AND) e agrega por
- * activity_name, já que o vínculo de template é por activity_name (1 template → N execuções).
+ * activity_name, já que o vínculo de template é por activity_name
+ * (1 template -> N execuções).
  */
 export function useActivitySearch(filters: ActivitySearchFilters, debounceMs = 350) {
   const [candidates, setCandidates] = useState<ActivityCandidate[]>([]);
@@ -52,11 +53,81 @@ export function useActivitySearch(filters: ActivitySearchFilters, debounceMs = 3
   const [truncated, setTruncated] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Chave estável para disparar o efeito só quando os filtros mudam de fato.
   const filterKey = useMemo(
     () => JSON.stringify([filters.jornada, filters.segmento, filters.canal, filters.activityName, filters.data]),
     [filters.jornada, filters.segmento, filters.canal, filters.activityName, filters.data]
   );
+
+  const fetchCandidates = useCallback(async () => {
+    if (!hasAnyFilter(filters)) {
+      setCandidates([]);
+      setError(null);
+      setTruncated(false);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('activities')
+        .select('id, "Activity name / Taxonomia", jornada, "Canal", "Segmento", "Data de Disparo", BU, template_id')
+        .not('"Activity name / Taxonomia"', 'is', null)
+        .order('"Data de Disparo"', { ascending: false })
+        .limit(MAX_ROWS);
+
+      if (filters.jornada) query = query.ilike('jornada', `%${filters.jornada}%`);
+      if (filters.segmento) query = query.ilike('"Segmento"', `%${filters.segmento}%`);
+      if (filters.canal) query = query.eq('"Canal"', filters.canal);
+      if (filters.activityName) query = query.ilike('"Activity name / Taxonomia"', `%${filters.activityName}%`);
+      if (filters.data) query = query.eq('"Data de Disparo"', filters.data);
+
+      const { data, error: qError } = await query;
+      if (qError) throw qError;
+
+      const rows = (data ?? []) as ActivityQueryRow[];
+      setTruncated(rows.length >= MAX_ROWS);
+
+      const byName = new Map<string, ActivityCandidate>();
+      for (const r of rows) {
+        const name = r['Activity name / Taxonomia'];
+        if (!name) continue;
+        const existing = byName.get(name);
+        const date = r['Data de Disparo'] ?? null;
+
+        if (existing) {
+          existing.executions += 1;
+          if (date && (!existing.latestDate || date > existing.latestDate)) existing.latestDate = date;
+          if (r.template_id) {
+            existing.hasTemplate = true;
+            existing.templateId = r.template_id;
+          }
+          continue;
+        }
+
+        byName.set(name, {
+          activityName: name,
+          jornada: r.jornada ?? '—',
+          canal: r.Canal ?? '—',
+          canalInferido: inferChannelFromActivityName(name),
+          segmento: r.Segmento ?? '—',
+          bu: r.BU ?? '—',
+          latestDate: date,
+          executions: 1,
+          hasTemplate: !!r.template_id,
+          templateId: r.template_id ?? null,
+        });
+      }
+
+      setCandidates(Array.from(byName.values()).sort((a, b) => (b.latestDate ?? '').localeCompare(a.latestDate ?? '')));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha na busca de disparos.');
+      setCandidates([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -70,69 +141,20 @@ export function useActivitySearch(filters: ActivitySearchFilters, debounceMs = 3
     }
 
     setLoading(true);
-    timerRef.current = setTimeout(async () => {
-      try {
-        let query = supabase
-          .from('activities')
-          .select('id, "Activity name / Taxonomia", jornada, "Canal", "Segmento", "Data de Disparo", BU, template_id')
-          .not('"Activity name / Taxonomia"', 'is', null)
-          .order('"Data de Disparo"', { ascending: false })
-          .limit(MAX_ROWS);
-
-        if (filters.jornada) query = query.ilike('jornada', `%${filters.jornada}%`);
-        if (filters.segmento) query = query.ilike('"Segmento"', `%${filters.segmento}%`);
-        if (filters.canal) query = query.eq('"Canal"', filters.canal);
-        if (filters.activityName) query = query.ilike('"Activity name / Taxonomia"', `%${filters.activityName}%`);
-        if (filters.data) query = query.eq('"Data de Disparo"', filters.data);
-
-        const { data, error: qError } = await query;
-        if (qError) throw qError;
-
-        const rows = (data ?? []) as ActivityQueryRow[];
-        setTruncated(rows.length >= MAX_ROWS);
-
-        // Agrega por activity_name
-        const byName = new Map<string, ActivityCandidate>();
-        for (const r of rows) {
-          const name = r['Activity name / Taxonomia'];
-          if (!name) continue;
-          const existing = byName.get(name);
-          const date = r['Data de Disparo'] ?? null;
-          if (existing) {
-            existing.executions += 1;
-            if (date && (!existing.latestDate || date > existing.latestDate)) existing.latestDate = date;
-            if (r.template_id) { existing.hasTemplate = true; existing.templateId = r.template_id; }
-          } else {
-            byName.set(name, {
-              activityName: name,
-              jornada: r.jornada ?? '—',
-              canal: r.Canal ?? '—',
-              canalInferido: inferChannelFromActivityName(name),
-              segmento: r.Segmento ?? '—',
-              bu: r.BU ?? '—',
-              latestDate: date,
-              executions: 1,
-              hasTemplate: !!r.template_id,
-              templateId: r.template_id ?? null,
-            });
-          }
-        }
-
-        setCandidates(Array.from(byName.values()).sort((a, b) => (b.latestDate ?? '').localeCompare(a.latestDate ?? '')));
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Falha na busca de disparos.');
-        setCandidates([]);
-      } finally {
-        setLoading(false);
-      }
+    timerRef.current = setTimeout(() => {
+      void fetchCandidates();
     }, debounceMs);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey, debounceMs]);
+  }, [filterKey, debounceMs, fetchCandidates]);
 
-  return { candidates, loading, error, truncated };
+  const refetch = useCallback(async () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    await fetchCandidates();
+  }, [fetchCandidates]);
+
+  return { candidates, loading, error, truncated, refetch };
 }

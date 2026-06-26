@@ -17,7 +17,7 @@ export const CadastroCobertura: React.FC = () => {
   const { templates, refetch: refetchTemplates } = useCommunicationTemplates();
 
   const [filters, setFilters] = useState<ActivitySearchFilters>({});
-  const { candidates, loading: searchLoading, error: searchError, truncated } = useActivitySearch(filters);
+  const { candidates, loading: searchLoading, error: searchError, truncated, refetch: refetchSearch } = useActivitySearch(filters);
 
   const [selection, setSelection] = useState<DispatchSelection | null>(null);
 
@@ -33,6 +33,7 @@ export const CadastroCobertura: React.FC = () => {
     setSelection(null);
     refetchSlots();
     refetchTemplates();
+    refetchSearch();
   };
 
   return (

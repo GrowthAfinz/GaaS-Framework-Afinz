@@ -55,6 +55,26 @@ function fileExtension(name: string): string {
   return ext && ext !== name ? ext.toLowerCase() : 'png';
 }
 
+async function sha256Hex(input: Blob | string): Promise<string> {
+  const buffer = typeof input === 'string'
+    ? new TextEncoder().encode(input)
+    : await input.arrayBuffer();
+  const hash = await crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(hash))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function getTemplateAssetHash(templateId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('communication_templates')
+    .select('content_hash')
+    .eq('template_id', templateId)
+    .maybeSingle();
+  if (error) throw error;
+  return typeof data?.content_hash === 'string' ? data.content_hash : null;
+}
+
 /**
  * Cadastra a peça e amarra o disparo ao template numa única ação.
  * Ordem (FK activities.template_id → communication_templates):
@@ -81,6 +101,7 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
 
   let uploadedPath: string | null = null;
   let templateCreated = false;
+  let uploadedHash: string | null = null;
 
   try {
     // ── 1. Upload (novo template ou template existente recebendo/atualizando asset) ──
@@ -91,6 +112,10 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
 
       if (isEmail) {
         if (!input.email?.html?.trim()) throw new Error('HTML do e-mail é obrigatório.');
+        uploadedHash = await sha256Hex(input.email.html);
+        if (input.mode === 'existing' && uploadedHash === await getTemplateAssetHash(templateId)) {
+          throw new Error('Este mesmo asset já está salvo neste template_id. Use outro HTML/imagem para substituir.');
+        }
         const path = `crm/${slug}/${templateId}/email.html`;
         const blob = new Blob([input.email.html], { type: 'text/html' });
         const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
@@ -101,6 +126,10 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
         uploadedPath = path;
       } else {
         if (!input.imageFile) throw new Error('Imagem/print é obrigatório para este canal.');
+        uploadedHash = await sha256Hex(input.imageFile);
+        if (input.mode === 'existing' && uploadedHash === await getTemplateAssetHash(templateId)) {
+          throw new Error('Este mesmo asset já está salvo neste template_id. Use outro HTML/imagem para substituir.');
+        }
         const ext = fileExtension(input.imageFile.name);
         const path = `crm/${slug}/${templateId}/original.${ext}`;
         const { error } = await supabase.storage.from(BUCKET).upload(path, input.imageFile, {
@@ -129,6 +158,7 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
         storage_bucket: BUCKET,
         original_path: uploadedPath,
         mime_type: isEmail ? 'text/html' : (input.imageFile?.type || null),
+        content_hash: uploadedHash,
         file_size_bytes: isEmail
           ? new Blob([input.email!.html]).size
           : (input.imageFile?.size ?? null),
@@ -162,6 +192,7 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
           preview_path: null,
           thumbnail_path: null,
           mime_type: isEmail ? 'text/html' : (input.imageFile?.type || null),
+          content_hash: uploadedHash,
           file_size_bytes: isEmail
             ? new Blob([input.email!.html]).size
             : (input.imageFile?.size ?? null),
@@ -229,10 +260,15 @@ export async function addAssetToTemplate(input: AddAssetInput): Promise<{ storag
   const isEmail = isEmailChannel(input.channel);
   const slug = channelSlug(input.channel);
   let uploadedPath: string | null = null;
+  let uploadedHash: string | null = null;
 
   try {
     if (isEmail) {
       if (!input.email?.html?.trim()) throw new Error('HTML do e-mail é obrigatório.');
+      uploadedHash = await sha256Hex(input.email.html);
+      if (uploadedHash === await getTemplateAssetHash(input.templateId)) {
+        throw new Error('Este mesmo asset já está salvo neste template_id. Use outro HTML/imagem para substituir.');
+      }
       const path = `crm/${slug}/${input.templateId}/email.html`;
       const blob = new Blob([input.email.html], { type: 'text/html' });
       const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: 'text/html' });
@@ -240,6 +276,10 @@ export async function addAssetToTemplate(input: AddAssetInput): Promise<{ storag
       uploadedPath = path;
     } else {
       if (!input.imageFile) throw new Error('Imagem/print é obrigatório para este canal.');
+      uploadedHash = await sha256Hex(input.imageFile);
+      if (uploadedHash === await getTemplateAssetHash(input.templateId)) {
+        throw new Error('Este mesmo asset já está salvo neste template_id. Use outro HTML/imagem para substituir.');
+      }
       const ext = fileExtension(input.imageFile.name);
       const path = `crm/${slug}/${input.templateId}/original.${ext}`;
       const { error } = await supabase.storage.from(BUCKET).upload(path, input.imageFile, { upsert: true, contentType: input.imageFile.type || undefined });
@@ -259,6 +299,7 @@ export async function addAssetToTemplate(input: AddAssetInput): Promise<{ storag
     const { error: upErr } = await supabase.from('communication_templates').update({
       original_path: uploadedPath,
       mime_type: isEmail ? 'text/html' : (input.imageFile?.type || null),
+      content_hash: uploadedHash,
       file_size_bytes: isEmail ? new Blob([input.email!.html]).size : (input.imageFile?.size ?? null),
       status: 'active',
       metadata,
