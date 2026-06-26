@@ -10,24 +10,28 @@ import {
   YAxis,
 } from 'recharts';
 import type { TemplatePerformance, TemplateTimelinePoint } from '../../hooks/useTemplatePerformance';
+import type { ActivityRow } from '../../types/activity';
 import { getSignedUrl, renameTemplate, deleteTemplateAsset, describeError } from '../../services/communicationService';
 import { isEmailChannel } from '../../utils/inferChannel';
 import { normalizeTemplateId, isValidTemplateId } from '../../utils/templateId';
 import { decorateTemplate } from '../../hooks/useTemplateCatalog';
 import { ActivityLinkManager } from './ActivityLinkManager';
 import { AddAssetModal } from './AddAssetModal';
+import { DisparoDetailModal } from '../explorer/disparo/DisparoDetailModal';
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const int = (v: number) => v.toLocaleString('pt-BR');
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-type TimelineMetric = 'baseEnviada' | 'cliques' | 'cartoes' | 'propostas' | 'ctr' | 'taxaConversao' | 'custoEfetivo' | 'cacEfetivo';
+type TimelineMetric = 'baseEnviada' | 'aberturas' | 'cliques' | 'cartoes' | 'propostas' | 'taxaAbertura' | 'ctr' | 'taxaConversao' | 'custoEfetivo' | 'cacEfetivo';
 
 const TIMELINE_METRICS: Array<{ key: TimelineMetric; label: string; kind: 'int' | 'pct' | 'brl' }> = [
   { key: 'baseEnviada', label: 'Base', kind: 'int' },
+  { key: 'aberturas', label: 'Aberturas', kind: 'int' },
   { key: 'cliques', label: 'Cliques', kind: 'int' },
   { key: 'cartoes', label: 'Cartoes', kind: 'int' },
   { key: 'propostas', label: 'Propostas', kind: 'int' },
+  { key: 'taxaAbertura', label: 'Tx. abertura', kind: 'pct' },
   { key: 'ctr', label: 'CTR', kind: 'pct' },
   { key: 'taxaConversao', label: 'Conv.', kind: 'pct' },
   { key: 'custoEfetivo', label: 'Gasto', kind: 'brl' },
@@ -72,6 +76,7 @@ const TimelineTooltip: React.FC<{
         <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
           <span>Execucoes</span><span className="text-right font-semibold">{int(point.executions)}</span>
           <span>Base</span><span className="text-right font-semibold">{int(point.baseEnviada)}</span>
+          <span>Aberturas</span><span className="text-right font-semibold">{int(point.aberturas)}</span>
           <span>Cliques</span><span className="text-right font-semibold">{int(point.cliques)}</span>
           <span>Cartoes</span><span className="text-right font-semibold">{int(point.cartoes)}</span>
         </div>
@@ -80,7 +85,26 @@ const TimelineTooltip: React.FC<{
   );
 };
 
-const ContentTimeline: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
+const TimelineDot = (props: any) => {
+  const { cx, cy, payload, onPointClick } = props;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      fill="#fff"
+      stroke="#0891B2"
+      strokeWidth={2}
+      className="cursor-pointer"
+      onClick={(event) => {
+        event.stopPropagation();
+        onPointClick?.(payload as TemplateTimelinePoint);
+      }}
+    />
+  );
+};
+
+const ContentTimeline: React.FC<{ item: TemplatePerformance; onPointClick: (point: TemplateTimelinePoint) => void }> = ({ item, onPointClick }) => {
   const [metricKey, setMetricKey] = useState<TimelineMetric>('cartoes');
   const metric = TIMELINE_METRICS.find((m) => m.key === metricKey) ?? TIMELINE_METRICS[2];
   const data = useMemo(() => item.timeline.filter((point) => point.date !== 'sem-data'), [item.timeline]);
@@ -134,7 +158,7 @@ const ContentTimeline: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
                 dataKey={metric.key}
                 stroke="#0891B2"
                 strokeWidth={2.5}
-                dot={{ r: 3, strokeWidth: 2, fill: '#fff' }}
+                dot={(props) => <TimelineDot {...props} onPointClick={onPointClick} />}
                 activeDot={{ r: 5 }}
               />
             </LineChart>
@@ -144,6 +168,57 @@ const ContentTimeline: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
     </div>
   );
 };
+
+const ActivityDayPicker: React.FC<{
+  point: TemplateTimelinePoint;
+  onClose: () => void;
+  onSelect: (activity: ActivityRow) => void;
+}> = ({ point, onClose, onSelect }) => (
+  <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
+    <div
+      className="w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+        <div>
+          <h4 className="text-base font-bold text-slate-800">Disparos do dia {point.label}</h4>
+          <p className="text-sm text-slate-400">{point.activities.length} activity_name{point.activities.length === 1 ? '' : 's'} vinculada{point.activities.length === 1 ? '' : 's'} ao template.</p>
+        </div>
+        <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <X size={18} />
+        </button>
+      </div>
+      <div className="max-h-[60vh] overflow-y-auto p-4">
+        <div className="space-y-2">
+          {point.activities.map((activity) => (
+            <button
+              key={activity.id ?? activity['Activity name / Taxonomia']}
+              type="button"
+              onClick={() => onSelect(activity)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-cyan-300 hover:bg-cyan-50"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-xs font-bold text-slate-700">{activity['Activity name / Taxonomia']}</p>
+                  <p className="mt-1 truncate text-xs text-slate-400">{activity.jornada}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                  {activity.Canal ?? '-'}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
+                <span><span className="text-slate-400">Base</span> <b className="text-slate-700">{int(Number(activity['Base Total'] ?? 0))}</b></span>
+                <span><span className="text-slate-400">Abert.</span> <b className="text-slate-700">{int(Number(activity.Abertura ?? 0))}</b></span>
+                <span><span className="text-slate-400">Cliques</span> <b className="text-slate-700">{int(Number(activity.Cliques ?? 0))}</b></span>
+                <span><span className="text-slate-400">Cartões</span> <b className="text-slate-700">{int(Number(activity['Cartões Gerados'] ?? activity['CartÃµes Gerados'] ?? 0))}</b></span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onChanged }) => {
   const { template } = item;
@@ -161,6 +236,18 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [replacingAsset, setReplacingAsset] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<TemplateTimelinePoint | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityRow | null>(null);
+
+  const handleTimelinePointClick = (point: TemplateTimelinePoint) => {
+    if (point.activities.length === 1) {
+      setSelectedActivity(point.activities[0]);
+      return;
+    }
+    if (point.activities.length > 1) {
+      setSelectedDay(point);
+    }
+  };
 
   const handleRename = async () => {
     const next = normalizeTemplateId(newId);
@@ -345,6 +432,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Métricas somadas</p>
             <div className="grid grid-cols-2 gap-2">
               <Stat label="Base enviada" value={int(item.baseEnviada)} />
+              <Stat label="Aberturas" value={int(item.aberturas)} />
               <Stat label="Cliques" value={int(item.cliques)} />
               <Stat label="CTR" value={pct(item.ctr)} />
               <Stat label="Conversão" value={pct(item.taxaConversao)} />
@@ -362,7 +450,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
               />
             </div>
 
-            <ContentTimeline item={item} />
+            <ContentTimeline item={item} onPointClick={handleTimelinePointClick} />
 
             <div className="mt-5 border-t border-slate-100 pt-4">
               <ActivityLinkManager template={template} onChanged={onChanged} />
@@ -378,6 +466,26 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
             setReplacingAsset(false);
             onChanged?.();
             onClose();
+          }}
+        />
+      )}
+      {selectedDay && (
+        <ActivityDayPicker
+          point={selectedDay}
+          onClose={() => setSelectedDay(null)}
+          onSelect={(activity) => {
+            setSelectedDay(null);
+            setSelectedActivity(activity);
+          }}
+        />
+      )}
+      {selectedActivity && (
+        <DisparoDetailModal
+          activity={selectedActivity}
+          onClose={() => setSelectedActivity(null)}
+          onSaved={(updated) => {
+            setSelectedActivity(updated);
+            onChanged?.();
           }}
         />
       )}

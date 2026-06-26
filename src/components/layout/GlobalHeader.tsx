@@ -14,6 +14,7 @@ import {
     GitBranch,
     Tag,
     Mail,
+    LayoutGrid,
     X,
 } from 'lucide-react';
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
@@ -126,9 +127,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
         },
         {
             title: 'Comunicações',
-            direct: true,
+            direct: false,
             items: [
-                { id: 'comunicacoes', label: 'Comunicações', icon: Mail, onClick: () => setTab('comunicacoes') },
+                { id: 'comunicacoes-cadastro', label: 'Cadastro e Templates', icon: LayoutGrid, onClick: () => setTab('comunicacoes-cadastro') },
+                { id: 'comunicacoes-performance', label: 'Performance do Conteudo', icon: Mail, onClick: () => setTab('comunicacoes-performance') },
             ]
         },
         {

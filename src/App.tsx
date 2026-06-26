@@ -478,12 +478,17 @@ function App() {
                   <ConfiguracoesView />
                 </PageTransition>
               )}
-              {activeTab === 'comunicacoes' && (
+              {(activeTab === 'comunicacoes' || activeTab === 'comunicacoes-cadastro') && (
                 <PageTransition>
-                  <CommunicationsView />
+                  <CommunicationsView mode="cadastro" />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga', 'relatorio', 'comunicacoes'].includes(activeTab) && (
+              {activeTab === 'comunicacoes-performance' && (
+                <PageTransition>
+                  <CommunicationsView mode="performance" />
+                </PageTransition>
+              )}
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>

@@ -6,20 +6,24 @@ import { channelUnitCost } from '../utils/inferChannel';
 import { usePeriod } from '../contexts/PeriodContext';
 import { useBU } from '../contexts/BUContext';
 import { useAppStore } from '../store/useAppStore';
+import type { ActivityRow } from '../types/activity';
 
 export interface TemplateTimelinePoint {
   date: string;
   label: string;
   executions: number;
   baseEnviada: number;
+  aberturas: number;
   cliques: number;
   cartoes: number;
   propostas: number;
   custoTotal: number;
   custoEfetivo: number;
   ctr: number;
+  taxaAbertura: number;
   taxaConversao: number;
   cacEfetivo: number;
+  activities: ActivityRow[];
 }
 
 /** Performance agregada de um template (soma de todas as execucoes vinculadas). */
@@ -29,6 +33,7 @@ export interface TemplatePerformance {
   timeline: TemplateTimelinePoint[];
   executions: number;
   baseEnviada: number;
+  aberturas: number;
   cliques: number;
   cartoes: number;
   propostas: number;
@@ -49,6 +54,7 @@ interface ActivityMetricRow {
   'Activity name / Taxonomia': string | null;
   'Data de Disparo': string | null;
   'Base Total': number | null;
+  Abertura: number | null;
   Cliques: number | null;
   'Cartões Gerados'?: number | null;
   'CartÃµes Gerados'?: number | null;
@@ -69,14 +75,17 @@ function emptyTimelinePoint(date: string): TemplateTimelinePoint {
     label: date === 'sem-data' ? 's/d' : `${date.slice(8, 10)}/${date.slice(5, 7)}`,
     executions: 0,
     baseEnviada: 0,
+    aberturas: 0,
     cliques: 0,
     cartoes: 0,
     propostas: 0,
     custoTotal: 0,
     custoEfetivo: 0,
     ctr: 0,
+    taxaAbertura: 0,
     taxaConversao: 0,
     cacEfetivo: 0,
+    activities: [],
   };
 }
 
@@ -87,6 +96,7 @@ function createAccumulator(template: CommunicationTemplate): Accumulator {
     timeline: [],
     executions: 0,
     baseEnviada: 0,
+    aberturas: 0,
     cliques: 0,
     cartoes: 0,
     propostas: 0,
@@ -133,7 +143,7 @@ export function useTemplatePerformance() {
     try {
       let actQuery = supabase
         .from('activities')
-        .select('template_id, "Activity name / Taxonomia", "Data de Disparo", "Base Total", "Cliques", "Cartões Gerados", "Propostas", "Custo Total Campanha"')
+        .select('*')
         .not('template_id', 'is', null)
         .gte('"Data de Disparo"', dataInicio)
         .lte('"Data de Disparo"', `${dataFim} 23:59:59`);
@@ -169,6 +179,7 @@ export function useTemplatePerformance() {
         }
 
         const base = num(r['Base Total']);
+        const aberturas = num(r.Abertura);
         const cliques = num(r.Cliques);
         const cartoes = num(r['Cartões Gerados'] ?? r['CartÃµes Gerados']);
         const propostas = num(r.Propostas);
@@ -177,6 +188,7 @@ export function useTemplatePerformance() {
 
         p.executions += 1;
         p.baseEnviada += base;
+        p.aberturas += aberturas;
         p.cliques += cliques;
         p.cartoes += cartoes;
         p.propostas += propostas;
@@ -188,11 +200,13 @@ export function useTemplatePerformance() {
         const day = p._timeline.get(dateKey) ?? emptyTimelinePoint(dateKey);
         day.executions += 1;
         day.baseEnviada += base;
+        day.aberturas += aberturas;
         day.cliques += cliques;
         day.cartoes += cartoes;
         day.propostas += propostas;
         day.custoTotal += custoTotal;
         day.custoEfetivo += custoTotal > 0 ? custoTotal : custoEstimadoDia;
+        day.activities.push(r as unknown as ActivityRow);
         p._timeline.set(dateKey, day);
       }
 
@@ -214,6 +228,7 @@ export function useTemplatePerformance() {
           .map((point) => ({
             ...point,
             ctr: point.baseEnviada > 0 ? point.cliques / point.baseEnviada : 0,
+            taxaAbertura: point.baseEnviada > 0 ? point.aberturas / point.baseEnviada : 0,
             taxaConversao: point.baseEnviada > 0 ? point.cartoes / point.baseEnviada : 0,
             cacEfetivo: point.cartoes > 0 ? point.custoEfetivo / point.cartoes : 0,
           }))
