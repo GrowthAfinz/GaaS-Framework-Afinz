@@ -11,7 +11,18 @@ interface Props {
   onSaved: () => void;
 }
 
-/** Adiciona o asset (HTML/imagem) a um template DRAFT já mapeado pela governança. */
+function htmlToSuggestionText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Adiciona o asset (HTML/imagem) a um template DRAFT ja mapeado pela governanca. */
 export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) => {
   const isEmail = isEmailChannel(template.channel);
   const [html, setHtml] = useState('');
@@ -23,6 +34,10 @@ export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) =
 
   const imageUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
+
+  const suggestionContentText = useMemo(() => (
+    isEmail ? [subject, preheader, htmlToSuggestionText(html)].filter(Boolean).join(' ') : ''
+  ), [html, isEmail, preheader, subject]);
 
   const canSave = !saving && (isEmail ? html.trim().length > 0 : !!imageFile);
 
@@ -94,7 +109,7 @@ export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) =
           )}
 
           <div className="mt-5 border-t border-slate-100 pt-4">
-            <ActivityLinkManager template={template} />
+            <ActivityLinkManager template={template} contentText={suggestionContentText} />
           </div>
 
           {error && (

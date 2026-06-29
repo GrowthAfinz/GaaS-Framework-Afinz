@@ -3,6 +3,15 @@ import { supabase } from '../services/supabaseClient';
 import { inferChannelFromActivityName, toCanonicalChannel } from '../utils/inferChannel';
 import type { CatalogTemplate } from './useTemplateCatalog';
 
+export type ActivitySuggestionConfidence = 'alta' | 'media' | 'baixa';
+export type ActivitySuggestionCategory = 'alta_confianca' | 'revisar' | 'conflito' | 'ja_vinculado';
+
+export interface ActivitySuggestionSignal {
+  label: string;
+  detail?: string;
+  weight?: number;
+}
+
 export interface ActivitySuggestion {
   activityName: string;
   jornada: string;
@@ -12,12 +21,19 @@ export interface ActivitySuggestion {
   canal: string;
   latestDate: string | null;
   executions: number;
-  score: number;          // 0-100
+  score: number;
   reasons: string[];
   warnings: string[];
-  confidence: 'alta' | 'media' | 'baixa';
-  alreadyLinked: boolean; // ja vinculado a ESTE template
+  evidence: ActivitySuggestionSignal[];
+  conflicts: ActivitySuggestionSignal[];
+  scoreBreakdown: ActivitySuggestionSignal[];
+  confidence: ActivitySuggestionConfidence;
+  category: ActivitySuggestionCategory;
+  alreadyLinked: boolean;
   linkedToOther: boolean;
+  linkedTemplateId: string | null;
+  plannedMatch: boolean;
+  contentMatch: boolean;
 }
 
 interface Row {
@@ -42,7 +58,7 @@ interface SegmentRule {
   siglas: string[];
 }
 
-interface TemplateMatchContext {
+export interface TemplateSuggestionContext {
   templateId: string;
   channel: string | null;
   partnerKey: PartnerKey | null;
@@ -51,7 +67,70 @@ interface TemplateMatchContext {
   week: string | null;
   dispatch: string | null;
   segment: SegmentRule | null;
+  plannedActivityNames: string[];
+  contentTokens: string[];
 }
+
+export interface ActivitySuggestionDiagnostics {
+  fetchedRows: number;
+  uniqueActivityNames: number;
+  suggestedCount: number;
+  byCategory: Record<ActivitySuggestionCategory, number>;
+  rejected: {
+    missingName: number;
+    hardIncompatible: number;
+    lowScore: number;
+  };
+  hardRejectReasons: {
+    channel: number;
+    partner: number;
+    campaign: number;
+  };
+  planned: {
+    total: number;
+    found: number;
+    missing: string[];
+  };
+}
+
+export interface ActivitySuggestionBuckets {
+  altaConfianca: ActivitySuggestion[];
+  revisar: ActivitySuggestion[];
+  conflitos: ActivitySuggestion[];
+  jaVinculados: ActivitySuggestion[];
+}
+
+interface UseActivitySuggestionsOptions {
+  topN?: number;
+  contentText?: string;
+}
+
+const EMPTY_DIAGNOSTICS: ActivitySuggestionDiagnostics = {
+  fetchedRows: 0,
+  uniqueActivityNames: 0,
+  suggestedCount: 0,
+  byCategory: {
+    alta_confianca: 0,
+    revisar: 0,
+    conflito: 0,
+    ja_vinculado: 0,
+  },
+  rejected: {
+    missingName: 0,
+    hardIncompatible: 0,
+    lowScore: 0,
+  },
+  hardRejectReasons: {
+    channel: 0,
+    partner: 0,
+    campaign: 0,
+  },
+  planned: {
+    total: 0,
+    found: 0,
+    missing: [],
+  },
+};
 
 const SEGMENT_BY_SIGLA: Record<string, SegmentRule> = {
   bsp: { canonical: 'Base_Proprietaria', aliases: ['base proprietaria', 'base_proprietaria'], siglas: ['bsp'] },
@@ -67,6 +146,23 @@ const SEGMENT_BY_METADATA: Record<string, SegmentRule> = {
   crm: SEGMENT_BY_SIGLA.crm,
   aprovados_nao_convertidos: SEGMENT_BY_SIGLA.apr,
 };
+
+const CONTENT_KEYWORDS = [
+  'copa',
+  'visa',
+  'sorteio',
+  'sorteios',
+  'premio',
+  'premios',
+  '50mil',
+  '50',
+  '300',
+  'cartao',
+  'credito',
+  'limite',
+  'aprovado',
+  'proposta',
+];
 
 function normalize(value: unknown): string {
   return String(value ?? '')
@@ -84,6 +180,20 @@ function tokensFrom(value: unknown): string[] {
 
 function includesToken(text: string, token: string): boolean {
   return new RegExp(`(^|[^a-z0-9])${token}([^a-z0-9]|$)`, 'i').test(text);
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function normalizeActivityName(value: string): string {
+  return normalize(value).replace(/\s+/g, '_');
+}
+
+function extractContentTokens(contentText: string | undefined): string[] {
+  const normalized = normalize(contentText);
+  if (!normalized) return [];
+  return CONTENT_KEYWORDS.filter((token) => normalized.includes(token));
 }
 
 function inferPartnerKey(template: CatalogTemplate): PartnerKey | null {
@@ -137,7 +247,7 @@ function inferDispatch(template: CatalogTemplate): string | null {
   return match ? match[1].toLowerCase() : null;
 }
 
-function buildContext(template: CatalogTemplate): TemplateMatchContext {
+function buildContext(template: CatalogTemplate, contentText?: string): TemplateSuggestionContext {
   const partnerKey = inferPartnerKey(template);
   return {
     templateId: template.template_id,
@@ -148,6 +258,8 @@ function buildContext(template: CatalogTemplate): TemplateMatchContext {
     week: inferWeek(template),
     dispatch: inferDispatch(template),
     segment: inferSegment(template),
+    plannedActivityNames: uniqueValues(template.activityNamesPlanejados.map(normalizeActivityName)),
+    contentTokens: extractContentTokens(contentText),
   };
 }
 
@@ -172,7 +284,7 @@ function rowTaxonomyText(r: Row): string {
   ].filter(Boolean).join(' '));
 }
 
-function partnerMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
+function partnerMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.partnerKey) return null;
   const text = rowText(r);
   const taxonomyText = rowTaxonomyText(r);
@@ -185,11 +297,20 @@ function partnerMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
       return includesToken(taxonomyText, 'dia') || parceiro.includes('dia');
     case 'bb':
       if (includesToken(taxonomyText, 'dia') || taxonomyText.includes('plurix')) return false;
-      return includesToken(taxonomyText, 'bb') || taxonomyText.includes('bem barato') || parceiro.includes('bem barato') || parceiro === 'bb';
+      return includesToken(taxonomyText, 'bb') || includesToken(taxonomyText, 'bbt') || taxonomyText.includes('bem barato') || parceiro.includes('bem barato') || parceiro === 'bb';
     case 'plurix':
       return parceiro.includes('plurix') || bu.includes('plurix') || text.includes('plurix') || includesToken(text, 'plu');
     case 'b2c': {
-      const isOtherPartner = parceiro.includes('dia') || parceiro.includes('bem barato') || parceiro.includes('plurix') || bu.includes('plurix');
+      const hasOtherPartnerInTaxonomy = includesToken(taxonomyText, 'dia')
+        || includesToken(taxonomyText, 'bb')
+        || includesToken(taxonomyText, 'bbt')
+        || taxonomyText.includes('bem barato')
+        || taxonomyText.includes('plurix');
+      const isOtherPartner = hasOtherPartnerInTaxonomy
+        || parceiro.includes('dia')
+        || parceiro.includes('bem barato')
+        || parceiro.includes('plurix')
+        || bu.includes('plurix');
       if (isOtherPartner) return false;
       return bu.includes('b2c') || parceiro.includes('proprietaria') || text.includes('b2c');
     }
@@ -198,18 +319,25 @@ function partnerMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
   }
 }
 
-function segmentMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
+function segmentMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.segment) return null;
   const segment = normalize(r.Segmento);
-  const text = rowText(r);
   if (!segment) return null;
   if (normalize(ctx.segment.canonical) === segment) return true;
   if (ctx.segment.aliases.some((alias) => segment === normalize(alias) || segment.includes(normalize(alias)))) return true;
-  if (ctx.segment.siglas.some((sigla) => includesToken(text, sigla))) return true;
+
+  // A sigla no activity_name ajuda quando a coluna oficial está vaga, mas não deve
+  // sobrescrever uma coluna oficial diferente (ex.: jornada contém CRM, Segmento = Base_Proprietaria).
   return false;
 }
 
-function campaignMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
+function segmentTokenMatches(ctx: TemplateSuggestionContext, r: Row): boolean {
+  if (!ctx.segment) return false;
+  const text = rowText(r);
+  return ctx.segment.siglas.some((sigla) => includesToken(text, sigla));
+}
+
+function campaignMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (ctx.campaignTokens.length === 0) return null;
   const text = rowText(r);
   return ctx.campaignTokens.every((token) => (
@@ -217,91 +345,282 @@ function campaignMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
   ));
 }
 
-function weekMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
+function contentMatches(ctx: TemplateSuggestionContext, r: Row): boolean {
+  if (ctx.contentTokens.length === 0) return false;
+  const text = rowText(r);
+  return ctx.contentTokens.some((token) => text.includes(token));
+}
+
+function weekMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.week) return null;
   return includesToken(rowText(r), ctx.week);
 }
 
-function dispatchMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
+function dispatchMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.dispatch) return null;
   return includesToken(rowText(r), ctx.dispatch);
 }
 
-function channelMatches(ctx: TemplateMatchContext, r: Row): boolean | null {
+function channelMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.channel) return null;
   const rowChannel = toCanonicalChannel(r.Canal) ?? inferChannelFromActivityName(r['Activity name / Taxonomia']);
   if (!rowChannel) return null;
   return rowChannel === ctx.channel;
 }
 
-function isStronglyIncompatible(ctx: TemplateMatchContext, r: Row): boolean {
-  if (partnerMatches(ctx, r) === false) return true;
-  if (channelMatches(ctx, r) === false) return true;
-  if (campaignMatches(ctx, r) === false) return true;
-  return false;
+function hardRejectReason(ctx: TemplateSuggestionContext, r: Row): 'channel' | 'partner' | 'campaign' | null {
+  if (channelMatches(ctx, r) === false) return 'channel';
+  if (partnerMatches(ctx, r) === false) return 'partner';
+  if (campaignMatches(ctx, r) === false) return 'campaign';
+  return null;
 }
 
-function scoreRow(ctx: TemplateMatchContext, r: Row): { score: number; reasons: string[]; warnings: string[] } {
+function pushSignal(list: ActivitySuggestionSignal[], label: string, detail?: string, weight?: number) {
+  list.push({ label, detail, weight });
+}
+
+function scoreRow(ctx: TemplateSuggestionContext, r: Row, templateId: string): {
+  score: number;
+  reasons: string[];
+  warnings: string[];
+  evidence: ActivitySuggestionSignal[];
+  conflicts: ActivitySuggestionSignal[];
+  scoreBreakdown: ActivitySuggestionSignal[];
+  plannedMatch: boolean;
+  contentMatch: boolean;
+} {
   let score = 0;
   const reasons: string[] = [];
   const warnings: string[] = [];
+  const evidence: ActivitySuggestionSignal[] = [];
+  const conflicts: ActivitySuggestionSignal[] = [];
+  const scoreBreakdown: ActivitySuggestionSignal[] = [];
 
-  const add = (points: number, reason: string) => { score += points; reasons.push(reason); };
-  const warn = (reason: string) => warnings.push(reason);
-
-  const partner = partnerMatches(ctx, r);
-  if (partner === true) add(35, `Parceiro ${ctx.partnerLabel}`);
-  else if (partner === null && ctx.partnerLabel) warn(`Parceiro ${ctx.partnerLabel} nao confirmado`);
-
-  const segment = segmentMatches(ctx, r);
-  if (segment === true && ctx.segment) add(25, `Segmento ${ctx.segment.canonical}`);
-  else if (segment === null && ctx.segment) warn(`Segmento ${ctx.segment.canonical} nao confirmado`);
-  else if (segment === false && ctx.segment) warn(`Segmento atual: ${r.Segmento ?? '-'}`);
-
-  const campaign = campaignMatches(ctx, r);
-  if (campaign === true && ctx.campaignTokens.length) add(20, ctx.campaignTokens.includes('copa') ? 'Campanha Copa' : 'Campanha compativel');
-  else if (campaign === null && ctx.campaignTokens.length) warn('Campanha nao confirmada');
-
-  const week = weekMatches(ctx, r);
-  if (week === true && ctx.week) add(12, `Semana ${ctx.week.toUpperCase()}`);
-  else if (week === null && ctx.week) warn(`Semana ${ctx.week.toUpperCase()} nao confirmada`);
-
-  const dispatch = dispatchMatches(ctx, r);
-  if (dispatch === true && ctx.dispatch) add(8, `Disparo ${ctx.dispatch.toUpperCase()}`);
+  const name = r['Activity name / Taxonomia'] ?? '';
+  const plannedMatch = ctx.plannedActivityNames.includes(normalizeActivityName(name));
+  if (plannedMatch) {
+    score += 50;
+    reasons.push('Planejado na governanca');
+    pushSignal(evidence, 'Planejado na governanca', 'activity_name veio do mapeamento do template', 50);
+    pushSignal(scoreBreakdown, 'Planejado', '+50', 50);
+  }
 
   const channel = channelMatches(ctx, r);
-  if (channel === true && ctx.channel) add(10, `Canal ${ctx.channel}`);
-  else if (channel === null && ctx.channel) warn(`Canal ${ctx.channel} nao confirmado`);
+  if (channel === true && ctx.channel) {
+    score += 15;
+    reasons.push(`Canal ${ctx.channel}`);
+    pushSignal(evidence, `Canal ${ctx.channel}`, undefined, 15);
+    pushSignal(scoreBreakdown, 'Canal', '+15', 15);
+  } else if (channel === null && ctx.channel) {
+    warnings.push(`Canal ${ctx.channel} nao confirmado`);
+    pushSignal(conflicts, 'Canal nao confirmado', `esperado: ${ctx.channel}`);
+  }
 
-  if (!r.template_id) add(5, 'Livre');
-  else if (r.template_id === ctx.templateId) add(5, 'Ja vinculado aqui');
-  else warn(`Ja vinculado a ${r.template_id}`);
+  const partner = partnerMatches(ctx, r);
+  if (partner === true && ctx.partnerLabel) {
+    score += 25;
+    reasons.push(`Parceiro ${ctx.partnerLabel}`);
+    pushSignal(evidence, `Parceiro ${ctx.partnerLabel}`, undefined, 25);
+    pushSignal(scoreBreakdown, 'Parceiro', '+25', 25);
+  } else if (partner === null && ctx.partnerLabel) {
+    warnings.push(`Parceiro ${ctx.partnerLabel} nao confirmado`);
+    pushSignal(conflicts, 'Parceiro nao confirmado', `esperado: ${ctx.partnerLabel}`);
+  }
 
-  if (r['Data de Disparo']) add(3, 'Tem execucao recente');
+  const segment = segmentMatches(ctx, r);
+  if (segment === true && ctx.segment) {
+    score += 25;
+    reasons.push(`Segmento ${ctx.segment.canonical}`);
+    pushSignal(evidence, `Segmento ${ctx.segment.canonical}`, undefined, 25);
+    pushSignal(scoreBreakdown, 'Segmento oficial', '+25', 25);
+  } else if (segment === false && ctx.segment) {
+    warnings.push(`Segmento atual: ${r.Segmento ?? '-'}`);
+    pushSignal(conflicts, 'Segmento oficial diverge', `esperado: ${ctx.segment.canonical}; atual: ${r.Segmento ?? '-'}`, -20);
+    score -= 20;
+  } else if (segment === null && ctx.segment) {
+    warnings.push(`Segmento ${ctx.segment.canonical} nao confirmado`);
+  }
 
-  return { score: Math.min(100, Math.max(0, score)), reasons, warnings };
+  if (segment !== true && segmentTokenMatches(ctx, r) && ctx.segment) {
+    score += 6;
+    warnings.push(`Sigla ${ctx.segment.siglas.join('/')} apareceu na taxonomia`);
+    pushSignal(evidence, 'Sigla de segmento na taxonomia', ctx.segment.siglas.join('/'), 6);
+    pushSignal(scoreBreakdown, 'Sigla de segmento', '+6', 6);
+  }
+
+  const campaign = campaignMatches(ctx, r);
+  if (campaign === true && ctx.campaignTokens.length) {
+    score += 18;
+    reasons.push(ctx.campaignTokens.includes('copa') ? 'Campanha Copa' : 'Campanha compativel');
+    pushSignal(evidence, 'Campanha compativel', ctx.campaignTokens.join(', '), 18);
+    pushSignal(scoreBreakdown, 'Campanha', '+18', 18);
+  } else if (campaign === null && ctx.campaignTokens.length) {
+    warnings.push('Campanha nao confirmada');
+  }
+
+  const week = weekMatches(ctx, r);
+  if (week === true && ctx.week) {
+    score += 12;
+    reasons.push(`Semana ${ctx.week.toUpperCase()}`);
+    pushSignal(evidence, `Semana ${ctx.week.toUpperCase()}`, undefined, 12);
+    pushSignal(scoreBreakdown, 'Semana', '+12', 12);
+  } else if (week === false && ctx.week) {
+    warnings.push(`Semana ${ctx.week.toUpperCase()} nao encontrada`);
+    pushSignal(conflicts, 'Semana nao bate', `esperado: ${ctx.week.toUpperCase()}`);
+  }
+
+  const dispatch = dispatchMatches(ctx, r);
+  if (dispatch === true && ctx.dispatch) {
+    score += 10;
+    reasons.push(`Disparo ${ctx.dispatch.toUpperCase()}`);
+    pushSignal(evidence, `Disparo ${ctx.dispatch.toUpperCase()}`, undefined, 10);
+    pushSignal(scoreBreakdown, 'Disparo', '+10', 10);
+  } else if (dispatch === false && ctx.dispatch) {
+    warnings.push(`Disparo ${ctx.dispatch.toUpperCase()} nao encontrado`);
+    pushSignal(conflicts, 'Disparo nao bate', `esperado: ${ctx.dispatch.toUpperCase()}`);
+  }
+
+  const hasContentMatch = contentMatches(ctx, r);
+  if (hasContentMatch) {
+    score += 8;
+    reasons.push('Conteudo compativel');
+    pushSignal(evidence, 'Conteudo compativel', ctx.contentTokens.join(', '), 8);
+    pushSignal(scoreBreakdown, 'Conteudo', '+8', 8);
+  }
+
+  if (!r.template_id) {
+    score += 5;
+    reasons.push('Livre');
+    pushSignal(evidence, 'Livre', 'sem template_id vinculado hoje', 5);
+    pushSignal(scoreBreakdown, 'Livre', '+5', 5);
+  } else if (r.template_id === templateId) {
+    score += 5;
+    reasons.push('Ja vinculado aqui');
+    pushSignal(evidence, 'Ja vinculado aqui', undefined, 5);
+    pushSignal(scoreBreakdown, 'Vinculo atual', '+5', 5);
+  } else {
+    warnings.push(`Ja vinculado a ${r.template_id}`);
+    pushSignal(conflicts, 'Ja vinculado a outro template', r.template_id, -30);
+  }
+
+  if (r['Data de Disparo']) {
+    score += 3;
+    reasons.push('Tem execucao recente');
+    pushSignal(scoreBreakdown, 'Recencia', '+3', 3);
+  }
+
+  return {
+    score: Math.min(100, Math.max(0, score)),
+    reasons,
+    warnings,
+    evidence,
+    conflicts,
+    scoreBreakdown,
+    plannedMatch,
+    contentMatch: hasContentMatch,
+  };
 }
 
-function confidence(score: number): ActivitySuggestion['confidence'] {
+function confidence(score: number): ActivitySuggestionConfidence {
   if (score >= 85) return 'alta';
   if (score >= 65) return 'media';
   return 'baixa';
 }
 
+function categoryForSuggestion(s: Pick<ActivitySuggestion, 'alreadyLinked' | 'linkedToOther' | 'score' | 'conflicts'>): ActivitySuggestionCategory {
+  if (s.alreadyLinked) return 'ja_vinculado';
+  if (s.linkedToOther || s.conflicts.some((c) => c.label === 'Ja vinculado a outro template')) return 'conflito';
+  if (s.score >= 85) return 'alta_confianca';
+  return 'revisar';
+}
+
+function emptyBuckets(): ActivitySuggestionBuckets {
+  return {
+    altaConfianca: [],
+    revisar: [],
+    conflitos: [],
+    jaVinculados: [],
+  };
+}
+
+function bucketize(suggestions: ActivitySuggestion[]): ActivitySuggestionBuckets {
+  const buckets = emptyBuckets();
+  for (const s of suggestions) {
+    if (s.category === 'alta_confianca') buckets.altaConfianca.push(s);
+    else if (s.category === 'revisar') buckets.revisar.push(s);
+    else if (s.category === 'conflito') buckets.conflitos.push(s);
+    else buckets.jaVinculados.push(s);
+  }
+  return buckets;
+}
+
+function buildDiagnostics(
+  ctx: TemplateSuggestionContext,
+  rows: Row[],
+  suggestions: ActivitySuggestion[],
+  rejected: ActivitySuggestionDiagnostics['rejected'],
+  hardRejectReasons: ActivitySuggestionDiagnostics['hardRejectReasons']
+): ActivitySuggestionDiagnostics {
+  const foundPlanned = new Set(
+    rows
+      .map((row) => row['Activity name / Taxonomia'])
+      .filter((name): name is string => !!name)
+      .map(normalizeActivityName)
+      .filter((name) => ctx.plannedActivityNames.includes(name))
+  );
+  const byCategory = suggestions.reduce<ActivitySuggestionDiagnostics['byCategory']>((acc, s) => {
+    acc[s.category] += 1;
+    return acc;
+  }, { alta_confianca: 0, revisar: 0, conflito: 0, ja_vinculado: 0 });
+
+  return {
+    fetchedRows: rows.length,
+    uniqueActivityNames: new Set(rows.map((r) => r['Activity name / Taxonomia']).filter(Boolean)).size,
+    suggestedCount: suggestions.length,
+    byCategory,
+    rejected,
+    hardRejectReasons,
+    planned: {
+      total: ctx.plannedActivityNames.length,
+      found: foundPlanned.size,
+      missing: ctx.plannedActivityNames.filter((name) => !foundPlanned.has(name)),
+    },
+  };
+}
+
+function parseOptions(optionsOrTopN?: number | UseActivitySuggestionsOptions): Required<UseActivitySuggestionsOptions> {
+  if (typeof optionsOrTopN === 'number') return { topN: optionsOrTopN, contentText: '' };
+  return {
+    topN: optionsOrTopN?.topN ?? 12,
+    contentText: optionsOrTopN?.contentText ?? '',
+  };
+}
+
 /**
- * Sugere activity_names provaveis para um template.
- * Primeiro elimina incompatibilidades fortes por canal/parceiro/segmento/campanha;
- * depois ranqueia por evidencias oficiais de activities e pela taxonomia.
+ * Sugere activity_names provaveis para um template e explica o funil da decisao.
+ * O hook nunca auto-vincula: ele so prioriza candidatos e mostra evidencias/conflitos
+ * para o operador confirmar.
  */
-export function useActivitySuggestions(template: CatalogTemplate | null, topN = 12) {
+export function useActivitySuggestions(template: CatalogTemplate | null, optionsOrTopN?: number | UseActivitySuggestionsOptions) {
+  const options = parseOptions(optionsOrTopN);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const context = useMemo(() => template ? buildContext(template) : null, [template]);
+  const context = useMemo(() => template ? buildContext(template, options.contentText) : null, [template, options.contentText]);
   const channel = context?.channel ?? '';
   const contextKey = context
-    ? [context.templateId, context.channel, context.partnerKey, context.campaignTokens.join('|'), context.week, context.dispatch, context.segment?.canonical].join('::')
+    ? [
+      context.templateId,
+      context.channel,
+      context.partnerKey,
+      context.campaignTokens.join('|'),
+      context.week,
+      context.dispatch,
+      context.segment?.canonical,
+      context.plannedActivityNames.join('|'),
+      context.contentTokens.join('|'),
+    ].join('::')
     : '';
   const templateId = template?.template_id ?? '';
 
@@ -330,21 +649,45 @@ export function useActivitySuggestions(template: CatalogTemplate | null, topN = 
     return () => { active = false; };
   }, [template, channel, contextKey]);
 
-  const suggestions = useMemo<ActivitySuggestion[]>(() => {
-    if (!template || !context) return [];
+  const computed = useMemo(() => {
+    if (!template || !context) {
+      return {
+        suggestions: [] as ActivitySuggestion[],
+        diagnostics: EMPTY_DIAGNOSTICS,
+        buckets: emptyBuckets(),
+      };
+    }
 
+    const rejected = { missingName: 0, hardIncompatible: 0, lowScore: 0 };
+    const hardRejectReasons = { channel: 0, partner: 0, campaign: 0 };
     const byName = new Map<string, ActivitySuggestion>();
+
     for (const r of rows) {
       const name = r['Activity name / Taxonomia'];
-      if (!name) continue;
-      if (isStronglyIncompatible(context, r)) continue;
+      if (!name) {
+        rejected.missingName += 1;
+        continue;
+      }
+
+      const hardReason = hardRejectReason(context, r);
+      if (hardReason) {
+        rejected.hardIncompatible += 1;
+        hardRejectReasons[hardReason] += 1;
+        continue;
+      }
 
       const date = r['Data de Disparo'] ?? null;
       const linkedToThis = r.template_id === templateId;
       const linkedToOther = !!r.template_id && r.template_id !== templateId;
+      const scored = scoreRow(context, r, templateId);
+      const shouldKeep = linkedToThis || linkedToOther || scored.plannedMatch || scored.score >= 55;
+      if (!shouldKeep) {
+        rejected.lowScore += 1;
+        continue;
+      }
+
       let s = byName.get(name);
       if (!s) {
-        const { score, reasons, warnings } = scoreRow(context, r);
         s = {
           activityName: name,
           jornada: r.jornada ?? '-',
@@ -354,27 +697,76 @@ export function useActivitySuggestions(template: CatalogTemplate | null, topN = 
           canal: r.Canal ?? '-',
           latestDate: date,
           executions: 1,
-          score,
-          reasons,
-          warnings,
-          confidence: confidence(score),
+          score: scored.score,
+          reasons: scored.reasons,
+          warnings: scored.warnings,
+          evidence: scored.evidence,
+          conflicts: scored.conflicts,
+          scoreBreakdown: scored.scoreBreakdown,
+          confidence: confidence(scored.score),
+          category: 'revisar',
           alreadyLinked: linkedToThis,
           linkedToOther,
+          linkedTemplateId: linkedToOther ? r.template_id : null,
+          plannedMatch: scored.plannedMatch,
+          contentMatch: scored.contentMatch,
         };
+        s.category = categoryForSuggestion(s);
         byName.set(name, s);
       } else {
         s.executions += 1;
         if (date && (!s.latestDate || date > s.latestDate)) s.latestDate = date;
-        if (linkedToThis) s.alreadyLinked = true;
-        if (linkedToOther) s.linkedToOther = true;
+        if (linkedToThis) {
+          s.alreadyLinked = true;
+          s.category = 'ja_vinculado';
+        }
+        if (linkedToOther) {
+          s.linkedToOther = true;
+          s.linkedTemplateId = r.template_id;
+          s.category = 'conflito';
+        }
+        if (scored.score > s.score) {
+          s.score = scored.score;
+          s.reasons = scored.reasons;
+          s.warnings = scored.warnings;
+          s.evidence = scored.evidence;
+          s.conflicts = scored.conflicts;
+          s.scoreBreakdown = scored.scoreBreakdown;
+          s.confidence = confidence(scored.score);
+          s.plannedMatch = s.plannedMatch || scored.plannedMatch;
+          s.contentMatch = s.contentMatch || scored.contentMatch;
+          s.category = categoryForSuggestion(s);
+        }
       }
     }
 
-    return Array.from(byName.values())
-      .filter((s) => s.alreadyLinked || s.score >= 60)
-      .sort((a, b) => b.score - a.score || (b.latestDate ?? '').localeCompare(a.latestDate ?? ''))
-      .slice(0, topN);
-  }, [rows, template, context, templateId, topN]);
+    const suggestions = Array.from(byName.values())
+      .sort((a, b) => {
+        const categoryRank: Record<ActivitySuggestionCategory, number> = {
+          alta_confianca: 0,
+          revisar: 1,
+          conflito: 2,
+          ja_vinculado: 3,
+        };
+        return categoryRank[a.category] - categoryRank[b.category]
+          || b.score - a.score
+          || (b.latestDate ?? '').localeCompare(a.latestDate ?? '');
+      })
+      .slice(0, options.topN);
 
-  return { suggestions, loading, error };
+    return {
+      suggestions,
+      diagnostics: buildDiagnostics(context, rows, suggestions, rejected, hardRejectReasons),
+      buckets: bucketize(suggestions),
+    };
+  }, [rows, template, context, templateId, options.topN]);
+
+  return {
+    suggestions: computed.suggestions,
+    buckets: computed.buckets,
+    diagnostics: computed.diagnostics,
+    context,
+    loading,
+    error,
+  };
 }
