@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  Flame,
   FileImage,
   Gauge,
   Grid3X3,
@@ -21,6 +22,7 @@ import { CommunicationDetailModal } from './CommunicationDetailModal';
 
 type ViewMode = 'overview' | 'gallery' | 'table';
 type SortKey = 'score' | 'cartoes' | 'ctr' | 'taxaAbertura' | 'taxaConversao' | 'cacEfetivo';
+type ActionTone = 'good' | 'warn' | 'bad';
 
 interface ScoredTemplatePerformance extends TemplatePerformance {
   contentScore: number;
@@ -65,6 +67,12 @@ const Metric: React.FC<{ label: string; value: string; accent?: boolean }> = ({ 
     <p className={`text-sm font-bold tabular-nums ${accent ? 'text-cyan-700' : 'text-slate-700'}`}>{value}</p>
   </div>
 );
+
+const toneClasses: Record<ActionTone, string> = {
+  good: 'border-emerald-100 bg-emerald-50 text-emerald-800',
+  warn: 'border-amber-100 bg-amber-50 text-amber-800',
+  bad: 'border-rose-100 bg-rose-50 text-rose-800',
+};
 
 const TemplatePreview: React.FC<{ item: TemplatePerformance; className?: string }> = ({ item, className = 'h-44' }) => {
   const [url, setUrl] = useState<string | null>(null);
@@ -136,6 +144,20 @@ const TemplatePreview: React.FC<{ item: TemplatePerformance; className?: string 
   );
 };
 
+const MiniTemplateThumb: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
+  const meta = channelMeta(item.template.channel);
+  return (
+    <div
+      className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-100 shadow-sm"
+      style={{ boxShadow: `inset 0 0 0 1px ${meta.color}18` }}
+    >
+      <span className="text-[10px] font-black uppercase" style={{ color: meta.color }}>
+        {meta.short}
+      </span>
+    </div>
+  );
+};
+
 const ScoreBar: React.FC<{ score: number; compact?: boolean }> = ({ score, compact: isCompact }) => {
   const tone = score >= 70 ? 'emerald' : score >= 45 ? 'amber' : 'rose';
   const cls = {
@@ -179,6 +201,57 @@ function computeScoredData(data: TemplatePerformance[]): ScoredTemplatePerforman
   });
 }
 
+function buildSuggestedActions(data: ScoredTemplatePerformance[]) {
+  const actions: Array<{ tone: ActionTone; title: string; text: string; item: ScoredTemplatePerformance }> = [];
+  const byScore = [...data].sort((a, b) => b.contentScore - a.contentScore);
+  const best = byScore[0];
+  if (best) {
+    actions.push({
+      tone: 'good',
+      title: `Escalar ${best.template.template_id}`,
+      text: `Maior índice do recorte: ${best.contentScore}/100, ${pct(best.taxaAbertura, 1)} de abertura e ${int(best.cartoes)} cartões.`,
+      item: best,
+    });
+  }
+
+  const highVolume = data.filter((item) => item.baseEnviada > 1000);
+  const lowOpen = [...highVolume].sort((a, b) => a.taxaAbertura - b.taxaAbertura)[0];
+  if (lowOpen && lowOpen !== best) {
+    actions.push({
+      tone: 'bad',
+      title: `Revisar abertura de ${lowOpen.template.template_id}`,
+      text: `Volume relevante com abertura de ${pct(lowOpen.taxaAbertura, 1)}. Priorize assunto, primeira dobra e timing.`,
+      item: lowOpen,
+    });
+  }
+
+  const highOpenLowConv = [...data]
+    .filter((item) => item.taxaAbertura > 0.2 && item.taxaConversao < 0.0001)
+    .sort((a, b) => b.taxaAbertura - a.taxaAbertura)[0];
+  if (highOpenLowConv && !actions.some((a) => a.item.template.template_id === highOpenLowConv.template.template_id)) {
+    actions.push({
+      tone: 'warn',
+      title: `Revisar CTA de ${highOpenLowConv.template.template_id}`,
+      text: `Abertura boa (${pct(highOpenLowConv.taxaAbertura, 1)}), mas conversão baixa. O gargalo provável está na oferta ou CTA.`,
+      item: highOpenLowConv,
+    });
+  }
+
+  const highCac = [...data]
+    .filter((item) => item.cacEfetivo > 0 && item.cartoes > 0)
+    .sort((a, b) => b.cacEfetivo - a.cacEfetivo)[0];
+  if (highCac && !actions.some((a) => a.item.template.template_id === highCac.template.template_id)) {
+    actions.push({
+      tone: 'bad',
+      title: `Controlar CAC de ${highCac.template.template_id}`,
+      text: `CAC de ${brl(highCac.cacEfetivo)}${highCac.custoEstimado ? ' estimado' : ''}. Reavalie base e oferta antes de repetir.`,
+      item: highCac,
+    });
+  }
+
+  return actions.slice(0, 4);
+}
+
 const HeaderControls: React.FC<{
   view: ViewMode;
   setView: (view: ViewMode) => void;
@@ -188,12 +261,12 @@ const HeaderControls: React.FC<{
   setQuery: (query: string) => void;
 }> = ({ view, setView, channel, setChannel, query, setQuery }) => (
   <div className="space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="hidden">
         <h3 className="text-xl font-bold text-slate-900">Performance do conteúdo</h3>
         <p className="text-sm text-slate-500">Compare peças por canal, template e activity_name vinculada.</p>
       </div>
-      <div className="inline-flex rounded-xl bg-slate-100 p-1">
+      <div className="inline-flex rounded-2xl bg-slate-100/80 p-1 shadow-inner ring-1 ring-slate-200/70">
         {[
           ['overview', Gauge, 'Visão Geral'],
           ['gallery', Grid3X3, 'Galeria'],
@@ -204,8 +277,8 @@ const HeaderControls: React.FC<{
             type="button"
             onClick={() => setView(id as ViewMode)}
             className={[
-              'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors',
-              view === id ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+              'inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors',
+              view === id ? 'bg-white text-cyan-700 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-700',
             ].join(' ')}
           >
             {React.createElement(Icon as typeof Gauge, { size: 15 })}
@@ -216,15 +289,15 @@ const HeaderControls: React.FC<{
     </div>
 
     {view !== 'overview' && (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
           <CalendarDays size={14} />
           Período global
         </div>
         <button
           type="button"
           onClick={() => setChannel('all')}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${channel === 'all' ? 'bg-slate-900 text-white ring-slate-900' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${channel === 'all' ? 'bg-slate-900 text-white ring-slate-900 shadow-sm' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}
         >
           Todos
         </button>
@@ -239,7 +312,7 @@ const HeaderControls: React.FC<{
             {c.label}
           </button>
         ))}
-        <div className="ml-auto flex min-w-[240px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-400">
+        <div className="ml-auto flex min-w-[280px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-400 shadow-sm">
           <Search size={15} />
           <input
             value={query}
@@ -312,7 +385,7 @@ const Overview: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: Tem
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h4 className="font-bold text-slate-800">Volume por canal</h4>
@@ -337,7 +410,8 @@ const Overview: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: Tem
           </div>
         </div>
 
-        <div className="rounded-2xl border border-dashed border-cyan-200 bg-cyan-50/40 p-4">
+        <ActionPanel data={data} onOpen={onOpen} />
+        <div className="hidden">
           <div className="flex items-start gap-3">
             <div className="rounded-xl bg-white p-2 text-cyan-700 shadow-sm">
               <Gauge size={18} />
@@ -391,7 +465,7 @@ const Overview: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: Tem
 };
 
 const SummaryCard: React.FC<{ label: string; value: string; sub: string; icon: React.ReactNode }> = ({ label, value, sub, icon }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
     <div className="flex items-center justify-between">
       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <div className="rounded-xl bg-slate-50 p-2 text-slate-400">{icon}</div>
@@ -400,6 +474,46 @@ const SummaryCard: React.FC<{ label: string; value: string; sub: string; icon: R
     <p className="mt-2 text-sm text-slate-500">{sub}</p>
   </div>
 );
+
+const ActionPanel: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: TemplatePerformance) => void }> = ({ data, onOpen }) => {
+  const actions = buildSuggestedActions(data);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-700">
+            <Flame size={16} />
+          </span>
+          <div>
+            <h4 className="font-bold text-slate-800">Ações sugeridas</h4>
+            <p className="text-xs text-slate-400">Regras simples por peça · inteligência avançada depois</p>
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2.5">
+        {actions.map((action) => (
+          <button
+            key={`${action.tone}-${action.item.template.template_id}`}
+            type="button"
+            onClick={() => onOpen(action.item)}
+            className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-transform hover:-translate-y-0.5 ${toneClasses[action.tone]}`}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/70 font-black shadow-sm">
+              {action.tone === 'good' ? '↑' : action.tone === 'warn' ? '!' : '△'}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-black">{action.title}</span>
+              <span className="mt-0.5 block text-xs leading-snug opacity-80">{action.text}</span>
+            </span>
+            <span className="rounded-xl bg-white/80 px-3 py-1.5 text-xs font-bold shadow-sm transition-colors group-hover:bg-white">
+              Ver peça →
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const ChannelBadge: React.FC<{ channel: string }> = ({ channel }) => {
   const meta = channelMeta(channel);
@@ -414,9 +528,9 @@ const GalleryCard: React.FC<{ item: ScoredTemplatePerformance; onOpen: () => voi
   <button
     type="button"
     onClick={onOpen}
-    className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-md"
+    className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm shadow-slate-200/60 transition-all hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-900/5"
   >
-    <div className="relative bg-gradient-to-br from-slate-50 to-white px-4 pt-4">
+    <div className="relative bg-gradient-to-br from-cyan-50/40 via-white to-indigo-50/30 px-4 pt-4">
       <div className="absolute left-3 top-3 z-10 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-100">
         <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
         {item.template.status === 'active' ? 'No ar' : item.template.status}
@@ -424,7 +538,7 @@ const GalleryCard: React.FC<{ item: ScoredTemplatePerformance; onOpen: () => voi
       <div className="absolute right-3 top-3 z-10">
         <ChannelBadge channel={item.template.channel} />
       </div>
-      <TemplatePreview item={item} className="h-56 rounded-t-xl" />
+      <TemplatePreview item={item} className="h-48 rounded-t-xl" />
     </div>
     <div className="space-y-3 p-4">
       <div className="min-w-0">
@@ -447,7 +561,7 @@ const GalleryCard: React.FC<{ item: ScoredTemplatePerformance; onOpen: () => voi
 );
 
 const Gallery: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: TemplatePerformance) => void }> = ({ data, onOpen }) => (
-  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
     {data.map((item) => (
       <GalleryCard key={item.template.template_id} item={item} onOpen={() => onOpen(item)} />
     ))}
@@ -519,9 +633,7 @@ const TableView: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: Te
               <tr key={item.template.template_id} onClick={() => onOpen(item)} className="cursor-pointer transition-colors hover:bg-cyan-50/40">
                 <td className="max-w-[360px] px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
-                      <TemplatePreview item={item} className="h-10" />
-                    </div>
+                    <MiniTemplateThumb item={item} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <ChannelBadge channel={item.template.channel} />
@@ -613,7 +725,7 @@ export const TemplatePerformanceGrid: React.FC = () => {
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="mx-auto max-w-[1480px] space-y-5">
         <HeaderControls view={view} setView={setView} channel={channel} setChannel={setChannel} query={query} setQuery={setQuery} />
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">
           Recorte atual: <b className="text-slate-700">{periodLabel}</b> · {filtered.length} de {data.length} templates exibidos
