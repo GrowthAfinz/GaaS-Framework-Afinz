@@ -34,10 +34,9 @@ const DraftCard: React.FC<{ t: CatalogTemplate; onClick: () => void }> = ({ t, o
 );
 
 export const TemplateCatalogView: React.FC = () => {
-  const { drafts, comAsset, loading, error, refetch } = useTemplateCatalog();
+  const { drafts, comAsset, total, filteredTotal, activeFilterLabels, loading, error, refetch } = useTemplateCatalog();
   const [selected, setSelected] = useState<CatalogTemplate | null>(null);
 
-  // Agrupa os drafts por app para uma leitura mais organizada.
   const draftsByApp = useMemo(() => {
     const m = new Map<string, CatalogTemplate[]>();
     for (const t of drafts) {
@@ -49,7 +48,7 @@ export const TemplateCatalogView: React.FC = () => {
   }, [drafts]);
 
   if (loading) {
-    return <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400"><Loader2 size={18} className="animate-spin" /> Carregando catálogo…</div>;
+    return <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400"><Loader2 size={18} className="animate-spin" /> Carregando catálogo...</div>;
   }
   if (error) {
     return <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><AlertCircle size={16} /> {error}</div>;
@@ -57,7 +56,22 @@ export const TemplateCatalogView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Drafts — prioridade */}
+      {activeFilterLabels.length > 0 && (
+        <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Filtros globais aplicados</span>
+            <span className="text-xs text-cyan-700/80">{filteredTotal} de {total} templates no recorte</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {activeFilterLabels.map((label) => (
+              <span key={label} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-cyan-700 ring-1 ring-cyan-100">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <section>
         <div className="mb-3 flex items-center gap-2">
           <h3 className="font-semibold text-slate-800">Aguardando asset</h3>
@@ -68,7 +82,7 @@ export const TemplateCatalogView: React.FC = () => {
         {drafts.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white py-12 text-center text-slate-400">
             <CheckCircle2 size={28} className="text-emerald-400" />
-            <span className="text-sm">Todos os templates têm asset. 🎉</span>
+            <span className="text-sm">Nenhum template pendente neste recorte.</span>
           </div>
         ) : (
           <div className="space-y-5">
@@ -84,7 +98,6 @@ export const TemplateCatalogView: React.FC = () => {
         )}
       </section>
 
-      {/* Com asset — resumo discreto */}
       {comAsset.length > 0 && (
         <section>
           <div className="mb-3 flex items-center gap-2">
