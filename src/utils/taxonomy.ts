@@ -206,6 +206,16 @@ export function matchTemplate<T extends { dims: TemplateDims }>(parsed: ParsedAc
 
 export interface TemplateIdPart { key: DimId | 'seq'; label: string; value: string }
 
+/** Expande a sequência: 'S2D02' → 'Semana 2 · Disparo 2' · 'D3' → 'Dia 3'. */
+export function formatSeq(seq: string | null | undefined): string {
+  if (!seq) return '';
+  const sd = seq.match(/^S(\d+)D0*(\d+)$/i);
+  if (sd) return `Semana ${sd[1]} · Disparo ${sd[2]}`;
+  const d = seq.match(/^D0*(\d+)$/i);
+  if (d) return `Dia ${d[1]}`;
+  return seq;
+}
+
 /**
  * Traduz um template_id nas suas dimensões legíveis (Público/BU · Canal ·
  * Campanha · Segmento · Momento). Base para exibir a "tradução" no lugar do id cru.
@@ -221,7 +231,7 @@ export function translateTemplateId(id: string): TemplateIdPart[] {
   const seg = resolveDim('segmento', id);
   if (seg) parts.push({ key: 'segmento', label: 'Segmento', value: optLabel('segmento', seg) });
   const seq = parseSeq(id);
-  if (seq) parts.push({ key: 'seq', label: 'Momento', value: seq });
+  if (seq) parts.push({ key: 'seq', label: 'Momento', value: formatSeq(seq) });
   return parts;
 }
 
