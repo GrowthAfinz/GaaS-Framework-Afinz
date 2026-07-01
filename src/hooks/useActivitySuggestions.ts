@@ -182,6 +182,10 @@ function includesToken(text: string, token: string): boolean {
   return new RegExp(`(^|[^a-z0-9])${token}([^a-z0-9]|$)`, 'i').test(text);
 }
 
+function compact(value: unknown): string {
+  return normalize(value).replace(/\s+/g, '');
+}
+
 function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
@@ -353,11 +357,21 @@ function contentMatches(ctx: TemplateSuggestionContext, r: Row): boolean {
 
 function weekMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.week) return null;
+  const expected = Number(ctx.week.replace(/\D/g, ''));
+  if (!expected) return includesToken(rowText(r), ctx.week);
+  const text = compact(rowText(r));
+  const match = text.match(/disp\d+s0?(\d+)/i) ?? text.match(/s0?(\d+)d\d+/i) ?? text.match(/s0?(\d+)/i);
+  if (match) return Number(match[1]) === expected;
   return includesToken(rowText(r), ctx.week);
 }
 
 function dispatchMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.dispatch) return null;
+  const expected = Number(ctx.dispatch.replace(/\D/g, ''));
+  if (!expected) return includesToken(rowText(r), ctx.dispatch);
+  const text = compact(rowText(r));
+  const match = text.match(/disp0?(\d+)s\d+/i) ?? text.match(/d0?(\d+)/i);
+  if (match) return Number(match[1]) === expected;
   return includesToken(rowText(r), ctx.dispatch);
 }
 
@@ -370,8 +384,6 @@ function channelMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null 
 
 function hardRejectReason(ctx: TemplateSuggestionContext, r: Row): 'channel' | 'partner' | 'campaign' | null {
   if (channelMatches(ctx, r) === false) return 'channel';
-  if (partnerMatches(ctx, r) === false) return 'partner';
-  if (campaignMatches(ctx, r) === false) return 'campaign';
   return null;
 }
 
@@ -422,6 +434,10 @@ function scoreRow(ctx: TemplateSuggestionContext, r: Row, templateId: string): {
     reasons.push(`Parceiro ${ctx.partnerLabel}`);
     pushSignal(evidence, `Parceiro ${ctx.partnerLabel}`, undefined, 25);
     pushSignal(scoreBreakdown, 'Parceiro', '+25', 25);
+  } else if (partner === false && ctx.partnerLabel) {
+    warnings.push(`Parceiro divergente: ${r.Parceiro ?? '-'}`);
+    pushSignal(conflicts, 'Parceiro diverge', `esperado: ${ctx.partnerLabel}; atual: ${r.Parceiro ?? '-'}`, -25);
+    score -= 25;
   } else if (partner === null && ctx.partnerLabel) {
     warnings.push(`Parceiro ${ctx.partnerLabel} nao confirmado`);
     pushSignal(conflicts, 'Parceiro nao confirmado', `esperado: ${ctx.partnerLabel}`);
@@ -454,8 +470,19 @@ function scoreRow(ctx: TemplateSuggestionContext, r: Row, templateId: string): {
     reasons.push(ctx.campaignTokens.includes('copa') ? 'Campanha Copa' : 'Campanha compativel');
     pushSignal(evidence, 'Campanha compativel', ctx.campaignTokens.join(', '), 18);
     pushSignal(scoreBreakdown, 'Campanha', '+18', 18);
+  } else if (campaign === false && ctx.campaignTokens.length) {
+    warnings.push(`Campanha nao bate todos os tokens: ${ctx.campaignTokens.join(', ')}`);
+    pushSignal(conflicts, 'Campanha parcial/divergente', `esperado: ${ctx.campaignTokens.join(', ')}`, -10);
+    score -= 10;
   } else if (campaign === null && ctx.campaignTokens.length) {
     warnings.push('Campanha nao confirmada');
+  }
+
+  if (partner === true && segment === true && ctx.partnerLabel && ctx.segment) {
+    score += 10;
+    reasons.push('Familia operacional compativel');
+    pushSignal(evidence, 'Familia operacional', `${ctx.partnerLabel} + ${ctx.segment.canonical}`, 10);
+    pushSignal(scoreBreakdown, 'Familia', '+10', 10);
   }
 
   const week = weekMatches(ctx, r);
@@ -608,7 +635,6 @@ export function useActivitySuggestions(template: CatalogTemplate | null, options
   const [error, setError] = useState<string | null>(null);
 
   const context = useMemo(() => template ? buildContext(template, options.contentText) : null, [template, options.contentText]);
-  const channel = context?.channel ?? '';
   const contextKey = context
     ? [
       context.templateId,
@@ -635,8 +661,7 @@ export function useActivitySuggestions(template: CatalogTemplate | null, options
           .select('"Activity name / Taxonomia", jornada, "Canal", "BU", "Parceiro", "Segmento", "Etapa de aquisição", "Oferta", "Promocional", "Data de Disparo", template_id')
           .not('"Activity name / Taxonomia"', 'is', null)
           .order('"Data de Disparo"', { ascending: false })
-          .limit(1500);
-        if (channel) q = q.eq('"Canal"', channel);
+          .limit(2500);
         const { data, error: e } = await q;
         if (e) throw e;
         if (active) { setRows((data ?? []) as Row[]); setError(null); }
@@ -647,7 +672,7 @@ export function useActivitySuggestions(template: CatalogTemplate | null, options
       }
     })();
     return () => { active = false; };
-  }, [template, channel, contextKey]);
+  }, [template, contextKey]);
 
   const computed = useMemo(() => {
     if (!template || !context) {
