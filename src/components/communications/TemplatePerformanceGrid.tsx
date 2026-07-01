@@ -470,7 +470,7 @@ const SummaryCard: React.FC<{ label: string; value: string; sub: string; icon: R
       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <div className="rounded-xl bg-slate-50 p-2 text-slate-400">{icon}</div>
     </div>
-    <p className="mt-5 text-3xl font-black tracking-tight text-slate-900">{value}</p>
+    <p className="mt-5 text-3xl font-black text-slate-900">{value}</p>
     <p className="mt-2 text-sm text-slate-500">{sub}</p>
   </div>
 );

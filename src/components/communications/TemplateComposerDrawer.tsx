@@ -56,7 +56,7 @@ export const TemplateComposerDrawer: React.FC<Props> = ({ seed, onClose, onSaved
         <div className="flex items-start justify-between border-b border-slate-200 bg-white px-6 py-5">
           <div>
             <div className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400">{seed ? 'Criar template a partir do disparo' : 'Novo template'}</div>
-            <h2 className="mt-1 text-lg font-extrabold tracking-tight text-slate-900">Compositor de ID</h2>
+            <h2 className="mt-1 text-lg font-bold text-slate-900">Compositor de ID</h2>
           </div>
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600"><X size={16} /></button>
         </div>

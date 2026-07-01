@@ -23,7 +23,7 @@ export const CommunicationsView: React.FC = () => {
   return (
     <div className="relative flex h-full flex-col">
       <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">Cadastro e templates</h2>
+        <h2 className="text-2xl font-bold text-slate-900">Cadastro e templates</h2>
         <p className="mt-0.5 text-sm text-slate-500">Costure os disparos do CRM aos templates curados · governança de assets e cobertura de réguas</p>
       </div>
 

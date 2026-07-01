@@ -16,11 +16,11 @@ export const CoverageHeader: React.FC<{ c: CoverageStats }> = ({ c }) => {
             <circle cx="43" cy="43" r={R} fill="none" stroke="#5eead4" strokeWidth="8" strokeLinecap="round"
               strokeDasharray={circ} strokeDashoffset={circ * (1 - c.pctCobertura / 100)} transform="rotate(-90 43 43)" />
           </svg>
-          <div className="text-[26px] font-extrabold tracking-tight">{c.pctCobertura}<small className="text-[13px] opacity-70">%</small></div>
+          <div className="text-[26px] font-bold">{c.pctCobertura}<small className="text-[13px] opacity-70">%</small></div>
         </div>
         <div>
           <div className="text-[10.5px] font-bold uppercase tracking-wider text-white/70">Cobertura de réguas CRM</div>
-          <div className="my-1.5 text-[21px] font-extrabold leading-tight tracking-tight">
+          <div className="my-1.5 text-[21px] font-bold leading-tight">
             {int(c.cobertos)} de {int(c.totalDisparos)} execuções<br />vinculadas a um template
           </div>
           <div className="max-w-[380px] text-xs leading-snug text-white/80">
@@ -53,7 +53,7 @@ const Stat: React.FC<{ v: number; l: string; s: string; tone?: 'warn' | 'info' }
     : 'bg-white/10 border-white/15';
   return (
     <div className={`flex min-w-[118px] flex-col rounded-xl border px-4 py-3 ${bg}`}>
-      <div className="text-[25px] font-extrabold leading-none tracking-tight tabular-nums">{v}</div>
+      <div className="text-[25px] font-bold leading-none tabular-nums">{v}</div>
       <div className="mt-1.5 text-[11px] font-bold text-white/90">{l}</div>
       <div className="mt-0.5 max-w-[130px] text-[10px] leading-tight text-white/60">{s}</div>
     </div>
