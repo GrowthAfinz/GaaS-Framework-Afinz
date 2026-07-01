@@ -194,8 +194,8 @@ export const CommunicationUploadModal: React.FC<Props> = ({ selection, templates
               {mode === 'existing' && (
                 <div className="mb-3 rounded-lg border border-cyan-100 bg-cyan-50 px-3 py-2 text-xs text-cyan-800">
                   {selectedTemplate?.original_path
-                    ? 'Opcional: cole/envie um novo asset para substituir o atual deste template. Se deixar vazio, apenas o vínculo com o disparo será salvo.'
-                    : 'Este template ainda não tem asset. Cole o HTML ou envie a imagem para preencher o preview.'}
+                    ? 'Opcional: cole/envie uma nova peça para substituir o atual deste template. Se deixar vazio, apenas o vínculo com o disparo será salvo.'
+                    : 'Este template ainda não tem peça. Cole o HTML ou envie a imagem para preencher o preview.'}
                 </div>
               )}
               {isEmail ? (

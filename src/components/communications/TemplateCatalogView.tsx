@@ -28,7 +28,7 @@ const DraftCard: React.FC<{ t: CatalogTemplate; onClick: () => void }> = ({ t, o
       <p className="text-[11px] text-slate-400">{t.activityNamesPlanejados.length} disparo(s) planejado(s)</p>
     )}
     <span className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-600 group-hover:text-cyan-500">
-      <FilePlus2 size={15} /> Adicionar asset
+      <FilePlus2 size={15} /> Adicionar peça
     </span>
   </button>
 );
@@ -74,7 +74,7 @@ export const TemplateCatalogView: React.FC = () => {
 
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <h3 className="font-semibold text-slate-800">Aguardando asset</h3>
+          <h3 className="font-semibold text-slate-800">Aguardando peça</h3>
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{drafts.length}</span>
           <span className="text-xs text-slate-400">templates mapeados — só falta subir a peça</span>
         </div>
@@ -101,7 +101,7 @@ export const TemplateCatalogView: React.FC = () => {
       {comAsset.length > 0 && (
         <section>
           <div className="mb-3 flex items-center gap-2">
-            <h3 className="font-semibold text-slate-800">Com asset</h3>
+            <h3 className="font-semibold text-slate-800">Com peça</h3>
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">{comAsset.length}</span>
           </div>
           <div className="flex flex-wrap gap-2">

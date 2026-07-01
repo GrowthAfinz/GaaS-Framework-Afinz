@@ -48,7 +48,7 @@ export const ChannelPreview: React.FC<{ item: TemplatePerformance; width?: numbe
     return (
       <div style={{ ...frame, background: `linear-gradient(170deg, ${ch.tint}, #fff 72%)` }} className="flex flex-col items-center justify-center gap-3 text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl text-white" style={{ background: ch.color }}><FileImage size={22} /></span>
-        <p className="px-6 text-xs font-semibold text-slate-500">Sem asset vinculado para este {ch.label}.</p>
+        <p className="px-6 text-xs font-semibold text-slate-500">Sem peça vinculada para este {ch.label}.</p>
         <p className="px-8 text-[11px] leading-snug text-slate-400">Anexe o criativo no Cadastro para ver o preview real aqui.</p>
       </div>
     );

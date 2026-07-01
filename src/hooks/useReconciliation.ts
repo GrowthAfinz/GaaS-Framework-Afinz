@@ -52,15 +52,15 @@ export interface ReconciledRow {
 
 export interface CoverageStats {
   pctCobertura: number;
-  totalDisparos: number;
-  cobertos: number;
-  orfaos: number;
-  orphanExec: number;
-  semAsset: number;
-  ativos: number;
+  disparosUnicos: number;   // activity_names distintos disparados no período (CRM)
+  comPeca: number;          // disparos únicos cuja peça (asset) já está no template
+  precisamPeca: number;     // disparos únicos que ainda precisam da peça
+  orfaos: number;           // disparos sem NENHUM template vinculado
+  semAsset: number;         // templates (IDs) sem peça anexada
+  ativos: number;           // templates com peça no ar
   totalTemplates: number;
   fortes: number;
-  byChannel: { ch: string; label: string; color: string; orf: number; tpl: number; ass: number }[];
+  byChannel: { ch: string; label: string; color: string; total: number; orf: number; status: string }[];
 }
 
 interface OrphanQueryRow {
@@ -249,28 +249,36 @@ export function useReconciliation() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const coverage = useMemo<CoverageStats>(() => {
-    const orphanExec = orphans.reduce((a, o) => a + o.exec, 0);
+    const orphanNames = new Set(orphans.map((o) => o.name));
+    // Disparos únicos que já têm a PEÇA (template vinculado com asset).
+    const comPecaNames = new Set(reconciled.filter((r) => r.template?.hasAsset).map((r) => r.name));
+    // Todos os disparos únicos do período (órfãos + reconciliados).
+    const allNames = new Set<string>([...orphanNames, ...reconciled.map((r) => r.name)]);
+
+    const disparosUnicos = allNames.size;
+    const comPeca = comPecaNames.size;
+    const precisamPeca = disparosUnicos - comPeca; // órfãos + vinculados a template sem peça
     const orfaos = orphans.length;
     const semAsset = catalog.filter((t) => !t.hasAsset).length;
     const ativos = catalog.filter((t) => t.hasAsset).length;
     const fortes = orphans.filter((o) => o.confidence === 'forte').length;
-    // Base de cobertura: disparos órfãos + execuções já cobertas (aprox. via catálogo com asset)
-    const totalDisparos = orphanExec + ativos;
-    const cobertos = ativos;
-    const byChannel = ['email', 'wpp', 'push', 'sms'].map((ch) => ({
-      ch,
-      label: CH_META[ch].label,
-      color: CH_META[ch].color,
-      orf: orphans.filter((o) => o.channel === ch).length,
-      tpl: catalog.filter((t) => canalToId(t.channel) === ch).length,
-      ass: catalog.filter((t) => canalToId(t.channel) === ch && t.hasAsset).length,
-    }));
+
+    const byChannel = ['email', 'wpp', 'push', 'sms'].map((ch) => {
+      const orf = orphans.filter((o) => o.channel === ch).length;
+      const total = new Set<string>([
+        ...orphans.filter((o) => o.channel === ch).map((o) => o.name),
+        ...reconciled.filter((r) => r.channel === ch).map((r) => r.name),
+      ]).size;
+      const status = total === 0 ? 'sem atividade' : orf > 0 ? `${orf} órfãos` : 'ok';
+      return { ch, label: CH_META[ch].label, color: CH_META[ch].color, total, orf, status };
+    });
+
     return {
-      pctCobertura: totalDisparos > 0 ? Math.round((cobertos / totalDisparos) * 100) : 0,
-      totalDisparos, cobertos, orfaos, orphanExec, semAsset, ativos,
+      pctCobertura: disparosUnicos > 0 ? Math.round((comPeca / disparosUnicos) * 100) : 0,
+      disparosUnicos, comPeca, precisamPeca, orfaos, semAsset, ativos,
       totalTemplates: catalog.length, fortes, byChannel,
     };
-  }, [orphans, catalog]);
+  }, [orphans, reconciled, catalog]);
 
   return { orphans, reconciled, catalog, coverage, loading, error, refetch: fetchData };
 }

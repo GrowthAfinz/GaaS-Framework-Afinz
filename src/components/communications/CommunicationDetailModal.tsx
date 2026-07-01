@@ -357,7 +357,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
   };
 
   const handleDeleteAsset = async () => {
-    const confirmed = window.confirm('Excluir o asset deste template? O template e os vínculos continuam, mas ele volta para "sem asset".');
+    const confirmed = window.confirm('Excluir a peça deste template? O template e os vínculos continuam, mas ele volta para "sem peça".');
     if (!confirmed) return;
     setDeleteBusy(true);
     setDeleteError(null);
@@ -440,20 +440,20 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
                   onClick={handleDeleteAsset}
                   disabled={deleteBusy || !template.original_path}
                   className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  title={template.original_path ? 'Excluir asset do template' : 'Este template já está sem asset'}
+                  title={template.original_path ? 'Excluir peça do template' : 'Este template já está sem peça'}
                 >
                   {deleteBusy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                  Excluir asset
+                  Excluir peça
                 </button>
                 <button
                   onClick={() => setReplacingAsset(true)}
                   className="inline-flex items-center gap-1.5 rounded-md border border-cyan-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-50"
-                  title="Substituir ou adicionar asset neste template"
+                  title="Substituir ou adicionar peça neste template"
                 >
                   <UploadCloud size={13} />
-                  Substituir asset
+                  Substituir peça
                 </button>
-                <span className="text-xs text-slate-400">Troque o HTML/imagem ou remova o asset mantendo template_id, vínculos e histórico.</span>
+                <span className="text-xs text-slate-400">Troque o HTML/imagem ou remova a peça mantendo template_id, vínculos e histórico.</span>
               </div>
             )}
             {deleteError && (

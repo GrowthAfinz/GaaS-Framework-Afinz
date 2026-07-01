@@ -72,9 +72,9 @@ function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplate
   }
   if (tpl.hasAsset) {
     score += 4;
-    positives.push('Template com asset');
+    positives.push('Template com peça');
   } else {
-    warnings.push('Template sem asset');
+    warnings.push('Template sem peça');
   }
 
   return { tpl, score: Math.max(0, Math.min(100, score)), positives, warnings };
@@ -178,7 +178,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
                           <code className="font-mono text-sm font-bold text-slate-900">{item.tpl.id}</code>
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{item.tpl.channel}</span>
                           {isCurrent && <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-700">vínculo atual</span>}
-                          {!item.tpl.hasAsset && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem asset</span>}
+                          {!item.tpl.hasAsset && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem peça</span>}
                         </div>
                         <p className="mt-0.5 truncate text-xs text-slate-500">{item.tpl.raw.title || item.tpl.id}</p>
                         <div className="mt-2 flex flex-wrap gap-1">

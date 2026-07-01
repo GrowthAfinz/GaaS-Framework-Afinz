@@ -28,7 +28,7 @@ const CadastroTemplates: React.FC = () => {
 
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
     { id: 'fila', label: 'Fila de reconciliação', icon: Inbox, n: coverage.orfaos },
-    { id: 'asset', label: 'Aguardando asset', icon: UploadCloud, n: coverage.semAsset },
+    { id: 'asset', label: 'Aguardando peça', icon: UploadCloud, n: coverage.semAsset },
     { id: 'auditoria', label: 'Auditoria', icon: ClipboardCheck, n: reconciled.length },
   ];
 
@@ -36,7 +36,7 @@ const CadastroTemplates: React.FC = () => {
     <div className="relative flex h-full flex-col">
       <div className="border-b border-slate-200 bg-white px-6 py-4">
         <h2 className="text-2xl font-bold text-slate-900">Cadastro e templates</h2>
-        <p className="mt-0.5 text-sm text-slate-500">Costure os disparos do CRM aos templates curados · governança de assets e cobertura de réguas</p>
+        <p className="mt-0.5 text-sm text-slate-500">Costure os disparos do CRM aos templates curados · governança de peças e cobertura de réguas</p>
       </div>
 
       {/* pb-28 garante que o conteúdo não fique atrás do FAB */}

@@ -64,7 +64,7 @@ export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) =
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
           <div className="min-w-0">
-            <h3 className="text-lg font-bold text-slate-800">Adicionar asset</h3>
+            <h3 className="text-lg font-bold text-slate-800">Adicionar peça</h3>
             <p className="mt-0.5 truncate text-sm text-slate-500">
               <span className="font-mono text-xs">{template.template_id}</span> · {template.channel}
               {template.campanha ? ` · ${template.campanha}` : ''}{template.semana ? ` · ${template.semana}` : ''}
@@ -123,7 +123,7 @@ export const AddAssetModal: React.FC<Props> = ({ template, onClose, onSaved }) =
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">Cancelar</button>
           <button onClick={handleSave} disabled={!canSave}
             className="flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50">
-            {saving && <Loader2 size={15} className="animate-spin" />} Salvar asset
+            {saving && <Loader2 size={15} className="animate-spin" />} Salvar peça
           </button>
         </div>
       </div>
