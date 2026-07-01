@@ -80,6 +80,19 @@ export interface CommunicationSlot {
   updated_at: string;
 }
 
+export type ActivityMomentKind = 'semana_disparo' | 'disparo' | 'pontual';
+
+export interface ActivityMomentSuggestion {
+  kind: ActivityMomentKind;
+  enabled: boolean;
+  week?: number | null;
+  dispatch?: number | null;
+  label: string;
+  confidence: 'alta' | 'media' | 'baixa' | 'manual';
+  source: 'parser' | 'manual';
+  updated_at?: string;
+}
+
 // Regra CRM atual (substitui o AppsFlyerCommunicationParameters antigo).
 // Identidade: c = jornada/campanha · af_sub3 = template_id (conteúdo).
 export interface AppsFlyerCrmCommunicationParameters {

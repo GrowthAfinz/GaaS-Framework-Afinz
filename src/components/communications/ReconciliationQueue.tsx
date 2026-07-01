@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles } from 'lucide-react';
+import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles, CalendarClock } from 'lucide-react';
 import type { CatalogEntry, OrphanRow } from '../../hooks/useReconciliation';
 import { linkActivityToTemplate, describeError } from '../../services/communicationService';
 import { optLabel, type Confidence, type DimId } from '../../utils/taxonomy';
 import { TemplateSuggestionModal } from './TemplateSuggestionModal';
 import { TemplateIdChips } from './TemplateIdChips';
+import { ActivityMomentModal } from './ActivityMomentModal';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: n >= 100000 ? 0 : 1 })}k` : String(Math.round(n));
 const CONF_ORDER: Record<Confidence, number> = { forte: 0, provavel: 1, fraca: 2, novo: 3 };
@@ -29,6 +30,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<OrphanRow | null>(null);
+  const [editingMoment, setEditingMoment] = useState<OrphanRow | null>(null);
 
   const list = useMemo(() => {
     let l = [...orphans].sort((a, b) => CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || b.base - a.base);
@@ -91,7 +93,8 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
           {list.map((o) => (
             <OrphanCard key={o.uid} o={o} open={expanded === o.uid}
               onToggle={() => setExpanded((e) => e === o.uid ? null : o.uid)}
-              onLink={() => link(o)} onCreate={() => onCreate(o)} onSuggest={() => setSuggesting(o)} busy={busy === o.uid} />
+              onLink={() => link(o)} onCreate={() => onCreate(o)} onSuggest={() => setSuggesting(o)}
+              onEditMoment={() => setEditingMoment(o)} busy={busy === o.uid} />
           ))}
         </div>
       )}
@@ -104,11 +107,18 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
           onChanged={onChanged}
         />
       )}
+      {editingMoment && (
+        <ActivityMomentModal
+          row={editingMoment}
+          onClose={() => setEditingMoment(null)}
+          onChanged={onChanged}
+        />
+      )}
     </div>
   );
 };
 
-const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; onSuggest: () => void; busy: boolean }> = ({ o, open, onToggle, onLink, onCreate, onSuggest, busy }) => {
+const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; onSuggest: () => void; onEditMoment: () => void; busy: boolean }> = ({ o, open, onToggle, onLink, onCreate, onSuggest, onEditMoment, busy }) => {
   const m = o.match;
   const canLink = m && o.confidence !== 'fraca' && o.confidence !== 'novo';
   return (
@@ -117,7 +127,21 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
         <ChevronRight size={15} className={`shrink-0 text-slate-300 transition-transform ${open ? 'rotate-90 text-cyan-600' : ''}`} />
         <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500">{o.canalLabel}</span>
         <div className="min-w-0 flex-1">
-          <code className="block truncate font-mono text-xs font-semibold text-slate-800">{o.name}</code>
+          <div className="flex min-w-0 items-center gap-2">
+            <code className="block min-w-0 truncate font-mono text-xs font-semibold text-slate-800">{o.name}</code>
+            <button
+              onClick={(e) => { e.stopPropagation(); onEditMoment(); }}
+              title="Editar sugestão de semana/disparo deste activity_name"
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold transition-colors ${
+                o.momentSuggestion.source === 'manual'
+                  ? 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
+                  : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-cyan-200 hover:text-cyan-700'
+              }`}
+            >
+              <CalendarClock size={11} />
+              {o.momentSuggestion.label}
+            </button>
+          </div>
           <div className="mt-0.5 flex items-center gap-1 truncate text-[10.5px] text-slate-400"><GitBranch size={11} /> {o.jornada}</div>
         </div>
         <div className="hidden shrink-0 gap-3.5 text-[11px] tabular-nums text-slate-500 sm:flex">

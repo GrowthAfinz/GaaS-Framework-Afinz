@@ -6,9 +6,9 @@ import { decorateTemplate, matchesGlobalFilters } from './useTemplateCatalog';
 import { usePeriod } from '../contexts/PeriodContext';
 import { useBU } from '../contexts/BUContext';
 import { useAppStore } from '../store/useAppStore';
-import type { CommunicationTemplate } from '../types/communication';
+import type { ActivityMomentSuggestion, CommunicationTemplate } from '../types/communication';
 import {
-  canalToId, resolveDim, parseSeq, parseActivity, matchTemplate, confidenceOf,
+  canalToId, resolveDim, parseSeq, parseActivity, matchTemplate, confidenceOf, formatSeq, parseSeqParts,
   type Confidence, type MatchResult, type ParsedActivity, type TemplateDims,
 } from '../utils/taxonomy';
 
@@ -34,6 +34,8 @@ export interface OrphanRow {
   match: MatchResult<CatalogEntry> | null;
   confidence: Confidence;
   suggestedId: string;
+  slotId?: string | null;
+  momentSuggestion: ActivityMomentSuggestion;
 }
 
 export interface ReconciledRow {
@@ -74,6 +76,14 @@ interface OrphanQueryRow {
   template_id: string | null;
 }
 
+interface SlotMomentRow {
+  id: string;
+  journey_name: string;
+  activity_name: string;
+  channel: string;
+  metadata: Record<string, unknown> | null;
+}
+
 const CH_META: Record<string, { label: string; color: string }> = {
   email: { label: 'E-mail', color: '#6366f1' },
   wpp: { label: 'WhatsApp', color: '#25D366' },
@@ -93,6 +103,73 @@ function templateDims(t: CommunicationTemplate): TemplateDims {
 }
 
 const num = (v: number | null | undefined) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
+
+const slotKey = (journey: string | null | undefined, activity: string | null | undefined, channel: string | null | undefined) => (
+  `${journey || 'Sem jornada'}::${activity || ''}::${channel || 'N/A'}`
+);
+
+function momentLabel(s: Pick<ActivityMomentSuggestion, 'kind' | 'enabled' | 'week' | 'dispatch'>) {
+  if (s.kind === 'pontual') return s.enabled && s.dispatch ? `Pontual · ${s.dispatch}` : 'Pontual';
+  if (s.kind === 'semana_disparo') return `Semana ${s.week || 1} · Disparo ${s.dispatch || 1}`;
+  return `Disparo ${s.dispatch || 1}`;
+}
+
+function readMomentSuggestion(metadata: Record<string, unknown> | null | undefined): ActivityMomentSuggestion | null {
+  const raw = metadata?.moment_suggestion;
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Partial<ActivityMomentSuggestion>;
+  if (r.kind !== 'semana_disparo' && r.kind !== 'disparo' && r.kind !== 'pontual') return null;
+  return {
+    kind: r.kind,
+    enabled: r.enabled !== false,
+    week: typeof r.week === 'number' ? r.week : null,
+    dispatch: typeof r.dispatch === 'number' ? r.dispatch : null,
+    label: r.label || momentLabel({
+      kind: r.kind,
+      enabled: r.enabled !== false,
+      week: typeof r.week === 'number' ? r.week : null,
+      dispatch: typeof r.dispatch === 'number' ? r.dispatch : null,
+    }),
+    confidence: r.confidence || 'manual',
+    source: r.source || 'manual',
+    updated_at: r.updated_at,
+  };
+}
+
+function inferMomentSuggestion(activityName: string): ActivityMomentSuggestion {
+  const parts = parseSeqParts(activityName);
+  if (parts?.week) {
+    return {
+      kind: 'semana_disparo',
+      enabled: true,
+      week: parts.week,
+      dispatch: parts.dispatch || 1,
+      label: formatSeq(parts.seq),
+      confidence: 'alta',
+      source: 'parser',
+    };
+  }
+  if (parts?.dispatch) {
+    return {
+      kind: 'disparo',
+      enabled: true,
+      week: null,
+      dispatch: parts.dispatch,
+      label: formatSeq(parts.seq),
+      confidence: parts.source === 'fallback' ? 'media' : 'alta',
+      source: 'parser',
+    };
+  }
+  return {
+    kind: 'pontual',
+    enabled: false,
+    week: null,
+    dispatch: 1,
+    label: 'Pontual',
+    confidence: 'baixa',
+    source: 'parser',
+  };
+}
 
 /**
  * Fila de reconciliação: disparos (activity_name) do recorte SEM template,
@@ -158,6 +235,22 @@ export function useReconciliation() {
       const [{ data: acts, error: aErr }, { data: linkedActs, error: lErr }, templates] = await Promise.all([orphanQuery, linkedQuery, listTemplates()]);
       if (aErr) throw aErr;
       if (lErr) throw lErr;
+      const orphanRows = ((acts ?? []) as OrphanQueryRow[]);
+      const slotMap = new Map<string, SlotMomentRow>();
+      const activityNames = Array.from(new Set(orphanRows.map((r) => r['Activity name / Taxonomia']).filter((v): v is string => !!v)));
+      if (activityNames.length) {
+        const { data: slots, error: slotError } = await supabase
+          .from('communication_slots')
+          .select('id, journey_name, activity_name, channel, metadata')
+          .in('activity_name', activityNames);
+        if (slotError) {
+          console.warn('[useReconciliation] falha ao carregar curadoria de momento:', slotError);
+        } else {
+          for (const s of (slots ?? []) as SlotMomentRow[]) {
+            slotMap.set(slotKey(s.journey_name, s.activity_name, s.channel), s);
+          }
+        }
+      }
 
       // Aplica os mesmos filtros globais aos templates (para o header de cobertura respeitar o recorte).
       const filteredTemplates = templates.filter((t) => matchesGlobalFilters(decorateTemplate(t), selectedBUs, f));
@@ -173,7 +266,7 @@ export function useReconciliation() {
 
       // Agrega órfãos por activity_name
       const byName = new Map<string, OrphanRow>();
-      for (const r of (acts ?? []) as OrphanQueryRow[]) {
+      for (const r of orphanRows) {
         const name = r['Activity name / Taxonomia'];
         if (!name) continue;
         const date = r['Data de Disparo'] ?? null;
@@ -186,6 +279,7 @@ export function useReconciliation() {
           const chId = canalToId(r.Canal);
           const parsed = parseActivity(name, { canal: r.Canal, parceiro: r.Parceiro, segmento: r.Segmento });
           const match = matchTemplate(parsed, cat);
+          const slot = slotMap.get(slotKey(r.jornada, name, r.Canal));
           byName.set(name, {
             uid: name,
             name,
@@ -199,6 +293,8 @@ export function useReconciliation() {
             match,
             confidence: confidenceOf(match),
             suggestedId: match ? match.tpl.id : (parsed.canal ? '' : ''),
+            slotId: slot?.id ?? null,
+            momentSuggestion: readMomentSuggestion(slot?.metadata) ?? inferMomentSuggestion(name),
           });
         }
       }

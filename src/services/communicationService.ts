@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { CommunicationTemplate } from '../types/communication';
+import type { ActivityMomentSuggestion, CommunicationTemplate } from '../types/communication';
 import { normalizeTemplateId, isValidTemplateId } from '../utils/templateId';
 import { channelSlug, isEmailChannel } from '../utils/inferChannel';
 
@@ -362,6 +362,65 @@ export async function unlinkActivity(activityName: string): Promise<number> {
   return data?.length ?? 0;
 }
 
+export async function saveActivityMomentSuggestion(input: {
+  journeyName: string;
+  activityName: string;
+  channel: string;
+  latestDate?: string | null;
+  suggestion: ActivityMomentSuggestion;
+}): Promise<void> {
+  const identity = {
+    journey_name: input.journeyName || 'Sem jornada',
+    activity_name: input.activityName,
+    channel: input.channel || 'N/A',
+  };
+  const { data: current, error: readError } = await supabase
+    .from('communication_slots')
+    .select('id, metadata')
+    .eq('journey_name', identity.journey_name)
+    .eq('activity_name', identity.activity_name)
+    .eq('channel', identity.channel)
+    .maybeSingle();
+  if (readError) throw readError;
+
+  const now = new Date().toISOString();
+  const metadata = {
+    ...((current?.metadata as Record<string, unknown> | null) ?? {}),
+    moment_suggestion: {
+      ...input.suggestion,
+      source: 'manual',
+      updated_at: now,
+    },
+  };
+
+  if (current?.id) {
+    const { error } = await supabase
+      .from('communication_slots')
+      .update({
+        metadata,
+        last_reviewed_at: now,
+        updated_at: now,
+      })
+      .eq('id', current.id);
+    if (error) throw error;
+    return;
+  }
+
+  const day = input.latestDate?.slice(0, 10) || null;
+  const { error } = await supabase.from('communication_slots').insert({
+    ...identity,
+    lifecycle_status: 'candidate',
+    coverage_status: 'unmapped',
+    source: 'manual',
+    first_seen_on: day,
+    last_seen_on: day,
+    metadata,
+    last_reviewed_at: now,
+    updated_at: now,
+  });
+  if (error) throw error;
+}
+
 /**
  * Renomeia o template_id (PK). O FK activities.template_id e
  * communication_slots.current_template_id têm ON UPDATE CASCADE, então o vínculo
@@ -425,6 +484,7 @@ export const communicationService = {
   saveCommunication,
   addAssetToTemplate,
   createDraftTemplate,
+  saveActivityMomentSuggestion,
   deleteTemplateAsset,
   getSignedUrl,
   listTemplates,
