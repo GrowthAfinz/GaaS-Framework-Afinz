@@ -36,12 +36,12 @@ const ChannelTag: React.FC<{ channel: string; soft?: boolean }> = ({ channel, so
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: ch.color }} />{ch.label}
     </span>
   );
-  return <span className="inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[10px] font-black tracking-wide text-white" style={{ background: ch.color }}>{ch.short}</span>;
+  return <span className="inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white" style={{ background: ch.color }}>{ch.short}</span>;
 };
 
 const BuChip: React.FC<{ bu?: string | null }> = ({ bu }) => {
   if (!bu) return null;
-  return <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10.5px] font-black text-white" style={{ background: buColor(bu) }}>{bu}</span>;
+  return <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10.5px] font-bold text-white" style={{ background: buColor(bu) }}>{bu}</span>;
 };
 
 const MetaChip: React.FC<{ children: React.ReactNode; title?: string }> = ({ children, title }) => (
@@ -63,7 +63,7 @@ const StatusDot: React.FC<{ status: string; withLabel?: boolean }> = ({ status, 
 const ScoreBadge: React.FC<{ score: number | null; sm?: boolean }> = ({ score, sm }) => {
   const t = TONE[scoreTone(score)];
   return (
-    <span className={`inline-flex items-baseline gap-0.5 rounded-lg font-black tabular-nums ring-1 ${t.chip} ${sm ? 'px-1.5 py-0.5 text-[13px]' : 'px-2 py-1 text-sm'}`}>
+    <span className={`inline-flex items-baseline gap-0.5 rounded-lg font-bold tabular-nums ring-1 ${t.chip} ${sm ? 'px-1.5 py-0.5 text-[13px]' : 'px-2 py-1 text-sm'}`}>
       {score == null ? '—' : score}<small className="text-[9px] font-bold opacity-60">/100</small>
     </span>
   );
@@ -78,7 +78,7 @@ const ScoreRing: React.FC<{ score: number | null; size?: number }> = ({ score, s
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef1f5" strokeWidth="5" />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={solid} strokeWidth="5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       </svg>
-      <span className="text-[15px] font-black tabular-nums" style={{ color: solid }}>{score == null ? '—' : score}</span>
+      <span className="text-[15px] font-bold tabular-nums" style={{ color: solid }}>{score == null ? '—' : score}</span>
     </div>
   );
 };
@@ -89,7 +89,7 @@ const DiagBadge: React.FC<{ id: string }> = ({ id }) => {
   const glyph = d.tone === 'good' ? '↑' : d.tone === 'bad' ? '!' : d.tone === 'info' ? 'i' : '~';
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-bold ring-1 ${t.chip}`} title={d.hint}>
-      <span className={`grid h-3.5 w-3.5 place-items-center rounded-full text-[9px] font-black text-white ${t.glyph}`}>{glyph}</span>{d.label}
+      <span className={`grid h-3.5 w-3.5 place-items-center rounded-full text-[9px] font-bold text-white ${t.glyph}`}>{glyph}</span>{d.label}
     </span>
   );
 };
@@ -196,7 +196,7 @@ const KpiEvolution: React.FC<{ items: ScoredTemplate[] }> = ({ items }) => {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-[18px] py-[15px]">
-        <div className="flex items-center gap-2.5 text-sm font-black text-slate-900"><span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700"><BarChart3 size={15} /></span>Evolução de KPIs</div>
+        <div className="flex items-center gap-2.5 text-sm font-bold text-slate-900"><span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700"><BarChart3 size={15} /></span>Evolução de KPIs</div>
         <span className="text-xs font-semibold text-slate-400">soma diária no período</span>
       </div>
       <div className="p-[18px]">
@@ -240,7 +240,7 @@ const GCard: React.FC<{ label: string; value: React.ReactNode; sub: React.ReactN
       <span className="text-[10.5px] font-bold uppercase tracking-wide text-slate-500">{label}</span>
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500">{icon}</span>
     </div>
-    <div className="text-[30px] font-black leading-none tracking-tight tabular-nums text-slate-900">{value}</div>
+    <div className="text-[30px] font-bold leading-none tracking-tight tabular-nums text-slate-900">{value}</div>
     <div className="mt-2 text-xs leading-snug text-slate-500">{sub}</div>
   </div>
 );
@@ -268,9 +268,9 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
             <Flame size={15} className="text-white/80" />
           </div>
           <div className="mt-3 flex items-center gap-3">
-            <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-white/10 ring-4 ring-white/10"><span className="text-lg font-black">{champion.score ?? '—'}</span></div>
+            <div className="grid h-[58px] w-[58px] place-items-center rounded-full bg-white/10 ring-4 ring-white/10"><span className="text-lg font-bold">{champion.score ?? '—'}</span></div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-[13px] font-black"><ChannelTag channel={champion.template.channel} /><span className="truncate">{champion.template.template_id}</span></div>
+              <div className="flex items-center gap-2 text-[13px] font-bold"><ChannelTag channel={champion.template.channel} /><span className="truncate">{champion.template.template_id}</span></div>
               <div className="mt-1 truncate text-[11px] text-white/80">{contextLabel(champion)}</div>
             </div>
           </div>
@@ -280,9 +280,6 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
         <GCard label="Base acionada" value={fmt.k(totals.base)} icon={<Users2 size={15} />} sub={<span>Alcance somado dos disparos no período</span>} />
         <GCard label="Engajamento médio" value={fmt.pctFrac(engaj, 1)} icon={<Gauge size={15} />} sub={<span>WhatsApp <b className="text-slate-800">{fmt.pctFrac(stats.whatsapp.txAbertura, 0)}</b> · E-mail <b className="text-slate-800">{fmt.pctFrac(stats.email.txAbertura, 0)}</b> de abertura</span>} />
       </div>
-
-      {/* gráfico de KPIs enquadrado acima dos insights */}
-      <KpiEvolution items={items} />
 
       {/* volume + ações */}
       <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
@@ -316,7 +313,7 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
                     <div key={ch} className="grid grid-cols-[104px_1fr_auto_auto] items-center gap-3 border-t border-slate-100 py-2.5 first:border-t-0">
                       <div className="flex items-center gap-2 text-[13px] font-bold text-slate-700"><span className="h-2 w-2 rounded-full" style={{ background: CHANNELS[ch].color }} />{CHANNELS[ch].label}</div>
                       <div className="h-2 overflow-hidden rounded-[5px] bg-slate-100"><div className="h-full rounded-[5px]" style={{ width: `${Math.max(4, (s.disparos / maxDisparos) * 100)}%`, background: CHANNELS[ch].color }} /></div>
-                      <div className="whitespace-nowrap text-xs tabular-nums text-slate-600"><b className="text-sm font-black text-slate-900">{s.disparos}</b> disparos</div>
+                      <div className="whitespace-nowrap text-xs tabular-nums text-slate-600"><b className="text-sm font-bold text-slate-900">{s.disparos}</b> disparos</div>
                       <div className="whitespace-nowrap text-[10.5px] text-slate-400">{s.templates} {s.templates === 1 ? 'template' : 'templates'}</div>
                     </div>
                   );
@@ -337,7 +334,7 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
                   <div key={`${a.tone}-${a.item.template.template_id}`} className={`flex gap-3 rounded-xl border px-3 py-3 ${a.tone === 'good' ? 'border-emerald-100 bg-emerald-50' : a.tone === 'warn' ? 'border-amber-200 bg-amber-50' : 'border-rose-100 bg-rose-50'}`}>
                     <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-white ${t.glyph}`}>{a.tone === 'good' ? <Flame size={14} /> : a.tone === 'warn' ? <Link2 size={14} /> : <AlertTriangle size={14} />}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-black text-slate-900">{a.title}</div>
+                      <div className="text-[13px] font-bold text-slate-900">{a.title}</div>
                       <div className="mt-0.5 text-xs leading-snug text-slate-600">{a.text}</div>
                     </div>
                     <button onClick={() => onOpen(a.item)} className="self-center whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:border-slate-300">Ver peça →</button>
@@ -356,15 +353,15 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
             const sig = signatureMetric(t);
             return (
               <button key={t.template.template_id} onClick={() => onOpen(t)} className="grid w-full grid-cols-[24px_42px_1fr_auto_auto_minmax(140px,180px)_16px] items-center gap-3.5 border-t border-slate-100 px-4 py-3 text-left transition-colors first:border-t-0 hover:bg-slate-50">
-                <span className="text-center text-sm font-black tabular-nums text-slate-300">{i + 1}</span>
+                <span className="text-center text-sm font-bold tabular-nums text-slate-300">{i + 1}</span>
                 <ChannelThumb item={t} w={42} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2"><ChannelTag channel={t.template.channel} /><span className="truncate text-[13px] font-bold text-slate-800">{t.template.template_id}</span></div>
                   <div className="mt-0.5 truncate text-[11px] text-slate-500">{contextLabel(t)}</div>
                   <div className="mt-1.5 flex">{t.diagnoses.filter((d) => d !== 'custo_parcial').slice(0, 1).map((d) => <DiagBadge key={d} id={d} />)}</div>
                 </div>
-                <div className="text-right"><div className="text-[15px] font-black leading-none tabular-nums text-slate-900">{sig.v}</div><div className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">{sig.l}</div></div>
-                <div className="text-right"><div className="text-[15px] font-black leading-none tabular-nums text-slate-400">{fmt.int(t.cartoes)}</div><div className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">cartões</div></div>
+                <div className="text-right"><div className="text-[15px] font-bold leading-none tabular-nums text-slate-900">{sig.v}</div><div className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">{sig.l}</div></div>
+                <div className="text-right"><div className="text-[15px] font-bold leading-none tabular-nums text-slate-400">{fmt.int(t.cartoes)}</div><div className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">cartões</div></div>
                 <div className="flex items-center gap-2.5">
                   <div className="h-2 flex-1 overflow-hidden rounded-[5px] bg-slate-100"><div className={`h-full rounded-[5px] ${TONE[t.tone].fill}`} style={{ width: `${t.score ?? 0}%` }} /></div>
                   <ScoreBadge score={t.score} sm />
@@ -382,7 +379,7 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
 const Card: React.FC<{ title: string; subtitle?: string; icon: React.ReactNode; noPad?: boolean; children: React.ReactNode }> = ({ title, subtitle, icon, noPad, children }) => (
   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
     <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-[18px] py-[15px]">
-      <div className="flex items-center gap-2.5 text-sm font-black text-slate-900"><span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700">{icon}</span>{title}</div>
+      <div className="flex items-center gap-2.5 text-sm font-bold text-slate-900"><span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700">{icon}</span>{title}</div>
       {subtitle && <span className="text-xs font-semibold text-slate-400">{subtitle}</span>}
     </div>
     <div className={noPad ? '' : 'p-[18px]'}>{children}</div>
@@ -419,7 +416,7 @@ const GalCard: React.FC<{ t: ScoredTemplate; onOpen: () => void }> = ({ t, onOpe
 
 const KTile: React.FC<{ v: string; l: string; accent?: boolean }> = ({ v, l, accent }) => (
   <div className={`rounded-lg border px-1 py-2 text-center ${accent ? 'border-cyan-100 bg-cyan-50' : 'border-slate-100 bg-slate-50'}`}>
-    <div className={`text-sm font-black leading-none tabular-nums ${accent ? 'text-cyan-700' : 'text-slate-900'}`}>{v}</div>
+    <div className={`text-sm font-bold leading-none tabular-nums ${accent ? 'text-cyan-700' : 'text-slate-900'}`}>{v}</div>
     <div className="mt-1 text-[8.5px] font-bold uppercase tracking-wide text-slate-400">{l}</div>
   </div>
 );
@@ -444,7 +441,7 @@ const TableView: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate)
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-black uppercase tracking-wide text-slate-500">
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
               <th className="px-2.5 py-2.5">Template / criativo</th>
               <th className="px-2.5 py-2.5">Contexto</th>
               {COLS.map((c) => (
@@ -477,7 +474,7 @@ const TableView: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate)
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{t.aberturas > 0 ? fmt.pctFrac(t.taxaAbertura, t.taxaAbertura < 0.1 ? 1 : 0) : <span className="text-slate-300">—</span>}</td>
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{fmt.pctFrac(t.ctr, 2)}</td>
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{fmt.pctFrac(t.taxaConversao, t.taxaConversao < 0.0001 ? 3 : 2)}</td>
-                  <td className="px-2.5 py-2.5 text-right text-sm font-black tabular-nums text-cyan-700">{fmt.int(t.cartoes)}</td>
+                  <td className="px-2.5 py-2.5 text-right text-sm font-bold tabular-nums text-cyan-700">{fmt.int(t.cartoes)}</td>
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{t.cacEfetivo > 0 ? `${fmt.brl(t.cacEfetivo)}${t.custoEstimado ? '*' : ''}` : <span className="text-slate-300">—</span>}</td>
                   <td className="px-2.5 py-2.5 text-right"><ScoreBadge score={t.score} sm /></td>
                   <td className="px-2.5 py-2.5"><div className="flex justify-center"><Sparkline series={t.timeline.map((p) => p.cartoes)} color={CHANNELS[t.channelKey].color} /></div></td>
@@ -518,7 +515,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
         </div>
         <div className="overflow-y-auto p-6">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="m-0 break-all text-lg font-black text-slate-900">{t.template.template_id}</h2>
+            <h2 className="m-0 break-all text-lg font-bold text-slate-900">{t.template.template_id}</h2>
             <ScoreRing score={t.score} size={52} />
           </div>
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -537,7 +534,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
                 <span className="text-xs font-bold text-slate-700">{b.name} <small className="font-semibold text-slate-400">·peso {Math.round(b.weight * 100)}%</small></span>
                 <div className="h-[7px] overflow-hidden rounded-[5px] bg-slate-100"><div className={`h-full rounded-[5px] ${TONE[scoreTone(b.score)].fill}`} style={{ width: `${b.score ?? 0}%` }} /></div>
                 <span className="text-right text-xs font-bold tabular-nums text-slate-600">{b.raw ?? '—'}</span>
-                <span className="text-right text-[13px] font-black tabular-nums text-slate-900">{b.score == null ? 'n/d' : b.score}</span>
+                <span className="text-right text-[13px] font-bold tabular-nums text-slate-900">{b.score == null ? 'n/d' : b.score}</span>
               </div>
             ))}
           </div>
@@ -570,10 +567,10 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
                   <span className="whitespace-nowrap text-[10.5px] text-slate-400">{p.label}</span>
                 </div>
                 <div className="mt-2 flex gap-3.5 text-xs text-slate-500">
-                  <span><b className="font-black text-slate-900">{fmt.int(p.baseEnviada)}</b> base</span>
-                  {p.aberturas > 0 && <span><b className="font-black text-slate-900">{fmt.int(p.aberturas)}</b> abert.</span>}
-                  {p.cliques > 0 && <span><b className="font-black text-slate-900">{fmt.int(p.cliques)}</b> clique</span>}
-                  <span><b className="font-black text-slate-900">{fmt.int(p.cartoes)}</b> cartões</span>
+                  <span><b className="font-bold text-slate-900">{fmt.int(p.baseEnviada)}</b> base</span>
+                  {p.aberturas > 0 && <span><b className="font-bold text-slate-900">{fmt.int(p.aberturas)}</b> abert.</span>}
+                  {p.cliques > 0 && <span><b className="font-bold text-slate-900">{fmt.int(p.cliques)}</b> clique</span>}
+                  <span><b className="font-bold text-slate-900">{fmt.int(p.cartoes)}</b> cartões</span>
                 </div>
               </div>
             ))}
@@ -590,7 +587,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
 };
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="mb-2.5 mt-5 text-[10.5px] font-black uppercase tracking-wide text-slate-400">{children}</div>
+  <div className="mb-2.5 mt-5 text-[10.5px] font-bold uppercase tracking-wide text-slate-400">{children}</div>
 );
 
 // ── MODO AUDITORIA (jornadas + activity_names atribuídas ao template) ────────
@@ -628,7 +625,7 @@ const AuditModal: React.FC<{ t: ScoredTemplate; onClose: () => void }> = ({ t, o
       <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-base font-black text-slate-900"><ListTree size={18} className="text-cyan-600" />Auditoria de vínculos</div>
+            <div className="flex items-center gap-2 text-base font-bold text-slate-900"><ListTree size={18} className="text-cyan-600" />Auditoria de vínculos</div>
             <p className="mt-1 truncate text-sm text-slate-500">{t.template.template_id} · {t.facets.jornadas.length} jornada(s) · {t.activityNames.length} activity_name(s)</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
@@ -640,7 +637,7 @@ const AuditModal: React.FC<{ t: ScoredTemplate; onClose: () => void }> = ({ t, o
                 <div className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700"><Route size={14} className="text-cyan-600" />{jornada}<span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{rows.length} activity_name{rows.length === 1 ? '' : 's'}</span></div>
                 <div className="overflow-hidden rounded-xl border border-slate-200">
                   <table className="min-w-full text-xs">
-                    <thead className="bg-slate-50 text-left text-[10px] font-black uppercase tracking-wide text-slate-500">
+                    <thead className="bg-slate-50 text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
                       <tr><th className="px-3 py-2">Activity name</th><th className="px-3 py-2">Segmento</th><th className="px-3 py-2">Safra</th><th className="px-3 py-2 text-right">Base</th><th className="px-3 py-2 text-right">Aberturas</th><th className="px-3 py-2 text-right">Cliques</th><th className="px-3 py-2 text-right">Cartões</th><th className="px-3 py-2 text-right">Disparos</th></tr>
                     </thead>
                     <tbody>
@@ -652,7 +649,7 @@ const AuditModal: React.FC<{ t: ScoredTemplate; onClose: () => void }> = ({ t, o
                           <td className="px-3 py-2 text-right tabular-nums text-slate-700">{fmt.int(r.base)}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-slate-700">{r.aberturas > 0 ? fmt.int(r.aberturas) : '—'}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-slate-700">{r.cliques > 0 ? fmt.int(r.cliques) : '—'}</td>
-                          <td className="px-3 py-2 text-right font-black tabular-nums text-cyan-700">{fmt.int(r.cartoes)}</td>
+                          <td className="px-3 py-2 text-right font-bold tabular-nums text-cyan-700">{fmt.int(r.cartoes)}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-slate-500">{r.datas.length}</td>
                         </tr>
                       ))}

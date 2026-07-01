@@ -151,7 +151,7 @@ const MiniTemplateThumb: React.FC<{ item: TemplatePerformance }> = ({ item }) =>
       className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-100 shadow-sm"
       style={{ boxShadow: `inset 0 0 0 1px ${meta.color}18` }}
     >
-      <span className="text-[10px] font-black uppercase" style={{ color: meta.color }}>
+      <span className="text-[10px] font-bold uppercase" style={{ color: meta.color }}>
         {meta.short}
       </span>
     </div>
@@ -366,7 +366,7 @@ const Overview: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: Tem
           </div>
           <div className="mt-5 flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 ring-4 ring-white/10">
-              <span className="text-lg font-black">{champion.contentScore}</span>
+              <span className="text-lg font-bold">{champion.contentScore}</span>
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -470,7 +470,7 @@ const SummaryCard: React.FC<{ label: string; value: string; sub: string; icon: R
       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
       <div className="rounded-xl bg-slate-50 p-2 text-slate-400">{icon}</div>
     </div>
-    <p className="mt-5 text-3xl font-black text-slate-900">{value}</p>
+    <p className="mt-5 text-3xl font-bold text-slate-900">{value}</p>
     <p className="mt-2 text-sm text-slate-500">{sub}</p>
   </div>
 );
@@ -498,11 +498,11 @@ const ActionPanel: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: 
             onClick={() => onOpen(action.item)}
             className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-transform hover:-translate-y-0.5 ${toneClasses[action.tone]}`}
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/70 font-black shadow-sm">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/70 font-bold shadow-sm">
               {action.tone === 'good' ? '↑' : action.tone === 'warn' ? '!' : '△'}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-black">{action.title}</span>
+              <span className="block truncate text-sm font-bold">{action.title}</span>
               <span className="mt-0.5 block text-xs leading-snug opacity-80">{action.text}</span>
             </span>
             <span className="rounded-xl bg-white/80 px-3 py-1.5 text-xs font-bold shadow-sm transition-colors group-hover:bg-white">
@@ -518,7 +518,7 @@ const ActionPanel: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: 
 const ChannelBadge: React.FC<{ channel: string }> = ({ channel }) => {
   const meta = channelMeta(channel);
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase ring-1 ${meta.tint}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ring-1 ${meta.tint}`}>
       {meta.short}
     </span>
   );
@@ -542,7 +542,7 @@ const GalleryCard: React.FC<{ item: ScoredTemplatePerformance; onOpen: () => voi
     </div>
     <div className="space-y-3 p-4">
       <div className="min-w-0">
-        <p className="truncate font-mono text-xs font-black text-slate-800" title={item.template.template_id}>{item.template.template_id}</p>
+        <p className="truncate font-mono text-xs font-bold text-slate-800" title={item.template.template_id}>{item.template.template_id}</p>
         <p className="mt-1 truncate text-xs text-slate-400">{item.template.title || `${item.activityNames.length} activity_name${item.activityNames.length === 1 ? '' : 's'}`}</p>
       </div>
       <ScoreBar score={item.contentScore} />
@@ -637,7 +637,7 @@ const TableView: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: Te
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <ChannelBadge channel={item.template.channel} />
-                        <span className="truncate font-mono text-xs font-black text-slate-800">{item.template.template_id}</span>
+                        <span className="truncate font-mono text-xs font-bold text-slate-800">{item.template.template_id}</span>
                       </div>
                       <p className="mt-0.5 truncate text-xs text-slate-400">{item.template.title || `${item.activityNames.length} activity_names`}</p>
                     </div>
@@ -656,7 +656,7 @@ const TableView: React.FC<{ data: ScoredTemplatePerformance[]; onOpen: (item: Te
                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">{item.aberturas > 0 ? pct(item.taxaAbertura, 1) : '—'}</td>
                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">{pct(item.ctr, 2)}</td>
                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">{pct(item.taxaConversao, 3)}</td>
-                <td className="px-4 py-3 text-right font-black tabular-nums text-cyan-700">{int(item.cartoes)}</td>
+                <td className="px-4 py-3 text-right font-bold tabular-nums text-cyan-700">{int(item.cartoes)}</td>
                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">{item.cacEfetivo > 0 ? `${brl(item.cacEfetivo)}${item.custoEstimado ? '*' : ''}` : '—'}</td>
                 <td className="px-4 py-3 text-right"><ScoreBar score={item.contentScore} compact /></td>
                 <td className="px-4 py-3 text-right"><Sparkline item={item} /></td>

@@ -114,7 +114,7 @@ export const ChannelThumb: React.FC<{ item: TemplatePerformance; w?: number; h?:
   const height = h ?? Math.round(w * 1.25);
   return (
     <div className="flex shrink-0 items-center justify-center rounded-lg border" style={{ width: w, height, background: `linear-gradient(160deg, ${ch.tint}, #fff 80%)`, borderColor: '#e7ebf0' }}>
-      <span className="text-[10px] font-black tracking-wide" style={{ color: ch.dark }}>{ch.short}</span>
+      <span className="text-[10px] font-bold tracking-wide" style={{ color: ch.dark }}>{ch.short}</span>
     </div>
   );
 };

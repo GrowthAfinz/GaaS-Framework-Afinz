@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch } from 'lucide-react';
-import type { OrphanRow } from '../../hooks/useReconciliation';
+import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles } from 'lucide-react';
+import type { CatalogEntry, OrphanRow } from '../../hooks/useReconciliation';
 import { linkActivityToTemplate, describeError } from '../../services/communicationService';
 import { optLabel, type Confidence, type DimId } from '../../utils/taxonomy';
+import { TemplateSuggestionModal } from './TemplateSuggestionModal';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: n >= 100000 ? 0 : 1 })}k` : String(Math.round(n));
 const CONF_ORDER: Record<Confidence, number> = { forte: 0, provavel: 1, fraca: 2, novo: 3 };
@@ -16,15 +17,17 @@ const CONF_LABEL: Record<Confidence, string> = { forte: 'match forte', provavel:
 
 interface Props {
   orphans: OrphanRow[];
+  catalog: CatalogEntry[];
   onCreate: (seed: OrphanRow) => void;
   onChanged: () => void;
 }
 
-export const ReconciliationQueue: React.FC<Props> = ({ orphans, onCreate, onChanged }) => {
+export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreate, onChanged }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todos' | 'forte' | 'novo'>('todos');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState<OrphanRow | null>(null);
 
   const list = useMemo(() => {
     let l = [...orphans].sort((a, b) => CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || b.base - a.base);
@@ -87,15 +90,24 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, onCreate, onChan
           {list.map((o) => (
             <OrphanCard key={o.uid} o={o} open={expanded === o.uid}
               onToggle={() => setExpanded((e) => e === o.uid ? null : o.uid)}
-              onLink={() => link(o)} onCreate={() => onCreate(o)} busy={busy === o.uid} />
+              onLink={() => link(o)} onCreate={() => onCreate(o)} onSuggest={() => setSuggesting(o)} busy={busy === o.uid} />
           ))}
         </div>
+      )}
+      {suggesting && (
+        <TemplateSuggestionModal
+          row={suggesting}
+          catalog={catalog}
+          currentTemplateId={suggesting.match?.tpl.id ?? null}
+          onClose={() => setSuggesting(null)}
+          onChanged={onChanged}
+        />
       )}
     </div>
   );
 };
 
-const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; busy: boolean }> = ({ o, open, onToggle, onLink, onCreate, busy }) => {
+const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; onSuggest: () => void; busy: boolean }> = ({ o, open, onToggle, onLink, onCreate, onSuggest, busy }) => {
   const m = o.match;
   const canLink = m && o.confidence !== 'fraca' && o.confidence !== 'novo';
   return (
@@ -123,6 +135,10 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
           )}
         </div>
         <div className="flex shrink-0 gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <button onClick={onSuggest}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs font-bold text-cyan-700 hover:bg-cyan-50">
+            <Sparkles size={13} /> SugestÃµes
+          </button>
           {canLink ? (
             <button onClick={onLink} disabled={busy}
               className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-cyan-500 disabled:opacity-60">

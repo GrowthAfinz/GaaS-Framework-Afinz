@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Inbox, UploadCloud, Plus, Loader2, type LucideIcon } from 'lucide-react';
+import { ClipboardCheck, Inbox, UploadCloud, Plus, Loader2, type LucideIcon } from 'lucide-react';
 import { useReconciliation, type OrphanRow } from '../../hooks/useReconciliation';
 import { CoverageHeader } from './CoverageHeader';
 import { ReconciliationQueue } from './ReconciliationQueue';
+import { ReconciliationAudit } from './ReconciliationAudit';
 import { TemplateCatalogView } from './TemplateCatalogView';
 import { TemplateComposerDrawer } from './TemplateComposerDrawer';
 import { PerformanceView } from './performance/PerformanceView';
