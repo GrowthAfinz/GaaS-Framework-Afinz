@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
-import { Inbox, UploadCloud, BarChart3, Plus, Loader2, type LucideIcon } from 'lucide-react';
+import { Inbox, UploadCloud, Plus, Loader2, type LucideIcon } from 'lucide-react';
 import { useReconciliation, type OrphanRow } from '../../hooks/useReconciliation';
 import { CoverageHeader } from './CoverageHeader';
 import { ReconciliationQueue } from './ReconciliationQueue';
 import { TemplateCatalogView } from './TemplateCatalogView';
-import { TemplatePerformanceGrid } from './TemplatePerformanceGrid';
 import { TemplateComposerDrawer } from './TemplateComposerDrawer';
+import { PerformanceView } from './performance/PerformanceView';
 
-type SubTab = 'fila' | 'asset' | 'performance';
+interface CommunicationsViewProps {
+  mode: 'cadastro' | 'performance';
+}
 
-export const CommunicationsView: React.FC = () => {
+type SubTab = 'fila' | 'asset';
+
+export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) => {
+  if (mode === 'performance') {
+    return <PerformanceView />;
+  }
+  return <CadastroTemplates />;
+};
+
+const CadastroTemplates: React.FC = () => {
   const [tab, setTab] = useState<SubTab>('fila');
   const [compose, setCompose] = useState<OrphanRow | null | undefined>(undefined); // undefined=fechado, null=novo, orphan=seed
   const { orphans, coverage, loading, error, refetch } = useReconciliation();
@@ -17,7 +28,6 @@ export const CommunicationsView: React.FC = () => {
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
     { id: 'fila', label: 'Fila de reconciliação', icon: Inbox, n: coverage.orfaos },
     { id: 'asset', label: 'Aguardando asset', icon: UploadCloud, n: coverage.semAsset },
-    { id: 'performance', label: 'Performance', icon: BarChart3 },
   ];
 
   return (
@@ -27,7 +37,8 @@ export const CommunicationsView: React.FC = () => {
         <p className="mt-0.5 text-sm text-slate-500">Costure os disparos do CRM aos templates curados · governança de assets e cobertura de réguas</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      {/* pb-28 garante que o conteúdo não fique atrás do FAB */}
+      <div className="flex-1 overflow-y-auto p-6 pb-28">
         {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         {loading ? (
@@ -55,14 +66,13 @@ export const CommunicationsView: React.FC = () => {
                 <ReconciliationQueue orphans={orphans} onCreate={(seed) => setCompose(seed)} onChanged={refetch} />
               )}
               {tab === 'asset' && <TemplateCatalogView />}
-              {tab === 'performance' && <TemplatePerformanceGrid />}
             </div>
           </>
         )}
       </div>
 
       <button onClick={() => setCompose(null)}
-        className="absolute bottom-6 right-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-slate-800">
+        className="absolute bottom-6 right-6 z-10 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-slate-800">
         <Plus size={16} /> Novo template
       </button>
 

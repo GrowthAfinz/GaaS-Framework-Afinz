@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '../services/supabaseClient';
 import { listTemplates } from '../services/communicationService';
+import { decorateTemplate, matchesGlobalFilters } from './useTemplateCatalog';
 import { usePeriod } from '../contexts/PeriodContext';
 import { useBU } from '../contexts/BUContext';
 import { useAppStore } from '../store/useAppStore';
@@ -124,7 +125,10 @@ export function useReconciliation() {
       const [{ data: acts, error: aErr }, templates] = await Promise.all([orphanQuery, listTemplates()]);
       if (aErr) throw aErr;
 
-      const cat: CatalogEntry[] = templates.map((t) => ({
+      // Aplica os mesmos filtros globais aos templates (para o header de cobertura respeitar o recorte).
+      const filteredTemplates = templates.filter((t) => matchesGlobalFilters(decorateTemplate(t), selectedBUs, f));
+
+      const cat: CatalogEntry[] = filteredTemplates.map((t) => ({
         id: t.template_id,
         channel: t.channel,
         hasAsset: !!t.original_path,

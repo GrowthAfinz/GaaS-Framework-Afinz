@@ -95,6 +95,27 @@ function templateMatchesBU(template: CatalogTemplate, selectedBUs: string[]): bo
   });
 }
 
+export interface GlobalTemplateFilters {
+  canais?: string[];
+  jornadas?: string[];
+  segmentos?: string[];
+  parceiros?: string[];
+  subgrupos?: string[];
+  ofertas?: string[];
+}
+
+/** Predicado único de filtro global para um template (reusado em Catálogo e Reconciliação). */
+export function matchesGlobalFilters(template: CatalogTemplate, selectedBUs: string[], filters: GlobalTemplateFilters): boolean {
+  const text = template.searchableText;
+  return templateMatchesBU(template, selectedBUs)
+    && channelMatches(template, filters.canais ?? [])
+    && textMatchesAny(text, filters.segmentos ?? [])
+    && textMatchesAny(text, filters.jornadas ?? [])
+    && textMatchesAny(text, filters.parceiros ?? [])
+    && textMatchesAny(text, filters.subgrupos ?? [])
+    && textMatchesAny(text, filters.ofertas ?? []);
+}
+
 /** Catálogo de templates com os DRAFTS (sem asset) priorizados no topo. */
 export function useTemplateCatalog() {
   const [all, setAll] = useState<CatalogTemplate[]>([]);
@@ -118,16 +139,7 @@ export function useTemplateCatalog() {
 
   useEffect(() => { fetchCatalog(); }, [fetchCatalog]);
 
-  const filtered = useMemo(() => all.filter((template) => {
-    const text = template.searchableText;
-    return templateMatchesBU(template, selectedBUs)
-      && channelMatches(template, filters.canais ?? [])
-      && textMatchesAny(text, filters.segmentos ?? [])
-      && textMatchesAny(text, filters.jornadas ?? [])
-      && textMatchesAny(text, filters.parceiros ?? [])
-      && textMatchesAny(text, filters.subgrupos ?? [])
-      && textMatchesAny(text, filters.ofertas ?? []);
-  }), [
+  const filtered = useMemo(() => all.filter((template) => matchesGlobalFilters(template, selectedBUs, filters)), [
     all,
     selectedBUs,
     filters.canais,

@@ -240,7 +240,7 @@ const GCard: React.FC<{ label: string; value: React.ReactNode; sub: React.ReactN
       <span className="text-[10.5px] font-bold uppercase tracking-wide text-slate-500">{label}</span>
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500">{icon}</span>
     </div>
-    <div className="text-[30px] font-black leading-none tabular-nums text-slate-900">{value}</div>
+    <div className="text-[30px] font-black leading-none tracking-tight tabular-nums text-slate-900">{value}</div>
     <div className="mt-2 text-xs leading-snug text-slate-500">{sub}</div>
   </div>
 );
