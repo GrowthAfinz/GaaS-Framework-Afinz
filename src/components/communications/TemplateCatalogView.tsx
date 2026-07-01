@@ -3,6 +3,7 @@ import { Loader2, AlertCircle, FilePlus2, CheckCircle2, Mail, MessageCircle } fr
 import { useTemplateCatalog, type CatalogTemplate } from '../../hooks/useTemplateCatalog';
 import { isEmailChannel } from '../../utils/inferChannel';
 import { AddAssetModal } from './AddAssetModal';
+import { TemplateIdChips } from './TemplateIdChips';
 
 const ChannelIcon: React.FC<{ channel: string }> = ({ channel }) =>
   isEmailChannel(channel) ? <Mail size={14} /> : <MessageCircle size={14} />;
@@ -20,8 +21,8 @@ const DraftCard: React.FC<{ t: CatalogTemplate; onClick: () => void }> = ({ t, o
         <ChannelIcon channel={t.channel} /> {t.channel}
       </span>
     </div>
-    <p className="truncate font-mono text-xs font-semibold text-slate-700" title={t.template_id}>{t.template_id}</p>
-    <p className="truncate text-xs text-slate-400">
+    <TemplateIdChips id={t.template_id} showId />
+    <p className="truncate text-[11px] text-slate-400">
       {[t.app, t.campanha, t.semana].filter(Boolean).join(' · ') || '—'}
     </p>
     {t.activityNamesPlanejados.length > 0 && (
@@ -107,7 +108,7 @@ export const TemplateCatalogView: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             {comAsset.map((t) => (
               <span key={t.template_id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
-                <CheckCircle2 size={12} className="text-emerald-500" /> <span className="font-mono">{t.template_id}</span>
+                <CheckCircle2 size={12} className="text-emerald-500" /> <TemplateIdChips id={t.template_id} />
               </span>
             ))}
           </div>

@@ -204,6 +204,27 @@ export function matchTemplate<T extends { dims: TemplateDims }>(parsed: ParsedAc
   return best;
 }
 
+export interface TemplateIdPart { key: DimId | 'seq'; label: string; value: string }
+
+/**
+ * Traduz um template_id nas suas dimensões legíveis (Público/BU · Canal ·
+ * Campanha · Segmento · Momento). Base para exibir a "tradução" no lugar do id cru.
+ */
+export function translateTemplateId(id: string): TemplateIdPart[] {
+  const parts: TemplateIdPart[] = [];
+  const pub = resolveDim('publico', id);
+  if (pub) parts.push({ key: 'publico', label: 'Público', value: optLabel('publico', pub) });
+  const can = resolveDim('canal', id);
+  if (can) parts.push({ key: 'canal', label: 'Canal', value: optLabel('canal', can) });
+  const camp = resolveDim('campanha', id);
+  if (camp) parts.push({ key: 'campanha', label: 'Campanha', value: optLabel('campanha', camp) });
+  const seg = resolveDim('segmento', id);
+  if (seg) parts.push({ key: 'segmento', label: 'Segmento', value: optLabel('segmento', seg) });
+  const seq = parseSeq(id);
+  if (seq) parts.push({ key: 'seq', label: 'Momento', value: seq });
+  return parts;
+}
+
 export type Confidence = 'forte' | 'provavel' | 'fraca' | 'novo';
 export function confidenceOf(match: { score: number } | null): Confidence {
   if (!match) return 'novo';

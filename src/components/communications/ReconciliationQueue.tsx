@@ -4,6 +4,7 @@ import type { CatalogEntry, OrphanRow } from '../../hooks/useReconciliation';
 import { linkActivityToTemplate, describeError } from '../../services/communicationService';
 import { optLabel, type Confidence, type DimId } from '../../utils/taxonomy';
 import { TemplateSuggestionModal } from './TemplateSuggestionModal';
+import { TemplateIdChips } from './TemplateIdChips';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: n >= 100000 ? 0 : 1 })}k` : String(Math.round(n));
 const CONF_ORDER: Record<Confidence, number> = { forte: 0, provavel: 1, fraca: 2, novo: 3 };
@@ -124,10 +125,10 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
           <span><b className="text-slate-800">{o.exec}</b> exec</span>
           <span className="text-slate-400">{o.latestDate?.slice(0, 10)}</span>
         </div>
-        <div className="hidden w-[220px] shrink-0 md:block">
+        <div className="hidden w-[300px] shrink-0 md:block">
           {m ? (
             <div className="flex items-center gap-2">
-              <code className="truncate rounded-md bg-cyan-50 px-2 py-1 text-[11px] font-bold text-cyan-700">{m.tpl.id}</code>
+              <TemplateIdChips id={m.tpl.id} className="min-w-0 flex-1" />
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CONF_STYLE[o.confidence]}`}>{o.confidence === 'forte' || o.confidence === 'provavel' ? `${m.score}` : CONF_LABEL[o.confidence]}</span>
             </div>
           ) : (
@@ -137,7 +138,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
         <div className="flex shrink-0 gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button onClick={onSuggest}
             className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs font-bold text-cyan-700 hover:bg-cyan-50">
-            <Sparkles size={13} /> SugestÃµes
+            <Sparkles size={13} /> Sugestões
           </button>
           {canLink ? (
             <button onClick={onLink} disabled={busy}

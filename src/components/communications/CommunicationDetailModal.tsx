@@ -17,6 +17,7 @@ import { normalizeTemplateId, isValidTemplateId } from '../../utils/templateId';
 import { decorateTemplate } from '../../hooks/useTemplateCatalog';
 import { ActivityLinkManager } from './ActivityLinkManager';
 import { AddAssetModal } from './AddAssetModal';
+import { TemplateIdChips } from './TemplateIdChips';
 import { DisparoDetailModal } from '../explorer/disparo/DisparoDetailModal';
 
 const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
@@ -462,7 +463,8 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
                 <span>{deleteError}</span>
               </div>
             )}
-            <p className="mt-0.5 text-sm text-slate-500">
+            <div className="mt-1.5"><TemplateIdChips id={template.template_id} /></div>
+            <p className="mt-1 text-sm text-slate-500">
               {template.title && template.title !== template.template_id ? `${template.title} · ` : ''}
               {item.activityNames.length} activity_name{item.activityNames.length === 1 ? '' : 's'} · {int(item.executions)} execuções
               {template.version_label ? ` · ${template.version_label}` : ''}
