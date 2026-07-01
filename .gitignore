@@ -120,3 +120,6 @@ dist
 .vercel
 .env*.local
 .npm-cache/
+.vite/
+.deploy-worktrees/
+

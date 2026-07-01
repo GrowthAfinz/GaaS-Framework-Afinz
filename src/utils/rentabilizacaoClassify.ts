@@ -21,6 +21,7 @@ export interface RentabilizacaoClass {
 const COMBINING_MARKS = new RegExp('[\\u0300-\\u036f]', 'g');
 const normalize = (jornada: string): string =>
     (jornada || '')
+        .replace(/ATIVA�+O/gi, 'ATIVACAO')
         .normalize('NFD')
         .replace(COMBINING_MARKS, '')
         .toUpperCase();

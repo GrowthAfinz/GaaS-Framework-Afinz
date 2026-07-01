@@ -414,6 +414,7 @@ const SEGMENT_BY_TAXONOMY_CODE: Record<string, string> = {
 
 const normalize = (value: unknown) =>
     String(value ?? '')
+        .replace(/ATIVA�+O/gi, 'ATIVACAO')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .trim()
@@ -2293,32 +2294,44 @@ const processTotalCrmDinamicaBI = (
     };
 };
 
+const decodeDelimitedFile = (buffer: ArrayBuffer) => {
+    const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
+    const win1252 = new TextDecoder('windows-1252', { fatal: false }).decode(buffer);
+    const brokenScore = (text: string) => (text.match(/�/g)?.length ?? 0)
+        + (text.match(/Ã|Â/g)?.length ?? 0);
+    return brokenScore(win1252) < brokenScore(utf8) ? win1252 : utf8;
+};
+
+const parseDelimitedText = (text: string, delimiter: string | undefined, resolve: (rows: string[][]) => void, reject: (reason?: any) => void) => {
+    Papa.parse<string[]>(text, {
+        skipEmptyLines: false,
+        delimiter,
+        complete: (results) => {
+            if (results.errors.length > 0 && results.data.length === 0) {
+                reject(new Error(results.errors[0]?.message || 'Erro ao interpretar o arquivo.'));
+                return;
+            }
+            resolve(results.data
+                .filter((row): row is string[] => Array.isArray(row))
+                .map((row) => row.map((cell) => String(cell ?? '').trim())));
+        },
+        error: (error: Error) => reject(new Error(error.message || 'Erro ao ler o arquivo.')),
+    });
+};
+
 const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((resolve, reject) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
-        Papa.parse<string[]>(file, {
-            worker: true,
-            skipEmptyLines: false,
-            delimiter: ext === 'tsv' ? '\t' : '',
-            complete: (results) => {
-                if (results.errors.length > 0 && results.data.length === 0) {
-                    reject(new Error(results.errors[0]?.message || 'Erro ao interpretar o arquivo.'));
-                    return;
-                }
-                resolve(results.data
-                    .filter((row): row is string[] => Array.isArray(row))
-                    .map((row) => row.map((cell) => String(cell ?? '').trim())));
-            },
-            error: (error) => reject(new Error(error.message || 'Erro ao ler o arquivo.')),
-        });
-        return;
-    }
-
     const reader = new FileReader();
 
     reader.onerror = () => reject(new Error('Erro ao ler o arquivo.'));
     reader.onload = (event) => {
         try {
+            if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
+                const text = decodeDelimitedFile(event.target?.result as ArrayBuffer);
+                parseDelimitedText(text, ext === 'tsv' ? '\t' : '', resolve, reject);
+                return;
+            }
+
             if (ext === 'xlsx' || ext === 'xls') {
                 const data = new Uint8Array(event.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: 'array', cellDates: true });
@@ -2946,14 +2959,17 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
     const filteredCandidates = useMemo(() => {
         const term = normalizeKey(reviewSearchTerm);
+        const [periodStart, periodEnd] = reviewStartDate && reviewEndDate && reviewStartDate > reviewEndDate
+            ? [reviewEndDate, reviewStartDate]
+            : [reviewStartDate, reviewEndDate];
         return candidates.filter((candidate) => {
             const statusMatches = statusFilter === 'all'
                 || (statusFilter === 'update' && candidate.metricRefresh)
                 || (statusFilter === 'ready' && candidate.status === 'ready' && !candidate.metricRefresh)
                 || (statusFilter !== 'update' && statusFilter !== 'ready' && candidate.status === statusFilter);
             if (!statusMatches) return false;
-            if (reviewStartDate && candidate.date < reviewStartDate) return false;
-            if (reviewEndDate && candidate.date > reviewEndDate) return false;
+            if (periodStart && candidate.date < periodStart) return false;
+            if (periodEnd && candidate.date > periodEnd) return false;
             if (!term) return true;
 
             const haystack = normalizeKey([

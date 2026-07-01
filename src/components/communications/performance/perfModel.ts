@@ -5,6 +5,7 @@
 // convertido para percentual ao pontuar contra os benchmarks de cada canal.
 
 import type { TemplatePerformance } from '../../../hooks/useTemplatePerformance';
+import type { ActivityRow } from '../../../types/activity';
 import { channelSlug } from '../../../utils/inferChannel';
 
 export type ChannelKey = 'email' | 'whatsapp' | 'push' | 'sms';
@@ -226,6 +227,48 @@ export function deriveDiagnoses(item: TemplatePerformance, score: number | null)
   return Array.from(new Set(out));
 }
 
+// ── Facetas do template (segmento/campanha/safra/período) ─────────────────────
+// A força da activity_name: tem muitas colunas no Supabase. Extraímos as
+// dimensões de referência a partir das activities vinculadas ao template.
+export interface TemplateFacets {
+  segmentos: string[];
+  jornadas: string[];
+  safras: string[];
+  parceiros: string[];
+  subgrupos: string[];
+  produtos: string[];
+  ofertas: string[];
+  etapas: string[];
+  periodStart: string | null;
+  periodEnd: string | null;
+}
+
+const uniqStr = (vals: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(vals.filter((v): v is string => typeof v === 'string' && v.trim().length > 0).map((v) => v.trim())));
+
+export function templateFacets(item: TemplatePerformance): TemplateFacets {
+  const rows = item.timeline.flatMap((p) => p.activities) as unknown as ActivityRow[];
+  const dates = item.timeline.map((p) => p.date).filter((d) => d !== 'sem-data').sort();
+  return {
+    segmentos: uniqStr(rows.map((r) => r.Segmento)),
+    jornadas: uniqStr(rows.map((r) => r.jornada)),
+    safras: uniqStr(rows.map((r) => r.Safra)),
+    parceiros: uniqStr(rows.map((r) => r.Parceiro)),
+    subgrupos: uniqStr(rows.map((r) => r.Subgrupos)),
+    produtos: uniqStr(rows.map((r) => r.Produto)),
+    ofertas: uniqStr(rows.map((r) => r.Oferta ?? undefined)),
+    etapas: uniqStr(rows.map((r) => r['Etapa de aquisição'])),
+    periodStart: dates[0] ?? null,
+    periodEnd: dates[dates.length - 1] ?? null,
+  };
+}
+
+const dm = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
+export function facetPeriodLabel(f: TemplateFacets): string | null {
+  if (!f.periodStart) return null;
+  return f.periodStart === f.periodEnd || !f.periodEnd ? dm(f.periodStart) : `${dm(f.periodStart)}–${dm(f.periodEnd)}`;
+}
+
 // ── Tipo enriquecido + builder ────────────────────────────────────────────────
 export interface ScoredTemplate extends TemplatePerformance {
   channelKey: ChannelKey;
@@ -234,6 +277,7 @@ export interface ScoredTemplate extends TemplatePerformance {
   breakdown: ScoreBreakdownRow[];
   diagnoses: string[];
   taxaAbertura: number; // fração
+  facets: TemplateFacets;
 }
 
 export function scoreTemplate(item: TemplatePerformance): ScoredTemplate {
@@ -247,7 +291,17 @@ export function scoreTemplate(item: TemplatePerformance): ScoredTemplate {
     breakdown,
     diagnoses: deriveDiagnoses(item, score),
     taxaAbertura: item.baseEnviada > 0 ? item.aberturas / item.baseEnviada : 0,
+    facets: templateFacets(item),
   };
+}
+
+/** Blob de busca: id + título + activity_names + jornadas + segmentos + safras + parceiros. */
+export function searchBlob(t: ScoredTemplate): string {
+  return [
+    t.template.template_id, t.template.title, t.template.family,
+    ...t.activityNames, ...t.facets.jornadas, ...t.facets.segmentos,
+    ...t.facets.safras, ...t.facets.parceiros, ...t.facets.subgrupos,
+  ].filter(Boolean).join(' ').toLowerCase();
 }
 
 // ── Agregações para a Visão Geral ─────────────────────────────────────────────
@@ -383,11 +437,12 @@ export function suggestedActions(items: ScoredTemplate[]): SuggestedAction[] {
   return actions.slice(0, 4);
 }
 
-// ── Texto de contexto (segmento · jornada) a partir do activity_name ─────────
-export function contextLabel(item: TemplatePerformance): string {
+// ── Texto de contexto (segmento · campanha) a partir da activity_name ────────
+export function contextLabel(t: ScoredTemplate): string {
   const parts: string[] = [];
-  if (item.template.family) parts.push(String(item.template.family));
-  if (item.template.title) parts.push(String(item.template.title));
-  if (!parts.length && item.activityNames.length) parts.push(`${item.activityNames.length} activity_name${item.activityNames.length === 1 ? '' : 's'}`);
+  if (t.facets.segmentos[0]) parts.push(t.facets.segmentos[0]);
+  if (t.facets.jornadas[0]) parts.push(t.facets.jornadas[0]);
+  if (!parts.length && t.template.family) parts.push(String(t.template.family));
+  if (!parts.length && t.activityNames.length) parts.push(`${t.activityNames.length} activity_name${t.activityNames.length === 1 ? '' : 's'}`);
   return parts.join(' · ') || '—';
 }

@@ -129,6 +129,26 @@ function titleCase(str: string): string {
   return str.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function parseAtivacaoJourneySafe(jornada: string): { produto: string; periodo: string } {
+  const j = normalizeJourneyText(jornada)
+    .replace(/^JOR_ATIVACAO_/, '')
+    .replace(/_SEEDLIST$/, '')
+    .replace(/ \(COPIAR\)$/, '')
+    .replace(/_TESTE$/, '');
+
+  const ATIVACAO_NAMES: Record<string, string> = {
+    'DESBLOQUEIO_VC': 'Desbloqueio VC',
+    'DESBLOQUEIO_PLURIX_MAISAMIGO': 'Desbloqueio Plurix Mais Amigo',
+    'WELCOME_AFINZ_VC': 'Welcome Afinz VC',
+    'WELCOME_PLURIX_MAISAMIGO': 'Welcome Plurix Mais Amigo',
+    'INCENTIVO_AO_USO_AFINZ_VC': 'Incentivo ao Uso Afinz',
+    'POS_TOMBAMENTO_DESBLOQUEIO_PLURIX_MAISAMIGO_MAIO': 'Desbloqueio Pos-Tombamento',
+  };
+
+  const produto = ATIVACAO_NAMES[j] ?? titleCase(j.replace(/_/g, ' ').toLowerCase());
+  return { produto, periodo: '' };
+}
+
 function formatPeriodo(raw: string): string {
   const MESES: Record<string, string> = {
     JAN: 'Jan', FEV: 'Fev', MAR: 'Mar', ABR: 'Abr', MAI: 'Mai',
@@ -149,6 +169,15 @@ function asInt(value: unknown): number {
 
 function normalizeFieldName(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function normalizeJourneyText(value: unknown): string {
+  return String(value ?? '')
+    .replace(/ATIVA�+O/gi, 'ATIVACAO')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim();
 }
 
 function rowValue(row: RawRow, ...parts: string[]): unknown {
@@ -563,12 +592,12 @@ function idxKey(dateStr: string, produto: string, canal: string): string {
 /** Retorna null para linhas que devem ir para Auditoria */
 function classify(row: RawRow): { produto: string; periodo: string } | null {
   const jornada = String(row['jornada'] ?? '');
-  const j = jornada.toUpperCase().trim();
+  const j = normalizeJourneyText(jornada);
 
   if (j.startsWith('JOR_RENTABILIZACAO')) return parseJourney(jornada);
 
   if (j.startsWith('JOR_ATIVACAO_') || j.startsWith('JOR_ATIVAÇÃO_'))
-    return parseAtivacaoJourney(jornada);
+    return parseAtivacaoJourneySafe(jornada);
 
   if (j.startsWith('JOR_INCENTIVO_AO_USO_'))
     return { produto: 'Incentivo ao Uso', periodo: '' };
