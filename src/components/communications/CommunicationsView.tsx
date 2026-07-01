@@ -1,7 +1,7 @@
 import React from 'react';
 import { Mail, LayoutGrid, BarChart3 } from 'lucide-react';
 import { CadastroCobertura } from './CadastroCobertura';
-import { TemplatePerformanceGrid } from './TemplatePerformanceGrid';
+import { PerformanceView } from './performance/PerformanceView';
 import { TemplateCatalogView } from './TemplateCatalogView';
 
 interface CommunicationsViewProps {
@@ -33,7 +33,7 @@ export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) 
 
       <div className="flex-1 overflow-y-auto p-6">
         {isPerformance ? (
-          <TemplatePerformanceGrid />
+          <PerformanceView />
         ) : (
           <div className="space-y-8">
             <section>
