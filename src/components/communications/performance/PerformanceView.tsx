@@ -3,6 +3,7 @@ import {
   AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BarChart3, Flame, Gauge, LayoutGrid,
   Link2, ListTree, Loader2, Pencil, Rows3, Route, Search, Send, Users2, X, Zap,
 } from 'lucide-react';
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../../../contexts/PeriodContext';
 import { useTemplatePerformance, type TemplatePerformance } from '../../../hooks/useTemplatePerformance';
 import type { ActivityRow } from '../../../types/activity';
@@ -139,6 +140,99 @@ const RefChips: React.FC<{ t: ScoredTemplate }> = ({ t }) => {
   );
 };
 
+// ── GRÁFICOS (área temporal reutilizável) ─────────────────────────────────────
+type MetricKind = 'int' | 'pct' | 'brl';
+const tlFmt = (v: number, kind: MetricKind) =>
+  kind === 'pct' ? `${v.toLocaleString('pt-BR', { maximumFractionDigits: v < 0.1 ? 3 : 2 })}%`
+    : kind === 'brl' ? fmt.brl(v)
+      : fmt.int(Math.round(v));
+
+const MetricArea: React.FC<{ data: { label: string; val: number }[]; color: string; kind: MetricKind; height?: number }> = ({ data, color, kind, height = 180 }) => {
+  const gid = `perfArea-${color.replace('#', '')}`;
+  return (
+    <div style={{ height }} className="w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={0.28} /><stop offset="100%" stopColor={color} stopOpacity={0.02} /></linearGradient></defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F6" vertical={false} />
+          <XAxis dataKey="label" tick={{ fill: '#94A3B8', fontSize: 11 }} tickLine={false} axisLine={false} />
+          <YAxis width={48} tick={{ fill: '#94A3B8', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => tlFmt(Number(v), kind)} />
+          <Tooltip formatter={(v: number | string) => [tlFmt(Number(v), kind), '']} labelFormatter={(l) => `Dia ${l}`} contentStyle={{ borderRadius: 12, border: '1px solid #e7ebf0', fontSize: 12 }} />
+          <Area type="monotone" dataKey="val" stroke={color} strokeWidth={2.4} fill={`url(#${gid})`} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+const MetricTabs: React.FC<{ options: readonly { key: string; label: string }[]; value: string; onChange: (k: string) => void }> = ({ options, value, onChange }) => (
+  <div className="mb-3 flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+    {options.map((o) => (
+      <button key={o.key} onClick={() => onChange(o.key)} className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${value === o.key ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-slate-700'}`}>{o.label}</button>
+    ))}
+  </div>
+);
+
+// KPIs agregados no período (Visão Geral)
+const KPI_METRICS = [
+  { key: 'aberturas', label: 'Aberturas', kind: 'int' as const, color: '#0ea5e9' },
+  { key: 'cliques', label: 'Cliques', kind: 'int' as const, color: '#6366f1' },
+  { key: 'cartoes', label: 'Cartões', kind: 'int' as const, color: '#00838a' },
+  { key: 'base', label: 'Base', kind: 'int' as const, color: '#94a3b8' },
+];
+const KpiEvolution: React.FC<{ items: ScoredTemplate[] }> = ({ items }) => {
+  const [mk, setMk] = useState('cartoes');
+  const cfg = KPI_METRICS.find((m) => m.key === mk) ?? KPI_METRICS[2];
+  const data = useMemo(() => {
+    const byDate = new Map<string, { label: string; aberturas: number; cliques: number; cartoes: number; base: number }>();
+    for (const t of items) for (const p of t.timeline) {
+      if (p.date === 'sem-data') continue;
+      const cur = byDate.get(p.date) ?? { label: p.label, aberturas: 0, cliques: 0, cartoes: 0, base: 0 };
+      cur.aberturas += p.aberturas; cur.cliques += p.cliques; cur.cartoes += p.cartoes; cur.base += p.baseEnviada;
+      byDate.set(p.date, cur);
+    }
+    return Array.from(byDate.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => ({ label: v.label, val: (v as unknown as Record<string, number>)[mk] }));
+  }, [items, mk]);
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-[18px] py-[15px]">
+        <div className="flex items-center gap-2.5 text-sm font-black text-slate-900"><span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700"><BarChart3 size={15} /></span>Evolução de KPIs</div>
+        <span className="text-xs font-semibold text-slate-400">soma diária no período</span>
+      </div>
+      <div className="p-[18px]">
+        <MetricTabs options={KPI_METRICS} value={mk} onChange={setMk} />
+        {data.length === 0 ? <div className="flex h-44 items-center justify-center text-sm text-slate-400">Sem série temporal no período.</div> : <MetricArea data={data} color={cfg.color} kind={cfg.kind} height={200} />}
+      </div>
+    </div>
+  );
+};
+
+// linha do tempo de um template (Drawer)
+const TL_METRICS = [
+  { key: 'baseEnviada', label: 'Base', kind: 'int' as const },
+  { key: 'aberturas', label: 'Aberturas', kind: 'int' as const },
+  { key: 'cliques', label: 'Cliques', kind: 'int' as const },
+  { key: 'cartoes', label: 'Cartões', kind: 'int' as const },
+  { key: 'ctr', label: 'CTR', kind: 'pct' as const },
+  { key: 'taxaConversao', label: 'Conv.', kind: 'pct' as const },
+  { key: 'cacEfetivo', label: 'CAC', kind: 'brl' as const },
+];
+const DrawerTimeline: React.FC<{ t: ScoredTemplate }> = ({ t }) => {
+  const [mk, setMk] = useState('cartoes');
+  const m = TL_METRICS.find((x) => x.key === mk) ?? TL_METRICS[3];
+  const color = CHANNELS[t.channelKey].color;
+  const data = useMemo(() => t.timeline.filter((p) => p.date !== 'sem-data').map((p) => {
+    const raw = Number((p as unknown as Record<string, number>)[m.key] ?? 0);
+    return { label: p.label, val: m.kind === 'pct' ? raw * 100 : raw };
+  }), [t, m.key, m.kind]);
+  return (
+    <>
+      <MetricTabs options={TL_METRICS} value={mk} onChange={setMk} />
+      {data.length === 0 ? <div className="flex h-40 items-center justify-center text-sm text-slate-400">Sem série no período.</div> : <MetricArea data={data} color={color} kind={m.kind} height={180} />}
+    </>
+  );
+};
+
 // ── VISÃO GERAL ───────────────────────────────────────────────────────────────
 const GCard: React.FC<{ label: string; value: React.ReactNode; sub: React.ReactNode; icon: React.ReactNode }> = ({ label, value, sub, icon }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -186,6 +280,9 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
         <GCard label="Base acionada" value={fmt.k(totals.base)} icon={<Users2 size={15} />} sub={<span>Alcance somado dos disparos no período</span>} />
         <GCard label="Engajamento médio" value={fmt.pctFrac(engaj, 1)} icon={<Gauge size={15} />} sub={<span>WhatsApp <b className="text-slate-800">{fmt.pctFrac(stats.whatsapp.txAbertura, 0)}</b> · E-mail <b className="text-slate-800">{fmt.pctFrac(stats.email.txAbertura, 0)}</b> de abertura</span>} />
       </div>
+
+      {/* gráfico de KPIs enquadrado acima dos insights */}
+      <KpiEvolution items={items} />
 
       {/* volume + ações */}
       <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
@@ -410,14 +507,14 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/45 backdrop-blur-sm" onClick={onClose}>
-      <div className="grid h-full w-[900px] max-w-[95vw] grid-cols-[380px_1fr] bg-white shadow-2xl" style={{ animation: 'perfDrawer .28s ease' }} onClick={(e) => e.stopPropagation()}>
+      <div className="grid h-full w-[1360px] max-w-[98vw] grid-cols-[minmax(560px,44%)_1fr] bg-white shadow-2xl" style={{ animation: 'perfDrawer .28s ease' }} onClick={(e) => e.stopPropagation()}>
         <style>{`@keyframes perfDrawer{from{transform:translateX(40px);opacity:.5}to{transform:translateX(0);opacity:1}}`}</style>
         <div className="flex flex-col overflow-y-auto border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white p-[18px]">
           <div className="mb-4 flex items-center justify-between">
             <ChannelTag channel={t.template.channel} soft />
             <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"><X size={16} /></button>
           </div>
-          <div className="flex flex-1 items-start justify-center"><ChannelPreview item={t} width={340} height={560} /></div>
+          <div className="flex flex-1 items-start justify-center"><ChannelPreview item={t} width={560} height={780} /></div>
         </div>
         <div className="overflow-y-auto p-6">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -455,6 +552,9 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
               </div>
             ))}
           </div>
+
+          <SectionTitle>Evolução (linha do tempo)</SectionTitle>
+          <DrawerTimeline t={t} />
 
           {t.diagnoses.length > 0 && <>
             <SectionTitle>Diagnóstico</SectionTitle>
