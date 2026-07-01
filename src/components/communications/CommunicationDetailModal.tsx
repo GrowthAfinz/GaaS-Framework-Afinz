@@ -23,6 +23,15 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 const int = (v: number) => v.toLocaleString('pt-BR');
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const clampScore = (value: number | null | undefined) => Math.max(0, Math.min(100, Math.round(value ?? 0)));
+const scoreTone = (score: number | null) => score == null ? 'bg-slate-300' : score >= 70 ? 'bg-emerald-500' : score >= 45 ? 'bg-amber-500' : 'bg-rose-500';
+
+const withEmailPreviewScale = (html: string) => {
+  const style = '<style>html,body{margin:0!important;}body{zoom:1.12;}@supports not (zoom:1){body{transform:scale(1.12);transform-origin:top center;}}</style>';
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head([^>]*)>/i, `<head$1>${style}`);
+  return `${style}${html}`;
+};
+
 type TimelineMetric = 'baseEnviada' | 'aberturas' | 'cliques' | 'cartoes' | 'propostas' | 'taxaAbertura' | 'ctr' | 'taxaConversao' | 'custoEfetivo' | 'cacEfetivo';
 
 const TIMELINE_METRICS: Array<{ key: TimelineMetric; label: string; kind: 'int' | 'pct' | 'brl' }> = [
@@ -220,6 +229,87 @@ const ActivityDayPicker: React.FC<{
   </div>
 );
 
+const ScoreBreakdown: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
+  const taxaAbertura = item.baseEnviada > 0 ? item.aberturas / item.baseEnviada : 0;
+  const rows = [
+    {
+      label: 'Abertura',
+      weight: 'peso 20%',
+      raw: item.aberturas > 0 ? pct(taxaAbertura) : '—',
+      score: item.aberturas > 0 ? clampScore(taxaAbertura / 0.35 * 100) : null,
+    },
+    {
+      label: 'Clique (CTR)',
+      weight: 'peso 22%',
+      raw: item.cliques > 0 ? pct(item.ctr) : '—',
+      score: item.cliques > 0 ? clampScore(item.ctr / 0.0015 * 100) : null,
+    },
+    {
+      label: 'Conversão',
+      weight: 'peso 33%',
+      raw: item.cartoes > 0 ? pct(item.taxaConversao) : '—',
+      score: item.cartoes > 0 ? clampScore(item.taxaConversao / 0.00012 * 100) : null,
+    },
+    {
+      label: 'Eficiência de CAC',
+      weight: 'peso 15%',
+      raw: item.cacEfetivo > 0 ? brl(item.cacEfetivo) : '—',
+      score: item.cacEfetivo > 0 ? clampScore(((60 - item.cacEfetivo) / (60 - 12)) * 100) : null,
+    },
+  ];
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Como o score foi calculado</p>
+      <div className="space-y-2.5">
+        {rows.map((row) => (
+          <div key={row.label} className="grid grid-cols-[132px_1fr_58px_34px] items-center gap-2 text-xs">
+            <div className="min-w-0">
+              <span className="font-semibold text-slate-600">{row.label}</span>
+              <span className="ml-1 text-[10px] text-slate-400">{row.weight}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className={`h-full rounded-full ${scoreTone(row.score)}`} style={{ width: `${row.score ?? 0}%` }} />
+            </div>
+            <span className="text-right font-semibold tabular-nums text-slate-500">{row.raw}</span>
+            <span className="text-right font-bold tabular-nums text-slate-700">{row.score == null ? 'n/d' : row.score}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const FunnelBreakdown: React.FC<{ item: TemplatePerformance }> = ({ item }) => {
+  const steps = [
+    { label: 'Base', value: item.baseEnviada, aux: null },
+    { label: 'Abertura', value: item.aberturas, aux: item.baseEnviada > 0 ? pct(item.aberturas / item.baseEnviada) : null },
+    { label: 'Clique', value: item.cliques, aux: item.baseEnviada > 0 ? pct(item.ctr) : null },
+    { label: 'Cartões', value: item.cartoes, aux: null },
+  ];
+  const max = Math.max(...steps.map((step) => step.value), 1);
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-100 bg-white p-3">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Funil do disparo</p>
+      <div className="space-y-2.5">
+        {steps.map((step) => (
+          <div key={step.label} className="grid grid-cols-[72px_1fr_112px] items-center gap-3 text-xs">
+            <span className="font-semibold text-slate-500">{step.label}</span>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max(1.5, (step.value / max) * 100)}%` }} />
+            </div>
+            <span className="text-right font-bold tabular-nums text-slate-700">
+              {int(step.value)}
+              {step.aux && <small className="ml-1 font-semibold text-slate-400">{step.aux}</small>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onChanged }) => {
   const { template } = item;
   const email = isEmailChannel(template.channel);
@@ -295,7 +385,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
         if (!active) return;
         if (email) {
           const text = await fetch(u).then((r) => r.text());
-          if (active) setHtml(text);
+          if (active) setHtml(withEmailPreviewScale(text));
         } else {
           setImgUrl(u);
         }
@@ -307,7 +397,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex max-h-[95vh] w-[94vw] max-w-[1660px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -383,9 +473,9 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
           </button>
         </div>
 
-        <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-7">
+        <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden xl:grid-cols-12">
           {/* Preview (e-mail completo / imagem) */}
-          <div className="flex flex-col border-b border-slate-200 md:col-span-4 md:border-b-0 md:border-r">
+          <div className="flex flex-col border-b border-slate-200 xl:col-span-8 xl:border-b-0 xl:border-r">
             <div className="bg-slate-100 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Peça {email ? '(e-mail completo)' : ''}
             </div>
@@ -400,7 +490,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
                     <Loader2 size={22} className="animate-spin" />
                   </div>
                 ) : (
-                  <iframe title={`Preview ${template.template_id}`} sandbox="" srcDoc={html} className="h-[68vh] w-full bg-white" />
+                  <iframe title={`Preview ${template.template_id}`} sandbox="" srcDoc={html} className="h-[76vh] w-full bg-white" />
                 )
               ) : imgUrl ? (
                 <div className="flex items-center justify-center p-4">
@@ -415,7 +505,7 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
           </div>
 
           {/* Detalhes + métricas */}
-          <div className="overflow-y-auto p-5 md:col-span-3">
+          <div className="overflow-y-auto p-5 xl:col-span-4">
             {email && (
               <div className="mb-4 space-y-3">
                 <div>
@@ -450,6 +540,8 @@ export const CommunicationDetailModal: React.FC<Props> = ({ item, onClose, onCha
               />
             </div>
 
+            <ScoreBreakdown item={item} />
+            <FunnelBreakdown item={item} />
             <ContentTimeline item={item} onPointClick={handleTimelinePointClick} />
 
             <div className="mt-5 border-t border-slate-100 pt-4">
