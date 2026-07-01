@@ -322,6 +322,24 @@ export async function addAssetToTemplate(input: AddAssetInput): Promise<{ storag
   }
 }
 
+/** Cria um template DRAFT (sem asset) a partir do compositor de ID. */
+export async function createDraftTemplate(input: {
+  templateId: string;
+  channel: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  const { error } = await supabase.from('communication_templates').insert({
+    template_id: input.templateId,
+    title: input.templateId,
+    channel: input.channel,
+    status: 'draft',
+    source_system: 'gaas',
+    storage_bucket: 'crm-communications',
+    metadata: input.metadata ?? {},
+  });
+  if (error) throw error;
+}
+
 /** Vincula (marca) um activity_name a um template — todas as execuções do nome. */
 export async function linkActivityToTemplate(activityName: string, templateId: string): Promise<number> {
   const { data, error } = await supabase
@@ -406,6 +424,7 @@ export async function listTemplates(): Promise<CommunicationTemplate[]> {
 export const communicationService = {
   saveCommunication,
   addAssetToTemplate,
+  createDraftTemplate,
   deleteTemplateAsset,
   getSignedUrl,
   listTemplates,
