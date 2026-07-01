@@ -10,7 +10,7 @@ import { formatVariation } from '../utils/variationDisplay';
 import { MonthlyReportView } from './relatorio/MonthlyReportView';
 import { DailyReportView } from './relatorio/DailyReportView';
 import { formatMonthLabel } from '../utils/monthlyAggregation';
-import { exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
+import { exportAquisicaoCrmMonthlyXlsx, exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import {
@@ -233,6 +233,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   // re-filtragem da tabela roda em prioridade baixa (React 18).
   const deferredTableSearch = useDeferredValue(tableSearch);
   const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
+  const [isExportingAquisicaoMonthly, setIsExportingAquisicaoMonthly] = useState(false);
   const [isExportingRnt, setIsExportingRnt] = useState(false);
 
   // ── Personalização de colunas / agrupamentos ──
@@ -568,6 +569,21 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     }
   }, [periodEnd, periodStart]);
 
+  const exportAquisicaoCrmMonthly = useCallback(async () => {
+    const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
+    const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
+
+    setIsExportingAquisicaoMonthly(true);
+    try {
+      await exportAquisicaoCrmMonthlyXlsx(start, end);
+    } catch (error) {
+      console.error('Erro ao exportar XLSX mensal de Aquisição CRM', error);
+      window.alert('Não foi possível gerar o XLSX mensal de Aquisição CRM. Verifique a conexão com a base de dados e tente novamente.');
+    } finally {
+      setIsExportingAquisicaoMonthly(false);
+    }
+  }, [periodEnd, periodStart]);
+
   const exportRentabilizacaoCrm = useCallback(async () => {
     const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
     const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
@@ -840,6 +856,15 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             >
               <FileSpreadsheet size={14} />
               {isExportingAquisicao ? 'Gerando XLSX...' : 'Exportar XLSX Aquisição'}
+            </button>}
+            {!rentab && <button
+              onClick={exportAquisicaoCrmMonthly}
+              disabled={isExportingAquisicaoMonthly}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 shadow-sm transition-colors hover:border-cyan-300 hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-60"
+              title="Exportar relatório mensal de Aquisição CRM com MoM por BU, segmento, semana e canal"
+            >
+              <FileSpreadsheet size={14} />
+              {isExportingAquisicaoMonthly ? 'Gerando mensal...' : 'Exportar XLSX Aquisição - Mensal'}
             </button>}
             {rentab && <button
               onClick={exportRentabilizacaoCrm}

@@ -1221,6 +1221,17 @@ function downloadBuffer(buffer: BlobPart, filename: string): void {
 }
 
 export async function exportAquisicaoCrmXlsx(start: Date, end: Date): Promise<{ rows: number; filename: string }> {
+  const rawRows = await fetchSupabaseRows(start, end);
+  const b2cDailyRows = await fetchB2cDailyMetrics(start, end);
+  const ExcelJSModule = await import('exceljs');
+  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, b2cDailyRows, start, end);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const filename = `aquisicao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(end).replace(/-/g, '')}.xlsx`;
+  downloadBuffer(buffer, filename);
+  return { rows: rawRows.length, filename };
+}
+
+export async function exportAquisicaoCrmMonthlyXlsx(start: Date, end: Date): Promise<{ rows: number; filename: string }> {
   const monthStart = new Date(start.getFullYear(), start.getMonth(), 1);
   const previousStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
   const rawRows = await fetchSupabaseRows(previousStart, end);
