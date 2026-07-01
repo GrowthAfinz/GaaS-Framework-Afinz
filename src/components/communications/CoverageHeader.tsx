@@ -31,7 +31,7 @@ export const CoverageHeader: React.FC<{ c: CoverageStats }> = ({ c }) => {
 
       <div className="ml-auto flex items-stretch gap-3.5">
         <Stat v={c.orfaos} l="Disparos órfãos" s="réguas ativas sem template" tone="warn" />
-        <Stat v={c.semAsset} l="Aguardando peça" s="IDs de template sem peça" tone="info" />
+        <Stat v={c.semAsset} l="Templates sem peça" s="IDs de template sem a peça" tone="info" />
         <Stat v={c.ativos} l="Templates no ar" s={`de ${c.totalTemplates} cadastrados`} />
         <div className="flex flex-col justify-center gap-1.5 pl-1.5">
           {c.byChannel.map((x) => (

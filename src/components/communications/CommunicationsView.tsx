@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ClipboardCheck, Inbox, Loader2, Plus, UploadCloud, type LucideIcon } from 'lucide-react';
+import { ClipboardCheck, Inbox, Loader2, UploadCloud, type LucideIcon } from 'lucide-react';
 import { useReconciliation, type OrphanRow } from '../../hooks/useReconciliation';
 import { CoverageHeader } from './CoverageHeader';
 import { ReconciliationQueue } from './ReconciliationQueue';
@@ -28,7 +28,7 @@ const CadastroTemplates: React.FC = () => {
 
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
     { id: 'fila', label: 'Fila de reconciliação', icon: Inbox, n: coverage.orfaos },
-    { id: 'asset', label: 'Aguardando peça', icon: UploadCloud, n: coverage.semAsset },
+    { id: 'asset', label: 'Templates sem peça', icon: UploadCloud, n: coverage.semAsset },
     { id: 'auditoria', label: 'Auditoria', icon: ClipboardCheck, n: reconciled.length },
   ];
 
@@ -39,8 +39,7 @@ const CadastroTemplates: React.FC = () => {
         <p className="mt-0.5 text-sm text-slate-500">Costure os disparos do CRM aos templates curados · governança de peças e cobertura de réguas</p>
       </div>
 
-      {/* pb-28 garante que o conteúdo não fique atrás do FAB */}
-      <div className="flex-1 overflow-y-auto p-6 pb-28">
+      <div className="flex-1 overflow-y-auto p-6">
         {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         {loading ? (
@@ -76,13 +75,6 @@ const CadastroTemplates: React.FC = () => {
           </>
         )}
       </div>
-
-      <button
-        onClick={() => setCompose(null)}
-        className="absolute bottom-6 right-6 z-10 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-slate-800"
-      >
-        <Plus size={16} /> Novo template
-      </button>
 
       {compose !== undefined && (
         <TemplateComposerDrawer seed={compose} onClose={() => setCompose(undefined)} onSaved={() => { setCompose(undefined); refetch(); }} />

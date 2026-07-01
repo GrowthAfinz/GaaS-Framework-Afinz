@@ -75,7 +75,7 @@ export const TemplateCatalogView: React.FC = () => {
 
       <section>
         <div className="mb-3 flex items-center gap-2">
-          <h3 className="font-semibold text-slate-800">Aguardando peça</h3>
+          <h3 className="font-semibold text-slate-800">Templates sem peça</h3>
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">{drafts.length}</span>
           <span className="text-xs text-slate-400">templates mapeados — só falta subir a peça</span>
         </div>
