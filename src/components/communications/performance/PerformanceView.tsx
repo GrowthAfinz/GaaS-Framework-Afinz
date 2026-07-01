@@ -3,7 +3,6 @@ import {
   AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BarChart3, Flame, Gauge, LayoutGrid,
   Link2, ListTree, Loader2, Pencil, Rows3, Route, Search, Send, Users2, X, Zap,
 } from 'lucide-react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../../../contexts/PeriodContext';
 import { useTemplatePerformance, type TemplatePerformance } from '../../../hooks/useTemplatePerformance';
 import type { ActivityRow } from '../../../types/activity';
@@ -140,66 +139,6 @@ const RefChips: React.FC<{ t: ScoredTemplate }> = ({ t }) => {
   );
 };
 
-// ── GRÁFICO DE EVOLUÇÃO DE KPIs (Recharts) ─────────────────────────────────────
-const KPI_METRICS = [
-  { key: 'aberturas', label: 'Aberturas', color: '#0ea5e9' },
-  { key: 'cliques', label: 'Cliques', color: '#6366f1' },
-  { key: 'cartoes', label: 'Cartões', color: '#00838a' },
-  { key: 'base', label: 'Base', color: '#94a3b8' },
-] as const;
-type KpiKey = (typeof KPI_METRICS)[number]['key'];
-
-const KpiEvolution: React.FC<{ items: ScoredTemplate[] }> = ({ items }) => {
-  const [metric, setMetric] = useState<KpiKey>('cartoes');
-  const data = useMemo(() => {
-    const byDate = new Map<string, { label: string; aberturas: number; cliques: number; cartoes: number; base: number }>();
-    for (const t of items) for (const p of t.timeline) {
-      if (p.date === 'sem-data') continue;
-      const cur = byDate.get(p.date) ?? { label: p.label, aberturas: 0, cliques: 0, cartoes: 0, base: 0 };
-      cur.aberturas += p.aberturas; cur.cliques += p.cliques; cur.cartoes += p.cartoes; cur.base += p.baseEnviada;
-      byDate.set(p.date, cur);
-    }
-    return Array.from(byDate.entries()).sort((a, b) => a[0].localeCompare(b[0])).map(([, v]) => v);
-  }, [items]);
-  const cfg = KPI_METRICS.find((m) => m.key === metric)!;
-
-  return (
-    <Card title="Evolução de KPIs" subtitle="soma diária no período" icon={<BarChart3 size={15} />}>
-      <div className="mb-3 flex flex-wrap gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-        {KPI_METRICS.map((m) => (
-          <button key={m.key} onClick={() => setMetric(m.key)} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${metric === m.key ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-slate-700'}`}>{m.label}</button>
-        ))}
-      </div>
-      {data.length === 0 ? (
-        <div className="flex h-44 items-center justify-center text-sm text-slate-400">Sem série temporal no período.</div>
-      ) : (
-        <div className="h-52 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="kpiFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={cfg.color} stopOpacity={0.28} />
-                  <stop offset="100%" stopColor={cfg.color} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F6" vertical={false} />
-              <XAxis dataKey="label" tick={{ fill: '#94A3B8', fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis width={48} tick={{ fill: '#94A3B8', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => fmt.k(Number(v))} />
-              <Tooltip
-                cursor={{ stroke: cfg.color, strokeOpacity: 0.2 }}
-                formatter={(v: number | string) => [fmt.int(Number(v)), cfg.label]}
-                labelFormatter={(l) => `Dia ${l}`}
-                contentStyle={{ borderRadius: 12, border: '1px solid #e7ebf0', fontSize: 12 }}
-              />
-              <Area type="monotone" dataKey={metric} stroke={cfg.color} strokeWidth={2.4} fill="url(#kpiFill)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </Card>
-  );
-};
-
 // ── VISÃO GERAL ───────────────────────────────────────────────────────────────
 const GCard: React.FC<{ label: string; value: React.ReactNode; sub: React.ReactNode; icon: React.ReactNode }> = ({ label, value, sub, icon }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -247,9 +186,6 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
         <GCard label="Base acionada" value={fmt.k(totals.base)} icon={<Users2 size={15} />} sub={<span>Alcance somado dos disparos no período</span>} />
         <GCard label="Engajamento médio" value={fmt.pctFrac(engaj, 1)} icon={<Gauge size={15} />} sub={<span>WhatsApp <b className="text-slate-800">{fmt.pctFrac(stats.whatsapp.txAbertura, 0)}</b> · E-mail <b className="text-slate-800">{fmt.pctFrac(stats.email.txAbertura, 0)}</b> de abertura</span>} />
       </div>
-
-      {/* KPI charts enquadrados acima dos insights */}
-      <KpiEvolution items={items} />
 
       {/* volume + ações */}
       <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
