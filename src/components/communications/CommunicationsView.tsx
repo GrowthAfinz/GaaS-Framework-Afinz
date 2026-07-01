@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ClipboardCheck, Inbox, UploadCloud, Plus, Loader2, type LucideIcon } from 'lucide-react';
+import { ClipboardCheck, Inbox, Loader2, Plus, UploadCloud, type LucideIcon } from 'lucide-react';
 import { useReconciliation, type OrphanRow } from '../../hooks/useReconciliation';
 import { CoverageHeader } from './CoverageHeader';
 import { ReconciliationQueue } from './ReconciliationQueue';
@@ -12,7 +12,7 @@ interface CommunicationsViewProps {
   mode: 'cadastro' | 'performance';
 }
 
-type SubTab = 'fila' | 'asset';
+type SubTab = 'fila' | 'asset' | 'auditoria';
 
 export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) => {
   if (mode === 'performance') {
@@ -24,11 +24,12 @@ export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) 
 const CadastroTemplates: React.FC = () => {
   const [tab, setTab] = useState<SubTab>('fila');
   const [compose, setCompose] = useState<OrphanRow | null | undefined>(undefined); // undefined=fechado, null=novo, orphan=seed
-  const { orphans, coverage, loading, error, refetch } = useReconciliation();
+  const { orphans, reconciled, catalog, coverage, loading, error, refetch } = useReconciliation();
 
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
     { id: 'fila', label: 'Fila de reconciliação', icon: Inbox, n: coverage.orfaos },
     { id: 'asset', label: 'Aguardando asset', icon: UploadCloud, n: coverage.semAsset },
+    { id: 'auditoria', label: 'Auditoria', icon: ClipboardCheck, n: reconciled.length },
   ];
 
   return (
@@ -53,8 +54,11 @@ const CadastroTemplates: React.FC = () => {
                 const Icon = t.icon;
                 const active = tab === t.id;
                 return (
-                  <button key={t.id} onClick={() => setTab(t.id)}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${active ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}>
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${active ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+                  >
                     <Icon size={15} /> {t.label}
                     {t.n != null && <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${active ? 'bg-white/25' : 'bg-slate-100 text-slate-500'}`}>{t.n}</span>}
                   </button>
@@ -64,16 +68,19 @@ const CadastroTemplates: React.FC = () => {
 
             <div className="mt-5">
               {tab === 'fila' && (
-                <ReconciliationQueue orphans={orphans} onCreate={(seed) => setCompose(seed)} onChanged={refetch} />
+                <ReconciliationQueue orphans={orphans} catalog={catalog} onCreate={(seed) => setCompose(seed)} onChanged={refetch} />
               )}
               {tab === 'asset' && <TemplateCatalogView />}
+              {tab === 'auditoria' && <ReconciliationAudit rows={reconciled} catalog={catalog} onChanged={refetch} />}
             </div>
           </>
         )}
       </div>
 
-      <button onClick={() => setCompose(null)}
-        className="absolute bottom-6 right-6 z-10 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-slate-800">
+      <button
+        onClick={() => setCompose(null)}
+        className="absolute bottom-6 right-6 z-10 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg hover:bg-slate-800"
+      >
         <Plus size={16} /> Novo template
       </button>
 

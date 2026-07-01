@@ -36,6 +36,20 @@ export interface OrphanRow {
   suggestedId: string;
 }
 
+export interface ReconciledRow {
+  uid: string;
+  name: string;
+  jornada: string;
+  channel: string | null;
+  canalLabel: string;
+  base: number;
+  exec: number;
+  latestDate: string | null;
+  parsed: ParsedActivity;
+  templateId: string;
+  template: CatalogEntry | null;
+}
+
 export interface CoverageStats {
   pctCobertura: number;
   totalDisparos: number;
@@ -87,6 +101,7 @@ const num = (v: number | null | undefined) => (typeof v === 'number' && !Number.
  */
 export function useReconciliation() {
   const [orphans, setOrphans] = useState<OrphanRow[]>([]);
+  const [reconciled, setReconciled] = useState<ReconciledRow[]>([]);
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,9 +121,11 @@ export function useReconciliation() {
     setLoading(true);
     setError(null);
     try {
+      const baseSelect = '"Activity name / Taxonomia", jornada, "Canal", "Parceiro", "Segmento", "Base Total", "Data de Disparo", template_id';
+
       let orphanQuery = supabase
         .from('activities')
-        .select('"Activity name / Taxonomia", jornada, "Canal", "Parceiro", "Segmento", "Base Total", "Data de Disparo", template_id')
+        .select(baseSelect)
         .is('template_id', null)
         .not('"Activity name / Taxonomia"', 'is', null)
         .gte('"Data de Disparo"', dataInicio)
@@ -122,8 +139,25 @@ export function useReconciliation() {
       if (f.segmentos?.length) orphanQuery = orphanQuery.in('"Segmento"', f.segmentos);
       if (f.parceiros?.length) orphanQuery = orphanQuery.in('"Parceiro"', f.parceiros);
 
-      const [{ data: acts, error: aErr }, templates] = await Promise.all([orphanQuery, listTemplates()]);
+      let linkedQuery = supabase
+        .from('activities')
+        .select(baseSelect)
+        .not('template_id', 'is', null)
+        .not('"Activity name / Taxonomia"', 'is', null)
+        .gte('"Data de Disparo"', dataInicio)
+        .lte('"Data de Disparo"', `${dataFim} 23:59:59`)
+        .in('"Canal"', ['E-mail', 'SMS', 'WhatsApp', 'Push'])
+        .order('"Data de Disparo"', { ascending: false })
+        .limit(2500);
+      if (selectedBUs.length) linkedQuery = linkedQuery.in('BU', selectedBUs);
+      if (f.canais?.length) linkedQuery = linkedQuery.in('"Canal"', f.canais);
+      if (f.jornadas?.length) linkedQuery = linkedQuery.in('jornada', f.jornadas);
+      if (f.segmentos?.length) linkedQuery = linkedQuery.in('"Segmento"', f.segmentos);
+      if (f.parceiros?.length) linkedQuery = linkedQuery.in('"Parceiro"', f.parceiros);
+
+      const [{ data: acts, error: aErr }, { data: linkedActs, error: lErr }, templates] = await Promise.all([orphanQuery, linkedQuery, listTemplates()]);
       if (aErr) throw aErr;
+      if (lErr) throw lErr;
 
       // Aplica os mesmos filtros globais aos templates (para o header de cobertura respeitar o recorte).
       const filteredTemplates = templates.filter((t) => matchesGlobalFilters(decorateTemplate(t), selectedBUs, f));
@@ -169,8 +203,41 @@ export function useReconciliation() {
         }
       }
 
+      const catById = new Map(cat.map((t) => [t.id, t]));
+      const byLinked = new Map<string, ReconciledRow>();
+      for (const r of (linkedActs ?? []) as OrphanQueryRow[]) {
+        const name = r['Activity name / Taxonomia'];
+        const templateId = r.template_id;
+        if (!name || !templateId) continue;
+        const date = r['Data de Disparo'] ?? null;
+        const uid = `${templateId}::${name}`;
+        const existing = byLinked.get(uid);
+        if (existing) {
+          existing.exec += 1;
+          existing.base += num(r['Base Total']);
+          if (date && (!existing.latestDate || date > existing.latestDate)) existing.latestDate = date;
+        } else {
+          const chId = canalToId(r.Canal);
+          const parsed = parseActivity(name, { canal: r.Canal, parceiro: r.Parceiro, segmento: r.Segmento });
+          byLinked.set(uid, {
+            uid,
+            name,
+            jornada: r.jornada ?? 'â€”',
+            channel: chId,
+            canalLabel: r.Canal ?? 'â€”',
+            base: num(r['Base Total']),
+            exec: 1,
+            latestDate: date,
+            parsed,
+            templateId,
+            template: catById.get(templateId) ?? null,
+          });
+        }
+      }
+
       setCatalog(cat);
       setOrphans(Array.from(byName.values()));
+      setReconciled(Array.from(byLinked.values()));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar a fila de reconciliação.');
     } finally {
@@ -205,5 +272,5 @@ export function useReconciliation() {
     };
   }, [orphans, catalog]);
 
-  return { orphans, catalog, coverage, loading, error, refetch: fetchData };
+  return { orphans, reconciled, catalog, coverage, loading, error, refetch: fetchData };
 }
