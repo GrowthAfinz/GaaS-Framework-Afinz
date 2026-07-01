@@ -1,5 +1,6 @@
 import type { BorderStyle, Cell, CellFormulaValue, Workbook, Worksheet } from 'exceljs';
 import { supabase } from '../services/supabaseClient';
+import { buildAquisicaoCrmMonthlyReportWorkbook } from './crmAquisicaoMonthlyReportExport';
 
 type RawActivity = Record<string, any>;
 type Metrics = {
@@ -1220,19 +1221,18 @@ function downloadBuffer(buffer: BlobPart, filename: string): void {
 }
 
 export async function exportAquisicaoCrmXlsx(start: Date, end: Date): Promise<{ rows: number; filename: string }> {
-  const queryStart = getBaselineQueryStart(start);
-  const [rawRows, b2cDailyRows] = await Promise.all([
-    fetchSupabaseRows(queryStart, end),
-    fetchB2cDailyMetrics(queryStart, end),
-  ]);
+  const monthStart = new Date(start.getFullYear(), start.getMonth(), 1);
+  const previousStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+  const rawRows = await fetchSupabaseRows(previousStart, end);
   const ExcelJSModule = await import('exceljs');
-  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, b2cDailyRows, start, end);
+  const workbook = buildAquisicaoCrmMonthlyReportWorkbook(ExcelJSModule.default, rawRows, monthStart, end);
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `aquisicao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(end).replace(/-/g, '')}.xlsx`;
+  const monthLabel = monthStart.toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, (char) => char.toUpperCase());
+  const filename = `Report_${monthLabel}_CRM.xlsx`;
   downloadBuffer(buffer, filename);
   const rowsInPeriod = rawRows.filter((row) => {
     const rowDate = parseRowDate(get(row, 'Data de Disparo'));
-    return rowDate >= start && rowDate <= end;
+    return rowDate >= monthStart && rowDate <= end;
   }).length;
   return { rows: rowsInPeriod, filename };
 }
