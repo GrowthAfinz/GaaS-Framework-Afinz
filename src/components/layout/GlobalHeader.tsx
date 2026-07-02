@@ -29,6 +29,7 @@ import { useExplorerStore, PendingNavigation } from '../../store/explorerStore';
 
 interface GlobalHeaderProps {
     onMouseEnter?: () => void;
+    isFilterDropOpen?: boolean;
 }
 
 const TYPE_CONFIG: Record<GlobalSearchResultType, { label: string; icon: React.FC<{ size: number; className?: string }> }> = {
@@ -51,7 +52,7 @@ const BU_DOT: Record<string, string> = {
     Seguros: 'bg-orange-500',
 };
 
-export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
+export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilterDropOpen }) => {
     const { setTab, viewSettings } = useAppStore();
     const activeTab = viewSettings.abaAtual;
     const { canSeeTab } = useUserRole();
@@ -153,7 +154,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
 
     return (
         <header
-            className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#e0f7f8] border-b-4 border-[#00C6CC] shadow-md flex items-center px-6 gap-4"
+            className={`fixed top-0 left-0 right-0 z-50 h-16 bg-[#e0f7f8] flex items-center px-6 gap-4 transition-all duration-300 ${
+                isFilterDropOpen 
+                    ? 'border-b border-white/20 shadow-none' 
+                    : 'border-b-4 border-[#00C6CC] shadow-md'
+            }`}
             onMouseEnter={onMouseEnter}
         >
             {/* ── LEFT: Brand ────────────────────────────────────────── */}

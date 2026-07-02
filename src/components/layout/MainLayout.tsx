@@ -5,14 +5,15 @@ interface MainLayoutProps {
     children: ReactNode;
     onHeaderMouseEnter?: () => void;
     onContentMouseEnter?: () => void;
+    isFilterDropOpen?: boolean;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ children, onHeaderMouseEnter, onContentMouseEnter }) => {
+export const MainLayout: React.FC<MainLayoutProps> = ({ children, onHeaderMouseEnter, onContentMouseEnter, isFilterDropOpen }) => {
     return (
         <div className="flex flex-col min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-cyan-200/60">
 
             {/* 1. Global App Header (Logo, Search, User, Nav) */}
-            <GlobalHeader onMouseEnter={onHeaderMouseEnter} />
+            <GlobalHeader onMouseEnter={onHeaderMouseEnter} isFilterDropOpen={isFilterDropOpen} />
 
             {/* 2. Main Content Area (Full Width) */}
             <main
