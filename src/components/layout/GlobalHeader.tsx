@@ -153,7 +153,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter }) => {
 
     return (
         <header
-            className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#f0fdfa]/95 backdrop-blur-md border-b border-white shadow-[0_1px_3px_rgba(0,198,204,0.06),_0_1px_2px_rgba(0,198,204,0.03)] flex items-center px-6 gap-4"
+            className="fixed top-0 left-0 right-0 z-50 h-16 bg-[#e0f7f8] border-b-4 border-[#00C6CC] shadow-md flex items-center px-6 gap-4"
             onMouseEnter={onMouseEnter}
         >
             {/* ── LEFT: Brand ────────────────────────────────────────── */}
