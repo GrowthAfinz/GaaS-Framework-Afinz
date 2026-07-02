@@ -11,6 +11,7 @@ import { MonthlyReportView } from './relatorio/MonthlyReportView';
 import { DailyReportView } from './relatorio/DailyReportView';
 import { formatMonthLabel } from '../utils/monthlyAggregation';
 import { exportAquisicaoCrmMonthlyXlsx, exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
+import { exportMidiaPagaMonthlyXlsx } from '../utils/midiaPagaMonthlyReportExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import {
@@ -234,6 +235,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const deferredTableSearch = useDeferredValue(tableSearch);
   const [isExportingAquisicao, setIsExportingAquisicao] = useState(false);
   const [isExportingAquisicaoMonthly, setIsExportingAquisicaoMonthly] = useState(false);
+  const [isExportingMidiaPagaMonthly, setIsExportingMidiaPagaMonthly] = useState(false);
   const [isExportingRnt, setIsExportingRnt] = useState(false);
 
   // ── Personalização de colunas / agrupamentos ──
@@ -584,6 +586,21 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     }
   }, [periodEnd, periodStart]);
 
+  const exportMidiaPagaMonthly = useCallback(async () => {
+    const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
+    const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
+
+    setIsExportingMidiaPagaMonthly(true);
+    try {
+      await exportMidiaPagaMonthlyXlsx(start, end);
+    } catch (error) {
+      console.error('Erro ao exportar XLSX mensal de Mídia Paga', error);
+      window.alert('Não foi possível gerar o XLSX mensal de Mídia Paga. Verifique a conexão com a base de dados e tente novamente.');
+    } finally {
+      setIsExportingMidiaPagaMonthly(false);
+    }
+  }, [periodEnd, periodStart]);
+
   const exportRentabilizacaoCrm = useCallback(async () => {
     const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
     const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
@@ -865,6 +882,15 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             >
               <FileSpreadsheet size={14} />
               {isExportingAquisicaoMonthly ? 'Gerando mensal...' : 'Exportar XLSX Aquisição - Mensal'}
+            </button>}
+            {!rentab && <button
+              onClick={exportMidiaPagaMonthly}
+              disabled={isExportingMidiaPagaMonthly}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 shadow-sm transition-colors hover:border-violet-300 hover:bg-violet-100 disabled:cursor-wait disabled:opacity-60"
+              title="Exportar relatório mensal de Mídia Paga com MoM por frente, semana, plataforma e criativo + abas CRM Aquisição e Diarizado"
+            >
+              <FileSpreadsheet size={14} />
+              {isExportingMidiaPagaMonthly ? 'Gerando mídia paga...' : 'Exportar XLSX Mídia Paga - Mensal'}
             </button>}
             {rentab && <button
               onClick={exportRentabilizacaoCrm}

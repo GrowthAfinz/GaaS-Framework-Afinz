@@ -19,19 +19,19 @@ type ReportRow = {
   metrics: ReportMetrics;
 };
 
-type WeekWindow = {
+export type WeekWindow = {
   label: string;
   startDay: number;
   endDay: number;
   days: number;
 };
 
-const MONTHS_PT = [
+export const MONTHS_PT = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
-const REPORT_COLORS = {
+export const REPORT_COLORS = {
   navy: '1F2937',
   slate: '334155',
   card: 'F1F5F9',
@@ -69,11 +69,11 @@ const dateOnlyReport = (value: any): string => String(value ?? '').slice(0, 10);
 
 const reportMonthKey = (date: Date): string => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-const monthStart = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), 1);
+export const monthStart = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), 1);
 
-const monthEnd = (date: Date): Date => new Date(date.getFullYear(), date.getMonth() + 1, 0);
+export const monthEnd = (date: Date): Date => new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
-const previousMonthStart = (date: Date): Date => new Date(date.getFullYear(), date.getMonth() - 1, 1);
+export const previousMonthStart = (date: Date): Date => new Date(date.getFullYear(), date.getMonth() - 1, 1);
 
 const normalizeReportChannel = (value: any): string => {
   const raw = String(value ?? '').trim();
@@ -125,12 +125,12 @@ const reportCac = (metrics: ReportMetrics): number | null => (metrics.cartoes ? 
 
 const reportRate = (num: number, den: number): number | null => (den ? num / den : null);
 
-const reportDelta = (current: number | null, previous: number | null): number | null => {
+export const reportDelta = (current: number | null, previous: number | null): number | null => {
   if (current === null || previous === null || !previous) return null;
   return current / previous - 1;
 };
 
-const reportPctText = (value: number | null): string => {
+export const reportPctText = (value: number | null): string => {
   if (value === null || !Number.isFinite(value)) return '—';
   return `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`;
 };
@@ -141,9 +141,9 @@ const reportDeltaColor = (value: number | null, invert = false): string => {
   return isBetter ? REPORT_COLORS.green : REPORT_COLORS.red;
 };
 
-const dayOfMonthReport = (dateString: string): number => Number(dateString.slice(8, 10));
+export const dayOfMonthReport = (dateString: string): number => Number(dateString.slice(8, 10));
 
-const weekWindows = (date: Date, maxDay: number): WeekWindow[] => {
+export const weekWindows = (date: Date, maxDay: number): WeekWindow[] => {
   const windows: WeekWindow[] = [];
   const monthNumber = date.getMonth() + 1;
   for (let startDay = 1; startDay <= maxDay; startDay += 7) {
@@ -158,7 +158,7 @@ const weekWindows = (date: Date, maxDay: number): WeekWindow[] => {
   return windows;
 };
 
-const previousWeekWindows = (date: Date, currentWindows: WeekWindow[]): WeekWindow[] => {
+export const previousWeekWindows = (date: Date, currentWindows: WeekWindow[]): WeekWindow[] => {
   const lastDay = monthEnd(date).getDate();
   return currentWindows.map((window) => {
     const startDay = Math.min(window.startDay, lastDay);
@@ -189,7 +189,7 @@ const buildReportGroup = (rows: ReportRow[], keyFn: (row: ReportRow) => string):
 
 const metricOrEmpty = (map: Map<string, ReportMetrics>, key: string): ReportMetrics => map.get(key) ?? emptyReportMetrics();
 
-function setCellValue(cell: Cell, value: any, options: { bold?: boolean; fontColor?: string; fill?: string; align?: 'left' | 'center' | 'right'; numFmt?: string } = {}): void {
+export function setCellValue(cell: Cell, value: any, options: { bold?: boolean; fontColor?: string; fill?: string; align?: 'left' | 'center' | 'right'; numFmt?: string } = {}): void {
   cell.value = value;
   cell.font = { name: 'Arial', bold: options.bold ?? false, color: { argb: options.fontColor ?? REPORT_COLORS.navy }, size: 10 };
   cell.alignment = { vertical: 'middle', horizontal: options.align ?? 'right', wrapText: false };
@@ -203,7 +203,7 @@ function setCellValue(cell: Cell, value: any, options: { bold?: boolean; fontCol
   };
 }
 
-function writeReportHeader(ws: Worksheet, row: number, headers: string[]): void {
+export function writeReportHeader(ws: Worksheet, row: number, headers: string[]): void {
   headers.forEach((header, index) => {
     const cell = ws.getCell(row, index + 1);
     setCellValue(cell, header, { bold: true, fill: REPORT_COLORS.slate, fontColor: REPORT_COLORS.white, align: 'center' });
@@ -212,12 +212,12 @@ function writeReportHeader(ws: Worksheet, row: number, headers: string[]): void 
   ws.getRow(row).height = 30;
 }
 
-function styleReportDelta(cell: Cell, value: number | null, invert = false): void {
+export function styleReportDelta(cell: Cell, value: number | null, invert = false): void {
   cell.font = { name: 'Arial', bold: true, color: { argb: reportDeltaColor(value, invert) }, size: 10 };
   cell.alignment = { vertical: 'middle', horizontal: 'center' };
 }
 
-function writeSectionTitle(ws: Worksheet, row: number, title: string, columns: number): void {
+export function writeSectionTitle(ws: Worksheet, row: number, title: string, columns: number): void {
   ws.mergeCells(row, 1, row, columns);
   setCellValue(ws.getCell(row, 1), title, { bold: true, align: 'left' });
   ws.getCell(row, 1).font = { name: 'Arial', bold: true, color: { argb: REPORT_COLORS.navy }, size: 14 };
@@ -451,13 +451,10 @@ function writeChannelTable(ws: Worksheet, startRow: number, analysis: ReturnType
   return startRow + analysis.channelKeys.length + 3;
 }
 
-export function buildAquisicaoCrmMonthlyReportWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rawRows: RawActivity[], start: Date, end: Date): Workbook {
+export function writeAquisicaoCrmMonthlySheet(workbook: Workbook, rawRows: RawActivity[], start: Date, end: Date): void {
   const currentStart = monthStart(start);
   const currentEnd = end;
   const analysis = buildReportAnalysis(rawRows, currentStart, currentEnd);
-  const workbook = new ExcelJSRuntime.Workbook();
-  workbook.creator = 'GaaS AFINZ';
-  workbook.created = new Date();
   const ws = workbook.addWorksheet('CRM Aquisição', {
     views: [{ state: 'frozen', xSplit: 2, ySplit: 2, topLeftCell: 'C3', activeCell: 'C3', showGridLines: false }],
   });
@@ -485,5 +482,12 @@ export function buildAquisicaoCrmMonthlyReportWorkbook(ExcelJSRuntime: { Workboo
   const widths = [12, 28, 12, 16, 16, 16, 14, 16, 14, 16, 12, 16, 14, 16, 14, 16, 16, 18];
   widths.forEach((width, index) => { ws.getColumn(index + 1).width = width; });
   ws.eachRow((excelRow) => { excelRow.height = Math.max(excelRow.height ?? 20, 20); });
+}
+
+export function buildAquisicaoCrmMonthlyReportWorkbook(ExcelJSRuntime: { Workbook: new () => Workbook }, rawRows: RawActivity[], start: Date, end: Date): Workbook {
+  const workbook = new ExcelJSRuntime.Workbook();
+  workbook.creator = 'GaaS AFINZ';
+  workbook.created = new Date();
+  writeAquisicaoCrmMonthlySheet(workbook, rawRows, start, end);
   return workbook;
 }

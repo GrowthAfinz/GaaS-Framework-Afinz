@@ -1164,7 +1164,7 @@ function buildWorkbook(
   return wb;
 }
 
-async function fetchSupabaseRows(start: Date, end: Date): Promise<RawActivity[]> {
+export async function fetchSupabaseRows(start: Date, end: Date): Promise<RawActivity[]> {
   const rows: RawActivity[] = [];
   const pageSize = 1000;
   const exclusiveEnd = addDays(end, 1);
