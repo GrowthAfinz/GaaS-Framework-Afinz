@@ -127,15 +127,15 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
         <ChevronRight size={15} className={`shrink-0 text-slate-300 transition-transform ${open ? 'rotate-90 text-cyan-600' : ''}`} />
         <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500">{o.canalLabel}</span>
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <code className="block min-w-0 truncate font-mono text-xs font-semibold text-slate-800">{o.name}</code>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <code className="block max-w-[420px] truncate font-mono text-xs font-semibold text-slate-800 xl:max-w-[560px]">{o.name}</code>
             <button
               onClick={(e) => { e.stopPropagation(); onEditMoment(); }}
               title="Editar sugestão de semana/disparo deste activity_name"
-              className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold transition-colors ${
+              className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-1 text-[10px] font-bold shadow-sm transition-colors ${
                 o.momentSuggestion.source === 'manual'
-                  ? 'border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100'
-                  : 'border-slate-200 bg-slate-50 text-slate-500 hover:border-cyan-200 hover:text-cyan-700'
+                  ? 'border-cyan-300 bg-cyan-50 text-cyan-800 hover:bg-cyan-100'
+                  : 'border-cyan-200 bg-white text-cyan-700 hover:bg-cyan-50'
               }`}
             >
               <CalendarClock size={11} />

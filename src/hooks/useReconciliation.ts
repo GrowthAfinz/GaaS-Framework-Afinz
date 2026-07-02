@@ -8,7 +8,7 @@ import { useBU } from '../contexts/BUContext';
 import { useAppStore } from '../store/useAppStore';
 import type { ActivityMomentSuggestion, CommunicationTemplate } from '../types/communication';
 import {
-  canalToId, resolveDim, parseSeq, parseActivity, matchTemplate, confidenceOf, formatSeq, parseSeqParts,
+  canalToId, resolveDim, parseSeq, parseActivity, matchTemplate, confidenceOf, formatSeq,
   type Confidence, type MatchResult, type ParsedActivity, type TemplateDims,
 } from '../utils/taxonomy';
 
@@ -137,26 +137,31 @@ function readMomentSuggestion(metadata: Record<string, unknown> | null | undefin
 }
 
 function inferMomentSuggestion(activityName: string): ActivityMomentSuggestion {
-  const parts = parseSeqParts(activityName);
-  if (parts?.week) {
+  const seq = parseSeq(activityName);
+  const weekly = seq?.match(/^S(\d+)D0*(\d+)$/i);
+  if (weekly) {
+    const week = Number(weekly[1]);
+    const dispatch = Number(weekly[2]);
     return {
       kind: 'semana_disparo',
       enabled: true,
-      week: parts.week,
-      dispatch: parts.dispatch || 1,
-      label: formatSeq(parts.seq),
+      week,
+      dispatch: dispatch || 1,
+      label: formatSeq(seq),
       confidence: 'alta',
       source: 'parser',
     };
   }
-  if (parts?.dispatch) {
+  const dispatchOnly = seq?.match(/^D0*(\d+)$/i);
+  if (dispatchOnly) {
+    const dispatch = Number(dispatchOnly[1]);
     return {
       kind: 'disparo',
       enabled: true,
       week: null,
-      dispatch: parts.dispatch,
-      label: formatSeq(parts.seq),
-      confidence: parts.source === 'fallback' ? 'media' : 'alta',
+      dispatch,
+      label: formatSeq(seq),
+      confidence: 'media',
       source: 'parser',
     };
   }
