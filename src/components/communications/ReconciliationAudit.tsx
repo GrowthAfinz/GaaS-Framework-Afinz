@@ -50,10 +50,11 @@ export const ReconciliationAudit: React.FC<Props> = ({ rows, catalog, onChanged 
   const [showHelp, setShowHelp] = useState(false);
 
   const stats = useMemo(() => {
-    const outsideCatalog = rows.filter((r) => !r.template).length;
+    const missingTemplate = rows.filter((r) => !r.template).length;
+    const outsideFilter = rows.filter((r) => r.template && !r.template.inCurrentFilter).length;
     const uniqueTemplates = new Set(rows.map((r) => r.templateId)).size;
     const totalExecutions = rows.reduce((sum, r) => sum + r.exec, 0);
-    return { outsideCatalog, uniqueTemplates, totalExecutions };
+    return { missingTemplate, outsideFilter, uniqueTemplates, totalExecutions };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -147,13 +148,13 @@ export const ReconciliationAudit: React.FC<Props> = ({ rows, catalog, onChanged 
             <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">Execuções cobertas</span>
             <b className="mt-1 block text-lg text-slate-900">{stats.totalExecutions}</b>
           </div>
-          <div className={`rounded-xl border px-3 py-2 ${stats.outsideCatalog ? 'border-amber-200 bg-amber-50' : 'border-emerald-100 bg-emerald-50'}`}>
-            <span className={`block text-[10px] font-bold uppercase tracking-wide ${stats.outsideCatalog ? 'text-amber-600' : 'text-emerald-600'}`}>Atenção</span>
-            <b className={`mt-1 block text-lg ${stats.outsideCatalog ? 'text-amber-700' : 'text-emerald-700'}`}>
-              {stats.outsideCatalog}
+          <div className={`rounded-xl border px-3 py-2 ${stats.missingTemplate ? 'border-red-200 bg-red-50' : stats.outsideFilter ? 'border-cyan-200 bg-cyan-50' : 'border-emerald-100 bg-emerald-50'}`}>
+            <span className={`block text-[10px] font-bold uppercase tracking-wide ${stats.missingTemplate ? 'text-red-600' : stats.outsideFilter ? 'text-cyan-700' : 'text-emerald-600'}`}>Diagnóstico</span>
+            <b className={`mt-1 block text-lg ${stats.missingTemplate ? 'text-red-700' : stats.outsideFilter ? 'text-cyan-800' : 'text-emerald-700'}`}>
+              {stats.missingTemplate || stats.outsideFilter}
             </b>
-            <span className={`text-[11px] ${stats.outsideCatalog ? 'text-amber-700' : 'text-emerald-700'}`}>
-              fora do catálogo filtrado
+            <span className={`text-[11px] ${stats.missingTemplate ? 'text-red-700' : stats.outsideFilter ? 'text-cyan-800' : 'text-emerald-700'}`}>
+              {stats.missingTemplate ? 'template_id não cadastrado' : stats.outsideFilter ? 'fora dos filtros atuais' : 'vínculos resolvidos'}
             </span>
           </div>
         </div>
@@ -183,7 +184,11 @@ export const ReconciliationAudit: React.FC<Props> = ({ rows, catalog, onChanged 
                 </div>
                 <div className="hidden w-[300px] shrink-0 md:block">
                   <TemplateIdChips id={row.templateId} showId />
-                  {!row.template && <span className="mt-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">fora do recorte filtrado</span>}
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {!row.template && <span className="inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600">template_id não cadastrado</span>}
+                    {row.template && !row.template.inCurrentFilter && <span className="inline-block rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] font-bold text-cyan-700">fora dos filtros atuais</span>}
+                    {row.template && !row.template.hasAsset && <span className="inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">sem peça</span>}
+                  </div>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
                   <button
@@ -220,4 +225,3 @@ export const ReconciliationAudit: React.FC<Props> = ({ rows, catalog, onChanged 
     </div>
   );
 };
-

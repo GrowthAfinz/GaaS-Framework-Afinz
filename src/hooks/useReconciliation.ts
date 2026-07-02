@@ -16,6 +16,7 @@ export interface CatalogEntry {
   id: string;
   channel: string;
   hasAsset: boolean;
+  inCurrentFilter: boolean;
   vinc: number;
   dims: TemplateDims;
   raw: CommunicationTemplate;
@@ -287,17 +288,16 @@ export function useReconciliation() {
         }
       }
 
-      // Aplica os mesmos filtros globais aos templates (para o header de cobertura respeitar o recorte).
-      const filteredTemplates = templates.filter((t) => matchesGlobalFilters(decorateTemplate(t), selectedBUs, f));
-
-      const cat: CatalogEntry[] = filteredTemplates.map((t) => ({
+      const cat: CatalogEntry[] = templates.map((t) => ({
         id: t.template_id,
         channel: t.channel,
         hasAsset: !!t.original_path,
+        inCurrentFilter: matchesGlobalFilters(decorateTemplate(t), selectedBUs, f),
         vinc: 0,
         dims: templateDims(t),
         raw: t,
       }));
+      const filteredCat = cat.filter((t) => t.inCurrentFilter);
 
       // Agrega órfãos por activity_name
       const byName = new Map<string, OrphanRow>();
@@ -316,9 +316,10 @@ export function useReconciliation() {
           const slot = slotMap.get(slotKey(r.jornada, name, r.Canal));
           const momentSuggestion = readMomentSuggestion(slot?.metadata) ?? inferMomentSuggestion(name);
           const effectiveParsed = applyMomentSuggestion(parsed, momentSuggestion);
-          const exactMomentTemplates = momentExactTemplates(effectiveParsed, cat);
-          const match = matchTemplate(effectiveParsed, exactMomentTemplates);
-          const fallbackMatch = matchTemplate(effectiveParsed, cat);
+          const exactInFilter = effectiveParsed.seq ? momentExactTemplates(effectiveParsed, filteredCat) : filteredCat;
+          const exactInCatalog = effectiveParsed.seq ? momentExactTemplates(effectiveParsed, cat) : [];
+          const match = matchTemplate(effectiveParsed, exactInFilter) ?? matchTemplate(effectiveParsed, exactInCatalog);
+          const fallbackMatch = matchTemplate(effectiveParsed, filteredCat) ?? matchTemplate(effectiveParsed, cat);
           const momentConflict = !!(
             effectiveParsed.seq
             && !match
@@ -401,8 +402,9 @@ export function useReconciliation() {
     const comPeca = comPecaNames.size;
     const precisamPeca = disparosUnicos - comPeca; // órfãos + vinculados a template sem peça
     const orfaos = orphans.length;
-    const semAsset = catalog.filter((t) => !t.hasAsset).length;
-    const ativos = catalog.filter((t) => t.hasAsset).length;
+    const scopedCatalog = catalog.filter((t) => t.inCurrentFilter);
+    const semAsset = scopedCatalog.filter((t) => !t.hasAsset).length;
+    const ativos = scopedCatalog.filter((t) => t.hasAsset).length;
     const fortes = orphans.filter((o) => o.confidence === 'forte').length;
 
     const byChannel = ['email', 'wpp', 'push', 'sms'].map((ch) => {
@@ -418,7 +420,7 @@ export function useReconciliation() {
     return {
       pctCobertura: disparosUnicos > 0 ? Math.round((comPeca / disparosUnicos) * 100) : 0,
       disparosUnicos, comPeca, precisamPeca, orfaos, semAsset, ativos,
-      totalTemplates: catalog.length, fortes, byChannel,
+      totalTemplates: scopedCatalog.length, fortes, byChannel,
     };
   }, [orphans, reconciled, catalog]);
 

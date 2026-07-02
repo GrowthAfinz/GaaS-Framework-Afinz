@@ -80,6 +80,11 @@ function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplate
     score += 6;
     positives.push('Vínculo atual');
   }
+  if (tpl.inCurrentFilter) {
+    score += 3;
+  } else {
+    warnings.push('Fora dos filtros atuais');
+  }
   if (tpl.hasAsset) {
     score += 4;
     positives.push('Template com peça');
@@ -117,7 +122,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
     return catalog
       .map((tpl) => rankTemplate(row.parsed, tpl, currentTemplateId))
       .filter((item) => !q || item.tpl.id.toLowerCase().includes(q) || item.tpl.raw.title?.toLowerCase().includes(q))
-      .sort((a, b) => a.momentPriority - b.momentPriority || b.score - a.score || a.tpl.id.localeCompare(b.tpl.id))
+      .sort((a, b) => a.momentPriority - b.momentPriority || Number(b.tpl.inCurrentFilter) - Number(a.tpl.inCurrentFilter) || b.score - a.score || a.tpl.id.localeCompare(b.tpl.id))
       .slice(0, 40);
   }, [catalog, currentTemplateId, query, row.parsed]);
 
@@ -181,7 +186,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
         <div className="flex-1 overflow-y-auto p-6">
           {ranked.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">
-              Nenhum template encontrado para este filtro.
+              Nenhum template encontrado para esta busca.
             </div>
           ) : (
             <div className="space-y-2">
@@ -198,6 +203,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
                           <code className="font-mono text-sm font-bold text-slate-900">{item.tpl.id}</code>
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{item.tpl.channel}</span>
                           {isCurrent && <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-700">vínculo atual</span>}
+                          {!item.tpl.inCurrentFilter && <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-700">fora dos filtros</span>}
                           {!item.tpl.hasAsset && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem peça</span>}
                         </div>
                         <p className="mt-0.5 truncate text-xs text-slate-500">{item.tpl.raw.title || item.tpl.id}</p>

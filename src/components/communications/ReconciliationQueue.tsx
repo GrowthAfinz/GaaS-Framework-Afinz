@@ -40,6 +40,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
   }, [orphans, filter]);
 
   const strong = useMemo(() => orphans.filter((o) => o.confidence === 'forte'), [orphans]);
+  const bulkStrong = useMemo(() => strong.filter((o) => o.match?.tpl.inCurrentFilter), [strong]);
 
   const link = async (o: OrphanRow) => {
     if (!o.match) return;
@@ -51,7 +52,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
 
   const linkMany = async () => {
     setBusy('bulk'); setError(null);
-    try { for (const o of strong) if (o.match) await linkActivityToTemplate(o.name, o.match.tpl.id); onChanged(); }
+    try { for (const o of bulkStrong) if (o.match) await linkActivityToTemplate(o.name, o.match.tpl.id); onChanged(); }
     catch (err) { setError(describeError(err)); }
     finally { setBusy(null); }
   };
@@ -73,11 +74,11 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
             </button>
           ))}
         </div>
-        {strong.length > 0 && (
+        {bulkStrong.length > 0 && (
           <button onClick={linkMany} disabled={busy === 'bulk'}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60">
             {busy === 'bulk' ? <Loader2 size={15} className="animate-spin" /> : <CheckCheck size={15} />}
-            Vincular {strong.length} matches fortes
+            Vincular {bulkStrong.length} matches fortes
           </button>
         )}
       </div>
@@ -151,9 +152,11 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
         </div>
         <div className="hidden w-[300px] shrink-0 md:block">
           {m ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <TemplateIdChips id={m.tpl.id} className="min-w-0 flex-1" />
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CONF_STYLE[o.confidence]}`}>{o.confidence === 'forte' || o.confidence === 'provavel' ? `${m.score}` : CONF_LABEL[o.confidence]}</span>
+              {!m.tpl.hasAsset && <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem peca</span>}
+              {!m.tpl.inCurrentFilter && <span className="shrink-0 rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700">fora dos filtros</span>}
             </div>
           ) : o.momentConflict ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700" title="Existem candidatos parecidos, mas nenhum com a semana/disparo curada.">
@@ -193,6 +196,16 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Por que essa sugestão</p>
             {m ? (
               <div className="flex flex-wrap gap-1.5">
+                {!m.tpl.hasAsset && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
+                    Template sem peca: pode vincular agora e subir o asset depois
+                  </span>
+                )}
+                {!m.tpl.inCurrentFilter && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
+                    Template encontrado no catalogo completo, fora dos filtros atuais
+                  </span>
+                )}
                 {m.reasons.map((r, i) => (
                   <span key={i} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${r.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
                     {r.ok ? <Check size={11} /> : null}<span className="opacity-70">{r.label}:</span> {r.val}
