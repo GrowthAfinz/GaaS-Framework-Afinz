@@ -1233,17 +1233,19 @@ export async function exportAquisicaoCrmXlsx(start: Date, end: Date): Promise<{ 
 
 export async function exportAquisicaoCrmMonthlyXlsx(start: Date, end: Date): Promise<{ rows: number; filename: string }> {
   const monthStart = new Date(start.getFullYear(), start.getMonth(), 1);
+  const monthEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+  const effectiveEnd = end > monthEnd ? monthEnd : end;
   const previousStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
-  const rawRows = await fetchSupabaseRows(previousStart, end);
+  const rawRows = await fetchSupabaseRows(previousStart, effectiveEnd);
   const ExcelJSModule = await import('exceljs');
-  const workbook = buildAquisicaoCrmMonthlyReportWorkbook(ExcelJSModule.default, rawRows, monthStart, end);
+  const workbook = buildAquisicaoCrmMonthlyReportWorkbook(ExcelJSModule.default, rawRows, monthStart, effectiveEnd);
   const buffer = await workbook.xlsx.writeBuffer();
   const monthLabel = monthStart.toLocaleDateString('pt-BR', { month: 'long' }).replace(/^\w/, (char) => char.toUpperCase());
   const filename = `Report_${monthLabel}_CRM.xlsx`;
   downloadBuffer(buffer, filename);
   const rowsInPeriod = rawRows.filter((row) => {
     const rowDate = parseRowDate(get(row, 'Data de Disparo'));
-    return rowDate >= monthStart && rowDate <= end;
+    return rowDate >= monthStart && rowDate <= effectiveEnd;
   }).length;
   return { rows: rowsInPeriod, filename };
 }
