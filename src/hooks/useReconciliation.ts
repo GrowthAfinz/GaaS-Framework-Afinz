@@ -36,6 +36,7 @@ export interface OrphanRow {
   suggestedId: string;
   slotId?: string | null;
   momentSuggestion: ActivityMomentSuggestion;
+  momentConflict: boolean;
 }
 
 export interface ReconciledRow {
@@ -176,6 +177,30 @@ function inferMomentSuggestion(activityName: string): ActivityMomentSuggestion {
   };
 }
 
+function momentSuggestionToSeq(suggestion: ActivityMomentSuggestion): string | null {
+  if (!suggestion.enabled && suggestion.kind === 'pontual') return null;
+  const dispatch = suggestion.dispatch && suggestion.dispatch > 0
+    ? Math.round(suggestion.dispatch)
+    : 1;
+  if (suggestion.kind === 'semana_disparo') {
+    const week = suggestion.week && suggestion.week > 0 ? Math.round(suggestion.week) : 1;
+    return `S${week}D${String(dispatch).padStart(2, '0')}`;
+  }
+  if (suggestion.kind === 'disparo' || suggestion.kind === 'pontual') {
+    return `D${dispatch}`;
+  }
+  return null;
+}
+
+function applyMomentSuggestion(parsed: ParsedActivity, suggestion: ActivityMomentSuggestion): ParsedActivity {
+  const seq = momentSuggestionToSeq(suggestion);
+  return {
+    ...parsed,
+    seq,
+    cadencia: seq && seq.startsWith('D') ? seq : parsed.cadencia,
+  };
+}
+
 /**
  * Fila de reconciliação: disparos (activity_name) do recorte SEM template,
  * com o melhor template sugerido + estatísticas de cobertura. Escopo pelos
@@ -283,8 +308,15 @@ export function useReconciliation() {
         } else {
           const chId = canalToId(r.Canal);
           const parsed = parseActivity(name, { canal: r.Canal, parceiro: r.Parceiro, segmento: r.Segmento });
-          const match = matchTemplate(parsed, cat);
           const slot = slotMap.get(slotKey(r.jornada, name, r.Canal));
+          const momentSuggestion = readMomentSuggestion(slot?.metadata) ?? inferMomentSuggestion(name);
+          const effectiveParsed = applyMomentSuggestion(parsed, momentSuggestion);
+          const match = matchTemplate(effectiveParsed, cat);
+          const momentConflict = !!(
+            effectiveParsed.seq
+            && match?.tpl.dims.seq
+            && match.tpl.dims.seq !== effectiveParsed.seq
+          );
           byName.set(name, {
             uid: name,
             name,
@@ -294,12 +326,13 @@ export function useReconciliation() {
             base: num(r['Base Total']),
             exec: 1,
             latestDate: date,
-            parsed,
+            parsed: effectiveParsed,
             match,
             confidence: confidenceOf(match),
-            suggestedId: match ? match.tpl.id : (parsed.canal ? '' : ''),
+            suggestedId: match ? match.tpl.id : (effectiveParsed.canal ? '' : ''),
             slotId: slot?.id ?? null,
-            momentSuggestion: readMomentSuggestion(slot?.metadata) ?? inferMomentSuggestion(name),
+            momentSuggestion,
+            momentConflict,
           });
         }
       }

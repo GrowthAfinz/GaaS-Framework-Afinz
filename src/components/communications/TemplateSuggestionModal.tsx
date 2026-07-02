@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Check, GitBranch, Link2, Loader2, Search, X } from 'lucide-react';
 import type { CatalogEntry, OrphanRow, ReconciledRow } from '../../hooks/useReconciliation';
 import { describeError, linkActivityToTemplate } from '../../services/communicationService';
-import { optLabel, type DimId, type ParsedActivity, type TemplateDims } from '../../utils/taxonomy';
+import { formatSeq, optLabel, type DimId, type ParsedActivity, type TemplateDims } from '../../utils/taxonomy';
 
 type TargetRow = OrphanRow | ReconciledRow;
 
@@ -43,7 +43,7 @@ const dimValue = (parsed: ParsedActivity, dim: keyof TemplateDims) => dim === 's
 
 function displayDim(dim: keyof TemplateDims, value: string | null) {
   if (!value) return 'n/i';
-  return dim === 'seq' ? value : optLabel(dim as DimId, value);
+  return dim === 'seq' ? formatSeq(value) : optLabel(dim as DimId, value);
 }
 
 function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplateId?: string | null): RankedTemplate {
@@ -213,4 +213,3 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
     </div>
   );
 };
-
