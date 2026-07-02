@@ -190,7 +190,7 @@ const FilterDropdownInner: React.FC<FilterDropdownProps> = ({
                     if (isOpen) setSearchTerm('');
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all border shadow-sm select-none ${isActive || isOpen
-                ? 'bg-white border-[#00C6CC] text-cyan-700 shadow-md ring-1 ring-cyan-500/10'
+                ? 'bg-white border-afinz-teal text-cyan-700 shadow-md ring-1 ring-cyan-500/10'
                 : 'bg-white border-cyan-100 hover:border-cyan-200 text-slate-600'
                 }`}
             >

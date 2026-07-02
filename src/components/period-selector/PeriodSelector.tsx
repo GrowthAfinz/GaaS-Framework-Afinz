@@ -44,7 +44,7 @@ export const PeriodSelector: React.FC<PeriodSelectorProps> = ({ compact = false,
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border shadow-sm transition-all select-none ${isOpen
-                    ? 'bg-white border-[#00C6CC] text-cyan-700 shadow-md ring-1 ring-cyan-500/10'
+                    ? 'bg-white border-afinz-teal text-cyan-700 shadow-md ring-1 ring-cyan-500/10'
                     : 'bg-white border-cyan-100 text-slate-700 hover:border-cyan-200'
                     }`}
             >

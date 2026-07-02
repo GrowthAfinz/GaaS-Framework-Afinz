@@ -312,7 +312,7 @@ function App() {
         <div className="sticky top-0 z-30" ref={filterShellRef}>
           <div
             className={`
-              bg-[#f0fdfa] border-b-4 border-[#00C6CC] shadow-md transform-gpu origin-top
+              bg-afinz-ice-light border-b-4 border-afinz-teal shadow-md transform-gpu origin-top
               transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
               ${isFilterDropOpen ? 'max-h-44 opacity-100 translate-y-0 overflow-visible' : 'max-h-0 opacity-0 -translate-y-3 overflow-hidden pointer-events-none'}
             `}
