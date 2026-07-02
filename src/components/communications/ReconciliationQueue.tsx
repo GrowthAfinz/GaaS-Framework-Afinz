@@ -17,6 +17,11 @@ const CONF_STYLE: Record<Confidence, string> = {
 };
 const CONF_LABEL: Record<Confidence, string> = { forte: 'match forte', provavel: 'provável', fraca: 'fraca', novo: 'sem template' };
 
+function displayTemplateIdForUsage(templateId: string, usageSeq?: string | null) {
+  if (!usageSeq) return templateId;
+  return templateId.replace(/S\d+D\d+$/i, usageSeq);
+}
+
 interface Props {
   orphans: OrphanRow[];
   catalog: CatalogEntry[];
@@ -121,6 +126,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
 
 const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; onSuggest: () => void; onEditMoment: () => void; busy: boolean }> = ({ o, open, onToggle, onLink, onCreate, onSuggest, onEditMoment, busy }) => {
   const m = o.match;
+  const displayTemplateId = m ? displayTemplateIdForUsage(m.tpl.id, o.reuseSuggestion?.usageSeq) : '';
   const canLink = m && !o.momentConflict && o.confidence !== 'fraca' && o.confidence !== 'novo';
   return (
     <div className={`overflow-hidden rounded-xl border bg-white transition-shadow ${open ? 'border-cyan-400 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}>
@@ -153,9 +159,8 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
         <div className="hidden w-[300px] shrink-0 md:block">
           {m ? (
             <div className="flex flex-wrap items-center gap-1.5">
-              <TemplateIdChips id={m.tpl.id} className="min-w-0 flex-1" />
+              <TemplateIdChips id={displayTemplateId} className="min-w-0 flex-1" />
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CONF_STYLE[o.confidence]}`}>{o.confidence === 'forte' || o.confidence === 'provavel' ? `${m.score}` : CONF_LABEL[o.confidence]}</span>
-              {o.reuseSuggestion && <span className="shrink-0 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">reuso da régua</span>}
               {!m.tpl.hasAsset && <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem peca</span>}
               {!m.tpl.inCurrentFilter && <span className="shrink-0 rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700">fora dos filtros</span>}
             </div>
@@ -199,7 +204,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
               <div className="flex flex-wrap gap-1.5">
                 {o.reuseSuggestion && (
                   <span className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700">
-                    {o.reuseSuggestion.label}: uso {o.reuseSuggestion.usageSeq} vinculado na peça {o.reuseSuggestion.targetSeq}
+                    (reuso) {o.reuseSuggestion.label}: uso {o.reuseSuggestion.usageSeq} vinculado na peça {o.reuseSuggestion.targetSeq}
                   </span>
                 )}
                 {!m.tpl.hasAsset && (
