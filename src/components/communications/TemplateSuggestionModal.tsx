@@ -17,6 +17,7 @@ interface Props {
 interface RankedTemplate {
   tpl: CatalogEntry;
   score: number;
+  momentPriority: number;
   positives: string[];
   warnings: string[];
 }
@@ -50,6 +51,15 @@ function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplate
   let score = 0;
   const positives: string[] = [];
   const warnings: string[] = [];
+  const expectedSeq = parsed.seq;
+  const templateSeq = tpl.dims.seq;
+  const momentPriority = !expectedSeq
+    ? 0
+    : templateSeq === expectedSeq
+      ? 0
+      : !templateSeq
+        ? 1
+        : 2;
 
   (['publico', 'canal', 'campanha', 'segmento', 'seq'] as (keyof TemplateDims)[]).forEach((dim) => {
     const pv = dimValue(parsed, dim);
@@ -77,7 +87,17 @@ function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplate
     warnings.push('Template sem peça');
   }
 
-  return { tpl, score: Math.max(0, Math.min(100, score)), positives, warnings };
+  if (expectedSeq && templateSeq === expectedSeq) {
+    score += 30;
+    positives.push(`Momento curado: ${formatSeq(expectedSeq)}`);
+  } else if (expectedSeq && templateSeq) {
+    score -= 45;
+    warnings.unshift(`Momento diferente: ${formatSeq(templateSeq)}`);
+  } else if (expectedSeq) {
+    warnings.unshift(`Momento curado: ${formatSeq(expectedSeq)}`);
+  }
+
+  return { tpl, score: Math.max(0, Math.min(100, score)), momentPriority, positives, warnings };
 }
 
 const scoreClass = (score: number, isCurrent: boolean) => {
@@ -97,7 +117,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
     return catalog
       .map((tpl) => rankTemplate(row.parsed, tpl, currentTemplateId))
       .filter((item) => !q || item.tpl.id.toLowerCase().includes(q) || item.tpl.raw.title?.toLowerCase().includes(q))
-      .sort((a, b) => b.score - a.score || a.tpl.id.localeCompare(b.tpl.id))
+      .sort((a, b) => a.momentPriority - b.momentPriority || b.score - a.score || a.tpl.id.localeCompare(b.tpl.id))
       .slice(0, 40);
   }, [catalog, currentTemplateId, query, row.parsed]);
 

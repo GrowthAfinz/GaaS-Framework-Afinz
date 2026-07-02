@@ -201,6 +201,11 @@ function applyMomentSuggestion(parsed: ParsedActivity, suggestion: ActivityMomen
   };
 }
 
+function momentExactTemplates(parsed: ParsedActivity, templates: CatalogEntry[]): CatalogEntry[] {
+  if (!parsed.seq) return templates;
+  return templates.filter((tpl) => tpl.dims.seq === parsed.seq);
+}
+
 /**
  * Fila de reconciliação: disparos (activity_name) do recorte SEM template,
  * com o melhor template sugerido + estatísticas de cobertura. Escopo pelos
@@ -311,11 +316,14 @@ export function useReconciliation() {
           const slot = slotMap.get(slotKey(r.jornada, name, r.Canal));
           const momentSuggestion = readMomentSuggestion(slot?.metadata) ?? inferMomentSuggestion(name);
           const effectiveParsed = applyMomentSuggestion(parsed, momentSuggestion);
-          const match = matchTemplate(effectiveParsed, cat);
+          const exactMomentTemplates = momentExactTemplates(effectiveParsed, cat);
+          const match = matchTemplate(effectiveParsed, exactMomentTemplates);
+          const fallbackMatch = matchTemplate(effectiveParsed, cat);
           const momentConflict = !!(
             effectiveParsed.seq
-            && match?.tpl.dims.seq
-            && match.tpl.dims.seq !== effectiveParsed.seq
+            && !match
+            && fallbackMatch?.tpl.dims.seq
+            && fallbackMatch.tpl.dims.seq !== effectiveParsed.seq
           );
           byName.set(name, {
             uid: name,

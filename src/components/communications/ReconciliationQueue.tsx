@@ -154,12 +154,11 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
             <div className="flex items-center gap-2">
               <TemplateIdChips id={m.tpl.id} className="min-w-0 flex-1" />
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CONF_STYLE[o.confidence]}`}>{o.confidence === 'forte' || o.confidence === 'provavel' ? `${m.score}` : CONF_LABEL[o.confidence]}</span>
-              {o.momentConflict && (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700" title="O melhor template encontrado ainda tem semana/disparo diferente do momento curado.">
-                  <AlertTriangle size={10} /> momento
-                </span>
-              )}
             </div>
+          ) : o.momentConflict ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700" title="Existem candidatos parecidos, mas nenhum com a semana/disparo curada.">
+              <AlertTriangle size={10} /> sem template desse momento
+            </span>
           ) : (
             <span className="text-[11px] italic text-slate-400">nenhum template combina</span>
           )}
@@ -174,7 +173,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
               className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-cyan-500 disabled:opacity-60">
               {busy ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Vincular
             </button>
-          ) : o.momentConflict && m ? (
+          ) : o.momentConflict ? (
             <button onClick={onSuggest}
               className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white hover:bg-amber-400">
               <AlertTriangle size={13} /> Revisar
