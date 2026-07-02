@@ -156,8 +156,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
         <header
             className={`fixed top-0 left-0 right-0 z-50 h-16 bg-afinz-ice flex items-center px-6 gap-4 transition-all duration-300 ${
                 isFilterDropOpen 
-                    ? 'border-b border-white/20 shadow-none' 
-                    : 'border-b-4 border-afinz-teal shadow-md'
+                    ? 'border-b border-white shadow-none' 
+                    : 'border-b border-cyan-200/50 shadow-sm'
             }`}
             onMouseEnter={onMouseEnter}
         >

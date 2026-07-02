@@ -16,8 +16,8 @@ export default {
           'teal-dark': '#007c80',
           orange: '#f8a538',
           red: '#e74742',
-          ice: '#e0f7f8',
-          'ice-light': '#f0fdfa',
+          ice: '#f0fdfa',
+          'ice-light': '#f8fdfd',
         },
       },
       fontFamily: {
