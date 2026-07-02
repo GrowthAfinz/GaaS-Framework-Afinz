@@ -155,6 +155,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
             <div className="flex flex-wrap items-center gap-1.5">
               <TemplateIdChips id={m.tpl.id} className="min-w-0 flex-1" />
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CONF_STYLE[o.confidence]}`}>{o.confidence === 'forte' || o.confidence === 'provavel' ? `${m.score}` : CONF_LABEL[o.confidence]}</span>
+              {o.reuseSuggestion && <span className="shrink-0 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">reuso da régua</span>}
               {!m.tpl.hasAsset && <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem peca</span>}
               {!m.tpl.inCurrentFilter && <span className="shrink-0 rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700">fora dos filtros</span>}
             </div>
@@ -196,6 +197,11 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Por que essa sugestão</p>
             {m ? (
               <div className="flex flex-wrap gap-1.5">
+                {o.reuseSuggestion && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700">
+                    {o.reuseSuggestion.label}: uso {o.reuseSuggestion.usageSeq} vinculado na peça {o.reuseSuggestion.targetSeq}
+                  </span>
+                )}
                 {!m.tpl.hasAsset && (
                   <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700">
                     Template sem peca: pode vincular agora e subir o asset depois

@@ -22,6 +22,13 @@ export interface CatalogEntry {
   raw: CommunicationTemplate;
 }
 
+export interface TemplateReuseSuggestion {
+  usageSeq: string;
+  targetSeq: string;
+  label: string;
+  variantType: 'subject_variant' | 'repeat_template';
+}
+
 export interface OrphanRow {
   uid: string;
   name: string;
@@ -38,6 +45,7 @@ export interface OrphanRow {
   slotId?: string | null;
   momentSuggestion: ActivityMomentSuggestion;
   momentConflict: boolean;
+  reuseSuggestion?: TemplateReuseSuggestion | null;
 }
 
 export interface ReconciledRow {
@@ -207,6 +215,40 @@ function momentExactTemplates(parsed: ParsedActivity, templates: CatalogEntry[])
   return templates.filter((tpl) => tpl.dims.seq === parsed.seq);
 }
 
+function inferTopFunnelReuse(parsed: ParsedActivity): TemplateReuseSuggestion | null {
+  if (parsed.canal !== 'email' || parsed.campanha !== 'copa' || !parsed.seq) return null;
+  const match = parsed.seq.match(/^S(\d+)D0*(\d+)$/i);
+  if (!match) return null;
+  const week = Number(match[1]);
+  const dispatch = Number(match[2]);
+  if (!week || !dispatch) return null;
+  if (dispatch === 3) {
+    return {
+      usageSeq: parsed.seq,
+      targetSeq: `S${week}D01`,
+      label: 'Email x.1: variação de assunto reaproveita a peça D1',
+      variantType: 'subject_variant',
+    };
+  }
+  if (dispatch === 4) {
+    return {
+      usageSeq: parsed.seq,
+      targetSeq: `S${week}D02`,
+      label: 'Continuação da régua: D4 repete a peça D2',
+      variantType: 'repeat_template',
+    };
+  }
+  return null;
+}
+
+function applyTemplateSeq(parsed: ParsedActivity, seq: string): ParsedActivity {
+  return {
+    ...parsed,
+    seq,
+    cadencia: seq.startsWith('D') ? seq : parsed.cadencia,
+  };
+}
+
 /**
  * Fila de reconciliação: disparos (activity_name) do recorte SEM template,
  * com o melhor template sugerido + estatísticas de cobertura. Escopo pelos
@@ -318,7 +360,22 @@ export function useReconciliation() {
           const effectiveParsed = applyMomentSuggestion(parsed, momentSuggestion);
           const exactInFilter = effectiveParsed.seq ? momentExactTemplates(effectiveParsed, filteredCat) : filteredCat;
           const exactInCatalog = effectiveParsed.seq ? momentExactTemplates(effectiveParsed, cat) : [];
-          const match = matchTemplate(effectiveParsed, exactInFilter) ?? matchTemplate(effectiveParsed, exactInCatalog);
+          const exactMatch = matchTemplate(effectiveParsed, exactInFilter) ?? matchTemplate(effectiveParsed, exactInCatalog);
+          const reuseSuggestion = inferTopFunnelReuse(effectiveParsed);
+          const reuseParsed = reuseSuggestion ? applyTemplateSeq(effectiveParsed, reuseSuggestion.targetSeq) : null;
+          const reuseInFilter = reuseParsed ? momentExactTemplates(reuseParsed, filteredCat) : [];
+          const reuseInCatalog = reuseParsed ? momentExactTemplates(reuseParsed, cat) : [];
+          const reuseMatch = reuseParsed
+            ? matchTemplate(reuseParsed, reuseInFilter) ?? matchTemplate(reuseParsed, reuseInCatalog)
+            : null;
+          const match = exactMatch ?? (reuseMatch ? {
+            ...reuseMatch,
+            reasons: [
+              { dim: 'reuse', label: 'Regra da régua', val: reuseSuggestion?.label ?? 'Reuso esperado', ok: true },
+              { dim: 'usage_seq', label: 'Uso real', val: effectiveParsed.seq ?? 'n/i', ok: true },
+              ...reuseMatch.reasons,
+            ],
+          } : null);
           const fallbackMatch = matchTemplate(effectiveParsed, filteredCat) ?? matchTemplate(effectiveParsed, cat);
           const momentConflict = !!(
             effectiveParsed.seq
@@ -342,6 +399,7 @@ export function useReconciliation() {
             slotId: slot?.id ?? null,
             momentSuggestion,
             momentConflict,
+            reuseSuggestion: exactMatch ? null : reuseSuggestion,
           });
         }
       }

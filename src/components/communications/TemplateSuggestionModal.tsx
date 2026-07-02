@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Check, GitBranch, Link2, Loader2, Search, X } from 'lucide-react';
-import type { CatalogEntry, OrphanRow, ReconciledRow } from '../../hooks/useReconciliation';
+import type { CatalogEntry, OrphanRow, ReconciledRow, TemplateReuseSuggestion } from '../../hooks/useReconciliation';
 import { describeError, linkActivityToTemplate } from '../../services/communicationService';
 import { formatSeq, optLabel, type DimId, type ParsedActivity, type TemplateDims } from '../../utils/taxonomy';
 
@@ -47,19 +47,22 @@ function displayDim(dim: keyof TemplateDims, value: string | null) {
   return dim === 'seq' ? formatSeq(value) : optLabel(dim as DimId, value);
 }
 
-function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplateId?: string | null): RankedTemplate {
+function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplateId?: string | null, reuse?: TemplateReuseSuggestion | null): RankedTemplate {
   let score = 0;
   const positives: string[] = [];
   const warnings: string[] = [];
   const expectedSeq = parsed.seq;
   const templateSeq = tpl.dims.seq;
+  const isReuseTarget = !!reuse && expectedSeq === reuse.usageSeq && templateSeq === reuse.targetSeq;
   const momentPriority = !expectedSeq
     ? 0
     : templateSeq === expectedSeq
       ? 0
-      : !templateSeq
+      : isReuseTarget
         ? 1
-        : 2;
+      : !templateSeq
+        ? 2
+        : 3;
 
   (['publico', 'canal', 'campanha', 'segmento', 'seq'] as (keyof TemplateDims)[]).forEach((dim) => {
     const pv = dimValue(parsed, dim);
@@ -67,6 +70,9 @@ function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplate
     if (pv && tv && pv === tv) {
       score += DIM_WEIGHT[dim];
       positives.push(`${DIM_LABEL[dim]}: ${displayDim(dim, tv)}`);
+    } else if (dim === 'seq' && isReuseTarget && tv) {
+      score += DIM_WEIGHT.seq - 4;
+      positives.push(`Reuso da régua: ${formatSeq(reuse!.usageSeq)} usa ${formatSeq(reuse!.targetSeq)}`);
     } else if (pv && tv) {
       const penalty = dim === 'canal' ? 35 : dim === 'seq' ? 14 : 8;
       score -= penalty;
@@ -95,6 +101,9 @@ function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplate
   if (expectedSeq && templateSeq === expectedSeq) {
     score += 30;
     positives.push(`Momento curado: ${formatSeq(expectedSeq)}`);
+  } else if (isReuseTarget) {
+    score += 24;
+    positives.push(reuse!.label);
   } else if (expectedSeq && templateSeq) {
     score -= 45;
     warnings.unshift(`Momento diferente: ${formatSeq(templateSeq)}`);
@@ -119,8 +128,9 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
 
   const ranked = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const reuseSuggestion = 'reuseSuggestion' in row ? row.reuseSuggestion : null;
     return catalog
-      .map((tpl) => rankTemplate(row.parsed, tpl, currentTemplateId))
+      .map((tpl) => rankTemplate(row.parsed, tpl, currentTemplateId, reuseSuggestion))
       .filter((item) => !q || item.tpl.id.toLowerCase().includes(q) || item.tpl.raw.title?.toLowerCase().includes(q))
       .sort((a, b) => a.momentPriority - b.momentPriority || Number(b.tpl.inCurrentFilter) - Number(a.tpl.inCurrentFilter) || b.score - a.score || a.tpl.id.localeCompare(b.tpl.id))
       .slice(0, 40);
