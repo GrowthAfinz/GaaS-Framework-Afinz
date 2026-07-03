@@ -24,6 +24,7 @@ export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) 
 const CadastroTemplates: React.FC = () => {
   const [tab, setTab] = useState<SubTab>('fila');
   const [compose, setCompose] = useState<OrphanRow | null | undefined>(undefined); // undefined=fechado, null=novo, orphan=seed
+  const [queueChannel, setQueueChannel] = useState<string | null>(null); // filtro de canal vindo do header de cobertura
   const { orphans, reconciled, catalog, coverage, loading, error, refetch } = useReconciliation();
 
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
@@ -46,7 +47,12 @@ const CadastroTemplates: React.FC = () => {
           <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400"><Loader2 size={18} className="animate-spin" /> Carregando cobertura…</div>
         ) : (
           <>
-            <CoverageHeader c={coverage} />
+            <CoverageHeader
+              c={coverage}
+              onOrfaosClick={() => { setQueueChannel(null); setTab('fila'); }}
+              onSemPecaClick={() => setTab('asset')}
+              onChannelClick={(label) => { setQueueChannel(label); setTab('fila'); }}
+            />
 
             <div className="mt-5 flex items-center gap-2">
               {tabs.map((t) => {
@@ -67,7 +73,14 @@ const CadastroTemplates: React.FC = () => {
 
             <div className="mt-5">
               {tab === 'fila' && (
-                <ReconciliationQueue orphans={orphans} catalog={catalog} onCreate={(seed) => setCompose(seed)} onChanged={refetch} />
+                <ReconciliationQueue
+                  orphans={orphans}
+                  catalog={catalog}
+                  channelFilter={queueChannel}
+                  onClearChannelFilter={() => setQueueChannel(null)}
+                  onCreate={(seed) => setCompose(seed)}
+                  onChanged={refetch}
+                />
               )}
               {tab === 'asset' && <TemplateCatalogView />}
               {tab === 'auditoria' && <ReconciliationAudit rows={reconciled} catalog={catalog} onChanged={refetch} />}

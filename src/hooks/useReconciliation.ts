@@ -423,9 +423,9 @@ export function useReconciliation() {
           byLinked.set(uid, {
             uid,
             name,
-            jornada: r.jornada ?? 'â€”',
+            jornada: r.jornada ?? '—',
             channel: chId,
-            canalLabel: r.Canal ?? 'â€”',
+            canalLabel: r.Canal ?? '—',
             base: num(r['Base Total']),
             exec: 1,
             latestDate: date,

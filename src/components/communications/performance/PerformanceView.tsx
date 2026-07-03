@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../../../contexts/PeriodContext';
-import { useTemplatePerformance, type TemplatePerformance } from '../../../hooks/useTemplatePerformance';
+import { useTemplatePerformance, type PerformancePrevTotals, type TemplatePerformance } from '../../../hooks/useTemplatePerformance';
 import type { ActivityRow } from '../../../types/activity';
 import { CommunicationDetailModal } from '../CommunicationDetailModal';
 import { ChannelPreview, ChannelThumb } from './ChannelPreview';
@@ -196,12 +196,12 @@ const KpiEvolution: React.FC<{ items: ScoredTemplate[] }> = ({ items }) => {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-[18px] py-[15px]">
-        <div className="flex items-center gap-2.5 text-sm font-bold text-slate-900"><span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700"><BarChart3 size={15} /></span>Evolução de KPIs</div>
+        <div className="flex items-center gap-2.5 text-sm font-bold text-slate-900"><span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-50 text-cyan-700"><BarChart3 size={15} /></span>Evolução no período</div>
         <span className="text-xs font-semibold text-slate-400">soma diária no período</span>
       </div>
       <div className="p-[18px]">
         <MetricTabs options={KPI_METRICS} value={mk} onChange={setMk} />
-        {data.length === 0 ? <div className="flex h-44 items-center justify-center text-sm text-slate-400">Sem série temporal no período.</div> : <MetricArea data={data} color={cfg.color} kind={cfg.kind} height={200} />}
+        {data.length === 0 ? <div className="flex h-44 items-center justify-center text-sm text-slate-400">Sem série no período.</div> : <MetricArea data={data} color={cfg.color} kind={cfg.kind} height={200} />}
       </div>
     </div>
   );
@@ -234,18 +234,35 @@ const DrawerTimeline: React.FC<{ t: ScoredTemplate }> = ({ t }) => {
 };
 
 // ── VISÃO GERAL ───────────────────────────────────────────────────────────────
-const GCard: React.FC<{ label: string; value: React.ReactNode; sub: React.ReactNode; icon: React.ReactNode }> = ({ label, value, sub, icon }) => (
+/** Delta vs. período anterior de mesma duração. Sem baseline → não renderiza. */
+const Delta: React.FC<{ cur: number; prev: number | null | undefined; goodWhenUp?: boolean }> = ({ cur, prev, goodWhenUp = true }) => {
+  if (prev == null || prev <= 0) return null;
+  const pct = (cur - prev) / prev;
+  if (!Number.isFinite(pct)) return null;
+  const up = pct >= 0;
+  const good = up === goodWhenUp;
+  return (
+    <span
+      className={`ml-2 inline-flex items-center gap-0.5 align-middle text-[12px] font-bold tabular-nums ${good ? 'text-emerald-600' : 'text-rose-600'}`}
+      title="vs. período anterior de mesma duração"
+    >
+      {up ? <ArrowUp size={12} /> : <ArrowDown size={12} />}{Math.abs(pct * 100).toFixed(0)}%
+    </span>
+  );
+};
+
+const GCard: React.FC<{ label: string; value: React.ReactNode; sub: React.ReactNode; icon: React.ReactNode; delta?: React.ReactNode }> = ({ label, value, sub, icon, delta }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
     <div className="mb-2.5 flex items-center justify-between">
       <span className="text-[10.5px] font-bold uppercase tracking-wide text-slate-500">{label}</span>
       <span className="grid h-7 w-7 place-items-center rounded-lg bg-slate-100 text-slate-500">{icon}</span>
     </div>
-    <div className="text-[30px] font-bold leading-none tracking-tight tabular-nums text-slate-900">{value}</div>
+    <div className="text-[30px] font-bold leading-none tracking-tight tabular-nums text-slate-900">{value}{delta}</div>
     <div className="mt-2 text-xs leading-snug text-slate-500">{sub}</div>
   </div>
 );
 
-const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) => void }> = ({ items, onOpen }) => {
+const Overview: React.FC<{ items: ScoredTemplate[]; prev?: PerformancePrevTotals | null; onOpen: (t: ScoredTemplate) => void }> = ({ items, prev, onOpen }) => {
   const stats = useMemo(() => channelStats(items), [items]);
   const totals = useMemo(() => perfTotals(items, stats), [items, stats]);
   const timeline = useMemo(() => dispatchTimeline(items), [items]);
@@ -255,11 +272,27 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
   if (!champion) return null;
 
   const engaj = totals.base > 0 ? totals.aberturas / totals.base : 0;
+  const engajPrev = prev && prev.baseEnviada > 0 ? prev.aberturas / prev.baseEnviada : null;
   const maxStack = Math.max(...timeline.map((d) => d.email + d.whatsapp + d.push + d.sms), 1);
   const maxDisparos = Math.max(...CHANNEL_ORDER.map((ch) => stats[ch].disparos), 1);
 
+  // Narrativa de abertura (Padrão → Impacto → Ação), no padrão da skill de produto.
+  const topChannel = CHANNEL_ORDER.reduce((a, b) => (stats[b].disparos > stats[a].disparos ? b : a), CHANNEL_ORDER[0]);
+  const firstAction = actions[0];
+  const narrative = [
+    `${CHANNELS[topChannel].label} concentra ${stats[topChannel].disparos} de ${totals.disparos} disparos no período.`,
+    `A peça campeã é ${champion.template.template_id} (score ${champion.score ?? '—'}).`,
+    firstAction ? `Próximo passo: ${firstAction.title.toLowerCase()} — ${firstAction.item.template.template_id}.` : null,
+  ].filter(Boolean).join(' ');
+
   return (
     <div className="flex flex-col gap-5">
+      {/* narrativa do período */}
+      <div className="flex items-start gap-2.5 rounded-2xl border border-cyan-100 bg-cyan-50/60 px-4 py-3">
+        <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-cyan-600 text-white"><Zap size={13} /></span>
+        <p className="text-[13px] leading-snug text-slate-700">{narrative}</p>
+      </div>
+
       {/* cockpit */}
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
         <button onClick={() => onOpen(champion)} className="rounded-2xl border border-transparent bg-gradient-to-br from-[#063b3d] via-[#0a5f63] to-[#00838a] p-4 text-left text-white shadow-sm transition-transform hover:-translate-y-0.5">
@@ -276,9 +309,9 @@ const Overview: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) 
           </div>
           <div className="mt-3 text-[11px] text-white/70">Maior score de conteúdo do período</div>
         </button>
-        <GCard label="Disparos no período" value={fmt.int(totals.disparos)} icon={<Send size={15} />} sub={<span><b className="text-slate-800">{totals.templates}</b> templates · {totals.realChannels} de 4 canais com dado</span>} />
-        <GCard label="Base acionada" value={fmt.k(totals.base)} icon={<Users2 size={15} />} sub={<span>Alcance somado dos disparos no período</span>} />
-        <GCard label="Engajamento médio" value={fmt.pctFrac(engaj, 1)} icon={<Gauge size={15} />} sub={<span>WhatsApp <b className="text-slate-800">{fmt.pctFrac(stats.whatsapp.txAbertura, 0)}</b> · E-mail <b className="text-slate-800">{fmt.pctFrac(stats.email.txAbertura, 0)}</b> de abertura</span>} />
+        <GCard label="Disparos no período" value={fmt.int(totals.disparos)} delta={<Delta cur={totals.disparos} prev={prev?.executions} />} icon={<Send size={15} />} sub={<span><b className="text-slate-800">{totals.templates}</b> templates · {totals.realChannels} de 4 canais com dado</span>} />
+        <GCard label="Base acionada" value={fmt.k(totals.base)} delta={<Delta cur={totals.base} prev={prev?.baseEnviada} />} icon={<Users2 size={15} />} sub={<span>Alcance somado dos disparos no período</span>} />
+        <GCard label="Engajamento médio" value={fmt.pctFrac(engaj, 1)} delta={<Delta cur={engaj} prev={engajPrev} />} icon={<Gauge size={15} />} sub={<span>WhatsApp <b className="text-slate-800">{fmt.pctFrac(stats.whatsapp.txAbertura, 0)}</b> · E-mail <b className="text-slate-800">{fmt.pctFrac(stats.email.txAbertura, 0)}</b> de abertura</span>} />
       </div>
 
       {/* volume + ações */}
@@ -406,7 +439,7 @@ const GalCard: React.FC<{ t: ScoredTemplate; onOpen: () => void }> = ({ t, onOpe
           <KTile v={sig.v} l={sig.l} />
           <KTile v={fmt.pctFrac(t.ctr, 2)} l="CTR" />
           <KTile v={fmt.int(t.cartoes)} l="cartões" accent />
-          <KTile v={t.cacEfetivo > 0 ? fmt.brl(t.cacEfetivo) : '—'} l={`CAC${t.custoEstimado ? '*' : ''}`} />
+          <KTile v={t.cacEfetivo > 0 ? fmt.brl(t.cacEfetivo) : '—'} l={t.custoEstimado ? 'CAC est.' : 'CAC'} />
         </div>
         <div className="mt-auto flex flex-wrap gap-1.5">{t.diagnoses.filter((d) => d !== 'custo_parcial').slice(0, 2).map((d) => <DiagBadge key={d} id={d} />)}</div>
       </div>
@@ -475,7 +508,14 @@ const TableView: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate)
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{fmt.pctFrac(t.ctr, 2)}</td>
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{fmt.pctFrac(t.taxaConversao, t.taxaConversao < 0.0001 ? 3 : 2)}</td>
                   <td className="px-2.5 py-2.5 text-right text-sm font-bold tabular-nums text-cyan-700">{fmt.int(t.cartoes)}</td>
-                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{t.cacEfetivo > 0 ? `${fmt.brl(t.cacEfetivo)}${t.custoEstimado ? '*' : ''}` : <span className="text-slate-300">—</span>}</td>
+                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">
+                    {t.cacEfetivo > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        {fmt.brl(t.cacEfetivo)}
+                        {t.custoEstimado && <span className="rounded bg-amber-50 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-600" title="CAC estimado pelo custo unitário do canal (sem custo real vinculado)">est.</span>}
+                      </span>
+                    ) : <span className="text-slate-300">—</span>}
+                  </td>
                   <td className="px-2.5 py-2.5 text-right"><ScoreBadge score={t.score} sm /></td>
                   <td className="px-2.5 py-2.5"><div className="flex justify-center"><Sparkline series={t.timeline.map((p) => p.cartoes)} color={CHANNELS[t.channelKey].color} /></div></td>
                   <td className="px-2.5 py-2.5"><ArrowRight size={15} className="text-slate-300" /></td>
@@ -550,7 +590,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
             ))}
           </div>
 
-          <SectionTitle>Evolução (linha do tempo)</SectionTitle>
+          <SectionTitle>Evolução no período</SectionTitle>
           <DrawerTimeline t={t} />
 
           {t.diagnoses.length > 0 && <>
@@ -674,7 +714,7 @@ function buOf(t: ScoredTemplate): string | null {
 
 // ── ORQUESTRADOR ───────────────────────────────────────────────────────────
 export const PerformanceView: React.FC = () => {
-  const { data, loading, error, refetch } = useTemplatePerformance();
+  const { data, previousTotals, loading, error, refetch } = useTemplatePerformance();
   const { startDate, endDate } = usePeriod();
   const [view, setView] = useState<ViewMode>('overview');
   const [channel, setChannel] = useState<ChannelKey | 'all'>('all');
@@ -744,7 +784,7 @@ export const PerformanceView: React.FC = () => {
           <Search size={28} className="text-slate-300" /><p className="text-sm text-slate-400">Nenhuma peça neste filtro.</p>
         </div>
       ) : view === 'overview' ? (
-        <Overview items={filtered} onOpen={setSelected} />
+        <Overview items={filtered} prev={previousTotals} onOpen={setSelected} />
       ) : view === 'gallery' ? (
         <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((t) => <GalCard key={t.template.template_id} t={t} onOpen={() => setSelected(t)} />)}

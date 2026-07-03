@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { differenceInCalendarDays, format, subDays } from 'date-fns';
 import { supabase } from '../services/supabaseClient';
 import type { CommunicationTemplate } from '../types/communication';
 import { channelUnitCost } from '../utils/inferChannel';
@@ -47,6 +47,15 @@ export interface TemplatePerformance {
   custoEfetivo: number;      // gasto exibido (real ou estimado pelo canal)
   cacEfetivo: number;        // CAC exibido (real ou estimado pelo canal)
   custoEstimado: boolean;    // true quando custoEfetivo veio do custo de canal (sem custo real)
+}
+
+/** Totais do período anterior (mesma duração), para deltas nos KPI cards. */
+export interface PerformancePrevTotals {
+  executions: number;
+  baseEnviada: number;
+  aberturas: number;
+  cliques: number;
+  cartoes: number;
 }
 
 interface ActivityMetricRow {
@@ -121,6 +130,7 @@ function createAccumulator(template: CommunicationTemplate): Accumulator {
  */
 export function useTemplatePerformance() {
   const [data, setData] = useState<TemplatePerformance[]>([]);
+  const [previousTotals, setPreviousTotals] = useState<PerformancePrevTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -155,12 +165,40 @@ export function useTemplatePerformance() {
       if (f.parceiros?.length) actQuery = actQuery.in('"Parceiro"', f.parceiros);
       if (f.subgrupos?.length) actQuery = actQuery.in('"Subgrupos"', f.subgrupos);
 
-      const [{ data: acts, error: aErr }, { data: tmpls, error: tErr }] = await Promise.all([
+      // Janela anterior de mesma duração (padrão previousFilters do App.tsx)
+      const spanDays = Math.max(differenceInCalendarDays(endDate, startDate), 0);
+      const prevEnd = subDays(startDate, 1);
+      const prevStart = subDays(prevEnd, spanDays);
+      let prevQuery = supabase
+        .from('activities')
+        .select('"Base Total", Abertura, Cliques, "Cartões Gerados"')
+        .not('template_id', 'is', null)
+        .gte('"Data de Disparo"', format(prevStart, 'yyyy-MM-dd'))
+        .lte('"Data de Disparo"', `${format(prevEnd, 'yyyy-MM-dd')} 23:59:59`);
+      if (selectedBUs.length) prevQuery = prevQuery.in('BU', selectedBUs);
+      if (f.canais?.length) prevQuery = prevQuery.in('"Canal"', f.canais);
+      if (f.jornadas?.length) prevQuery = prevQuery.in('jornada', f.jornadas);
+      if (f.segmentos?.length) prevQuery = prevQuery.in('"Segmento"', f.segmentos);
+      if (f.parceiros?.length) prevQuery = prevQuery.in('"Parceiro"', f.parceiros);
+      if (f.subgrupos?.length) prevQuery = prevQuery.in('"Subgrupos"', f.subgrupos);
+
+      const [{ data: acts, error: aErr }, { data: tmpls, error: tErr }, { data: prevActs }] = await Promise.all([
         actQuery,
         supabase.from('communication_templates').select('*'),
+        prevQuery,
       ]);
       if (aErr) throw aErr;
       if (tErr) throw tErr;
+
+      const prev: PerformancePrevTotals = { executions: 0, baseEnviada: 0, aberturas: 0, cliques: 0, cartoes: 0 };
+      for (const r of (prevActs ?? []) as ActivityMetricRow[]) {
+        prev.executions += 1;
+        prev.baseEnviada += num(r['Base Total']);
+        prev.aberturas += num(r.Abertura);
+        prev.cliques += num(r.Cliques);
+        prev.cartoes += num(r['Cartões Gerados'] ?? r['CartÃµes Gerados']);
+      }
+      setPreviousTotals(prev.executions > 0 ? prev : null);
 
       const templateById = new Map<string, CommunicationTemplate>();
       for (const t of (tmpls ?? []) as CommunicationTemplate[]) templateById.set(t.template_id, t);
@@ -254,5 +292,5 @@ export function useTemplatePerformance() {
     fetchPerformance();
   }, [fetchPerformance]);
 
-  return { data, loading, error, refetch: fetchPerformance };
+  return { data, previousTotals, loading, error, refetch: fetchPerformance };
 }

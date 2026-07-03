@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles, CalendarClock, AlertTriangle } from 'lucide-react';
+import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles, CalendarClock, AlertTriangle, X } from 'lucide-react';
 import type { CatalogEntry, OrphanRow } from '../../hooks/useReconciliation';
 import { linkActivityToTemplate, describeError } from '../../services/communicationService';
 import { optLabel, type Confidence, type DimId } from '../../utils/taxonomy';
@@ -25,11 +25,14 @@ function displayTemplateIdForUsage(templateId: string, usageSeq?: string | null)
 interface Props {
   orphans: OrphanRow[];
   catalog: CatalogEntry[];
+  /** Filtro de canal vindo do header de cobertura (label canônico, ex.: 'E-mail'). */
+  channelFilter?: string | null;
+  onClearChannelFilter?: () => void;
   onCreate: (seed: OrphanRow) => void;
   onChanged: () => void;
 }
 
-export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreate, onChanged }) => {
+export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channelFilter, onClearChannelFilter, onCreate, onChanged }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todos' | 'forte' | 'novo'>('todos');
   const [busy, setBusy] = useState<string | null>(null);
@@ -37,14 +40,19 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
   const [suggesting, setSuggesting] = useState<OrphanRow | null>(null);
   const [editingMoment, setEditingMoment] = useState<OrphanRow | null>(null);
 
+  const scoped = useMemo(
+    () => (channelFilter ? orphans.filter((o) => o.canalLabel === channelFilter) : orphans),
+    [orphans, channelFilter]
+  );
+
   const list = useMemo(() => {
-    let l = [...orphans].sort((a, b) => CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || b.base - a.base);
+    let l = [...scoped].sort((a, b) => CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || b.base - a.base);
     if (filter === 'forte') l = l.filter((o) => o.confidence === 'forte');
     if (filter === 'novo') l = l.filter((o) => o.confidence === 'novo');
     return l;
-  }, [orphans, filter]);
+  }, [scoped, filter]);
 
-  const strong = useMemo(() => orphans.filter((o) => o.confidence === 'forte'), [orphans]);
+  const strong = useMemo(() => scoped.filter((o) => o.confidence === 'forte'), [scoped]);
   const bulkStrong = useMemo(() => strong.filter((o) => o.match?.tpl.inCurrentFilter), [strong]);
 
   const link = async (o: OrphanRow) => {
@@ -63,21 +71,29 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
   };
 
   const filters: [typeof filter, string, number][] = [
-    ['todos', 'Todos', orphans.length],
+    ['todos', 'Todos', scoped.length],
     ['forte', 'Match forte', strong.length],
-    ['novo', 'Sem template', orphans.filter((o) => o.confidence === 'novo').length],
+    ['novo', 'Sem template', scoped.filter((o) => o.confidence === 'novo').length],
   ];
 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {filters.map(([id, label, n]) => (
             <button key={id} onClick={() => setFilter(id)}
               className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${filter === id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
               {label}<span className="text-[11px] font-bold opacity-70">{n}</span>
             </button>
           ))}
+          {channelFilter && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-700">
+              Canal: {channelFilter}
+              <button onClick={onClearChannelFilter} title="Remover filtro de canal" className="rounded-full p-0.5 text-cyan-500 hover:bg-cyan-100 hover:text-cyan-800">
+                <X size={12} />
+              </button>
+            </span>
+          )}
         </div>
         {bulkStrong.length > 0 && (
           <button onClick={linkMany} disabled={busy === 'bulk'}
@@ -90,9 +106,9 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, onCreat
 
       {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
 
-      {orphans.length === 0 ? (
+      {scoped.length === 0 ? (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">
-          <CheckCheck size={22} /> <div><b>Fila zerada.</b> Todos os disparos do recorte estão vinculados a um template.</div>
+          <CheckCheck size={22} /> <div><b>Fila zerada.</b> {channelFilter ? `Nenhum órfão de ${channelFilter} no recorte.` : 'Todos os disparos do recorte estão vinculados a um template.'}</div>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -160,8 +176,10 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
           {m ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <TemplateIdChips id={displayTemplateId} className="min-w-0 flex-1" />
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CONF_STYLE[o.confidence]}`}>{o.confidence === 'forte' || o.confidence === 'provavel' ? `${m.score}` : CONF_LABEL[o.confidence]}</span>
-              {!m.tpl.hasAsset && <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem peca</span>}
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${CONF_STYLE[o.confidence]}`} title={`Score de match: ${m.score}/100 (${CONF_LABEL[o.confidence]})`}>
+                {o.confidence === 'novo' ? CONF_LABEL[o.confidence] : `${m.score}${o.confidence === 'fraca' ? ' · fraca' : ''}`}
+              </span>
+              {!m.tpl.hasAsset && <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">sem peça</span>}
               {!m.tpl.inCurrentFilter && <span className="shrink-0 rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-bold text-cyan-700">fora dos filtros</span>}
             </div>
           ) : o.momentConflict ? (
