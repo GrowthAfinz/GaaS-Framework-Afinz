@@ -4,7 +4,7 @@ import { TreeNode as TreeNodeType } from '../../../types/explorer';
 import { TreeNodeIcon } from './TreeNodeIcon';
 import { TreeNodeBadge } from './TreeNodeBadge';
 
-const LEVEL_INDENT = 16; // px per level
+const LEVEL_INDENT = 12; // px per level
 
 interface TreeNodeProps {
   node: TreeNodeType;
@@ -27,8 +27,8 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const hasChildren = node.children.length > 0;
-  const paddingLeft = level * LEVEL_INDENT;
   const isDisparo = node.type === 'disparo';
+  const paddingLeft = isDisparo ? (level - 1) * LEVEL_INDENT : level * LEVEL_INDENT;
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();

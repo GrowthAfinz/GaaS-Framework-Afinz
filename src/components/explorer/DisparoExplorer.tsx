@@ -356,7 +356,7 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
   return (
     <div className="flex h-full gap-4 p-4 overflow-hidden">
       {/* 1. Left Column: TreeView */}
-      <aside className="w-72 shrink-0 flex flex-col gap-3 overflow-hidden">
+      <aside className="w-[420px] shrink-0 flex flex-col gap-3 overflow-hidden">
         <div className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
           <span className="text-xs font-semibold text-slate-600">
             {format(startDate, 'dd MMM', { locale: ptBR })} - {format(endDate, 'dd MMM yyyy', { locale: ptBR })}
