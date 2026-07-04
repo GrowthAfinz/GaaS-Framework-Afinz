@@ -9,6 +9,7 @@ import {
   TreeNode
 } from '../../types/explorer';
 import { ActivityRow } from '../../types/activity';
+import { cleanJourneyName } from '../../utils/taxonomy';
 
 type FocusContext = {
   bu?: string;
@@ -316,7 +317,7 @@ export function useComparisonData({
 
       return {
         id: `${distributionLevel}-${idx}`,
-        label,
+        label: distributionLevel === 'jornada' ? cleanJourneyName(label) : label,
         value,
         prevValue,
         color,

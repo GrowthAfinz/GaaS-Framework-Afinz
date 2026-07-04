@@ -293,3 +293,24 @@ export function confidenceOf(match: { score: number } | null): Confidence {
   if (!match) return 'novo';
   return match.score >= 85 ? 'forte' : match.score >= 60 ? 'provavel' : 'fraca';
 }
+
+export function cleanJourneyName(name: string): string {
+  if (!name) return name;
+  let clean = name;
+  // Remove prefix JOR_AQUISICAO_ or JOR_
+  clean = clean.replace(/^JOR_AQUISICAO_/, '');
+  clean = clean.replace(/^JOR_/, '');
+  // Remove starting underscore
+  clean = clean.replace(/^_/, '');
+  // Replace underscores with spaces
+  clean = clean.replace(/_/g, ' ');
+  // Normalize spaces
+  clean = clean.trim().replace(/\s+/g, ' ');
+  
+  // Convert to Title Case with acronym exceptions
+  return clean.toLowerCase().split(' ').map(word => {
+    if (['na', 'de', 'do', 'da', 'no', 'em', 'para', 'com', 'por'].includes(word)) return word;
+    if (['b2c', 'b2b', 'b2b2c', 'ngd', 'cac', 'kpi', 'wpp', 'sms', 'copa', 'rao', 'vibe', 'pad'].includes(word)) return word.toUpperCase();
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+}

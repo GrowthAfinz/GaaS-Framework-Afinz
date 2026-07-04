@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { TreeNode as TreeNodeType } from '../../../types/explorer';
 import { TreeNodeIcon } from './TreeNodeIcon';
 import { TreeNodeBadge } from './TreeNodeBadge';
+import { cleanJourneyName } from '../../../utils/taxonomy';
 
 const LEVEL_INDENT = 12; // px per level
 
@@ -108,8 +109,11 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
         <TreeNodeIcon type={node.type} label={node.label} color={node.color} size={13} />
 
         {/* Label */}
-        <span className="truncate flex-1 font-medium text-xs leading-relaxed">
-          {node.label}
+        <span
+          className={`${node.type === 'jornada' ? 'whitespace-normal line-clamp-2 pr-1' : 'truncate'} flex-1 font-medium text-xs leading-relaxed`}
+          title={node.label}
+        >
+          {node.type === 'jornada' ? cleanJourneyName(node.label) : node.label}
         </span>
 
         {/* Badge */}

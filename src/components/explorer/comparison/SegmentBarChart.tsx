@@ -94,7 +94,7 @@ export const SegmentBarChart: React.FC<SegmentBarChartProps> = ({ data, metric, 
           tick={{ fill: '#475569', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={90}
+          width={180}
         />
         <Tooltip content={<CustomTooltip metric={metric} />} cursor={{ fill: 'rgba(226,232,240,0.35)' }} />
 
