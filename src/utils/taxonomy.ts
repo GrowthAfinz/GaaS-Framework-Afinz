@@ -307,10 +307,5 @@ export function cleanJourneyName(name: string): string {
   // Normalize spaces
   clean = clean.trim().replace(/\s+/g, ' ');
   
-  // Convert to Title Case with acronym exceptions
-  return clean.toLowerCase().split(' ').map(word => {
-    if (['na', 'de', 'do', 'da', 'no', 'em', 'para', 'com', 'por'].includes(word)) return word;
-    if (['b2c', 'b2b', 'b2b2c', 'ngd', 'cac', 'kpi', 'wpp', 'sms', 'copa', 'rao', 'vibe', 'pad'].includes(word)) return word.toUpperCase();
-    return word.charAt(0).toUpperCase() + word.slice(1);
-  }).join(' ');
+  return clean.toUpperCase();
 }
