@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { inferChannelFromActivityName, toCanonicalChannel } from '../utils/inferChannel';
+import { parseSeqParts } from '../utils/taxonomy';
 import type { CatalogTemplate } from './useTemplateCatalog';
 
 export type ActivitySuggestionConfidence = 'alta' | 'media' | 'baixa';
@@ -64,6 +65,7 @@ export interface TemplateSuggestionContext {
   partnerKey: PartnerKey | null;
   partnerLabel: string | null;
   campaignTokens: string[];
+  seq: string | null;
   week: string | null;
   dispatch: string | null;
   segment: SegmentRule | null;
@@ -239,28 +241,30 @@ function inferCampaignTokens(template: CatalogTemplate): string[] {
 }
 
 function inferWeek(template: CatalogTemplate): string | null {
+  const seq = parseSeqParts(template.template_id);
+  if (seq?.week) return `s${seq.week}`;
   const explicit = normalize(template.semana).replace(/\s+/g, '');
   if (/^s\d+$/i.test(explicit)) return explicit;
-  const match = template.template_id.match(/(?:^|[_-])(s\d+)(?:[_-]|d\d+|$)/i);
-  return match ? match[1].toLowerCase() : null;
+  return null;
 }
 
 function inferDispatch(template: CatalogTemplate): string | null {
-  const match = template.template_id.match(/(?:^|[_-])s\d+(d\d+)(?:[_-]|$)/i)
-    ?? template.template_id.match(/(?:^|[_-])(d\d+)(?:[_-]|$)/i);
-  return match ? match[1].toLowerCase() : null;
+  const seq = parseSeqParts(template.template_id);
+  return seq ? `d${String(seq.dispatch).padStart(2, '0')}` : null;
 }
 
 function buildContext(template: CatalogTemplate, contentText?: string): TemplateSuggestionContext {
   const partnerKey = inferPartnerKey(template);
+  const seq = parseSeqParts(template.template_id);
   return {
     templateId: template.template_id,
     channel: toCanonicalChannel(template.channel) ?? inferChannelFromActivityName(template.template_id),
     partnerKey,
     partnerLabel: partnerLabel(partnerKey),
     campaignTokens: inferCampaignTokens(template),
-    week: inferWeek(template),
-    dispatch: inferDispatch(template),
+    seq: seq?.seq ?? null,
+    week: seq?.week ? `s${seq.week}` : inferWeek(template),
+    dispatch: seq ? `d${String(seq.dispatch).padStart(2, '0')}` : inferDispatch(template),
     segment: inferSegment(template),
     plannedActivityNames: uniqueValues(template.activityNamesPlanejados.map(normalizeActivityName)),
     contentTokens: extractContentTokens(contentText),
@@ -283,6 +287,13 @@ function rowText(r: Row): string {
 
 function rowTaxonomyText(r: Row): string {
   return normalize([
+    r['Activity name / Taxonomia'],
+    r.jornada,
+  ].filter(Boolean).join(' '));
+}
+
+function rowSeq(r: Row) {
+  return parseSeqParts([
     r['Activity name / Taxonomia'],
     r.jornada,
   ].filter(Boolean).join(' '));
@@ -359,6 +370,8 @@ function weekMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null {
   if (!ctx.week) return null;
   const expected = Number(ctx.week.replace(/\D/g, ''));
   if (!expected) return includesToken(rowText(r), ctx.week);
+  const parsed = rowSeq(r);
+  if (parsed?.week) return parsed.week === expected;
   const text = compact(rowText(r));
   const match = text.match(/disp\d+s0?(\d+)/i) ?? text.match(/s0?(\d+)d\d+/i) ?? text.match(/s0?(\d+)/i);
   if (match) return Number(match[1]) === expected;
@@ -369,6 +382,8 @@ function dispatchMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null
   if (!ctx.dispatch) return null;
   const expected = Number(ctx.dispatch.replace(/\D/g, ''));
   if (!expected) return includesToken(rowText(r), ctx.dispatch);
+  const parsed = rowSeq(r);
+  if (parsed?.dispatch) return parsed.dispatch === expected;
   const text = compact(rowText(r));
   const match = text.match(/disp0?(\d+)s\d+/i) ?? text.match(/d0?(\d+)/i);
   if (match) return Number(match[1]) === expected;
@@ -483,6 +498,29 @@ function scoreRow(ctx: TemplateSuggestionContext, r: Row, templateId: string): {
     reasons.push('Familia operacional compativel');
     pushSignal(evidence, 'Familia operacional', `${ctx.partnerLabel} + ${ctx.segment.canonical}`, 10);
     pushSignal(scoreBreakdown, 'Familia', '+10', 10);
+  }
+
+  const parsedSeq = rowSeq(r);
+  if (ctx.seq && parsedSeq?.seq === ctx.seq) {
+    score += 8;
+    reasons.push(`Ordem ${ctx.seq}`);
+    pushSignal(evidence, 'Ordem canonica', `${ctx.seq} (semana ${parsedSeq.week ?? '-'} / disparo ${parsedSeq.dispatch})`, 8);
+    pushSignal(scoreBreakdown, 'Ordem', '+8', 8);
+  } else if (ctx.seq && parsedSeq?.seq) {
+    const inverted = ctx.seq.match(/^S(\d+)D0*(\d+)$/i);
+    const rowInverted = parsedSeq.week && inverted
+      ? Number(inverted[1]) === parsedSeq.dispatch && Number(inverted[2]) === parsedSeq.week
+      : false;
+    warnings.push(rowInverted
+      ? `Ordem possivelmente invertida: activity ${parsedSeq.seq}, template ${ctx.seq}`
+      : `Ordem ${parsedSeq.seq} diferente do template ${ctx.seq}`);
+    pushSignal(
+      conflicts,
+      rowInverted ? 'Ordem invertida' : 'Ordem divergente',
+      `activity: ${parsedSeq.seq} | template: ${ctx.seq}`,
+      -14
+    );
+    score -= rowInverted ? 14 : 8;
   }
 
   const week = weekMatches(ctx, r);

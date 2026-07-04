@@ -64,53 +64,57 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
     ? 'Distribuidor por BU'
     : distributionLevel === 'segmento'
       ? 'Distribuidor por Segmento'
-      : distributionLevel === 'canal'
-        ? 'Distribuidor por Canal'
-        : 'Detalhamento por Disparo';
+      : distributionLevel === 'jornada'
+        ? 'Distribuidor por Jornada'
+        : distributionLevel === 'canal'
+          ? 'Distribuidor por Canal'
+          : 'Detalhamento por Disparo';
 
   return (
-    <div className="flex flex-col gap-4 h-full">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-1">
+    <div className="flex flex-col gap-5 h-full">
+      <div className="flex items-center justify-between pb-1">
+        <h3 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest pl-1">
           Comparação Visual
         </h3>
         <MetricToggle value={metric} onChange={onMetricChange} />
       </div>
 
       {drillPath.length > 0 && (
-        <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-          <span className="text-slate-400">Foco:</span>
+        <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-[#f0fdfa]/60 border border-[#00c6cc]/15 rounded-xl px-3.5 py-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.02)] transition-all">
+          <span className="text-[#007c80] font-bold">Foco:</span>
           {drillPath.map((p, i) => (
             <React.Fragment key={p}>
-              {i > 0 && <span className="text-slate-300">›</span>}
-              <span className="font-semibold text-slate-600">{p}</span>
+              {i > 0 && <span className="text-[#00c6cc]/40">›</span>}
+              <span className="font-semibold text-slate-700">{p}</span>
             </React.Fragment>
           ))}
         </div>
       )}
 
-      <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 shadow-sm">
-        <p className="text-xs text-slate-500 mb-3 font-semibold uppercase tracking-wider">{distributionLabel}</p>
+      {/* Bar Chart Container */}
+      <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.025)] transition-all duration-300">
+        <p className="text-[10px] font-bold text-slate-400 mb-4 uppercase tracking-widest">{distributionLabel}</p>
         <SegmentBarChart data={barChartData} metric={metric} onBarClick={onBarClick} />
       </div>
 
-      <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
-          <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider shrink-0">
+      {/* Daily Chart Container */}
+      <div className="bg-white border border-slate-150 rounded-2xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.015)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.025)] transition-all duration-300">
+        <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">
             Concentração Temporal Diária
           </p>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             {/* Temporal metric selector */}
-            <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-md p-0.5">
+            <div className="flex items-center gap-0.5 bg-slate-100/80 border border-slate-200/50 rounded-lg p-0.5">
               {temporalOptions.map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => onTemporalMetricChange(opt.value)}
                   className={[
-                    'px-2 py-1 text-[10px] font-semibold rounded transition-all',
+                    'px-2.5 py-1 text-[10px] font-bold rounded-md transition-all duration-150',
                     temporalMetric === opt.value
-                      ? 'bg-blue-600 text-white shadow'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100',
+                      ? 'bg-[#00c6cc] text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50',
                   ].join(' ')}
                 >
                   {opt.label}
@@ -118,16 +122,16 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
               ))}
             </div>
             {/* Simple / Stacked toggle */}
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-md p-1">
+            <div className="flex items-center gap-0.5 bg-slate-100/80 border border-slate-200/50 rounded-lg p-0.5">
               <button
                 onClick={() => setTemporalMode('simple')}
-                className={`px-2 py-1 text-[11px] rounded ${temporalMode === 'simple' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-150 ${temporalMode === 'simple' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-850 hover:bg-slate-250/50'}`}
               >
                 Simples
               </button>
               <button
                 onClick={() => setTemporalMode('stacked')}
-                className={`px-2 py-1 text-[11px] rounded ${temporalMode === 'stacked' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-150 ${temporalMode === 'stacked' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-850 hover:bg-slate-250/50'}`}
               >
                 Empilhado
               </button>

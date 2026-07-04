@@ -51,11 +51,11 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
           onKeyDown={(e) => onKeyDown(e, node.id)}
           title={node.label}
           className={[
-            'flex items-center gap-1.5 px-2 py-0.5 rounded cursor-pointer select-none transition-colors',
-            'focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500',
+            'flex items-center gap-1.5 px-2 py-0.5 rounded cursor-pointer select-none transition-all duration-150',
+            'focus:outline-none focus-visible:ring-1 focus-visible:ring-[#00c6cc]/50',
             isSelected
-              ? 'bg-blue-50 border-l-2 border-blue-400 text-blue-700'
-              : 'text-slate-500 hover:bg-slate-50 border-l-2 border-transparent hover:text-slate-700',
+              ? 'bg-[#f0fdfa] border-l-2 border-[#00c6cc] text-slate-800 font-semibold'
+              : 'text-slate-500 hover:bg-slate-100/60 border-l-2 border-transparent hover:text-slate-850',
           ].join(' ')}
           style={{ paddingLeft: `${paddingLeft + 8}px` }}
         >
@@ -83,11 +83,11 @@ export const TreeNodeComponent: React.FC<TreeNodeProps> = ({
         onClick={handleClick}
         onKeyDown={(e) => onKeyDown(e, node.id)}
         className={[
-          'flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer select-none text-sm transition-colors',
-          'focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500',
+          'flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer select-none text-sm transition-all duration-150',
+          'focus:outline-none focus-visible:ring-1 focus-visible:ring-[#00c6cc]/50',
           isSelected
-            ? 'bg-blue-50 border-l-2 border-blue-500 text-blue-700 font-semibold'
-            : 'text-slate-600 hover:bg-slate-50 border-l-2 border-transparent hover:text-slate-800',
+            ? 'bg-[#f0fdfa]/80 border-l-2 border-[#00c6cc] text-slate-800 font-bold'
+            : 'text-slate-600 hover:bg-slate-100/60 border-l-2 border-transparent hover:text-slate-850',
         ].join(' ')}
         style={{ paddingLeft: `${paddingLeft + 8}px` }}
       >

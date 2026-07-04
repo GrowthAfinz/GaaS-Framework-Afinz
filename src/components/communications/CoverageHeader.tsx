@@ -11,10 +11,12 @@ interface Props {
   onSemPecaClick?: () => void;
   /** Clique numa linha de canal com órfãos → abre a Fila filtrada naquele canal. */
   onChannelClick?: (channelLabel: string) => void;
+  /** Clique em "Templates no ar" → abre o modal com os templates ativos. */
+  onAtivosClick?: () => void;
 }
 
 /** Header de saúde de cobertura de réguas CRM (anel % + stats acionáveis + por canal). */
-export const CoverageHeader: React.FC<Props> = ({ c, onOrfaosClick, onSemPecaClick, onChannelClick }) => {
+export const CoverageHeader: React.FC<Props> = ({ c, onOrfaosClick, onSemPecaClick, onChannelClick, onAtivosClick }) => {
   const R = 37;
   const circ = 2 * Math.PI * R;
   return (

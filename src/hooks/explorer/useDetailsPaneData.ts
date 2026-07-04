@@ -181,10 +181,16 @@ export function useDetailsPaneData(
           const parentBu = nodeMap.get(node.parentId!)?.label;
           if (a.BU !== parentBu || a.Segmento !== node.label) return false;
         }
-        if (node.type === 'canal') {
+        if (node.type === 'jornada') {
           const pSeg = nodeMap.get(node.parentId!);
           const pBu = nodeMap.get(pSeg?.parentId!);
-          if (a.BU !== pBu?.label || a.Segmento !== pSeg?.label || a.Canal !== node.label) return false;
+          if (a.BU !== pBu?.label || a.Segmento !== pSeg?.label || a.jornada !== node.label) return false;
+        }
+        if (node.type === 'canal') {
+          const pJor = nodeMap.get(node.parentId!);
+          const pSeg = nodeMap.get(pJor?.parentId!);
+          const pBu = nodeMap.get(pSeg?.parentId!);
+          if (a.BU !== pBu?.label || a.Segmento !== pSeg?.label || a.jornada !== pJor?.label || a.Canal !== node.label) return false;
         }
         if (node.type === 'disparo') {
           // For leaf node, we compare by Activity name or just id if same? Usually comparing by taxonomy / same template name might make more sense, but let's compare by same BU/Segment/Canal/Template? If we just use ID, it won't exist in prev period.
@@ -195,11 +201,14 @@ export function useDetailsPaneData(
       });
 
       let cartoes = 0, propostas = 0, aprovados = 0, custoTotal = 0, cacSum = 0, cacCount = 0;
+      let aberturas = 0, cliques = 0;
       for (const p of prevActs) {
         cartoes += (p['Cartões Gerados'] ?? 0);
         propostas += (p.Propostas ?? 0);
         aprovados += (p.Aprovados ?? 0);
         custoTotal += (p['Custo Total Campanha'] ?? 0);
+        aberturas += (p.Abertura ?? 0);
+        cliques += (p.Cliques ?? 0);
         if (p.CAC && p.CAC > 0) {
           cacSum += p.CAC;
           cacCount++;
@@ -213,7 +222,10 @@ export function useDetailsPaneData(
         aprovados,
         custoTotal,
         cac: cacCount > 0 ? cacSum / cacCount : 0,
-        taxaConversao: propostas > 0 ? (aprovados / propostas) * 100 : 0
+        taxaConversao: propostas > 0 ? (aprovados / propostas) * 100 : 0,
+        aberturas,
+        cliques,
+        taxaClique: aberturas > 0 ? (cliques / aberturas) * 100 : 0
       };
     }
 

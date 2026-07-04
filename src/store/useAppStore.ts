@@ -64,6 +64,10 @@ interface AppState {
     setBudgets: (bg: Budget[]) => void;
     isTransitioning: boolean;
     setTransitioning: (val: boolean) => void;
+
+    // Deep-link transitório entre abas de Comunicações (Cadastro → Performance do Conteúdo)
+    perfDeepLink: { view: 'overview' | 'gallery' | 'table'; query: string } | null;
+    setPerfDeepLink: (dl: { view: 'overview' | 'gallery' | 'table'; query: string } | null) => void;
 }
 
 const INITIAL_FILTERS: FilterState = {
@@ -154,6 +158,9 @@ export const useAppStore = create<AppState>()(
             setPeriodo: (inicio, fim) => set((state) => ({
                 viewSettings: { ...state.viewSettings, periodo: { inicio, fim } }
             })),
+
+            perfDeepLink: null,
+            setPerfDeepLink: (dl) => set({ perfDeepLink: dl }),
 
             // B2C State
             b2cData: [],

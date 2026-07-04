@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BarChart3, Flame, Gauge, LayoutGrid,
   Link2, ListTree, Loader2, Pencil, Rows3, Route, Search, Send, Users2, X, Zap,
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../../../contexts/PeriodContext';
+import { useAppStore } from '../../../store/useAppStore';
 import { useTemplatePerformance, type PerformancePrevTotals, type TemplatePerformance } from '../../../hooks/useTemplatePerformance';
 import type { ActivityRow } from '../../../types/activity';
 import { CommunicationDetailModal } from '../CommunicationDetailModal';
@@ -716,9 +717,20 @@ function buOf(t: ScoredTemplate): string | null {
 export const PerformanceView: React.FC = () => {
   const { data, previousTotals, loading, error, refetch } = useTemplatePerformance();
   const { startDate, endDate } = usePeriod();
+  const perfDeepLink = useAppStore((s) => s.perfDeepLink);
+  const setPerfDeepLink = useAppStore((s) => s.setPerfDeepLink);
   const [view, setView] = useState<ViewMode>('overview');
   const [channel, setChannel] = useState<ChannelKey | 'all'>('all');
   const [query, setQuery] = useState('');
+
+  // Deep-link vindo do card "Templates no ar" (Cadastro): abre a view+filtro pedidos.
+  useEffect(() => {
+    if (!perfDeepLink) return;
+    setView(perfDeepLink.view);
+    setQuery(perfDeepLink.query);
+    setChannel('all');
+    setPerfDeepLink(null);
+  }, [perfDeepLink, setPerfDeepLink]);
   const [selected, setSelected] = useState<ScoredTemplate | null>(null);
   const [editing, setEditing] = useState<TemplatePerformance | null>(null);
   const [auditing, setAuditing] = useState<ScoredTemplate | null>(null);

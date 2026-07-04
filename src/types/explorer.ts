@@ -7,7 +7,7 @@ import { ActivityRow } from './activity';
 export type NodeType = 'bu' | 'segmento' | 'jornada' | 'canal' | 'disparo';
 
 export type ExplorerMetric = 'volume' | 'cartoes' | 'cac' | 'custo' | 'disparos' | 'aberturas' | 'cliques' | 'taxaClique';
-export type DistributionLevel = 'bu' | 'segmento' | 'canal' | 'disparo';
+export type DistributionLevel = 'bu' | 'segmento' | 'jornada' | 'canal' | 'disparo';
 export type TemporalViewMode = 'simple' | 'stacked';
 
 export interface NodeMetrics {

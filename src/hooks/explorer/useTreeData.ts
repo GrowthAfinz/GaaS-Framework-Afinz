@@ -16,10 +16,10 @@ function rowCustoTotal(r: ActivityRow): number {
 }
 
 const BU_COLORS: Record<string, string> = {
-  B2C: '#3B82F6',
-  B2B2C: '#10B981',
-  Plurix: '#A855F7',
-  Seguros: '#F97316',
+  B2C: '#00c6cc',     // Teal Afinz
+  B2B2C: '#007c80',   // Dark Teal Afinz
+  Plurix: '#7c3aed',  // Violeta
+  Seguros: '#f8a538',  // Laranja Afinz
 };
 
 const CANAL_COLORS: Record<string, string> = {
@@ -201,7 +201,7 @@ export function useTreeData({ activities, filters }: UseTreeDataProps): UseTreeD
       buGroups.get(bu)!.push(a);
     }
 
-    const levels: NodeType[] = ['segmento', 'canal'];
+    const levels: NodeType[] = ['segmento', 'jornada', 'canal'];
 
     const rootNodes: TreeNode[] = Array.from(buGroups.entries())
       .sort(([a], [b]) => a.localeCompare(b))

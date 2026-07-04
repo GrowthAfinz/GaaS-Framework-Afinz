@@ -128,16 +128,69 @@ export interface ParsedActivity {
   seq: string | null;
 }
 
+export interface ParsedSeq {
+  seq: string;
+  week: number | null;
+  dispatch: number;
+  source: 'template' | 'activity' | 'fallback';
+}
+
+const normalizeSeqText = (value: string) => value
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[\s.-]+/g, '_');
+
+const toSeq = (week: number | null, dispatch: number) => (
+  week ? `S${week}D${String(dispatch).padStart(2, '0')}` : `D${dispatch}`
+);
+
+export function parseSeqParts(name: string): ParsedSeq | null {
+  const n = normalizeSeqText(name);
+  const compact = n.replace(/_/g, '');
+
+  const template = compact.match(/s0?(\d+)d0?(\d+)/);
+  if (template) {
+    const week = Number(template[1]);
+    const dispatch = Number(template[2]);
+    if (week && dispatch) return { seq: toSeq(week, dispatch), week, dispatch, source: 'template' };
+  }
+
+  const activity =
+    compact.match(/disp(?:aro)?0?(\d+)s(?:emana)?0?(\d+)/)
+    ?? compact.match(/d(?:isp)?0?(\d+)sem(?:ana)?0?(\d+)/);
+  if (activity) {
+    const dispatch = Number(activity[1]);
+    const week = Number(activity[2]);
+    if (week && dispatch) return { seq: toSeq(week, dispatch), week, dispatch, source: 'activity' };
+  }
+
+  const explicit = n.match(/(?:^|_)semana_?0?(\d+).*?(?:disp|disparo|d)_?0?(\d+)(?:_|$)/);
+  if (explicit) {
+    const week = Number(explicit[1]);
+    const dispatch = Number(explicit[2]);
+    if (week && dispatch) return { seq: toSeq(week, dispatch), week, dispatch, source: 'activity' };
+  }
+
+  const fallback = compact.match(/d0?(\d+)(?:diario|pontual|$)/);
+  if (fallback) {
+    const dispatch = Number(fallback[1]);
+    if (dispatch) return { seq: toSeq(null, dispatch), week: null, dispatch, source: 'fallback' };
+  }
+
+  return null;
+}
+
 /** Extrai a sequência S?D?? (disparo) do activity_name. */
 export function parseSeq(name: string): string | null {
-  const n = name.toLowerCase();
-  const m2 = n.match(/s(\d)d0?(\d+)/);               // s1d02 → S1D02
-  const m1 = n.match(/disp(\d+)s(\d)/);              // disp4s1 → S1D04
-  const m3 = n.match(/d(\d)(?:diario|pontual|$|_)/); // wpp d3 → D3
-  if (m2) return `S${m2[1]}D${m2[2].padStart(2, '0')}`;
-  if (m1) return `S${m1[2]}D${m1[1].padStart(2, '0')}`;
-  if (m3) return `D${m3[1]}`;
-  return null;
+  return parseSeqParts(name)?.seq ?? null;
+}
+
+export function isInvertedSeq(a: string | null | undefined, b: string | null | undefined): boolean {
+  const pa = a ? parseSeqParts(a) : null;
+  const pb = b ? parseSeqParts(b) : null;
+  if (!pa || !pb || !pa.week || !pb.week) return false;
+  return pa.week === pb.dispatch && pa.dispatch === pb.week;
 }
 
 /** Decodifica um disparo usando colunas estruturadas + fallback na string. */

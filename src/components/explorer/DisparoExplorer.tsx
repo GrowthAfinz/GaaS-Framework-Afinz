@@ -260,11 +260,18 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
       if (!parentBu) return null;
       return explorerFocus.build({ bu: parentBu.label, segmento: node.label });
     }
+    if (node.type === 'jornada') {
+      const parentSeg = node.parentId ? nodeMap.get(node.parentId) : null;
+      const parentBu = parentSeg?.parentId ? nodeMap.get(parentSeg.parentId) : null;
+      if (!parentBu || !parentSeg) return null;
+      return explorerFocus.build({ bu: parentBu.label, segmento: parentSeg.label, jornada: node.label });
+    }
     if (node.type === 'canal') {
-      const parentSegmento = node.parentId ? nodeMap.get(node.parentId) : null;
-      const parentBu = parentSegmento?.parentId ? nodeMap.get(parentSegmento.parentId) : null;
-      if (!parentBu || !parentSegmento) return null;
-      return explorerFocus.build({ bu: parentBu.label, segmento: parentSegmento.label, canal: node.label });
+      const parentJor = node.parentId ? nodeMap.get(node.parentId) : null;
+      const parentSeg = parentJor?.parentId ? nodeMap.get(parentJor.parentId) : null;
+      const parentBu = parentSeg?.parentId ? nodeMap.get(parentSeg.parentId) : null;
+      if (!parentBu || !parentSeg || !parentJor) return null;
+      return explorerFocus.build({ bu: parentBu.label, segmento: parentSeg.label, jornada: parentJor.label, canal: node.label });
     }
     return null;
   }, [nodeMap]);

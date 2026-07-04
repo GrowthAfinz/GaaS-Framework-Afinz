@@ -13,15 +13,16 @@ import { ActivityRow } from '../../types/activity';
 type FocusContext = {
   bu?: string;
   segmento?: string;
+  jornada?: string;
   canal?: string;
   disparoId?: string;
 };
 
 const BU_COLORS: Record<string, string> = {
-  B2C: '#3B82F6',
-  B2B2C: '#10B981',
-  Plurix: '#A855F7',
-  Seguros: '#F97316',
+  B2C: '#00c6cc',     // Teal Afinz
+  B2B2C: '#007c80',   // Dark Teal Afinz
+  Plurix: '#7c3aed',  // Violeta
+  Seguros: '#f8a538',  // Laranja Afinz
 };
 
 const CANAL_COLORS: Record<string, string> = {
@@ -81,7 +82,9 @@ const getMetricValueFromRows = (rows: ActivityRow[], metric: ExplorerMetric): nu
 
 const buildFocusId = (ctx: FocusContext): string => {
   if (ctx.disparoId) return `disparo:${ctx.disparoId}`;
+  if (ctx.canal && ctx.jornada && ctx.segmento && ctx.bu) return `canal:${ctx.bu}|${ctx.segmento}|${ctx.jornada}|${ctx.canal}`;
   if (ctx.canal && ctx.segmento && ctx.bu) return `canal:${ctx.bu}|${ctx.segmento}|${ctx.canal}`;
+  if (ctx.jornada && ctx.segmento && ctx.bu) return `jornada:${ctx.bu}|${ctx.segmento}|${ctx.jornada}`;
   if (ctx.segmento && ctx.bu) return `segmento:${ctx.bu}|${ctx.segmento}`;
   if (ctx.bu) return `bu:${ctx.bu}`;
   return ROOT_FOCUS_ID;
@@ -95,8 +98,17 @@ const parseFocusId = (focusId: string | null): FocusContext => {
     const [bu, segmento] = payload.split('|');
     return { bu, segmento };
   }
+  if (type === 'jornada') {
+    const [bu, segmento, jornada] = payload.split('|');
+    return { bu, segmento, jornada };
+  }
   if (type === 'canal') {
-    const [bu, segmento, canal] = payload.split('|');
+    const parts = payload.split('|');
+    if (parts.length === 4) {
+      const [bu, segmento, jornada, canal] = parts;
+      return { bu, segmento, jornada, canal };
+    }
+    const [bu, segmento, canal] = parts;
     return { bu, segmento, canal };
   }
   if (type === 'disparo') return { disparoId: payload };
@@ -180,10 +192,16 @@ export function useComparisonData({
           const parent = selected.parentId ? nodeMap.get(selected.parentId) : null;
           focusId = buildFocusId({ bu: parent?.label, segmento: selected.label });
         }
+        if (selected.type === 'jornada') {
+          const parentSeg = selected.parentId ? nodeMap.get(selected.parentId) : null;
+          const parentBu = parentSeg?.parentId ? nodeMap.get(parentSeg.parentId) : null;
+          focusId = buildFocusId({ bu: parentBu?.label, segmento: parentSeg?.label, jornada: selected.label });
+        }
         if (selected.type === 'canal') {
-          const parentSegmento = selected.parentId ? nodeMap.get(selected.parentId) : null;
-          const parentBu = parentSegmento?.parentId ? nodeMap.get(parentSegmento.parentId) : null;
-          focusId = buildFocusId({ bu: parentBu?.label, segmento: parentSegmento?.label, canal: selected.label });
+          const parentJor = selected.parentId ? nodeMap.get(selected.parentId) : null;
+          const parentSeg = parentJor?.parentId ? nodeMap.get(parentJor.parentId) : null;
+          const parentBu = parentSeg?.parentId ? nodeMap.get(parentSeg.parentId) : null;
+          focusId = buildFocusId({ bu: parentBu?.label, segmento: parentSeg?.label, jornada: parentJor?.label, canal: selected.label });
         }
       }
     }
@@ -194,22 +212,32 @@ export function useComparisonData({
       if (focus.disparoId) return a.id === focus.disparoId;
       if (focus.bu && a.BU !== focus.bu) return false;
       if (focus.segmento && a.Segmento !== focus.segmento) return false;
+      if (focus.jornada && a.jornada !== focus.jornada) return false;
       if (focus.canal && a.Canal !== focus.canal) return false;
       return true;
     });
 
     let distributionLevel: DistributionLevel = 'bu';
-    if (focus.bu && !focus.segmento) distributionLevel = 'segmento';
-    if (focus.bu && focus.segmento && !focus.canal) distributionLevel = 'canal';
-    if (focus.bu && focus.segmento && focus.canal) distributionLevel = 'disparo';
+    if (focus.bu && !focus.segmento) {
+      distributionLevel = 'segmento';
+    } else if (focus.bu && focus.segmento && !focus.jornada && !focus.canal) {
+      distributionLevel = 'jornada';
+    } else if (focus.bu && focus.segmento && focus.jornada && !focus.canal) {
+      distributionLevel = 'canal';
+    } else if (focus.bu && focus.segmento && focus.jornada && focus.canal) {
+      distributionLevel = 'disparo';
+    } else if (focus.bu && focus.segmento && !focus.jornada && focus.canal) {
+      distributionLevel = 'disparo'; // fallback
+    }
 
-    const drillPath = [focus.bu, focus.segmento, focus.canal].filter(Boolean) as string[];
+    const drillPath = [focus.bu, focus.segmento, focus.jornada, focus.canal].filter(Boolean) as string[];
 
     const groups = new Map<string, ActivityRow[]>();
     scopeActivities.forEach((a) => {
       let key = '';
       if (distributionLevel === 'bu') key = a.BU || '(sem BU)';
       if (distributionLevel === 'segmento') key = a.Segmento || '(sem segmento)';
+      if (distributionLevel === 'jornada') key = a.jornada || '(sem jornada)';
       if (distributionLevel === 'canal') key = a.Canal || '(sem canal)';
       if (distributionLevel === 'disparo') key = a['Activity name / Taxonomia'] || a.id;
       if (!groups.has(key)) groups.set(key, []);
@@ -236,6 +264,7 @@ export function useComparisonData({
         if (focus.disparoId && a.id !== focus.disparoId) return false;
         if (focus.bu && a.BU !== focus.bu) return false;
         if (focus.segmento && a.Segmento !== focus.segmento) return false;
+        if (focus.jornada && a.jornada !== focus.jornada) return false;
         if (focus.canal && a.Canal !== focus.canal) return false;
         return true;
       });
@@ -244,6 +273,7 @@ export function useComparisonData({
         let key = '';
         if (distributionLevel === 'bu') key = a.BU || '(sem BU)';
         if (distributionLevel === 'segmento') key = a.Segmento || '(sem segmento)';
+        if (distributionLevel === 'jornada') key = a.jornada || '(sem jornada)';
         if (distributionLevel === 'canal') key = a.Canal || '(sem canal)';
         if (distributionLevel === 'disparo') key = a['Activity name / Taxonomia'] || a.id;
         if (!prevGroups.has(key)) prevGroups.set(key, []);
@@ -270,8 +300,11 @@ export function useComparisonData({
       } else if (distributionLevel === 'segmento') {
         nextFocusId = buildFocusId({ bu: focus.bu, segmento: label });
         color = PALETTE[idx % PALETTE.length];
+      } else if (distributionLevel === 'jornada') {
+        nextFocusId = buildFocusId({ bu: focus.bu, segmento: focus.segmento, jornada: label });
+        color = PALETTE[idx % PALETTE.length];
       } else if (distributionLevel === 'canal') {
-        nextFocusId = buildFocusId({ bu: focus.bu, segmento: focus.segmento, canal: label });
+        nextFocusId = buildFocusId({ bu: focus.bu, segmento: focus.segmento, jornada: focus.jornada, canal: label });
         color = CANAL_COLORS[label] ?? PALETTE[idx % PALETTE.length];
       } else {
         // Nível disparo: usa o label (Activity name / Taxonomia) como chave de lookup,
@@ -309,9 +342,11 @@ export function useComparisonData({
       ? 'BU'
       : distributionLevel === 'segmento'
         ? 'Segmento'
-        : distributionLevel === 'canal'
-          ? 'Canal'
-          : 'Activity name / Taxonomia';
+        : distributionLevel === 'jornada'
+          ? 'jornada'
+          : distributionLevel === 'canal'
+            ? 'Canal'
+            : 'Activity name / Taxonomia';
 
     const stackTotals = new Map<string, number>();
     scopeActivities.forEach((a) => {
