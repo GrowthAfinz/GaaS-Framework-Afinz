@@ -188,7 +188,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const globalFilters = viewSettings.filtrosGlobais;
   const rentab = viewSettings.frente === 'rentabilizacao';
   const { selectedBUs } = useBU();
-  const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly'>('performance');
+  const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly' | 'xlsx'>('performance');
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
   const previousAllActivities = useMemo(() => Object.values(previousData ?? {}).flat(), [previousData]);
   const filterReportActivities = useCallback((activities: Activity[]) => (
@@ -772,6 +772,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                     { key: 'performance' as const, label: 'Overview' },
                     { key: 'daily' as const, label: 'Diário' },
                     { key: 'monthly' as const, label: 'Mensal' },
+                    { key: 'xlsx' as const, label: 'XLSX Reports' },
                   ].map((option) => (
                     <button
                       key={option.key}
@@ -841,6 +842,88 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
         <DailyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
       )}
 
+      {reportMode === 'xlsx' && (
+        <section className="space-y-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center gap-2 text-sm text-slate-700">
+              <FileSpreadsheet size={16} className="text-cyan-600" />
+              <span>Central de relatórios XLSX · período <b>{format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</b></span>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">Os relatórios mensais comparam o mês do período com o mês anterior (MoM). Ajuste o período no topo antes de exportar.</p>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">Mensais · com comparação MoM</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border-2 border-violet-200 bg-violet-50/40 p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center"><FileSpreadsheet size={18} className="text-violet-600" /></div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Report Mensal — Mídia Paga + CRM</p>
+                    <p className="text-xs text-violet-600 font-medium">recomendado</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed flex-1">Abas Mídia Paga (frentes, criativo por grupo, Start Trial B2C), CRM Aquisição e Diarizado — tudo com MoM vs mês anterior.</p>
+                <button onClick={exportMidiaPagaMonthly} disabled={isExportingMidiaPagaMonthly} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-violet-300 bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60">
+                  <FileSpreadsheet size={14} />
+                  {isExportingMidiaPagaMonthly ? 'Gerando mídia paga...' : 'Baixar XLSX'}
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-50 flex items-center justify-center"><FileSpreadsheet size={18} className="text-cyan-600" /></div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Aquisição CRM — Mensal</p>
+                    <p className="text-xs text-slate-400">MoM por BU, segmento, semana e canal</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed flex-1">Resultado mensal de aquisição CRM com variação vs mês anterior por dimensão.</p>
+                <button onClick={exportAquisicaoCrmMonthly} disabled={isExportingAquisicaoMonthly} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 shadow-sm transition-colors hover:border-cyan-300 hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-60">
+                  <FileSpreadsheet size={14} />
+                  {isExportingAquisicaoMonthly ? 'Gerando mensal...' : 'Baixar XLSX'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-3">Diarizados · por período</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-50 flex items-center justify-center"><FileSpreadsheet size={18} className="text-cyan-600" /></div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Aquisição CRM — Diarizado</p>
+                    <p className="text-xs text-slate-400">abas Aquisição CRM + Auditoria</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed flex-1">Disparos diarizados de aquisição por seção e bloco, com auditoria de mapeamento.</p>
+                <button onClick={exportAquisicaoCrm} disabled={isExportingAquisicao} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-cyan-300 hover:text-cyan-700 disabled:cursor-wait disabled:opacity-60">
+                  <FileSpreadsheet size={14} />
+                  {isExportingAquisicao ? 'Gerando XLSX...' : 'Baixar XLSX'}
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-5 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center"><FileSpreadsheet size={18} className="text-orange-500" /></div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Rentabilização CRM — Diarizado</p>
+                    <p className="text-xs text-slate-400">cross-sell, ativação, seguros</p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed flex-1">Disparos diarizados de rentabilização (Copa, ativação, seguros) com auditoria.</p>
+                <button onClick={exportRentabilizacaoCrm} disabled={isExportingRnt} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-orange-300 hover:text-orange-600 disabled:cursor-wait disabled:opacity-60">
+                  <FileSpreadsheet size={14} />
+                  {isExportingRnt ? 'Gerando XLSX...' : 'Baixar XLSX'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {reportMode === 'performance' && (
       <>
       {/* ── PERFORMANCE CAMPANHAS ── */}
@@ -865,48 +948,20 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               available={METRIC_COLUMNS}
               onChange={setCampanhasColumns}
             />
-            {!rentab && <button
-              onClick={exportAquisicaoCrm}
-              disabled={isExportingAquisicao}
-              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 disabled:cursor-wait disabled:opacity-60 transition-colors font-medium"
-              title="Exportar Excel diarizado de aquisição CRM com abas Aquisição CRM e Auditoria"
-            >
-              <FileSpreadsheet size={14} />
-              {isExportingAquisicao ? 'Gerando XLSX...' : 'Exportar XLSX Aquisição'}
-            </button>}
-            {!rentab && <button
-              onClick={exportAquisicaoCrmMonthly}
-              disabled={isExportingAquisicaoMonthly}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 shadow-sm transition-colors hover:border-cyan-300 hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-60"
-              title="Exportar relatório mensal de Aquisição CRM com MoM por BU, segmento, semana e canal"
-            >
-              <FileSpreadsheet size={14} />
-              {isExportingAquisicaoMonthly ? 'Gerando mensal...' : 'Exportar XLSX Aquisição - Mensal'}
-            </button>}
-            {!rentab && <button
-              onClick={exportMidiaPagaMonthly}
-              disabled={isExportingMidiaPagaMonthly}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 shadow-sm transition-colors hover:border-violet-300 hover:bg-violet-100 disabled:cursor-wait disabled:opacity-60"
-              title="Exportar relatório mensal de Mídia Paga com MoM por frente, semana, plataforma e criativo + abas CRM Aquisição e Diarizado"
-            >
-              <FileSpreadsheet size={14} />
-              {isExportingMidiaPagaMonthly ? 'Gerando mídia paga...' : 'Exportar XLSX Mídia Paga - Mensal'}
-            </button>}
-            {rentab && <button
-              onClick={exportRentabilizacaoCrm}
-              disabled={isExportingRnt}
-              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-orange-500 disabled:cursor-wait disabled:opacity-60 transition-colors font-medium"
-              title="Exportar Excel diarizado de Rentabilização CRM (cross-sell, ativação, seguros)"
-            >
-              <FileSpreadsheet size={14} />
-              {isExportingRnt ? 'Gerando XLSX...' : 'Exportar XLSX Rentabilização'}
-            </button>}
             <button
               onClick={exportSegmento}
               className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
             >
               <FileSpreadsheet size={14} />
               Exportar CSV
+            </button>
+            <button
+              onClick={() => setReportMode('xlsx')}
+              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
+              title="Central de relatórios XLSX (Aquisição, Rentabilização e Mensal)"
+            >
+              <FileSpreadsheet size={14} />
+              XLSX Reports
             </button>
           </div>
         </div>

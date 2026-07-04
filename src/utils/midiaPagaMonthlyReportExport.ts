@@ -12,7 +12,6 @@ import {
   weekWindows,
   previousWeekWindows,
   setCellValue,
-  writeReportHeader,
   styleReportDelta,
   writeSectionTitle,
   writeAquisicaoCrmMonthlySheet,
@@ -32,6 +31,23 @@ export const HERO_KPI: Record<MidiaFrente, 'CPC' | 'CPM' | 'CPL'> = {
   'Seguros': 'CPL',
 };
 
+// Budget mensal por frente (mesmos valores do Diarizado; ajustar quando houver fonte em goals).
+export const FRENTE_BUDGET: Record<MidiaFrente, number> = {
+  'Aquisição B2C': 7000,
+  'Aquisição Plurix': 3000,
+  'Marca B2C (Copa)': 5000,
+  'Seguros': 3000,
+};
+
+// Rótulo do resultado por objetivo da campanha (para a coluna Tipo do criativo).
+const RESULT_LABEL: Record<string, string> = {
+  app_installs: 'Instalações',
+  awareness: 'Alcance',
+  leads: 'Cadastros',
+  conversion: 'Conversões',
+};
+const resultLabel = (objective: string): string => RESULT_LABEL[objective] || 'Resultado';
+
 export type MediaMetrics = {
   spend: number;
   impressions: number;
@@ -45,6 +61,7 @@ export type PaidRow = {
   day: number;
   channel: string;
   campaign: string;
+  objective: string;
   adName: string | null;
   adsetName: string | null;
   frente: MidiaFrente;
@@ -62,6 +79,10 @@ export function classifyFrente(campaign: unknown): MidiaFrente {
   if (/\[PLURIX\]|mais_amigo/i.test(c)) return 'Aquisição Plurix';
   return 'Aquisição B2C';
 }
+
+// Dentro de Aquisição B2C, a campanha de Onboarding otimiza para Start Trial (In-app trials started);
+// as demais otimizam para Instalação (Mobile app installs). Separa os dois resultados pela tag da campanha.
+export const isTrialCampaign = (campaign: string): boolean => /onboarding/i.test(campaign);
 
 export const emptyMediaMetrics = (): MediaMetrics => ({ spend: 0, impressions: 0, clicks: 0, conversions: 0, reach: 0 });
 
@@ -104,6 +125,7 @@ const toPaidRow = (row: PaidMediaRawRow): PaidRow => {
     day: dayOfMonthReport(date),
     channel: String(row.channel ?? 'unknown').toLowerCase(),
     campaign: String(row.campaign ?? ''),
+    objective: String(row.objective ?? '').toLowerCase(),
     adName: row.ad_name ? String(row.ad_name) : null,
     adsetName: row.adset_name ? String(row.adset_name) : null,
     frente: classifyFrente(row.campaign),
@@ -126,6 +148,7 @@ type CreativeRow = {
 
 type MidiaAnalysis = {
   currentRows: PaidRow[];
+  previousRows: PaidRow[];
   currentTotal: MediaMetrics;
   previousTotal: MediaMetrics;
   byFrenteCurrent: Map<MidiaFrente, MediaMetrics>;
@@ -237,6 +260,7 @@ export function buildMidiaPagaAnalysis(
 
   return {
     currentRows,
+    previousRows,
     currentTotal,
     previousTotal,
     byFrenteCurrent,
@@ -262,6 +286,85 @@ const REPORT_WIDTH = 18;
 
 const fmtBRLText = (value: number | null): string =>
   value === null ? '—' : `R$ ${value.toFixed(2).replace('.', ',')}`;
+
+// Cores de cabeçalho por grupo temático (organização visual das seções).
+const HEADER_FILL = {
+  realizado: '0F766E', // teal — metas / pacing
+  resultados: '1E3A8A', // navy — resultado principal
+  semanal: '6D28D9', // violet — visões temporais
+  plataforma: '0E7490', // cyan — canais
+  google: 'B45309', // amber — Google
+  criativo: 'BE185D', // pink — criativo
+  eficiencia: '4338CA', // indigo — eficiência
+};
+
+function writeColoredHeader(ws: Worksheet, row: number, headers: string[], fill: string): void {
+  headers.forEach((header, index) => {
+    const cell = ws.getCell(row, index + 1);
+    setCellValue(cell, header, { bold: true, fill, fontColor: REPORT_COLORS.white, align: 'center' });
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  });
+  ws.getRow(row).height = 30;
+}
+
+function writeColoredTitle(ws: Worksheet, row: number, title: string, columns: number, color: string): void {
+  ws.mergeCells(row, 1, row, columns);
+  setCellValue(ws.getCell(row, 1), title, { bold: true, align: 'left' });
+  ws.getCell(row, 1).font = { name: 'Arial', bold: true, color: { argb: color }, size: 14 };
+}
+
+type MetricSpec = { label: string; get: (m: MediaMetrics) => number | null; fmt: 'currency' | 'int' | 'pct'; invert: boolean };
+const numFmtOf = (fmt: MetricSpec['fmt']): string => (fmt === 'currency' ? CURRENCY_FMT : fmt === 'int' ? INT_FMT : PCT_FMT);
+
+// Cada métrica vira 3 colunas: valor do mês atual, valor do mês anterior (nomeados) e Δ MoM.
+function writeComparativeRow(
+  ws: Worksheet,
+  row: number,
+  name: string,
+  current: MediaMetrics,
+  previous: MediaMetrics,
+  specs: MetricSpec[],
+  isTotal: boolean,
+  trailing: (string | number | null)[] = [],
+): void {
+  setCellValue(ws.getCell(row, 1), name, { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'left' });
+  specs.forEach((spec, index) => {
+    const curCol = 2 + index * 3;
+    const cur = spec.get(current);
+    const prev = spec.get(previous);
+    const delta = reportDelta(cur, prev);
+    setCellValue(ws.getCell(row, curCol), cur ?? 0, { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'right', numFmt: numFmtOf(spec.fmt) });
+    setCellValue(ws.getCell(row, curCol + 1), prev ?? 0, { fill: isTotal ? REPORT_COLORS.total : REPORT_COLORS.card, align: 'right', numFmt: numFmtOf(spec.fmt) });
+    setCellValue(ws.getCell(row, curCol + 2), reportPctText(delta), { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'center' });
+    styleReportDelta(ws.getCell(row, curCol + 2), delta, spec.invert);
+  });
+  const tailStart = 2 + specs.length * 3;
+  trailing.forEach((value, index) => {
+    setCellValue(ws.getCell(row, tailStart + index), value, { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'left' });
+  });
+}
+
+function comparativeHeaders(specs: MetricSpec[], curLabel: string, prevLabel: string): string[] {
+  return specs.flatMap((spec) => [`${spec.label} ${curLabel}`, `${spec.label} ${prevLabel}`, 'Δ']);
+}
+
+const FRENTE_SPECS: MetricSpec[] = [
+  { label: 'Investimento', get: (m) => m.spend, fmt: 'currency', invert: false },
+  { label: 'Impressões', get: (m) => m.impressions, fmt: 'int', invert: false },
+  { label: 'Alcance', get: (m) => m.reach || null, fmt: 'int', invert: false },
+  { label: 'Cliques', get: (m) => m.clicks, fmt: 'int', invert: false },
+  { label: 'CTR', get: (m) => mediaCtr(m), fmt: 'pct', invert: false },
+  { label: 'CPC (R$)', get: (m) => mediaCpc(m), fmt: 'currency', invert: true },
+  { label: 'CPM (R$)', get: (m) => mediaCpm(m), fmt: 'currency', invert: true },
+];
+
+const PLATFORM_SPECS: MetricSpec[] = [
+  { label: 'Investimento', get: (m) => m.spend, fmt: 'currency', invert: false },
+  { label: 'Cliques', get: (m) => m.clicks, fmt: 'int', invert: false },
+  { label: 'CPC (R$)', get: (m) => mediaCpc(m), fmt: 'currency', invert: true },
+  { label: 'Impressões', get: (m) => m.impressions, fmt: 'int', invert: false },
+  { label: 'CTR', get: (m) => mediaCtr(m), fmt: 'pct', invert: false },
+];
 
 function writeMediaCards(ws: Worksheet, analysis: MidiaAnalysis): void {
   const cur = analysis.currentTotal;
@@ -293,48 +396,18 @@ function writeMediaCards(ws: Worksheet, analysis: MidiaAnalysis): void {
 }
 
 function writeFrenteTable(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
-  const headers = ['Frente', 'Investimento', 'Δ', 'Impressões', 'Δ', 'Alcance', 'Δ', 'Cliques', 'Δ', 'CTR', 'Δ', 'CPC (R$)', 'Δ', 'CPM (R$)', 'Δ', 'KPI-herói'];
-  writeSectionTitle(ws, startRow, 'POR FRENTE — todas as métricas com Δ MoM', headers.length);
-  writeReportHeader(ws, startRow + 1, headers);
+  const curLabel = MONTHS_PT[analysis.currentStart.getMonth()];
+  const prevLabel = MONTHS_PT[analysis.previousStart.getMonth()];
+  const headers = ['Frente', ...comparativeHeaders(FRENTE_SPECS, curLabel, prevLabel), 'KPI-herói'];
+  writeColoredTitle(ws, startRow, 'Resultados por Objetivo', headers.length, HEADER_FILL.resultados);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.resultados);
   const keys: (MidiaFrente | 'TOTAL')[] = [...FRENTE_ORDER, 'TOTAL'];
   keys.forEach((key, index) => {
     const excelRow = startRow + 2 + index;
     const current = key === 'TOTAL' ? analysis.currentTotal : mediaOrEmpty(analysis.byFrenteCurrent, key);
     const previous = key === 'TOTAL' ? analysis.previousTotal : mediaOrEmpty(analysis.byFrentePrevious, key);
-    const deltas: [number, number | null, boolean][] = [
-      [3, reportDelta(current.spend, previous.spend), false],
-      [5, reportDelta(current.impressions, previous.impressions), false],
-      [7, reportDelta(current.reach || null, previous.reach || null), false],
-      [9, reportDelta(current.clicks, previous.clicks), false],
-      [11, reportDelta(mediaCtr(current), mediaCtr(previous)), false],
-      [13, reportDelta(mediaCpc(current), mediaCpc(previous)), true],
-      [15, reportDelta(mediaCpm(current), mediaCpm(previous)), true],
-    ];
-    const hero = key === 'TOTAL'
-      ? '—'
-      : `${HERO_KPI[key]} · ${fmtBRLText(heroKpiValue(key, current))}`;
-    const values = [
-      key, current.spend, reportPctText(deltas[0][1]),
-      current.impressions, reportPctText(deltas[1][1]),
-      current.reach, reportPctText(deltas[2][1]),
-      current.clicks, reportPctText(deltas[3][1]),
-      mediaCtr(current) ?? 0, reportPctText(deltas[4][1]),
-      mediaCpc(current), reportPctText(deltas[5][1]),
-      mediaCpm(current), reportPctText(deltas[6][1]),
-      hero,
-    ];
-    values.forEach((value, colIndex) => {
-      const cell = ws.getCell(excelRow, colIndex + 1);
-      setCellValue(cell, value, {
-        bold: key === 'TOTAL',
-        fill: key === 'TOTAL' ? REPORT_COLORS.total : undefined,
-        align: colIndex === 0 ? 'left' : colIndex === 15 ? 'center' : 'right',
-      });
-      if ([3, 5, 7].includes(colIndex)) cell.numFmt = INT_FMT;
-      if ([1, 11, 13].includes(colIndex)) cell.numFmt = CURRENCY_FMT;
-      if (colIndex === 9) cell.numFmt = PCT_FMT;
-    });
-    deltas.forEach(([column, delta, invert]) => styleReportDelta(ws.getCell(excelRow, column), delta, invert));
+    const hero = key === 'TOTAL' ? '—' : `${HERO_KPI[key]} · ${fmtBRLText(heroKpiValue(key, current))}`;
+    writeComparativeRow(ws, excelRow, key, current, previous, FRENTE_SPECS, key === 'TOTAL', [hero]);
   });
   return startRow + keys.length + 3;
 }
@@ -346,40 +419,38 @@ function writeWeeklyPacingTable(
   metric: 'spend' | 'clicks',
   title: string,
 ): number {
-  const headers = ['Frente', ...analysis.currentWindows.flatMap((window) => [window.label, `MoM ${window.label}`]), 'Total', 'Variação total MoM'];
-  writeSectionTitle(ws, startRow, title, headers.length);
-  writeReportHeader(ws, startRow + 1, headers);
+  const prevWindows = previousWeekWindows(analysis.previousStart, analysis.currentWindows);
+  const numFmt = metric === 'spend' ? CURRENCY_FMT : INT_FMT;
+  const headers = ['Frente', ...analysis.currentWindows.flatMap((window, i) => [window.label, prevWindows[i]?.label ?? '—', 'Δ']), 'Total', 'Total ant.', 'Δ'];
+  writeColoredTitle(ws, startRow, title, headers.length, HEADER_FILL.semanal);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.semanal);
   const keys: (MidiaFrente | 'TOTAL')[] = [...FRENTE_ORDER, 'TOTAL'];
   keys.forEach((key, index) => {
     const excelRow = startRow + 2 + index;
+    const isTotal = key === 'TOTAL';
     const weekValue = (source: Map<MidiaFrente, MediaMetrics[]>, weekIndex: number): number => (
-      key === 'TOTAL'
+      isTotal
         ? FRENTE_ORDER.reduce((sum, frente) => sum + source.get(frente)![weekIndex][metric], 0)
         : source.get(key)![weekIndex][metric]
     );
-    const weekly = analysis.currentWindows.flatMap((_, weekIndex) => {
-      const current = weekValue(analysis.weeklyCurrent, weekIndex);
-      const previous = weekValue(analysis.weeklyPrevious, weekIndex);
-      return [current, reportPctText(reportDelta(current, previous))];
-    });
-    const currentTotal = key === 'TOTAL' ? analysis.currentTotal[metric] : mediaOrEmpty(analysis.byFrenteCurrent, key)[metric];
-    const previousTotal = key === 'TOTAL' ? analysis.previousTotal[metric] : mediaOrEmpty(analysis.byFrentePrevious, key)[metric];
-    const values = [key, ...weekly, currentTotal, reportPctText(reportDelta(currentTotal, previousTotal))];
-    values.forEach((value, colIndex) => {
-      const cell = ws.getCell(excelRow, colIndex + 1);
-      setCellValue(cell, value, {
-        bold: key === 'TOTAL',
-        fill: key === 'TOTAL' ? REPORT_COLORS.total : undefined,
-        align: colIndex === 0 ? 'left' : 'right',
-      });
-      if (colIndex >= 1 && colIndex % 2 === 1) cell.numFmt = metric === 'spend' ? CURRENCY_FMT : INT_FMT;
-    });
+    setCellValue(ws.getCell(excelRow, 1), key, { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'left' });
     analysis.currentWindows.forEach((_, weekIndex) => {
-      const current = weekValue(analysis.weeklyCurrent, weekIndex);
-      const previous = weekValue(analysis.weeklyPrevious, weekIndex);
-      styleReportDelta(ws.getCell(excelRow, 3 + weekIndex * 2), reportDelta(current, previous));
+      const cur = weekValue(analysis.weeklyCurrent, weekIndex);
+      const prev = weekValue(analysis.weeklyPrevious, weekIndex);
+      const delta = reportDelta(cur, prev);
+      const base = 2 + weekIndex * 3;
+      setCellValue(ws.getCell(excelRow, base), cur, { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'right', numFmt });
+      setCellValue(ws.getCell(excelRow, base + 1), prev, { fill: isTotal ? REPORT_COLORS.total : REPORT_COLORS.card, align: 'right', numFmt });
+      setCellValue(ws.getCell(excelRow, base + 2), reportPctText(delta), { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'center' });
+      styleReportDelta(ws.getCell(excelRow, base + 2), delta);
     });
-    styleReportDelta(ws.getCell(excelRow, headers.length), reportDelta(currentTotal, previousTotal));
+    const curTotal = isTotal ? analysis.currentTotal[metric] : mediaOrEmpty(analysis.byFrenteCurrent, key)[metric];
+    const prevTotal = isTotal ? analysis.previousTotal[metric] : mediaOrEmpty(analysis.byFrentePrevious, key)[metric];
+    const totalCol = 2 + analysis.currentWindows.length * 3;
+    setCellValue(ws.getCell(excelRow, totalCol), curTotal, { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'right', numFmt });
+    setCellValue(ws.getCell(excelRow, totalCol + 1), prevTotal, { fill: isTotal ? REPORT_COLORS.total : REPORT_COLORS.card, align: 'right', numFmt });
+    setCellValue(ws.getCell(excelRow, totalCol + 2), reportPctText(reportDelta(curTotal, prevTotal)), { bold: isTotal, fill: isTotal ? REPORT_COLORS.total : undefined, align: 'center' });
+    styleReportDelta(ws.getCell(excelRow, totalCol + 2), reportDelta(curTotal, prevTotal));
   });
   return startRow + keys.length + 3;
 }
@@ -387,111 +458,191 @@ function writeWeeklyPacingTable(
 const PLATFORM_LABELS: Record<string, string> = { meta: 'Meta', google: 'Google' };
 
 function writePlatformTable(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
-  const headers = ['Plataforma', 'Investimento', 'Δ', 'Cliques', 'Δ', 'CPC (R$)', 'Δ', 'Impressões', 'Δ', 'CTR', 'Share invest.'];
-  writeSectionTitle(ws, startRow, 'POR PLATAFORMA — Meta vs Google com MoM', headers.length);
-  writeReportHeader(ws, startRow + 1, headers);
+  const curLabel = MONTHS_PT[analysis.currentStart.getMonth()];
+  const prevLabel = MONTHS_PT[analysis.previousStart.getMonth()];
+  const headers = ['Plataforma', ...comparativeHeaders(PLATFORM_SPECS, curLabel, prevLabel), 'Share invest.'];
+  writeColoredTitle(ws, startRow, 'INVESTIMENTO / PLATAFORMA', headers.length, HEADER_FILL.plataforma);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.plataforma);
+  const shareCol = 2 + PLATFORM_SPECS.length * 3;
   const keys = [...analysis.platformKeys, 'TOTAL'];
   keys.forEach((key, index) => {
     const excelRow = startRow + 2 + index;
     const current = key === 'TOTAL' ? analysis.currentTotal : mediaOrEmpty(analysis.byPlatformCurrent, key);
     const previous = key === 'TOTAL' ? analysis.previousTotal : mediaOrEmpty(analysis.byPlatformPrevious, key);
     const share = analysis.currentTotal.spend ? current.spend / analysis.currentTotal.spend : 0;
-    const deltas: [number, number | null, boolean][] = [
-      [3, reportDelta(current.spend, previous.spend), false],
-      [5, reportDelta(current.clicks, previous.clicks), false],
-      [7, reportDelta(mediaCpc(current), mediaCpc(previous)), true],
-      [9, reportDelta(current.impressions, previous.impressions), false],
-    ];
+    const name = key === 'TOTAL' ? 'TOTAL' : (PLATFORM_LABELS[key] ?? key);
+    writeComparativeRow(ws, excelRow, name, current, previous, PLATFORM_SPECS, key === 'TOTAL');
+    setCellValue(ws.getCell(excelRow, shareCol), share, {
+      bold: key === 'TOTAL', fill: key === 'TOTAL' ? REPORT_COLORS.total : undefined, align: 'right', numFmt: PCT_FMT,
+    });
+  });
+  return startRow + keys.length + 3;
+}
+
+type CreativeGroup = {
+  adset: string;
+  frente: MidiaFrente;
+  objective: string;
+  total: MediaMetrics;
+  ads: { ad: string; metrics: MediaMetrics }[];
+};
+
+const buildCreativeGroups = (analysis: MidiaAnalysis): CreativeGroup[] => {
+  const map = new Map<string, CreativeGroup>();
+  analysis.currentRows
+    .filter((row) => row.channel === 'meta' && row.adName)
+    .forEach((row) => {
+      const adset = row.adsetName ?? '—';
+      if (!map.has(adset)) {
+        map.set(adset, { adset, frente: row.frente, objective: row.objective, total: emptyMediaMetrics(), ads: [] });
+      }
+      const group = map.get(adset)!;
+      addMediaMetrics(group.total, row.metrics);
+      let ad = group.ads.find((item) => item.ad === row.adName);
+      if (!ad) { ad = { ad: row.adName!, metrics: emptyMediaMetrics() }; group.ads.push(ad); }
+      addMediaMetrics(ad.metrics, row.metrics);
+    });
+  const groups = Array.from(map.values());
+  groups.forEach((group) => group.ads.sort((a, b) => b.metrics.spend - a.metrics.spend));
+  return groups.sort((a, b) =>
+    FRENTE_ORDER.indexOf(a.frente) - FRENTE_ORDER.indexOf(b.frente) || b.total.spend - a.total.spend);
+};
+
+function writeCreativeTable(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
+  const headers = ['Grupo de Anúncio / Criativo', 'Investimento', 'Impressões', 'Alcance', 'Frequência', 'Cliques', 'CTR', 'CPC (R$)', 'CPM (R$)', 'Resultado', 'Tipo', 'Custo/resultado'];
+  writeColoredTitle(ws, startRow, 'PERFORMANCE POR CRIATIVO - GRUPO DE ANÚNCIO', headers.length, HEADER_FILL.criativo);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.criativo);
+  const groups = buildCreativeGroups(analysis);
+  let excelRow = startRow + 2;
+  if (!groups.length) {
+    ws.mergeCells(excelRow, 1, excelRow, headers.length);
+    setCellValue(ws.getCell(excelRow, 1), 'Sem dados em nível de anúncio para o mês — verificar ingestão de ads do Meta no Supabase.', { fill: REPORT_COLORS.note, fontColor: REPORT_COLORS.noteText, align: 'left' });
+    return excelRow + 3;
+  }
+
+  const writeMetricRow = (row: number, label: string, m: MediaMetrics, objective: string, isGroup: boolean): void => {
+    const custoResult = m.conversions ? m.spend / m.conversions : null;
     const values = [
-      key === 'TOTAL' ? 'TOTAL' : (PLATFORM_LABELS[key] ?? key),
-      current.spend, reportPctText(deltas[0][1]),
-      current.clicks, reportPctText(deltas[1][1]),
-      mediaCpc(current), reportPctText(deltas[2][1]),
-      current.impressions, reportPctText(deltas[3][1]),
-      mediaCtr(current) ?? 0,
-      share,
+      label, m.spend, m.impressions, m.reach, mediaFrequency(m) ?? '—', m.clicks,
+      mediaCtr(m) ?? 0, mediaCpc(m), mediaCpm(m),
+      m.conversions || (isGroup ? m.conversions : 0), resultLabel(objective), custoResult,
     ];
+    values.forEach((value, colIndex) => {
+      const cell = ws.getCell(row, colIndex + 1);
+      setCellValue(cell, value, {
+        bold: isGroup,
+        fill: isGroup ? REPORT_COLORS.card : undefined,
+        align: colIndex === 0 ? 'left' : colIndex === 10 ? 'center' : 'right',
+      });
+      if ([1, 7, 8, 11].includes(colIndex)) cell.numFmt = CURRENCY_FMT;
+      if ([2, 3, 5, 9].includes(colIndex)) cell.numFmt = INT_FMT;
+      if (colIndex === 4 && typeof value === 'number') cell.numFmt = '0.00';
+      if (colIndex === 6) cell.numFmt = PCT_FMT;
+    });
+  };
+
+  groups.forEach((group) => {
+    writeMetricRow(excelRow, `▸ ${group.adset}  ·  ${group.frente}`, group.total, group.objective, true);
+    excelRow += 1;
+    group.ads.forEach((ad) => {
+      writeMetricRow(excelRow, `    ${ad.ad}`, ad.metrics, group.objective, false);
+      excelRow += 1;
+    });
+  });
+
+  const coverage = analysis.adCoverage;
+  if (coverage !== null && coverage < 0.95) {
+    ws.mergeCells(excelRow, 1, excelRow, headers.length);
+    setCellValue(ws.getCell(excelRow, 1), `⚠ Cobertura nível anúncio ${(coverage * 100).toFixed(1)}% — checar ingestão de ads no Supabase.`, {
+      fill: REPORT_COLORS.note, fontColor: REPORT_COLORS.noteText, align: 'left',
+    });
+    return excelRow + 3;
+  }
+  return excelRow + 2;
+}
+
+function writeBudgetPacing(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
+  const headers = ['Frente', 'Realizado', 'Meta', '% meta', 'Projeção fim mês', 'Status'];
+  writeColoredTitle(ws, startRow, 'Realizado vs Meta', headers.length, HEADER_FILL.realizado);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.realizado);
+  const daysInMonth = monthEnd(analysis.currentStart).getDate();
+  const closedDays = Math.max(1, Math.min(analysis.maxDataDay, daysInMonth));
+  const keys: (MidiaFrente | 'TOTAL')[] = [...FRENTE_ORDER, 'TOTAL'];
+  const totalBudget = FRENTE_ORDER.reduce((sum, frente) => sum + FRENTE_BUDGET[frente], 0);
+  keys.forEach((key, index) => {
+    const excelRow = startRow + 2 + index;
+    const realized = key === 'TOTAL' ? analysis.currentTotal.spend : mediaOrEmpty(analysis.byFrenteCurrent, key).spend;
+    const budget = key === 'TOTAL' ? totalBudget : FRENTE_BUDGET[key];
+    const pct = budget ? realized / budget : 0;
+    const projection = (realized / closedDays) * daysInMonth;
+    const projPct = budget ? projection / budget : 0;
+    const status = projPct > 1.1 ? '🔴 acima' : projPct < 0.85 ? '🟡 abaixo' : '🟢 no ritmo';
+    const values = [key === 'TOTAL' ? 'TOTAL' : key, realized, budget, pct, projection, status];
     values.forEach((value, colIndex) => {
       const cell = ws.getCell(excelRow, colIndex + 1);
       setCellValue(cell, value, {
         bold: key === 'TOTAL',
         fill: key === 'TOTAL' ? REPORT_COLORS.total : undefined,
-        align: colIndex === 0 ? 'left' : 'right',
+        align: colIndex === 0 ? 'left' : colIndex === 5 ? 'center' : 'right',
       });
-      if ([1, 5].includes(colIndex)) cell.numFmt = CURRENCY_FMT;
-      if ([3, 7].includes(colIndex)) cell.numFmt = INT_FMT;
-      if ([9, 10].includes(colIndex)) cell.numFmt = PCT_FMT;
+      if ([1, 2, 4].includes(colIndex)) cell.numFmt = CURRENCY_FMT;
+      if (colIndex === 3) cell.numFmt = PCT_FMT;
     });
-    deltas.forEach(([column, delta, invert]) => styleReportDelta(ws.getCell(excelRow, column), delta, invert));
   });
   return startRow + keys.length + 3;
 }
 
-function writeCreativeTable(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
-  const headers = ['Frente', 'Conjunto (adset)', 'Criativo', 'Investimento', 'Impressões', 'Alcance', 'Freq.', 'Cliques', 'CTR', 'CPC (R$)'];
-  writeSectionTitle(ws, startRow, 'PERFORMANCE POR CRIATIVO — Meta, mês corrente (sem MoM)', headers.length);
-  writeReportHeader(ws, startRow + 1, headers);
-  let excelRow = startRow + 2;
-  if (!analysis.creatives.length) {
-    ws.mergeCells(excelRow, 1, excelRow, headers.length);
-    setCellValue(ws.getCell(excelRow, 1), 'Sem dados em nível de anúncio para o mês — verificar ingestão de ads do Meta no Supabase.', { fill: REPORT_COLORS.note, fontColor: REPORT_COLORS.noteText, align: 'left' });
-    excelRow += 1;
-  }
-  analysis.creatives.forEach((creative) => {
-    const m = creative.metrics;
-    const values = [
-      creative.frente, creative.adset, creative.ad,
-      m.spend, m.impressions, m.reach,
-      mediaFrequency(m) ?? '—', m.clicks, mediaCtr(m) ?? 0, mediaCpc(m),
-    ];
+function writeGoogleTable(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
+  const googleRows = analysis.currentRows.filter((row) => row.channel === 'google');
+  if (!googleRows.length) return startRow;
+  const headers = ['Campanha (Google)', 'Frente', 'Investimento', 'Impressões', 'Cliques', 'CPC (R$)', 'CPM (R$)', 'CTR'];
+  writeColoredTitle(ws, startRow, 'GOOGLE ADS', headers.length, HEADER_FILL.google);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.google);
+  const byCampaign = new Map<string, { frente: MidiaFrente; metrics: MediaMetrics }>();
+  googleRows.forEach((row) => {
+    if (!byCampaign.has(row.campaign)) byCampaign.set(row.campaign, { frente: row.frente, metrics: emptyMediaMetrics() });
+    addMediaMetrics(byCampaign.get(row.campaign)!.metrics, row.metrics);
+  });
+  const ordered = Array.from(byCampaign.entries()).sort((a, b) => b[1].metrics.spend - a[1].metrics.spend);
+  ordered.forEach(([campaign, item], index) => {
+    const m = item.metrics;
+    const values = [campaign, item.frente, m.spend, m.impressions, m.clicks, mediaCpc(m), mediaCpm(m), mediaCtr(m) ?? 0];
     values.forEach((value, colIndex) => {
-      const cell = ws.getCell(excelRow, colIndex + 1);
-      setCellValue(cell, value, { align: colIndex <= 2 ? 'left' : 'right' });
-      if ([3, 9].includes(colIndex)) cell.numFmt = CURRENCY_FMT;
-      if ([4, 5, 7].includes(colIndex)) cell.numFmt = INT_FMT;
-      if (colIndex === 6 && typeof value === 'number') cell.numFmt = '0.00';
-      if (colIndex === 8) cell.numFmt = PCT_FMT;
+      const cell = ws.getCell(startRow + 2 + index, colIndex + 1);
+      setCellValue(cell, value, { align: colIndex <= 1 ? 'left' : 'right' });
+      if ([2, 5, 6].includes(colIndex)) cell.numFmt = CURRENCY_FMT;
+      if ([3, 4].includes(colIndex)) cell.numFmt = INT_FMT;
+      if (colIndex === 7) cell.numFmt = PCT_FMT;
     });
-    excelRow += 1;
   });
-  const coverage = analysis.adCoverage;
-  const coverageText = coverage === null
-    ? 'Cobertura nível anúncio: sem investimento Meta no mês.'
-    : `Cobertura nível anúncio: ${(coverage * 100).toFixed(1)}% do investimento Meta do mês está detalhado por criativo no Supabase.${coverage < 0.95 ? ' ⚠ Abaixo de 95% — checar ingestão de ads.' : ''}`;
-  ws.mergeCells(excelRow, 1, excelRow, headers.length);
-  setCellValue(ws.getCell(excelRow, 1), coverageText, {
-    fill: coverage !== null && coverage < 0.95 ? REPORT_COLORS.note : REPORT_COLORS.card,
-    fontColor: coverage !== null && coverage < 0.95 ? REPORT_COLORS.noteText : REPORT_COLORS.gray,
-    align: 'left',
-  });
-  return excelRow + 3;
+  return startRow + ordered.length + 3;
 }
 
 function writeHeroWeeklyTable(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
-  const headers = ['Frente (KPI-herói)', ...analysis.currentWindows.flatMap((window) => [window.label, `MoM ${window.label}`]), 'Mês', 'Δ mês MoM'];
-  writeSectionTitle(ws, startRow, 'EFICIÊNCIA SEMANAL — KPI-HERÓI por frente (CPC/CPM/CPL, MoM verde = caiu)', headers.length);
-  writeReportHeader(ws, startRow + 1, headers);
+  const prevWindows = previousWeekWindows(analysis.previousStart, analysis.currentWindows);
+  const headers = ['Frente (KPI-herói)', ...analysis.currentWindows.flatMap((window, i) => [window.label, prevWindows[i]?.label ?? '—', 'Δ']), 'Mês', 'Mês ant.', 'Δ'];
+  writeColoredTitle(ws, startRow, 'EFICIÊNCIA SEMANAL', headers.length, HEADER_FILL.eficiencia);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.eficiencia);
   FRENTE_ORDER.forEach((frente, index) => {
     const excelRow = startRow + 2 + index;
-    const weekly = analysis.currentWindows.flatMap((_, weekIndex) => {
-      const current = heroKpiValue(frente, analysis.weeklyCurrent.get(frente)![weekIndex]);
-      const previous = heroKpiValue(frente, analysis.weeklyPrevious.get(frente)![weekIndex]);
-      return [current ?? '—', reportPctText(reportDelta(current, previous))];
-    });
-    const monthCurrent = heroKpiValue(frente, mediaOrEmpty(analysis.byFrenteCurrent, frente));
-    const monthPrevious = heroKpiValue(frente, mediaOrEmpty(analysis.byFrentePrevious, frente));
-    const values = [`${frente} · ${HERO_KPI[frente]}`, ...weekly, monthCurrent ?? '—', reportPctText(reportDelta(monthCurrent, monthPrevious))];
-    values.forEach((value, colIndex) => {
-      const cell = ws.getCell(excelRow, colIndex + 1);
-      setCellValue(cell, value, { align: colIndex === 0 ? 'left' : 'right' });
-      if (colIndex >= 1 && colIndex % 2 === 1 && typeof value === 'number') cell.numFmt = CURRENCY_FMT;
-    });
+    setCellValue(ws.getCell(excelRow, 1), `${frente} · ${HERO_KPI[frente]}`, { align: 'left' });
     analysis.currentWindows.forEach((_, weekIndex) => {
-      const current = heroKpiValue(frente, analysis.weeklyCurrent.get(frente)![weekIndex]);
-      const previous = heroKpiValue(frente, analysis.weeklyPrevious.get(frente)![weekIndex]);
-      styleReportDelta(ws.getCell(excelRow, 3 + weekIndex * 2), reportDelta(current, previous), true);
+      const cur = heroKpiValue(frente, analysis.weeklyCurrent.get(frente)![weekIndex]);
+      const prev = heroKpiValue(frente, analysis.weeklyPrevious.get(frente)![weekIndex]);
+      const delta = reportDelta(cur, prev);
+      const base = 2 + weekIndex * 3;
+      setCellValue(ws.getCell(excelRow, base), cur ?? '—', { align: 'right', numFmt: typeof cur === 'number' ? CURRENCY_FMT : undefined });
+      setCellValue(ws.getCell(excelRow, base + 1), prev ?? '—', { fill: REPORT_COLORS.card, align: 'right', numFmt: typeof prev === 'number' ? CURRENCY_FMT : undefined });
+      setCellValue(ws.getCell(excelRow, base + 2), reportPctText(delta), { align: 'center' });
+      styleReportDelta(ws.getCell(excelRow, base + 2), delta, true);
     });
-    styleReportDelta(ws.getCell(excelRow, headers.length), reportDelta(monthCurrent, monthPrevious), true);
+    const monthCur = heroKpiValue(frente, mediaOrEmpty(analysis.byFrenteCurrent, frente));
+    const monthPrev = heroKpiValue(frente, mediaOrEmpty(analysis.byFrentePrevious, frente));
+    const base = 2 + analysis.currentWindows.length * 3;
+    setCellValue(ws.getCell(excelRow, base), monthCur ?? '—', { align: 'right', numFmt: typeof monthCur === 'number' ? CURRENCY_FMT : undefined });
+    setCellValue(ws.getCell(excelRow, base + 1), monthPrev ?? '—', { fill: REPORT_COLORS.card, align: 'right', numFmt: typeof monthPrev === 'number' ? CURRENCY_FMT : undefined });
+    setCellValue(ws.getCell(excelRow, base + 2), reportPctText(reportDelta(monthCur, monthPrev)), { align: 'center' });
+    styleReportDelta(ws.getCell(excelRow, base + 2), reportDelta(monthCur, monthPrev), true);
   });
   return startRow + FRENTE_ORDER.length + 3;
 }
@@ -554,7 +705,7 @@ function buildHighlights(analysis: MidiaAnalysis): string[] {
 function writeHighlightsSection(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
   const bullets = buildHighlights(analysis);
   if (!bullets.length) return startRow;
-  writeSectionTitle(ws, startRow, 'LEITURA DO MÊS — destaques automáticos', REPORT_WIDTH);
+  writeSectionTitle(ws, startRow, 'LEITURA DO MÊS', REPORT_WIDTH);
   bullets.forEach((bullet, index) => {
     const excelRow = startRow + 1 + index;
     ws.mergeCells(excelRow, 1, excelRow, REPORT_WIDTH);
@@ -568,39 +719,111 @@ function writeHighlightsSection(ws: Worksheet, startRow: number, analysis: Midia
   return startRow + bullets.length + 3;
 }
 
+type B2CWeek = { metrics: MediaMetrics; installs: number; trials: number };
+
+const emptyB2CWeek = (): B2CWeek => ({ metrics: emptyMediaMetrics(), installs: 0, trials: 0 });
+
+const bucketB2C = (rows: PaidRow[], windows: WeekWindow[]): B2CWeek[] => {
+  const weeks = windows.map(() => emptyB2CWeek());
+  rows.filter((row) => row.frente === 'Aquisição B2C').forEach((row) => {
+    const index = windows.findIndex((window) => row.day >= window.startDay && row.day <= window.endDay);
+    if (index < 0) return;
+    addMediaMetrics(weeks[index].metrics, row.metrics);
+    if (isTrialCampaign(row.campaign)) weeks[index].trials += row.metrics.conversions;
+    else weeks[index].installs += row.metrics.conversions;
+  });
+  return weeks;
+};
+
+const sumB2C = (weeks: B2CWeek[]): B2CWeek => weeks.reduce((total, week) => {
+  addMediaMetrics(total.metrics, week.metrics);
+  total.installs += week.installs;
+  total.trials += week.trials;
+  return total;
+}, emptyB2CWeek());
+
+// Métricas do funil B2C (app): investimento, mídia, Instalações + CPI e Start Trial + Custo/Trial.
+const b2cCells = (week: B2CWeek): (number | null)[] => {
+  const m = week.metrics;
+  return [
+    m.spend, m.impressions, mediaCpm(m), m.clicks, mediaCpc(m), mediaCtr(m) ?? 0,
+    week.installs, week.installs ? m.spend / week.installs : null,
+    week.trials, week.trials ? m.spend / week.trials : null,
+  ];
+};
+const B2C_NUMFMT: (string | undefined)[] = [CURRENCY_FMT, INT_FMT, CURRENCY_FMT, INT_FMT, CURRENCY_FMT, PCT_FMT, INT_FMT, CURRENCY_FMT, INT_FMT, CURRENCY_FMT];
+// Colunas de resultado (custo cai = melhora): CPM, CPC, CPI, Custo/Trial.
+const B2C_INVERT = [false, false, true, false, true, false, false, true, false, true];
+
+function writeB2CFunnelTable(ws: Worksheet, startRow: number, analysis: MidiaAnalysis): number {
+  const headers = ['Semana', 'Investimento', 'Impressões', 'CPM (R$)', 'Cliques', 'CPC (R$)', 'CTR', 'Instalações', 'CPI (R$)', 'Start Trial', 'Custo/Trial'];
+  writeColoredTitle(ws, startRow, 'AQUISIÇÃO B2C — INSTALAÇÕES & START TRIAL (semanal)', headers.length, HEADER_FILL.resultados);
+  writeColoredHeader(ws, startRow + 1, headers, HEADER_FILL.resultados);
+  const prevWindows = previousWeekWindows(analysis.previousStart, analysis.currentWindows);
+  const weeksCur = bucketB2C(analysis.currentRows, analysis.currentWindows);
+  const weeksPrev = bucketB2C(analysis.previousRows, prevWindows);
+  const curLabel = MONTHS_PT[analysis.currentStart.getMonth()];
+  const prevLabel = MONTHS_PT[analysis.previousStart.getMonth()];
+
+  const writeRow = (row: number, label: string, cells: (number | null)[], opts: { bold?: boolean; fill?: string } = {}): void => {
+    setCellValue(ws.getCell(row, 1), label, { bold: opts.bold, fill: opts.fill, align: 'left' });
+    cells.forEach((value, i) => {
+      const cell = ws.getCell(row, i + 2);
+      setCellValue(cell, value ?? '—', { bold: opts.bold, fill: opts.fill, align: 'right' });
+      if (typeof value === 'number' && B2C_NUMFMT[i]) cell.numFmt = B2C_NUMFMT[i]!;
+    });
+  };
+
+  let r = startRow + 2;
+  analysis.currentWindows.forEach((window, i) => {
+    writeRow(r, `Sem ${i + 1} (${window.label})`, b2cCells(weeksCur[i]));
+    r += 1;
+  });
+  const totalCur = sumB2C(weeksCur);
+  const totalPrev = sumB2C(weeksPrev);
+  const cellsCur = b2cCells(totalCur);
+  const cellsPrev = b2cCells(totalPrev);
+  writeRow(r, `TOTAL ${curLabel}`, cellsCur, { bold: true, fill: REPORT_COLORS.total });
+  r += 1;
+  writeRow(r, `TOTAL ${prevLabel}`, cellsPrev, { fill: REPORT_COLORS.card });
+  r += 1;
+  setCellValue(ws.getCell(r, 1), 'Δ MoM', { bold: true, align: 'left' });
+  cellsCur.forEach((cur, i) => {
+    const delta = reportDelta(cur, cellsPrev[i]);
+    setCellValue(ws.getCell(r, i + 2), reportPctText(delta), { bold: true, align: 'center' });
+    styleReportDelta(ws.getCell(r, i + 2), delta, B2C_INVERT[i]);
+  });
+  return r + 3;
+}
+
 export function writeMidiaPagaSheet(workbook: Workbook, analysis: MidiaAnalysis): void {
   const ws = workbook.addWorksheet('Mídia Paga', {
     views: [{ state: 'frozen', xSplit: 2, ySplit: 2, topLeftCell: 'C3', activeCell: 'C3', showGridLines: false }],
   });
   const currentLabel = MONTHS_PT[analysis.currentStart.getMonth()];
   const previousLabel = MONTHS_PT[analysis.previousStart.getMonth()];
-  ws.mergeCells(1, 1, 1, REPORT_WIDTH);
-  setCellValue(ws.getCell(1, 1), `MÍDIA PAGA — ${currentLabel}/${analysis.currentStart.getFullYear()}  ·  todas as métricas vs ${previousLabel} (MoM)`, { bold: true, align: 'left' });
+  ws.mergeCells(1, 1, 1, 12);
+  setCellValue(ws.getCell(1, 1), `MÍDIA PAGA — ${currentLabel}/${analysis.currentStart.getFullYear()}  ·  ${currentLabel} vs ${previousLabel}`, { bold: true, align: 'left' });
   ws.getCell(1, 1).font = { name: 'Arial', bold: true, color: { argb: REPORT_COLORS.navy }, size: 18 };
-  ws.mergeCells(2, 1, 2, REPORT_WIDTH);
-  setCellValue(ws.getCell(2, 1), 'Frentes classificadas pela tag do nome da campanha · Fonte: Supabase (paid_media_metrics) — Meta em nível de anúncio + Google agregado.', { align: 'left' });
-  ws.getCell(2, 1).font = { name: 'Arial', color: { argb: REPORT_COLORS.gray }, size: 9 };
 
   writeMediaCards(ws, analysis);
-  ws.mergeCells(8, 1, 9, REPORT_WIDTH);
-  setCellValue(ws.getCell(8, 1), '⚠ Conversão de plataforma é evento (clique/lead/install), NÃO cartão emitido. Tracking de instalação B2C quebrou em abr/2026 e Plurix (+Amigo) zerou em jun — ler aquisição por CLIQUE/CPC até normalizar. Google entra só no total (sem criativo). MoM verde = melhora.', { fill: REPORT_COLORS.note, fontColor: REPORT_COLORS.noteText, align: 'left' });
 
-  let row = 11;
+  let row = 8;
+  row = writeBudgetPacing(ws, row, analysis);
   row = writeFrenteTable(ws, row, analysis);
-  row = writeWeeklyPacingTable(ws, row, analysis, 'spend', 'PACING SEMANAL — INVESTIMENTO por frente com MoM por semana');
-  row = writeWeeklyPacingTable(ws, row, analysis, 'clicks', 'PACING SEMANAL — CLIQUES por frente com MoM por semana');
+  row = writeB2CFunnelTable(ws, row, analysis);
+  row = writeWeeklyPacingTable(ws, row, analysis, 'spend', 'SEMANAL — INVESTIMENTO');
+  row = writeWeeklyPacingTable(ws, row, analysis, 'clicks', 'SEMANAL — CLIQUES');
   row = writePlatformTable(ws, row, analysis);
+  row = writeGoogleTable(ws, row, analysis);
   row = writeCreativeTable(ws, row, analysis);
   row = writeHeroWeeklyTable(ws, row, analysis);
-  row = writeHighlightsSection(ws, row, analysis);
+  writeHighlightsSection(ws, row, analysis);
 
-  ws.mergeCells(row + 1, 1, row + 1, REPORT_WIDTH);
-  setCellValue(ws.getCell(row + 1, 1), 'Rodapé: alcance = soma de reach diário (superestima usuários únicos entre dias). Google não reporta alcance nem criativo nesta base. Conversões de plataforma seguem não confiáveis (tracking) — usar CPL apenas em Seguros. Criativo não tem MoM nesta versão. Comparativo semanal usa dias proporcionais do mês anterior.', { fill: REPORT_COLORS.card, align: 'left' });
-  ws.getCell(row + 1, 1).font = { name: 'Arial', italic: true, color: { argb: REPORT_COLORS.gray }, size: 8 };
-
-  ws.getColumn(1).width = 24;
-  for (let column = 2; column <= REPORT_WIDTH; column += 1) {
-    ws.getColumn(column).width = column === 16 ? 16 : column % 2 === 0 ? 13 : 11;
+  ws.getColumn(1).width = 32;
+  const maxColumn = Math.max(REPORT_WIDTH, ws.columnCount);
+  for (let column = 2; column <= maxColumn; column += 1) {
+    ws.getColumn(column).width = 13;
   }
   ws.eachRow((excelRow) => { excelRow.height = Math.max(excelRow.height ?? 20, 20); });
 }
@@ -611,7 +834,7 @@ async function fetchPaidMediaRows(start: Date, end: Date): Promise<PaidMediaRawR
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await supabase
       .from('paid_media_metrics')
-      .select('date, channel, campaign, spend, impressions, clicks, conversions, reach, frequency, ad_name, adset_name')
+      .select('date, channel, campaign, objective, spend, impressions, clicks, conversions, reach, frequency, ad_name, adset_name')
       .gte('date', mediaIsoDate(start))
       .lte('date', mediaIsoDate(end))
       .order('date', { ascending: true })
