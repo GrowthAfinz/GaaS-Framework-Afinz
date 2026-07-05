@@ -52,7 +52,7 @@ export const CoverageHeader: React.FC<Props> = ({ c, onOrfaosClick, onSemPecaCli
       <div className="ml-auto flex items-stretch gap-3.5">
         <Stat v={c.orfaos} l="Disparos órfãos" s="réguas ativas sem template" tone="warn" onClick={onOrfaosClick} hint="Abrir a fila de reconciliação" />
         <Stat v={c.semAsset} l="Templates sem peça" s="IDs de template sem a peça" tone="info" onClick={onSemPecaClick} hint="Abrir templates sem peça" />
-        <Stat v={c.ativos} l="Templates no ar" s={`de ${c.totalTemplates} cadastrados`} />
+        <Stat v={c.ativos} l="Templates no ar" s={`de ${c.totalTemplates} cadastrados`} tone="ok" onClick={onAtivosClick} hint="Ver os templates no ar e abrir a performance" />
         <div className="flex flex-col justify-center gap-1.5 pl-1.5">
           {c.byChannel.map((x) => {
             const clickable = x.orf > 0 && !!onChannelClick;
@@ -76,9 +76,10 @@ export const CoverageHeader: React.FC<Props> = ({ c, onOrfaosClick, onSemPecaCli
   );
 };
 
-const Stat: React.FC<{ v: number; l: string; s: string; tone?: 'warn' | 'info'; onClick?: () => void; hint?: string }> = ({ v, l, s, tone, onClick, hint }) => {
+const Stat: React.FC<{ v: number; l: string; s: string; tone?: 'warn' | 'info' | 'ok'; onClick?: () => void; hint?: string }> = ({ v, l, s, tone, onClick, hint }) => {
   const bg = tone === 'warn' ? 'bg-amber-400/20 border-amber-300/30'
     : tone === 'info' ? 'bg-sky-400/16 border-sky-300/30'
+    : tone === 'ok' ? 'bg-emerald-400/16 border-emerald-300/30'
     : 'bg-white/10 border-white/15';
   const interactive = onClick ? 'cursor-pointer transition-transform hover:scale-[1.03] hover:brightness-110' : 'cursor-default';
   return (
