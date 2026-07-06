@@ -265,13 +265,17 @@ export const useB2CAnalysis = () => {
         return calculateMetrics(prevCrmFiltered, b2cData, format(prevStartDate, 'yyyy-MM-dd'), format(prevEndDate, 'yyyy-MM-dd'), 'daily', alertConfig);
     }, [prevCrmFiltered, b2cData, prevStartDate, prevEndDate, alertConfig]);
 
-    // --- 3b. Year-to-date (monthly) — independente do período selecionado ---
-    // Usado pelos gráficos de "Metas & Resultados" quando em modo Mensal:
-    // resultados do ano corrente, quebrados por mês (jan → hoje).
+    // --- 3b. Série mensal para os gráficos de "Metas & Resultados" (modo Mensal) ---
+    // Cobre o MAIOR intervalo entre (período selecionado) e (ano corrente até hoje).
+    // Assim o padrão é sempre o ano cheio (jan → hoje), mas se o usuário escolher um
+    // período maior que 1 ano, a série mensal se estende para cobrir todo esse range.
     const { ytdStart, ytdEnd } = useMemo(() => {
         const now = new Date();
-        return { ytdStart: format(startOfYear(now), 'yyyy-MM-dd'), ytdEnd: format(now, 'yyyy-MM-dd') };
-    }, []);
+        const yearStart = startOfYear(now);
+        const rangeStart = new Date(Math.min(deferredStartDate.getTime(), yearStart.getTime()));
+        const rangeEnd = new Date(Math.max(deferredEndDate.getTime(), now.getTime()));
+        return { ytdStart: format(rangeStart, 'yyyy-MM-dd'), ytdEnd: format(rangeEnd, 'yyyy-MM-dd') };
+    }, [deferredStartDate, deferredEndDate]);
 
     const ytdFilters = useMemo(() => ({
         ...deferredGlobalFilters,

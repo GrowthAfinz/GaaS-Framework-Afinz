@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, Goal } from '../../types/framework';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, CartesianGrid } from 'recharts';
+import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, CartesianGrid } from 'recharts';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
 import { Info } from 'lucide-react';
@@ -170,23 +170,29 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const chartClick = isMonthly ? undefined : handleChartClick;
     const dotClick = isMonthly ? undefined : handleDotClick;
 
-    // Toggle minimalista Mensal | Diário (fica no cabeçalho do gráfico CAC).
+    // Toggle Mensal | Diário — segmented control em pill (fica no cabeçalho do CAC).
     const ChartModeToggle = () => (
-        <div className="flex items-center gap-0.5 bg-slate-100 rounded-md p-0.5">
-            <button
-                type="button"
-                onClick={() => setChartMode('monthly')}
-                className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${isMonthly ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Mensal
-            </button>
-            <button
-                type="button"
-                onClick={() => setChartMode('daily')}
-                className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${!isMonthly ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-                Diário
-            </button>
+        <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 ring-1 ring-slate-200/70">
+            {([
+                { key: 'monthly', label: 'Mensal' },
+                { key: 'daily', label: 'Diário' },
+            ] as const).map(({ key, label }) => {
+                const active = chartMode === key;
+                return (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => setChartMode(key)}
+                        className={`px-3 py-1 text-[11px] font-semibold rounded-full transition-all duration-200 ${
+                            active
+                                ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200'
+                                : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        {label}
+                    </button>
+                );
+            })}
         </div>
     );
 
@@ -326,23 +332,29 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 </div>
 
                 {showCharts && (
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 h-52 flex flex-col shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-slate-500 text-[10px] font-bold uppercase flex items-center gap-2">
-                                CAC Evolution (R$) <span title="Evolucao do Custo de Aquisicao de Cartao ao longo do tempo"><Info size={10} className="text-slate-500" /></span>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5">
+                                CAC Evolution <span className="text-slate-400 font-medium normal-case">(R$)</span>
+                                <span title="Evolucao do Custo de Aquisicao de Cartao ao longo do tempo"><Info size={10} className="text-slate-400" /></span>
                             </h3>
                             <ChartModeToggle />
                         </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={timeChartData} onClick={chartClick} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                                    <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{ fontSize: 9 }} minTickGap={10} />
-                                    <YAxis stroke="#94a3b8" tick={{ fontSize: 9 }} />
-                                    <Tooltip content={<ChartTooltip />} wrapperStyle={{ pointerEvents: 'none' }} />
-                                    <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                    <Line type="monotone" dataKey="cac_medio" name="CAC Medio" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{ r: 6, onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
-                                </LineChart>
+                                <AreaChart data={timeChartData} onClick={chartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
+                                    <defs>
+                                        <linearGradient id="cacGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#10B981" stopOpacity={0.28} />
+                                            <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
+                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(v) => `R$${Number(v).toFixed(0)}`} />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none' }} />
+                                    <Area type="monotone" dataKey="cac_medio" name="CAC Medio" stroke="#10B981" strokeWidth={2.5} fill="url(#cacGradient)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
+                                </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
@@ -352,39 +364,39 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
             {showCharts && (
                 <div className="space-y-4">
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 h-52 flex flex-col shadow-sm">
-                        <h3 className="text-slate-500 text-[10px] font-bold uppercase mb-2 flex items-center gap-2">
-                            Propostas: CRM vs B2C <span title="Comparativo entre propostas geradas via CRM e outros canais B2C"><Info size={10} className="text-slate-500" /></span>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
+                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                            Propostas: CRM vs B2C <span title="Comparativo entre propostas geradas via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
                         </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={timeChartData} onClick={chartClick} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                                    <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{ fontSize: 9 }} minTickGap={10} />
-                                    <YAxis stroke="#94a3b8" tick={{ fontSize: 9 }} />
-                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.9 }} wrapperStyle={{ pointerEvents: 'none' }} />
+                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
+                                    <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
+                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
                                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
                                     <Bar dataKey="propostas_crm" name="CRM" stackId="a" fill="#3B82F6" />
-                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#64748b" opacity={0.5} />
+                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
-                    <div className="bg-white border border-slate-200 rounded-lg p-3 h-48 flex flex-col shadow-sm">
-                        <h3 className="text-slate-500 text-[10px] font-bold uppercase mb-2 flex items-center gap-2">
-                            Emissoes: CRM vs B2C <span title="Comparativo entre cartoes emitidos via CRM e outros canais B2C"><Info size={10} className="text-slate-500" /></span>
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-48 flex flex-col shadow-sm">
+                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                            Emissoes: CRM vs B2C <span title="Comparativo entre cartoes emitidos via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
                         </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={timeChartData} onClick={chartClick} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                                    <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{ fontSize: 9 }} minTickGap={10} />
-                                    <YAxis stroke="#94a3b8" tick={{ fontSize: 9 }} />
-                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.9 }} wrapperStyle={{ pointerEvents: 'none' }} />
+                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
+                                    <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
+                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
                                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
                                     <Bar dataKey="emissoes_crm" name="CRM" stackId="a" fill="#10B981" />
-                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#64748b" opacity={0.5} />
+                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
