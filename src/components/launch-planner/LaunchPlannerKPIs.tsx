@@ -135,17 +135,21 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         { name: metrics.label, value: metrics.goalCards, color: '#10B981' }
     ];
 
+    // Serasa é subconjunto do Total B2C; "Outros B2C" = Total − CRM − Serasa (residual).
+    const withChannels = (d: typeof dailyAnalysis[number]) => ({
+        ...d,
+        serasa_propostas: d.propostas_serasa,
+        serasa_emissoes: d.emissoes_serasa,
+        outros_propostas: Math.max(0, d.propostas_b2c_total - d.propostas_crm - d.propostas_serasa),
+        outros_emissoes: Math.max(0, d.emissoes_b2c_total - d.emissoes_crm - d.emissoes_serasa),
+        cac_medio: d.cac_medio
+    });
+
     const comparisonData = useMemo(() => {
         return dailyAnalysis.map(d => {
             const [y, m, day] = d.data.split('-').map(Number);
             const dateObj = new Date(y, m - 1, day);
-            return {
-                ...d,
-                displayDate: format(dateObj, 'dd/MM', { locale: ptBR }),
-                outros_propostas: Math.max(0, d.propostas_b2c_total - d.propostas_crm),
-                outros_emissoes: Math.max(0, d.emissoes_b2c_total - d.emissoes_crm),
-                cac_medio: d.cac_medio
-            };
+            return { ...withChannels(d), displayDate: format(dateObj, 'dd/MM', { locale: ptBR }) };
         });
     }, [dailyAnalysis]);
 
@@ -153,13 +157,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const monthlyData = useMemo(() => {
         return yearMonthlyAnalysis.map(d => {
             const dateObj = new Date(d.ano, d.mes - 1, 1);
-            return {
-                ...d,
-                displayDate: format(dateObj, 'MMM/yy', { locale: ptBR }),
-                outros_propostas: Math.max(0, d.propostas_b2c_total - d.propostas_crm),
-                outros_emissoes: Math.max(0, d.emissoes_b2c_total - d.emissoes_crm),
-                cac_medio: d.cac_medio
-            };
+            return { ...withChannels(d), displayDate: format(dateObj, 'MMM/yy', { locale: ptBR }) };
         });
     }, [yearMonthlyAnalysis]);
 
@@ -291,7 +289,13 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     }
 
     return (
-        <div className={`grid gap-4 mb-2 ${showCharts ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="mb-2">
+            {showCharts && (
+                <div className="flex justify-end mb-2">
+                    <ChartModeToggle />
+                </div>
+            )}
+            <div className={`grid gap-4 ${showCharts ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
             <div className="space-y-4">
                 <div className="bg-white border border-slate-200 rounded-lg p-3 flex flex-col justify-between h-48 relative overflow-hidden group shadow-sm">
                     <div className="flex justify-between items-start mb-1 relative z-10">
@@ -333,13 +337,10 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
                 {showCharts && (
                     <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
-                        <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5">
-                                CAC Evolution <span className="text-slate-400 font-medium normal-case">(R$)</span>
-                                <span title="Evolucao do Custo de Aquisicao de Cartao ao longo do tempo"><Info size={10} className="text-slate-400" /></span>
-                            </h3>
-                            <ChartModeToggle />
-                        </div>
+                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                            CAC Evolution <span className="text-slate-400 font-medium normal-case">(R$)</span>
+                            <span title="Evolucao do Custo de Aquisicao de Cartao ao longo do tempo"><Info size={10} className="text-slate-400" /></span>
+                        </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={timeChartData} onClick={chartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
@@ -377,6 +378,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
                                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
                                     <Bar dataKey="propostas_crm" name="CRM" stackId="a" fill="#3B82F6" />
+                                    <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" />
                                     <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -396,6 +398,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
                                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
                                     <Bar dataKey="emissoes_crm" name="CRM" stackId="a" fill="#10B981" />
+                                    <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" />
                                     <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -409,6 +412,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 activities={selectedActivities}
                 onClose={() => setSelectedDate(null)}
             />
+            </div>
         </div>
     );
 };

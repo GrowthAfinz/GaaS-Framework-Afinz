@@ -73,16 +73,29 @@ const calculateMetrics = (
         return format(d, 'yyyy-MM-dd');
     };
 
+    // Index B2C por data, separando o Total (tipo='total') do canal Serasa (tipo='serasa_api').
+    // Um mesmo dia pode ter múltiplas linhas (total + serasa); o Total é o denominador e
+    // o Serasa é um subconjunto exibido como canal próprio nos gráficos.
+    const b2cByDate: Record<string, { total_propostas: number; total_emissoes: number; serasa_propostas: number; serasa_emissoes: number }> = {};
     b2cData.forEach(d => {
         const isoDate = getISODate(d.data);
-        if (isoDate) allDates.add(isoDate);
+        if (!isoDate) return;
+        allDates.add(isoDate);
+        if (!b2cByDate[isoDate]) b2cByDate[isoDate] = { total_propostas: 0, total_emissoes: 0, serasa_propostas: 0, serasa_emissoes: 0 };
+        const tipo = (d.tipo || 'total').toLowerCase();
+        if (tipo === 'serasa_api') {
+            b2cByDate[isoDate].serasa_propostas += d.propostas_b2c_total || 0;
+            b2cByDate[isoDate].serasa_emissoes += d.emissoes_b2c_total || 0;
+        } else if (tipo === 'total') {
+            b2cByDate[isoDate].total_propostas += d.propostas_b2c_total || 0;
+            b2cByDate[isoDate].total_emissoes += d.emissoes_b2c_total || 0;
+        }
+        // tipo === 'crm' das métricas B2C é ignorado (o CRM vem das activities)
     });
 
     const normalizedDailyData = Array.from(allDates).sort().map(date => {
         const crm = crmByDate[date] || { propostas: 0, emissoes: 0, custo: 0, count: 0, baseEntregue: 0, baseEnviada: 0, campaignCount: 0 };
-        const b2cRow = b2cData.find(row => getISODate(row.data) === date);
-        const propostas_b2c = b2cRow?.propostas_b2c_total || 0;
-        const emissoes_b2c = b2cRow?.emissoes_b2c_total || 0;
+        const b2c = b2cByDate[date] || { total_propostas: 0, total_emissoes: 0, serasa_propostas: 0, serasa_emissoes: 0 };
 
         return {
             date,
@@ -93,8 +106,10 @@ const calculateMetrics = (
             crm_base_enviada: crm.baseEnviada,
             crm_count: crm.count,
             crm_campaign_count: crm.campaignCount,
-            b2c_propostas: propostas_b2c,
-            b2c_emissoes: emissoes_b2c
+            b2c_propostas: b2c.total_propostas,
+            b2c_emissoes: b2c.total_emissoes,
+            serasa_propostas: b2c.serasa_propostas,
+            serasa_emissoes: b2c.serasa_emissoes
         };
     });
 
@@ -125,7 +140,7 @@ const calculateMetrics = (
         if (!grouped[key]) {
             grouped[key] = {
                 crm_propostas: 0, crm_emissoes: 0, crm_custo: 0, crm_count: 0, crm_base_entregue: 0, crm_base_enviada: 0, crm_campaign_count: 0,
-                b2c_propostas: 0, b2c_emissoes: 0, count: 0, originalDate: key
+                b2c_propostas: 0, b2c_emissoes: 0, serasa_propostas: 0, serasa_emissoes: 0, count: 0, originalDate: key
             };
         }
 
@@ -138,6 +153,8 @@ const calculateMetrics = (
         grouped[key].crm_campaign_count += d.crm_campaign_count;
         grouped[key].b2c_propostas += d.b2c_propostas;
         grouped[key].b2c_emissoes += d.b2c_emissoes;
+        grouped[key].serasa_propostas += d.serasa_propostas;
+        grouped[key].serasa_emissoes += d.serasa_emissoes;
         grouped[key].count += 1;
     });
 
@@ -172,6 +189,8 @@ const calculateMetrics = (
             num_campanhas_crm: g.crm_campaign_count,
             propostas_b2c_total: g.b2c_propostas,
             emissoes_b2c_total: g.b2c_emissoes,
+            propostas_serasa: g.serasa_propostas,
+            emissoes_serasa: g.serasa_emissoes,
             share_propostas_crm_percentual: share_propostas,
             share_emissoes_crm_percentual: share_emissoes,
             taxa_conversao_crm: conv_crm,

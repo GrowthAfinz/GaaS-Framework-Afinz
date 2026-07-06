@@ -25,6 +25,10 @@ export interface DailyAnalysis {
     emissoes_b2c_total: number;
     taxa_conversao_b2c: number;
 
+    // Canal Serasa API (subconjunto do Total B2C, tipo='serasa_api')
+    propostas_serasa: number;
+    emissoes_serasa: number;
+
     // CRM Data
     propostas_crm: number;
     // Maps to 'Cartões Gerados'
