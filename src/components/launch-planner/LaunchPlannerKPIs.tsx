@@ -22,7 +22,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
     const { isBUSelected, selectedBUs } = useBU();
 
-    const [showSerasa, setShowSerasa] = useState(true);
+    const [showSerasa, setShowSerasa] = useState(false);
 
     const SEGMENT_COLORS: Record<string, string> = {
         'Abandonados': '#3B82F6',
@@ -489,16 +489,22 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
                                     <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
                                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                    {activeSegments.map((segment, index) => (
-                                        <Bar
-                                            key={segment}
-                                            dataKey={`crm_propostas_${segment}`}
-                                            name={segment}
-                                            stackId="a"
-                                            fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
-                                        />
-                                    ))}
-                                    {showSerasa && <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" />}
+                                    {showSerasa ? (
+                                        <>
+                                            <Bar dataKey="propostas_crm" name="CRM B2C" stackId="a" fill="#3B82F6" />
+                                            <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" />
+                                        </>
+                                    ) : (
+                                        activeSegments.map((segment, index) => (
+                                            <Bar
+                                                key={segment}
+                                                dataKey={`crm_propostas_${segment}`}
+                                                name={segment}
+                                                stackId="a"
+                                                fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                                            />
+                                        ))
+                                    )}
                                     <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -517,16 +523,22 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
                                     <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
                                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                    {activeSegments.map((segment, index) => (
-                                        <Bar
-                                            key={segment}
-                                            dataKey={`crm_emissoes_${segment}`}
-                                            name={segment}
-                                            stackId="a"
-                                            fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
-                                        />
-                                    ))}
-                                    {showSerasa && <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" />}
+                                    {showSerasa ? (
+                                        <>
+                                            <Bar dataKey="emissoes_crm" name="CRM B2C" stackId="a" fill="#10B981" />
+                                            <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" />
+                                        </>
+                                    ) : (
+                                        activeSegments.map((segment, index) => (
+                                            <Bar
+                                                key={segment}
+                                                dataKey={`crm_emissoes_${segment}`}
+                                                name={segment}
+                                                stackId="a"
+                                                fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                                            />
+                                        ))
+                                    )}
                                     <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
