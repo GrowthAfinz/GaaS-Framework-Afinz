@@ -20,7 +20,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, onHeaderMouseE
                 className="flex-1 flex flex-col relative w-full max-w-[1920px] mx-auto pt-16"
                 onMouseEnter={onContentMouseEnter}
             >
-                <div className="flex-1 p-2 w-full h-full overflow-y-auto overflow-x-hidden">
+                <div className="flex-1 px-2 pb-2 w-full h-full overflow-y-auto overflow-x-hidden">
                     {children}
                 </div>
             </main>
