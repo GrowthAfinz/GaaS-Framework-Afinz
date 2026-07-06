@@ -24,6 +24,10 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const { isBUSelected, selectedBUs } = useBU();
 
     const [showSerasa, setShowSerasa] = useState(false);
+    // Modo dos gráficos de série temporal (Metas & Resultados): Mensal (padrão) = ano
+    // corrente quebrado por mês; Diário = dia a dia do período selecionado.
+    const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('monthly');
+    const isMonthly = chartMode === 'monthly';
 
     const SEGMENT_COLORS: Record<string, string> = {
         'Abandonados': '#3B82F6',
@@ -96,10 +100,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         return map;
     }, [allStoreActivities, selectedBUs]);
 
-    // Modo dos gráficos de série temporal (Metas & Resultados): Mensal (padrão) = ano
-    // corrente quebrado por mês; Diário = dia a dia do período selecionado.
-    const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('monthly');
-    const isMonthly = chartMode === 'monthly';
+
     const isOnlySeguros = selectedBUs.length === 1 && selectedBUs[0] === 'Seguros';
     const segurosActivities = useMemo(() => activities.filter((activity) => activity.bu === 'Seguros'), [activities]);
 
