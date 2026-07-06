@@ -104,7 +104,7 @@ Ferramenta incremental para transformar a aba `Dinamica BI` em linhas revisaveis
 - copiar linhas TSV para Excel;
 - confirmar apenas linhas aceitas/selecionadas para a base de dados.
 
-Documentacao detalhada: `docs/architecture/ATUALIZADOR_INTELIGENTE_GAAS.md`.
+Documentacao detalhada: `docs/explanation/atualizador-inteligente-gaas.md`.
 
 ---
 

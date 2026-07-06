@@ -61,9 +61,9 @@ O aplicativo estara disponivel em `http://localhost:5173`.
 
 Para entender melhor o sistema, consulte a documentacao completa em `docs/`:
 
-- **Arquitetura Geral:** `docs/architecture/SYSTEM_OVERVIEW.md`
-- **Abas do Sistema:** `docs/tabs/*.md`
-- **API e Banco de Dados:** `docs/api/SUPABASE_SCHEMA.md`
+- **Arquitetura Geral:** `docs/explanation/system-overview.md`
+- **Abas do Sistema:** `docs/reference/tabs/*.md`
+- **API e Banco de Dados:** `docs/reference/supabase-schema.md`
 - **Guia do Desenvolvedor:** `CLAUDE.md` (na raiz)
 
 ---

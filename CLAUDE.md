@@ -21,6 +21,18 @@ This is a strategic calendar dashboard designed for growth marketing operators t
 
 ---
 
+## KNOWLEDGE BASE & ONTOLOGY (OBSIDIAN VAULT)
+
+O conhecimento de negócio, baselines e regras operacionais da Afinz (mídia paga, CRM, canais, segmentos, KPIs) está documentado no **Vault Obsidian** localizado em `../Afinz-CRM-Midia-Vault/` (pasta irmã deste repositório).
+
+Para que a IA tenha acesso completo, instantâneo e com recall perfeito a este contexto, ele é compilado em um arquivo unificado:
+*   **Ontologia Compilada:** `../docs/AFINZ_GAAS_ONTOLOGY.md` (gerado fora deste repositório, na raiz de `ACALENDARIO APP/`)
+*   **Como atualizar:** Ao fazer alterações no Obsidian Vault, execute `python ../scripts/bundle_vault.py` no terminal para recompilar a ontologia.
+*   **Instrução para IA:** Antes de qualquer alteração de código, análise de dados ou geração de insights, você **DEVE** ler `AFINZ_GAAS_ONTOLOGY.md` para usar a taxonomia, baselines e regras de negócio corretas.
+*   **Governança da documentação técnica:** ver `docs/DOCS_GOVERNANCE.md` para a regra de "o que vai no repo vs. o que vai no vault" (pasta `08-Engenharia/` do vault cobre a síntese de negócio; este `docs/` cobre o detalhe técnico de implementação).
+
+---
+
 ## PILAR DO PROJETO: Automatizacao por Historico
 
 > **A AUTOMATIZACAO E BUSCA BASEADA EM HISTORICO E O PILAR FUNDAMENTAL DO PROJETO!**
@@ -68,9 +80,16 @@ Todo campo preenchivel do modal de programacao de disparo DEVE:
 
 ## SYSTEM ARCHITECTURE
 
-### 9 Main Tabs/Views
+### 10 Main Tabs/Views
 
-O sistema possui 9 abas principais organizadas em 4 categorias:
+O sistema possui 10 abas principais organizadas em 4 categorias (ver `src/config/navigation.ts` — fonte de verdade da navegação **no código**).
+
+> ⚠️ **Divergência observada em teste de produção (2026-07-05):** o menu renderizado (`GlobalHeader.tsx`) não é 1:1 com `NAV_CONFIG`. Achados reais navegando em `https://growthafinz.github.io/GaaS-Framework-Afinz/#`:
+> - **Comunicações** aparece como item de nav próprio (dropdown: "Cadastro e Templates", "Performance do Conteúdo") — não listado em `navigation.ts`.
+> - O grupo "FRAMEWORK" renderiza como link único direto para o Explorador Avançado (sem dropdown), e "Configurações" some do nav visível (ver bug de layout abaixo).
+> - **Não há link visível para "Resultados"** no menu — seu conteúdo parece ter sido absorvido pelo Launch (seção "Metas & Resultados") e pelo Relatório.
+> - **Bug de layout confirmado:** em viewport de ~1238px de largura, os ícones do canto direito do header (incluindo o botão "Configurações" e "Tela cheia") ficam posicionados fora da área visível (x=1300–1334px), sem scroll horizontal disponível — inacessíveis por clique normal.
+> Antes de confiar cegamente em `navigation.ts` para decisões de UX/nav, confirmar contra o comportamento real renderizado.
 
 #### PLANEJAMENTO
 | Aba | Rota | Componente | Funcao |
@@ -83,6 +102,7 @@ O sistema possui 9 abas principais organizadas em 4 categorias:
 |-----|------|------------|--------|
 | **Jornada & Disparos** | `jornada` | JornadaDisparosView.tsx | Analise de funil e deteccao de anomalias |
 | **Resultados** | `resultados` | ResultadosView.tsx | Metricas de performance e metas |
+| **Relatorio** | `relatorio` | RelatorioView.tsx | Exportacao de relatorios XLSX (mensal/diario, agregados, comparativos) |
 | **Orientador** | `orientador` | OrientadorView.tsx | Motor de recomendacoes AI |
 
 #### ORIGEM
@@ -94,8 +114,10 @@ O sistema possui 9 abas principais organizadas em 4 categorias:
 #### FRAMEWORK
 | Aba | Rota | Componente | Funcao |
 |-----|------|------------|--------|
-| **Campanhas** | `framework` | FrameworkView.tsx | Editor de dados CSV com versionamento |
+| **Explorador Avancado** | `explorador` | DisparoExplorer.tsx | Exploracao avancada de dados de disparo (sucessor da antiga aba "Campanhas") |
 | **Configuracoes** | `configuracoes` | ConfiguracoesView.tsx | Admin, versionamento, metas |
+
+> Nota: `FrameworkView.tsx` (antiga aba "Campanhas") ainda existe no codigo mas nao esta mais em `NAV_CONFIG` — nao documentar como aba ativa sem confirmar com o usuario.
 
 ---
 
@@ -265,10 +287,14 @@ calendar-estrategico/
 │   ├── workers/                 # Web Workers
 │   └── config/                  # Configuration
 │
-├── docs/                        # Documentation
-│   ├── architecture/
-│   ├── tabs/
-│   ├── api/
+├── docs/                        # Documentation (Diátaxis — ver DOCS_GOVERNANCE.md)
+│   ├── tutorials/
+│   ├── how-to/
+│   ├── reference/
+│   │   └── tabs/
+│   ├── explanation/
+│   ├── plans/
+│   ├── specs/
 │   └── legacy/
 │
 └── public/                      # Static assets
@@ -477,32 +503,11 @@ npm run lint         # Run ESLint
 npm run deploy       # Deploy to GitHub Pages
 ```
 
-### Adding a New Tab/View
-1. Create view component in `src/components/`
-2. Add route in `App.tsx`
-3. Add navigation item in `src/config/navigation.ts`
-4. Update `GlobalHeader.tsx` if needed
-5. Create documentation in `docs/tabs/`
-
-### Adding a New Hook
-1. Create hook file in `src/hooks/use*.ts`
-2. Define TypeScript interfaces
-3. Implement data fetching/processing logic
-4. Add to relevant components
-5. Document in `docs/api/HOOKS_REFERENCE.md`
-
-### Working with Dispatch Modal
-1. Dispatch modal is in `src/components/dispatch/`
-2. Form state managed by `DispatchFormContext`
-3. Each section is a separate Block component
-4. AI projections in `dispatch/ai/` components
-5. Smart inputs use `SmartSelect` and `SmartInput`
-
-### Adding ML Features
-1. ML services are in `src/services/ml/`
-2. `AIOrchestrator` coordinates the pipeline
-3. New features should follow similarity/prediction/explanation pattern
-4. Update `useFieldProjection` hook for form integration
+### How-To Guides
+- [Adicionar uma nova aba/view](docs/how-to/adicionar-nova-aba.md)
+- [Adicionar um novo hook](docs/how-to/adicionar-novo-hook.md)
+- [Trabalhar com o Modal de Disparo](docs/how-to/trabalhar-com-modal-disparo.md)
+- [Adicionar uma feature de ML](docs/how-to/adicionar-feature-ml.md)
 
 ---
 
@@ -542,13 +547,14 @@ npm run deploy       # Deploy to GitHub Pages
 - **`src/App.tsx`** - Main application, routing, layout
 - **`src/config/navigation.ts`** - Tab/navigation configuration
 
-### Views (9 Main)
+### Views (10 Main)
 - **`src/components/launch-planner/LaunchPlanner.tsx`** - Launch tab
 - **`src/components/JornadaDisparosView.tsx`** - Jornada tab
 - **`src/components/ResultadosView.tsx`** - Resultados tab
+- **`src/components/RelatorioView.tsx`** - Relatorio tab
 - **`src/components/OrientadorView.tsx`** - Orientador tab
 - **`src/components/OriginacaoB2CView.tsx`** - Originacao tab
-- **`src/components/FrameworkView.tsx`** - Framework tab
+- **`src/components/explorer/DisparoExplorer.tsx`** - Explorador Avancado tab
 - **`src/components/DiarioBordo.tsx`** - Diario tab
 - **`src/components/ConfiguracoesView.tsx`** - Configuracoes tab
 - **`src/paid-media/PaidMediaAfinzApp.tsx`** - Media Analytics
@@ -625,30 +631,36 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 ## DOCUMENTATION FILES
 
-### Architecture
-- **`docs/architecture/SYSTEM_OVERVIEW.md`** - High-level system overview
-- **`ARQUITETURA_VISUAL.md`** - Visual architecture diagrams
+Estrutura organizada pelo framework [Diátaxis](https://diataxis.fr/) — ver `docs/DOCS_GOVERNANCE.md` para a regra completa de organização e a divisão de papéis entre este `docs/` e o vault Obsidian (`08-Engenharia/`).
 
-### Tab Documentation
-- **`docs/tabs/TAB_LAUNCH_PLANNER.md`** - Launch Planner documentation
-- **`docs/tabs/TAB_JORNADA_DISPAROS.md`** - Jornada & Disparos
-- **`docs/tabs/TAB_RESULTADOS.md`** - Resultados view
-- **`docs/tabs/TAB_ORIENTADOR.md`** - Recommendation engine
-- **`docs/tabs/TAB_ORIGINACAO_B2C.md`** - B2C Origination
-- **`docs/tabs/TAB_FRAMEWORK_CAMPANHAS.md`** - Framework editor
-- **`docs/tabs/TAB_DIARIO_BORDO.md`** - Diary feature
-- **`docs/tabs/TAB_CONFIGURACOES.md`** - Settings/Admin
-- **`docs/tabs/TAB_MEDIA_ANALYTICS.md`** - Paid Media
+### Tutorials (aprender fazendo)
+- **`docs/tutorials/quick-start.md`** - Quick start
 
-### API Reference
-- **`docs/api/SUPABASE_SCHEMA.md`** - Database schema
-- **`docs/api/ML_SERVICES.md`** - ML pipeline documentation
-- **`docs/api/HOOKS_REFERENCE.md`** - Custom hooks reference
-- **`docs/api/SERVICES_REFERENCE.md`** - Services reference
+### How-To Guides (resolver uma tarefa específica)
+- **`docs/how-to/adicionar-nova-aba.md`**
+- **`docs/how-to/adicionar-novo-hook.md`**
+- **`docs/how-to/trabalhar-com-modal-disparo.md`**
+- **`docs/how-to/adicionar-feature-ml.md`**
+- **`docs/how-to/testar-validacao-projecao.md`**
 
-### Quick Start
-- **`docs/getting-started/QUICK_START.md`** - English quick start
-- **`docs/getting-started/SETUP_INSTRUCTIONS.md`** - Setup instructions
+### Reference (fatos técnicos, consulta rápida)
+- **`docs/reference/stack.md`** - Stack tecnológico
+- **`docs/reference/supabase-schema.md`** - Database schema
+- **`docs/reference/ml-services.md`** - ML pipeline documentation
+- **`docs/reference/hooks.md`** - Custom hooks reference
+- **`docs/reference/services.md`** - Services reference
+- **`docs/reference/tabs/TAB_*.md`** - Documentação por aba: Launch, Jornada, Resultados (⚠️ ver nota de nav abaixo), Orientador, Originação B2C, Framework/Campanhas, Diário, Configurações, Media Analytics, **Relatório**, **Explorador Avançado**, **Experimentos**, **Comunicações** (os 4 últimos preenchidos em 2026-07-05 — ver `docs/DOCS_GOVERNANCE.md` para o histórico do gap)
+
+### Explanation (o porquê, decisões, arquitetura)
+- **`docs/explanation/system-overview.md`** - Visão geral do sistema
+- **`docs/explanation/arquitetura-visual.md`** - Diagramas visuais
+- **`docs/explanation/validacao-projecao-progressiva.md`** - Sistema de validação/projeção
+- **`docs/explanation/atualizador-inteligente-gaas.md`** - Atualizador inteligente
+- **`docs/explanation/filter-chain-orchestrator.md`** - Orquestrador de filtros (stub)
+
+### Plans & Specs (trabalho em andamento, fora de Diátaxis)
+- **`docs/plans/`** - Specs de features em desenvolvimento
+- **`docs/specs/`** - Specs de fixes pontuais
 
 ### Legacy
 - **`docs/legacy/`** - Archived MVP documentation

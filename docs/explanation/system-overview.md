@@ -17,22 +17,7 @@ O **Calendario Estrategico** e uma plataforma de analytics para Growth Marketing
 - Fornecer fonte unica de verdade para tracking de campanhas
 - Automatizar agendamento de disparos com projecoes AI
 
----
-
-## Stack Tecnologico
-
-| Camada | Tecnologia | Versao |
-|--------|------------|--------|
-| **Frontend** | React + TypeScript | 18 / 5.2 |
-| **Build Tool** | Vite | 5.0 |
-| **Styling** | Tailwind CSS | 3.3 |
-| **State Management** | Zustand + React Context | 5.0 |
-| **Charts** | Recharts | 3.5 |
-| **Icons** | Lucide React | 0.563 |
-| **Data Processing** | Papaparse | 5.4 |
-| **Storage Local** | IndexedDB (idb-keyval) | 6.2 |
-| **Backend** | Supabase | 2.93 |
-| **Validacao** | Zod | 3.x |
+Stack tecnológico completo: ver [reference/stack.md](../reference/stack.md).
 
 ---
 
@@ -43,7 +28,7 @@ O **Calendario Estrategico** e uma plataforma de analytics para Growth Marketing
 │                        FRONTEND (React)                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   9 TABS    │  │  130+ COMP  │  │     20 HOOKS            │  │
+│  │   10 TABS   │  │  130+ COMP  │  │     20 HOOKS            │  │
 │  │   /VIEWS    │  │  ONENETS    │  │     CUSTOMIZADOS        │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 ├─────────────────────────────────────────────────────────────────┤
@@ -75,9 +60,9 @@ O **Calendario Estrategico** e uma plataforma de analytics para Growth Marketing
 
 ---
 
-## As 9 Abas Principais
+## As 10 Abas Principais
 
-O sistema e organizado em 9 abas/views principais, agrupadas em 4 categorias:
+O sistema e organizado em 10 abas/views principais, agrupadas em 4 categorias (fonte de verdade: `src/config/navigation.ts`):
 
 ### PLANEJAMENTO
 
@@ -92,6 +77,7 @@ O sistema e organizado em 9 abas/views principais, agrupadas em 4 categorias:
 |-----|------|-----------|
 | **Jornada & Disparos** | `/jornada` | Analise de funil de conversao com deteccao de anomalias |
 | **Resultados** | `/resultados` | Metricas de performance, metas e projecoes |
+| **Relatorio** | `/relatorio` | Exportacao de relatorios XLSX (mensal/diario, agregados, comparativos) |
 | **Orientador** | `/orientador` | Motor de recomendacoes AI baseado em historico |
 
 ### ORIGEM
@@ -105,7 +91,7 @@ O sistema e organizado em 9 abas/views principais, agrupadas em 4 categorias:
 
 | Aba | Rota | Descricao |
 |-----|------|-----------|
-| **Campanhas** | `/framework` | Editor de dados CSV com versionamento e historico |
+| **Explorador Avancado** | `/explorador` | Exploracao avancada de dados de disparo (sucessor da antiga aba "Campanhas") |
 | **Configuracoes** | `/configuracoes` | Admin, gestao de metas, versionamento de dados |
 
 ---
@@ -146,13 +132,19 @@ src/components/
 │   ├── OriginacaoCharts.tsx
 │   └── ...
 │
-├── admin/              (2)  Gestao de dados
+├── relatorio/          (13) Exportacao de relatorios XLSX
+├── communications/     (15) Sistema de mensageria (em evolucao)
+├── experiments/        (12) Kanban de experimentos
+├── explorer/           (1)  Explorador Avancado
+├── admin/              (5)  Gestao de dados
 ├── orientador/         (2)  Recomendacoes
 ├── paid-media/         (3)  Midia paga
-├── resultados/         (1)  Projecoes
-├── layout/             (5)  Layout e navegacao
-└── [40+ root]               Componentes gerais
+├── resultados/         (2)  Projecoes
+├── layout/             (8)  Layout e navegacao
+└── [demais componentes raiz]
 ```
+
+> Nota: contagens por pasta são um snapshot; ver `docs/reference/` para referência técnica atualizada por área quando disponível.
 
 ---
 
@@ -173,6 +165,8 @@ src/components/
 | `useVersionManager` | Versionamento de dados |
 | `useStrategyMetrics` | Metricas por segmento |
 
+Referência completa: [reference/hooks.md](../reference/hooks.md).
+
 ### Services (13)
 
 | Service | Funcao |
@@ -188,6 +182,8 @@ src/components/
 | `causalAnalyzer` | Analise causal |
 | `explanationGenerator` | Explicacoes em linguagem natural |
 | `dataProcessor` | Pre-processamento de dados |
+
+Referência completa: [reference/services.md](../reference/services.md) e [reference/ml-services.md](../reference/ml-services.md).
 
 ---
 
@@ -215,6 +211,8 @@ src/components/
 - **Motor de recomendacoes**
 - **Orquestrador de funil B2C**
 - **Versionamento de dados**
+- **Exportação de relatórios XLSX** (aba Relatório)
+- **Explorador avançado de dados de disparo** (sucessor da aba Campanhas)
 
 ### Roadmap (Futuro)
 
@@ -269,7 +267,8 @@ O sistema rastreia 14+ KPIs organizados em categorias:
 ## Documentacao Relacionada
 
 - [CLAUDE.md](../../CLAUDE.md) - Guia do desenvolvedor
-- [TAB_LAUNCH_PLANNER.md](../tabs/TAB_LAUNCH_PLANNER.md) - Documentacao do Launch
-- [TAB_JORNADA_DISPAROS.md](../tabs/TAB_JORNADA_DISPAROS.md) - Documentacao de Jornada
-- [SUPABASE_SCHEMA.md](../api/SUPABASE_SCHEMA.md) - Schema do banco
-- [ML_SERVICES.md](../api/ML_SERVICES.md) - Pipeline de ML
+- [reference/tabs/TAB_LAUNCH_PLANNER.md](../reference/tabs/TAB_LAUNCH_PLANNER.md) - Documentacao do Launch
+- [reference/tabs/TAB_JORNADA_DISPAROS.md](../reference/tabs/TAB_JORNADA_DISPAROS.md) - Documentacao de Jornada
+- [reference/supabase-schema.md](../reference/supabase-schema.md) - Schema do banco
+- [reference/ml-services.md](../reference/ml-services.md) - Pipeline de ML
+- [DOCS_GOVERNANCE.md](../DOCS_GOVERNANCE.md) - Regra repo vs vault
