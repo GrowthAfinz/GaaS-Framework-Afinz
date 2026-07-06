@@ -335,26 +335,45 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     }, [activities]);
 
     const ChartTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white border border-slate-200 p-2 rounded text-[10px] text-slate-700 shadow-sm">
-                    <p className="font-bold mb-1 border-b border-slate-200 pb-1">{label}</p>
-                    {payload.map((entry: any, index: number) => {
-                        const isCurrency = entry.name.includes('CAC');
-                        const val = isCurrency
-                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entry.value)
-                            : entry.value.toLocaleString('pt-BR');
+        if (!active || !payload || !payload.length) return null;
 
-                        return (
-                            <p key={index} style={{ color: entry.color }}>
-                                {entry.name}: {val}
-                            </p>
-                        );
-                    })}
+        const fmtInt = (v: number) => (v || 0).toLocaleString('pt-BR');
+        const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+
+        // Moeda (CAC) é uma taxa — não entra no total. Segmentos com valor > 0 entram.
+        const currencyEntries = payload.filter((e: any) => e?.name && e.name.includes('CAC'));
+        const valueEntries = payload.filter((e: any) => e?.name && !e.name.includes('CAC') && (e.value ?? 0) > 0);
+        const total = valueEntries.reduce((s: number, e: any) => s + (e.value || 0), 0);
+        const showTotal = valueEntries.length > 0;
+
+        const Row = ({ color, name, value, strong }: { color?: string; name: string; value: string; strong?: boolean }) => (
+            <div className="flex items-center justify-between gap-5">
+                <span className="flex items-center gap-1.5 min-w-0">
+                    {color && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />}
+                    <span className={`truncate ${strong ? 'font-bold text-slate-700' : 'text-slate-600'}`}>{name}</span>
+                </span>
+                <span className={`tabular-nums shrink-0 ${strong ? 'font-bold text-emerald-600' : 'font-semibold text-slate-800'}`}>{value}</span>
+            </div>
+        );
+
+        return (
+            <div className="bg-white/95 backdrop-blur-sm border border-slate-200 rounded-lg shadow-lg px-3 py-2 min-w-[168px] text-[11px]">
+                <p className="font-bold text-slate-800 text-xs mb-1.5 pb-1.5 border-b border-slate-100">{label}</p>
+                <div className="space-y-1">
+                    {currencyEntries.map((e: any, i: number) => (
+                        <Row key={`c${i}`} color={e.color} name={e.name} value={fmtBRL(e.value)} />
+                    ))}
+                    {valueEntries.map((e: any, i: number) => (
+                        <Row key={`v${i}`} color={e.color} name={e.name} value={fmtInt(e.value)} />
+                    ))}
                 </div>
-            );
-        }
-        return null;
+                {showTotal && (
+                    <div className="mt-1.5 pt-1.5 border-t border-slate-200">
+                        <Row name={`Total no ${isMonthly ? 'mês' : 'dia'}`} value={fmtInt(total)} strong />
+                    </div>
+                )}
+            </div>
+        );
     };
 
     if (rentab) {
