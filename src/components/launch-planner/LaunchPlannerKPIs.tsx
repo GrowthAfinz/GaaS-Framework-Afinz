@@ -23,7 +23,6 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const { isBUSelected, selectedBUs } = useBU();
 
     const [showSerasa, setShowSerasa] = useState(true);
-    const [crmSegmentMetric, setCrmSegmentMetric] = useState<'baseEnviada' | 'propostas' | 'emissoes'>('emissoes');
 
     const SEGMENT_COLORS: Record<string, string> = {
         'Abandonados': '#3B82F6',
@@ -39,44 +38,57 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const DEFAULT_COLORS = ['#2563EB', '#10B981', '#A855F7', '#F97316', '#EC4899', '#14B8A6', '#F59E0B', '#64748B'];
 
-    // Agrupa e acumula atividades do CRM por mês e segmento
-    const crmSegmentData = useMemo(() => {
-        const monthlyGroups = new Map<string, Record<string, any>>();
-        const segmentsSet = new Set<string>();
+    const activeSegments = useMemo(() => {
+        const segments = new Set<string>();
+        activities.forEach(activity => {
+            if (activity.segmento) {
+                segments.add(activity.segmento);
+            }
+        });
+        return Array.from(segments);
+    }, [activities]);
 
+    const dailySegmentsMap = useMemo(() => {
+        const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
         activities.forEach(activity => {
             const date = activity.dataDisparo;
             if (!date || isNaN(date.getTime())) return;
-            
-            const monthKey = format(date, 'yyyy-MM');
-            const displayMonth = format(date, 'MMM/yy', { locale: ptBR });
+            const dateKey = format(date, 'yyyy-MM-dd');
             const segment = activity.segmento || 'Sem Segmento';
-            
-            segmentsSet.add(segment);
 
-            if (!monthlyGroups.has(monthKey)) {
-                monthlyGroups.set(monthKey, {
-                    displayDate: displayMonth,
-                    monthKeyVal: monthKey
-                });
+            if (!map.has(dateKey)) {
+                map.set(dateKey, {});
             }
-
-            const group = monthlyGroups.get(monthKey)!;
-            
-            const val = crmSegmentMetric === 'baseEnviada'
-                ? (activity.kpis?.baseEnviada || 0)
-                : crmSegmentMetric === 'propostas'
-                ? (activity.kpis?.propostas || 0)
-                : (activity.kpis?.emissoes || activity.kpis?.cartoes || 0);
-
-            group[segment] = (group[segment] || 0) + val;
+            const segments = map.get(dateKey)!;
+            if (!segments[segment]) {
+                segments[segment] = { propostas: 0, emissoes: 0 };
+            }
+            segments[segment].propostas += activity.kpis?.propostas || 0;
+            segments[segment].emissoes += activity.kpis?.emissoes || activity.kpis?.cartoes || 0;
         });
+        return map;
+    }, [activities]);
 
-        return {
-            chartData: Array.from(monthlyGroups.values()).sort((a, b) => a.monthKeyVal.localeCompare(b.monthKeyVal)),
-            segments: Array.from(segmentsSet)
-        };
-    }, [activities, crmSegmentMetric]);
+    const monthlySegmentsMap = useMemo(() => {
+        const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
+        activities.forEach(activity => {
+            const date = activity.dataDisparo;
+            if (!date || isNaN(date.getTime())) return;
+            const monthKey = format(date, 'yyyy-MM');
+            const segment = activity.segmento || 'Sem Segmento';
+
+            if (!map.has(monthKey)) {
+                map.set(monthKey, {});
+            }
+            const segments = map.get(monthKey)!;
+            if (!segments[segment]) {
+                segments[segment] = { propostas: 0, emissoes: 0 };
+            }
+            segments[segment].propostas += activity.kpis?.propostas || 0;
+            segments[segment].emissoes += activity.kpis?.emissoes || activity.kpis?.cartoes || 0;
+        });
+        return map;
+    }, [activities]);
 
     // Modo dos gráficos de série temporal (Metas & Resultados): Mensal (padrão) = ano
     // corrente quebrado por mês; Diário = dia a dia do período selecionado.
@@ -194,8 +206,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     // Serasa é subconjunto do Total B2C; "Outros B2C" = Total − CRM − Serasa (residual).
     const withChannels = (d: typeof dailyAnalysis[number]) => ({
         ...d,
-        serasa_propostas: d.propostas_serasa,
-        serasa_emissoes: d.emissoes_serasa,
+        serasa_propostas: showSerasa ? d.propostas_serasa : 0,
+        serasa_emissoes: showSerasa ? d.emissoes_serasa : 0,
         outros_propostas: Math.max(0, d.propostas_b2c_total - d.propostas_crm - d.propostas_serasa),
         outros_emissoes: Math.max(0, d.emissoes_b2c_total - d.emissoes_crm - d.emissoes_serasa),
         cac_medio: d.cac_medio
@@ -205,17 +217,45 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         return dailyAnalysis.map(d => {
             const [y, m, day] = d.data.split('-').map(Number);
             const dateObj = new Date(y, m - 1, day);
-            return { ...withChannels(d), displayDate: format(dateObj, 'dd/MM', { locale: ptBR }) };
+            const dateKey = d.data;
+
+            const segmentDataObj: Record<string, number> = {};
+            const segmentMap = dailySegmentsMap.get(dateKey) || {};
+            activeSegments.forEach(segment => {
+                const segVals = segmentMap[segment] || { propostas: 0, emissoes: 0 };
+                segmentDataObj[`crm_propostas_${segment}`] = segVals.propostas;
+                segmentDataObj[`crm_emissoes_${segment}`] = segVals.emissoes;
+            });
+
+            return { 
+                ...withChannels(d), 
+                ...segmentDataObj, 
+                displayDate: format(dateObj, 'dd/MM', { locale: ptBR }) 
+            };
         });
-    }, [dailyAnalysis]);
+    }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa]);
 
     // Série mensal do ano corrente (jan → hoje), para o modo Mensal dos gráficos.
     const monthlyData = useMemo(() => {
         return yearMonthlyAnalysis.map(d => {
             const dateObj = new Date(d.ano, d.mes - 1, 1);
-            return { ...withChannels(d), displayDate: format(dateObj, 'MMM/yy', { locale: ptBR }) };
+            const monthKey = format(dateObj, 'yyyy-MM');
+
+            const segmentDataObj: Record<string, number> = {};
+            const segmentMap = monthlySegmentsMap.get(monthKey) || {};
+            activeSegments.forEach(segment => {
+                const segVals = segmentMap[segment] || { propostas: 0, emissoes: 0 };
+                segmentDataObj[`crm_propostas_${segment}`] = segVals.propostas;
+                segmentDataObj[`crm_emissoes_${segment}`] = segVals.emissoes;
+            });
+
+            return { 
+                ...withChannels(d), 
+                ...segmentDataObj, 
+                displayDate: format(dateObj, 'MMM/yy', { locale: ptBR }) 
+            };
         });
-    }, [yearMonthlyAnalysis]);
+    }, [yearMonthlyAnalysis, monthlySegmentsMap, activeSegments, showSerasa]);
 
     // Dados efetivos usados pelos 3 gráficos de série temporal (CAC, Propostas, Emissões).
     const timeChartData = isMonthly ? monthlyData : comparisonData;
@@ -250,19 +290,18 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         </div>
     );
 
-    // Toggle Serasa API — botão com indicador de status
+    // Toggle Serasa API — botão simplificado
     const SerasaToggle = () => (
         <button
             type="button"
             onClick={() => setShowSerasa(!showSerasa)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 ring-1 ${
+            className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 ring-1 ${
                 showSerasa
-                    ? 'bg-amber-50 text-amber-700 ring-amber-200/70 hover:bg-amber-100/80'
+                    ? 'bg-amber-50 text-amber-700 ring-amber-200/70 hover:bg-amber-100/80 shadow-sm'
                     : 'bg-slate-100 text-slate-500 ring-slate-200/70 hover:bg-slate-200/50'
             }`}
         >
-            <span className={`w-1.5 h-1.5 rounded-full ${showSerasa ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
-            Serasa API: {showSerasa ? 'Ativa' : 'Inativa'}
+            Serasa API
         </button>
     );
 
@@ -437,97 +476,63 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
             </div>
 
             {showCharts && (
-                showSerasa ? (
-                    <div className="space-y-4">
-                        <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
-                            <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                                Propostas: CRM vs B2C <span title="Comparativo entre propostas geradas via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
-                            </h3>
-                            <div className="flex-1 w-full min-h-0">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                        <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
-                                        <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
-                                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
-                                        <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
-                                        <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                        <Bar dataKey="propostas_crm" name="CRM" stackId="a" fill="#3B82F6" />
-                                        <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" />
-                                        <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        <div className="bg-white border border-slate-200 rounded-xl p-4 h-48 flex flex-col shadow-sm">
-                            <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                                Emissoes: CRM vs B2C <span title="Comparativo entre cartoes emitidos via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
-                            </h3>
-                            <div className="flex-1 w-full min-h-0">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                        <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
-                                        <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
-                                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
-                                        <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
-                                        <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                        <Bar dataKey="emissoes_crm" name="CRM" stackId="a" fill="#10B981" />
-                                        <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" />
-                                        <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-[416px] flex flex-col shadow-sm">
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5">
-                                CRM: Resultados por Segmento <span title="Evolução acumulada por mês dividida pelos segmentos cadastrados no CRM"><Info size={10} className="text-slate-400" /></span>
-                            </h3>
-                            <div className="flex rounded-md border border-slate-100 bg-slate-50 p-0.5">
-                                {([
-                                    { key: 'baseEnviada', label: 'Base' },
-                                    { key: 'propostas', label: 'Propostas' },
-                                    { key: 'emissoes', label: 'Emissões' }
-                                ] as const).map(({ key, label }) => (
-                                    <button
-                                        key={key}
-                                        type="button"
-                                        onClick={() => setCrmSegmentMetric(key)}
-                                        className={`rounded px-2 py-0.5 text-[9px] font-semibold transition-all ${
-                                            crmSegmentMetric === key
-                                                ? 'bg-white text-slate-800 shadow-sm ring-1 ring-slate-200'
-                                                : 'text-slate-500 hover:text-slate-700'
-                                        }`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                <div className="space-y-4">
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
+                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                            Propostas: CRM vs B2C <span title="Comparativo entre propostas geradas via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
+                        </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={crmSegmentData.chartData} barCategoryGap="28%">
+                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
                                     <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
-                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} dy={4} />
+                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
                                     <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
-                                    <Legend iconSize={8} wrapperStyle={{ fontSize: '9px', paddingTop: '5px' }} />
-                                    {crmSegmentData.segments.map((segment, index) => (
+                                    <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
+                                    {activeSegments.map((segment, index) => (
                                         <Bar
                                             key={segment}
-                                            dataKey={segment}
+                                            dataKey={`crm_propostas_${segment}`}
                                             name={segment}
                                             stackId="a"
                                             fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
                                         />
                                     ))}
+                                    {showSerasa && <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" />}
+                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
-                )
+
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-48 flex flex-col shadow-sm">
+                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                            Emissoes: CRM vs B2C <span title="Comparativo entre cartoes emitidos via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
+                        </h3>
+                        <div className="flex-1 w-full min-h-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
+                                    <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
+                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
+                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
+                                    <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
+                                    {activeSegments.map((segment, index) => (
+                                        <Bar
+                                            key={segment}
+                                            dataKey={`crm_emissoes_${segment}`}
+                                            name={segment}
+                                            stackId="a"
+                                            fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                                        />
+                                    ))}
+                                    {showSerasa && <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" />}
+                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <DailyDetailsModal
