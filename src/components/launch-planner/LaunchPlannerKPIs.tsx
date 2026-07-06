@@ -19,6 +19,7 @@ interface LaunchPlannerKPIsProps {
 export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities, goals, currentMonth }) => {
 
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
+    const allStoreActivities = useAppStore((state) => state.activities);
     const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
     const { isBUSelected, selectedBUs } = useBU();
 
@@ -40,13 +41,17 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const activeSegments = useMemo(() => {
         const segments = new Set<string>();
-        activities.forEach(activity => {
+        const targetActivities = isMonthly 
+            ? allStoreActivities.filter(a => selectedBUs.includes(a.bu))
+            : activities;
+
+        targetActivities.forEach(activity => {
             if (activity.segmento) {
                 segments.add(activity.segmento);
             }
         });
         return Array.from(segments);
-    }, [activities]);
+    }, [activities, allStoreActivities, selectedBUs, isMonthly]);
 
     const dailySegmentsMap = useMemo(() => {
         const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
@@ -71,7 +76,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const monthlySegmentsMap = useMemo(() => {
         const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
-        activities.forEach(activity => {
+        const targetActivities = allStoreActivities.filter(a => selectedBUs.includes(a.bu));
+        targetActivities.forEach(activity => {
             const date = activity.dataDisparo;
             if (!date || isNaN(date.getTime())) return;
             const monthKey = format(date, 'yyyy-MM');
@@ -88,7 +94,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
             segments[segment].emissoes += activity.kpis?.emissoes || activity.kpis?.cartoes || 0;
         });
         return map;
-    }, [activities]);
+    }, [allStoreActivities, selectedBUs]);
 
     // Modo dos gráficos de série temporal (Metas & Resultados): Mensal (padrão) = ano
     // corrente quebrado por mês; Diário = dia a dia do período selecionado.
