@@ -5,7 +5,7 @@ import { useFrameworkData } from './useFrameworkData';
 import { useAdvancedFilters } from './useAdvancedFilters';
 import { DailyAnalysis, MetricsSummary } from '../types/b2c';
 import { usePeriod } from '../contexts/PeriodContext';
-import { startOfWeek, startOfMonth, format, subDays, differenceInDays, eachDayOfInterval } from 'date-fns';
+import { startOfWeek, startOfMonth, startOfYear, format, subDays, differenceInDays, eachDayOfInterval } from 'date-fns';
 import { useBU } from '../contexts/BUContext';
 import { parseDate } from '../utils/formatters';
 
@@ -265,6 +265,27 @@ export const useB2CAnalysis = () => {
         return calculateMetrics(prevCrmFiltered, b2cData, format(prevStartDate, 'yyyy-MM-dd'), format(prevEndDate, 'yyyy-MM-dd'), 'daily', alertConfig);
     }, [prevCrmFiltered, b2cData, prevStartDate, prevEndDate, alertConfig]);
 
+    // --- 3b. Year-to-date (monthly) — independente do período selecionado ---
+    // Usado pelos gráficos de "Metas & Resultados" quando em modo Mensal:
+    // resultados do ano corrente, quebrados por mês (jan → hoje).
+    const { ytdStart, ytdEnd } = useMemo(() => {
+        const now = new Date();
+        return { ytdStart: format(startOfYear(now), 'yyyy-MM-dd'), ytdEnd: format(now, 'yyyy-MM-dd') };
+    }, []);
+
+    const ytdFilters = useMemo(() => ({
+        ...deferredGlobalFilters,
+        dataInicio: ytdStart,
+        dataFim: ytdEnd,
+        bu: deferredBUs
+    }), [deferredGlobalFilters, ytdStart, ytdEnd, deferredBUs]);
+
+    const { filteredData: ytdCrmFiltered } = useAdvancedFilters(frameworkData, ytdFilters);
+
+    const { analysisData: yearMonthlyAnalysis } = useMemo(() => {
+        return calculateMetrics(ytdCrmFiltered, b2cData, ytdStart, ytdEnd, 'monthly', alertConfig);
+    }, [ytdCrmFiltered, b2cData, ytdStart, ytdEnd, alertConfig]);
+
 
     // --- 4. Helpers (Modal, Pie) ---
     const getActivities = (dateStr: string, mode: 'daily' | 'weekly' = 'daily') => {
@@ -294,6 +315,7 @@ export const useB2CAnalysis = () => {
 
     return {
         dailyAnalysis: filteredData,
+        yearMonthlyAnalysis, // YTD por mês (independente do período)
         summary,
         previousSummary, // EXPOSED
         viewMode,

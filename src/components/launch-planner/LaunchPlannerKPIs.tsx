@@ -19,8 +19,13 @@ interface LaunchPlannerKPIsProps {
 export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities, goals, currentMonth }) => {
 
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
-    const { dailyAnalysis } = useB2CAnalysis();
+    const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
     const { isBUSelected, selectedBUs } = useBU();
+
+    // Modo dos gráficos de série temporal (Metas & Resultados): Mensal (padrão) = ano
+    // corrente quebrado por mês; Diário = dia a dia do período selecionado.
+    const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('monthly');
+    const isMonthly = chartMode === 'monthly';
     const isOnlySeguros = selectedBUs.length === 1 && selectedBUs[0] === 'Seguros';
     const segurosActivities = useMemo(() => activities.filter((activity) => activity.bu === 'Seguros'), [activities]);
 
@@ -143,6 +148,47 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
             };
         });
     }, [dailyAnalysis]);
+
+    // Série mensal do ano corrente (jan → hoje), para o modo Mensal dos gráficos.
+    const monthlyData = useMemo(() => {
+        return yearMonthlyAnalysis.map(d => {
+            const dateObj = new Date(d.ano, d.mes - 1, 1);
+            return {
+                ...d,
+                displayDate: format(dateObj, 'MMM/yy', { locale: ptBR }),
+                outros_propostas: Math.max(0, d.propostas_b2c_total - d.propostas_crm),
+                outros_emissoes: Math.max(0, d.emissoes_b2c_total - d.emissoes_crm),
+                cac_medio: d.cac_medio
+            };
+        });
+    }, [yearMonthlyAnalysis]);
+
+    // Dados efetivos usados pelos 3 gráficos de série temporal (CAC, Propostas, Emissões).
+    const timeChartData = isMonthly ? monthlyData : comparisonData;
+
+    // No modo Mensal não faz sentido abrir o modal de detalhes de um único dia.
+    const chartClick = isMonthly ? undefined : handleChartClick;
+    const dotClick = isMonthly ? undefined : handleDotClick;
+
+    // Toggle minimalista Mensal | Diário (fica no cabeçalho do gráfico CAC).
+    const ChartModeToggle = () => (
+        <div className="flex items-center gap-0.5 bg-slate-100 rounded-md p-0.5">
+            <button
+                type="button"
+                onClick={() => setChartMode('monthly')}
+                className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${isMonthly ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Mensal
+            </button>
+            <button
+                type="button"
+                onClick={() => setChartMode('daily')}
+                className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${!isMonthly ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Diário
+            </button>
+        </div>
+    );
 
     const engagementData = useMemo(() => {
         const byDate = new Map<string, { data: string; displayDate: string; aberturas: number; cliques: number; custo: number }>();
@@ -281,18 +327,21 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
                 {showCharts && (
                     <div className="bg-white border border-slate-200 rounded-lg p-3 h-52 flex flex-col shadow-sm">
-                        <h3 className="text-slate-500 text-[10px] font-bold uppercase mb-2 flex items-center gap-2">
-                            CAC Evolution (R$) <span title="Evolucao do Custo de Aquisicao de Cartao ao longo do tempo"><Info size={10} className="text-slate-500" /></span>
-                        </h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-slate-500 text-[10px] font-bold uppercase flex items-center gap-2">
+                                CAC Evolution (R$) <span title="Evolucao do Custo de Aquisicao de Cartao ao longo do tempo"><Info size={10} className="text-slate-500" /></span>
+                            </h3>
+                            <ChartModeToggle />
+                        </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={comparisonData} onClick={handleChartClick} style={{ cursor: 'pointer' }}>
+                                <LineChart data={timeChartData} onClick={chartClick} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                                     <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{ fontSize: 9 }} minTickGap={10} />
                                     <YAxis stroke="#94a3b8" tick={{ fontSize: 9 }} />
                                     <Tooltip content={<ChartTooltip />} wrapperStyle={{ pointerEvents: 'none' }} />
                                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                    <Line type="monotone" dataKey="cac_medio" name="CAC Medio" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{ r: 6, onClick: handleDotClick, style: { cursor: 'pointer' } }} />
+                                    <Line type="monotone" dataKey="cac_medio" name="CAC Medio" stroke="#10B981" strokeWidth={2} dot={false} activeDot={{ r: 6, onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
@@ -309,7 +358,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                         </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={comparisonData} onClick={handleChartClick} style={{ cursor: 'pointer' }}>
+                                <BarChart data={timeChartData} onClick={chartClick} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                                     <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{ fontSize: 9 }} minTickGap={10} />
                                     <YAxis stroke="#94a3b8" tick={{ fontSize: 9 }} />
@@ -328,7 +377,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                         </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={comparisonData} onClick={handleChartClick} style={{ cursor: 'pointer' }}>
+                                <BarChart data={timeChartData} onClick={chartClick} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                                     <XAxis dataKey="displayDate" stroke="#94a3b8" tick={{ fontSize: 9 }} minTickGap={10} />
                                     <YAxis stroke="#94a3b8" tick={{ fontSize: 9 }} />
