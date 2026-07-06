@@ -119,7 +119,7 @@ export const KPIOverview: React.FC<KPIOverviewProps> = ({ activities, previousAc
                 </div>
                 {variation !== undefined && variation !== 0 && (
                     <span className={`text-[9px] font-bold ${variation > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {variation > 0 ? '?' : '?'} {Math.abs(variation).toFixed(1)}%
+                        {variation > 0 ? '\u25B2' : '\u25BC'} {Math.abs(variation).toFixed(1)}%
                     </span>
                 )}
             </div>
