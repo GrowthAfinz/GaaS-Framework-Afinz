@@ -6,7 +6,7 @@
  * confiáveis que parsear a string.
  */
 
-export type DimId = 'publico' | 'canal' | 'campanha' | 'segmento' | 'cadencia';
+export type DimId = 'publico' | 'canal' | 'campanha' | 'segmento' | 'cadencia' | 'variante';
 
 export interface TaxoOption {
   id: string;
@@ -70,9 +70,95 @@ export const TAXO: Record<DimId, TaxoDim> = {
       { id: 'D7', label: 'Dia 7', tokens: ['d7'] },
     ],
   },
+  // Dimensão "variante de criativo": duas peças diferentes disputando o mesmo
+  // momento/segmento (ex.: Carrinho Abandonado Copa B2C manda institucional E
+  // ecred no mesmo disparo; Vibe/Reativação manda int E ecred; ANC segmenta
+  // por faixa de limite maior/menor). Informativa por enquanto — não entra no
+  // score do matchTemplate nem no composeId, só ajuda a enxergar a peça certa.
+  variante: {
+    label: 'Variante', dim: 'variante',
+    opts: [
+      { id: 'institucional', label: 'Institucional', tokens: ['institucional', 'inst'] },
+      { id: 'ecred', label: 'ECRED', tokens: ['ecred'] },
+      { id: 'int', label: 'Interno', tokens: ['int'] },
+      { id: 'maior', label: 'Maior limite', tokens: ['maior'] },
+      { id: 'menor', label: 'Menor limite', tokens: ['menor'] },
+    ],
+  },
 };
 
 export const DIMS: DimId[] = ['publico', 'canal', 'campanha', 'segmento', 'cadencia'];
+
+/**
+ * Tabela de códigos de segmento (taxonomia SFMC, granularidade fina — 58
+ * códigos). Fonte única compartilhada: antes vivia duplicada dentro de
+ * IntelligentFrameworkUpdate.tsx (importador inteligente), desalinhada do
+ * TAXO.segmento acima (que é deliberadamente mais grosso, só 5 buckets, para
+ * a UI de Comunicações). Corrigir um código aqui agora vale para os dois
+ * fluxos. Atenção: 'apr' (Aprovados) e 'anc' (Aprovados não convertidos) são
+ * códigos DISTINTOS aqui, mas colapsam no mesmo opt 'apr' do TAXO.segmento —
+ * divergência de granularidade conhecida, não uma inconsistência a corrigir
+ * às cegas.
+ */
+export const SEGMENT_CODE_TABLE: Record<string, string> = {
+  abn: 'Abandono',
+  ac: 'Acordo Certo',
+  adq: 'Adquirencia',
+  alv: 'Alvorada',
+  apr: 'Aprovados',
+  anc: 'Aprovados nao convertidos',
+  atl: 'Ativo com limite',
+  atv: 'Ativo Geral',
+  bp: 'Base_Proprietaria',
+  bsp: 'Base_Proprietaria',
+  bb: 'Bem Barato',
+  abb: 'Ativo Bem Barato',
+  car: 'Carrinho Abandonado',
+  blq: 'Cartao Bloqueado',
+  cart: 'Cartonista',
+  emi: 'Clientes Emissores',
+  club: 'Clube',
+  cp: 'Credito Pessoal',
+  rtv: 'Reativacao',
+  cap: 'Desenrola Contemplado aVista aPrazo',
+  dne: 'Desenrola Nao Elegiveis',
+  dia: 'Dia',
+  err: 'Erro',
+  frm: 'Farmacia',
+  freq: 'Frequentes e recorrentes',
+  ina: 'Inadimplente',
+  inv: 'Investidores',
+  ipr: 'Ip roxo',
+  leal: 'Leal',
+  ami: 'Mais Amigo',
+  nsa: 'Nao se aplica',
+  ngd: 'Negados',
+  expl: 'Novo explorador e ocasional',
+  nov: 'Novos',
+  org: 'Organico',
+  bpc: 'Parceiro Bom Pra Credito',
+  srsa: 'Parceiro Serasa',
+  tbm: 'Pos Tombamento',
+  pre: 'Pre Analisados',
+  chu: 'Pre churn e churn',
+  pro: 'Prospect',
+  in1: 'Publico 1 - Investidores',
+  pf1: 'Publico 1 - PF Atrasado',
+  pj1: 'Publico 1 - PJ Negado',
+  pf2: 'Publico 2 - PF Em dia - Lim Baixo',
+  pj2: 'Publico 2 - PJ Aceito',
+  pf3: 'Publico 3 - PF Em dia - Lim Alto',
+  quo: 'Quod',
+  rec: 'Recencia',
+  seg: 'Segurados',
+  sem: 'Sem Parar',
+  pao: 'Super Pao',
+  tst: 'Teste',
+  tds: 'Todos',
+  upo: 'Upgrade de Oferta',
+  nvp: 'Venda Nova Platinum',
+  vnd: 'Vendedor',
+};
 
 /** Canal canônico (activities.Canal) → id da taxonomia. */
 export function canalToId(canal: string | null | undefined): string | null {
@@ -125,6 +211,7 @@ export interface ParsedActivity {
   campanha: string | null;
   segmento: string | null;
   cadencia: string | null;
+  variante: string | null;
   seq: string | null;
 }
 
@@ -153,7 +240,7 @@ export function parseSeqParts(name: string): ParsedSeq | null {
   if (template) {
     const week = Number(template[1]);
     const dispatch = Number(template[2]);
-    if (week && dispatch) return { seq: toSeq(week, dispatch), week, dispatch, source: 'template' };
+    if (week && Number.isFinite(dispatch)) return { seq: toSeq(week, dispatch), week, dispatch, source: 'template' };
   }
 
   const activity =
@@ -162,20 +249,33 @@ export function parseSeqParts(name: string): ParsedSeq | null {
   if (activity) {
     const dispatch = Number(activity[1]);
     const week = Number(activity[2]);
-    if (week && dispatch) return { seq: toSeq(week, dispatch), week, dispatch, source: 'activity' };
+    if (week && Number.isFinite(dispatch)) return { seq: toSeq(week, dispatch), week, dispatch, source: 'activity' };
   }
 
   const explicit = n.match(/(?:^|_)semana_?0?(\d+).*?(?:disp|disparo|d)_?0?(\d+)(?:_|$)/);
   if (explicit) {
     const week = Number(explicit[1]);
     const dispatch = Number(explicit[2]);
-    if (week && dispatch) return { seq: toSeq(week, dispatch), week, dispatch, source: 'activity' };
+    if (week && Number.isFinite(dispatch)) return { seq: toSeq(week, dispatch), week, dispatch, source: 'activity' };
   }
 
-  const fallback = compact.match(/d0?(\d+)(?:diario|pontual|$)/);
+  // Disparo isolado marcado por "disp" + número, tolerando texto colado no meio
+  // (ex.: dispcopa21, disp7vibeecred, disp4_maior/menor). Sem semana associada.
+  const dispOnly = compact.match(/disp[a-z]*?0?(\d+)/);
+  if (dispOnly) {
+    const dispatch = Number(dispOnly[1]);
+    if (Number.isFinite(dispatch)) return { seq: toSeq(null, dispatch), week: null, dispatch, source: 'fallback' };
+  }
+
+  // Disparo isolado marcado por "d" + dígito + sufixo de campanha/variante colado
+  // antes de diario/pontual (ex.: d1institucionalcopa_diario, d3ecredcopa_diario,
+  // d12refmaio_pontual, d0arefmaio_pontual). Aceita D0 como disparo válido (dia
+  // zero/imediato da régua) — variantes de letra (d0a vs d0b) colapsam no mesmo
+  // número, perdendo a distinção entre as duas mensagens do mesmo dia.
+  const fallback = compact.match(/d0?(\d+)[a-z]*(?:diario|pontual|$)/);
   if (fallback) {
     const dispatch = Number(fallback[1]);
-    if (dispatch) return { seq: toSeq(null, dispatch), week: null, dispatch, source: 'fallback' };
+    if (Number.isFinite(dispatch)) return { seq: toSeq(null, dispatch), week: null, dispatch, source: 'fallback' };
   }
 
   return null;
@@ -203,6 +303,7 @@ export function parseActivity(name: string, structured?: { canal?: string | null
     campanha: resolveDim('campanha', n),
     segmento: segmentoToId(structured?.segmento, n),
     cadencia: seq && seq.startsWith('D') ? seq : resolveDim('cadencia', n),
+    variante: resolveDim('variante', n),
     seq,
   };
 }
@@ -292,6 +393,38 @@ export type Confidence = 'forte' | 'provavel' | 'fraca' | 'novo';
 export function confidenceOf(match: { score: number } | null): Confidence {
   if (!match) return 'novo';
   return match.score >= 85 ? 'forte' : match.score >= 60 ? 'provavel' : 'fraca';
+}
+
+const normalizeJourneyKey = (value: unknown) => String(value ?? '')
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, ' ');
+
+export const PLURIX_CART_INDEPENDENT_JOURNEY = 'JOR_AQUISICAO_PLURIX_CARRINHO_ABANDONADO_INDEPENDENTE';
+export const PLURIX_CART_ASSISTED_JOURNEY = 'JOR_AQUISICAO_PLURIX_CARRINHO_ABANDONADO_ASSISTIDO';
+
+/**
+ * Canonicaliza a jornada de Carrinho Abandonado Plurix em assistido vs
+ * independente. Portado do importador inteligente (IntelligentFrameworkUpdate.tsx)
+ * pra virar fonte única — antes só o importador sabia resolver essa duplicidade
+ * de jornada, e a Reconciliation Queue de Comunicações via as duas jornadas
+ * como entidades separadas sem relação entre si.
+ */
+export function canonicalPlurixCartJourney(journey: unknown, activityName: unknown): string {
+  const journeyKey = normalizeJourneyKey(journey);
+  const isPlurixCartJourney = journeyKey.includes('aquisicao_plurix_carrinho_abandonado');
+  if (!isPlurixCartJourney || journeyKey.includes('teste')) return String(journey ?? '').trim();
+
+  const activityKey = normalizeJourneyKey(activityName);
+  const isAssistedOrLojista = activityKey.includes('carrinhoabandonadoassistido')
+    || journeyKey.includes('assistido')
+    || journeyKey.includes('lojista');
+
+  return isAssistedOrLojista
+    ? PLURIX_CART_ASSISTED_JOURNEY
+    : PLURIX_CART_INDEPENDENT_JOURNEY;
 }
 
 export function cleanJourneyName(name: string): string {

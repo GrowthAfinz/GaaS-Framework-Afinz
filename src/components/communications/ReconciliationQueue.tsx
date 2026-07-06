@@ -246,7 +246,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
           <div>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Anatomia do activity_name</p>
             <div className="grid grid-cols-3 gap-1.5">
-              {([['Público', 'publico'], ['Canal', 'canal'], ['Campanha', 'campanha'], ['Segmento', 'segmento'], ['Disparo', 'seq']] as [string, string][]).map(([label, key]) => {
+              {([['Público', 'publico'], ['Canal', 'canal'], ['Campanha', 'campanha'], ['Segmento', 'segmento'], ['Variante', 'variante'], ['Disparo', 'seq']] as [string, string][]).map(([label, key]) => {
                 const v = key === 'seq' ? o.parsed.seq : o.parsed[key as DimId];
                 const display = key === 'seq' ? (v || '—') : (v ? optLabel(key as DimId, v) : '—');
                 return (

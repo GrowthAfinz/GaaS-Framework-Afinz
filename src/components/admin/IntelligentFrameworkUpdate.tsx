@@ -31,6 +31,13 @@ import type {
 } from '../../services/intelligentUpdateService';
 import type { Activity } from '../../types/framework';
 import { classifyRentabilizacao } from '../../utils/rentabilizacaoClassify';
+import {
+    parseSeqParts,
+    resolveDim,
+    SEGMENT_CODE_TABLE as SEGMENT_BY_TAXONOMY_CODE,
+    canonicalPlurixCartJourney,
+    PLURIX_CART_ASSISTED_JOURNEY,
+} from '../../utils/taxonomy';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
@@ -352,66 +359,6 @@ const FLOW_TARGET_LABEL: Record<UpdateFlow, string> = {
     rentabilizacao: DOMAIN_TARGET_TABLE.rentabilizacao,
 };
 
-const SEGMENT_BY_TAXONOMY_CODE: Record<string, string> = {
-    abn: 'Abandono',
-    ac: 'Acordo Certo',
-    adq: 'Adquirencia',
-    alv: 'Alvorada',
-    apr: 'Aprovados',
-    anc: 'Aprovados nao convertidos',
-    atl: 'Ativo com limite',
-    atv: 'Ativo Geral',
-    bp: 'Base_Proprietaria',
-    bsp: 'Base_Proprietaria',
-    bb: 'Bem Barato',
-    abb: 'Ativo Bem Barato',
-    car: 'Carrinho Abandonado',
-    blq: 'Cartao Bloqueado',
-    cart: 'Cartonista',
-    emi: 'Clientes Emissores',
-    club: 'Clube',
-    cp: 'Credito Pessoal',
-    rtv: 'Reativacao',
-    cap: 'Desenrola Contemplado aVista aPrazo',
-    dne: 'Desenrola Nao Elegiveis',
-    dia: 'Dia',
-    err: 'Erro',
-    frm: 'Farmacia',
-    freq: 'Frequentes e recorrentes',
-    ina: 'Inadimplente',
-    inv: 'Investidores',
-    ipr: 'Ip roxo',
-    leal: 'Leal',
-    ami: 'Mais Amigo',
-    nsa: 'Nao se aplica',
-    ngd: 'Negados',
-    expl: 'Novo explorador e ocasional',
-    nov: 'Novos',
-    org: 'Organico',
-    bpc: 'Parceiro Bom Pra Credito',
-    srsa: 'Parceiro Serasa',
-    tbm: 'Pos Tombamento',
-    pre: 'Pre Analisados',
-    chu: 'Pre churn e churn',
-    pro: 'Prospect',
-    in1: 'Publico 1 - Investidores',
-    pf1: 'Publico 1 - PF Atrasado',
-    pj1: 'Publico 1 - PJ Negado',
-    pf2: 'Publico 2 - PF Em dia - Lim Baixo',
-    pj2: 'Publico 2 - PJ Aceito',
-    pf3: 'Publico 3 - PF Em dia - Lim Alto',
-    quo: 'Quod',
-    rec: 'Recencia',
-    seg: 'Segurados',
-    sem: 'Sem Parar',
-    pao: 'Super Pao',
-    tst: 'Teste',
-    tds: 'Todos',
-    upo: 'Upgrade de Oferta',
-    nvp: 'Venda Nova Platinum',
-    vnd: 'Vendedor',
-};
-
 const normalize = (value: unknown) =>
     String(value ?? '')
         .replace(/ATIVA�+O/gi, 'ATIVACAO')
@@ -500,6 +447,19 @@ const normalizedOriginTokens = (value: unknown) =>
         return cadenceMatch?.[1] ? [token, cadenceMatch[1]] : [token];
     });
 
+/**
+ * Sugere a ordem de disparo a partir do activity_name, reaproveitando o
+ * parser de sequência do taxonomy.ts (mesmo motor da Reconciliation Queue
+ * de Comunicações). Antes disso o campo ficava sempre em branco, obrigando
+ * digitação manual em todo upload — mesmo quando o nome já carrega o padrão
+ * (ex.: d3ecredcopa_diario -> disparo 3). O humano ainda pode sobrescrever
+ * no input numérico antes de aprovar o candidato.
+ */
+const inferOrdemDisparo = (activityName: unknown): number | undefined => {
+    const parsed = parseSeqParts(String(activityName ?? ''));
+    return parsed?.dispatch;
+};
+
 const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activityName'>) => {
     const activityTokens = normalizedOriginTokens(metric.activityName);
     const journeyTokens = normalizedOriginTokens(metric.journey);
@@ -523,10 +483,20 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
     const activityOrigin = findOrigin(activityTokens);
     const journeyOrigin = activityOrigin ? null : findOrigin(journeyTokens);
     const origin = activityOrigin ?? journeyOrigin;
+    // Dimensão "variante de criativo" (institucional/ecred/int/maior/menor) do
+    // taxonomy.ts, exposta aqui como campo próprio — antes só entrava indiretamente
+    // como sinal de parceiro (institucional/inst -> Proprietaria), sem virar
+    // informação visível por si só (ex.: Carrinho Abandonado Copa B2C manda
+    // institucional E ecred no mesmo disparo; isso hoje é achatado em "Proprietaria"
+    // pra ambos, perdendo a distinção de qual peça é qual).
+    const variante = resolveDim('variante', activityTokens.join('_'))
+        ?? resolveDim('variante', journeyTokens.join('_'))
+        ?? undefined;
     return {
         parceiro: origin?.parceiro,
         source: activityOrigin ? 'token determinístico da activity' : journeyOrigin ? 'token determinístico da jornada' : undefined,
         evidence: origin?.evidence,
+        variante,
     };
 };
 
@@ -544,26 +514,8 @@ const canonicalChannel = (channel: Channel | string) => {
     return normalized === 'Indefinido' ? String(channel ?? '') : normalized;
 };
 
-const PLURIX_CART_INDEPENDENT_JOURNEY = 'JOR_AQUISICAO_PLURIX_CARRINHO_ABANDONADO_INDEPENDENTE';
-const PLURIX_CART_ASSISTED_JOURNEY = 'JOR_AQUISICAO_PLURIX_CARRINHO_ABANDONADO_ASSISTIDO';
-
 const isPlurixCartActivity = (activityName: unknown) =>
     normalizeKey(activityName).includes('carrinhoabandonado');
-
-const canonicalPlurixCartJourney = (journey: unknown, activityName: unknown) => {
-    const journeyKey = normalizeKey(journey);
-    const isPlurixCartJourney = journeyKey.includes('aquisicao_plurix_carrinho_abandonado');
-    if (!isPlurixCartJourney || journeyKey.includes('teste')) return String(journey ?? '').trim();
-
-    const activityKey = normalizeKey(activityName);
-    const isAssistedOrLojista = activityKey.includes('carrinhoabandonadoassistido')
-        || journeyKey.includes('assistido')
-        || journeyKey.includes('lojista');
-
-    return isAssistedOrLojista
-        ? PLURIX_CART_ASSISTED_JOURNEY
-        : PLURIX_CART_INDEPENDENT_JOURNEY;
-};
 
 const canonicalActivityJourney = (activity: Activity) => {
     const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
@@ -1388,7 +1340,7 @@ const buildCandidate = (
         produto: valueFor('produto', 'Cartao'),
         oferta: valueFor('oferta', ''),
         promocional: valueFor('promocional', ''),
-        ordemDisparo: undefined,
+        ordemDisparo: inferOrdemDisparo(metric.activityName),
         suggestions: fieldSuggestions,
         conflictJourneys,
         // matchedActivity forca UPDATE no service (asDbActivityId) em vez de INSERT,
@@ -2032,7 +1984,7 @@ const buildRentabilizacaoCandidate = (
         produto: taxonomy.produto,
         oferta: taxonomy.oferta,
         promocional: taxonomy.promocional ?? 'N/A',
-        ordemDisparo: undefined,
+        ordemDisparo: inferOrdemDisparo(metric.activityName),
         suggestions: fieldSuggestions,
         conflictJourneys: [],
         conflictReason: undefined,
