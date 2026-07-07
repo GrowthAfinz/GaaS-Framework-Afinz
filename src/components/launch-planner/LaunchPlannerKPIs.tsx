@@ -221,7 +221,17 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     });
 
     const comparisonData = useMemo(() => {
+        // CAC diário isolado (custo do dia / cartões do dia) é muito volátil — dias sem
+        // cartão zeram e dias de baixo volume disparam picos. Usamos o CAC ACUMULADO
+        // (custo acumulado / cartões acumulados até o dia): linha suave que converge para
+        // o CAC real do período. É a "evolução" do CAC de fato.
+        let cumCusto = 0;
+        let cumEmis = 0;
         return dailyAnalysis.map(d => {
+            cumCusto += d.custo_crm || 0;
+            cumEmis += d.emissoes_crm || 0;
+            const cacAcumulado = cumEmis > 0 ? cumCusto / cumEmis : null;
+
             const [y, m, day] = d.data.split('-').map(Number);
             const dateObj = new Date(y, m - 1, day);
             const dateKey = d.data;
@@ -234,10 +244,11 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 segmentDataObj[`crm_emissoes_${segment}`] = segVals.emissoes;
             });
 
-            return { 
-                ...withChannels(d), 
-                ...segmentDataObj, 
-                displayDate: format(dateObj, 'dd/MM', { locale: ptBR }) 
+            return {
+                ...withChannels(d),
+                ...segmentDataObj,
+                cac_medio: cacAcumulado,
+                displayDate: format(dateObj, 'dd/MM', { locale: ptBR })
             };
         });
     }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa]);
@@ -476,8 +487,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 {showCharts && (
                     <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
                         <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                            CAC Evolution <span className="text-slate-400 font-medium normal-case">(R$)</span>
-                            <span title="Evolucao do Custo de Aquisicao de Cartao ao longo do tempo"><Info size={10} className="text-slate-400" /></span>
+                            Evolução de CAC <span className="text-slate-400 font-medium normal-case">(R$)</span>
+                            <span title={isMonthly ? 'CAC por mês (custo do mês / cartões do mês)' : 'CAC acumulado do período (custo acumulado / cartões acumulados até o dia)'}><Info size={10} className="text-slate-400" /></span>
                         </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
@@ -492,7 +503,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(v) => `R$${Number(v).toFixed(0)}`} />
                                     <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none' }} />
-                                    <Area type="monotone" dataKey="cac_medio" name="CAC Medio" stroke="#10B981" strokeWidth={2.5} fill="url(#cacGradient)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
+                                    <Area type="monotone" dataKey="cac_medio" name={isMonthly ? 'CAC do mês' : 'CAC acumulado'} connectNulls stroke="#10B981" strokeWidth={2.5} fill="url(#cacGradient)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
