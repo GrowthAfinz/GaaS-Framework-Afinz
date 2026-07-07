@@ -309,6 +309,14 @@ export const useB2CAnalysis = () => {
         return calculateMetrics(ytdCrmFiltered, b2cData, ytdStart, ytdEnd, 'monthly', alertConfig);
     }, [ytdCrmFiltered, b2cData, ytdStart, ytdEnd, alertConfig]);
 
+    // Mesma base (jan → hoje, ou período selecionado se maior), mas em granularidade
+    // diária. Usada para calcular o CAC acumulado "de verdade" (desde o início do ano),
+    // evitando que o acumulado reinicie do zero sempre que o usuário troca o período
+    // selecionado (ex.: olhar só os últimos 28 dias não deveria zerar o acumulado).
+    const { analysisData: ytdDailyAnalysis } = useMemo(() => {
+        return calculateMetrics(ytdCrmFiltered, b2cData, ytdStart, ytdEnd, 'daily', alertConfig);
+    }, [ytdCrmFiltered, b2cData, ytdStart, ytdEnd, alertConfig]);
+
 
     // --- 4. Helpers (Modal, Pie) ---
     const getActivities = (dateStr: string, mode: 'daily' | 'weekly' = 'daily') => {
@@ -339,6 +347,7 @@ export const useB2CAnalysis = () => {
     return {
         dailyAnalysis: filteredData,
         yearMonthlyAnalysis, // YTD por mês (independente do período)
+        ytdDailyAnalysis, // YTD por dia (independente do período) — base do CAC acumulado real
         summary,
         previousSummary, // EXPOSED
         viewMode,

@@ -20,7 +20,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
     const allStoreActivities = useAppStore((state) => state.activities);
-    const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
+    const { dailyAnalysis, yearMonthlyAnalysis, ytdDailyAnalysis } = useB2CAnalysis();
     const { isBUSelected, selectedBUs } = useBU();
 
     const [showSerasa, setShowSerasa] = useState(false);
@@ -220,17 +220,28 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         cac_medio: d.cac_medio
     });
 
-    const comparisonData = useMemo(() => {
-        // CAC diário isolado (custo do dia / cartões do dia) é muito volátil — dias sem
-        // cartão zeram e dias de baixo volume disparam picos. Usamos o CAC ACUMULADO
-        // (custo acumulado / cartões acumulados até o dia): linha suave que converge para
-        // o CAC real do período. É a "evolução" do CAC de fato.
+    // CAC diário isolado (custo do dia / cartões do dia) é muito volátil — dias sem
+    // cartão zeram e dias de baixo volume disparam picos. Usamos o CAC ACUMULADO
+    // (custo acumulado / cartões acumulados desde o início do ano): linha suave.
+    // Importante: a acumulação usa a série YTD completa (ytdDailyAnalysis), não a
+    // janela selecionada — senão o acumulado "reinicia" do zero sempre que o usuário
+    // troca o período (ex.: olhar só os últimos 28 dias zerava o acumulado e deixava
+    // o gráfico em branco até o período acumular cartões suficientes).
+    const cumulativeCacByDate = useMemo(() => {
+        const map = new Map<string, number | null>();
         let cumCusto = 0;
         let cumEmis = 0;
-        return dailyAnalysis.map(d => {
+        ytdDailyAnalysis.forEach(d => {
             cumCusto += d.custo_crm || 0;
             cumEmis += d.emissoes_crm || 0;
-            const cacAcumulado = cumEmis > 0 ? cumCusto / cumEmis : null;
+            map.set(d.data, cumEmis > 0 ? cumCusto / cumEmis : null);
+        });
+        return map;
+    }, [ytdDailyAnalysis]);
+
+    const comparisonData = useMemo(() => {
+        return dailyAnalysis.map(d => {
+            const cacAcumulado = cumulativeCacByDate.get(d.data) ?? null;
 
             const [y, m, day] = d.data.split('-').map(Number);
             const dateObj = new Date(y, m - 1, day);
@@ -251,7 +262,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 displayDate: format(dateObj, 'dd/MM', { locale: ptBR })
             };
         });
-    }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa]);
+    }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa, cumulativeCacByDate]);
 
     // Série mensal do ano corrente (jan → hoje), para o modo Mensal dos gráficos.
     // CAC acumulado por mês (custo acumulado desde jan / cartões acumulados desde jan).
@@ -496,7 +507,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                     <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
                         <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1.5">
                             Evolução de CAC <span className="text-slate-400 font-medium normal-case">(R$)</span>
-                            <span title={isMonthly ? 'CAC por mês (custo do mês / cartões do mês)' : 'CAC acumulado do período (custo acumulado / cartões acumulados até o dia)'}><Info size={10} className="text-slate-400" /></span>
+                            <span title="CAC acumulado desde o início do ano (custo acumulado / cartões acumulados até a data)"><Info size={10} className="text-slate-400" /></span>
                         </h3>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
@@ -511,7 +522,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(v) => `R$${Number(v).toFixed(0)}`} />
                                     <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none' }} />
-                                    <Area type="monotone" dataKey="cac_medio" name={isMonthly ? 'CAC do mês' : 'CAC acumulado'} connectNulls stroke="#10B981" strokeWidth={2.5} fill="url(#cacGradient)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
+                                    <Area type="monotone" dataKey="cac_medio" name="CAC acumulado" connectNulls stroke="#10B981" strokeWidth={2.5} fill="url(#cacGradient)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
