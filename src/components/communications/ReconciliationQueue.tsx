@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles, CalendarClock, AlertTriangle, X } from 'lucide-react';
+import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles, CalendarClock, AlertTriangle, X, ArrowDownWideNarrow, Repeat, Clock, type LucideIcon } from 'lucide-react';
 import type { CatalogEntry, OrphanRow } from '../../hooks/useReconciliation';
 import { linkActivityToTemplate, describeError } from '../../services/communicationService';
 import { optLabel, type Confidence, type DimId } from '../../utils/taxonomy';
@@ -32,9 +32,20 @@ interface Props {
   onChanged: () => void;
 }
 
+type SortBy = 'padrao' | 'base' | 'exec' | 'data';
+const SORT_OPTIONS: [SortBy, string, LucideIcon][] = [
+  ['base', 'Volume de base', ArrowDownWideNarrow],
+  ['exec', 'Execuções', Repeat],
+  ['data', 'Mais recentes', Clock],
+];
+
 export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channelFilter, onClearChannelFilter, onCreate, onChanged }) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todos' | 'forte' | 'novo'>('todos');
+  const [sortBy, setSortBy] = useState<SortBy>('padrao');
+  const [canalSel, setCanalSel] = useState('todos');
+  const [segmentoSel, setSegmentoSel] = useState('todos');
+  const [momentoSel, setMomentoSel] = useState('todos');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<OrphanRow | null>(null);
@@ -45,12 +56,33 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
     [orphans, channelFilter]
   );
 
+  const canalOptions = useMemo(() => Array.from(new Set(scoped.map((o) => o.canalLabel))).sort(), [scoped]);
+  const segmentoOptions = useMemo(
+    () => Array.from(new Set(scoped.map((o) => o.parsed.segmento).filter((v): v is string => !!v))).sort(),
+    [scoped]
+  );
+  const momentoOptions = useMemo(
+    () => Array.from(new Set(scoped.map((o) => o.momentSuggestion.label))).sort(),
+    [scoped]
+  );
+
   const list = useMemo(() => {
-    let l = [...scoped].sort((a, b) => CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || b.base - a.base);
+    let l = scoped.filter((o) => {
+      if (canalSel !== 'todos' && o.canalLabel !== canalSel) return false;
+      if (segmentoSel !== 'todos' && o.parsed.segmento !== segmentoSel) return false;
+      if (momentoSel !== 'todos' && o.momentSuggestion.label !== momentoSel) return false;
+      return true;
+    });
     if (filter === 'forte') l = l.filter((o) => o.confidence === 'forte');
     if (filter === 'novo') l = l.filter((o) => o.confidence === 'novo');
+    l = [...l].sort((a, b) => {
+      if (sortBy === 'base') return b.base - a.base;
+      if (sortBy === 'exec') return b.exec - a.exec;
+      if (sortBy === 'data') return (b.latestDate ?? '').localeCompare(a.latestDate ?? '');
+      return CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || b.base - a.base;
+    });
     return l;
-  }, [scoped, filter]);
+  }, [scoped, filter, sortBy, canalSel, segmentoSel, momentoSel]);
 
   const strong = useMemo(() => scoped.filter((o) => o.confidence === 'forte'), [scoped]);
   const bulkStrong = useMemo(() => strong.filter((o) => o.match?.tpl.inCurrentFilter), [strong]);
@@ -102,6 +134,38 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
             Vincular {bulkStrong.length} matches fortes
           </button>
         )}
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span className="mr-0.5 font-semibold uppercase tracking-wide text-slate-400">Ordenar</span>
+        {SORT_OPTIONS.map(([id, label, Icon]) => {
+          const active = sortBy === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setSortBy((s) => (s === id ? 'padrao' : id))}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-semibold transition-colors ${active ? 'border-cyan-300 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}
+            >
+              <Icon size={12} /> {label}
+            </button>
+          );
+        })}
+        <span className="ml-3 mr-0.5 font-semibold uppercase tracking-wide text-slate-400">Filtrar</span>
+        <select value={canalSel} onChange={(e) => setCanalSel(e.target.value)}
+          className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600 hover:border-slate-300">
+          <option value="todos">Canal: todos</option>
+          {canalOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={segmentoSel} onChange={(e) => setSegmentoSel(e.target.value)}
+          className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600 hover:border-slate-300">
+          <option value="todos">Segmento: todos</option>
+          {segmentoOptions.map((s) => <option key={s} value={s}>{optLabel('segmento', s)}</option>)}
+        </select>
+        <select value={momentoSel} onChange={(e) => setMomentoSel(e.target.value)}
+          className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600 hover:border-slate-300">
+          <option value="todos">Momento: todos</option>
+          {momentoOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
       </div>
 
       {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
