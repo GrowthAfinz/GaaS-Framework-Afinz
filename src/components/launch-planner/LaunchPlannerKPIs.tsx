@@ -254,8 +254,15 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa]);
 
     // Série mensal do ano corrente (jan → hoje), para o modo Mensal dos gráficos.
+    // CAC acumulado por mês (custo acumulado desde jan / cartões acumulados desde jan).
     const monthlyData = useMemo(() => {
+        let cumCusto = 0;
+        let cumEmis = 0;
         return yearMonthlyAnalysis.map(d => {
+            cumCusto += d.custo_crm || 0;
+            cumEmis += d.emissoes_crm || 0;
+            const cacAcumulado = cumEmis > 0 ? cumCusto / cumEmis : null;
+
             const dateObj = new Date(d.ano, d.mes - 1, 1);
             const monthKey = format(dateObj, 'yyyy-MM');
 
@@ -267,10 +274,11 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 segmentDataObj[`crm_emissoes_${segment}`] = segVals.emissoes;
             });
 
-            return { 
-                ...withChannels(d), 
-                ...segmentDataObj, 
-                displayDate: format(dateObj, 'MMM/yy', { locale: ptBR }) 
+            return {
+                ...withChannels(d),
+                ...segmentDataObj,
+                cac_medio: cacAcumulado,
+                displayDate: format(dateObj, 'MMM/yy', { locale: ptBR })
             };
         });
     }, [yearMonthlyAnalysis, monthlySegmentsMap, activeSegments, showSerasa]);
