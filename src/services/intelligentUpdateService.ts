@@ -54,6 +54,7 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     conflictJourneys?: string[];
     conflictReason?: string;
     metricRefresh?: boolean;
+    canonicalDimensionRefresh?: boolean;
     manualOverrides?: Array<{
         field: string;
         previousValue?: string | number;
@@ -118,7 +119,7 @@ const optionalAuditColumnError = (error: any) => {
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     const patch: Record<string, number | string | null> = {};
     const manuallyChanged = new Set((candidate.manualOverrides ?? []).map((override) => override.field));
-    const includeDimension = (field: string) => !candidate.metricRefresh || manuallyChanged.has(field);
+    const includeDimension = (field: string) => !candidate.metricRefresh || candidate.canonicalDimensionRefresh || manuallyChanged.has(field);
 
     if (candidate.sent !== undefined) patch['Base Total'] = candidate.sent;
     if (candidate.delivered !== undefined) patch['Base Acionável'] = candidate.delivered;
@@ -141,7 +142,7 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     if (candidate.ordemDisparo !== undefined && includeDimension('ordemDisparo')) patch['Ordem de disparo'] = candidate.ordemDisparo;
     // Renomeia a jornada canonica quando o disparo ja existe na base sob nome antigo
     // (BI renomeou no SFMC). Aplicado apenas em candidatos aceitos pelo humano.
-    if (candidate.journey && !candidate.metricRefresh) patch['jornada'] = candidate.journey;
+    if (candidate.journey && (!candidate.metricRefresh || candidate.canonicalDimensionRefresh)) patch['jornada'] = candidate.journey;
 
     return {
         ...patch,

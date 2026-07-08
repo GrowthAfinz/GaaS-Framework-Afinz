@@ -151,6 +151,7 @@ interface UpdateCandidate extends MetricRow {
     conflictReason?: string;
     matchedActivity?: Activity;
     metricRefresh?: boolean;
+    canonicalDimensionRefresh?: boolean;
     manualOverrides?: ManualOverride[];
 }
 
@@ -460,9 +461,25 @@ const inferOrdemDisparo = (activityName: unknown): number | undefined => {
     return parsed?.dispatch;
 };
 
+const hasAbandonedCartSignal = (journey: unknown, activityName: unknown) => {
+    const journeyText = normalizeKey(journey);
+    const activityText = normalizeKey(activityName);
+    return journeyText.includes('carrinho')
+        || journeyText.includes('abandonado')
+        || activityText.includes('carrinhoabandonado')
+        || /(^|_)car_d\d/.test(activityText);
+};
+
+const canonicalAcquisitionJourney = (journey: unknown, activityName: unknown) => {
+    const plurixCanonical = canonicalPlurixCartJourney(journey, activityName);
+    if (!hasAbandonedCartSignal(plurixCanonical, activityName)) return plurixCanonical;
+    return String(plurixCanonical).replace(/CARRINHO_AQUISICAO/gi, 'CARRINHO_REATIVACAO');
+};
+
 const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activityName'>) => {
     const activityTokens = normalizedOriginTokens(metric.activityName);
     const journeyTokens = normalizedOriginTokens(metric.journey);
+    const isAbandonedCart = hasAbandonedCartSignal(metric.journey, metric.activityName);
     const findOrigin = (tokens: string[]) => {
         if (tokens.some((token) => ['serasa', 'ecred', 'srs', 'srsa', 'parceiroserasa'].includes(token))) {
             return { parceiro: 'Serasa', evidence: tokens.find((token) => ['serasa', 'ecred', 'srs', 'srsa', 'parceiroserasa'].includes(token))! };
@@ -494,8 +511,10 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
         ?? undefined;
     return {
         parceiro: origin?.parceiro,
+        segmento: isAbandonedCart ? 'Abandonados' : undefined,
+        etapaAquisicao: isAbandonedCart ? 'Reativacao' : undefined,
         source: activityOrigin ? 'token determinístico da activity' : journeyOrigin ? 'token determinístico da jornada' : undefined,
-        evidence: origin?.evidence,
+        evidence: origin?.evidence ?? (isAbandonedCart ? 'carrinho_abandonado' : undefined),
         variante,
     };
 };
@@ -519,7 +538,7 @@ const isPlurixCartActivity = (activityName: unknown) =>
 
 const canonicalActivityJourney = (activity: Activity) => {
     const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
-    return canonicalPlurixCartJourney(activity.jornada, activityName);
+    return canonicalAcquisitionJourney(activity.jornada, activityName);
 };
 
 const buildNoveltyKey = (journey: unknown, activityName: unknown, channel: unknown, date: unknown) =>
@@ -641,7 +660,7 @@ const readBlockRows = (
     for (let row = start.row + 1; row < matrix.length; row += 1) {
         const rawJourney = getCell(matrix, row, start.col + offsets.journey);
         const activityName = getCell(matrix, row, start.col + offsets.activity);
-        const journey = canonicalPlurixCartJourney(rawJourney, activityName);
+        const journey = canonicalAcquisitionJourney(rawJourney, activityName);
         const date = toDateKey(getCell(matrix, row, start.col + offsets.date));
         const rowChannel = offsets.channel !== undefined
             ? normalizeChannel(getCell(matrix, row, start.col + offsets.channel))
@@ -821,7 +840,7 @@ const inferTaxonomy = (metric: MetricRow) => {
                     ? 'N/A'
                     : 'N/A');
 
-    const segmento = isNovosCopa
+    const segmento = deterministic.segmento || (isNovosCopa
         ? 'Novos'
         : segmentByCode
         || (text.includes('carrinho') || text.includes('_car_')
@@ -830,9 +849,9 @@ const inferTaxonomy = (metric: MetricRow) => {
                 ? 'Base Proprietaria'
                 : text.includes('crm')
                     ? 'CRM'
-                    : 'CRM');
+                    : 'CRM'));
 
-    return { bu, parceiro, segmento, subgrupo: isNovosCopa ? 'Copa' : undefined };
+    return { bu, parceiro, segmento, etapaAquisicao: deterministic.etapaAquisicao, subgrupo: isNovosCopa ? 'Copa' : undefined };
 };
 
 const emptySuggestions = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, FieldSuggestion[]>>>((acc, field) => {
@@ -973,9 +992,16 @@ const suggestAllFields = (
     const result: Partial<Record<SuggestionField, FieldSuggestion[]>> = {};
     for (const field of SUGGESTION_FIELDS) {
         const deterministic = inferDeterministicDimensions(metric);
-        const deterministicSuggestion: FieldSuggestion[] = field === 'parceiro' && deterministic.parceiro
+        const deterministicValue = field === 'parceiro'
+            ? deterministic.parceiro
+            : field === 'segmento'
+                ? deterministic.segmento
+                : field === 'etapaAquisicao'
+                    ? deterministic.etapaAquisicao
+                    : undefined;
+        const deterministicSuggestion: FieldSuggestion[] = deterministicValue
             ? [{
-                value: deterministic.parceiro,
+                value: deterministicValue,
                 confidence: 100,
                 source: deterministic.source ?? 'regra determinística',
                 count: 1,
@@ -1198,6 +1224,12 @@ const buildCandidate = (
     const taxonomy = inferTaxonomy(metric);
     const hasDeterministicBasePropria = taxonomy.bu === 'B2C' && taxonomy.parceiro === 'Proprietaria' && taxonomy.segmento === 'Base_Proprietaria';
     const hasDeterministicNovosCopa = taxonomy.segmento === 'Novos' && taxonomy.subgrupo === 'Copa';
+    // Auditoria 2026-07-06: jornadas com token explicito de BU (B2B2C/Plurix no nome)
+    // entravam com BU='B2C' porque a sugestao por historico (valueFor) podia vencer o
+    // parse deterministico de inferTaxonomy quando o bucket de tokens tinha contaminacao
+    // de outras jornadas. Token explicito na jornada e sinal de alta confianca (mesma
+    // logica de inferTaxonomy:806-812) e nao deve perder para sugestao por similaridade.
+    const hasExplicitBuToken = taxonomy.bu === 'B2B2C' || taxonomy.bu === 'Plurix';
     const fieldSuggestions = suggestAllFields(metric, historyIndex);
 
     const valueFor = (field: SuggestionField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
@@ -1236,7 +1268,16 @@ const buildCandidate = (
     })[0];
     const existsInBase = Boolean(existingDispatch);
     const refreshDetails = metricRefreshDetails(metric, existingDispatch);
-    const hasMetricRefresh = refreshDetails.length > 0;
+    const canonicalJourneyChanged = Boolean(existingDispatch)
+        && normalizeKey(existingDispatch?.jornada) !== normalizeKey(metric.journey);
+    const canonicalCartDimensionChanged = Boolean(existingDispatch)
+        && hasAbandonedCartSignal(metric.journey, metric.activityName)
+        && (
+            normalizeKey(getRaw(existingDispatch!, ['Segmento'])) !== normalizeKey(taxonomy.segmento)
+            || normalizeKey(getRaw(existingDispatch!, ['Etapa de aquisicao', 'Etapa de aquisição'])) !== normalizeKey(taxonomy.etapaAquisicao)
+        );
+    const hasCanonicalDimensionRefresh = canonicalJourneyChanged || canonicalCartDimensionChanged;
+    const hasMetricRefresh = refreshDetails.length > 0 || hasCanonicalDimensionRefresh;
     const collidesWithAnotherJourney = historicalSignatureMatches.length > 0 && !existsInBase;
 
     // Duplicacao do BI: a mesma activity+canal+data vem com varios nomes de jornada
@@ -1304,7 +1345,9 @@ const buildCandidate = (
                 ? 'Colisao de jornada sem vencedor claro'
                 : existsInBase
                     ? (hasMetricRefresh
-                        ? `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`
+                        ? (hasCanonicalDimensionRefresh
+                            ? 'Classificacao canonica de carrinho mudou para Reativacao'
+                            : `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`)
                         : 'Disparo ja existe na base de dados')
                     : collidesWithAnotherJourney
                         ? 'Mesma activity, canal e data existem em outra jornada; tratado como novo disparo'
@@ -1324,18 +1367,22 @@ const buildCandidate = (
                         ? `colisao de jornada sem vencedor claro: ${conflictJourneys.join(', ')}`
                 : existsInBase
                             ? (hasMetricRefresh
-                                ? refreshDetails.map(({ field, previous, next }) => `${String(field)}: ${previous} -> ${next}`).join(' | ')
+                                ? [
+                                    ...refreshDetails.map(({ field, previous, next }) => `${String(field)}: ${previous} -> ${next}`),
+                                    ...(canonicalJourneyChanged ? [`jornada: ${existingDispatch?.jornada ?? '-'} -> ${metric.journey}`] : []),
+                                    ...(canonicalCartDimensionChanged ? ['carrinho abandonado: Segmento/Etapa -> Abandonados/Reativacao'] : []),
+                                ].join(' | ')
                                 : 'activity, canal, data e jornada ja existem na base de dados')
                             : collidesWithAnotherJourney
                                 ? `assinatura operacional ja usada em outra jornada: ${historicalSignatureMatches.map((activity) => activity.jornada).join(', ')}`
                             : 'sugestoes por taxonomia e historico',
         accepted: false,
         domain: metric.domain,
-        bu: hasDeterministicBasePropria ? taxonomy.bu : valueFor('bu', taxonomy.bu),
+        bu: hasDeterministicBasePropria || hasExplicitBuToken ? taxonomy.bu : valueFor('bu', taxonomy.bu),
         parceiro: valueFor('parceiro', taxonomy.parceiro),
-        segmento: hasDeterministicBasePropria || hasDeterministicNovosCopa ? taxonomy.segmento : valueFor('segmento', taxonomy.segmento),
+        segmento: hasDeterministicBasePropria || hasDeterministicNovosCopa || taxonomy.segmento === 'Abandonados' ? taxonomy.segmento : valueFor('segmento', taxonomy.segmento),
         subgrupo: hasDeterministicNovosCopa ? taxonomy.subgrupo : valueFor('subgrupo', 'N/A'),
-        etapaAquisicao: valueFor('etapaAquisicao', ''),
+        etapaAquisicao: taxonomy.etapaAquisicao || valueFor('etapaAquisicao', ''),
         perfilCredito: valueFor('perfilCredito', ''),
         produto: valueFor('produto', 'Cartao'),
         oferta: valueFor('oferta', ''),
@@ -1350,6 +1397,7 @@ const buildCandidate = (
         // Conflito de jornada (superseded/ambiguo) nunca e update seguro: nao deve
         // aparecer no rotulo/filtro "Atualizar metricas", mesmo que as metricas tenham mudado.
         metricRefresh: hasMetricRefresh && !fileSuperseded && !fileAmbiguous,
+        canonicalDimensionRefresh: hasCanonicalDimensionRefresh && !fileSuperseded && !fileAmbiguous,
         conflictReason: fileSuperseded
             ? 'superseded_file_journey'
             : fileAmbiguous
@@ -2127,10 +2175,6 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     if (attribution.mergedEcred > 0) {
         warnings.push(`${attribution.mergedEcred} linhas ECRED-API consolidadas via caminho ecred (cartoes emitidos pelo canal ECRED atribuidos ao disparo de origem).`);
     }
-    const importedKeyCount = scopedRows.reduce((map, row) => {
-        map.set(row.key, (map.get(row.key) ?? 0) + 1);
-        return map;
-    }, new Map<string, number>());
     const journeyDayActivityCount = scopedRows.reduce((map, row) => {
         const key = buildJourneyDayKey(row.journey, row.channel, row.date);
         if (!map.has(key)) map.set(key, new Set<string>());
@@ -2157,6 +2201,10 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     });
 
     const metrics = Array.from(metricMap.values());
+    const importedKeyCount = metrics.reduce((map, row) => {
+        map.set(row.key, 1);
+        return map;
+    }, new Map<string, number>());
     const candidates = propagateGroupEmissions(metrics
         .map((row) => {
             try {

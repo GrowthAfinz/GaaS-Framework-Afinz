@@ -7,6 +7,14 @@ import { storageService } from '../services/storageService';
 import CsvWorker from '../workers/csvWorker?worker';
 import { WorkerMessage, WorkerResponse } from '../workers/csvWorker';
 
+const isAcquisitionCampaign = (activity: any) => {
+  const journey = String(activity?.jornada ?? activity?.raw?.jornada ?? '').toUpperCase();
+  const activityName = String(activity?.raw?.['Activity name / Taxonomia'] ?? activity?.id ?? '').toUpperCase();
+  return journey.startsWith('JOR_AQUISICAO')
+    || journey.startsWith('DISP_AQUISICAO')
+    || activityName.includes('_AQS_');
+};
+
 export const useFrameworkData = (): {
   data: CalendarData;
   rentabilizacaoData: CalendarData;
@@ -40,7 +48,7 @@ export const useFrameworkData = (): {
   // Frente de Rentabilização: mesmo agrupamento por data, fonte separada.
   const rentabilizacaoData = useMemo(() => {
     const grouped: CalendarData = {};
-    storeRentabActivities.forEach((activity) => {
+    storeRentabActivities.filter((activity) => !isAcquisitionCampaign(activity)).forEach((activity) => {
       const dateKey = formatDateKey(activity.dataDisparo);
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
@@ -188,7 +196,7 @@ export const useFrameworkData = (): {
             console.log('⏭️ Supabase vazio, mantendo atividades locais.');
           }
 
-          setRentabilizacaoActivities(fetchedRentab);
+          setRentabilizacaoActivities(fetchedRentab.filter((activity: any) => !isAcquisitionCampaign(activity)));
 
           let finalB2C = fetchedB2C;
           if (fetchedB2C.length === 0) {

@@ -370,6 +370,14 @@ function getTab(row: RawRow): 'seguros' | 'rentabilizacao' {
   return 'rentabilizacao';
 }
 
+function isAcquisitionCampaign(row: RawRow): boolean {
+  const jornada = String(row['jornada'] ?? '').toUpperCase();
+  const activity = String(row['Activity name / Taxonomia'] ?? '').toUpperCase();
+  return jornada.startsWith('JOR_AQUISICAO')
+    || jornada.startsWith('DISP_AQUISICAO')
+    || activity.includes('_AQS_');
+}
+
 function productHeaderColor(produto: string, tab: 'seguros' | 'rentabilizacao'): string {
   const p = produto.toLowerCase();
   if (tab === 'seguros') {
@@ -1604,7 +1612,7 @@ async function fetchRntRows(start: Date, end: Date): Promise<RawRow[]> {
     rows.push(...((data ?? []) as RawRow[]));
     if (!data || data.length < pageSize) break;
   }
-  return rows;
+  return rows.filter((row) => !isAcquisitionCampaign(row));
 }
 
 function emptyMediaAgg(): CopaMediaAgg {
