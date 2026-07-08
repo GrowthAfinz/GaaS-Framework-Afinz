@@ -373,6 +373,16 @@ function getTab(row: RawRow): 'seguros' | 'rentabilizacao' {
 function isAcquisitionCampaign(row: RawRow): boolean {
   const jornada = String(row['jornada'] ?? '').toUpperCase();
   const activity = String(row['Activity name / Taxonomia'] ?? '').toUpperCase();
+  if (
+    jornada.startsWith('JOR_RENTABILIZACAO')
+    || jornada.startsWith('JOR_ATIVACAO')
+    || jornada.startsWith('JOR_INCENTIVO_AO_USO')
+    || jornada.startsWith('JOR_POS_TOMBAMENTO_DESBLOQUEIO')
+    || jornada.startsWith('JOR_CARTAO_VC_WELCOME')
+    || jornada.includes('SEGURO')
+  ) {
+    return false;
+  }
   return jornada.startsWith('JOR_AQUISICAO')
     || jornada.startsWith('DISP_AQUISICAO')
     || activity.includes('_AQS_');

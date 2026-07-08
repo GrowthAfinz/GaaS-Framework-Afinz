@@ -11,7 +11,7 @@ const normalizeTaxonomy = (value: unknown): string =>
 
 export const isRentabilizacaoTaxonomy = (value: unknown): boolean => {
   const taxonomy = normalizeTaxonomy(value);
-  if (!taxonomy || isAquisicaoTaxonomy(value)) return false;
+  if (!taxonomy) return false;
 
   return taxonomy.startsWith('JOR_RENTABILIZACAO_')
     || taxonomy.startsWith('JOR_ATIVACAO')
@@ -31,13 +31,15 @@ export const isAquisicaoTaxonomy = (value: unknown): boolean => {
 
 export const activityMatchesFrente = (activity: Activity, frente: Frente): boolean => {
   const raw = (activity.raw ?? {}) as Record<string, unknown>;
-  const taxonomy = activity.jornada
+  const journeyTaxonomy = activity.jornada
     || raw['Jornada']
-    || raw['jornada']
-    || raw['Activity name / Taxonomia']
-    || activity.id;
+    || raw['jornada'];
   const activityName = raw['Activity name / Taxonomia'] || activity.id;
-  const isRentabilizacao = isRentabilizacaoTaxonomy(taxonomy) && !isAquisicaoTaxonomy(activityName);
+  const taxonomy = journeyTaxonomy || activityName;
+  const journeyIsRentabilizacao = isRentabilizacaoTaxonomy(journeyTaxonomy);
+  const journeyIsAquisicao = isAquisicaoTaxonomy(journeyTaxonomy);
+  const isRentabilizacao = journeyIsRentabilizacao
+    || (!journeyIsAquisicao && isRentabilizacaoTaxonomy(taxonomy) && !isAquisicaoTaxonomy(activityName));
 
   return frente === 'rentabilizacao' ? isRentabilizacao : !isRentabilizacao;
 };
