@@ -109,60 +109,10 @@ const chunkArray = <T,>(items: T[], size: number) => {
 const targetTableForDomain = (domain: UpdateDomain) =>
     domain === 'rentabilizacao' ? 'rentabilizacao_activities' : 'activities';
 
-const canonicalKeyPart = (value: unknown) =>
-    String(value ?? '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-
-const operationTypeForCandidate = (
-    candidate: IntelligentUpdateCandidatePayload,
-    wasApplied: boolean,
-    candidateDomain: UpdateDomain
-) => {
-    if (!candidate.accepted || !canApplyCandidate(candidate)) return 'blocked';
-    if (!wasApplied) return 'pending';
-    if (candidateDomain === 'aquisicao' && asDbActivityId(candidate.matchedActivity)) return 'update_metrics';
-    if (candidateDomain === 'rentabilizacao' && candidate.metricRefresh) return 'update_metrics';
-    if (candidateDomain === 'rentabilizacao') return 'upsert';
-    return 'insert';
-};
-
-const idempotencyKeyForCandidate = (candidate: IntelligentUpdateCandidatePayload, candidateDomain: UpdateDomain) =>
-    [
-        candidateDomain,
-        canonicalKeyPart(candidate.activityName),
-        canonicalKeyPart(candidate.channel),
-        String(candidate.date ?? '').slice(0, 10),
-    ].join('|');
-
 const optionalAuditColumnError = (error: any) => {
     const message = `${error?.message ?? ''} ${error?.details ?? ''} ${error?.hint ?? ''}`;
     return /domain|target_table|target_record_id/i.test(message)
         && /column|schema cache|could not find|does not exist/i.test(message);
-};
-
-const stripOptionalAuditColumns = <T extends Record<string, any>>(row: T) => {
-    const { domain, target_table, target_record_id, ...rest } = row;
-    return rest;
-};
-
-const insertWithOptionalAuditColumns = async <T extends Record<string, any>>(
-    tableName: string,
-    rows: T[],
-    selectColumns?: string
-) => {
-    let query = supabase.from(tableName).insert(rows);
-    if (selectColumns) query = query.select(selectColumns);
-    const result = await query;
-    if (!result.error || !optionalAuditColumnError(result.error)) return result;
-
-    let fallbackQuery = supabase.from(tableName).insert(rows.map(stripOptionalAuditColumns));
-    if (selectColumns) fallbackQuery = fallbackQuery.select(selectColumns);
-    return fallbackQuery;
 };
 
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
@@ -416,9 +366,6 @@ const applyConfirmedActivityChanges = async (
     return appliedByKey;
 };
 
-const candidateStatusForDb = (status: CandidateStatus) =>
-    status === 'conflict' ? 'review' : status;
-
 // ── Historico de atualizacoes (leitura) ──
 export interface UpdateRunHistoryItem {
     id: string;
@@ -663,102 +610,13 @@ export const intelligentUpdateService = {
         if (!run?.id) throw new Error('Execucao criada sem identificador.');
 
         try {
-        const metricRows = payload.metrics.map((metric) => ({
-            domain: metric.domain ?? payload.domain,
-            run_id: run.id,
-            source_block: metric.sourceBlock,
-            channel: metric.channel,
-            journey: metric.journey || null,
-            activity_name: metric.activityName,
-            metric_date: metric.date,
-            sent: metric.sent ?? null,
-            delivered: metric.delivered ?? null,
-            opens: metric.opens ?? null,
-            clicks: metric.clicks ?? null,
-            proposals: metric.proposals ?? null,
-            approved: metric.approved ?? null,
-            finalized: metric.finalized ?? null,
-            assisted: metric.assisted ?? null,
-            independent: metric.independent ?? null,
-            natural_key: metric.key,
-            raw_payload: {
-                domain: metric.domain ?? payload.domain,
-                source_blocks: metric.sourceBlocks ?? [metric.sourceBlock],
-                dispatch_signature: metric.dispatchSignature ?? null,
-            },
-        }));
-
-        const insertedMetrics: Array<{ id: string; natural_key: string }> = [];
-        for (const chunk of chunkArray(metricRows, 500)) {
-            const { data, error } = await insertWithOptionalAuditColumns('gaas_dinamica_bi_metrics', chunk, 'id,natural_key');
-
-            if (error) throw error;
-            insertedMetrics.push(...(data || []));
-        }
-
-        const metricIdByKey = new Map(insertedMetrics.map((metric: any) => [metric.natural_key, metric.id]));
-
+        // PILAR (2026-07-08): o Atualizador Inteligente parou de auditar metrica-a-metrica
+        // e candidato-a-candidato em gaas_dinamica_bi_metrics/gaas_update_candidates. As duas
+        // tabelas nao tinham nenhum leitor no app (so escrita) e somaram ~1,28 GB de um limite
+        // de 0,5 GB no Supabase Free. O historico de runs (gaas_update_runs.summary, abaixo)
+        // continua guardando as contagens agregadas por upload.
         const appliedByKey = await applyConfirmedActivityChanges(payload.candidates, payload.domain);
         const now = new Date().toISOString();
-
-        const candidateRows = payload.candidates.map((candidate) => {
-            const candidateDomain = candidate.domain ?? (payload.domain === 'rentabilizacao' ? 'rentabilizacao' : 'aquisicao');
-            const candidateTargetTable = targetTableForDomain(candidateDomain);
-            const existingActivityId = candidateDomain === 'aquisicao' ? asDbActivityId(candidate.matchedActivity) : null;
-            const appliedTarget = appliedByKey.get(candidate.key);
-            const targetRecordId = appliedTarget?.id ?? existingActivityId ?? null;
-            const wasApplied = Boolean(appliedTarget);
-
-            return {
-                domain: candidate.domain ?? payload.domain,
-                target_table: appliedTarget?.table ?? candidateTargetTable,
-                target_record_id: targetRecordId,
-                run_id: run.id,
-                metric_id: metricIdByKey.get(candidate.key) ?? null,
-                activity_id: candidateDomain === 'aquisicao' ? targetRecordId : null,
-                status: wasApplied ? 'applied' : candidateStatusForDb(candidate.status),
-                operation_type: operationTypeForCandidate(candidate, wasApplied, candidateDomain),
-                idempotency_key: idempotencyKeyForCandidate(candidate, candidateDomain),
-                match_count: candidate.matchCount,
-                field_to_review: candidate.fieldToReview,
-                suggestion: candidate.suggestion,
-                confidence: candidate.confidence,
-                previous_dispatches_count: candidate.previousDispatches ?? 0,
-                suggested_dispatch_order: candidate.suggestedOrder ?? null,
-                dispatch_order_basis: candidate.basis,
-                excel_tsv_row: candidate.excelTsvRow,
-                before_payload: candidateDomain === 'aquisicao' ? candidate.matchedActivity?.raw ?? null : null,
-                after_payload: numericPatch(candidate),
-                validation_after_save: wasApplied ? {
-                    target_table: appliedTarget?.table ?? candidateTargetTable,
-                    target_record_id: targetRecordId,
-                    confirmed_by_write_return: true,
-                } : null,
-                proposed_activity_update: {
-                    ...numericPatch(candidate),
-                    domain: candidate.domain ?? payload.domain,
-                    target_table: appliedTarget?.table ?? candidateTargetTable,
-                    target_record_id: targetRecordId,
-                    activity_name: candidate.activityName,
-                    journey: candidate.journey,
-                    channel: candidate.channel,
-                    metric_date: candidate.date,
-                    accepted: Boolean(candidate.accepted),
-                    applied_automatically: wasApplied,
-                    status_original: candidate.status,
-                    conflict_reason: candidate.conflictReason ?? null,
-                    conflict_journeys: candidate.conflictJourneys ?? [],
-                    dispatch_signature: candidate.dispatchSignature ?? null,
-                    manual_overrides: candidate.manualOverrides ?? [],
-                },
-                applied_at: wasApplied ? now : null,
-            };
-        });
-
-        for (const chunk of chunkArray(candidateRows, 500)) {
-            const { error } = await insertWithOptionalAuditColumns('gaas_update_candidates', chunk);
-            if (error) throw error;
-        }
 
         const appliedCount = appliedByKey.size;
         const finalStatus = appliedCount > 0 ? 'applied' : 'reviewing';
