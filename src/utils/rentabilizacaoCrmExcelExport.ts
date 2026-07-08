@@ -427,6 +427,18 @@ function classifyCopa(row: RawRow): { partner: CopaPartner; block: CopaBlock } |
   else if (jornada.includes('NOVOS')) block = 'Novos';
   else if (jornada.includes('REATIVACAO')) block = 'Reativacao';
   else if (jornada.includes('ATIVACAO') || jornada.includes('VISA')) block = 'Ativacao';
+  else if (
+    jornada.includes('INICIO_COPA') ||
+    jornada.includes('PRIMEIRO_COPA') ||
+    jornada.includes('SEGUNDO_COPA') ||
+    jornada.includes('TERCEIRO_COPA') ||
+    jornada.includes('QUARTO_COPA') ||
+    jornada.includes('QUINTO_COPA') ||
+    jornada.includes('SORTEIO') ||
+    jornada.includes('JOGO') ||
+    jornada.includes('BANNER') ||
+    jornada.startsWith('JOR_RENT_COPA')
+  ) block = 'Ativacao';
 
   return block ? { partner, block } : null;
 }
