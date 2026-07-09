@@ -556,6 +556,19 @@ const isSameJourneyFamily = (currentJourney: unknown, otherJourney: unknown) => 
     return current === other;
 };
 
+const journeySimilarity = (currentJourney: unknown, otherJourney: unknown) => {
+    const currentTokens = new Set(normalizeKey(currentJourney).split(/\s+/).filter(Boolean));
+    const otherTokens = new Set(normalizeKey(otherJourney).split(/\s+/).filter(Boolean));
+    if (currentTokens.size === 0 || otherTokens.size === 0) return 0;
+    let intersection = 0;
+    currentTokens.forEach((token) => {
+        if (otherTokens.has(token)) intersection += 1;
+    });
+    return intersection / Math.max(currentTokens.size, otherTokens.size);
+};
+
+const RENAMED_JOURNEY_SIMILARITY_THRESHOLD = 0.7;
+
 const parseClipboardMatrix = (text: string): string[][] => {
     const cleanText = text.replace(/\r/g, '').trim();
     if (!cleanText) return [];
@@ -1243,17 +1256,39 @@ const buildCandidate = (
     const compatibleHistoricalMatches = historicalSignatureMatches.filter(
         (activity) => isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
     );
+    const renamedHistoricalMatches = compatibleHistoricalMatches.length > 0
+        ? []
+        : historicalSignatureMatches
+            .map((activity) => ({
+                activity,
+                similarity: Math.max(
+                    journeySimilarity(metric.journey, canonicalActivityJourney(activity)),
+                    journeySimilarity(metric.journey, activity.jornada)
+                ),
+            }))
+            .filter((match) => match.similarity >= RENAMED_JOURNEY_SIMILARITY_THRESHOLD);
 
-    // Atualizacao automatica exige a mesma jornada canonica. A mesma
-    // activity+canal+data em outra jornada pode ser um novo disparo criado a
-    // partir de uma duplicacao, portanto nao deve herdar o registro anterior.
-    const existingDispatch = [...compatibleHistoricalMatches].sort((left, right) => {
+    // Atualizacao automatica usa mesma jornada canonica ou renomeacao forte.
+    // Mesma activity+canal+data com jornada >=70% similar e duplicidade operacional:
+    // atualiza o registro existente e fixa a jornada canonica com o nome do arquivo.
+    const existingDispatchCandidates = compatibleHistoricalMatches.length > 0
+        ? compatibleHistoricalMatches
+        : renamedHistoricalMatches.map((match) => match.activity);
+    const renamedJourneyMatch = compatibleHistoricalMatches.length === 0 && renamedHistoricalMatches.length > 0;
+    const renamedJourneySimilarity = renamedHistoricalMatches
+        .reduce((best, match) => Math.max(best, match.similarity), 0);
+    const existingDispatch = [...existingDispatchCandidates].sort((left, right) => {
         const target = normalizeKey(metric.journey);
         const score = (activity: Activity) => {
             const canonicalJourney = normalizeKey(canonicalActivityJourney(activity));
             const rawJourney = normalizeKey(activity.jornada);
             if (canonicalJourney === target) return 4;
             if (rawJourney === target) return 3;
+            const similarity = Math.max(
+                journeySimilarity(metric.journey, canonicalActivityJourney(activity)),
+                journeySimilarity(metric.journey, activity.jornada)
+            );
+            if (similarity >= RENAMED_JOURNEY_SIMILARITY_THRESHOLD) return 2 + similarity;
             if (
                 target === normalizeKey(PLURIX_CART_ASSISTED_JOURNEY)
                 && (rawJourney.includes('assistido') || rawJourney.includes('lojista'))
@@ -1279,6 +1314,7 @@ const buildCandidate = (
     const hasCanonicalDimensionRefresh = canonicalJourneyChanged || canonicalCartDimensionChanged;
     const hasMetricRefresh = refreshDetails.length > 0 || hasCanonicalDimensionRefresh;
     const collidesWithAnotherJourney = historicalSignatureMatches.length > 0 && !existsInBase;
+    const renamedJourneyPct = Math.round(renamedJourneySimilarity * 100);
 
     // Duplicacao do BI: a mesma activity+canal+data vem com varios nomes de jornada
     // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
@@ -1331,7 +1367,7 @@ const buildCandidate = (
                     : fileAmbiguous
                         ? 'Colisao de jornada'
                         : existsInBase
-                            ? (hasMetricRefresh ? 'Atualizar resultados' : 'Ja existe na base')
+                            ? (renamedJourneyMatch ? 'Jornada renomeada' : hasMetricRefresh ? 'Atualizar resultados' : 'Ja existe na base')
                             : collidesWithAnotherJourney
                                 ? 'Novo disparo em outra jornada'
                             : missingHumanSuggestion
@@ -1345,7 +1381,9 @@ const buildCandidate = (
                 ? 'Colisao de jornada sem vencedor claro'
                 : existsInBase
                     ? (hasMetricRefresh
-                        ? (hasCanonicalDimensionRefresh
+                        ? (renamedJourneyMatch
+                            ? `Mesma activity, canal e data com jornada ${renamedJourneyPct}% similar; atualizar para nome canonico novo`
+                            : hasCanonicalDimensionRefresh
                             ? 'Classificacao canonica de carrinho mudou para Reativacao'
                             : `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`)
                         : 'Disparo ja existe na base de dados')
@@ -1369,6 +1407,7 @@ const buildCandidate = (
                             ? (hasMetricRefresh
                                 ? [
                                     ...refreshDetails.map(({ field, previous, next }) => `${String(field)}: ${previous} -> ${next}`),
+                                    ...(renamedJourneyMatch ? [`jornada similar ${renamedJourneyPct}%: ${existingDispatch?.jornada ?? '-'} -> ${metric.journey}`] : []),
                                     ...(canonicalJourneyChanged ? [`jornada: ${existingDispatch?.jornada ?? '-'} -> ${metric.journey}`] : []),
                                     ...(canonicalCartDimensionChanged ? ['carrinho abandonado: Segmento/Etapa -> Abandonados/Reativacao'] : []),
                                 ].join(' | ')
@@ -1403,7 +1442,7 @@ const buildCandidate = (
             : fileAmbiguous
                 ? 'ambiguous_file_journey'
                 : existsInBase
-                    ? 'existing_dispatch'
+                    ? (renamedJourneyMatch ? 'renamed_journey_existing_dispatch' : 'existing_dispatch')
                     : undefined,
     };
 };
