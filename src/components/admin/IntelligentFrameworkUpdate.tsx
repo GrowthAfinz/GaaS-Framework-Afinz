@@ -50,6 +50,8 @@ type NumericReviewField = 'ordemDisparo';
 type ReviewField = TextReviewField | NumericReviewField;
 type SuggestionField = Exclude<ReviewField, 'ordemDisparo'>;
 type ProcessingStage = 'idle' | 'reading' | 'indexing' | 'detecting' | 'reviewing';
+type ReviewMode = 'operation' | 'dimensions' | 'metrics';
+type ReviewSortKey = 'date_desc' | 'action' | 'confidence' | 'moment' | 'sent' | 'cards';
 
 type SuggestionStat = { count: number; lastUsed?: string };
 type SuggestionBucket = Map<SuggestionField, Map<string, SuggestionStat>>;
@@ -158,6 +160,35 @@ interface UpdateCandidate extends MetricRow {
 const BLOCKED_UPLOAD_STATUSES: CandidateStatus[] = ['duplicate', 'error', 'ignored', 'conflict'];
 const canUploadCandidate = (candidate: Pick<UpdateCandidate, 'status'>) =>
     !BLOCKED_UPLOAD_STATUSES.includes(candidate.status);
+
+const candidateAction = (candidate: UpdateCandidate): 'atualizar' | 'novo' | 'ignorar' => {
+    if (!canUploadCandidate(candidate)) return 'ignorar';
+    return candidate.metricRefresh || candidate.matchedActivity ? 'atualizar' : 'novo';
+};
+
+const ACTION_SORT_ORDER: Record<ReturnType<typeof candidateAction>, number> = {
+    atualizar: 0,
+    novo: 1,
+    ignorar: 2,
+};
+
+const REVIEW_SORT_OPTIONS: Record<ReviewMode, Array<{ key: ReviewSortKey; label: string }>> = {
+    operation: [
+        { key: 'date_desc', label: 'Mais recentes' },
+        { key: 'action', label: 'Ação' },
+        { key: 'confidence', label: 'Confiança' },
+    ],
+    dimensions: [
+        { key: 'moment', label: 'Momento' },
+        { key: 'date_desc', label: 'Mais recentes' },
+        { key: 'confidence', label: 'Confiança' },
+    ],
+    metrics: [
+        { key: 'sent', label: 'Mais envios' },
+        { key: 'cards', label: 'Mais cartões' },
+        { key: 'date_desc', label: 'Mais recentes' },
+    ],
+};
 
 interface ProcessResult {
     domain: UpdateFlow;
@@ -2984,7 +3015,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [periodFilterOpen, setPeriodFilterOpen] = useState(false);
     const [reviewStartDate, setReviewStartDate] = useState('');
     const [reviewEndDate, setReviewEndDate] = useState('');
-    const [reviewMode, setReviewMode] = useState<'operation' | 'dimensions' | 'metrics'>('operation');
+    const [reviewMode, setReviewMode] = useState<ReviewMode>('operation');
+    const [reviewSortByMode, setReviewSortByMode] = useState<Record<ReviewMode, ReviewSortKey>>({
+        operation: 'date_desc',
+        dimensions: 'moment',
+        metrics: 'sent',
+    });
     const [bulkEditOpen, setBulkEditOpen] = useState(false);
     const [bulkField, setBulkField] = useState<ReviewField>('promocional');
     const [bulkValue, setBulkValue] = useState('');
@@ -3060,12 +3096,41 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             return haystack.includes(term);
         });
     }, [candidates, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
-    const reviewPageCount = Math.max(1, Math.ceil(filteredCandidates.length / REVIEW_PAGE_SIZE));
+    const sortedCandidates = useMemo(() => {
+        const sortKey = reviewSortByMode[reviewMode];
+        const valueFor = (candidate: UpdateCandidate): string | number => {
+            if (sortKey === 'date_desc') return candidate.date;
+            if (sortKey === 'action') return ACTION_SORT_ORDER[candidateAction(candidate)];
+            if (sortKey === 'confidence') return candidate.confidence;
+            if (sortKey === 'moment') {
+                const moment = momentChipsFor(candidate);
+                return moment.seq || `D${candidate.ordemDisparo ?? 9999}`;
+            }
+            if (sortKey === 'sent') return candidate.sent ?? 0;
+            if (sortKey === 'cards') return candidate.finalized ?? 0;
+            return candidate.date;
+        };
+        return [...filteredCandidates].sort((left, right) => {
+            const leftValue = valueFor(left);
+            const rightValue = valueFor(right);
+            if (typeof leftValue === 'number' && typeof rightValue === 'number') {
+                const direction = sortKey === 'action' || sortKey === 'moment' ? 1 : -1;
+                const diff = leftValue - rightValue;
+                if (diff !== 0) return diff * direction;
+            } else {
+                const direction = sortKey === 'date_desc' ? -1 : 1;
+                const diff = String(leftValue).localeCompare(String(rightValue), 'pt-BR', { numeric: true });
+                if (diff !== 0) return diff * direction;
+            }
+            return right.confidence - left.confidence || right.date.localeCompare(left.date);
+        });
+    }, [filteredCandidates, reviewMode, reviewSortByMode]);
+    const reviewPageCount = Math.max(1, Math.ceil(sortedCandidates.length / REVIEW_PAGE_SIZE));
     const pagedCandidates = useMemo(() => {
         const safePage = Math.min(reviewPage, reviewPageCount);
         const start = (safePage - 1) * REVIEW_PAGE_SIZE;
-        return filteredCandidates.slice(start, start + REVIEW_PAGE_SIZE);
-    }, [filteredCandidates, reviewPage, reviewPageCount]);
+        return sortedCandidates.slice(start, start + REVIEW_PAGE_SIZE);
+    }, [sortedCandidates, reviewPage, reviewPageCount]);
     const bulkSuggestions = useMemo(() => {
         if (bulkField === 'ordemDisparo') return [];
         const source = bulkScope === 'filtered'
@@ -3940,12 +4005,35 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         <button
                                             key={mode}
                                             type="button"
-                                            onClick={() => setReviewMode(mode)}
+                                            onClick={() => {
+                                                setReviewMode(mode);
+                                                setReviewPage(1);
+                                            }}
                                             className={`rounded-md px-3 py-1.5 text-xs font-bold ${
                                                 reviewMode === mode ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'
                                             }`}
                                         >
                                             {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                                    <span className="px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Ordenar</span>
+                                    {REVIEW_SORT_OPTIONS[reviewMode].map((option) => (
+                                        <button
+                                            key={`${reviewMode}-${option.key}`}
+                                            type="button"
+                                            onClick={() => {
+                                                setReviewSortByMode((current) => ({ ...current, [reviewMode]: option.key }));
+                                                setReviewPage(1);
+                                            }}
+                                            className={`rounded-md px-2.5 py-1.5 text-xs font-bold ${
+                                                reviewSortByMode[reviewMode] === option.key
+                                                    ? 'bg-cyan-50 text-cyan-700'
+                                                    : 'text-slate-500 hover:bg-slate-100'
+                                            }`}
+                                        >
+                                            {option.label}
                                         </button>
                                     ))}
                                 </div>
