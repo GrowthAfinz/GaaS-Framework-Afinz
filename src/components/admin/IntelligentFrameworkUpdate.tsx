@@ -2569,6 +2569,41 @@ const StatCard = ({ label, value, tone }: { label: string; value: number; tone: 
     </div>
 );
 
+const DimensionChip = ({
+    label,
+    value,
+    tone = 'slate',
+}: {
+    label: string;
+    value?: string | number | null;
+    tone?: 'slate' | 'cyan' | 'blue' | 'emerald';
+}) => {
+    const text = value === undefined || value === null ? '' : String(value).trim();
+    if (!text || text === 'N/A') return null;
+    const toneClass = {
+        slate: 'border-slate-200 bg-slate-50 text-slate-700',
+        cyan: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+        blue: 'border-blue-100 bg-blue-50 text-blue-700',
+        emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    }[tone];
+    return (
+        <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${toneClass}`} title={`${label}: ${text}`}>
+            <span className="text-[9px] uppercase text-slate-400">{label}</span>
+            <span>{text}</span>
+        </span>
+    );
+};
+
+const momentChipsFor = (candidate: UpdateCandidate) => {
+    const parsed = parseSeqParts(candidate.activityName);
+    return {
+        seq: parsed?.seq ?? (candidate.ordemDisparo !== undefined ? `D${candidate.ordemDisparo}` : ''),
+        week: parsed?.week ? `S${parsed.week}` : '',
+        dispatch: parsed?.dispatch !== undefined ? `D${String(parsed.dispatch).padStart(2, '0')}` : '',
+        source: parsed?.source === 'template' ? 'template' : parsed?.source === 'activity' ? 'activity' : parsed?.source === 'fallback' ? 'parser' : '',
+    };
+};
+
 // ── Historico de atualizacoes ──
 type HistoryDomainFilter = 'all' | 'aquisicao' | 'rentabilizacao';
 type HistoryOperationFilter = 'all' | 'new' | 'metrics' | 'blocked';
@@ -4119,17 +4154,34 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                             </>}
                                             {reviewMode === 'dimensions' && <>
                                                 <td className="px-3 py-3 align-top">
-                                                    <div className="grid grid-cols-3 gap-x-3 gap-y-1 text-[11px]">
-                                                        <span><b>BU:</b> {candidate.bu}</span>
-                                                        <span><b>Parceiro:</b> {candidate.parceiro}</span>
-                                                        <span><b>Segmento:</b> {candidate.segmento}</span>
-                                                        <span><b>Subgrupo:</b> {candidate.subgrupo}</span>
-                                                        <span><b>Etapa:</b> {candidate.etapaAquisicao}</span>
-                                                        <span><b>Perfil:</b> {candidate.perfilCredito}</span>
-                                                        <span><b>Produto:</b> {candidate.produto}</span>
-                                                        <span><b>Oferta:</b> {candidate.oferta}</span>
-                                                        <span><b>Promo:</b> {candidate.promocional}</span>
-                                                    </div>
+                                                    {(() => {
+                                                        const moment = momentChipsFor(candidate);
+                                                        return (
+                                                            <div className="space-y-2">
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    <DimensionChip label="BU" value={candidate.bu} tone="blue" />
+                                                                    <DimensionChip label="Parceiro" value={candidate.parceiro} />
+                                                                    <DimensionChip label="Segmento" value={candidate.segmento} tone="cyan" />
+                                                                    <DimensionChip label="Subgrupo" value={candidate.subgrupo} />
+                                                                    <DimensionChip label="Etapa" value={candidate.etapaAquisicao} />
+                                                                    <DimensionChip label="Perfil" value={candidate.perfilCredito} />
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    <DimensionChip label="Momento" value={moment.seq} tone="emerald" />
+                                                                    <DimensionChip label="Semana" value={moment.week} tone="emerald" />
+                                                                    <DimensionChip label="Disparo" value={moment.dispatch} tone="emerald" />
+                                                                    <DimensionChip label="Canal" value={candidate.channel} tone="blue" />
+                                                                    <DimensionChip label="Data" value={formatDateBR(candidate.date)} tone="slate" />
+                                                                    <DimensionChip label="Origem" value={moment.source} tone="slate" />
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    <DimensionChip label="Produto" value={candidate.produto} />
+                                                                    <DimensionChip label="Oferta" value={candidate.oferta} tone="cyan" />
+                                                                    <DimensionChip label="Promo" value={candidate.promocional} tone="cyan" />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-3 py-3 align-top font-bold text-slate-700">{candidate.confidence}%</td>
                                             </>}
