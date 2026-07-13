@@ -564,9 +564,6 @@ const canonicalChannel = (channel: Channel | string) => {
     return normalized === 'Indefinido' ? String(channel ?? '') : normalized;
 };
 
-const isPlurixCartActivity = (activityName: unknown) =>
-    normalizeKey(activityName).includes('carrinhoabandonado');
-
 const canonicalActivityJourney = (activity: Activity) => {
     const activityName = activity.raw?.['Activity name / Taxonomia'] || activity.id;
     return canonicalAcquisitionJourney(activity.jornada, activityName);
@@ -1175,12 +1172,12 @@ const ALL_METRIC_FIELDS: Array<keyof MetricRow> = [
     'sent', 'delivered', 'opens', 'clicks', ...GROUP_RESULT_FIELDS,
 ];
 
-const collapsePlurixCartDuplicates = (rows: MetricRow[]) => {
+const collapseAbandonedCartDuplicates = (rows: MetricRow[]) => {
     const result: MetricRow[] = [];
     const grouped = new Map<string, MetricRow>();
 
     rows.forEach((row) => {
-        if (!isPlurixCartActivity(row.activityName)) {
+        if (!hasAbandonedCartSignal(row.journey, row.activityName)) {
             result.push(row);
             return;
         }
@@ -2226,8 +2223,8 @@ const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessR
     const missingBlocks = blocks.filter((block) => !block.detected).map((block) => block.label);
     if (missingBlocks.length > 0) warnings.push(`Blocos nao detectados: ${missingBlocks.join(', ')}.`);
 
-    const dispatchRows = collapsePlurixCartDuplicates([...whatsappRows, ...emailRows, ...smsRows, ...pushRows]);
-    const collapsedPerformanceRows = collapsePlurixCartDuplicates(performanceRows);
+    const dispatchRows = collapseAbandonedCartDuplicates([...whatsappRows, ...emailRows, ...smsRows, ...pushRows]);
+    const collapsedPerformanceRows = collapseAbandonedCartDuplicates(performanceRows);
     const rawRows = [...dispatchRows, ...collapsedPerformanceRows];
     const attribution = consolidateOperationalRows(dispatchRows, collapsedPerformanceRows);
     const allRows = attribution.rows;
