@@ -3,7 +3,9 @@ import {
   MetricVolumes,
   MonthlyDimension,
   MonthlyMetrics,
+  computeCacAggregate,
   computeMetrics,
+  emptyVolumes,
   metricsFromVolumes,
 } from './monthlyAggregation';
 
@@ -13,6 +15,10 @@ export interface DailyTotalRow extends MonthlyMetrics {
   dayKey: string;   // yyyy-MM-dd
   dayLabel: string; // dd/MM
   activitiesCount: number;
+  // Bookkeeping bruto de CAC (soma + contagem) — permite reconstruir a média
+  // corretamente em accumulate*/totalsFromDimensionRows sem re-varrer activities.
+  cacSum: number;
+  cacCount: number;
 }
 
 export interface DailyDimensionRow extends DailyTotalRow {
@@ -51,14 +57,16 @@ function groupActivitiesByDay(data: CalendarData): Map<string, Activity[]> {
 
 export function aggregateDailyTotals(data: CalendarData): DailyTotalRow[] {
   const groups = groupActivitiesByDay(data);
-  return Array.from(groups.entries())
+  const rows = Array.from(groups.entries())
     .map(([dayKey, activities]) => ({
       dayKey,
       dayLabel: formatDayLabel(dayKey),
       activitiesCount: activities.length,
       ...computeMetrics(activities),
-    }))
-    .sort((a, b) => a.dayKey.localeCompare(b.dayKey));
+      ...computeCacAggregate(activities),
+    }));
+  rows.forEach((row) => { row.participacaoEmissoes = row.emissoes > 0 ? 1 : 0; });
+  return rows.sort((a, b) => a.dayKey.localeCompare(b.dayKey));
 }
 
 export function aggregateDailyByDimension(
@@ -86,8 +94,19 @@ export function aggregateDailyByDimension(
         dimension,
         label,
         ...computeMetrics(dimensionActivities),
+        ...computeCacAggregate(dimensionActivities),
       });
     });
+  });
+
+  // % Participação = fatia das emissões do dia que essa série (segmento/canal) representa.
+  const dayEmissoesTotal = new Map<string, number>();
+  rows.forEach((row) => {
+    dayEmissoesTotal.set(row.dayKey, (dayEmissoesTotal.get(row.dayKey) ?? 0) + row.emissoes);
+  });
+  rows.forEach((row) => {
+    const total = dayEmissoesTotal.get(row.dayKey) ?? 0;
+    row.participacaoEmissoes = total > 0 ? row.emissoes / total : 0;
   });
 
   return rows.sort((a, b) => (
@@ -96,11 +115,41 @@ export function aggregateDailyByDimension(
 }
 
 const VOLUME_KEYS: (keyof MetricVolumes)[] = [
-  'baseEnviada', 'baseEntregue', 'aberturas', 'cliques', 'propostas', 'aprovados', 'emissoes', 'custoTotal',
+  'baseEnviada', 'baseEntregue', 'aberturas', 'cliques', 'propostas', 'aprovados',
+  'emissoes', 'emissoesIndependentes', 'emissoesAssistidas', 'custoTotal', 'cacSum', 'cacCount',
 ];
 
-function emptyVolumes(): MetricVolumes {
-  return { baseEnviada: 0, baseEntregue: 0, aberturas: 0, cliques: 0, propostas: 0, aprovados: 0, emissoes: 0, custoTotal: 0 };
+/**
+ * Reconstrói o total diário (somando todas as séries/labels do dia) a partir
+ * de linhas por dimensão — usado pelo modo multi-métrica do gráfico, que
+ * sobrepõe métricas sem quebra por segmento/canal. Funciona também sobre
+ * linhas já acumuladas (accumulateDailyDimensionRows), pois soma os volumes
+ * brutos já cumulativos e recalcula as taxas a partir deles.
+ */
+export function totalsFromDimensionRows(rows: DailyDimensionRow[]): DailyTotalRow[] {
+  const byDay = new Map<string, MetricVolumes & { dayLabel: string; activitiesCount: number }>();
+
+  rows.forEach((row) => {
+    const acc = byDay.get(row.dayKey) ?? { ...emptyVolumes(), dayLabel: row.dayLabel, activitiesCount: 0 };
+    VOLUME_KEYS.forEach((k) => { acc[k] += row[k]; });
+    acc.activitiesCount += row.activitiesCount;
+    byDay.set(row.dayKey, acc);
+  });
+
+  const result: DailyTotalRow[] = Array.from(byDay.entries()).map(([dayKey, acc]) => {
+    const metrics = metricsFromVolumes(acc);
+    metrics.participacaoEmissoes = metrics.emissoes > 0 ? 1 : 0;
+    return {
+      dayKey,
+      dayLabel: acc.dayLabel,
+      activitiesCount: acc.activitiesCount,
+      ...metrics,
+      cacSum: acc.cacSum,
+      cacCount: acc.cacCount,
+    };
+  });
+
+  return result.sort((a, b) => a.dayKey.localeCompare(b.dayKey));
 }
 
 /**
@@ -111,7 +160,7 @@ function emptyVolumes(): MetricVolumes {
 export function accumulateDailyTotals(rows: DailyTotalRow[]): DailyTotalRow[] {
   const running = emptyVolumes();
   let runningCount = 0;
-  return [...rows]
+  const accumulated = [...rows]
     .sort((a, b) => a.dayKey.localeCompare(b.dayKey))
     .map((row) => {
       VOLUME_KEYS.forEach((k) => { running[k] += row[k]; });
@@ -121,8 +170,12 @@ export function accumulateDailyTotals(rows: DailyTotalRow[]): DailyTotalRow[] {
         dayLabel: row.dayLabel,
         activitiesCount: runningCount,
         ...metricsFromVolumes(running),
+        cacSum: running.cacSum,
+        cacCount: running.cacCount,
       };
     });
+  accumulated.forEach((row) => { row.participacaoEmissoes = row.emissoes > 0 ? 1 : 0; });
+  return accumulated;
 }
 
 /**
@@ -134,7 +187,7 @@ export function accumulateDailyDimensionRows(rows: DailyDimensionRow[]): DailyDi
   const countByLabel = new Map<string, number>();
   const dimension = rows[0]?.dimension ?? 'segmento';
 
-  return [...rows]
+  const accumulated = [...rows]
     .sort((a, b) => a.dayKey.localeCompare(b.dayKey) || a.label.localeCompare(b.label))
     .map((row) => {
       const running = runningByLabel.get(row.label) ?? emptyVolumes();
@@ -149,8 +202,21 @@ export function accumulateDailyDimensionRows(rows: DailyDimensionRow[]): DailyDi
         dimension,
         label: row.label,
         ...metricsFromVolumes({ ...running }),
+        cacSum: running.cacSum,
+        cacCount: running.cacCount,
       };
     });
+
+  const dayEmissoesTotal = new Map<string, number>();
+  accumulated.forEach((row) => {
+    dayEmissoesTotal.set(row.dayKey, (dayEmissoesTotal.get(row.dayKey) ?? 0) + row.emissoes);
+  });
+  accumulated.forEach((row) => {
+    const total = dayEmissoesTotal.get(row.dayKey) ?? 0;
+    row.participacaoEmissoes = total > 0 ? row.emissoes / total : 0;
+  });
+
+  return accumulated;
 }
 
 /**
@@ -174,6 +240,8 @@ export function fillMissingDays(rows: DailyTotalRow[], startDate: Date, endDate:
         dayLabel: formatDayLabel(dayKey),
         activitiesCount: 0,
         ...metricsFromVolumes(emptyVolumes()),
+        cacSum: 0,
+        cacCount: 0,
       });
     }
     current.setDate(current.getDate() + 1);

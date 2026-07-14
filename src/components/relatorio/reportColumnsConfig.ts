@@ -184,3 +184,13 @@ export function getDimensionValue(activity: Activity, dim: DimensionKey): string
 export function getGroupableDimensionLabel(dim: DimensionKey): string {
   return COLUMN_BY_KEY[dim]?.label ?? dim;
 }
+
+// ── Família de escala (para gráficos multi-métrica com eixos combinados) ──
+export type MetricFamily = 'count' | 'percent' | 'currency';
+
+export function getMetricFamily(key: MetricKey): MetricFamily {
+  const format = COLUMN_BY_KEY[key]?.format;
+  if (format === 'currency') return 'currency';
+  if (format === 'percent' || format === 'percent4') return 'percent';
+  return 'count';
+}
