@@ -99,19 +99,28 @@ export function aggregateDailyByDimension(
     });
   });
 
-  // % Participação = fatia das emissões do dia que essa série (segmento/canal) representa.
+  return recomputeParticipacaoEmissoes(rows).sort((a, b) => (
+    a.dayKey.localeCompare(b.dayKey) || b.emissoes - a.emissoes || a.label.localeCompare(b.label)
+  ));
+}
+
+/**
+ * % Participação = fatia das emissões do dia que cada série (segmento/canal)
+ * representa, somando entre TODAS as linhas do mesmo dia — inclusive séries
+ * vindas de fora do agrupamento original (ex: mesclar Serasa API depois de
+ * aggregateDailyByDimension). Imutável: retorna linhas novas (não muta as
+ * recebidas), já que elas podem vir de um useMemo compartilhado por outros
+ * consumidores.
+ */
+export function recomputeParticipacaoEmissoes<T extends { dayKey: string; emissoes: number; participacaoEmissoes: number }>(rows: T[]): T[] {
   const dayEmissoesTotal = new Map<string, number>();
   rows.forEach((row) => {
     dayEmissoesTotal.set(row.dayKey, (dayEmissoesTotal.get(row.dayKey) ?? 0) + row.emissoes);
   });
-  rows.forEach((row) => {
+  return rows.map((row) => {
     const total = dayEmissoesTotal.get(row.dayKey) ?? 0;
-    row.participacaoEmissoes = total > 0 ? row.emissoes / total : 0;
+    return { ...row, participacaoEmissoes: total > 0 ? row.emissoes / total : 0 };
   });
-
-  return rows.sort((a, b) => (
-    a.dayKey.localeCompare(b.dayKey) || b.emissoes - a.emissoes || a.label.localeCompare(b.label)
-  ));
 }
 
 const VOLUME_KEYS: (keyof MetricVolumes)[] = [
@@ -207,16 +216,7 @@ export function accumulateDailyDimensionRows(rows: DailyDimensionRow[]): DailyDi
       };
     });
 
-  const dayEmissoesTotal = new Map<string, number>();
-  accumulated.forEach((row) => {
-    dayEmissoesTotal.set(row.dayKey, (dayEmissoesTotal.get(row.dayKey) ?? 0) + row.emissoes);
-  });
-  accumulated.forEach((row) => {
-    const total = dayEmissoesTotal.get(row.dayKey) ?? 0;
-    row.participacaoEmissoes = total > 0 ? row.emissoes / total : 0;
-  });
-
-  return accumulated;
+  return recomputeParticipacaoEmissoes(accumulated);
 }
 
 /**

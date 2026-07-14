@@ -9,7 +9,9 @@ import {
   aggregateDailyTotals,
   accumulateDailyDimensionRows,
   fillMissingDays,
+  recomputeParticipacaoEmissoes,
 } from '../../utils/dailyAggregation';
+import { aggregateDailySerasaRows } from '../../utils/serasaAggregation';
 import { DailyStackedBarChart } from './DailyStackedBarChart';
 
 interface DailyReportViewProps {
@@ -21,7 +23,8 @@ interface DailyReportViewProps {
 export const DailyReportView: React.FC<DailyReportViewProps> = ({ data, selectedBU, rentabilizacao = false }) => {
   const { startDate, endDate, setPeriod } = usePeriod();
   const [accumulated, setAccumulated] = useState(false);
-  const { viewSettings } = useAppStore();
+  const [includeSerasa, setIncludeSerasa] = useState(true);
+  const { viewSettings, b2cData } = useAppStore();
   const { filteredData } = useAdvancedFilters(data, viewSettings.filtrosGlobais, { computeFacets: false });
 
   const dailyTotalsRaw = useMemo(() => {
@@ -32,9 +35,26 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({ data, selected
   const segmentRowsRaw = useMemo(() => aggregateDailyByDimension(filteredData, 'segmento'), [filteredData]);
   const channelRowsRaw = useMemo(() => aggregateDailyByDimension(filteredData, 'canal'), [filteredData]);
 
+  // Serasa API é originação B2C integrada (fora do CRM/activities) — só faz
+  // sentido como série extra em "Segmentos por dia" (não tem Canal nem
+  // funil de engajamento, então fica fora da frente Rentabilização).
+  const serasaRowsInRange = useMemo(() => {
+    if (rentabilizacao) return [];
+    const startKey = format(startDate, 'yyyy-MM-dd');
+    const endKey = format(endDate, 'yyyy-MM-dd');
+    return aggregateDailySerasaRows(b2cData).filter((row) => row.dayKey >= startKey && row.dayKey <= endKey);
+  }, [b2cData, rentabilizacao, startDate, endDate]);
+
+  const shouldIncludeSerasa = includeSerasa && !rentabilizacao && serasaRowsInRange.length > 0;
+
+  const segmentRowsWithSerasa = useMemo(
+    () => (shouldIncludeSerasa ? recomputeParticipacaoEmissoes([...segmentRowsRaw, ...serasaRowsInRange]) : segmentRowsRaw),
+    [segmentRowsRaw, serasaRowsInRange, shouldIncludeSerasa],
+  );
+
   const segmentRows = useMemo(
-    () => (accumulated ? accumulateDailyDimensionRows(segmentRowsRaw) : segmentRowsRaw),
-    [accumulated, segmentRowsRaw],
+    () => (accumulated ? accumulateDailyDimensionRows(segmentRowsWithSerasa) : segmentRowsWithSerasa),
+    [accumulated, segmentRowsWithSerasa],
   );
   const channelRows = useMemo(
     () => (accumulated ? accumulateDailyDimensionRows(channelRowsRaw) : channelRowsRaw),
@@ -67,6 +87,22 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({ data, selected
         <span className="text-xs text-slate-400">
           {selectedBU ? `BU ${selectedBU} · ` : ''}{dailyTotalsRaw.length} dia{dailyTotalsRaw.length !== 1 ? 's' : ''} no recorte
         </span>
+
+        {!rentabilizacao && serasaRowsInRange.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIncludeSerasa((v) => !v)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors ${
+              includeSerasa
+                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
+            }`}
+            title="Inclui o canal Serasa API (originação B2C integrada, fora do CRM — só Propostas/Emissões/% conversão) como série extra em Segmentos por dia"
+          >
+            <span className={`h-2 w-2 rounded-full ${includeSerasa ? 'bg-blue-600' : 'bg-slate-300'}`} />
+            Serasa API
+          </button>
+        )}
 
         {/* Toggle Diário ↔ Acumulado */}
         <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">

@@ -20,6 +20,7 @@ import {
 import { ColumnsCustomizer } from './ColumnsCustomizer';
 import { NON_STACKABLE_MONTHLY_METRICS } from '../../utils/monthlyAggregation';
 import { DailyDimension, DailyDimensionRow, totalsFromDimensionRows } from '../../utils/dailyAggregation';
+import { SERASA_SEGMENT_LABEL, SERASA_SERIES_COLOR } from '../../utils/serasaAggregation';
 import { useAppStore } from '../../store/useAppStore';
 
 interface DailyStackedBarChartProps {
@@ -97,6 +98,9 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
   }, [activeGlobalValues]);
 
   const handleSeriesClick = (label: string) => {
+    // Serasa API não existe na tabela `activities` — aplicar o filtro global
+    // de segmento nesse label zeraria o resto do app (Overview, Detalhamento).
+    if (label === SERASA_SEGMENT_LABEL) return;
     const isActive = activeGlobalValues.length === 1 && activeGlobalValues[0] === label;
     const next = isActive ? [] : [label];
     if (dimension === 'segmento') {
@@ -253,6 +257,14 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
               3+ tipos de escala selecionados — eixo direito compartilhado (comparação aproximada)
             </span>
           )}
+          {!isMultiMetric && series.includes(SERASA_SEGMENT_LABEL) && (
+            <span
+              className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700"
+              title="Serasa API vem de b2c_daily_metrics (fora do CRM) — só tem Propostas, Emissões e % de conversão própria; as demais métricas ficam em 0 para essa série"
+            >
+              Inclui Serasa API (funil limitado)
+            </span>
+          )}
         </div>
         <div>
           <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
@@ -273,6 +285,24 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
           {Array.from(seriesTotals.entries())
             .sort((a, b) => b[1] - a[1])
             .map(([label, total], idx) => {
+              const isSerasa = label === SERASA_SEGMENT_LABEL;
+              if (isSerasa) {
+                return (
+                  <span
+                    key={`filter-${label}`}
+                    className="text-xs px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 whitespace-nowrap bg-blue-50 text-blue-700 border border-dashed border-blue-300"
+                    title="Serasa API é originação B2C integrada (fora do CRM) — não filtra a visão CRM, e só tem Propostas/Emissões/% conversão (sem funil detalhado)"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: SERASA_SERIES_COLOR }}
+                    />
+                    <span className="truncate">{label}</span>
+                    <span className="text-[11px] opacity-75">({formatChartValue(total, activeMetrics[0])})</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wide opacity-70">API</span>
+                  </span>
+                );
+              }
               const isGloballyActive = activeGlobalValues.includes(label);
               return (
                 <button
@@ -381,7 +411,7 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
                     dataKey={label}
                     yAxisId="left"
                     stackId={isStackable ? 'daily' : undefined}
-                    fill={SERIES_COLORS[index % SERIES_COLORS.length]}
+                    fill={label === SERASA_SEGMENT_LABEL ? SERASA_SERIES_COLOR : SERIES_COLORS[index % SERIES_COLORS.length]}
                     radius={isStackable ? [0, 0, 0, 0] : [4, 4, 0, 0]}
                     maxBarSize={isStackable ? 48 : 28}
                   />
