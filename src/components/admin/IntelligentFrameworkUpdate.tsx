@@ -41,7 +41,7 @@ import {
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
-type CandidateFilter = CandidateStatus | 'update' | 'all';
+type CandidateFilter = 'new_dispatch' | 'update_dispatch' | 'ignore';
 type SourceBlock = 'whatsapp' | 'email' | 'sms' | 'push' | 'performance';
 type UpdateDomain = 'aquisicao' | 'rentabilizacao';
 type UpdateFlow = 'total_crm' | UpdateDomain;
@@ -51,7 +51,7 @@ type ReviewField = TextReviewField | NumericReviewField;
 type SuggestionField = Exclude<ReviewField, 'ordemDisparo'>;
 type ProcessingStage = 'idle' | 'reading' | 'indexing' | 'detecting' | 'reviewing';
 type ReviewMode = 'operation' | 'dimensions' | 'metrics';
-type ReviewSortKey = 'date_desc' | 'action' | 'confidence' | 'moment' | 'sent' | 'cards';
+type ReviewSortKey = 'date_asc' | 'date_desc' | 'action' | 'confidence_asc' | 'confidence_desc' | 'moment' | 'sent' | 'cards';
 
 type SuggestionStat = { count: number; lastUsed?: string };
 type SuggestionBucket = Map<SuggestionField, Map<string, SuggestionStat>>;
@@ -136,6 +136,7 @@ interface UpdateCandidate extends MetricRow {
     fieldToReview: string;
     suggestion: string;
     confidence: number;
+    confidenceBreakdown?: Partial<Record<SuggestionField, number>>;
     basis: string;
     accepted: boolean;
     bu: string;
@@ -154,6 +155,7 @@ interface UpdateCandidate extends MetricRow {
     matchedActivity?: Activity;
     metricRefresh?: boolean;
     canonicalDimensionRefresh?: boolean;
+    auditRequired?: boolean;
     manualOverrides?: ManualOverride[];
 }
 
@@ -166,6 +168,13 @@ const candidateAction = (candidate: UpdateCandidate): 'atualizar' | 'novo' | 'ig
     return candidate.metricRefresh || candidate.matchedActivity ? 'atualizar' : 'novo';
 };
 
+const candidateFilterKey = (candidate: UpdateCandidate): CandidateFilter => {
+    const action = candidateAction(candidate);
+    if (action === 'atualizar') return 'update_dispatch';
+    if (action === 'novo') return 'new_dispatch';
+    return 'ignore';
+};
+
 const ACTION_SORT_ORDER: Record<ReturnType<typeof candidateAction>, number> = {
     atualizar: 0,
     novo: 1,
@@ -173,15 +182,11 @@ const ACTION_SORT_ORDER: Record<ReturnType<typeof candidateAction>, number> = {
 };
 
 const REVIEW_SORT_OPTIONS: Record<ReviewMode, Array<{ key: ReviewSortKey; label: string }>> = {
-    operation: [
-        { key: 'date_desc', label: 'Mais recentes' },
-        { key: 'action', label: 'Ação' },
-        { key: 'confidence', label: 'Confiança' },
-    ],
+    operation: [],
     dimensions: [
         { key: 'moment', label: 'Momento' },
         { key: 'date_desc', label: 'Mais recentes' },
-        { key: 'confidence', label: 'Confiança' },
+        { key: 'confidence_desc', label: 'Confiança' },
     ],
     metrics: [
         { key: 'sent', label: 'Mais envios' },
@@ -358,6 +363,21 @@ const SUGGESTION_FIELDS: SuggestionField[] = [
     'oferta',
     'promocional',
 ];
+
+const CONFIDENCE_WEIGHTS: Record<SuggestionField, number> = {
+    bu: 15,
+    parceiro: 20,
+    segmento: 20,
+    etapaAquisicao: 20,
+    produto: 10,
+    subgrupo: 4,
+    perfilCredito: 4,
+    oferta: 4,
+    promocional: 3,
+};
+
+const BLOCKING_CONFIDENCE_FIELDS: SuggestionField[] = ['bu', 'parceiro', 'segmento', 'etapaAquisicao'];
+const BULK_APPROVAL_CONFIDENCE = 90;
 
 const REVIEW_PAGE_SIZE = 100;
 
@@ -905,6 +925,26 @@ const suggestionsFor = (
     field: SuggestionField
 ) => suggestions?.[field] ?? [];
 
+const calculateCandidateConfidence = (
+    suggestions: Partial<Record<SuggestionField, FieldSuggestion[]>>
+) => {
+    const breakdown = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, number>>>((result, field) => {
+        result[field] = suggestionsFor(suggestions, field)[0]?.confidence ?? 0;
+        return result;
+    }, {});
+    const confidence = Math.round(SUGGESTION_FIELDS.reduce(
+        (sum, field) => sum + (breakdown[field] ?? 0) * CONFIDENCE_WEIGHTS[field] / 100,
+        0
+    ));
+    return { confidence, breakdown };
+};
+
+const isBulkApprovalEligible = (candidate: UpdateCandidate) =>
+    canUploadCandidate(candidate)
+    && !candidate.auditRequired
+    && candidate.confidence >= BULK_APPROVAL_CONFIDENCE
+    && BLOCKING_CONFIDENCE_FIELDS.every((field) => (candidate.confidenceBreakdown?.[field] ?? 0) >= BULK_APPROVAL_CONFIDENCE);
+
 const createBucket = (): SuggestionBucket =>
     SUGGESTION_FIELDS.reduce<SuggestionBucket>((bucket, field) => {
         bucket.set(field, new Map<string, SuggestionStat>());
@@ -1033,10 +1073,14 @@ const suggestAllFields = (
     const result: Partial<Record<SuggestionField, FieldSuggestion[]>> = {};
     for (const field of SUGGESTION_FIELDS) {
         const deterministic = inferDeterministicDimensions(metric);
-        const deterministicValue = field === 'parceiro'
-            ? deterministic.parceiro
+        const deterministicValue = field === 'bu'
+            ? taxonomy.bu
+            : field === 'produto'
+                ? 'Cartao'
+                : field === 'parceiro'
+                    ? deterministic.parceiro || taxonomy.parceiro
             : field === 'segmento'
-                ? deterministic.segmento
+                ? deterministic.segmento || taxonomy.segmento
                 : field === 'etapaAquisicao'
                     ? deterministic.etapaAquisicao
                     : undefined;
@@ -1274,10 +1318,11 @@ const buildCandidate = (
     const fieldSuggestions = suggestAllFields(metric, historyIndex);
 
     const valueFor = (field: SuggestionField, fallback: string) => suggestionsFor(fieldSuggestions, field)[0]?.value || fallback;
-    const confidences = SUGGESTION_FIELDS
-        .filter((field) => !['bu', 'segmento', 'produto'].includes(field))
-        .map((field) => suggestionsFor(fieldSuggestions, field)[0]?.confidence ?? 0);
-    const averageConfidence = Math.round(confidences.reduce((sum, value) => sum + value, 0) / confidences.length);
+    const weightedConfidence = calculateCandidateConfidence(fieldSuggestions);
+    const averageConfidence = weightedConfidence.confidence;
+    const blockingFieldsReady = BLOCKING_CONFIDENCE_FIELDS.every(
+        (field) => (weightedConfidence.breakdown[field] ?? 0) >= BULK_APPROVAL_CONFIDENCE
+    );
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     const importedJourneys = importedSignatureJourneys.get(metric.dispatchSignature) ?? new Set<string>();
     const historicalSignatureMatches = historyIndex.byDispatchSignature.get(metric.dispatchSignature) ?? [];
@@ -1378,7 +1423,7 @@ const buildCandidate = (
                         // BP/Base Propria e deterministico (taxonomia forca BU/Parceiro/Segmento);
                         // com todos os campos humanos cobertos pelo historico, vira Pronto mesmo
                         // sem historico de mesma-jornada (que e o unico que ultrapassa 80%).
-                        : (averageConfidence >= 80 || hasDeterministicBasePropria)
+                        : ((averageConfidence >= BULK_APPROVAL_CONFIDENCE && blockingFieldsReady) || hasDeterministicBasePropria)
                             ? 'ready'
                             : 'review';
 
@@ -1423,6 +1468,9 @@ const buildCandidate = (
         confidence: hasMetricRefresh
             ? 100
             : missingCritical || duplicateCount > 1 || fileSuperseded || fileAmbiguous || existsInBase ? 0 : averageConfidence,
+        confidenceBreakdown: hasMetricRefresh
+            ? SUGGESTION_FIELDS.reduce((result, field) => ({ ...result, [field]: 100 }), {})
+            : weightedConfidence.breakdown,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
             : duplicateCount > 1
@@ -1465,6 +1513,7 @@ const buildCandidate = (
         // aparecer no rotulo/filtro "Atualizar metricas", mesmo que as metricas tenham mudado.
         metricRefresh: hasMetricRefresh && !fileSuperseded && !fileAmbiguous,
         canonicalDimensionRefresh: hasCanonicalDimensionRefresh && !fileSuperseded && !fileAmbiguous,
+        auditRequired: renamedJourneyMatch,
         conflictReason: fileSuperseded
             ? 'superseded_file_journey'
             : fileAmbiguous
@@ -2986,7 +3035,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [result, setResult] = useState<ProcessResult | null>(null);
     const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
-    const [statusFilter, setStatusFilter] = useState<CandidateFilter>('all');
+    const [statusFilter, setStatusFilter] = useState<CandidateFilter>('new_dispatch');
     const [processing, setProcessing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -3070,10 +3119,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             ? [reviewEndDate, reviewStartDate]
             : [reviewStartDate, reviewEndDate];
         return candidates.filter((candidate) => {
-            const statusMatches = statusFilter === 'all'
-                || (statusFilter === 'update' && candidate.metricRefresh)
-                || (statusFilter === 'ready' && candidate.status === 'ready' && !candidate.metricRefresh)
-                || (statusFilter !== 'update' && statusFilter !== 'ready' && candidate.status === statusFilter);
+            const statusMatches = candidateFilterKey(candidate) === statusFilter;
             if (!statusMatches) return false;
             if (periodStart && candidate.date < periodStart) return false;
             if (periodEnd && candidate.date > periodEnd) return false;
@@ -3096,9 +3142,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const sortedCandidates = useMemo(() => {
         const sortKey = reviewSortByMode[reviewMode];
         const valueFor = (candidate: UpdateCandidate): string | number => {
-            if (sortKey === 'date_desc') return candidate.date;
+            if (sortKey === 'date_desc' || sortKey === 'date_asc') return candidate.date;
             if (sortKey === 'action') return ACTION_SORT_ORDER[candidateAction(candidate)];
-            if (sortKey === 'confidence') return candidate.confidence;
+            if (sortKey === 'confidence_asc' || sortKey === 'confidence_desc') return candidate.confidence;
             if (sortKey === 'moment') {
                 const moment = momentChipsFor(candidate);
                 return moment.seq || `D${candidate.ordemDisparo ?? 9999}`;
@@ -3111,17 +3157,27 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             const leftValue = valueFor(left);
             const rightValue = valueFor(right);
             if (typeof leftValue === 'number' && typeof rightValue === 'number') {
-                const direction = sortKey === 'action' || sortKey === 'moment' ? 1 : -1;
+                const direction = sortKey === 'action' || sortKey === 'moment' || sortKey === 'date_asc' || sortKey === 'confidence_asc' ? 1 : -1;
                 const diff = leftValue - rightValue;
                 if (diff !== 0) return diff * direction;
             } else {
-                const direction = sortKey === 'date_desc' ? -1 : 1;
+                const direction = sortKey === 'date_desc' || sortKey === 'confidence_desc' ? -1 : 1;
                 const diff = String(leftValue).localeCompare(String(rightValue), 'pt-BR', { numeric: true });
                 if (diff !== 0) return diff * direction;
             }
             return right.confidence - left.confidence || right.date.localeCompare(left.date);
         });
     }, [filteredCandidates, reviewMode, reviewSortByMode]);
+    const toggleOperationSort = (column: 'date' | 'confidence') => {
+        setReviewSortByMode((current) => {
+            const active = current.operation;
+            const next: ReviewSortKey = column === 'date'
+                ? active === 'date_desc' ? 'date_asc' : 'date_desc'
+                : active === 'confidence_desc' ? 'confidence_asc' : 'confidence_desc';
+            return { ...current, operation: next };
+        });
+        setReviewPage(1);
+    };
     const reviewPageCount = Math.max(1, Math.ceil(sortedCandidates.length / REVIEW_PAGE_SIZE));
     const pagedCandidates = useMemo(() => {
         const safePage = Math.min(reviewPage, reviewPageCount);
@@ -3270,7 +3326,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setResult(processed);
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewPage(1);
-            setStatusFilter('all');
+            setStatusFilter('new_dispatch');
             setSelectedKeys(new Set());
             setReviewOpen(true);
         } catch (error: any) {
@@ -3421,7 +3477,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
-                candidate.confidence >= 80 && canUploadCandidate(candidate)
+                isBulkApprovalEligible(candidate)
                     ? { ...applyApprovalDefaults(candidate), accepted: true }
                     : candidate
             );
@@ -4014,7 +4070,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         </button>
                                     ))}
                                 </div>
-                                <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                                {reviewMode !== 'operation' && <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
                                     <span className="px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Ordenar</span>
                                     {REVIEW_SORT_OPTIONS[reviewMode].map((option) => (
                                         <button
@@ -4033,7 +4089,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                             {option.label}
                                         </button>
                                     ))}
-                                </div>
+                                </div>}
                                 <div className="flex flex-wrap gap-2 text-[10px]">
                                     {Object.entries(result.insights.originCounts).map(([origin, count]) => (
                                         <span key={origin} className="rounded-full border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-600">
@@ -4043,7 +4099,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {(['all', 'update', 'ready', 'review', 'new', 'conflict', 'duplicate', 'error', 'ignored'] as const).map((status) => (
+                                {([
+                                    ['new_dispatch', 'Novos disparos'],
+                                    ['update_dispatch', 'Disparos com atualização'],
+                                    ['ignore', 'Ignorar'],
+                                ] as const).map(([status, label]) => (
                                     <button
                                         key={status}
                                         type="button"
@@ -4057,7 +4117,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                                         }`}
                                     >
-                                        {status === 'all' ? 'Todos' : status === 'update' ? 'Atualizar metricas' : STATUS_LABEL[status]}
+                                        {label}
                                     </button>
                                 ))}
                             </div>
@@ -4166,10 +4226,20 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <tr>
                                         <th className="w-10 px-3 py-3 font-bold">Sel.</th>
                                         <th className="w-24 px-3 py-3 font-bold">Status</th>
-                                        <th className="w-[32%] px-3 py-3 font-bold">Disparo</th>
+                                        <th className="w-[25%] px-3 py-3 font-bold">Disparo</th>
                                         {reviewMode === 'operation' && <>
-                                            <th className="w-[31%] px-3 py-3 font-bold">Classificação</th>
-                                            <th className="w-[18%] px-3 py-3 font-bold">Decisao</th>
+                                            <th className="w-28 px-3 py-3 font-bold">
+                                                <button type="button" onClick={() => toggleOperationSort('date')} className="inline-flex items-center gap-1 hover:text-cyan-700">
+                                                    Data do disparo {reviewSortByMode.operation === 'date_asc' ? '↑' : reviewSortByMode.operation === 'date_desc' ? '↓' : '↕'}
+                                                </button>
+                                            </th>
+                                            <th className="w-[26%] px-3 py-3 font-bold">Classificação</th>
+                                            <th className="w-[16%] px-3 py-3 font-bold">Decisão</th>
+                                            <th className="w-24 px-3 py-3 font-bold">
+                                                <button type="button" onClick={() => toggleOperationSort('confidence')} className="inline-flex items-center gap-1 hover:text-cyan-700">
+                                                    Confiança {reviewSortByMode.operation === 'confidence_asc' ? '↑' : reviewSortByMode.operation === 'confidence_desc' ? '↓' : '↕'}
+                                                </button>
+                                            </th>
                                         </>}
                                         {reviewMode === 'dimensions' && <>
                                             <th className="w-[38%] px-3 py-3 font-bold">Dimensões</th>
@@ -4218,12 +4288,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 </div>
                                                 <div className="truncate font-semibold text-slate-900" title={candidate.journey}>{candidate.journey}</div>
                                                 <div className="mt-1 truncate text-slate-500" title={candidate.activityName}>{candidate.activityName}</div>
-                                                <div className="mt-2 flex gap-2 text-[10px] font-bold text-slate-500">
-                                                    <span>{candidate.channel}</span>
-                                                    <span>{formatDateBR(candidate.date)}</span>
-                                                </div>
+                                                <div className="mt-2 text-[10px] font-bold text-slate-500">{candidate.channel}</div>
                                             </td>
                                             {reviewMode === 'operation' && <>
+                                                <td className="px-3 py-3 align-top font-semibold text-slate-700">{formatDateBR(candidate.date)}</td>
                                                 <td className="px-3 py-3 align-top">
                                                     <div className="font-semibold text-slate-800">{candidate.bu} · {candidate.parceiro} · {candidate.segmento}</div>
                                                     <div className="mt-1 text-[11px] text-slate-500">{candidate.subgrupo} · {candidate.etapaAquisicao} · {candidate.perfilCredito}</div>
@@ -4235,6 +4303,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                                 <td className="px-3 py-3 align-top">
                                                     <div className="font-bold text-slate-800">{candidate.fieldToReview}</div>
                                                     <div className="mt-1 line-clamp-2 text-[10px] text-slate-500">{candidate.suggestion}</div>
+                                                </td>
+                                                <td className="px-3 py-3 align-top">
+                                                    <div className="font-bold text-slate-800">{candidate.confidence}%</div>
+                                                    <div className="mt-1 text-[10px] text-slate-500">
+                                                        {candidate.auditRequired ? 'Auditoria obrigatória' : isBulkApprovalEligible(candidate) ? 'Elegível em lote' : 'Requer validação'}
+                                                    </div>
                                                 </td>
                                             </>}
                                             {reviewMode === 'dimensions' && <>

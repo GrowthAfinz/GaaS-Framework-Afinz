@@ -55,6 +55,7 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     conflictReason?: string;
     metricRefresh?: boolean;
     canonicalDimensionRefresh?: boolean;
+    auditRequired?: boolean;
     manualOverrides?: Array<{
         field: string;
         previousValue?: string | number;
@@ -63,6 +64,47 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
         changedAt: string;
     }>;
 }
+
+const journeyFamily = (journey: string) => journey
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\b(JAN|FEV|MAR|ABR|ABRI|MAI|MAIO|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\d{0,4}\b/g, '*')
+    .replace(/\bSEMANA\s*\d+(?:\.\d+)?\b/g, 'SEMANA*')
+    .replace(/\s+/g, '_');
+
+const persistLearningDecisions = async (
+    runId: string,
+    candidates: IntelligentUpdateCandidatePayload[]
+) => {
+    const rows = candidates.flatMap((candidate) => {
+        const common = {
+            run_id: runId,
+            candidate_fingerprint: candidate.dispatchSignature || candidate.key,
+            journey_family: journeyFamily(candidate.journey),
+        };
+        const manualRows = (candidate.manualOverrides ?? []).map((override) => ({
+            ...common,
+            field: override.field,
+            previous_value: override.previousValue == null ? null : String(override.previousValue),
+            chosen_value: override.nextValue == null ? null : String(override.nextValue),
+            reason: 'Correcao humana no importador inteligente',
+            decision_type: 'manual_override',
+        }));
+        const renameRows = candidate.auditRequired && candidate.accepted ? [{
+            ...common,
+            field: 'jornada',
+            previous_value: candidate.matchedActivity?.jornada ?? null,
+            chosen_value: candidate.journey,
+            reason: 'Renomeacao de jornada auditada; nome novo do arquivo substitui o historico',
+            decision_type: 'journey_rename',
+        }] : [];
+        return [...manualRows, ...renameRows];
+    });
+    if (rows.length === 0) return;
+    const { error } = await supabase.from('gaas_import_decisions').insert(rows);
+    if (error) throw error;
+};
 
 export interface IntelligentUpdateRunPayload {
     domain: UpdateFlow;
@@ -638,6 +680,8 @@ export const intelligentUpdateService = {
             .eq('id', run.id);
 
         if (updateRunError) throw updateRunError;
+
+        await persistLearningDecisions(run.id, payload.candidates);
 
         return {
             runId: run.id,
