@@ -17,18 +17,14 @@ import {
     AlertTriangle,
     ArrowRight,
     BarChart3,
-    CalendarClock,
-    CheckCircle2,
     ChevronDown,
+    ChevronRight,
     ChevronUp,
+    CheckCircle2,
     FilterX,
-    Flag,
-    Gauge,
-    Goal,
-    Layers3,
+    Info,
     Search,
-    Table2,
-    Target
+    Table2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { DailyDetailsModal } from './jornada/DailyDetailsModal';
@@ -76,59 +72,27 @@ const statusLabels = {
     risk: 'Abaixo do ritmo'
 };
 
-const deltaClasses: Record<DeltaTone, string> = {
-    positive: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    negative: 'bg-red-50 text-red-700 border-red-200',
-    neutral: 'bg-slate-50 text-slate-600 border-slate-200'
+const deltaTextClasses: Record<DeltaTone, string> = {
+    positive: 'text-emerald-600',
+    negative: 'text-red-600',
+    neutral: 'text-slate-400'
 };
 
 const cardBase =
     'rounded-2xl border border-slate-200 bg-white shadow-[0_10px_40px_rgba(15,23,42,0.04)]';
 
-const MetricTile: React.FC<{ label: string; value: string; helper: string }> = ({ label, value, helper }) => (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-        <p className="mt-2 font-mono text-3xl font-semibold text-slate-950">{value}</p>
-        <p className="mt-1 text-xs text-slate-500">{helper}</p>
-    </div>
-);
-
-const IntelligenceMetricTile: React.FC<{
+const StatChip: React.FC<{
     label: string;
     value: string;
-    helper: string;
     deltaLabel?: string | null;
     deltaTone?: DeltaTone;
-}> = ({ label, value, helper, deltaLabel, deltaTone = 'neutral' }) => (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-        <div className="flex items-start justify-between gap-3">
-            <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-                <p className="mt-3 font-mono text-3xl font-semibold text-slate-950">{value}</p>
-            </div>
-            {deltaLabel ? (
-                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${deltaClasses[deltaTone]}`}>
-                    {deltaLabel}
-                </span>
-            ) : null}
-        </div>
-        <p className="mt-2 text-sm text-slate-500">{helper}</p>
-    </div>
-);
-
-const DetailMetric: React.FC<{
-    icon: React.ReactNode;
-    label: string;
-    value: string;
-    helper?: string;
-}> = ({ icon, label, value, helper }) => (
-    <div className="rounded-xl border border-slate-200 p-4">
-        <div className="flex items-center gap-2 text-slate-500">
-            {icon}
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{label}</span>
-        </div>
-        <p className="mt-3 font-mono text-2xl font-semibold text-slate-900">{value}</p>
-        {helper ? <p className="mt-1 text-xs text-slate-500">{helper}</p> : null}
+}> = ({ label, value, deltaLabel, deltaTone = 'neutral' }) => (
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center">
+        <p className="font-mono text-lg font-semibold text-slate-950">{value}</p>
+        <p className="mt-1 text-[11px] font-medium text-slate-500">{label}</p>
+        {deltaLabel ? (
+            <p className={`mt-1 text-[10px] font-semibold ${deltaTextClasses[deltaTone]}`}>{deltaLabel}</p>
+        ) : null}
     </div>
 );
 
@@ -147,13 +111,6 @@ const CompositionLegend: React.FC<{ label: string; value: number; color: string;
             <p className="font-mono text-sm font-semibold text-slate-900">{formatInt(value)}</p>
             <p className="text-xs text-slate-500">{formatPct(share)}</p>
         </div>
-    </div>
-);
-
-const OpportunityItem: React.FC<{ title: string; description: string }> = ({ title, description }) => (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-        <p className="mt-1 text-sm text-slate-600">{description}</p>
     </div>
 );
 
@@ -184,6 +141,8 @@ export const OriginacaoB2CView: React.FC = () => {
     const [showValidacao, setShowValidacao] = useState(false);
     const [showObservacoes, setShowObservacoes] = useState(false);
     const [showCrmBreakdown, setShowCrmBreakdown] = useState(false);
+    const [showTable, setShowTable] = useState(false);
+    const [expandedOpportunity, setExpandedOpportunity] = useState<string | null>(null);
 
     const compositionData = useMemo(
         () => [
@@ -322,21 +281,24 @@ export const OriginacaoB2CView: React.FC = () => {
         return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     }, [dashboardSummary.monthKey]);
 
+    const isReconciliationOk = reconciliation.status === 'ok';
+
     return (
         <div className="flex flex-col gap-6 bg-slate-50 p-6">
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                     <BarChart3 className="text-blue-600 shrink-0" size={22} />
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Originação B2C</h1>
-                            <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 capitalize whitespace-nowrap">
-                                Meta: {ptBrMonthLabel}
-                            </span>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-500 truncate">
-                            Total B2C como verdade absoluta — CRM, Serasa e Outros como vetores explicativos.
-                        </p>
+                    <div className="min-w-0 flex items-center gap-2">
+                        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Originação B2C</h1>
+                        <span className="hidden sm:inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-500 capitalize whitespace-nowrap">
+                            Meta: {ptBrMonthLabel}
+                        </span>
+                        <span
+                            title="Total B2C como verdade absoluta — CRM, Serasa e Outros como vetores explicativos."
+                            className="inline-flex shrink-0 cursor-help text-slate-400 hover:text-slate-600"
+                        >
+                            <Info size={15} />
+                        </span>
                     </div>
                 </div>
 
@@ -350,111 +312,95 @@ export const OriginacaoB2CView: React.FC = () => {
                 </button>
             </div>
 
-            <section className={`${cardBase} p-6`}>
-                <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Inteligência CRM vs Total B2C
+            <section className={`${cardBase} p-5`}>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div
+                        className={`flex flex-1 items-start gap-3 rounded-xl border px-4 py-3 ${isReconciliationOk ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'
+                            }`}
+                    >
+                        {isReconciliationOk ? (
+                            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                        ) : (
+                            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                        )}
+                        <p className={`text-sm leading-relaxed ${isReconciliationOk ? 'text-emerald-800' : 'text-amber-800'}`}>
+                            {headline}
                         </p>
-                        <h2 className="mt-2 text-xl font-semibold text-slate-950">
-                            Leitura executiva da participação do CRM
-                        </h2>
-                        <p className="mt-2 max-w-4xl text-sm text-slate-600">{headline}</p>
                     </div>
-
-                    <div className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${reconciliation.status === 'ok'
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        : 'border-red-200 bg-red-50 text-red-700'
-                        }`}>
-                        {reconciliation.status === 'ok' ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-                        {reconciliation.status === 'ok'
-                            ? 'Reconciliação consistente'
-                            : `${reconciliation.inconsistentDays} dias divergentes`}
-                    </div>
+                    <p className="shrink-0 text-xs text-slate-500 lg:text-right">
+                        <span className="font-semibold text-slate-700">{reconciliation.consistentDays}</span> dias ok
+                        {reconciliation.inconsistentDays > 0 && (
+                            <>
+                                {' · '}
+                                <span className="font-semibold text-amber-600">{reconciliation.inconsistentDays}</span> divergentes
+                            </>
+                        )}
+                    </p>
                 </div>
 
-                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <IntelligenceMetricTile
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                    <StatChip
                         label="Total B2C"
                         value={comparisonSummary ? formatInt(comparisonSummary.emissoes_b2c_total) : '0'}
-                        helper="Verdade absoluta de fechamento no período"
-                        deltaLabel={totalB2CDelta !== null ? `${totalB2CDelta >= 0 ? '+' : ''}${totalB2CDelta.toFixed(1)}%` : 'Sem baseline'}
+                        deltaLabel={totalB2CDelta !== null ? `${totalB2CDelta >= 0 ? '+' : ''}${totalB2CDelta.toFixed(1)}%` : null}
                         deltaTone={totalB2CDelta === null ? 'neutral' : totalB2CDelta >= 0 ? 'positive' : 'negative'}
                     />
-                    <IntelligenceMetricTile
+                    <StatChip
                         label="Share CRM"
                         value={comparisonSummary ? formatPct(comparisonSummary.share_crm_media) : '0.0%'}
-                        helper="Participação do CRM sobre o Total B2C"
                         deltaLabel={formatSignedPp(shareDelta)}
                         deltaTone={shareDelta === null ? 'neutral' : shareDelta >= 0 ? 'positive' : 'negative'}
                     />
-                    <IntelligenceMetricTile
+                    <StatChip
                         label="Cartões CRM"
                         value={comparisonSummary ? formatInt(comparisonSummary.emissoes_crm_total) : '0'}
-                        helper="Resultado framework validado contra o Total B2C"
-                        deltaLabel={crmCardsDelta !== null ? `${crmCardsDelta >= 0 ? '+' : ''}${crmCardsDelta.toFixed(1)}%` : 'Sem baseline'}
+                        deltaLabel={crmCardsDelta !== null ? `${crmCardsDelta >= 0 ? '+' : ''}${crmCardsDelta.toFixed(1)}%` : null}
                         deltaTone={crmCardsDelta === null ? 'neutral' : crmCardsDelta >= 0 ? 'positive' : 'negative'}
                     />
-                    <IntelligenceMetricTile
-                        label="Cartões Serasa API"
-                        value={formatInt(vectors.serasaCards)}
-                        helper="Resultado marketplace Serasa no período"
-                    />
-                    <IntelligenceMetricTile
-                        label="Outros B2C"
-                        value={formatInt(vectors.otherCards)}
-                        helper="Residual explícito: Total B2C - CRM - Serasa"
-                    />
-                    <IntelligenceMetricTile
+                    <StatChip label="Cartões Serasa API" value={formatInt(vectors.serasaCards)} />
+                    <StatChip label="Outros B2C" value={formatInt(vectors.otherCards)} />
+                    <StatChip
                         label="CAC CRM"
                         value={comparisonSummary ? `R$ ${comparisonSummary.cac_medio.toFixed(2)}` : 'R$ 0,00'}
-                        helper="Custo total CRM por cartão gerado"
-                        deltaLabel={cacDelta !== null ? `${cacDelta >= 0 ? '+' : ''}${cacDelta.toFixed(1)}%` : 'Sem baseline'}
+                        deltaLabel={cacDelta !== null ? `${cacDelta >= 0 ? '+' : ''}${cacDelta.toFixed(1)}%` : null}
                         deltaTone={cacDelta === null ? 'neutral' : cacDelta <= 0 ? 'positive' : 'negative'}
                     />
                 </div>
 
-                <div className="mt-5 grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
-                        <div className="flex items-center gap-2 text-slate-700">
-                            <Target size={16} className="text-indigo-600" />
-                            <p className="text-sm font-semibold">Validação do período</p>
-                        </div>
-                        <div className="mt-4 space-y-3 text-sm text-slate-600">
-                            <p><span className="font-medium text-slate-900">{reconciliation.consistentDays}</span> dias consistentes.</p>
-                            <p><span className="font-medium text-slate-900">{reconciliation.inconsistentDays}</span> dias com divergência.</p>
-                            <p>
-                                Pior desvio observado:{' '}
-                                <span className="font-medium text-slate-900">
-                                    {reconciliation.maxNegativeVariance < 0 ? formatInt(Math.abs(reconciliation.maxNegativeVariance)) : '0'}
-                                </span>{' '}
-                                cartões.
-                            </p>
-                        </div>
+                {opportunities.length > 0 && (
+                    <div className="mt-4 divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                        {opportunities.map((opportunity) => {
+                            const isOpen = expandedOpportunity === opportunity.id;
+                            return (
+                                <div key={opportunity.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setExpandedOpportunity(isOpen ? null : opportunity.id)}
+                                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition hover:bg-slate-50"
+                                    >
+                                        <AlertTriangle size={13} className="shrink-0 text-amber-500" />
+                                        <span className="flex-1 text-xs font-medium text-slate-700">{opportunity.title}</span>
+                                        <ChevronRight
+                                            size={13}
+                                            className={`shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                                        />
+                                    </button>
+                                    {isOpen && (
+                                        <p className="bg-slate-50/60 px-4 pb-3 pt-1 text-xs text-slate-500">
+                                            {opportunity.description}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
-
-                    <div className="grid gap-3 md:grid-cols-3">
-                        {opportunities.map((opportunity) => (
-                            <OpportunityItem
-                                key={opportunity.id}
-                                title={opportunity.title}
-                                description={opportunity.description}
-                            />
-                        ))}
-                    </div>
-                </div>
+                )}
             </section>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_390px]">
                 <section className={`${cardBase} p-6`}>
-                    <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Meta & ritmo</p>
-                            <h2 className="mt-2 text-xl font-semibold text-slate-950">Pacing do Total B2C</h2>
-                            <p className="mt-1 text-sm text-slate-500">
-                                O pacing continua existindo, mas como camada contextual da leitura analítica.
-                            </p>
-                        </div>
+                    <div className="flex items-center justify-between gap-4 pb-4">
+                        <h2 className="text-lg font-semibold text-slate-950">Pacing do Total B2C</h2>
                         <span
                             className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusStyles[dashboardSummary.paceStatus]}`}
                         >
@@ -462,50 +408,39 @@ export const OriginacaoB2CView: React.FC = () => {
                         </span>
                     </div>
 
-                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                        <MetricTile label="Realizado" value={formatInt(dashboardSummary.realizedCards)} helper="Cartões acumulados no mês" />
-                        <MetricTile label="Meta" value={formatInt(dashboardSummary.metaCards)} helper="Meta mensal centralizada" />
-                        <MetricTile label="Atingimento" value={formatPct(dashboardSummary.attainmentPct)} helper="Realizado / meta" />
-                        <MetricTile label="Projeção" value={formatInt(Math.round(dashboardSummary.projectionBusinessDays))} helper="Fechamento por dia útil" />
-                        <MetricTile label="Gap" value={formatInt(Math.round(dashboardSummary.gapToMeta))} helper="Meta - realizado" />
+                    <div>
+                        <div className="mb-1.5 flex items-center justify-between text-xs text-slate-500">
+                            <span>Realizado</span>
+                            <span>
+                                {formatInt(dashboardSummary.realizedCards)} / {formatInt(dashboardSummary.metaCards)}{' '}
+                                · {formatPct(dashboardSummary.attainmentPct)}
+                            </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div
+                                className="h-full rounded-full bg-blue-600"
+                                style={{ width: `${Math.min(100, Math.max(0, dashboardSummary.attainmentPct))}%` }}
+                            />
+                        </div>
                     </div>
 
-                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <DetailMetric
-                            icon={<CalendarClock size={14} />}
+                    <div className="mt-5 grid gap-3 grid-cols-2 md:grid-cols-4">
+                        <StatChip
                             label="Dias úteis"
                             value={`${dashboardSummary.businessDaysElapsed}/${dashboardSummary.businessDaysInMonth}`}
-                            helper={`${dashboardSummary.remainingBusinessDays} restantes`}
                         />
-                        <DetailMetric
-                            icon={<Flag size={14} />}
-                            label="Esperado até hoje"
-                            value={formatInt(Math.round(dashboardSummary.expectedCardsToDate))}
-                            helper="Meta acumulada ideal"
-                        />
-                        <DetailMetric
-                            icon={<Gauge size={14} />}
+                        <StatChip label="Projeção" value={formatInt(Math.round(dashboardSummary.projectionBusinessDays))} />
+                        <StatChip label="Gap" value={formatInt(Math.round(dashboardSummary.gapToMeta))} />
+                        <StatChip
                             label="Desvio atual"
                             value={`${dashboardSummary.paceDeltaCards >= 0 ? '+' : ''}${formatInt(Math.round(dashboardSummary.paceDeltaCards))}`}
-                            helper="Realizado - esperado"
-                        />
-                        <DetailMetric
-                            icon={<Goal size={14} />}
-                            label="Proj. dia corrido"
-                            value={formatInt(Math.round(dashboardSummary.projectionCalendarDays))}
-                            helper={`${dashboardSummary.calendarDaysElapsed}/${dashboardSummary.calendarDaysInMonth} dias corridos`}
+                            deltaTone={dashboardSummary.paceDeltaCards >= 0 ? 'positive' : 'negative'}
                         />
                     </div>
                 </section>
 
                 <aside className={`${cardBase} p-6`}>
-                    <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Composição validada</p>
-                        <h2 className="mt-2 text-xl font-semibold text-slate-950">Quem carregou o Total B2C</h2>
-                        <p className="mt-1 text-sm text-slate-500">
-                            CRM, Serasa e Outros são vetores explicativos validados contra o Total B2C.
-                        </p>
-                    </div>
+                    <h2 className="text-lg font-semibold text-slate-950">Quem carregou o Total B2C</h2>
 
                     <div className="mt-4 h-[240px]">
                         <ResponsiveContainer width="100%" height="100%">
@@ -556,11 +491,10 @@ export const OriginacaoB2CView: React.FC = () => {
                                             type="button"
                                             onClick={() => setShowCrmBreakdown((v) => !v)}
                                             title={showCrmBreakdown ? 'Fechar breakdown' : 'Ver por segmento'}
-                                            className={`rounded-lg border p-1.5 transition ${
-                                                showCrmBreakdown
+                                            className={`rounded-lg border p-1.5 transition ${showCrmBreakdown
                                                     ? 'border-teal-200 bg-teal-50 text-teal-600'
                                                     : 'border-slate-200 bg-slate-50 text-slate-400 hover:text-slate-600'
-                                            }`}
+                                                }`}
                                         >
                                             {showCrmBreakdown ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                                         </button>
@@ -608,16 +542,10 @@ export const OriginacaoB2CView: React.FC = () => {
             </div>
 
             <section className={`${cardBase} p-6`}>
-                <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Diagnóstico CRM vs Total B2C</p>
-                        <h2 className="mt-2 text-xl font-semibold text-slate-950">Evolução, share, conversão e CAC do CRM</h2>
-                        <p className="mt-1 text-sm text-slate-500">
-                            Recupera a leitura comparativa da aba com base no framework e no Total B2C.
-                        </p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                        Limiar atual de anomalia de share CRM: {formatPct(alertConfig.share_crm_limiar)}
+                <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
+                    <h2 className="text-lg font-semibold text-slate-950">Evolução, share, conversão e CAC do CRM</h2>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                        Limiar de anomalia de share CRM: {formatPct(alertConfig.share_crm_limiar)}
                     </div>
                 </div>
 
@@ -632,14 +560,8 @@ export const OriginacaoB2CView: React.FC = () => {
             </section>
 
             <section className={`${cardBase} p-6`}>
-                <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Operação diária</p>
-                        <h2 className="mt-2 text-xl font-semibold text-slate-950">Propostas, cartões e meta acumulada</h2>
-                        <p className="mt-1 text-sm text-slate-500">
-                            Visão operacional do fechamento, mantendo o pacing como prova e não como substituto da inteligência.
-                        </p>
-                    </div>
+                <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-center lg:justify-between">
+                    <h2 className="text-lg font-semibold text-slate-950">Propostas, cartões e meta acumulada</h2>
 
                     <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
                         {(['accumulated', 'daily'] as const).map((mode) => (
@@ -704,178 +626,192 @@ export const OriginacaoB2CView: React.FC = () => {
             </section>
 
             <section className={`${cardBase} overflow-hidden`}>
-                <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Tabela diária reconciliada</p>
-                        <h2 className="mt-2 text-xl font-semibold text-slate-950">Diário operacional com validação contra o Total B2C</h2>
-                    </div>
+                <button
+                    type="button"
+                    onClick={() => setShowTable((v) => !v)}
+                    className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left transition hover:bg-slate-50"
+                >
                     <div className="flex items-center gap-2">
-                        {/* Toggle Validação */}
-                        <button
-                            type="button"
-                            onClick={() => setShowValidacao((v) => !v)}
-                            title={showValidacao ? 'Ocultar coluna de validação' : 'Mostrar coluna de validação'}
-                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                                showValidacao
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                    : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
-                            }`}
-                        >
-                            <CheckCircle2 size={13} />
-                            {showValidacao ? 'Ocultar validação' : 'Validação'}
-                        </button>
-                        {/* Toggle Observações */}
-                        <button
-                            type="button"
-                            onClick={() => setShowObservacoes((v) => !v)}
-                            title={showObservacoes ? 'Ocultar coluna de observações' : 'Mostrar coluna de observações'}
-                            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
-                                showObservacoes
-                                    ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
-                                    : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
-                            }`}
-                        >
-                            <Flag size={13} />
-                            {showObservacoes ? 'Ocultar obs.' : 'Observações'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleExport}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
-                        >
-                            <Table2 size={16} />
-                            Exportar diário
-                        </button>
-                    </div>
-                </div>
-
-                {/* Barra de filtros */}
-                <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Busca em observações */}
-                        <div className="relative min-w-[220px] flex-1 max-w-sm">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                value={obsFilter}
-                                onChange={(e) => setObsFilter(e.target.value)}
-                                placeholder="Buscar em observações..."
-                                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                            />
-                        </div>
-                        {/* Filtro de validação */}
-                        <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
-                            {(['all', 'ok', 'divergente'] as const).map((opt) => (
-                                <button
-                                    key={opt}
-                                    type="button"
-                                    onClick={() => setValidacaoFilter(opt)}
-                                    className={`rounded-md px-3 py-1 text-[11px] font-semibold transition ${
-                                        validacaoFilter === opt
-                                            ? opt === 'ok'
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : opt === 'divergente'
-                                                    ? 'bg-red-100 text-red-700'
-                                                    : 'bg-slate-200 text-slate-700'
-                                            : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                                >
-                                    {opt === 'all' ? 'Todos' : opt === 'ok' ? '✓ OK' : '⚠ Divergente'}
-                                </button>
-                            ))}
-                        </div>
-                        {/* Limpar filtros */}
-                        {hasActiveFilters && (
-                            <button
-                                type="button"
-                                onClick={() => { setObsFilter(''); setValidacaoFilter('all'); }}
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-white hover:text-slate-700"
-                            >
-                                <FilterX size={12} />
-                                Limpar
-                            </button>
-                        )}
-                        {/* Contador */}
-                        <span className="ml-auto text-[11px] text-slate-400">
-                            {rowsFiltered.length} de {dashboardRows.length} dias
+                        <Table2 size={16} className="text-slate-400" />
+                        <span className="text-sm font-semibold text-slate-800">
+                            Diário reconciliado — {dashboardRows.length} dias
                         </span>
                     </div>
-                </div>
+                    <ChevronDown
+                        size={16}
+                        className={`shrink-0 text-slate-400 transition-transform ${showTable ? 'rotate-180' : ''}`}
+                    />
+                </button>
 
-                <div className="overflow-x-auto">
-                    <table className="min-w-full border-collapse text-sm">
-                        <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            <tr>
-                                {/* Data — clicável para ordenar */}
-                                <th
-                                    className="whitespace-nowrap border-b border-slate-200 px-4 py-3 cursor-pointer select-none hover:text-slate-800 group"
-                                    onClick={() => setSortOrder((prev) => prev === 'desc' ? 'asc' : 'desc')}
+                {showTable && (
+                    <>
+                        <div className="flex flex-col gap-3 border-t border-slate-200 bg-white px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+                            <p className="text-xs text-slate-500">Validação contra o Total B2C, dia a dia.</p>
+                            <div className="flex items-center gap-2">
+                                {/* Toggle Validação */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowValidacao((v) => !v)}
+                                    title={showValidacao ? 'Ocultar coluna de validação' : 'Mostrar coluna de validação'}
+                                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${showValidacao
+                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                            : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                        }`}
                                 >
-                                    <span className="inline-flex items-center gap-1.5">
-                                        Data
-                                        {sortOrder === 'desc'
-                                            ? <ChevronDown size={13} className="text-blue-500" />
-                                            : <ChevronUp size={13} className="text-blue-500" />}
-                                    </span>
-                                </th>
-                                {[
-                                    'Prop. Serasa',
-                                    'Cartões Serasa',
-                                    'Conv. canal',
-                                    'Share Serasa',
-                                    'Cartões CRM',
-                                    'Share CRM',
-                                    'Outros',
-                                    'Cartões Total',
-                                    'Conv. total',
-                                ].map((header) => (
-                                    <th key={header} className="whitespace-nowrap border-b border-slate-200 px-4 py-3">{header}</th>
-                                ))}
-                                {showValidacao && <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3">Validação</th>}
-                                {showObservacoes && <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3">Observações</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rowsDescending.map((row) => {
-                                const otherCards = Math.max(0, row.totalCards - row.crmCards - row.serasaCards);
-                                const isDivergent = row.totalCards < row.crmCards + row.serasaCards;
+                                    <CheckCircle2 size={13} />
+                                    {showValidacao ? 'Ocultar validação' : 'Validação'}
+                                </button>
+                                {/* Toggle Observações */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowObservacoes((v) => !v)}
+                                    title={showObservacoes ? 'Ocultar coluna de observações' : 'Mostrar coluna de observações'}
+                                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${showObservacoes
+                                            ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                            : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                        }`}
+                                >
+                                    Observações
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleExport}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+                                >
+                                    <Table2 size={16} />
+                                    Exportar diário
+                                </button>
+                            </div>
+                        </div>
 
-                                return (
-                                    <tr
-                                        key={row.date}
-                                        className="cursor-pointer border-b border-slate-100 transition hover:bg-blue-50/60"
-                                        onClick={() => handleInspectDate(row.date)}
+                        {/* Barra de filtros */}
+                        <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {/* Busca em observações */}
+                                <div className="relative min-w-[220px] flex-1 max-w-sm">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        value={obsFilter}
+                                        onChange={(e) => setObsFilter(e.target.value)}
+                                        placeholder="Buscar em observações..."
+                                        className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    />
+                                </div>
+                                {/* Filtro de validação */}
+                                <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                                    {(['all', 'ok', 'divergente'] as const).map((opt) => (
+                                        <button
+                                            key={opt}
+                                            type="button"
+                                            onClick={() => setValidacaoFilter(opt)}
+                                            className={`rounded-md px-3 py-1 text-[11px] font-semibold transition ${validacaoFilter === opt
+                                                    ? opt === 'ok'
+                                                        ? 'bg-emerald-100 text-emerald-700'
+                                                        : opt === 'divergente'
+                                                            ? 'bg-red-100 text-red-700'
+                                                            : 'bg-slate-200 text-slate-700'
+                                                    : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                        >
+                                            {opt === 'all' ? 'Todos' : opt === 'ok' ? '✓ OK' : '⚠ Divergente'}
+                                        </button>
+                                    ))}
+                                </div>
+                                {/* Limpar filtros */}
+                                {hasActiveFilters && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setObsFilter(''); setValidacaoFilter('all'); }}
+                                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-white hover:text-slate-700"
                                     >
-                                        <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
-                                            {format(new Date(`${row.date}T12:00:00`), 'dd/MM/yyyy')}
-                                        </td>
-                                        <td className="px-4 py-3 font-mono text-slate-700">{formatCompact(row.serasaProposals)}</td>
-                                        <td className="px-4 py-3 font-mono font-semibold text-slate-900">{formatCompact(row.serasaCards)}</td>
-                                        <td className="px-4 py-3 text-slate-700">{formatPct(row.serasaConversionPct)}</td>
-                                        <td className="px-4 py-3 text-slate-700">{formatPct(row.serasaSharePct)}</td>
-                                        <td className="px-4 py-3 font-mono text-slate-700">{formatCompact(row.crmCards)}</td>
-                                        <td className="px-4 py-3 text-slate-700">{formatPct(row.crmSharePct)}</td>
-                                        <td className="px-4 py-3 font-mono text-slate-700">{formatCompact(otherCards)}</td>
-                                        <td className="px-4 py-3 font-mono font-semibold text-slate-900">{formatCompact(row.totalCards)}</td>
-                                        <td className="px-4 py-3 text-slate-700">{formatPct(row.totalConversion)}</td>
-                                        {showValidacao && (
-                                            <td className="px-4 py-3">
-                                                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${isDivergent ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                                                    {isDivergent ? 'Divergente' : 'OK'}
-                                                </span>
-                                            </td>
-                                        )}
-                                        {showObservacoes && (
-                                            <td className="max-w-[340px] px-4 py-3 text-slate-500">
-                                                <span className="line-clamp-2">{row.observation || '—'}</span>
-                                            </td>
-                                        )}
+                                        <FilterX size={12} />
+                                        Limpar
+                                    </button>
+                                )}
+                                {/* Contador */}
+                                <span className="ml-auto text-[11px] text-slate-400">
+                                    {rowsFiltered.length} de {dashboardRows.length} dias
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full border-collapse text-sm">
+                                <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                    <tr>
+                                        {/* Data — clicável para ordenar */}
+                                        <th
+                                            className="whitespace-nowrap border-b border-slate-200 px-4 py-3 cursor-pointer select-none hover:text-slate-800 group"
+                                            onClick={() => setSortOrder((prev) => prev === 'desc' ? 'asc' : 'desc')}
+                                        >
+                                            <span className="inline-flex items-center gap-1.5">
+                                                Data
+                                                {sortOrder === 'desc'
+                                                    ? <ChevronDown size={13} className="text-blue-500" />
+                                                    : <ChevronUp size={13} className="text-blue-500" />}
+                                            </span>
+                                        </th>
+                                        {[
+                                            'Prop. Serasa',
+                                            'Cartões Serasa',
+                                            'Conv. canal',
+                                            'Share Serasa',
+                                            'Cartões CRM',
+                                            'Share CRM',
+                                            'Outros',
+                                            'Cartões Total',
+                                            'Conv. total',
+                                        ].map((header) => (
+                                            <th key={header} className="whitespace-nowrap border-b border-slate-200 px-4 py-3">{header}</th>
+                                        ))}
+                                        {showValidacao && <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3">Validação</th>}
+                                        {showObservacoes && <th className="whitespace-nowrap border-b border-slate-200 px-4 py-3">Observações</th>}
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                                </thead>
+                                <tbody>
+                                    {rowsDescending.map((row) => {
+                                        const otherCards = Math.max(0, row.totalCards - row.crmCards - row.serasaCards);
+                                        const isDivergent = row.totalCards < row.crmCards + row.serasaCards;
+
+                                        return (
+                                            <tr
+                                                key={row.date}
+                                                className="cursor-pointer border-b border-slate-100 transition hover:bg-blue-50/60"
+                                                onClick={() => handleInspectDate(row.date)}
+                                            >
+                                                <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
+                                                    {format(new Date(`${row.date}T12:00:00`), 'dd/MM/yyyy')}
+                                                </td>
+                                                <td className="px-4 py-3 font-mono text-slate-700">{formatCompact(row.serasaProposals)}</td>
+                                                <td className="px-4 py-3 font-mono font-semibold text-slate-900">{formatCompact(row.serasaCards)}</td>
+                                                <td className="px-4 py-3 text-slate-700">{formatPct(row.serasaConversionPct)}</td>
+                                                <td className="px-4 py-3 text-slate-700">{formatPct(row.serasaSharePct)}</td>
+                                                <td className="px-4 py-3 font-mono text-slate-700">{formatCompact(row.crmCards)}</td>
+                                                <td className="px-4 py-3 text-slate-700">{formatPct(row.crmSharePct)}</td>
+                                                <td className="px-4 py-3 font-mono text-slate-700">{formatCompact(otherCards)}</td>
+                                                <td className="px-4 py-3 font-mono font-semibold text-slate-900">{formatCompact(row.totalCards)}</td>
+                                                <td className="px-4 py-3 text-slate-700">{formatPct(row.totalConversion)}</td>
+                                                {showValidacao && (
+                                                    <td className="px-4 py-3">
+                                                        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${isDivergent ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                                                            {isDivergent ? 'Divergente' : 'OK'}
+                                                        </span>
+                                                    </td>
+                                                )}
+                                                {showObservacoes && (
+                                                    <td className="max-w-[340px] px-4 py-3 text-slate-500">
+                                                        <span className="line-clamp-2">{row.observation || '—'}</span>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
             </section>
 
             {modalOpen && (
