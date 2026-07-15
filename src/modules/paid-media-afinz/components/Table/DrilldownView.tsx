@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { aggregate } from '../../utils/aggregateMetrics';
 
 interface DrilldownViewProps {
     data: any[];
     visibleColumns: Record<string, boolean>;
     fmtBRL: (v: number) => string;
     fmtNum: (v: number) => string;
+    totalSpend?: number; // spend total geral, para coluna "% Spend"
 }
 
 type AdsetStatus = 'excellent' | 'good' | 'warning' | 'critical';
@@ -33,43 +35,32 @@ const statusClass: Record<AdsetStatus, string> = {
     critical: 'bg-red-100 text-red-800',
 };
 
-export const DrilldownView: React.FC<DrilldownViewProps> = ({ data, visibleColumns, fmtBRL, fmtNum }) => {
+/** Agrupa linhas por uma chave, agregando as métricas com o helper ponderado. */
+function groupBy(rows: any[], keyFn: (r: any) => string) {
+    const map = new Map<string, any[]>();
+    rows.forEach(d => {
+        const key = keyFn(d);
+        const arr = map.get(key) || [];
+        arr.push(d);
+        map.set(key, arr);
+    });
+    return Array.from(map.entries())
+        .map(([name, groupRows]) => ({ name, rows: groupRows, ...aggregate(groupRows) }))
+        .sort((a, b) => b.spend - a.spend);
+}
+
+const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+
+export const DrilldownView: React.FC<DrilldownViewProps> = ({ data, visibleColumns, fmtBRL, fmtNum, totalSpend = 0 }) => {
     const [expandedAdsets, setExpandedAdsets] = useState<Set<string>>(new Set());
 
-    // Agrupar por Adset
-    const adsets = useMemo(() => {
-        const map = new Map<string, any>();
-        data.forEach(d => {
-            const key = d.adset_name || d.adset_id || 'Desconhecido';
-            const curr = map.get(key) || {
-                name: key,
-                spend: 0,
-                impressions: 0,
-                clicks: 0,
-                conversions: 0,
-                reach: 0,
-                ads: []
-            };
-            curr.spend += Number(d.spend) || 0;
-            curr.impressions += Number(d.impressions) || 0;
-            curr.clicks += Number(d.clicks) || 0;
-            curr.conversions += Number(d.conversions) || 0;
-            curr.reach += Number(d.reach) || 0;
-            curr.ads.push(d);
-            map.set(key, curr);
-        });
+    // Agrupar por Adset (Grupo) — agregação ponderada via helper compartilhado
+    const adsets = useMemo(
+        () => groupBy(data, d => d.adset_name || d.adset_id || 'Sem grupo'),
+        [data]
+    );
 
-        return Array.from(map.values()).map(set => ({
-            ...set,
-            frequency: set.reach > 0 ? set.impressions / set.reach : 0,
-            ctr: set.impressions > 0 ? (set.clicks / set.impressions) * 100 : 0,
-            cpc: set.clicks > 0 ? set.spend / set.clicks : 0,
-            cpa: set.conversions > 0 ? set.spend / set.conversions : 0,
-            cpm: set.impressions > 0 ? (set.spend / set.impressions) * 1000 : 0,
-        })).sort((a, b) => b.spend - a.spend);
-    }, [data]);
-
-    // Average CPA across adsets for relative comparison
+    // CPA médio entre grupos para comparação relativa
     const avgCpa = useMemo(() => {
         const withCpa = adsets.filter(a => a.cpa > 0);
         if (withCpa.length === 0) return 0;
@@ -99,10 +90,11 @@ export const DrilldownView: React.FC<DrilldownViewProps> = ({ data, visibleColum
                                     : adset.cpa > avgCpa * 1.2 ? 'text-red-600 font-bold'
                                         : 'text-[#00C6CC] font-bold'
                                 : 'text-[#00C6CC] font-bold';
+                            const adsetShare = totalSpend ? (adset.spend / totalSpend) * 100 : 0;
 
                             return (
                                 <React.Fragment key={adset.name}>
-                                    {/* ADSET ROW */}
+                                    {/* ADSET ROW (Grupo — subtotal ponderado do conjunto) */}
                                     <tr className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-3 font-medium text-slate-700 w-1/4">
                                             <div className="flex items-center gap-2 pl-4 border-l-2 border-slate-300">
@@ -126,6 +118,7 @@ export const DrilldownView: React.FC<DrilldownViewProps> = ({ data, visibleColum
                                         )}
                                         {visibleColumns.trend && <td className="px-4 py-3 text-center text-slate-300">—</td>}
                                         {visibleColumns.spend && <td className="px-6 py-3 text-right font-semibold text-slate-700">{fmtBRL(adset.spend)}</td>}
+                                        {visibleColumns.share && <td className="px-6 py-3 text-right text-slate-500">{fmtPct(adsetShare)}</td>}
                                         {visibleColumns.reach && <td className="px-6 py-3 text-right text-slate-500">{fmtNum(adset.reach)}</td>}
                                         {visibleColumns.impressions && <td className="px-6 py-3 text-right text-slate-500">{fmtNum(adset.impressions)}</td>}
                                         {visibleColumns.frequency && (
@@ -144,9 +137,9 @@ export const DrilldownView: React.FC<DrilldownViewProps> = ({ data, visibleColum
                                     {/* AD ROWS (se expandido) */}
                                     {expandedAdsets.has(adset.name) && (
                                         <tr>
-                                            <td colSpan={15} className="bg-slate-50/80 p-0">
+                                            <td colSpan={20} className="bg-slate-50/80 p-0">
                                                 <div className="pl-12 py-2">
-                                                    <AdList ads={adset.ads} adsetAvgCpa={adset.cpa} visibleColumns={visibleColumns} fmtBRL={fmtBRL} fmtNum={fmtNum} />
+                                                    <AdList ads={adset.rows} adsetAvgCpa={adset.cpa} visibleColumns={visibleColumns} fmtBRL={fmtBRL} fmtNum={fmtNum} totalSpend={totalSpend} />
                                                 </div>
                                             </td>
                                         </tr>
@@ -167,37 +160,13 @@ const AdList: React.FC<{
     visibleColumns: Record<string, boolean>;
     fmtBRL: (v: number) => string;
     fmtNum: (v: number) => string;
-}> = ({ ads, adsetAvgCpa, visibleColumns, fmtBRL, fmtNum }) => {
-    // Agrupar por Ad
-    const agAds = useMemo(() => {
-        const map = new Map<string, any>();
-        ads.forEach(d => {
-            const key = d.ad_name || d.ad_id || 'Desconhecido';
-            const curr = map.get(key) || {
-                name: key,
-                spend: 0,
-                impressions: 0,
-                clicks: 0,
-                conversions: 0,
-                reach: 0
-            };
-            curr.spend += Number(d.spend) || 0;
-            curr.impressions += Number(d.impressions) || 0;
-            curr.clicks += Number(d.clicks) || 0;
-            curr.conversions += Number(d.conversions) || 0;
-            curr.reach += Number(d.reach) || 0;
-            map.set(key, curr);
-        });
-
-        return Array.from(map.values()).map(set => ({
-            ...set,
-            frequency: set.reach > 0 ? set.impressions / set.reach : 0,
-            ctr: set.impressions > 0 ? (set.clicks / set.impressions) * 100 : 0,
-            cpc: set.clicks > 0 ? set.spend / set.clicks : 0,
-            cpa: set.conversions > 0 ? set.spend / set.conversions : 0,
-            cpm: set.impressions > 0 ? (set.spend / set.impressions) * 1000 : 0,
-        })).sort((a, b) => b.spend - a.spend);
-    }, [ads]);
+    totalSpend?: number;
+}> = ({ ads, adsetAvgCpa, visibleColumns, fmtBRL, fmtNum, totalSpend = 0 }) => {
+    // Agrupar por Ad (Anúncio) — agregação ponderada via helper compartilhado
+    const agAds = useMemo(
+        () => groupBy(ads, d => d.ad_name || d.ad_id || 'Sem anúncio'),
+        [ads]
+    );
 
     return (
         <table className="w-full text-sm text-left border-l-2 border-indigo-200 ml-4">
@@ -208,6 +177,7 @@ const AdList: React.FC<{
                             : ad.cpa > adsetAvgCpa * 1.2 ? 'text-red-500 font-medium'
                                 : 'text-indigo-600 font-medium'
                         : 'text-indigo-600 font-medium';
+                    const adShare = totalSpend ? (ad.spend / totalSpend) * 100 : 0;
 
                     return (
                         <tr key={idx} className="hover:bg-white transition-colors">
@@ -221,6 +191,7 @@ const AdList: React.FC<{
                             {visibleColumns.status && <td className="px-4 py-2 text-center text-slate-300">—</td>}
                             {visibleColumns.trend && <td className="px-4 py-2 text-center text-slate-300">—</td>}
                             {visibleColumns.spend && <td className="px-6 py-2 text-right text-slate-500 text-[13px]">{fmtBRL(ad.spend)}</td>}
+                            {visibleColumns.share && <td className="px-6 py-2 text-right text-slate-400 text-[13px]">{fmtPct(adShare)}</td>}
                             {visibleColumns.reach && <td className="px-6 py-2 text-right text-slate-400 text-[13px]">{fmtNum(ad.reach)}</td>}
                             {visibleColumns.impressions && <td className="px-6 py-2 text-right text-slate-400 text-[13px]">{fmtNum(ad.impressions)}</td>}
                             {visibleColumns.frequency && (

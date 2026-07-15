@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import type { DailyMetrics } from '../types';
 import { ArrowUpDown, Search, Filter, TrendingUp, TrendingDown, Minus, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
 import { CampaignSidePanel } from './CampaignSidePanel';
 import { DrilldownView } from './Table/DrilldownView';
 import { dataService } from '../../../services/dataService';
 import { useFilters } from '../context/FilterContext';
+import { aggregate, resolveFrente, getFrenteColorClasses } from '../utils/aggregateMetrics';
 import { format } from 'date-fns';
 
 interface CampaignPerformanceTableProps {
@@ -15,8 +15,8 @@ type SortField = 'campaign' | 'spend' | 'impressions' | 'clicks' | 'conversions'
 type SortOrder = 'asc' | 'desc';
 
 export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> = ({ data }) => {
-    const { filters } = useFilters();
-    
+    const { filters, objectives } = useFilters();
+
     const [sortField, setSortField] = useState<SortField>('spend');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
     const [search, setSearch] = useState('');
@@ -27,6 +27,16 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
     const [drilldownCache, setDrilldownCache] = useState<Record<string, any[]>>({});
     const [isLoadingDrilldown, setIsLoadingDrilldown] = useState<Record<string, boolean>>({});
 
+    // Frente (nível 0) collapse state — expandido por padrão (colapsa sob demanda)
+    const [collapsedFrentes, setCollapsedFrentes] = useState<Set<string>>(new Set());
+    const toggleFrente = (key: string) => {
+        setCollapsedFrentes(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    };
+
     // Invalidate cache when date range changes
     useEffect(() => {
         setDrilldownCache({});
@@ -35,7 +45,7 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
 
     const toggleCampaignParams = async (campaign: string, e: React.MouseEvent) => {
         e.stopPropagation(); // Prevents row click (Side Panel)
-        
+
         const newExpanded = new Set(expandedCampaigns);
         if (newExpanded.has(campaign)) {
              newExpanded.delete(campaign);
@@ -107,19 +117,34 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
             };
         });
 
-        // Calculate Average CPA for benchmark
-        const totalSpend = stats.reduce((a, b) => a + b.spend, 0);
-        const totalConv = stats.reduce((a, b) => a + b.conversions, 0);
-        const avgCpa = totalConv ? totalSpend / totalConv : 0;
+        // Benchmark de CPA POR FRENTE (não global) — campanha de marca não deve
+        // ser penalizada contra o CPA de aquisição. Fallback p/ média global.
+        const globalSpend = stats.reduce((a, b) => a + b.spend, 0);
+        const globalConv = stats.reduce((a, b) => a + b.conversions, 0);
+        const globalCpa = globalConv ? globalSpend / globalConv : 0;
+
+        const frenteCpa = new Map<string, number>();
+        const frenteAgg = new Map<string, { spend: number; conv: number }>();
+        stats.forEach(c => {
+            const key = resolveFrente(c.objective, objectives).key;
+            const agg = frenteAgg.get(key) || { spend: 0, conv: 0 };
+            agg.spend += c.spend;
+            agg.conv += c.conversions;
+            frenteAgg.set(key, agg);
+        });
+        frenteAgg.forEach((v, k) => frenteCpa.set(k, v.conv ? v.spend / v.conv : 0));
 
         return stats.map(c => {
-            // 1. Status Logic (CPA based)
+            const frenteKey = resolveFrente(c.objective, objectives).key;
+            const benchCpa = frenteCpa.get(frenteKey) || globalCpa;
+
+            // 1. Status Logic (CPA relativo à FRENTE)
             let status: 'excellent' | 'good' | 'warning' | 'critical' = 'good';
             if (c.cpa === 0 && c.spend > 100) status = 'critical'; // burning money
-            else if (c.cpa > 0) {
-                if (c.cpa < avgCpa * 0.8) status = 'excellent';
-                else if (c.cpa > avgCpa * 1.5) status = 'critical';
-                else if (c.cpa > avgCpa * 1.2) status = 'warning';
+            else if (c.cpa > 0 && benchCpa > 0) {
+                if (c.cpa < benchCpa * 0.8) status = 'excellent';
+                else if (c.cpa > benchCpa * 1.5) status = 'critical';
+                else if (c.cpa > benchCpa * 1.2) status = 'warning';
             }
 
             // Apply Frequency overrides
@@ -151,7 +176,7 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
 
             return { ...c, status, action, trend };
         });
-    }, [data]);
+    }, [data, objectives]);
 
     // Filter & Sort
     const processedData = useMemo(() => {
@@ -162,7 +187,7 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
             result = result.filter(c => c.campaign.toLowerCase().includes(q));
         }
 
-        result.sort((a, b) => {
+        result = [...result].sort((a, b) => {
             const valA = a[sortField];
             const valB = b[sortField];
 
@@ -173,6 +198,23 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
 
         return result;
     }, [campaignStats, search, sortField, sortOrder]);
+
+    // Total geral ponderado (reflete o que está visível após a busca)
+    const grandTotals = useMemo(() => aggregate(processedData), [processedData]);
+
+    // Agrupamento por Frente de Objetivo (nível 0) — ordena por spend desc
+    const frenteGroups = useMemo(() => {
+        const map = new Map<string, { frente: ReturnType<typeof resolveFrente>; campaigns: typeof processedData }>();
+        processedData.forEach(c => {
+            const frente = resolveFrente(c.objective, objectives);
+            const g = map.get(frente.key) || { frente, campaigns: [] as typeof processedData };
+            g.campaigns.push(c);
+            map.set(frente.key, g);
+        });
+        return Array.from(map.values())
+            .map(g => ({ ...g, totals: aggregate(g.campaigns) }))
+            .sort((a, b) => b.totals.spend - a.totals.spend);
+    }, [processedData, objectives]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -185,9 +227,11 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
 
     const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
     const fmtNum = (v: number) => new Intl.NumberFormat('pt-BR').format(v);
+    const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 
     const defaultColumns: Record<string, boolean> = {
         spend: true,
+        share: true,
         impressions: true,
         reach: false,
         frequency: true,
@@ -233,7 +277,7 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
                             />
                         </div>
                         <div className="text-sm text-slate-500 whitespace-nowrap">
-                            {processedData.length} campanhas
+                            {frenteGroups.length} frentes · {processedData.length} campanhas
                         </div>
                     </div>
 
@@ -260,6 +304,7 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
                                         />
                                         <span className="text-sm text-slate-700 capitalize">
                                             {col === 'spend' ? 'Investimento' :
+                                                col === 'share' ? '% Spend' :
                                                 col === 'impressions' ? 'Impressões' :
                                                     col === 'reach' ? 'Alcance' :
                                                         col === 'frequency' ? 'Frequência' :
@@ -283,7 +328,7 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
                         <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-semibold">
                             <tr>
                                 <th className="px-6 py-3 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('campaign')}>
-                                    <div className="flex items-center gap-1">Campanha <ArrowUpDown size={12} /></div>
+                                    <div className="flex items-center gap-1">Frente / Campanha <ArrowUpDown size={12} /></div>
                                 </th>
                                 {visibleColumns.status && <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer group">Status</th>}
 
@@ -292,6 +337,9 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
                                     <th className="px-6 py-3 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('spend')}>
                                         <div className="flex items-center justify-end gap-1">Invest. <ArrowUpDown size={12} /></div>
                                     </th>
+                                )}
+                                {visibleColumns.share && (
+                                    <th className="px-6 py-3 text-right">% Spend</th>
                                 )}
                                 {visibleColumns.reach && (
                                     <th className="px-6 py-3 text-right cursor-pointer hover:bg-slate-100" onClick={() => handleSort('reach')}>
@@ -341,104 +389,195 @@ export const CampaignPerformanceTable: React.FC<CampaignPerformanceTableProps> =
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {processedData.map((row) => (
-                                <React.Fragment key={row.campaign}>
-                                <tr
-                                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
-                                    onClick={() => setSelectedCampaign(row.campaign)}
-                                >
-                                    <td className="px-6 py-3 font-medium text-slate-700">
-                                        <div className="flex items-center gap-2">
-                                            <button 
-                                                onClick={(e) => toggleCampaignParams(row.campaign, e)} 
-                                                className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-primary transition-colors cursor-pointer"
-                                                title="Mostrar Conjuntos de Anúncios"
-                                            >
-                                                {expandedCampaigns.has(row.campaign) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                            </button>
-                                            <span className={`w-2 h-2 rounded-full ${row.channel === 'meta' ? 'bg-[#1877F2]' : 'bg-[#4285F4]'}`}></span>
-                                            {row.campaign}
-                                        </div>
-                                    </td>
-
-                                    {/* Status Column */}
-                                    {visibleColumns.status && (
-                                        <td className="px-4 py-3 whitespace-nowrap text-center">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                                                ${row.status === 'excellent' ? 'bg-emerald-100 text-emerald-800' :
-                                                    row.status === 'good' ? 'bg-green-100 text-green-800' :
-                                                        row.status === 'warning' ? 'bg-amber-100 text-amber-800' :
-                                                            'bg-red-100 text-red-800'}`}>
-                                                {row.status === 'excellent' ? 'Excelente' :
-                                                    row.status === 'good' ? 'Bom' :
-                                                        row.status === 'warning' ? 'Atenção' : 'Crítico'}
-                                            </span>
-                                        </td>
-                                    )}
-
-                                    {/* Trend Column */}
-                                    {visibleColumns.trend && (
-                                        <td className="px-4 py-3 whitespace-nowrap text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                {row.trend === 'up' && <TrendingUp size={14} className="text-red-500" />}
-                                                {row.trend === 'down' && <TrendingDown size={14} className="text-emerald-500" />}
-                                                {row.trend === 'flat' && <Minus size={14} className="text-slate-400" />}
-                                            </div>
-                                        </td>
-                                    )}
-
-                                    {visibleColumns.spend && <td className="px-6 py-3 text-right font-semibold text-slate-700">{fmtBRL(row.spend)}</td>}
-                                    {visibleColumns.reach && (
-                                        <td className="px-6 py-3 text-right text-slate-600 group relative">
-                                            <span className="cursor-help">{fmtNum(row.reach)}</span>
-                                            <div className="hidden group-hover:block absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-xs p-2 rounded w-48 shadow-lg z-50">
-                                                Soma do alcance por anúncio. Pode haver sobreposição entre anúncios.
-                                            </div>
-                                        </td>
-                                    )}
-                                    {visibleColumns.impressions && <td className="px-6 py-3 text-right text-slate-600">{fmtNum(row.impressions)}</td>}
-                                    {visibleColumns.frequency && (
-                                        <td 
-                                            className={`px-6 py-3 text-right font-medium ${row.frequency > 3.5 ? 'text-red-500' : 'text-slate-600'} group relative`}
+                            {frenteGroups.map((fg) => {
+                                const c = getFrenteColorClasses(fg.frente.color);
+                                const isCollapsed = collapsedFrentes.has(fg.frente.key);
+                                const t = fg.totals;
+                                const frenteShare = grandTotals.spend ? (t.spend / grandTotals.spend) * 100 : 0;
+                                return (
+                                    <React.Fragment key={`frente-${fg.frente.key}`}>
+                                        {/* FRENTE HEADER (nível 0) = subtotal ponderado */}
+                                        <tr
+                                            className={`${c.rowBg} border-l-4 ${c.leftBorder} cursor-pointer hover:brightness-95 transition-all`}
+                                            onClick={() => toggleFrente(fg.frente.key)}
                                         >
-                                            <span className="cursor-help">{row.frequency > 0 ? row.frequency.toFixed(1) : '-'}</span>
-                                            {row.frequency > 3.5 && (
-                                                <div className="hidden group-hover:block absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-xs p-2 rounded w-48 shadow-lg z-50 whitespace-normal text-right">
-                                                    Frequência alta pode indicar fadiga criativa.
+                                            <td className="px-6 py-2.5 font-semibold text-slate-800">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="p-1 text-slate-500">
+                                                        {isCollapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                                                    </span>
+                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide ${c.chip}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}></span>
+                                                        {fg.frente.label}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400 font-normal">{fg.campaigns.length} camp.</span>
                                                 </div>
+                                            </td>
+                                            {visibleColumns.status && <td className="px-4 py-2.5" />}
+                                            {visibleColumns.trend && <td className="px-4 py-2.5" />}
+                                            {visibleColumns.spend && <td className="px-6 py-2.5 text-right font-bold text-slate-800">{fmtBRL(t.spend)}</td>}
+                                            {visibleColumns.share && <td className="px-6 py-2.5 text-right font-semibold text-slate-600">{fmtPct(frenteShare)}</td>}
+                                            {visibleColumns.reach && (
+                                                <td className="px-6 py-2.5 text-right text-slate-600 group relative">
+                                                    <span className="cursor-help">{fmtNum(t.reach)}</span>
+                                                    <div className="hidden group-hover:block absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-xs p-2 rounded w-48 shadow-lg z-50">
+                                                        Soma do alcance — pode haver sobreposição de audiência entre campanhas.
+                                                    </div>
+                                                </td>
                                             )}
+                                            {visibleColumns.impressions && <td className="px-6 py-2.5 text-right text-slate-600">{fmtNum(t.impressions)}</td>}
+                                            {visibleColumns.frequency && (
+                                                <td className="px-6 py-2.5 text-right text-slate-500 group relative">
+                                                    <span className="cursor-help">{t.frequency > 0 ? t.frequency.toFixed(1) : '-'}</span>
+                                                    <div className="hidden group-hover:block absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-xs p-2 rounded w-48 shadow-lg z-50 whitespace-normal text-right">
+                                                        Aproximação — reach somado ignora sobreposição.
+                                                    </div>
+                                                </td>
+                                            )}
+                                            {visibleColumns.clicks && <td className="px-6 py-2.5 text-right text-slate-600">{fmtNum(t.clicks)}</td>}
+                                            {visibleColumns.conversions && <td className="px-6 py-2.5 text-right font-bold text-slate-800">{fmtNum(t.conversions)}</td>}
+                                            {visibleColumns.ctr && <td className="px-6 py-2.5 text-right text-slate-600">{t.ctr.toFixed(2)}%</td>}
+                                            {visibleColumns.cpm && <td className="px-6 py-2.5 text-right text-slate-600">{fmtBRL(t.cpm)}</td>}
+                                            {visibleColumns.cpc && <td className="px-6 py-2.5 text-right text-slate-600">{fmtBRL(t.cpc)}</td>}
+                                            {visibleColumns.cpa && <td className="px-6 py-2.5 text-right font-semibold text-slate-700">{fmtBRL(t.cpa)}</td>}
+                                        </tr>
+
+                                        {/* CAMPANHAS (nível 1) */}
+                                        {!isCollapsed && fg.campaigns.map((row) => {
+                                            const campShare = grandTotals.spend ? (row.spend / grandTotals.spend) * 100 : 0;
+                                            return (
+                                            <React.Fragment key={row.campaign}>
+                                                <tr
+                                                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                                                    onClick={() => setSelectedCampaign(row.campaign)}
+                                                >
+                                                    <td className="px-6 py-3 font-medium text-slate-700">
+                                                        <div className="flex items-center gap-2 pl-4">
+                                                            <button
+                                                                onClick={(e) => toggleCampaignParams(row.campaign, e)}
+                                                                className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-primary transition-colors cursor-pointer"
+                                                                title="Mostrar Conjuntos de Anúncios"
+                                                            >
+                                                                {expandedCampaigns.has(row.campaign) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                            </button>
+                                                            <span className={`w-2 h-2 rounded-full ${row.channel === 'meta' ? 'bg-[#1877F2]' : 'bg-[#4285F4]'}`}></span>
+                                                            {row.campaign}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Status Column */}
+                                                    {visibleColumns.status && (
+                                                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
+                                                                ${row.status === 'excellent' ? 'bg-emerald-100 text-emerald-800' :
+                                                                    row.status === 'good' ? 'bg-green-100 text-green-800' :
+                                                                        row.status === 'warning' ? 'bg-amber-100 text-amber-800' :
+                                                                            'bg-red-100 text-red-800'}`}>
+                                                                {row.status === 'excellent' ? 'Excelente' :
+                                                                    row.status === 'good' ? 'Bom' :
+                                                                        row.status === 'warning' ? 'Atenção' : 'Crítico'}
+                                                            </span>
+                                                        </td>
+                                                    )}
+
+                                                    {/* Trend Column */}
+                                                    {visibleColumns.trend && (
+                                                        <td className="px-4 py-3 whitespace-nowrap text-center">
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                {row.trend === 'up' && <TrendingUp size={14} className="text-red-500" />}
+                                                                {row.trend === 'down' && <TrendingDown size={14} className="text-emerald-500" />}
+                                                                {row.trend === 'flat' && <Minus size={14} className="text-slate-400" />}
+                                                            </div>
+                                                        </td>
+                                                    )}
+
+                                                    {visibleColumns.spend && <td className="px-6 py-3 text-right font-semibold text-slate-700">{fmtBRL(row.spend)}</td>}
+                                                    {visibleColumns.share && <td className="px-6 py-3 text-right text-slate-500">{fmtPct(campShare)}</td>}
+                                                    {visibleColumns.reach && (
+                                                        <td className="px-6 py-3 text-right text-slate-600 group relative">
+                                                            <span className="cursor-help">{fmtNum(row.reach)}</span>
+                                                            <div className="hidden group-hover:block absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-xs p-2 rounded w-48 shadow-lg z-50">
+                                                                Soma do alcance por anúncio. Pode haver sobreposição entre anúncios.
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                    {visibleColumns.impressions && <td className="px-6 py-3 text-right text-slate-600">{fmtNum(row.impressions)}</td>}
+                                                    {visibleColumns.frequency && (
+                                                        <td
+                                                            className={`px-6 py-3 text-right font-medium ${row.frequency > 3.5 ? 'text-red-500' : 'text-slate-600'} group relative`}
+                                                        >
+                                                            <span className="cursor-help">{row.frequency > 0 ? row.frequency.toFixed(1) : '-'}</span>
+                                                            {row.frequency > 3.5 && (
+                                                                <div className="hidden group-hover:block absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-xs p-2 rounded w-48 shadow-lg z-50 whitespace-normal text-right">
+                                                                    Frequência alta pode indicar fadiga criativa.
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    )}
+                                                    {visibleColumns.clicks && <td className="px-6 py-3 text-right text-slate-600">{fmtNum(row.clicks)}</td>}
+                                                    {visibleColumns.conversions && <td className="px-6 py-3 text-right font-semibold text-slate-700">{fmtNum(row.conversions)}</td>}
+                                                    {visibleColumns.ctr && <td className="px-6 py-3 text-right text-slate-600">{row.ctr.toFixed(2)}%</td>}
+                                                    {visibleColumns.cpm && <td className="px-6 py-3 text-right text-slate-600">{fmtBRL(row.cpm)}</td>}
+                                                    {visibleColumns.cpc && <td className="px-6 py-3 text-right text-slate-600">{fmtBRL(row.cpc)}</td>}
+                                                    {visibleColumns.cpa && <td className="px-6 py-3 text-right font-medium text-slate-700">{fmtBRL(row.cpa)}</td>}
+                                                </tr>
+
+                                                {expandedCampaigns.has(row.campaign) && (
+                                                    <tr className="bg-slate-50/30">
+                                                        <td colSpan={20} className="p-0">
+                                                            {isLoadingDrilldown[row.campaign] ? (
+                                                                <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center gap-3 bg-slate-50 border-y border-slate-100">
+                                                                    <Loader2 className="animate-spin text-primary" size={24} />
+                                                                    <span className="text-sm font-medium">Buscando criativos no Supabase...</span>
+                                                                </div>
+                                                            ) : (
+                                                                <DrilldownView
+                                                                    data={drilldownCache[row.campaign] || []}
+                                                                    visibleColumns={visibleColumns}
+                                                                    fmtBRL={fmtBRL}
+                                                                    fmtNum={fmtNum}
+                                                                    totalSpend={grandTotals.spend}
+                                                                />
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </tbody>
+
+                        {/* TOTAL GERAL (ponderado) */}
+                        {processedData.length > 0 && (
+                            <tfoot className="sticky bottom-0 z-10">
+                                <tr className="bg-slate-800 text-white font-semibold border-t-2 border-slate-900">
+                                    <td className="px-6 py-3 uppercase tracking-wider text-xs">Total Geral</td>
+                                    {visibleColumns.status && <td className="px-4 py-3" />}
+                                    {visibleColumns.trend && <td className="px-4 py-3" />}
+                                    {visibleColumns.spend && <td className="px-6 py-3 text-right">{fmtBRL(grandTotals.spend)}</td>}
+                                    {visibleColumns.share && <td className="px-6 py-3 text-right">100%</td>}
+                                    {visibleColumns.reach && (
+                                        <td className="px-6 py-3 text-right group relative">
+                                            <span className="cursor-help">{fmtNum(grandTotals.reach)}</span>
+                                            <div className="hidden group-hover:block absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-xs p-2 rounded w-48 shadow-lg z-50 font-normal">
+                                                Soma do alcance — pode haver sobreposição de audiência.
+                                            </div>
                                         </td>
                                     )}
-                                    {visibleColumns.clicks && <td className="px-6 py-3 text-right text-slate-600">{fmtNum(row.clicks)}</td>}
-                                    {visibleColumns.conversions && <td className="px-6 py-3 text-right font-semibold text-slate-700">{fmtNum(row.conversions)}</td>}
-                                    {visibleColumns.ctr && <td className="px-6 py-3 text-right text-slate-600">{row.ctr.toFixed(2)}%</td>}
-                                    {visibleColumns.cpm && <td className="px-6 py-3 text-right text-slate-600">{fmtBRL(row.cpm)}</td>}
-                                    {visibleColumns.cpc && <td className="px-6 py-3 text-right text-slate-600">{fmtBRL(row.cpc)}</td>}
-                                    {visibleColumns.cpa && <td className="px-6 py-3 text-right font-medium text-slate-700">{fmtBRL(row.cpa)}</td>}
+                                    {visibleColumns.impressions && <td className="px-6 py-3 text-right">{fmtNum(grandTotals.impressions)}</td>}
+                                    {visibleColumns.frequency && <td className="px-6 py-3 text-right">{grandTotals.frequency > 0 ? grandTotals.frequency.toFixed(1) : '-'}</td>}
+                                    {visibleColumns.clicks && <td className="px-6 py-3 text-right">{fmtNum(grandTotals.clicks)}</td>}
+                                    {visibleColumns.conversions && <td className="px-6 py-3 text-right">{fmtNum(grandTotals.conversions)}</td>}
+                                    {visibleColumns.ctr && <td className="px-6 py-3 text-right">{grandTotals.ctr.toFixed(2)}%</td>}
+                                    {visibleColumns.cpm && <td className="px-6 py-3 text-right">{fmtBRL(grandTotals.cpm)}</td>}
+                                    {visibleColumns.cpc && <td className="px-6 py-3 text-right">{fmtBRL(grandTotals.cpc)}</td>}
+                                    {visibleColumns.cpa && <td className="px-6 py-3 text-right">{fmtBRL(grandTotals.cpa)}</td>}
                                 </tr>
-                                
-                                {expandedCampaigns.has(row.campaign) && (
-                                    <tr className="bg-slate-50/30">
-                                        <td colSpan={15} className="p-0">
-                                            {isLoadingDrilldown[row.campaign] ? (
-                                                <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center gap-3 bg-slate-50 border-y border-slate-100">
-                                                    <Loader2 className="animate-spin text-primary" size={24} />
-                                                    <span className="text-sm font-medium">Buscando criativos no Supabase...</span>
-                                                </div>
-                                            ) : (
-                                                <DrilldownView 
-                                                    data={drilldownCache[row.campaign] || []} 
-                                                    visibleColumns={visibleColumns} 
-                                                    fmtBRL={fmtBRL} 
-                                                    fmtNum={fmtNum} 
-                                                />
-                                            )}
-                                        </td>
-                                    </tr>
-                                )}
-                                </React.Fragment>
-                            ))}
-                        </tbody>
+                            </tfoot>
+                        )}
                     </table>
                 </div>
 
