@@ -45,7 +45,9 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
   const [sortBy, setSortBy] = useState<SortBy>('padrao');
   const [canalSel, setCanalSel] = useState('todos');
   const [segmentoSel, setSegmentoSel] = useState('todos');
-  const [momentoSel, setMomentoSel] = useState('todos');
+  const [subgrupoSel, setSubgrupoSel] = useState('todos');
+  const [semanaSel, setSemanaSel] = useState('todos');
+  const [disparoSel, setDisparoSel] = useState('todos');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<OrphanRow | null>(null);
@@ -58,19 +60,20 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
 
   const canalOptions = useMemo(() => Array.from(new Set(scoped.map((o) => o.canalLabel))).sort(), [scoped]);
   const segmentoOptions = useMemo(
-    () => Array.from(new Set(scoped.map((o) => o.parsed.segmento).filter((v): v is string => !!v))).sort(),
+    () => Array.from(new Set(scoped.map((o) => o.segmentoLabel).filter((v) => v !== '—'))).sort(),
     [scoped]
   );
-  const momentoOptions = useMemo(
-    () => Array.from(new Set(scoped.map((o) => o.momentSuggestion.label))).sort(),
-    [scoped]
-  );
+  const subgrupoOptions = useMemo(() => Array.from(new Set(scoped.map((o) => o.subgrupoLabel).filter((v) => v !== '—'))).sort(), [scoped]);
+  const semanaOptions = useMemo(() => Array.from(new Set(scoped.map((o) => o.momentSuggestion.week).filter((v): v is number => v != null))).sort((a, b) => a - b), [scoped]);
+  const disparoOptions = useMemo(() => Array.from(new Set(scoped.map((o) => o.momentSuggestion.dispatch).filter((v): v is number => v != null))).sort((a, b) => a - b), [scoped]);
 
   const list = useMemo(() => {
     let l = scoped.filter((o) => {
       if (canalSel !== 'todos' && o.canalLabel !== canalSel) return false;
-      if (segmentoSel !== 'todos' && o.parsed.segmento !== segmentoSel) return false;
-      if (momentoSel !== 'todos' && o.momentSuggestion.label !== momentoSel) return false;
+      if (segmentoSel !== 'todos' && o.segmentoLabel !== segmentoSel) return false;
+      if (subgrupoSel !== 'todos' && o.subgrupoLabel !== subgrupoSel) return false;
+      if (semanaSel !== 'todos' && String(o.momentSuggestion.week ?? '') !== semanaSel) return false;
+      if (disparoSel !== 'todos' && String(o.momentSuggestion.dispatch ?? '') !== disparoSel) return false;
       return true;
     });
     if (filter === 'forte') l = l.filter((o) => o.confidence === 'forte');
@@ -82,7 +85,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
       return CONF_ORDER[a.confidence] - CONF_ORDER[b.confidence] || b.base - a.base;
     });
     return l;
-  }, [scoped, filter, sortBy, canalSel, segmentoSel, momentoSel]);
+  }, [scoped, filter, sortBy, canalSel, segmentoSel, subgrupoSel, semanaSel, disparoSel]);
 
   const strong = useMemo(() => scoped.filter((o) => o.confidence === 'forte'), [scoped]);
   const bulkStrong = useMemo(() => strong.filter((o) => o.match?.tpl.inCurrentFilter), [strong]);
@@ -159,12 +162,20 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
         <select value={segmentoSel} onChange={(e) => setSegmentoSel(e.target.value)}
           className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600 hover:border-slate-300">
           <option value="todos">Segmento: todos</option>
-          {segmentoOptions.map((s) => <option key={s} value={s}>{optLabel('segmento', s)}</option>)}
+          {segmentoOptions.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={momentoSel} onChange={(e) => setMomentoSel(e.target.value)}
+        <select value={subgrupoSel} onChange={(e) => setSubgrupoSel(e.target.value)}
           className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600 hover:border-slate-300">
-          <option value="todos">Momento: todos</option>
-          {momentoOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+          <option value="todos">Subgrupo: todos</option>
+          {subgrupoOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={semanaSel} onChange={(e) => setSemanaSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600 hover:border-slate-300">
+          <option value="todos">Semana: todas</option>
+          {semanaOptions.map((week) => <option key={week} value={week}>Semana {week}</option>)}
+        </select>
+        <select value={disparoSel} onChange={(e) => setDisparoSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600 hover:border-slate-300">
+          <option value="todos">Disparo: todos</option>
+          {disparoOptions.map((dispatch) => <option key={dispatch} value={dispatch}>Disparo {dispatch}</option>)}
         </select>
       </div>
 

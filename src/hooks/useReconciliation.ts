@@ -35,6 +35,8 @@ export interface OrphanRow {
   jornada: string;
   channel: string | null; // id da taxonomia
   canalLabel: string;
+  segmentoLabel: string;
+  subgrupoLabel: string;
   base: number;
   exec: number;
   latestDate: string | null;
@@ -54,6 +56,8 @@ export interface ReconciledRow {
   jornada: string;
   channel: string | null;
   canalLabel: string;
+  segmentoLabel: string;
+  subgrupoLabel: string;
   base: number;
   exec: number;
   latestDate: string | null;
@@ -82,6 +86,7 @@ interface OrphanQueryRow {
   BU: string | null;
   Parceiro: string | null;
   Segmento: string | null;
+  Subgrupos: string | null;
   'Base Total': number | null;
   'Data de Disparo': string | null;
   template_id: string | null;
@@ -269,15 +274,15 @@ export function useReconciliation() {
   const dataFim = format(endDate, 'yyyy-MM-dd');
 
   const filterKey = useMemo(
-    () => JSON.stringify([dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros]),
-    [dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros]
+    () => JSON.stringify([dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros, f.subgrupos]),
+    [dataInicio, dataFim, selectedBUs, f.canais, f.jornadas, f.segmentos, f.parceiros, f.subgrupos]
   );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const baseSelect = '"Activity name / Taxonomia", jornada, "Canal", "BU", "Parceiro", "Segmento", "Base Total", "Data de Disparo", template_id';
+      const baseSelect = '"Activity name / Taxonomia", jornada, "Canal", "BU", "Parceiro", "Segmento", "Subgrupos", "Base Total", "Data de Disparo", template_id';
 
       let orphanQuery = supabase
         .from('activities')
@@ -294,6 +299,7 @@ export function useReconciliation() {
       if (f.jornadas?.length) orphanQuery = orphanQuery.in('jornada', f.jornadas);
       if (f.segmentos?.length) orphanQuery = orphanQuery.in('"Segmento"', f.segmentos);
       if (f.parceiros?.length) orphanQuery = orphanQuery.in('"Parceiro"', f.parceiros);
+      if (f.subgrupos?.length) orphanQuery = orphanQuery.in('"Subgrupos"', f.subgrupos);
 
       let linkedQuery = supabase
         .from('activities')
@@ -310,6 +316,7 @@ export function useReconciliation() {
       if (f.jornadas?.length) linkedQuery = linkedQuery.in('jornada', f.jornadas);
       if (f.segmentos?.length) linkedQuery = linkedQuery.in('"Segmento"', f.segmentos);
       if (f.parceiros?.length) linkedQuery = linkedQuery.in('"Parceiro"', f.parceiros);
+      if (f.subgrupos?.length) linkedQuery = linkedQuery.in('"Subgrupos"', f.subgrupos);
 
       const [{ data: acts, error: aErr }, { data: linkedActs, error: lErr }, templates] = await Promise.all([orphanQuery, linkedQuery, listTemplates()]);
       if (aErr) throw aErr;
@@ -392,6 +399,8 @@ export function useReconciliation() {
             jornada: r.jornada ?? '—',
             channel: chId,
             canalLabel: r.Canal ?? '—',
+            segmentoLabel: r.Segmento ?? '—',
+            subgrupoLabel: r.Subgrupos ?? '—',
             base: num(r['Base Total']),
             exec: 1,
             latestDate: date,
@@ -431,6 +440,8 @@ export function useReconciliation() {
             jornada: r.jornada ?? '—',
             channel: chId,
             canalLabel: r.Canal ?? '—',
+            segmentoLabel: r.Segmento ?? '—',
+            subgrupoLabel: r.Subgrupos ?? '—',
             base: num(r['Base Total']),
             exec: 1,
             latestDate: date,

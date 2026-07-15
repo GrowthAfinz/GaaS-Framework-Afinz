@@ -1,11 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  ArrowDownWideNarrow,
+  Clock,
   GitBranch,
   HelpCircle,
   Link2Off,
   Loader2,
   RotateCcw,
+  Repeat,
   Search,
   Sparkles,
   Target,
@@ -15,6 +18,7 @@ import type { CatalogEntry, ReconciledRow } from '../../hooks/useReconciliation'
 import { describeError, unlinkActivity } from '../../services/communicationService';
 import { TemplateSuggestionModal } from './TemplateSuggestionModal';
 import { TemplateIdChips } from './TemplateIdChips';
+import { parseSeqParts } from '../../utils/taxonomy';
 
 interface Props {
   rows: ReconciledRow[];
@@ -23,6 +27,7 @@ interface Props {
 }
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: n >= 100000 ? 0 : 1 })}k` : String(Math.round(n));
+type AuditSort = 'risk' | 'recent' | 'moment' | 'base' | 'exec';
 
 const HELP_CARDS = [
   {
@@ -48,6 +53,13 @@ export const ReconciliationAudit: React.FC<Props> = ({ rows, catalog, onChanged 
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<ReconciledRow | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [sortBy, setSortBy] = useState<AuditSort>('risk');
+  const [canalSel, setCanalSel] = useState('todos');
+  const [segmentoSel, setSegmentoSel] = useState('todos');
+  const [subgrupoSel, setSubgrupoSel] = useState('todos');
+  const [semanaSel, setSemanaSel] = useState('todos');
+  const [disparoSel, setDisparoSel] = useState('todos');
+  const [diagnosticoSel, setDiagnosticoSel] = useState('todos');
 
   const stats = useMemo(() => {
     const missingTemplate = rows.filter((r) => !r.template).length;
@@ -57,16 +69,43 @@ export const ReconciliationAudit: React.FC<Props> = ({ rows, catalog, onChanged 
     return { missingTemplate, outsideFilter, uniqueTemplates, totalExecutions };
   }, [rows]);
 
+  const options = useMemo(() => ({
+    canais: Array.from(new Set(rows.map((r) => r.canalLabel))).sort(),
+    segmentos: Array.from(new Set(rows.map((r) => r.segmentoLabel).filter((v) => v !== '—'))).sort(),
+    subgrupos: Array.from(new Set(rows.map((r) => r.subgrupoLabel).filter((v) => v !== '—'))).sort(),
+    semanas: Array.from(new Set(rows.map((r) => parseSeqParts(r.parsed.seq ?? r.name)?.week).filter((v): v is number => v != null))).sort((a, b) => a - b),
+    disparos: Array.from(new Set(rows.map((r) => parseSeqParts(r.parsed.seq ?? r.name)?.dispatch).filter((v): v is number => v != null))).sort((a, b) => a - b),
+  }), [rows]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return [...rows]
-      .filter((r) => !q
-        || r.name.toLowerCase().includes(q)
-        || r.templateId.toLowerCase().includes(q)
-        || r.jornada.toLowerCase().includes(q)
-        || r.canalLabel.toLowerCase().includes(q))
-      .sort((a, b) => (b.latestDate ?? '').localeCompare(a.latestDate ?? '') || a.templateId.localeCompare(b.templateId));
-  }, [query, rows]);
+      .filter((r) => {
+        const moment = parseSeqParts(r.parsed.seq ?? r.name);
+        if (canalSel !== 'todos' && r.canalLabel !== canalSel) return false;
+        if (segmentoSel !== 'todos' && r.segmentoLabel !== segmentoSel) return false;
+        if (subgrupoSel !== 'todos' && r.subgrupoLabel !== subgrupoSel) return false;
+        if (semanaSel !== 'todos' && String(moment?.week ?? '') !== semanaSel) return false;
+        if (disparoSel !== 'todos' && String(moment?.dispatch ?? '') !== disparoSel) return false;
+        if (diagnosticoSel === 'sem_peca' && (r.template?.hasAsset ?? false)) return false;
+        if (diagnosticoSel === 'fora' && (!r.template || r.template.inCurrentFilter)) return false;
+        if (diagnosticoSel === 'ok' && (!r.template?.hasAsset || !r.template.inCurrentFilter)) return false;
+        return !q || r.name.toLowerCase().includes(q) || r.templateId.toLowerCase().includes(q) || r.jornada.toLowerCase().includes(q) || r.canalLabel.toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        if (sortBy === 'recent') return (b.latestDate ?? '').localeCompare(a.latestDate ?? '');
+        if (sortBy === 'base') return b.base - a.base;
+        if (sortBy === 'exec') return b.exec - a.exec;
+        if (sortBy === 'moment') {
+          const am = parseSeqParts(a.parsed.seq ?? a.name), bm = parseSeqParts(b.parsed.seq ?? b.name);
+          const av = am ? (am.week ?? 999) * 1000 + am.dispatch : Number.MAX_SAFE_INTEGER;
+          const bv = bm ? (bm.week ?? 999) * 1000 + bm.dispatch : Number.MAX_SAFE_INTEGER;
+          return av - bv;
+        }
+        const risk = (r: ReconciledRow) => !r.template ? 3 : !r.template.hasAsset ? 2 : !r.template.inCurrentFilter ? 1 : 0;
+        return risk(b) - risk(a) || (b.latestDate ?? '').localeCompare(a.latestDate ?? '');
+      });
+  }, [query, rows, sortBy, canalSel, segmentoSel, subgrupoSel, semanaSel, disparoSel, diagnosticoSel]);
 
   const runUnlink = async (row: ReconciledRow) => {
     setBusy(row.uid);
@@ -116,6 +155,30 @@ export const ReconciliationAudit: React.FC<Props> = ({ rows, catalog, onChanged 
               className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
           </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 text-[11px]">
+          <span className="mr-0.5 font-semibold uppercase tracking-wide text-slate-400">Ordenar</span>
+          {([
+            ['risk', 'Riscos primeiro', Target],
+            ['recent', 'Mais recentes', Clock],
+            ['moment', 'Ordem da régua', ArrowDownWideNarrow],
+            ['base', 'Volume de base', ArrowDownWideNarrow],
+            ['exec', 'Execuções', Repeat],
+          ] as [AuditSort, string, React.ComponentType<{ size?: number }>][]) .map(([id, label, Icon]) => (
+            <button key={id} onClick={() => setSortBy(id)} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-semibold ${sortBy === id ? 'border-cyan-300 bg-cyan-50 text-cyan-700' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'}`}>
+              <Icon size={12} />{label}
+            </button>
+          ))}
+          <span className="ml-3 mr-0.5 font-semibold uppercase tracking-wide text-slate-400">Filtrar envio</span>
+          <select value={canalSel} onChange={(e) => setCanalSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600"><option value="todos">Canal: todos</option>{options.canais.map((v) => <option key={v}>{v}</option>)}</select>
+          <select value={segmentoSel} onChange={(e) => setSegmentoSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600"><option value="todos">Segmento: todos</option>{options.segmentos.map((v) => <option key={v}>{v}</option>)}</select>
+          <select value={subgrupoSel} onChange={(e) => setSubgrupoSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600"><option value="todos">Subgrupo: todos</option>{options.subgrupos.map((v) => <option key={v}>{v}</option>)}</select>
+          <select value={semanaSel} onChange={(e) => setSemanaSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600"><option value="todos">Semana: todas</option>{options.semanas.map((v) => <option key={v} value={v}>Semana {v}</option>)}</select>
+          <select value={disparoSel} onChange={(e) => setDisparoSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600"><option value="todos">Disparo: todos</option>{options.disparos.map((v) => <option key={v} value={v}>Disparo {v}</option>)}</select>
+          <select value={diagnosticoSel} onChange={(e) => setDiagnosticoSel(e.target.value)} className="rounded-md border border-slate-200 bg-white px-2 py-1.5 font-semibold text-slate-600">
+            <option value="todos">Diagnóstico: todos</option><option value="sem_peca">Sem peça</option><option value="fora">Fora do recorte</option><option value="ok">Prontos</option>
+          </select>
         </div>
 
         {showHelp && (
