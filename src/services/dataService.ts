@@ -55,6 +55,8 @@ const PT_MONTH_MAP: Record<string, string> = {
 const normalizeSafra = (value: unknown): string => {
     const raw = normalizeText(value).toLowerCase();
     if (!raw) return '';
+    // Expande ano de 2 dígitos para 4 (26 -> 2026).
+    const toYear = (y: string): string => (y.length === 2 ? `20${y}` : y);
     // Already YYYY-MM or YYYY/MM
     const isoMatch = raw.match(/^(\d{4})[-/](\d{1,2})$/);
     if (isoMatch) {
@@ -67,15 +69,22 @@ const normalizeSafra = (value: unknown): string => {
         const [, m, y] = mmYyyy;
         return `${y}-${m.padStart(2, '0')}`;
     }
-    // MMM/YY or MMM/YYYY  (jan/26, fev/2026)
-    const monthYear = raw.match(/^([a-zçãéí]{3,})\.?[-/](\d{2,4})$/i);
+    // MM/YY or MM-YY  (01/26 -> 2026-01) — só quando o 1º grupo é um mês válido.
+    const mmYy = raw.match(/^(\d{1,2})[-/](\d{2})$/);
+    if (mmYy) {
+        const month = Number(mmYy[1]);
+        if (month >= 1 && month <= 12) {
+            return `${toYear(mmYy[2])}-${mmYy[1].padStart(2, '0')}`;
+        }
+    }
+    // MMM <sep> YY/YYYY — sep pode ser /, -, ., espaço ou "de"
+    // (jan/26, fev/2026, jan-26, "jan de 26", "jan 2026")
+    const monthYear = raw.match(/^([a-zçãéíêôõáâ]{3,})\.?\s*(?:de\s+)?[-/ ]?\s*(\d{2,4})$/i);
     if (monthYear) {
         const monthKey = monthYear[1].slice(0, 3);
         const month = PT_MONTH_MAP[monthKey];
         if (month) {
-            let year = monthYear[2];
-            if (year.length === 2) year = `20${year}`;
-            return `${year}-${month}`;
+            return `${toYear(monthYear[2])}-${month}`;
         }
     }
     return raw;
