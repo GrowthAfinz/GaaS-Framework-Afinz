@@ -11,7 +11,7 @@ import { useTemplatePerformance, type PerformancePrevTotals, type TemplatePerfor
 import type { ActivityRow } from '../../../types/activity';
 import { CommunicationDetailModal } from '../CommunicationDetailModal';
 import { TemplateIdChips } from '../TemplateIdChips';
-import { translateTemplateId } from '../../../utils/taxonomy';
+import { parseSeqParts, translateTemplateId } from '../../../utils/taxonomy';
 import { ChannelPreview, ChannelThumb } from './ChannelPreview';
 import {
   CHANNELS, CHANNEL_ORDER, DIAG, type ChannelKey, type ScoredTemplate, type Tone,
@@ -474,19 +474,52 @@ const KTile: React.FC<{ v: string; l: string; accent?: boolean }> = ({ v, l, acc
 );
 
 // ── TABELA ─────────────────────────────────────────────────────────────────
-type SortKey = 'taxaAbertura' | 'ctr' | 'taxaConversao' | 'cartoes' | 'cacEfetivo' | 'score';
+type SortKey = 'score' | 'recent' | 'moment' | 'entregas' | 'cliques' | 'propostas' | 'cartoes' | 'cacEfetivo' | 'taxaAbertura' | 'ctr' | 'taxaConversao';
+type SortState = { key: SortKey; dir: 1 | -1 };
+
+const SORT_OPTIONS: { key: SortKey; label: string; defaultDir: 1 | -1 }[] = [
+  { key: 'score', label: 'Melhor score', defaultDir: -1 },
+  { key: 'recent', label: 'Mais recentes', defaultDir: -1 },
+  { key: 'moment', label: 'Ordem da régua', defaultDir: 1 },
+  { key: 'entregas', label: 'Mais entregas', defaultDir: -1 },
+  { key: 'cliques', label: 'Mais cliques', defaultDir: -1 },
+  { key: 'propostas', label: 'Mais propostas', defaultDir: -1 },
+  { key: 'cartoes', label: 'Mais emissões', defaultDir: -1 },
+  { key: 'cacEfetivo', label: 'Menor CAC', defaultDir: 1 },
+];
+
+const sortValue = (t: ScoredTemplate, key: SortKey): number | null => {
+  if (key === 'score') return t.score;
+  if (key === 'recent') return t.facets.periodEnd ? Date.parse(`${t.facets.periodEnd}T00:00:00`) : null;
+  if (key === 'moment') {
+    const moment = parseSeqParts(t.template.template_id);
+    if (!moment) return null;
+    return moment.week == null ? 100000 + moment.dispatch : moment.week * 1000 + moment.dispatch;
+  }
+  if (key === 'entregas' && !t.temEntrega) return null;
+  const value = Number(t[key]);
+  if (!Number.isFinite(value)) return null;
+  if (key === 'cacEfetivo' && value <= 0) return null;
+  return value;
+};
+
+const sortTemplates = (items: ScoredTemplate[], sort: SortState) => [...items].sort((a, b) => {
+  const av = sortValue(a, sort.key), bv = sortValue(b, sort.key);
+  if (av == null && bv == null) return a.template.template_id.localeCompare(b.template.template_id);
+  if (av == null) return 1;
+  if (bv == null) return -1;
+  const primary = (av - bv) * sort.dir;
+  if (primary !== 0) return primary;
+  return (b.score ?? -1) - (a.score ?? -1) || a.template.template_id.localeCompare(b.template.template_id);
+});
 const COLS: { key: SortKey; label: string }[] = [
   { key: 'taxaAbertura', label: 'Abertura' }, { key: 'ctr', label: 'Clique' }, { key: 'taxaConversao', label: 'Conversão' },
   { key: 'cartoes', label: 'Cartões' }, { key: 'cacEfetivo', label: 'CAC' }, { key: 'score', label: 'Score' },
 ];
 
-const TableView: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate) => void }> = ({ items, onOpen }) => {
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'score', dir: -1 });
-  const sorted = useMemo(() => {
-    const get = (t: ScoredTemplate) => sort.key === 'score' ? (t.score ?? -1) : Number(t[sort.key] ?? -1);
-    return [...items].sort((a, b) => (get(a) - get(b)) * sort.dir);
-  }, [items, sort]);
-  const setS = (key: SortKey) => setSort((s) => s.key === key ? { key, dir: (s.dir === -1 ? 1 : -1) as 1 | -1 } : { key, dir: -1 });
+const TableView: React.FC<{ items: ScoredTemplate[]; sort: SortState; onSort: (sort: SortState) => void; onOpen: (t: ScoredTemplate) => void }> = ({ items, sort, onSort, onOpen }) => {
+  const sorted = useMemo(() => sortTemplates(items, sort), [items, sort]);
+  const setS = (key: SortKey) => onSort(sort.key === key ? { key, dir: sort.dir === -1 ? 1 : -1 } : { key, dir: key === 'cacEfetivo' ? 1 : -1 });
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -779,6 +812,7 @@ export const PerformanceView: React.FC = () => {
   const [query, setQuery] = useState('');
   const [segment, setSegment] = useState('all');
   const [showDrafts, setShowDrafts] = useState(false);
+  const [sort, setSort] = useState<SortState>({ key: 'score', dir: -1 });
 
   // Deep-link vindo do card "Templates no ar" (Cadastro): abre a view+filtro pedidos.
   useEffect(() => {
@@ -817,6 +851,7 @@ export const PerformanceView: React.FC = () => {
       return searchBlob(t).includes(q);
     });
   }, [scored, channel, query, segment, showDrafts]);
+  const ordered = useMemo(() => sortTemplates(filtered, sort), [filtered, sort]);
 
   const hiddenDrafts = useMemo(() => scored.filter((t) => t.template.status === 'draft').length, [scored]);
   const insight = useMemo(() => {
@@ -900,7 +935,24 @@ export const PerformanceView: React.FC = () => {
               <span className="h-2 w-2 rounded-full" style={{ background: CHANNELS[ch].color }} />{CHANNELS[ch].label}
             </button>
           ))}
-          <label className="ml-auto inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold text-slate-600">
+          <div className="ml-auto inline-flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600">
+            <span className="border-r border-slate-200 px-2.5 py-2 text-slate-400">Ordenar</span>
+            <select
+              value={sort.key}
+              onChange={(e) => {
+                const option = SORT_OPTIONS.find((item) => item.key === e.target.value) ?? SORT_OPTIONS[0];
+                setSort({ key: option.key, dir: option.defaultDir });
+              }}
+              className="bg-white px-2.5 py-2 outline-none"
+              aria-label="Ordenar templates por"
+            >
+              {SORT_OPTIONS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+            </select>
+            <button type="button" onClick={() => setSort((current) => ({ ...current, dir: current.dir === -1 ? 1 : -1 }))} className="border-l border-slate-200 p-2 text-cyan-700 hover:bg-cyan-50" title="Inverter ordem" aria-label="Inverter ordem">
+              {sort.dir === -1 ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+            </button>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold text-slate-600">
             <input type="checkbox" checked={showDrafts} onChange={(e) => setShowDrafts(e.target.checked)} className="peer sr-only" />
             <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-checked:bg-cyan-600 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
             Rascunhos {showDrafts ? 'on' : 'off'}{hiddenDrafts > 0 ? ` (${hiddenDrafts})` : ''}
@@ -932,10 +984,10 @@ export const PerformanceView: React.FC = () => {
         <Overview items={filtered} prev={previousTotals} onOpen={setSelected} />
       ) : view === 'gallery' ? (
         <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((t) => <GalCard key={t.template.template_id} t={t} onOpen={() => setSelected(t)} />)}
+          {ordered.map((t) => <GalCard key={t.template.template_id} t={t} onOpen={() => setSelected(t)} />)}
         </div>
       ) : (
-        <TableView items={filtered} onOpen={setSelected} />
+        <TableView items={filtered} sort={sort} onSort={setSort} onOpen={setSelected} />
       )}
 
       {selected && <Drawer t={selected} onClose={() => setSelected(null)} onEdit={() => { setEditing(selected); setSelected(null); }} onAudit={() => setAuditing(selected)} />}

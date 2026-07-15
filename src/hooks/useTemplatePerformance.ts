@@ -33,6 +33,8 @@ export interface TemplatePerformance {
   timeline: TemplateTimelinePoint[];
   executions: number;
   baseEnviada: number;
+  entregas: number;
+  temEntrega: boolean;
   aberturas: number;
   cliques: number;
   cartoes: number;
@@ -63,6 +65,7 @@ interface ActivityMetricRow {
   'Activity name / Taxonomia': string | null;
   'Data de Disparo': string | null;
   'Base Total': number | null;
+  'Taxa de Entrega'?: number | null;
   Abertura: number | null;
   Cliques: number | null;
   'Cartões Gerados'?: number | null;
@@ -72,6 +75,12 @@ interface ActivityMetricRow {
 }
 
 const num = (v: number | null | undefined) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
+
+const deliveredVolume = (base: number, rawRate: number | null | undefined) => {
+  if (rawRate == null || !Number.isFinite(Number(rawRate))) return 0;
+  const rate = Number(rawRate) > 1 ? Number(rawRate) / 100 : Number(rawRate);
+  return Math.round(base * Math.max(0, Math.min(rate, 1)));
+};
 
 type Accumulator = TemplatePerformance & {
   _names: Set<string>;
@@ -105,6 +114,8 @@ function createAccumulator(template: CommunicationTemplate): Accumulator {
     timeline: [],
     executions: 0,
     baseEnviada: 0,
+    entregas: 0,
+    temEntrega: false,
     aberturas: 0,
     cliques: 0,
     cartoes: 0,
@@ -217,6 +228,7 @@ export function useTemplatePerformance() {
         }
 
         const base = num(r['Base Total']);
+        const entregas = deliveredVolume(base, r['Taxa de Entrega']);
         const aberturas = num(r.Abertura);
         const cliques = num(r.Cliques);
         const cartoes = num(r['Cartões Gerados'] ?? r['CartÃµes Gerados']);
@@ -226,6 +238,8 @@ export function useTemplatePerformance() {
 
         p.executions += 1;
         p.baseEnviada += base;
+        p.entregas += entregas;
+        p.temEntrega ||= r['Taxa de Entrega'] != null;
         p.aberturas += aberturas;
         p.cliques += cliques;
         p.cartoes += cartoes;
