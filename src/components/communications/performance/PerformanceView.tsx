@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BarChart3, Flame, Gauge, LayoutGrid,
-  Link2, ListTree, Loader2, Pencil, Rows3, Route, Search, Send, Users2, X, Zap,
+  Lightbulb, Link2, ListTree, Loader2, Pencil, Rows3, Route, Search, Send, Users2, X, Zap,
+  ZoomIn, ZoomOut,
 } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../../../contexts/PeriodContext';
@@ -125,6 +126,20 @@ const signatureMetric = (t: ScoredTemplate) => t.channelKey === 'sms'
 
 const first = (arr: string[]) => arr[0] ?? null;
 const plusN = (arr: string[]) => (arr.length > 1 ? ` +${arr.length - 1}` : '');
+
+const SEGMENT_LABELS: Record<string, string> = {
+  abandonados: 'Abandonados', base_proprietaria: 'Base Proprietária', crm: 'CRM', negados: 'Negados',
+  leads_parceiros: 'Leads de Parceiros', aprovados_nao_convertidos: 'Aprovados não convertidos',
+  rentabilizacao: 'Rentabilização', cartonistas: 'Cartonistas', recencia_de_compra: 'Recência de compra', instabilidade: 'Instabilidade',
+};
+const SEGMENT_STAGE_FALLBACK: Record<string, string> = {
+  abandonados: 'Meio de funil', base_proprietaria: 'Aquisição', crm: 'Aquisição', negados: 'Meio de funil',
+  leads_parceiros: 'Meio de funil', aprovados_nao_convertidos: 'Meio de funil', rentabilizacao: 'Rentabilização',
+  cartonistas: 'Rentabilização', recencia_de_compra: 'Rentabilização',
+};
+const segmentKey = (value: string) => value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s-]+/g, '_');
+const segmentLabel = (value: string) => SEGMENT_LABELS[segmentKey(value)] ?? value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const stageLabel = (value: string, stages: string[]) => stages[0]?.replace(/_/g, ' ') ?? SEGMENT_STAGE_FALLBACK[segmentKey(value)] ?? 'Etapa não informada';
 
 /** chips de referência (segmento · campanha · safra · período) reutilizados nas views */
 const RefChips: React.FC<{ t: ScoredTemplate }> = ({ t }) => {
@@ -532,7 +547,25 @@ const TableView: React.FC<{ items: ScoredTemplate[]; onOpen: (t: ScoredTemplate)
 };
 
 // ── DRAWER ─────────────────────────────────────────────────────────────────
+// Zoom do preview do criativo (e-mail e imagem). Escalamos a MOLDURA (width/height),
+// não um transform, para que o scroll acompanhe naturalmente ao ampliar.
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.5;
+const PREVIEW_W = 500;
+const PREVIEW_H = 620;
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100));
+
 const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => void; onAudit: () => void }> = ({ t, onClose, onEdit, onAudit }) => {
+  const [zoom, setZoom] = useState(1);
+
+  // Fecha com Esc e reseta o zoom ao trocar de template.
+  useEffect(() => { setZoom(1); }, [t.template.template_id]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const funnel = [
     { l: 'Base', v: t.baseEnviada, pct: null as number | null },
     { l: 'Abertura', v: t.aberturas > 0 ? t.aberturas : null, pct: t.aberturas > 0 ? t.taxaAbertura : null },
@@ -547,12 +580,23 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/45 backdrop-blur-sm" onClick={onClose}>
       <div className="grid h-full w-[1360px] max-w-[98vw] grid-cols-[minmax(560px,44%)_1fr] bg-white shadow-2xl" style={{ animation: 'perfDrawer .28s ease' }} onClick={(e) => e.stopPropagation()}>
         <style>{`@keyframes perfDrawer{from{transform:translateX(40px);opacity:.5}to{transform:translateX(0);opacity:1}}`}</style>
-        <div className="flex flex-col overflow-y-auto border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white p-[18px]">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="flex flex-col overflow-hidden border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white p-[18px]">
+          <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
             <ChannelTag channel={t.template.channel} soft />
-            <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"><X size={16} /></button>
+            <div className="flex items-center gap-1.5">
+              <div className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
+                <button onClick={() => setZoom((z) => clampZoom(z - 0.25))} disabled={zoom <= MIN_ZOOM} title="Diminuir zoom" className="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40"><ZoomOut size={15} /></button>
+                <button onClick={() => setZoom(1)} title="Restaurar zoom (100%)" className="min-w-[46px] rounded-md px-1 py-1 text-center text-[11px] font-bold tabular-nums text-slate-600 transition-colors hover:bg-slate-100">{Math.round(zoom * 100)}%</button>
+                <button onClick={() => setZoom((z) => clampZoom(z + 0.25))} disabled={zoom >= MAX_ZOOM} title="Aumentar zoom" className="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40"><ZoomIn size={15} /></button>
+              </div>
+              <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"><X size={16} /></button>
+            </div>
           </div>
-          <div className="flex flex-1 items-start justify-center"><ChannelPreview item={t} width={560} height={780} /></div>
+          <div className="flex-1 overflow-auto">
+            <div className="flex min-h-full min-w-full items-center justify-center p-2">
+              <ChannelPreview item={t} width={Math.round(PREVIEW_W * zoom)} height={Math.round(PREVIEW_H * zoom)} />
+            </div>
+          </div>
         </div>
         <div className="overflow-y-auto p-6">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -719,9 +763,11 @@ export const PerformanceView: React.FC = () => {
   const { startDate, endDate } = usePeriod();
   const perfDeepLink = useAppStore((s) => s.perfDeepLink);
   const setPerfDeepLink = useAppStore((s) => s.setPerfDeepLink);
-  const [view, setView] = useState<ViewMode>('overview');
+  const [view, setView] = useState<ViewMode>('gallery');
   const [channel, setChannel] = useState<ChannelKey | 'all'>('all');
   const [query, setQuery] = useState('');
+  const [segment, setSegment] = useState('all');
+  const [showDrafts, setShowDrafts] = useState(false);
 
   // Deep-link vindo do card "Templates no ar" (Cadastro): abre a view+filtro pedidos.
   useEffect(() => {
@@ -729,6 +775,7 @@ export const PerformanceView: React.FC = () => {
     setView(perfDeepLink.view);
     setQuery(perfDeepLink.query);
     setChannel('all');
+    setSegment('all');
     setPerfDeepLink(null);
   }, [perfDeepLink, setPerfDeepLink]);
   const [selected, setSelected] = useState<ScoredTemplate | null>(null);
@@ -736,14 +783,39 @@ export const PerformanceView: React.FC = () => {
   const [auditing, setAuditing] = useState<ScoredTemplate | null>(null);
 
   const scored = useMemo<ScoredTemplate[]>(() => data.map(scoreTemplate), [data]);
+  const segmentOptions = useMemo(() => {
+    const bySegment = new Map<string, { value: string; stages: Set<string>; templates: Set<string> }>();
+    scored.forEach((t) => t.facets.segmentos.forEach((value) => {
+      const key = segmentKey(value);
+      const current = bySegment.get(key) ?? { value, stages: new Set<string>(), templates: new Set<string>() };
+      t.facets.etapas.forEach((stage) => current.stages.add(stage));
+      current.templates.add(t.template.template_id);
+      bySegment.set(key, current);
+    }));
+    return Array.from(bySegment.entries())
+      .map(([key, option]) => ({ key, value: option.value, stages: Array.from(option.stages), count: option.templates.size }))
+      .sort((a, b) => segmentLabel(a.value).localeCompare(segmentLabel(b.value), 'pt-BR'));
+  }, [scored]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return scored.filter((t) => {
+      if (!showDrafts && t.template.status === 'draft') return false;
+      if (segment !== 'all' && !t.facets.segmentos.some((value) => segmentKey(value) === segment)) return false;
       if (channel !== 'all' && t.channelKey !== channel) return false;
       if (!q) return true;
       return searchBlob(t).includes(q);
     });
-  }, [scored, channel, query]);
+  }, [scored, channel, query, segment, showDrafts]);
+
+  const hiddenDrafts = useMemo(() => scored.filter((t) => t.template.status === 'draft').length, [scored]);
+  const insight = useMemo(() => {
+    if (!filtered.length) return 'Não há peças comparáveis neste recorte. Tente outro segmento, canal ou ative os rascunhos.';
+    const actions = suggestedActions(filtered);
+    if (actions[0]) return `${actions[0].title}. ${actions[0].text}`;
+    const best = [...filtered].filter((t) => t.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+    if (best) return `${best.template.template_id} lidera o recorte com score ${best.score}/100. Compare oferta, CTA e abertura com as peças de menor score do mesmo segmento.`;
+    return 'Compare peças do mesmo segmento e etapa de funil; depois altere apenas o canal para reduzir diferenças de contexto.';
+  }, [filtered]);
 
   const periodLabel = `${startDate.toLocaleDateString('pt-BR')} – ${endDate.toLocaleDateString('pt-BR')}`;
 
@@ -776,6 +848,23 @@ export const PerformanceView: React.FC = () => {
       </div>
 
       {view !== 'overview' && (
+        <div className="space-y-3">
+        <section aria-labelledby="segment-filter-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div><h3 id="segment-filter-title" className="text-sm font-bold text-slate-800">Escolha o segmento</h3><p className="mt-0.5 text-xs text-slate-400">Compare primeiro peças do mesmo público e etapa de funil.</p></div>
+            {segment !== 'all' && <button type="button" onClick={() => setSegment('all')} className="text-xs font-semibold text-cyan-700 hover:text-cyan-900">Limpar seleção</button>}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <button type="button" onClick={() => setSegment('all')} aria-pressed={segment === 'all'} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${segment === 'all' ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+              <span className="block text-xs font-bold text-slate-800">Todos os segmentos</span><span className="mt-0.5 block text-[10px] text-slate-400">{scored.length} templates</span>
+            </button>
+            {segmentOptions.map((option) => (
+              <button key={option.key} type="button" onClick={() => setSegment(option.key)} aria-pressed={segment === option.key} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${segment === option.key ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+                <span className="block text-xs font-bold text-slate-800">{segmentLabel(option.value)}</span><span className="mt-0.5 block text-[10px] text-slate-400">{stageLabel(option.value, option.stages)} · {option.count} tmpl.</span>
+              </button>
+            ))}
+          </div>
+        </section>
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
           <button onClick={() => setChannel('all')} className={`rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${channel === 'all' ? 'bg-slate-900 text-white ring-slate-900' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>Todos</button>
           {CHANNEL_ORDER.map((ch) => (
@@ -784,10 +873,20 @@ export const PerformanceView: React.FC = () => {
               <span className="h-2 w-2 rounded-full" style={{ background: CHANNELS[ch].color }} />{CHANNELS[ch].label}
             </button>
           ))}
-          <div className="ml-auto flex min-w-[300px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-400 md:max-w-[420px]">
+          <label className="ml-auto inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold text-slate-600">
+            <input type="checkbox" checked={showDrafts} onChange={(e) => setShowDrafts(e.target.checked)} className="peer sr-only" />
+            <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-checked:bg-cyan-600 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
+            Rascunhos {showDrafts ? 'on' : 'off'}{hiddenDrafts > 0 ? ` (${hiddenDrafts})` : ''}
+          </label>
+          <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-400 md:max-w-[420px]">
             <Search size={14} />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por template, segmento, jornada ou activity_name…" className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
           </div>
+        </div>
+        <aside className="flex items-start gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-3" aria-label="Insight do recorte">
+          <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-cyan-700 shadow-sm"><Lightbulb size={15} /></span>
+          <div className="min-w-0"><p className="text-[11px] font-bold uppercase tracking-wide text-cyan-700">Insight e sugestão de análise</p><p className="mt-1 text-sm leading-relaxed text-slate-600">{insight}</p></div>
+        </aside>
         </div>
       )}
 
