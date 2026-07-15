@@ -14,6 +14,7 @@ import { exportAquisicaoCrmMonthlyXlsx, exportAquisicaoCrmXlsx } from '../utils/
 import { exportMidiaPagaMonthlyXlsx } from '../utils/midiaPagaMonthlyReportExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
+import { ReportLiveCard } from './relatorio/ReportLiveCard';
 import {
   ColumnKey,
   DimensionKey,
@@ -433,17 +434,18 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     const totalAprovados = displayRows.reduce((s, r) => s + r.aprovados, 0);
     const totalEmissoes = displayRows.reduce((s, r) => s + r.emissoes, 0);
     const totalCusto = displayRows.reduce((s, r) => s + r.custoTotal, 0);
-    const rowsComEmissao = displayRows.filter(r => r.emissoes > 0);
-    const avgCustoCartao = rowsComEmissao.length > 0
-      ? rowsComEmissao.reduce((s, r) => s + r.custoPorCartao, 0) / rowsComEmissao.length
-      : 0;
+    // CAC / Custo por Cartão agregado é SEMPRE ponderado (Σcusto / Σemissões),
+    // nunca a média simples das razões por disparo — a média de razões não é uma
+    // média válida de custo e diverge da visão Mensal e dos blocos de Performance
+    // (ambos usam computeRow ponderado). Ver monthlyAggregation.metricsFromVolumes.
+    const custoPorCartao = totalEmissoes > 0 ? totalCusto / totalEmissoes : 0;
     return {
       totalEntregas,
       totalPropostas,
       totalAprovados,
       totalEmissoes,
       totalCusto,
-      avgCustoCartao,
+      custoPorCartao,
       taxaProposta: totalEntregas > 0 ? totalPropostas / totalEntregas : 0,
       taxaAprovacao: totalPropostas > 0 ? totalAprovados / totalPropostas : 0,
       taxaFinalizacao: totalEntregas > 0 ? totalEmissoes / totalEntregas : 0,
@@ -847,6 +849,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           <p className="px-1 text-xs text-slate-500">
             Período <b className="text-slate-700">{format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</b> · aplica-se a todos os relatórios (mensais comparam vs mês anterior).
           </p>
+          <ReportLiveCard periodStart={periodStart} periodEnd={periodEnd} />
           <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 overflow-hidden">
             {[
               { key: 'mp', group: 'Mensais', title: 'Mídia Paga + CRM — Mensal', desc: 'frentes, criativo por grupo, Start Trial B2C, CRM e Diarizado', onClick: exportMidiaPagaMonthly, loading: isExportingMidiaPagaMonthly, color: 'text-violet-500' },

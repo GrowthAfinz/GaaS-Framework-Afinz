@@ -78,7 +78,8 @@ export interface DetailSummary {
   totalAprovados: number;
   totalEmissoes: number;
   totalCusto: number;
-  avgCustoCartao: number;
+  /** CAC agregado ponderado (Σcusto / Σemissões) — não é média das razões por disparo. */
+  custoPorCartao: number;
   taxaProposta: number;
   taxaAprovacao: number;
   taxaFinalizacao: number;
@@ -386,7 +387,7 @@ const DetailTableComponent: React.FC<DetailTableProps> = ({
     aprovados: summary.totalAprovados,
     emissoes: summary.totalEmissoes,
     custoTotal: summary.totalCusto,
-    custoPorCartao: summary.avgCustoCartao,
+    custoPorCartao: summary.custoPorCartao,
     taxaProposta: summary.taxaProposta,
     taxaAprovacao: summary.taxaAprovacao,
     taxaFinalizacao: summary.taxaFinalizacao,
@@ -398,7 +399,7 @@ const DetailTableComponent: React.FC<DetailTableProps> = ({
     taxaClique: 0,
     emissoesIndependentes: 0,
     emissoesAssistidas: 0,
-    cac: 0,
+    cac: summary.custoPorCartao,
     participacaoEmissoes: 0,
   };
 
