@@ -215,7 +215,7 @@ export const ActivityLinkManager: React.FC<Props> = ({ template, contentText = '
                 )}
                 {diagnostics.rejected.hardIncompatible > 0 && (
                   <p className="mt-1">
-                    Conflitos fortes: canal {diagnostics.hardRejectReasons.channel}, parceiro {diagnostics.hardRejectReasons.partner}, campanha {diagnostics.hardRejectReasons.campaign}.
+                    Conflitos fortes: canal {diagnostics.hardRejectReasons.channel}, parceiro {diagnostics.hardRejectReasons.partner}, segmento {diagnostics.hardRejectReasons.segment}, campanha {diagnostics.hardRejectReasons.campaign}.
                   </p>
                 )}
               </div>

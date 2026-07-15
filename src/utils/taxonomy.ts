@@ -171,16 +171,41 @@ export function canalToId(canal: string | null | undefined): string | null {
 }
 
 /** Parceiro estruturado (activities.Parceiro) → id de público. */
+function normalizeTaxonomyText(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function hasTaxonomyToken(value: unknown, token: string): boolean {
+  return ` ${normalizeTaxonomyText(value)} `.includes(` ${normalizeTaxonomyText(token)} `);
+}
+
+/** Resolve primeiro identidades especificas; `afz` e marca e tambem aparece em B2B2C. */
+export function resolvePublico(raw: string): string | null {
+  if (['bbt', 'b2b2c', 'bb', 'bem barato'].some((token) => hasTaxonomyToken(raw, token))) return 'bb';
+  if (hasTaxonomyToken(raw, 'dia')) return 'dia';
+  if (['plx', 'plu', 'plurix'].some((token) => hasTaxonomyToken(raw, token))) return 'plurix';
+  if (['b2c', 'vis'].some((token) => hasTaxonomyToken(raw, token))) return 'b2c';
+  if (hasTaxonomyToken(raw, 'afz')) return 'b2c';
+  return null;
+}
+
 export function parceiroToPublico(parceiro: string | null | undefined, activityName = ''): string | null {
+  const contextual = resolvePublico(activityName);
+  if (contextual && contextual !== 'b2c') return contextual;
   const p = (parceiro ?? '').toLowerCase();
   if (p.includes('dia')) return 'dia';
   if (p.includes('bem') || p.includes('barato')) return 'bb';
   if (p.includes('plurix')) return 'plurix';
   if (p.includes('proprietaria') || p.includes('serasa') || p === 'n/a' || !p) {
     // Sem parceiro claro → cai no token da taxonomia
-    return resolveDim('publico', activityName);
+    return contextual;
   }
-  return resolveDim('publico', activityName);
+  return contextual;
 }
 
 /** Segmento estruturado (activities.Segmento) → id de segmento. */
@@ -195,6 +220,7 @@ export function segmentoToId(segmento: string | null | undefined, activityName =
 }
 
 export function resolveDim(dim: DimId, raw: string): string | null {
+  if (dim === 'publico') return resolvePublico(raw);
   const t = String(raw || '').toLowerCase();
   for (const o of TAXO[dim].opts) if (o.tokens.some((tok) => t.includes(tok))) return o.id;
   return null;
@@ -294,14 +320,26 @@ export function isInvertedSeq(a: string | null | undefined, b: string | null | u
 }
 
 /** Decodifica um disparo usando colunas estruturadas + fallback na string. */
-export function parseActivity(name: string, structured?: { canal?: string | null; parceiro?: string | null; segmento?: string | null }): ParsedActivity {
+export function parseActivity(name: string, structured?: {
+  canal?: string | null;
+  parceiro?: string | null;
+  segmento?: string | null;
+  bu?: string | null;
+  jornada?: string | null;
+}): ParsedActivity {
   const n = name.toLowerCase();
+  const identityContext = [name, structured?.jornada, structured?.bu].filter(Boolean).join(' ');
+  const publico = parceiroToPublico(structured?.parceiro, identityContext);
+  const journeySegment = segmentoToId(null, structured?.jornada ?? '');
+  const segmento = publico === 'bb' && journeySegment === 'crm'
+    ? 'crm'
+    : segmentoToId(structured?.segmento, `${structured?.jornada ?? ''} ${n}`);
   const seq = parseSeq(name);
   return {
-    publico: parceiroToPublico(structured?.parceiro, n),
+    publico,
     canal: canalToId(structured?.canal) ?? resolveDim('canal', n),
     campanha: resolveDim('campanha', n),
-    segmento: segmentoToId(structured?.segmento, n),
+    segmento,
     cadencia: seq && seq.startsWith('D') ? seq : resolveDim('cadencia', n),
     variante: resolveDim('variante', n),
     seq,
@@ -332,6 +370,9 @@ export interface MatchResult<T> { tpl: T; score: number; reasons: MatchReason[] 
 export function matchTemplate<T extends { dims: TemplateDims }>(parsed: ParsedActivity, templates: T[]): MatchResult<T> | null {
   let best: MatchResult<T> | null = null;
   for (const tpl of templates) {
+    const incompatibleIdentity = (['publico', 'canal', 'campanha', 'segmento'] as const)
+      .some((dim) => parsed[dim] && tpl.dims[dim] && parsed[dim] !== tpl.dims[dim]);
+    if (incompatibleIdentity) continue;
     const reasons: MatchReason[] = [];
     let score = 0;
     let canalOk = false;

@@ -79,6 +79,7 @@ interface OrphanQueryRow {
   'Activity name / Taxonomia': string | null;
   jornada: string | null;
   Canal: string | null;
+  BU: string | null;
   Parceiro: string | null;
   Segmento: string | null;
   'Base Total': number | null;
@@ -276,7 +277,7 @@ export function useReconciliation() {
     setLoading(true);
     setError(null);
     try {
-      const baseSelect = '"Activity name / Taxonomia", jornada, "Canal", "Parceiro", "Segmento", "Base Total", "Data de Disparo", template_id';
+      const baseSelect = '"Activity name / Taxonomia", jornada, "Canal", "BU", "Parceiro", "Segmento", "Base Total", "Data de Disparo", template_id';
 
       let orphanQuery = supabase
         .from('activities')
@@ -354,7 +355,9 @@ export function useReconciliation() {
           if (date && (!existing.latestDate || date > existing.latestDate)) existing.latestDate = date;
         } else {
           const chId = canalToId(r.Canal);
-          const parsed = parseActivity(name, { canal: r.Canal, parceiro: r.Parceiro, segmento: r.Segmento });
+          const parsed = parseActivity(name, {
+            canal: r.Canal, parceiro: r.Parceiro, segmento: r.Segmento, bu: r.BU, jornada: r.jornada,
+          });
           const slot = slotMap.get(slotKey(r.jornada, name, r.Canal));
           const momentSuggestion = readMomentSuggestion(slot?.metadata) ?? inferMomentSuggestion(name);
           const effectiveParsed = applyMomentSuggestion(parsed, momentSuggestion);
@@ -419,7 +422,9 @@ export function useReconciliation() {
           if (date && (!existing.latestDate || date > existing.latestDate)) existing.latestDate = date;
         } else {
           const chId = canalToId(r.Canal);
-          const parsed = parseActivity(name, { canal: r.Canal, parceiro: r.Parceiro, segmento: r.Segmento });
+          const parsed = parseActivity(name, {
+            canal: r.Canal, parceiro: r.Parceiro, segmento: r.Segmento, bu: r.BU, jornada: r.jornada,
+          });
           byLinked.set(uid, {
             uid,
             name,

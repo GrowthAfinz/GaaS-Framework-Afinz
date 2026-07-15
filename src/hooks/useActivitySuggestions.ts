@@ -87,6 +87,7 @@ export interface ActivitySuggestionDiagnostics {
     channel: number;
     partner: number;
     campaign: number;
+    segment: number;
   };
   planned: {
     total: number;
@@ -126,6 +127,7 @@ const EMPTY_DIAGNOSTICS: ActivitySuggestionDiagnostics = {
     channel: 0,
     partner: 0,
     campaign: 0,
+    segment: 0,
   },
   planned: {
     total: 0,
@@ -397,8 +399,11 @@ function channelMatches(ctx: TemplateSuggestionContext, r: Row): boolean | null 
   return rowChannel === ctx.channel;
 }
 
-function hardRejectReason(ctx: TemplateSuggestionContext, r: Row): 'channel' | 'partner' | 'campaign' | null {
+function hardRejectReason(ctx: TemplateSuggestionContext, r: Row): 'channel' | 'partner' | 'campaign' | 'segment' | null {
   if (channelMatches(ctx, r) === false) return 'channel';
+  if (partnerMatches(ctx, r) === false) return 'partner';
+  if (segmentMatches(ctx, r) === false) return 'segment';
+  if (campaignMatches(ctx, r) === false) return 'campaign';
   return null;
 }
 
@@ -722,7 +727,7 @@ export function useActivitySuggestions(template: CatalogTemplate | null, options
     }
 
     const rejected = { missingName: 0, hardIncompatible: 0, lowScore: 0 };
-    const hardRejectReasons = { channel: 0, partner: 0, campaign: 0 };
+    const hardRejectReasons = { channel: 0, partner: 0, campaign: 0, segment: 0 };
     const byName = new Map<string, ActivitySuggestion>();
 
     for (const r of rows) {
