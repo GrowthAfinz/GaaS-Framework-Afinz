@@ -820,12 +820,28 @@ export const PerformanceView: React.FC = () => {
 
   const hiddenDrafts = useMemo(() => scored.filter((t) => t.template.status === 'draft').length, [scored]);
   const insight = useMemo(() => {
-    if (!filtered.length) return 'Não há peças comparáveis neste recorte. Tente outro segmento, canal ou ative os rascunhos.';
+    if (!filtered.length) return {
+      lead: 'Sem peças comparáveis',
+      text: 'Tente outro segmento, canal ou ative os rascunhos.',
+      item: null,
+    };
     const actions = suggestedActions(filtered);
-    if (actions[0]) return `${actions[0].title}. ${actions[0].text}`;
+    if (actions[0]) return {
+      lead: actions[0].title.replace(actions[0].item.template.template_id, '').trim(),
+      text: actions[0].text,
+      item: actions[0].item,
+    };
     const best = [...filtered].filter((t) => t.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
-    if (best) return `${templateLabelText(best.template.template_id)} lidera o recorte com score ${best.score}/100. Compare oferta, CTA e abertura com as peças de menor score do mesmo segmento.`;
-    return 'Compare peças do mesmo segmento e etapa de funil; depois altere apenas o canal para reduzir diferenças de contexto.';
+    if (best) return {
+      lead: 'Lidera o recorte',
+      text: `Score ${best.score}/100. Compare oferta, CTA e abertura com as peças de menor score do mesmo segmento.`,
+      item: best,
+    };
+    return {
+      lead: 'Próxima análise',
+      text: 'Compare peças do mesmo segmento e etapa de funil; depois altere apenas o canal para reduzir diferenças de contexto.',
+      item: null,
+    };
   }, [filtered]);
 
   const periodLabel = `${startDate.toLocaleDateString('pt-BR')} – ${endDate.toLocaleDateString('pt-BR')}`;
@@ -896,7 +912,14 @@ export const PerformanceView: React.FC = () => {
         </div>
         <aside className="flex items-start gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-3" aria-label="Insight do recorte">
           <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-cyan-700 shadow-sm"><Lightbulb size={15} /></span>
-          <div className="min-w-0"><p className="text-[11px] font-bold uppercase tracking-wide text-cyan-700">Insight e sugestão de análise</p><p className="mt-1 text-sm leading-relaxed text-slate-600">{insight}</p></div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-cyan-700">Insight e sugestão de análise</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-sm font-semibold text-slate-800">{insight.lead}</span>
+              {insight.item && <TemplateIdChips id={insight.item.template.template_id} />}
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">{insight.text}</p>
+          </div>
         </aside>
         </div>
       )}
