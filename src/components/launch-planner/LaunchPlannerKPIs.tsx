@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Goal } from '../../types/framework';
 import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, CartesianGrid } from 'recharts';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
@@ -56,6 +56,60 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         });
         return Array.from(segments);
     }, [activities, allStoreActivities, selectedBUs, isMonthly]);
+
+    // Filtro por clique na legenda: ao clicar num segmento (ou canal), os gráficos de
+    // Propostas/Emissões passam a exibir apenas aquela série; as demais somem do gráfico
+    // e ficam cinza na legenda. Clicar de novo (ou em outra) limpa/troca a seleção.
+    // A chave é o NOME da série, então a seleção vale para os dois gráficos e persiste
+    // entre os modos Mensal e Diário.
+    const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
+
+    const validSeriesNames = useMemo(() => {
+        const names = new Set<string>();
+        if (showSerasa) {
+            names.add('CRM B2C');
+            names.add('Serasa API');
+        } else {
+            activeSegments.forEach(s => names.add(s));
+        }
+        names.add('Outros B2C');
+        return names;
+    }, [showSerasa, activeSegments]);
+
+    // Se a série selecionada deixar de existir (ex.: alternar Serasa API, mudar de BU),
+    // limpa a seleção para não esconder todas as barras e deixar o gráfico vazio.
+    useEffect(() => {
+        if (selectedSeries && !validSeriesNames.has(selectedSeries)) {
+            setSelectedSeries(null);
+        }
+    }, [selectedSeries, validSeriesNames]);
+
+    const isSeriesHidden = (name: string) => !!selectedSeries && selectedSeries !== name;
+
+    const segmentLegendProps = {
+        iconSize: 8,
+        wrapperStyle: { fontSize: '10px', paddingTop: '5px' },
+        onClick: (o: any) => {
+            const name = o?.value ?? o?.payload?.value;
+            if (!name) return;
+            setSelectedSeries(prev => (prev === name ? null : name));
+        },
+        formatter: (value: string) => {
+            const dimmed = !!selectedSeries && selectedSeries !== value;
+            return (
+                <span
+                    style={{
+                        color: dimmed ? '#cbd5e1' : '#475569',
+                        opacity: dimmed ? 0.6 : 1,
+                        cursor: 'pointer',
+                        fontWeight: selectedSeries === value ? 700 : 400,
+                    }}
+                >
+                    {value}
+                </span>
+            );
+        },
+    };
 
     const dailySegmentsMap = useMemo(() => {
         const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
@@ -544,8 +598,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
                                     <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
-                                    <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                    {showSerasa && <Bar dataKey="propostas_crm" name="CRM B2C" stackId="a" fill="#3B82F6" />}
+                                    <Legend {...segmentLegendProps} />
+                                    {showSerasa && <Bar dataKey="propostas_crm" name="CRM B2C" stackId="a" fill="#3B82F6" hide={isSeriesHidden('CRM B2C')} />}
                                     {!showSerasa && activeSegments.map((segment, index) => (
                                         <Bar
                                             key={segment}
@@ -553,10 +607,11 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                             name={segment}
                                             stackId="a"
                                             fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                                            hide={isSeriesHidden(segment)}
                                         />
                                     ))}
-                                    {showSerasa && <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" />}
-                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
+                                    {showSerasa && <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
+                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={isSeriesHidden('Outros B2C')} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -573,8 +628,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
                                     <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
-                                    <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
-                                    {showSerasa && <Bar dataKey="emissoes_crm" name="CRM B2C" stackId="a" fill="#10B981" />}
+                                    <Legend {...segmentLegendProps} />
+                                    {showSerasa && <Bar dataKey="emissoes_crm" name="CRM B2C" stackId="a" fill="#10B981" hide={isSeriesHidden('CRM B2C')} />}
                                     {!showSerasa && activeSegments.map((segment, index) => (
                                         <Bar
                                             key={segment}
@@ -582,10 +637,11 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                             name={segment}
                                             stackId="a"
                                             fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
+                                            hide={isSeriesHidden(segment)}
                                         />
                                     ))}
-                                    {showSerasa && <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" />}
-                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} />
+                                    {showSerasa && <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
+                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={isSeriesHidden('Outros B2C')} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
