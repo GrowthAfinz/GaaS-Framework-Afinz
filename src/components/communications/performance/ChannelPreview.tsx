@@ -1,9 +1,23 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FileImage, Loader2 } from 'lucide-react';
+import { Bell, FileImage, Loader2, Mail, MessageCircle, MessageSquareText } from 'lucide-react';
 import type { TemplatePerformance } from '../../../hooks/useTemplatePerformance';
 import { getSignedUrl } from '../../../services/communicationService';
 import { isEmailChannel } from '../../../utils/inferChannel';
 import { CHANNELS, channelKeyOf } from './perfModel';
+
+const CHANNEL_ICON = {
+  email: Mail,
+  whatsapp: MessageCircle,
+  push: Bell,
+  sms: MessageSquareText,
+} as const;
+
+export const ChannelGlyph: React.FC<{ channel: string; size?: number; className?: string }> = ({ channel, size = 17, className }) => {
+  const key = channelKeyOf(channel);
+  const Icon = CHANNEL_ICON[key];
+  const meta = CHANNELS[key];
+  return <Icon size={size} strokeWidth={2} className={className} aria-hidden="true" title={meta.label} />;
+};
 
 const EMAIL_LOGICAL_WIDTH = 640; // largura lógica de render do e-mail antes de escalar
 
@@ -108,13 +122,13 @@ const EmailFit: React.FC<{ html: string; width: number; height: number; title: s
   );
 };
 
-/** Thumbnail compacto e robusto (listas/tabela): tile com a sigla do canal. */
+/** Thumbnail compacto e robusto (listas/tabela): tile com ícone semântico do canal. */
 export const ChannelThumb: React.FC<{ item: TemplatePerformance; w?: number; h?: number }> = ({ item, w = 42, h }) => {
   const ch = CHANNELS[channelKeyOf(item.template.channel)];
   const height = h ?? Math.round(w * 1.25);
   return (
-    <div className="flex shrink-0 items-center justify-center rounded-lg border" style={{ width: w, height, background: `linear-gradient(160deg, ${ch.tint}, #fff 80%)`, borderColor: '#e7ebf0' }}>
-      <span className="text-[10px] font-bold tracking-wide" style={{ color: ch.dark }}>{ch.short}</span>
+    <div className="flex shrink-0 items-center justify-center rounded-xl border shadow-sm" title={ch.label} aria-label={ch.label} style={{ width: w, height, color: ch.dark, background: `linear-gradient(145deg, ${ch.tint}, #fff 88%)`, borderColor: `${ch.color}30`, boxShadow: `inset 0 0 0 1px ${ch.color}0a` }}>
+      <ChannelGlyph channel={item.template.channel} size={Math.max(15, Math.min(20, w * 0.44))} />
     </div>
   );
 };

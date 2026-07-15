@@ -12,7 +12,7 @@ import type { ActivityRow } from '../../../types/activity';
 import { CommunicationDetailModal } from '../CommunicationDetailModal';
 import { TemplateIdChips } from '../TemplateIdChips';
 import { parseSeqParts, translateTemplateId } from '../../../utils/taxonomy';
-import { ChannelPreview, ChannelThumb } from './ChannelPreview';
+import { ChannelGlyph, ChannelPreview, ChannelThumb } from './ChannelPreview';
 import {
   CHANNELS, CHANNEL_ORDER, DIAG, type ChannelKey, type ScoredTemplate, type Tone,
   buColor, channelKeyOf, channelStats, contextLabel, dispatchTimeline, facetPeriodLabel, fmt, perfTotals,
@@ -37,10 +37,10 @@ const ChannelTag: React.FC<{ channel: string; soft?: boolean }> = ({ channel, so
   const ch = CHANNELS[channelKeyOf(channel)];
   if (soft) return (
     <span className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-bold" style={{ color: ch.dark, background: ch.tint }}>
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: ch.color }} />{ch.label}
+      <ChannelGlyph channel={channel} size={13} />{ch.label}
     </span>
   );
-  return <span className="inline-flex items-center rounded-[5px] px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white" style={{ background: ch.color }}>{ch.short}</span>;
+  return <span className="grid h-7 w-7 place-items-center rounded-lg text-white shadow-sm ring-1 ring-white/40" title={ch.label} aria-label={ch.label} style={{ background: ch.color }}><ChannelGlyph channel={channel} size={15} /></span>;
 };
 
 const BuChip: React.FC<{ bu?: string | null }> = ({ bu }) => {
