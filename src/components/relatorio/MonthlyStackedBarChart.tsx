@@ -18,6 +18,7 @@ import {
   NON_STACKABLE_MONTHLY_METRICS,
 } from '../../utils/monthlyAggregation';
 import { useAppStore } from '../../store/useAppStore';
+import { ChartTooltip } from '../ui/ChartTooltip';
 
 interface MonthlyStackedBarChartProps {
   title: string;
@@ -248,9 +249,15 @@ export const MonthlyStackedBarChart: React.FC<MonthlyStackedBarChartProps> = ({ 
             />
             <Tooltip
               cursor={{ fill: '#E2E8F0', opacity: 0.35 }}
-              formatter={(value: number, name: string) => [formatChartValue(value, metric), name]}
-              labelFormatter={(label) => `Mês: ${label}`}
-              contentStyle={{ borderColor: '#E2E8F0', borderRadius: 12, boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)' }}
+              wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
+              content={
+                <ChartTooltip
+                  labelPrefix="Mês"
+                  totalLabel="Total no mês"
+                  formatValue={(value) => formatChartValue(value, metric)}
+                  showTotal={isStackable}
+                />
+              }
             />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12, cursor: 'pointer' }} />
             {series.map((label, index) => (

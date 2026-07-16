@@ -22,6 +22,7 @@ import { NON_STACKABLE_MONTHLY_METRICS } from '../../utils/monthlyAggregation';
 import { DailyDimension, DailyDimensionRow, totalsFromDimensionRows } from '../../utils/dailyAggregation';
 import { SERASA_SEGMENT_LABEL, SERASA_SERIES_COLOR } from '../../utils/serasaAggregation';
 import { useAppStore } from '../../store/useAppStore';
+import { ChartTooltip } from '../ui/ChartTooltip';
 
 interface DailyStackedBarChartProps {
   title: string;
@@ -368,12 +369,19 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
             )}
             <Tooltip
               cursor={{ fill: '#E2E8F0', opacity: 0.35 }}
-              formatter={(value: number, name: string, props: any) => {
-                const metricKey = (isMultiMetric ? (props?.dataKey as MetricKey) : activeMetrics[0]);
-                return [formatChartValue(Number(value), metricKey), name];
-              }}
-              labelFormatter={(label) => `Dia: ${label}`}
-              contentStyle={{ borderColor: '#E2E8F0', borderRadius: 12, boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)' }}
+              wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
+              content={
+                <ChartTooltip
+                  labelPrefix="Dia"
+                  totalLabel="Total no dia"
+                  formatValue={(value, entry) =>
+                    formatChartValue(value, isMultiMetric ? (entry?.dataKey as MetricKey) : activeMetrics[0])
+                  }
+                  // Em multi-métrica cada série tem unidade própria (base, R$, %) — somar não faz sentido.
+                  isRate={(entry) => isMultiMetric && getMetricFamily(entry?.dataKey as MetricKey) === 'percent'}
+                  showTotal={isStackable && !isMultiMetric}
+                />
+              }
             />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12, cursor: 'pointer' }} />
             {isMultiMetric

@@ -6,6 +6,7 @@ import { useBU } from '../../contexts/BUContext';
 import { Info } from 'lucide-react';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 import { useAppStore } from '../../store/useAppStore';
+import { ChartTooltip } from '../ui/ChartTooltip';
 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -418,47 +419,21 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         }));
     }, [activities]);
 
-    const ChartTooltip = ({ active, payload, label }: any) => {
-        if (!active || !payload || !payload.length) return null;
+    // Moeda (CAC) é uma taxa — é listada, mas não entra na soma das séries.
+    const isCacEntry = (entry: any) => Boolean(entry?.name && String(entry.name).includes('CAC'));
 
-        const fmtInt = (v: number) => (v || 0).toLocaleString('pt-BR');
-        const fmtBRL = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
-
-        // Moeda (CAC) é uma taxa — não entra no total. Segmentos com valor > 0 entram.
-        const currencyEntries = payload.filter((e: any) => e?.name && e.name.includes('CAC'));
-        const valueEntries = payload.filter((e: any) => e?.name && !e.name.includes('CAC') && (e.value ?? 0) > 0);
-        const total = valueEntries.reduce((s: number, e: any) => s + (e.value || 0), 0);
-        const showTotal = valueEntries.length > 0;
-
-        const Row = ({ color, name, value, strong }: { color?: string; name: string; value: string; strong?: boolean }) => (
-            <div className="flex items-center justify-between gap-5">
-                <span className="flex items-center gap-1.5 min-w-0">
-                    {color && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />}
-                    <span className={`truncate ${strong ? 'font-bold text-slate-700' : 'text-slate-600'}`}>{name}</span>
-                </span>
-                <span className={`tabular-nums shrink-0 ${strong ? 'font-bold text-emerald-600' : 'font-semibold text-slate-800'}`}>{value}</span>
-            </div>
-        );
-
-        return (
-            <div className="bg-white/95 backdrop-blur-sm border border-slate-200 rounded-lg shadow-lg px-3 py-2 min-w-[168px] text-[11px]">
-                <p className="font-bold text-slate-800 text-xs mb-1.5 pb-1.5 border-b border-slate-100">{label}</p>
-                <div className="space-y-1">
-                    {currencyEntries.map((e: any, i: number) => (
-                        <Row key={`c${i}`} color={e.color} name={e.name} value={fmtBRL(e.value)} />
-                    ))}
-                    {valueEntries.map((e: any, i: number) => (
-                        <Row key={`v${i}`} color={e.color} name={e.name} value={fmtInt(e.value)} />
-                    ))}
-                </div>
-                {showTotal && (
-                    <div className="mt-1.5 pt-1.5 border-t border-slate-200">
-                        <Row name={`Total no ${isMonthly ? 'mês' : 'dia'}`} value={fmtInt(total)} strong />
-                    </div>
-                )}
-            </div>
-        );
-    };
+    const chartTooltip = (
+        <ChartTooltip
+            totalLabel={`Total no ${isMonthly ? 'mês' : 'dia'}`}
+            formatValue={(value, entry) =>
+                isCacEntry(entry)
+                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+                    : value.toLocaleString('pt-BR')
+            }
+            formatTotal={(total) => total.toLocaleString('pt-BR')}
+            isRate={isCacEntry}
+        />
+    );
 
     if (rentab) {
         const totalCliques = engagementData.reduce((sum, item) => sum + item.cliques, 0);
@@ -483,7 +458,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                             <XAxis dataKey="displayDate" tick={{ fontSize: 9 }} />
                             <YAxis tick={{ fontSize: 9 }} />
-                            <Tooltip />
+                            <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
                             <Bar dataKey="cliques" name="Cliques" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
@@ -495,7 +470,17 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                             <XAxis dataKey="displayDate" tick={{ fontSize: 9 }} />
                             <YAxis tick={{ fontSize: 9 }} unit="%" />
-                            <Tooltip formatter={(value: number) => `${Number(value).toFixed(1)}%`} />
+                            <Tooltip
+                                cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}
+                                wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
+                                content={
+                                    <ChartTooltip
+                                        formatValue={(value) => `${value.toFixed(1).replace('.', ',')}%`}
+                                        isRate={() => true}
+                                        showTotal={false}
+                                    />
+                                }
+                            />
                             <Line type="monotone" dataKey="taxaClique" name="% Clique" stroke="#10b981" strokeWidth={2} />
                         </LineChart>
                     </ResponsiveContainer>
@@ -543,9 +528,12 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                 <XAxis type="number" hide />
                                 <YAxis dataKey="name" type="category" width={50} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#334155', fontSize: '10px' }}
-                                    itemStyle={{ color: '#334155' }}
                                     cursor={{ fill: 'transparent' }}
+                                    wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
+                                    content={
+                                        // Realizado e Meta são leituras do mesmo indicador — somar não faz sentido.
+                                        <ChartTooltip formatValue={(value) => value.toLocaleString('pt-BR')} showTotal={false} />
+                                    }
                                 />
                                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                                     {metaChartData.map((entry, index) => (
@@ -575,7 +563,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(v) => `R$${Number(v).toFixed(0)}`} />
-                                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none' }} />
+                                    <Tooltip content={chartTooltip} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
                                     <Area type="monotone" dataKey="cac_medio" name="CAC acumulado" connectNulls stroke="#10B981" strokeWidth={2.5} fill="url(#cacGradient)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -597,7 +585,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
-                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
+                                    <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
                                     <Legend {...segmentLegendProps} />
                                     {showSerasa && <Bar dataKey="propostas_crm" name="CRM B2C" stackId="a" fill="#3B82F6" hide={isSeriesHidden('CRM B2C')} />}
                                     {!showSerasa && activeSegments.map((segment, index) => (
@@ -627,7 +615,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
-                                    <Tooltip content={<ChartTooltip />} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none' }} />
+                                    <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
                                     <Legend {...segmentLegendProps} />
                                     {showSerasa && <Bar dataKey="emissoes_crm" name="CRM B2C" stackId="a" fill="#10B981" hide={isSeriesHidden('CRM B2C')} />}
                                     {!showSerasa && activeSegments.map((segment, index) => (
