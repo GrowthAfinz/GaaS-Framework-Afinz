@@ -11,6 +11,7 @@ export const SEGMENT_DISPLAY: Record<string, SegmentDisplay> = {
   'Base_Proprietaria': { main: 'Base Proprietária', suffix: 'Topo de Funil' },
   'Leads_Parceiros': { main: 'Leads Parceiros' },
   'Aprovados_nao_convertidos': { main: 'Aprovados não convertidos', suffix: 'Upgrade' },
+  'CRM': { main: 'CRM' },
 };
 
 function resolveDisplay(value: string): SegmentDisplay {

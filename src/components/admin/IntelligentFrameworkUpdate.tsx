@@ -34,7 +34,6 @@ import { classifyRentabilizacao } from '../../utils/rentabilizacaoClassify';
 import {
     parseSeqParts,
     resolveDim,
-    SEGMENT_CODE_TABLE as SEGMENT_BY_TAXONOMY_CODE,
     canonicalPlurixCartJourney,
     PLURIX_CART_ASSISTED_JOURNEY,
 } from '../../utils/taxonomy';
@@ -545,6 +544,12 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
         if (tokens.includes('bem') && tokens.includes('barato') || tokens.includes('b2b2c') && tokens.includes('bb')) {
             return { parceiro: 'Bem Barato', evidence: 'bem_barato' };
         }
+        // DIA is the B2B2C partner, not an acquisition segment. Without this
+        // deterministic rule the generic segment-code parser interprets the
+        // `dia` token as Segmento=Dia and loses Parceiro=Dia.
+        if (tokens.includes('dia')) {
+            return { parceiro: 'Dia', evidence: 'dia' };
+        }
         return null;
     };
 
@@ -570,10 +575,59 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
     };
 };
 
+/**
+ * Vocabulário de SEGMENTO derivado 100% do histórico GaaS (coluna `Segmento`
+ * de `activities`, jornadas JOR_AQUISICAO_*). Só entram tokens de alta pureza,
+ * i.e. que no histórico mapeiam para um único segmento.
+ *
+ * IMPORTANTE: NÃO usar `SEGMENT_CODE_TABLE` (taxonomy.ts) aqui.
+ * Aquela tabela mistura três dimensões (segmento, PARCEIRO e público) num mapa
+ * só — `bb`→Bem Barato, `dia`→Dia, `bpc`→BpC, `srsa`→Serasa são PARCEIRO, não
+ * segmento. Como a taxonomia é `JOR_AQUISICAO_{BU}_{PARCEIRO}_{SEGMENTO}_...`,
+ * o parceiro aparece ANTES do segmento; um scan "primeiro match ganha" sobre a
+ * tabela conflada gravava o parceiro no campo Segmento (ex.: `_BB_NGD_` virava
+ * Segmento=Bem Barato em vez de Negados). O cruzamento token×Segmento no GaaS
+ * confirma: todo token de parceiro se espalha por vários segmentos; todo token
+ * abaixo é puro. Ver memory: importador-segmento-parceiro-bug.
+ */
+const SEGMENT_VOCAB: Record<string, string> = {
+    carrinho: 'Abandonados',
+    abandonado: 'Abandonados',
+    abandonados: 'Abandonados',
+    abd: 'Abandonados',
+    car: 'Abandonados',
+    ngd: 'Negados',
+    repescagem: 'Negados',
+    anc: 'Aprovados_nao_convertidos',
+    upgrade: 'Aprovados_nao_convertidos',
+    lp: 'Leads_Parceiros',
+    leads: 'Leads_Parceiros',
+    bp: 'Base_Proprietaria',
+    bsp: 'Base_Proprietaria',
+    crm: 'CRM',
+    topo: 'CRM',
+    recencia: 'Recencia_de_Compra',
+    cartonistas: 'Cartonistas',
+    cart: 'Cartonistas',
+};
+
+/**
+ * Valores que são PARCEIRO/base — nunca podem ocupar o campo Segmento. Guard de
+ * coerência: mesmo que uma fonte futura tente gravar um destes como segmento,
+ * recusamos e deixamos cair no fallback/revisão humana.
+ */
+const PARTNER_VALUE_GUARD = new Set<string>([
+    'Bem Barato', 'Dia', 'Serasa', 'Proprietaria', 'BpC',
+    'Bom Pra Credito', 'Mais Amigo', 'Sem Parar', 'Pos Tombamento',
+]);
+
+const isPartnerValue = (value: string | null | undefined) =>
+    !!value && PARTNER_VALUE_GUARD.has(value);
+
 const inferSegmentFromTaxonomy = (value: unknown) => {
     const tokens = taxonomyTokens(value);
     for (const token of tokens) {
-        const segment = SEGMENT_BY_TAXONOMY_CODE[token];
+        const segment = SEGMENT_VOCAB[token];
         if (segment) return segment;
     }
     return '';
@@ -901,16 +955,21 @@ const inferTaxonomy = (metric: MetricRow) => {
                     ? 'N/A'
                     : 'N/A');
 
-    const segmento = deterministic.segmento || (isNovosCopa
+    const segmentoRaw = deterministic.segmento || (isNovosCopa
         ? 'Novos'
         : segmentByCode
         || (text.includes('carrinho') || text.includes('_car_')
-            ? 'Carrinho Abandonado'
+            ? 'Abandonados'
             : text.includes('base proprietaria') || text.includes('_bsp_') || text.includes('_bp_')
-                ? 'Base Proprietaria'
+                ? 'Base_Proprietaria'
                 : text.includes('crm')
                     ? 'CRM'
                     : 'CRM'));
+
+    // Guard de coerência: um valor de PARCEIRO nunca pode ocupar o Segmento.
+    // Se escapou até aqui, cai no default institucional (CRM) em vez de gravar
+    // o parceiro no campo errado. Ver: importador-segmento-parceiro-bug.
+    const segmento = isPartnerValue(segmentoRaw) ? 'CRM' : segmentoRaw;
 
     return { bu, parceiro, segmento, etapaAquisicao: deterministic.etapaAquisicao, subgrupo: isNovosCopa ? 'Copa' : undefined };
 };
