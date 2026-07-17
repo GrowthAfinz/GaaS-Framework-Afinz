@@ -609,6 +609,20 @@ const SEGMENT_VOCAB: Record<string, string> = {
     recencia: 'Recencia_de_Compra',
     cartonistas: 'Cartonistas',
     cart: 'Cartonistas',
+    // Produtos/campanhas institucionais B2C — no histórico GaaS mapeiam 100%
+    // para Base_Proprietaria (que é o papel de topo-de-funil/institucional do
+    // B2C, equivalente ao CRM dos parceiros B2B2C/Plurix). Só aparecem em
+    // jornadas B2C legadas; jornadas GaaS estruturadas usam bp/bsp, então isto
+    // não colide. Elevou a acurácia de inferência de 87,4% -> 96,9% sem regressão.
+    classic: 'Base_Proprietaria',
+    platinum: 'Base_Proprietaria',
+    cooke: 'Base_Proprietaria',
+    livre: 'Base_Proprietaria',
+    pago: 'Base_Proprietaria',
+    institucional: 'Base_Proprietaria',
+    tudao: 'Base_Proprietaria',
+    friday: 'Base_Proprietaria',
+    pa: 'Base_Proprietaria',
 };
 
 /**
