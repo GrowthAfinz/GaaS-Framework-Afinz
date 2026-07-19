@@ -29,6 +29,78 @@ const toNonNegativeInt = (value: unknown): number => {
     return Math.round(num);
 };
 
+// ── Canonicalização de campanha por adset_id ────────────────────────────────
+// No Meta um adset pertence a EXATAMENTE uma campanha. Quando a campanha é
+// renomeada, o coletor grava linhas sob o nome novo, fragmentando o histórico
+// em vários `campaign` na paid_media_metrics (que não tem campaign_id). Aqui
+// unificamos, via union-find sobre adset_id compartilhado, todos os nomes da
+// mesma campanha sob um nome canônico (= o nome mais recente = nome atual no
+// Meta). É provado-correto: adset compartilhado ⇒ mesma campanha.
+
+interface CampaignCanonicalMap {
+    fwd: Record<string, string>;      // nome cru → nome canônico
+    groups: Record<string, string[]>; // nome canônico → todos os nomes crus
+}
+
+let _canonicalCache: CampaignCanonicalMap | null = null;
+
+/** Constrói o mapa canônico a partir de linhas cruas {campaign, adset_id, date}. */
+function computeCampaignCanonicalMap(
+    rows: Array<{ campaign: string | null; adset_id: string | null; date: string | null }>
+): CampaignCanonicalMap {
+    const parent: Record<string, string> = {};
+    const ensure = (x: string) => { if (!(x in parent)) parent[x] = x; };
+    const find = (x: string): string => {
+        let r = x;
+        while (parent[r] !== r) r = parent[r];
+        while (parent[x] !== r) { const n = parent[x]; parent[x] = r; x = n; }
+        return r;
+    };
+    const union = (a: string, b: string) => {
+        ensure(a); ensure(b);
+        const ra = find(a), rb = find(b);
+        if (ra !== rb) parent[ra] = rb;
+    };
+
+    const adsetToCampaign: Record<string, string> = {};
+    const maxDate: Record<string, string> = {};
+
+    for (const r of rows) {
+        const c = r.campaign;
+        if (!c) continue;
+        ensure(c);
+        const d = (r.date || '').substring(0, 10);
+        if (d && (!maxDate[c] || d > maxDate[c])) maxDate[c] = d;
+        if (r.adset_id) {
+            const prev = adsetToCampaign[r.adset_id];
+            if (prev && prev !== c) union(prev, c);
+            else if (!prev) adsetToCampaign[r.adset_id] = c;
+        }
+    }
+
+    // Agrupa por componente e escolhe o canônico (nome mais recente; empate → mais curto)
+    const comps: Record<string, string[]> = {};
+    for (const c of Object.keys(parent)) {
+        const root = find(c);
+        (comps[root] ||= []).push(c);
+    }
+
+    const fwd: Record<string, string> = {};
+    const groups: Record<string, string[]> = {};
+    for (const members of Object.values(comps)) {
+        let canon = members[0];
+        for (const m of members) {
+            const md = maxDate[m] || '';
+            const cd = maxDate[canon] || '';
+            if (md > cd || (md === cd && m.length < canon.length)) canon = m;
+        }
+        groups[canon] = members;
+        for (const m of members) fwd[m] = canon;
+    }
+
+    return { fwd, groups };
+}
+
 const previewRows = (rows: any[], limit = 3) => rows.slice(0, limit);
 
 const normalizeText = (value: unknown): string => {
@@ -337,13 +409,36 @@ export const dataService = {
             : typedRows;
     },
 
+    /** Mapa de canonicalização de campanha (raw→canônico) por adset_id compartilhado.
+     *  Cache de sessão; pode ser semeado por fetchPaidMediaByAd p/ evitar 2º scan. */
+    async getCampaignCanonicalMap(force = false): Promise<CampaignCanonicalMap> {
+        if (_canonicalCache && !force) return _canonicalCache;
+        let rows: Array<{ campaign: string | null; adset_id: string | null; date: string | null }> = [];
+        let page = 0;
+        while (true) {
+            const { data, error } = await supabase
+                .from('paid_media_metrics')
+                .select('campaign, adset_id, date')
+                .order('date', { ascending: false })
+                .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            rows = rows.concat(data as any);
+            if (data.length < PAGE_SIZE) break;
+            page++;
+        }
+        _canonicalCache = computeCampaignCanonicalMap(rows);
+        return _canonicalCache;
+    },
+
     async fetchPaidMedia(): Promise<DailyAdMetrics[]> {
-        const [{ data, error }, mappings] = await Promise.all([
+        const [{ data, error }, mappings, canon] = await Promise.all([
             supabase
                 .from('paid_media_metrics')
                 .select('*')
                 .order('date', { ascending: false }),
-            dataService.fetchCampaignMappings()
+            dataService.fetchCampaignMappings(),
+            dataService.getCampaignCanonicalMap()
         ]);
 
         if (error) throw error;
@@ -352,17 +447,23 @@ export const dataService = {
             acc[m.campaign_name] = m.objective;
             return acc;
         }, {} as Record<string, string>);
+        // propaga objetivo mapeado do nome cru para o canônico
+        for (const [raw, obj] of Object.entries(mappingDict)) {
+            const c = canon.fwd[raw];
+            if (c && !(c in mappingDict)) mappingDict[c] = obj;
+        }
 
-        // Group by date + channel + campaign + objective
+        // Group by date + channel + campaign(canônico) + objective
         const grouped = (data || []).reduce((acc: any, row: any) => {
             const dateStr = row.date.substring(0, 10);
-            const key = `${dateStr}_${row.channel}_${row.campaign}_${row.objective || ''}`;
-            
+            const canonCampaign = canon.fwd[row.campaign] || row.campaign;
+            const key = `${dateStr}_${row.channel}_${canonCampaign}_${row.objective || ''}`;
+
             if (!acc[key]) {
                 acc[key] = {
                     date: new Date(row.date + 'T12:00:00Z'),
                     channel: row.channel,
-                    campaign: row.campaign,
+                    campaign: canonCampaign,
                     objective: row.objective,
                     spend: 0,
                     impressions: 0,
@@ -438,16 +539,25 @@ export const dataService = {
             return acc;
         }, {} as Record<string, string>);
 
+        // Semeia o cache canônico a partir das linhas já puxadas (evita 2º scan)
+        const canon = computeCampaignCanonicalMap(allRows);
+        _canonicalCache = canon;
+        for (const [raw, obj] of Object.entries(mappingDict)) {
+            const c = canon.fwd[raw];
+            if (c && !(c in mappingDict)) mappingDict[c] = obj;
+        }
+
         return allRows.map((row: any) => {
-            let mappedObjective = mappingDict[row.campaign] || row.objective;
+            const canonCampaign = canon.fwd[row.campaign] || row.campaign;
+            let mappedObjective = mappingDict[row.campaign] || mappingDict[canonCampaign] || row.objective;
             if (mappedObjective === 'conversion') mappedObjective = 'b2c';
             if (mappedObjective === 'brand') mappedObjective = 'marca';
             if (mappedObjective === 'seguros' || mappedObjective === 'seguro' || mappedObjective === 'Seguros') mappedObjective = 'seguros';
-            
+
             return {
                 date: new Date(row.date + 'T12:00:00Z'),
                 channel: row.channel,
-                campaign: row.campaign,
+                campaign: canonCampaign,
                 objective: mappedObjective,
                 ad_id: row.ad_id,
                 ad_name: row.ad_name,
@@ -556,21 +666,33 @@ export const dataService = {
             .not('adset_name', 'is', null);
         if (fromDate) query = query.gte('date', fromDate);
         if (toDate) query = query.lte('date', toDate);
-        const { data, error } = await query;
+        const [{ data, error }, canon] = await Promise.all([
+            query,
+            dataService.getCampaignCanonicalMap()
+        ]);
         if (error) {
             console.error('fetchAdHierarchy error:', error);
             return [];
         }
-        return (data || []) as Array<{ campaign: string; adset_name: string | null; ad_name: string | null }>;
+        return (data || []).map((r: any) => ({
+            campaign: canon.fwd[r.campaign] || r.campaign,
+            adset_name: r.adset_name,
+            ad_name: r.ad_name,
+        })) as Array<{ campaign: string; adset_name: string | null; ad_name: string | null }>;
     },
 
     async fetchDrilldownData(campaign: string, fromDateStr: string, toDateStr: string): Promise<any[]> {
+        // `campaign` chega como nome CANÔNICO — expande p/ todos os nomes crus da
+        // mesma campanha (renames no Meta) para não perder linhas do histórico.
+        const canon = await dataService.getCampaignCanonicalMap();
+        const campaignNames = canon.groups[campaign] || [campaign];
+
         // As datas devem chegar no formato YYYY-MM-DD
         const [{ data, error }, mappings] = await Promise.all([
             supabase
                 .from('paid_media_metrics')
                 .select('*')
-                .eq('campaign', campaign)
+                .in('campaign', campaignNames)
                 .gte('date', fromDateStr)
                 .lte('date', toDateStr)
                 .order('date', { ascending: false }),
@@ -593,7 +715,7 @@ export const dataService = {
             return {
                 date: new Date(row.date + 'T12:00:00Z'),
                 channel: row.channel,
-                campaign: row.campaign,
+                campaign: canon.fwd[row.campaign] || row.campaign,
                 objective: mappedObjective,
                 adset_id: row.adset_id,
                 adset_name: row.adset_name,
