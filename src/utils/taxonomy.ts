@@ -80,6 +80,7 @@ export const TAXO: Record<DimId, TaxoDim> = {
     opts: [
       { id: 'institucional', label: 'Institucional', tokens: ['institucional', 'inst'] },
       { id: 'ecred', label: 'ECRED', tokens: ['ecred'] },
+      { id: 'srsa', label: 'Serasa', tokens: ['srsa', 'serasa'] },
       { id: 'int', label: 'Interno', tokens: ['int'] },
       { id: 'maior', label: 'Maior limite', tokens: ['maior'] },
       { id: 'menor', label: 'Menor limite', tokens: ['menor'] },
@@ -219,6 +220,104 @@ export function segmentoToId(segmento: string | null | undefined, activityName =
   return resolveDim('segmento', activityName);
 }
 
+// ── Público v2: parceiro-primeiro (dimensão ABERTA), BU como fallback ─────────
+// Regra validada 2026-07-19 contra os dados reais (activities: BU e Parceiro 100%
+// preenchidos; SIGLA_* vazias). BU é guarda-chuva; Parceiro é o parceiro real.
+// `bb` (Bem Barato) NÃO é código especial — é um parceiro entre vários (dia,
+// alvorada, hirota, ...). Público do disparo = código do PARCEIRO (quando B2B2C)
+// ou código da BU (B2C/Plurix). Substitui resolvePublico/parceiroToPublico no
+// caminho de reconciliação (mantidos acima só para legado/translate).
+
+/** Normaliza um nome de parceiro num código curto e estável. Aberto: parceiro novo vira slug. */
+export function partnerCode(parceiro: string | null | undefined): string | null {
+  const p = normalizeTaxonomyText(parceiro);
+  if (!p || p === 'n a' || p === 'na') return null;
+  if (p === 'proprietaria' || p.includes('base proprietaria')) return null; // base, não é marca de parceiro
+  if (p.includes('bem barato') || p === 'bb' || p === 'bbt') return 'bb';
+  if (p === 'dia') return 'dia';
+  if (p.includes('alvorada')) return 'alvorada';
+  if (p.includes('plurix')) return 'plurix';
+  if (p.includes('serasa')) return 'serasa';
+  if (p.includes('bom pra credito') || p === 'bpc') return 'bpc';
+  if (p.includes('acordo')) return 'acordo';
+  return p.split(' ')[0]; // parceiro novo: primeiro token
+}
+
+/** Público canônico do disparo a partir das colunas estruturadas BU + Parceiro (fonte de verdade). */
+export function publicoFromColumns(bu: string | null | undefined, parceiro: string | null | undefined): string | null {
+  const b = normalizeTaxonomyText(bu);
+  if (b === 'b2c') return 'b2c';
+  if (b === 'plurix') return 'plurix';
+  // B2B2C: público = parceiro específico. Sem parceiro nomeável → sentinela 'b2b2c'
+  // que não casa com prefixo de template nenhum (veta match → cai como "novo").
+  if (b === 'b2b2c') return partnerCode(parceiro) ?? 'b2b2c';
+  return null;
+}
+
+/** Código de público do template = prefixo do template_id (b2c/bb/dia/plurix/...). Exato. */
+export function templatePublicoCode(templateId: string | null | undefined): string | null {
+  const first = normalizeTaxonomyText((templateId ?? '').split('_')[0]);
+  return first || null;
+}
+
+// ── Segmento canônico: MESMO vocabulário nos dois lados (activities.Segmento ==
+// communication_templates.metadata.segmento_af_sub1). Igualdade exata, sem adivinhar token.
+const SEGMENTO_FULL_KEYS = new Set([
+  'abandonados', 'base_proprietaria', 'crm', 'negados', 'leads_parceiros',
+  'aprovados_nao_convertidos', 'cartonistas', 'recencia_de_compra', 'instabilidade',
+]);
+const SEGMENTO_TOKEN_TO_KEY: Record<string, string> = {
+  bsp: 'base_proprietaria', bp: 'base_proprietaria', baseproprietaria: 'base_proprietaria',
+  crm: 'crm', ngd: 'negados', neg: 'negados',
+  anc: 'aprovados_nao_convertidos', apr: 'aprovados_nao_convertidos',
+  abn: 'abandonados', car: 'abandonados', abd: 'abandonados',
+  lp: 'leads_parceiros', cart: 'cartonistas', rec: 'recencia_de_compra',
+};
+
+/** Chave canônica de segmento (aceita nome completo da coluna/metadata OU token curto do id). */
+export function segmentoKey(value: string | null | undefined): string | null {
+  const n = normalizeTaxonomyText(value);
+  if (!n) return null;
+  const slug = n.replace(/ /g, '_');
+  if (SEGMENTO_FULL_KEYS.has(slug)) return slug;
+  if (SEGMENTO_TOKEN_TO_KEY[slug]) return SEGMENTO_TOKEN_TO_KEY[slug];
+  if (slug.includes('proprietaria')) return 'base_proprietaria';
+  if (slug.includes('abandonad')) return 'abandonados';
+  if (slug.includes('negado')) return 'negados';
+  if (slug.startsWith('aprovados')) return 'aprovados_nao_convertidos';
+  return slug;
+}
+
+/** Extrai a chave de segmento de um template_id cru (varre os tokens; usado só p/ display). */
+export function segmentoKeyFromTemplateId(id: string): string | null {
+  for (const tok of (id ?? '').split('_')) {
+    const k = segmentoKey(tok);
+    if (k && SEGMENTO_FULL_KEYS.has(k)) return k;
+  }
+  return null;
+}
+
+const PUBLICO_LABELS: Record<string, string> = {
+  b2c: 'B2C · Afinz', bb: 'Bem Barato', dia: 'DIA', plurix: 'Plurix',
+  alvorada: 'Alvorada', serasa: 'Serasa', bpc: 'Bom Pra Crédito', acordo: 'Acordo Certo',
+  b2b2c: 'B2B2C (sem parceiro)',
+};
+const SEGMENTO_LABELS: Record<string, string> = {
+  abandonados: 'Abandonados', base_proprietaria: 'Base Proprietária', crm: 'CRM',
+  negados: 'Negados', leads_parceiros: 'Leads Parceiros', aprovados_nao_convertidos: 'Aprovados ñ conv.',
+  cartonistas: 'Cartonistas', recencia_de_compra: 'Recência de Compra', instabilidade: 'Instabilidade',
+};
+/** Label amigável para público (dimensão aberta) — conhecido ou capitalizado. */
+export function publicoLabel(code: string | null | undefined): string {
+  if (!code) return '—';
+  return PUBLICO_LABELS[code] ?? (code.charAt(0).toUpperCase() + code.slice(1));
+}
+/** Label amigável para segmento canônico. */
+export function segmentoLabelCanon(key: string | null | undefined): string {
+  if (!key) return '—';
+  return SEGMENTO_LABELS[key] ?? key;
+}
+
 export function resolveDim(dim: DimId, raw: string): string | null {
   if (dim === 'publico') return resolvePublico(raw);
   const t = String(raw || '').toLowerCase();
@@ -227,7 +326,11 @@ export function resolveDim(dim: DimId, raw: string): string | null {
 }
 
 export function optLabel(dim: DimId, id: string | null): string {
-  const o = id ? TAXO[dim].opts.find((x) => x.id === id) : null;
+  if (!id) return '—';
+  // publico e segmento agora usam códigos/chaves abertos (fora do TAXO): rotula por mapa próprio.
+  if (dim === 'publico') return publicoLabel(id);
+  if (dim === 'segmento') return segmentoLabelCanon(id);
+  const o = TAXO[dim].opts.find((x) => x.id === id);
   return o ? o.label : '—';
 }
 
@@ -328,20 +431,24 @@ export function parseActivity(name: string, structured?: {
   jornada?: string | null;
 }): ParsedActivity {
   const n = name.toLowerCase();
-  const identityContext = [name, structured?.jornada, structured?.bu].filter(Boolean).join(' ');
-  const publico = parceiroToPublico(structured?.parceiro, identityContext);
-  const journeySegment = segmentoToId(null, structured?.jornada ?? '');
-  const segmento = publico === 'bb' && journeySegment === 'crm'
-    ? 'crm'
-    : segmentoToId(structured?.segmento, `${structured?.jornada ?? ''} ${n}`);
+  // Público via CROSSWALK das colunas estruturadas (BU+Parceiro) — fonte de verdade,
+  // 100% preenchida. Fallback na string só se as colunas faltarem (raro).
+  const publico = publicoFromColumns(structured?.bu, structured?.parceiro)
+    ?? resolvePublico([name, structured?.jornada].filter(Boolean).join(' '));
+  // Segmento por chave canônica da coluna Segmento (== metadata.segmento_af_sub1 no template).
+  const segmento = segmentoKey(structured?.segmento)
+    ?? segmentoKey(resolveDim('segmento', `${structured?.jornada ?? ''} ${n}`));
   const seq = parseSeq(name);
+  // Serasa é audiência de B2C → também vira variante 'srsa' (discrimina peça do parceiro).
+  const variante = resolveDim('variante', n)
+    ?? (partnerCode(structured?.parceiro) === 'serasa' ? 'srsa' : null);
   return {
     publico,
     canal: canalToId(structured?.canal) ?? resolveDim('canal', n),
-    campanha: resolveDim('campanha', n),
+    campanha: resolveDim('campanha', `${structured?.jornada ?? ''} ${n}`),
     segmento,
     cadencia: seq && seq.startsWith('D') ? seq : resolveDim('cadencia', n),
-    variante: resolveDim('variante', n),
+    variante,
     seq,
   };
 }
@@ -356,23 +463,29 @@ export function composeId(dims: Partial<Record<DimId, string | null>>, seq: stri
 export const TEMPLATE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,79}$/;
 
 // ── Matcher: dimensões parseadas × template do catálogo ──────────────────────
-const DIM_WEIGHT: Record<string, number> = { publico: 16, canal: 24, campanha: 12, segmento: 22, seq: 26 };
-const DIM_LABEL: Record<string, string> = { publico: 'Público', canal: 'Canal', campanha: 'Campanha', segmento: 'Segmento', seq: 'Disparo' };
+const DIM_WEIGHT: Record<string, number> = { publico: 16, canal: 24, campanha: 12, segmento: 22, seq: 26, variante: 10 };
+const DIM_LABEL: Record<string, string> = { publico: 'Público', canal: 'Canal', campanha: 'Campanha', segmento: 'Segmento', seq: 'Disparo', variante: 'Variante' };
 
 export interface MatchReason { dim: string; label: string; val: string; ok: boolean }
-export interface TemplateDims { publico: string | null; canal: string | null; campanha: string | null; segmento: string | null; seq: string | null }
+export interface TemplateDims { publico: string | null; canal: string | null; campanha: string | null; segmento: string | null; seq: string | null; variante?: string | null }
 export interface MatchResult<T> { tpl: T; score: number; reasons: MatchReason[] }
 
 /**
- * Casa um disparo parseado contra o catálogo. Canal divergente descarta o
- * candidato. Retorna o melhor match (score 0-100) + os porquês.
+ * Casa um disparo parseado contra o catálogo.
+ *
+ * VETO DURO: Canal e Público (parceiro/BU vindos das colunas estruturadas) são
+ * identidade — divergência descarta o candidato de vez (nunca vira match forte com
+ * o parceiro errado). Segmento/campanha/seq/variante pontuam; a Variante desempata
+ * peças que dividem o mesmo momento/segmento (carrinho: institucional vs srsa/ecred).
+ * Retorna o melhor match (score 0-100) + os porquês. A confiança é derivada por
+ * âncoras em `confidenceOf`, não pelo score cru.
  */
 export function matchTemplate<T extends { dims: TemplateDims }>(parsed: ParsedActivity, templates: T[]): MatchResult<T> | null {
   let best: MatchResult<T> | null = null;
   for (const tpl of templates) {
-    const incompatibleIdentity = (['publico', 'canal', 'campanha', 'segmento'] as const)
-      .some((dim) => parsed[dim] && tpl.dims[dim] && parsed[dim] !== tpl.dims[dim]);
-    if (incompatibleIdentity) continue;
+    // Identidade dura: público (parceiro/BU) e canal divergentes eliminam o candidato.
+    if (parsed.publico && tpl.dims.publico && parsed.publico !== tpl.dims.publico) continue;
+    if (parsed.canal && tpl.dims.canal && parsed.canal !== tpl.dims.canal) continue;
     const reasons: MatchReason[] = [];
     let score = 0;
     let canalOk = false;
@@ -392,6 +505,11 @@ export function matchTemplate<T extends { dims: TemplateDims }>(parsed: ParsedAc
       reasons.push({ dim: 'seq', label: 'Disparo', val: tpl.dims.seq, ok: true });
     } else if (tpl.dims.seq) {
       reasons.push({ dim: 'seq', label: 'Disparo', val: tpl.dims.seq, ok: false });
+    }
+    // Variante: só desempata (nunca veta — nem todo template declara variante).
+    if (parsed.variante && tpl.dims.variante && parsed.variante === tpl.dims.variante) {
+      score += DIM_WEIGHT.variante;
+      reasons.push({ dim: 'variante', label: 'Variante', val: optLabel('variante', parsed.variante), ok: true });
     }
     if (!canalOk) continue;
     if (!best || score > best.score) best = { tpl, score: Math.min(100, score), reasons };
@@ -417,23 +535,37 @@ export function formatSeq(seq: string | null | undefined): string {
  */
 export function translateTemplateId(id: string): TemplateIdPart[] {
   const parts: TemplateIdPart[] = [];
-  const pub = resolveDim('publico', id);
-  if (pub) parts.push({ key: 'publico', label: 'Público', value: optLabel('publico', pub) });
+  const pub = templatePublicoCode(id); // prefixo exato (aberto): b2c/bb/dia/plurix/alvorada/...
+  if (pub) parts.push({ key: 'publico', label: 'Público', value: publicoLabel(pub) });
   const can = resolveDim('canal', id);
   if (can) parts.push({ key: 'canal', label: 'Canal', value: optLabel('canal', can) });
   const camp = resolveDim('campanha', id);
   if (camp) parts.push({ key: 'campanha', label: 'Campanha', value: optLabel('campanha', camp) });
-  const seg = resolveDim('segmento', id);
-  if (seg) parts.push({ key: 'segmento', label: 'Segmento', value: optLabel('segmento', seg) });
+  const seg = segmentoKeyFromTemplateId(id);
+  if (seg) parts.push({ key: 'segmento', label: 'Segmento', value: segmentoLabelCanon(seg) });
   const seq = parseSeq(id);
   if (seq) parts.push({ key: 'seq', label: 'Momento', value: formatSeq(seq) });
   return parts;
 }
 
 export type Confidence = 'forte' | 'provavel' | 'fraca' | 'novo';
-export function confidenceOf(match: { score: number } | null): Confidence {
+/**
+ * Confiança por ÂNCORAS (não pelo score cru): "forte" exige as 4 âncoras —
+ * Canal + Público(parceiro/BU) + Segmento + Disparo(seq). Isso impede que um
+ * disparo case como forte sem o parceiro certo. Reduz a chance de vínculo em
+ * massa errado na fila. Segmento é obrigatório para "provável".
+ */
+export function confidenceOf(match: { reasons?: MatchReason[]; score: number } | null): Confidence {
   if (!match) return 'novo';
-  return match.score >= 85 ? 'forte' : match.score >= 60 ? 'provavel' : 'fraca';
+  const ok = new Set((match.reasons ?? []).filter((r) => r.ok).map((r) => r.dim));
+  const canal = ok.has('canal');
+  const publico = ok.has('publico');
+  const segmento = ok.has('segmento');
+  const seq = ok.has('seq');
+  if (canal && publico && segmento && seq) return 'forte';
+  if (canal && segmento && (publico || seq)) return 'provavel';
+  if (canal && (segmento || seq || publico)) return 'fraca';
+  return 'novo';
 }
 
 const normalizeJourneyKey = (value: unknown) => String(value ?? '')

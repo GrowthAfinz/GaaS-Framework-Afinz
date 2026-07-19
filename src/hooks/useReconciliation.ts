@@ -9,8 +9,17 @@ import { useAppStore } from '../store/useAppStore';
 import type { ActivityMomentSuggestion, CommunicationTemplate } from '../types/communication';
 import {
   canalToId, resolveDim, parseSeq, parseActivity, matchTemplate, confidenceOf, formatSeq,
+  templatePublicoCode, segmentoKey, segmentoKeyFromTemplateId,
   type Confidence, type MatchResult, type ParsedActivity, type TemplateDims,
 } from '../utils/taxonomy';
+import { runReconciliationGoldenSet } from '../utils/taxonomy.goldenset';
+
+// Regressão do parser roda uma vez em DEV (removido do bundle de produção).
+if (import.meta.env?.DEV) {
+  const g = runReconciliationGoldenSet();
+  if (g.failed) console.warn(`[taxonomy golden] ${g.failed}/${g.total} regressões:`, g.failures);
+  else console.info(`[taxonomy golden] ${g.passed}/${g.total} OK`);
+}
 
 export interface CatalogEntry {
   id: string;
@@ -109,12 +118,18 @@ const CH_META: Record<string, { label: string; color: string }> = {
 
 function templateDims(t: CommunicationTemplate): TemplateDims {
   const id = t.template_id;
+  const meta = (t.metadata ?? {}) as Record<string, unknown>;
+  const metaSeg = typeof meta.segmento_af_sub1 === 'string' ? meta.segmento_af_sub1 : null;
+  const metaCamp = typeof meta.campanha === 'string' ? meta.campanha : null;
   return {
-    publico: resolveDim('publico', id),
+    // Público = prefixo do template_id (código exato de parceiro/BU).
+    publico: templatePublicoCode(id),
     canal: canalToId(t.channel) ?? resolveDim('canal', id),
-    campanha: resolveDim('campanha', id),
-    segmento: resolveDim('segmento', id),
+    campanha: resolveDim('campanha', metaCamp ?? id),
+    // Fonte de verdade do segmento é o metadata (o token do id podia divergir, ex. dia _bsp_ = CRM).
+    segmento: segmentoKey(metaSeg) ?? segmentoKeyFromTemplateId(id),
     seq: parseSeq(id),
+    variante: resolveDim('variante', id),
   };
 }
 
