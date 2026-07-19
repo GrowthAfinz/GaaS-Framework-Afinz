@@ -44,7 +44,7 @@ export const useBudgets = () => {
         } catch (err) {
             console.error('Failed to add budget:', err);
             // Revert
-            setBudgets(prev => prev.filter(x => x.id !== optimisticId));
+            setBudgets(prev => prev.filter(x => x.id !== newId));
         }
     };
 

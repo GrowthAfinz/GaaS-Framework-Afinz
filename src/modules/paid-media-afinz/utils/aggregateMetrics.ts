@@ -47,6 +47,7 @@ export function aggregate(rows: AggregatableRow[]): AggregatedMetrics {
 
     return {
         ...s,
+        reach: s.reach,
         ctr: s.impressions ? (s.clicks / s.impressions) * 100 : 0, // Σcliques / Σimpr
         cpc: s.clicks ? s.spend / s.clicks : 0,                      // Σspend / Σcliques
         cpm: s.impressions ? (s.spend / s.impressions) * 1000 : 0,

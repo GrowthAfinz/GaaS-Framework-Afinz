@@ -4,10 +4,15 @@ import { dataService } from '../../../services/dataService';
 export interface Target {
     id?: string;
     month: string; // "MM/yyyy"
-    metric: 'spend' | 'impressions' | 'clicks' | 'conversions' | 'cpm' | 'cpc' | 'ctr';
+    metric: 'spend' | 'impressions' | 'clicks' | 'conversions' | 'cpm' | 'cpc' | 'ctr' | 'cpa';
     value: number;
     channel?: 'meta' | 'google';
-    objective?: 'marca' | 'b2c' | 'plurix' | 'seguros';
+    objective?: string;
+    level?: 'global' | 'objective' | 'campaign';
+    entity_key?: string;
+    direction?: 'min' | 'max' | 'range';
+    warning_tolerance_pct?: number;
+    source?: 'manual' | 'historical_baseline';
     notes?: string;
 }
 
@@ -46,7 +51,7 @@ export const useTargets = () => {
         setTargets(prev => [...prev, optimisticTarget]);
 
         try {
-            await dataService.upsertPaidMediaTarget(t);
+            await dataService.upsertPaidMediaTarget(optimisticTarget);
             await load();
         } catch (err) {
             console.error('Failed to add target:', err);

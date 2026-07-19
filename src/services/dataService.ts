@@ -830,12 +830,32 @@ export const dataService = {
     async fetchPaidMediaTargets(): Promise<any[]> {
         const { data, error } = await supabase.from('paid_media_targets').select('*');
         if (error) throw error;
-        return data || [];
+        return (data || []).map((target: any) => ({
+            ...target,
+            value: Number(target.target_value ?? target.value) || 0,
+        }));
     },
 
     async upsertPaidMediaTarget(target: any) {
         // Upsert target using id as the conflict column
-        const { error } = await supabase.from('paid_media_targets').upsert(target, { onConflict: 'id' });
+        const { value, ...rest } = target;
+        const level = rest.level || (rest.objective ? 'objective' : 'global');
+        const entityKey = rest.entity_key || rest.objective || '__global__';
+        const direction = rest.direction || (
+            rest.metric === 'ctr' || ['impressions', 'clicks', 'conversions'].includes(rest.metric)
+                ? 'min'
+                : rest.metric === 'spend' ? 'range' : 'max'
+        );
+        const payload = {
+            ...rest,
+            level,
+            entity_key: entityKey,
+            direction,
+            warning_tolerance_pct: rest.warning_tolerance_pct ?? 10,
+            source: rest.source || 'manual',
+            target_value: value ?? target.target_value,
+        };
+        const { error } = await supabase.from('paid_media_targets').upsert(payload, { onConflict: 'id' });
         if (error) throw error;
     },
 
