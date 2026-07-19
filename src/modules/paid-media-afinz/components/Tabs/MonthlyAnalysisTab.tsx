@@ -22,9 +22,24 @@ const MetricsChart: React.FC<{
     color: string,
     title: string,
     isCurrency?: boolean,
+    isPercent?: boolean,
     granularity: 'day' | 'week' | 'month'
-}> = ({ data, dataKey, color, title, isCurrency, granularity }) => {
+}> = ({ data, dataKey, color, title, isCurrency, isPercent, granularity }) => {
     const isBar = granularity !== 'day';
+
+    const fmtAxis = (val: number) =>
+        isCurrency
+            ? new Intl.NumberFormat('pt-BR', { notation: 'compact', style: 'currency', currency: 'BRL' }).format(val)
+            : isPercent
+                ? `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val)}%`
+                : new Intl.NumberFormat('pt-BR', { notation: 'compact' }).format(val);
+
+    const fmtTooltip = (val: number) =>
+        isCurrency
+            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+            : isPercent
+                ? `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(val)}%`
+                : new Intl.NumberFormat('pt-BR').format(val);
 
     return (
         <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
@@ -44,20 +59,12 @@ const MetricsChart: React.FC<{
                             tick={{ fontSize: 12, fill: '#64748B' }}
                             axisLine={false}
                             tickLine={false}
-                            tickFormatter={(val) =>
-                                isCurrency
-                                    ? new Intl.NumberFormat('pt-BR', { notation: 'compact', style: 'currency', currency: 'BRL' }).format(val)
-                                    : new Intl.NumberFormat('pt-BR', { notation: 'compact' }).format(val)
-                            }
+                            tickFormatter={fmtAxis}
                         />
                         <Tooltip
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                             cursor={{ fill: '#F1F5F9' }}
-                            formatter={(val: any) =>
-                                isCurrency
-                                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
-                                    : new Intl.NumberFormat('pt-BR').format(val)
-                            }
+                            formatter={(val: any) => fmtTooltip(val)}
                         />
 
                         {isBar ? (
@@ -167,19 +174,24 @@ export const MonthlyAnalysisTab: React.FC = () => {
                     date: displayDate,
                     spend: 0,
                     impressions: 0,
+                    clicks: 0,
                     conversions: 0,
                 });
             }
             const item = aggMap.get(timeKey);
             item.spend += d.spend;
             item.impressions += d.impressions;
+            item.clicks += d.clicks || 0;
             item.conversions += d.conversions;
         });
 
-        // Convert key map to array and compute CPM
+        // Convert key map to array e recalcula taxas a partir das somas (ponderado)
         const result = Array.from(aggMap.values()).map(item => ({
             ...item,
-            cpm: item.impressions ? (item.spend / item.impressions) * 1000 : 0
+            cpm: item.impressions ? (item.spend / item.impressions) * 1000 : 0,
+            cpc: item.clicks ? item.spend / item.clicks : 0,
+            ctr: item.impressions ? (item.clicks / item.impressions) * 100 : 0,
+            convRate: item.clicks ? (item.conversions / item.clicks) * 100 : 0,
         })).sort((a, b) => a.date.getTime() - b.date.getTime());
 
         return result;
@@ -190,13 +202,23 @@ export const MonthlyAnalysisTab: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-fade-in relative">
-            <div className="flex justify-between items-end gap-4">
+            {/* ── Resumo por Mês (topo da página) ─────────────────────────────── */}
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
+                <div className="mb-4">
+                    <h3 className="text-md font-bold text-slate-800">Resumo por Mês</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Dados históricos mensais respeitando todos os filtros globais. Clique nas colunas para ordenar.</p>
+                </div>
+                <ImprovedMonthlyPivotTable rawData={rawData} filters={filters} />
+            </div>
+
+            {/* ── Projeção para o final do mês ────────────────────────────────── */}
+            <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
                     <ProjectionBox data={filteredData} />
                 </div>
                 <button
                     onClick={() => setIsTargetModalOpen(true)}
-                    className="mb-8 flex items-center gap-2 text-primary font-bold hover:underline bg-white px-4 py-3 rounded-lg border border-slate-100 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
+                    className="flex items-center gap-2 text-primary font-bold hover:underline bg-white px-4 py-2.5 rounded-lg border border-slate-100 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
                 >
                     <TargetIcon size={18} />
                     Definir Metas
@@ -235,12 +257,41 @@ export const MonthlyAnalysisTab: React.FC = () => {
                     granularity={granularity}
                 />
 
+                {/* Cliques */}
+                <MetricsChart
+                    data={chartData}
+                    dataKey="clicks"
+                    color="#eab308"
+                    title={`Cliques ${granularity === 'day' ? 'Diários' : granularity === 'week' ? 'Semanais' : 'Mensais'}`}
+                    granularity={granularity}
+                />
+
+                {/* CTR */}
+                <MetricsChart
+                    data={chartData}
+                    dataKey="ctr"
+                    color="#06b6d4"
+                    title={`CTR ${granularity === 'day' ? 'Diário' : granularity === 'week' ? 'Semanal' : 'Mensal'}`}
+                    isPercent
+                    granularity={granularity}
+                />
+
                 {/* CPM */}
                 <MetricsChart
                     data={chartData}
                     dataKey="cpm"
                     color="#f97316"
                     title={`CPM ${granularity === 'day' ? 'Diário' : granularity === 'week' ? 'Semanal' : 'Mensal'}`}
+                    isCurrency
+                    granularity={granularity}
+                />
+
+                {/* CPC */}
+                <MetricsChart
+                    data={chartData}
+                    dataKey="cpc"
+                    color="#ec4899"
+                    title={`CPC ${granularity === 'day' ? 'Diário' : granularity === 'week' ? 'Semanal' : 'Mensal'}`}
                     isCurrency
                     granularity={granularity}
                 />
@@ -253,20 +304,22 @@ export const MonthlyAnalysisTab: React.FC = () => {
                     title={`Conversões ${granularity === 'day' ? 'Diárias' : granularity === 'week' ? 'Semanais' : 'Mensais'}`}
                     granularity={granularity}
                 />
+
+                {/* Taxa de Conversão (Conversões ÷ Cliques) */}
+                <MetricsChart
+                    data={chartData}
+                    dataKey="convRate"
+                    color="#10b981"
+                    title={`Taxa de Conversão ${granularity === 'day' ? 'Diária' : granularity === 'week' ? 'Semanal' : 'Mensal'}`}
+                    isPercent
+                    granularity={granularity}
+                />
             </div>
 
 
 
 
 
-            {/* ── Tabela Pivot Mensal com Agrupamento ─────────────────────────────────────────── */}
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-6">
-                <div className="mb-4">
-                    <h3 className="text-md font-bold text-slate-800">Resumo por Mês (Agrupado por Objetivo)</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Dados históricos mensais respeitando todos os filtros globais. Clique nas colunas para ordenar.</p>
-                </div>
-                <ImprovedMonthlyPivotTable rawData={rawData} filters={filters} />
-            </div>
 
             {isTargetModalOpen && (
                 <CreateTargetModal

@@ -92,43 +92,40 @@ const ProjectionItem: React.FC<ProjectionItemProps> = ({ result, label, isCurren
         }
 
         statusNode = (
-            <div className={`flex items-center gap-1.5 text-xs font-bold mt-3 px-2 py-1.5 rounded-md border ${statusColor}`}>
-                <StatusIcon size={14} />
-                <span>{statusLabel}</span>
-                <span className="opacity-60 font-normal ml-auto text-xs">{progress.toFixed(0)}%</span>
-            </div>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusColor}`}>
+                <StatusIcon size={11} />
+                {statusLabel}
+                <span className="opacity-60 font-normal">{progress.toFixed(0)}%</span>
+            </span>
         );
     } else {
         // No target set
         statusNode = (
-            <div className={`flex items-center gap-1.5 text-xs font-medium mt-3 px-2 py-1.5 rounded-md border border-slate-100 bg-slate-50 text-slate-400`}>
-                <Activity size={14} />
-                <span>Sem meta definida</span>
-            </div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border border-slate-100 bg-slate-50 text-slate-400">
+                <Activity size={11} />
+                Sem meta
+            </span>
         );
     }
 
     return (
-        <div className="bg-white rounded-xl p-5 border border-slate-100 flex flex-col shadow-sm hover:shadow-md transition-shadow">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">{label}</span>
-            <div className="flex flex-col">
-                <div className="text-3xl font-extrabold text-slate-800 tracking-tight" title="Valor Realizado (Atual)">
-                    {format(result.current)}
-                </div>
-                <div className="flex items-center gap-1.5 mt-1 text-sm font-medium text-slate-500">
-                    <span className="opacity-70">Projeção:</span>
-                    <span className="text-slate-700 font-bold">{format(result.projected)}</span>
-                </div>
+        <div className="flex-1 min-w-[180px] px-4 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{label}</span>
+                <span className={`flex items-center gap-0.5 text-[10px] font-bold ${trendColor}`} title={`${result.confidence}% confiança`}>
+                    <Icon className="w-3 h-3" />
+                    {term}
+                </span>
             </div>
-
-            <div className="mt-4 pt-4 border-t border-slate-50">
-                <div className="flex items-center justify-between text-xs">
-                    <div className={`flex items-center gap-1 ${trendColor} font-bold`}>
-                        <Icon className="w-4 h-4" />
-                        <span>{term}</span>
-                    </div>
-                    <span className="text-slate-400 font-medium">{result.confidence}% confiança</span>
-                </div>
+            <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-xl font-extrabold text-slate-800 tracking-tight" title="Valor Realizado (Atual)">
+                    {format(result.current)}
+                </span>
+                <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">
+                    → proj. <span className="text-slate-600 font-bold">{format(result.projected)}</span>
+                </span>
+            </div>
+            <div className="mt-1.5">
                 {statusNode}
             </div>
         </div>
@@ -171,17 +168,22 @@ export const ProjectionBox: React.FC<ProjectionBoxProps> = ({ data }) => {
     const daysRemaining = daysTotal - daysPassed;
 
     return (
-        <div className="bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200/60 p-1 mb-8">
-            <div className="px-5 py-3 flex justify-between items-center">
-                <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div className="px-4 py-2 flex justify-between items-center border-b border-slate-100">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
                     Projeção para o final do mês
                 </h3>
-                <div className="text-xs font-semibold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
-                    {daysRemaining} dias restantes
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+                        *média móvel dos últimos 7 dias
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-100">
+                        {daysRemaining} dias restantes
+                    </span>
                 </div>
             </div>
 
-            <div className="p-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex flex-wrap divide-x divide-slate-100">
                 <ProjectionItem
                     result={spendProj}
                     label="Investimento"
@@ -200,10 +202,6 @@ export const ProjectionBox: React.FC<ProjectionBoxProps> = ({ data }) => {
                     targetValue={getTarget('cpa')}
                     inverse // Lower is better
                 />
-            </div>
-
-            <div className="px-6 py-2 text-[10px] text-center text-slate-400 font-medium">
-                *Projeção baseada na média móvel dos últimos 7 dias.
             </div>
         </div>
     );

@@ -446,6 +446,9 @@ export const AdsTab: React.FC = () => {
         return withCpa.length > 0 ? withCpa.reduce((s, a) => s + a.cpa, 0) / withCpa.length : 0;
     }, [allAds]);
 
+    // Stories (9:16) são ocultos por padrão no grid — contamos para explicar no rótulo
+    const hiddenStoriesCount = useMemo(() => allAds.filter(a => a.isStory).length, [allAds]);
+
     // ── Totals ──────────────────────────────────────────────────────────────
     const currTotals = useMemo(() => {
         const spend = filteredData.reduce((s, d) => s + d.spend, 0);
@@ -600,7 +603,17 @@ export const AdsTab: React.FC = () => {
                     {isRefreshing ? 'Atualizando...' : 'Atualizar Criativos'}
                 </button>
 
-                <span className="text-xs text-slate-400 ml-auto">{displayAds.length} anuncios</span>
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-slate-400 group relative">
+                    <span className="font-medium text-slate-500">{displayAds.length}</span>
+                    <span>{displayAds.length === 1 ? 'anúncio exibido' : 'anúncios exibidos'}</span>
+                    {hiddenStoriesCount > 0 && (
+                        <span className="text-slate-300">· {hiddenStoriesCount} stories ocultos</span>
+                    )}
+                    <Info size={12} className="text-slate-300 cursor-help" />
+                    <div className="hidden group-hover:block absolute right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-lg p-2.5 shadow-lg w-64 text-[11px] text-slate-500 leading-relaxed font-normal">
+                        Cards deduplicados por criativo (mesma imagem em vários posicionamentos/conjuntos vira 1 card) e stories 9:16 ocultos por padrão. Por isso o total pode diferir do contador de anúncios do filtro no topo.
+                    </div>
+                </div>
             </div>
 
             {/* Ad Feed Grid */}

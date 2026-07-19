@@ -101,10 +101,10 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'monthly', label: 'Análise Mensal', icon: BarChart2 },
-    { id: 'daily', label: 'Análise Diária', icon: Calendar },
     { id: 'campaigns', label: 'Campanhas', icon: List },
     { id: 'ads', label: 'Anúncios', icon: Image },
+    { id: 'daily', label: 'Análise Diária', icon: Calendar },
+    { id: 'monthly', label: 'Análise Mensal', icon: BarChart2 },
     { id: 'budget', label: 'Orçamentos', icon: Wallet },
   ] as const;
 
