@@ -11,6 +11,7 @@ import {
   ArrowDown,
   ArrowUp,
   BarChart3,
+  CopyPlus,
   Edit2,
   Loader2,
   Plus,
@@ -145,7 +146,7 @@ const toneClasses = {
 
 const objectiveDotClass = (objective: string) => {
   const normalized = objective.toLowerCase();
-  if (normalized.includes('b2c') || normalized.includes('performance')) return 'bg-blue-500';
+  if (normalized.includes('b2c') || normalized.includes('performance') || normalized.includes('aquis')) return 'bg-blue-500';
   if (normalized.includes('marca') || normalized.includes('brand')) return 'bg-violet-500';
   if (normalized.includes('plurix')) return 'bg-emerald-500';
   if (normalized.includes('seguro')) return 'bg-amber-500';
@@ -356,6 +357,7 @@ export const BudgetTabV2: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isReallocateOpen, setIsReallocateOpen] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
 
   const monthRows = useMemo(() => {
     return rawData.filter((row) => {
@@ -611,6 +613,95 @@ export const BudgetTabV2: React.FC = () => {
     }
   };
 
+  const handleCopyPreviousMonth = async () => {
+    const prevMonth = format(subMonths(monthDate, 1), 'MM/yyyy');
+    const confirmed = window.confirm(
+      `Copiar metas de ${prevMonth} para ${currentMonth}?\n\nObjetivos e campanhas ja existentes no mes atual serao mantidos; so o que faltar sera adicionado.`
+    );
+    if (!confirmed) return;
+
+    setIsCopying(true);
+    try {
+      const [allBudgets, prevCampaigns] = await Promise.all([
+        dataService.fetchPaidMediaBudgets(),
+        dataService.fetchCampaignBudgetsByMonth(prevMonth),
+      ]);
+      const prevObjectives = allBudgets.filter((b: any) => b.month === prevMonth);
+
+      if (prevObjectives.length === 0 && prevCampaigns.length === 0) {
+        window.alert(`Nenhuma meta encontrada em ${prevMonth} para copiar.`);
+        return;
+      }
+
+      // Estado atual — usado para pular duplicatas (idempotente)
+      // objective key -> id do objetivo no mes atual (para religar campanhas)
+      const objectiveKeyToId = new Map<string, string>();
+      allBudgets
+        .filter((b: any) => b.month === currentMonth)
+        .forEach((b: any) => objectiveKeyToId.set(b.objective, b.id));
+      // campanhas ja com budget real no mes atual (ignora as 'unbudgeted-')
+      const existingCampaignNames = new Set(
+        campaigns.filter((c) => !c.id.startsWith('unbudgeted-')).map((c) => c.campaignName)
+      );
+
+      // 1. Objetivos — mapeia id antigo -> id novo/existente
+      const objectiveIdMap = new Map<string, string>();
+      let objectivesCopied = 0;
+      for (const obj of prevObjectives) {
+        const existingId = objectiveKeyToId.get(obj.objective);
+        if (existingId) {
+          objectiveIdMap.set(obj.id, existingId);
+          continue;
+        }
+        const newId = crypto.randomUUID();
+        await dataService.upsertPaidMediaBudget({
+          id: newId,
+          month: currentMonth,
+          objective: obj.objective,
+          budget: obj.budget ?? 0,
+          channel: obj.channel ?? null,
+        });
+        objectiveIdMap.set(obj.id, newId);
+        objectiveKeyToId.set(obj.objective, newId);
+        objectivesCopied++;
+      }
+
+      // 2. Campanhas — religadas ao objetivo correspondente no mes atual
+      let campaignsCopied = 0;
+      for (const camp of prevCampaigns) {
+        if (existingCampaignNames.has(camp.campaign_name)) continue;
+        const targetObjectiveId =
+          objectiveIdMap.get(camp.objective_budget_id) ?? objectiveKeyToId.get(camp.objective);
+        if (!targetObjectiveId) continue; // sem objetivo no mes atual para vincular
+        await dataService.upsertCampaignBudget({
+          id: crypto.randomUUID(),
+          month: currentMonth,
+          objective_budget_id: targetObjectiveId,
+          campaign_name: camp.campaign_name,
+          objective: camp.objective,
+          channel: camp.channel,
+          allocated_budget: camp.allocated_budget ?? 0,
+          notes: camp.notes ?? null,
+        });
+        existingCampaignNames.add(camp.campaign_name);
+        campaignsCopied++;
+      }
+
+      await refetch();
+      window.alert(
+        `Copiado de ${prevMonth}: ${objectivesCopied} objetivo(s) e ${campaignsCopied} campanha(s).` +
+          (objectivesCopied === 0 && campaignsCopied === 0
+            ? '\n\nTudo do mes anterior ja existia no mes atual.'
+            : '')
+      );
+    } catch (err) {
+      console.error('Erro ao copiar metas do mes anterior:', err);
+      window.alert('Erro ao copiar metas do mes anterior.');
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   const getCampaignModalObjective = (): ObjectiveBudget => {
     if (editingCampaign) {
       return objectives.find((objective) => objective.id === editingCampaign.objectiveBudgetId) ?? objectives[0];
@@ -679,6 +770,15 @@ export const BudgetTabV2: React.FC = () => {
           >
             <Shuffle size={13} />
             Realocar budget
+          </button>
+          <button
+            onClick={handleCopyPreviousMonth}
+            disabled={isCopying}
+            title="Copiar objetivos e campanhas do mês anterior"
+            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white/80 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isCopying ? <Loader2 size={13} className="animate-spin" /> : <CopyPlus size={13} />}
+            Copiar mês anterior
           </button>
           <button
             onClick={() => setIsMappingsModalOpen(true)}
@@ -846,16 +946,26 @@ export const BudgetTabV2: React.FC = () => {
             </div>
             <p className="mb-1 font-medium text-slate-700">Nenhum orçamento configurado para {currentMonth}</p>
             <p className="mb-5 text-sm text-slate-400">Crie orçamentos por objetivo para acompanhar gastos e projeções.</p>
-            <button
-              onClick={() => {
-                setEditingObjective(undefined);
-                setIsObjectiveModalOpen(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-            >
-              <Plus size={15} />
-              Criar primeiro orçamento
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                onClick={() => {
+                  setEditingObjective(undefined);
+                  setIsObjectiveModalOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                <Plus size={15} />
+                Criar primeiro orçamento
+              </button>
+              <button
+                onClick={handleCopyPreviousMonth}
+                disabled={isCopying}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isCopying ? <Loader2 size={15} className="animate-spin" /> : <CopyPlus size={15} />}
+                Copiar do mês anterior
+              </button>
+            </div>
           </div>
         ) : objectiveViews.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
