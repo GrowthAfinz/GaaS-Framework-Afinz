@@ -12,6 +12,7 @@ import {
     ClipboardList,
     FolderOpen,
     GitBranch,
+    Funnel,
     Tag,
     Mail,
     LayoutGrid,
@@ -121,6 +122,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             direct: false,
             items: [
                 { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => setTab('originacao-b2c') },
+                { id: 'funil-aquisicao', label: 'Funil de Aquisição', icon: Funnel, onClick: () => setTab('funil-aquisicao') },
                 { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => setTab('relatorio') },
                 { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => setTab('jornada') },
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => setTab('orientador') },

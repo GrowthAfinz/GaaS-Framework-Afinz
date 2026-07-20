@@ -13,6 +13,7 @@ import { FrameworkView } from './components/FrameworkView';
 import { OrientadorView } from './components/OrientadorView';
 import { ConfiguracoesView } from './components/ConfiguracoesView';
 import { OriginacaoB2CView } from './components/OriginacaoB2CView';
+import { FunilAquisicaoView } from './components/FunilAquisicaoView';
 import { CommunicationsView } from './components/communications/CommunicationsView';
 import { DisparoExplorer } from './components/explorer/DisparoExplorer';
 import { useFrameworkData } from './hooks/useFrameworkData';
@@ -169,7 +170,7 @@ function App() {
   // sempre usam a frente de Aquisição (comportamento inalterado).
   const frente = viewSettings.frente;
   const sourceData = useMemo(() => {
-    const FRENTE_SCOPED_TABS = new Set(['launch', 'relatorio', 'resultados', 'jornada', 'explorador', 'orientador']);
+    const FRENTE_SCOPED_TABS = new Set(['launch', 'relatorio', 'resultados', 'jornada', 'explorador', 'orientador', 'funil-aquisicao']);
     return frente === 'rentabilizacao' && FRENTE_SCOPED_TABS.has(activeTab)
       ? rentabilizacaoData
       : data;
@@ -265,6 +266,14 @@ function App() {
   const resultados = useResultadosMetrics(filteredData);
 
   const hasData = Object.keys(data).length > 0 || Object.keys(rentabilizacaoData).length > 0;
+
+  if (import.meta.env.DEV && urlHash === '#funil-preview') {
+    return (
+      <MainLayout>
+        <FunilAquisicaoView />
+      </MainLayout>
+    );
+  }
 
   if (authLoading) {
     return <div className="h-screen w-full bg-slate-50 text-slate-500 flex items-center justify-center">Carregando...</div>;
@@ -474,6 +483,18 @@ function App() {
                   )}
                 </PageTransition>
               )}
+              {activeTab === 'funil-aquisicao' && (
+                <PageTransition>
+                  {frente === 'rentabilizacao' ? (
+                    <div className="flex min-h-[60vh] items-center justify-center p-8">
+                      <div className="max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                        <h2 className="text-xl font-bold text-slate-900">Funil de Aquisição pertence à frente Aquisição</h2>
+                        <p className="mt-2 text-sm text-slate-500">Troque para Aquisição para acompanhar as etapas da jornada do app.</p>
+                      </div>
+                    </div>
+                  ) : <FunilAquisicaoView />}
+                </PageTransition>
+              )}
               {activeTab === 'configuracoes' && (
                 <PageTransition>
                   <ConfiguracoesView />
@@ -489,7 +510,7 @@ function App() {
                   <CommunicationsView mode="performance" />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance'].includes(activeTab) && (
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>

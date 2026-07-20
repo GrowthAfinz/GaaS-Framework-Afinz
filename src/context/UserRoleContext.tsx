@@ -74,7 +74,7 @@ export const UserRoleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const canSeeTab = (tabId: string): boolean => {
     // Analista Plurix não vê a aba de Originação B2C
-    if (isPlurixAnalyst && tabId === 'originacao-b2c') {
+    if (isPlurixAnalyst && (tabId === 'originacao-b2c' || tabId === 'funil-aquisicao')) {
       return false;
     }
     return true;
