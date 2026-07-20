@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CalendarDays, CheckCircle2, Download, Info } from 'lucide-react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type MetricMode = 'volume' | 'evolution';
@@ -78,7 +78,7 @@ export const FunilAquisicaoView: React.FC = () => {
     const periods = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-limit).map(([key, values]) => {
       const t = sum(values), start = values[0].date;
       const label = granularity === 'daily' ? shortDate(start) : granularity === 'weekly' ? shortDate(start) : start.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-      return { key, period: label, ...t };
+      return { key, period: label, ...t, taxaGeral: percentage(t.emitidos, t.consultas) };
     });
     return periods.map((period, index) => {
       const previous = periods[index - 1];
@@ -129,9 +129,9 @@ export const FunilAquisicaoView: React.FC = () => {
         </div>
         <div className="mt-3 h-[380px]">
           {selectedStages.length === 0 ? <div className="flex h-full items-center justify-center text-sm text-slate-400">Selecione ao menos uma etapa para visualizar.</div> :
-          <ResponsiveContainer width="100%" height="100%"><LineChart data={chartData} margin={{ top: 20, right: 24, left: 8, bottom: 4 }}><CartesianGrid vertical={false} stroke="#e2e8f0" /><XAxis dataKey="period" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} tickFormatter={value => metricMode === 'evolution' ? `${value}%` : value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><Tooltip formatter={(value: number, name: string) => [metricMode === 'evolution' ? percentageLabel(value) : formatNumber(value), stageConfig.find(stage => stage.key === name)?.label ?? name]} />{stageConfig.filter(stage => selectedStages.includes(stage.key)).map(stage => <Line key={stage.key} type="monotone" dataKey={stage.key} name={stage.key} stroke={stage.color} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls={false} />)}</LineChart></ResponsiveContainer>}
+          <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 18, right: 28, left: 8, bottom: 4 }} barGap={2} barCategoryGap="22%"><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} /><YAxis yAxisId="primary" axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => metricMode === 'evolution' ? `${value}%` : value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} />{metricMode === 'volume' && <YAxis yAxisId="rate" orientation="right" domain={[0, 'auto']} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => `${value}%`} />}<Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ border: '1px solid #cbd5e1', borderRadius: 2, fontSize: 11, fontFamily: 'ui-monospace, monospace' }} labelStyle={{ color: '#0f172a', fontWeight: 700, marginBottom: 6 }} formatter={(value: number, name: string) => [metricMode === 'evolution' || name === 'taxaGeral' ? percentageLabel(value, name === 'taxaGeral' ? 2 : 1) : formatNumber(value), name === 'taxaGeral' ? 'Taxa geral' : stageConfig.find(stage => stage.key === name)?.label ?? name]} />{metricMode === 'evolution' && <ReferenceLine yAxisId="primary" y={0} stroke="#334155" strokeWidth={1.25} />}{stageConfig.filter(stage => selectedStages.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="primary" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={granularity === 'daily' ? 18 : 38} />)}{metricMode === 'volume' && <Line yAxisId="rate" type="linear" dataKey="taxaGeral" name="taxaGeral" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3, fill: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 5 }} />}</ComposedChart></ResponsiveContainer>}
         </div>
-        <p className="text-[10px] text-slate-500">{metricMode === 'evolution' ? 'Variação percentual contra o período imediatamente anterior. Sem base quando o período anterior é zero ou nulo.' : 'Volumes agregados conforme a granularidade selecionada. Passe o cursor para comparar as etapas.'}</p>
+        <p className="text-[10px] text-slate-500">{metricMode === 'evolution' ? 'Colunas acima/abaixo de zero representam a variação contra o período anterior. Sem base quando o período anterior é zero ou nulo.' : 'Colunas: volumes das etapas selecionadas · linha laranja/eixo direito: taxa geral de emitidos sobre consultas.'}</p>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
