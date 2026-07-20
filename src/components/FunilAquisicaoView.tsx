@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CalendarDays, CheckCircle2, Download, Info } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { usePeriod } from '../contexts/PeriodContext';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type MetricMode = 'volume' | 'evolution';
@@ -57,6 +58,7 @@ const EvolutionCell = ({ value, previous }: { value: number | null; previous: nu
 };
 
 export const FunilAquisicaoView: React.FC = () => {
+  const { startDate, endDate } = usePeriod();
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [granularity, setGranularity] = useState<Granularity>('weekly');
@@ -69,11 +71,14 @@ export const FunilAquisicaoView: React.FC = () => {
   }, []);
 
   const lastDate = rows.at(-1)?.date;
-  const current = useMemo(() => !lastDate ? [] : rows.filter(r => r.date.getFullYear() === lastDate.getFullYear() && r.date.getMonth() === lastDate.getMonth()), [rows, lastDate]);
+  const periodStart = useMemo(() => new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()), [startDate]);
+  const periodEnd = useMemo(() => new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999), [endDate]);
+  const current = useMemo(() => rows.filter(row => row.date >= periodStart && row.date <= periodEnd), [rows, periodStart, periodEnd]);
   const total = useMemo(() => sum(current), [current]);
+  const periodLabel = `${startDate.toLocaleDateString('pt-BR')} – ${endDate.toLocaleDateString('pt-BR')}`;
   const chartData = useMemo(() => {
     const groups = new Map<string, Row[]>();
-    rows.forEach(row => { const key = periodKey(row.date, granularity); groups.set(key, [...(groups.get(key) ?? []), row]); });
+    current.forEach(row => { const key = periodKey(row.date, granularity); groups.set(key, [...(groups.get(key) ?? []), row]); });
     const limit = granularity === 'daily' ? 31 : granularity === 'weekly' ? 12 : 7;
     const periods = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-limit).map(([key, values]) => {
       const t = sum(values), start = values[0].date;
@@ -85,7 +90,7 @@ export const FunilAquisicaoView: React.FC = () => {
       const evolution = Object.fromEntries(stageConfig.map(stage => [stage.key, previous ? delta(period[stage.key], previous[stage.key]) : null]));
       return metricMode === 'volume' ? period : { ...period, ...evolution };
     });
-  }, [rows, granularity, metricMode]);
+  }, [current, granularity, metricMode]);
 
   const stages = [
     ['Consultas', total.consultas, null, 'confirmado'],
@@ -100,7 +105,7 @@ export const FunilAquisicaoView: React.FC = () => {
   const exportCsv = () => {
     const csv = ['Data;Consultas;Aprovados;Pedidos;Foto biometria;Documentos;Assinaturas;Emitidos', ...current.map(r => [shortDate(r.date), r.consultas, r.aprovados, r.pedidos, r.bio ?? '', r.docs, r.assinatura ?? '', r.emitidos].join(';'))].join('\n');
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a'); a.href = url; a.download = 'funil-serasa-jul-2026.csv'; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = `funil-serasa-${iso(periodStart)}-${iso(periodEnd)}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   return <div className="min-h-full bg-slate-50 px-4 py-5 text-slate-800">
@@ -113,7 +118,7 @@ export const FunilAquisicaoView: React.FC = () => {
       {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
 
       <section className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-        <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Período analisado</p><p className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-800"><CalendarDays size={16} /> Julho de 2026 · até o último dia disponível</p></div>
+        <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Período analisado</p><p className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-800"><CalendarDays size={16} /> {periodLabel}</p></div>
         <div className="inline-flex rounded-lg border border-slate-200 p-1 text-xs font-semibold">{(['daily', 'weekly', 'monthly'] as Granularity[]).map(g => <button key={g} onClick={() => setGranularity(g)} className={`rounded-md px-4 py-2 transition ${granularity === g ? 'bg-cyan-50 text-cyan-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>{g === 'daily' ? 'Diária' : g === 'weekly' ? 'Semanal' : 'Mensal'}</button>)}</div>
       </section>
 
@@ -141,7 +146,7 @@ export const FunilAquisicaoView: React.FC = () => {
       </section>
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center justify-between p-5"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe diário · julho</h2><p className="text-xs text-slate-500">Volume e evolução contra o dia anterior. Destaques fortes indicam variação igual ou superior a 20%.</p></div><button onClick={exportCsv} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
+        <div className="flex items-center justify-between p-5"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe diário · {periodLabel}</h2><p className="text-xs text-slate-500">Volume e evolução contra o dia anterior. Destaques fortes indicam variação igual ou superior a 20%.</p></div><button onClick={exportCsv} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
         <div className="max-h-[470px] overflow-auto"><table className="w-full min-w-[1120px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr>{['Data','Consultas','Aprovados','Pedidos','Biometria','Documentos','Assinaturas','Emitidos','Taxa geral'].map(h => <th key={h} className="px-3 py-2.5 text-right font-semibold first:text-left">{h}</th>)}</tr></thead><tbody>{current.map((row, rowIndex) => {
           const globalIndex = rows.findIndex(item => iso(item.date) === iso(row.date));
           const previous = globalIndex > 0 ? rows[globalIndex - 1] : null;
