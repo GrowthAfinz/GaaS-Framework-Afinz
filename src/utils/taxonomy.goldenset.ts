@@ -71,6 +71,22 @@ function run(): Check[] {
   const alv = matchTemplate(alvorada(), CATALOG);
   checks.push({ name: 'Alvorada sem template → novo', pass: alv === null, got: alv ? alv.tpl.id : 'null' });
 
+  // Divergência jornada × coluna: coluna diz B2C/Base_Proprietaria, jornada diz B2B2C_BB_CRM.
+  // Precedência C: a jornada corrige (bb/crm) e a linha fica marcada como divergente.
+  const div = parseActivity('afz_car_bbt_aqs_email_bsp_disp1s2copa_pontual', {
+    canal: 'E-mail', parceiro: 'Proprietaria', segmento: 'Base_Proprietaria', bu: 'B2C',
+    jornada: 'JOR_AQUISICAO_B2B2C_BB_CRM_AQUISICAO_COPA_PAD_SEM2',
+  });
+  eq('divergência: jornada corrige público → bb', div.publico, 'bb');
+  eq('divergência: jornada corrige segmento → crm', div.segmento, 'crm');
+  checks.push({ name: 'divergência: linha marcada', pass: !!div.divergencias?.length, got: JSON.stringify(div.divergencias) });
+  // B2C legítimo (carrinho): jornada e coluna concordam → SEM divergência falsa.
+  const b2cOk = parseActivity('afz_car_vis_aqs_email_bsp_disp1s2copa_pontual', {
+    canal: 'E-mail', parceiro: 'Proprietaria', segmento: 'Base_Proprietaria', bu: 'B2C',
+    jornada: 'JOR_AQUISICAO_B2C_CARRINHO_AQUISICAO_VIBE_PAD_26',
+  });
+  checks.push({ name: 'B2C consistente: sem divergência falsa', pass: !b2cOk.divergencias, got: JSON.stringify(b2cOk.divergencias) });
+
   return checks;
 }
 

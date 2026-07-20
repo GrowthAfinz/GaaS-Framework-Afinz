@@ -297,6 +297,31 @@ export function segmentoKeyFromTemplateId(id: string): string | null {
   return null;
 }
 
+// ── Jornada como TERCEIRA fonte estruturada ──────────────────────────────────
+// Formato canônico: JOR_AQUISICAO_<BU>_<PARCEIRO>_<SEGMENTO>_... O token de BU
+// (posição 3) é confiável; para B2B2C o parceiro/segmento também. Usado para
+// cruzar contra as colunas e pescar linhas com metadado corrompido (ex.: jornada
+// diz B2B2C_BB_CRM mas a coluna BU foi gravada como B2C).
+const BU_JORNADA_TOKENS = new Set(['b2c', 'b2b2c', 'plurix']);
+
+export interface JornadaIdentity { bu: string | null; publico: string | null; segmento: string | null }
+
+/** Identidade estruturada derivada da jornada (null quando a jornada foge do padrão canônico). */
+export function parseJornadaIdentity(jornada: string | null | undefined): JornadaIdentity {
+  const cleaned = String(jornada ?? '').trim().replace(/^JOR_AQUISICAO_/i, '').replace(/^JOR_/i, '');
+  const toks = cleaned.split('_').filter(Boolean);
+  const buTok = normalizeTaxonomyText(toks[0]).replace(/ /g, '');
+  if (!BU_JORNADA_TOKENS.has(buTok)) return { bu: null, publico: null, segmento: null };
+  const segAt = (i: number) => {
+    const k = segmentoKey(toks[i]);
+    return k && SEGMENTO_FULL_KEYS.has(k) ? k : null;
+  };
+  if (buTok === 'b2c') return { bu: 'b2c', publico: 'b2c', segmento: null }; // token[1] é marcador (carrinho/na/21d), não segmento limpo
+  if (buTok === 'plurix') return { bu: 'plurix', publico: 'plurix', segmento: null };
+  // b2b2c: token[1] = parceiro (bb/dia/alvorada...), token[2] = segmento (crm...)
+  return { bu: 'b2b2c', publico: partnerCode(toks[1]), segmento: segAt(2) };
+}
+
 const PUBLICO_LABELS: Record<string, string> = {
   b2c: 'B2C · Afinz', bb: 'Bem Barato', dia: 'DIA', plurix: 'Plurix',
   alvorada: 'Alvorada', serasa: 'Serasa', bpc: 'Bom Pra Crédito', acordo: 'Acordo Certo',
@@ -342,6 +367,8 @@ export interface ParsedActivity {
   cadencia: string | null;
   variante: string | null;
   seq: string | null;
+  /** Divergências jornada × coluna (null quando batem). A jornada vence a sugestão; a linha fica marcada p/ auditoria. */
+  divergencias?: string[] | null;
 }
 
 export interface ParsedSeq {
@@ -433,11 +460,31 @@ export function parseActivity(name: string, structured?: {
   const n = name.toLowerCase();
   // Público via CROSSWALK das colunas estruturadas (BU+Parceiro) — fonte de verdade,
   // 100% preenchida. Fallback na string só se as colunas faltarem (raro).
-  const publico = publicoFromColumns(structured?.bu, structured?.parceiro)
+  const colPublico = publicoFromColumns(structured?.bu, structured?.parceiro)
     ?? resolvePublico([name, structured?.jornada].filter(Boolean).join(' '));
   // Segmento por chave canônica da coluna Segmento (== metadata.segmento_af_sub1 no template).
-  const segmento = segmentoKey(structured?.segmento)
+  const colSegmento = segmentoKey(structured?.segmento)
     ?? segmentoKey(resolveDim('segmento', `${structured?.jornada ?? ''} ${n}`));
+
+  // Cross-check jornada × coluna (precedência C): a jornada (plano autorado) corrige
+  // a sugestão quando diverge, mas a linha é marcada como divergente para auditoria.
+  const jid = parseJornadaIdentity(structured?.jornada);
+  const divergencias: string[] = [];
+  let publico = colPublico;
+  if (jid.publico && colPublico && jid.publico !== colPublico) {
+    divergencias.push(`Público: coluna=${publicoLabel(colPublico)} · jornada=${publicoLabel(jid.publico)}`);
+    publico = jid.publico;
+  } else if (!colPublico && jid.publico) {
+    publico = jid.publico;
+  }
+  let segmento = colSegmento;
+  if (jid.segmento && colSegmento && jid.segmento !== colSegmento) {
+    divergencias.push(`Segmento: coluna=${segmentoLabelCanon(colSegmento)} · jornada=${segmentoLabelCanon(jid.segmento)}`);
+    segmento = jid.segmento;
+  } else if (!colSegmento && jid.segmento) {
+    segmento = jid.segmento;
+  }
+
   const seq = parseSeq(name);
   // Serasa é audiência de B2C → também vira variante 'srsa' (discrimina peça do parceiro).
   const variante = resolveDim('variante', n)
@@ -450,6 +497,7 @@ export function parseActivity(name: string, structured?: {
     cadencia: seq && seq.startsWith('D') ? seq : resolveDim('cadencia', n),
     variante,
     seq,
+    divergencias: divergencias.length ? divergencias : null,
   };
 }
 

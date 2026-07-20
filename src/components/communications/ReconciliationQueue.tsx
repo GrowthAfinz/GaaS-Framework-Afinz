@@ -88,7 +88,11 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
   }, [scoped, filter, sortBy, canalSel, segmentoSel, subgrupoSel, semanaSel, disparoSel]);
 
   const strong = useMemo(() => scoped.filter((o) => o.confidence === 'forte'), [scoped]);
-  const bulkStrong = useMemo(() => strong.filter((o) => o.match?.tpl.inCurrentFilter), [strong]);
+  // Divergentes (jornada × coluna) saem do vínculo em massa: exigem revisão individual.
+  const bulkStrong = useMemo(
+    () => strong.filter((o) => o.match?.tpl.inCurrentFilter && !o.parsed.divergencias?.length),
+    [strong]
+  );
 
   const link = async (o: OrphanRow) => {
     if (!o.match) return;
@@ -239,6 +243,14 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
               <CalendarClock size={11} />
               {o.momentSuggestion.label}
             </button>
+            {!!o.parsed.divergencias?.length && (
+              <span
+                title={`Jornada diverge das colunas — sugestão corrigida pela jornada:\n${o.parsed.divergencias.join('\n')}`}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700"
+              >
+                <AlertTriangle size={11} /> divergência
+              </span>
+            )}
           </div>
           <div className="mt-0.5 flex items-center gap-1 truncate text-[10.5px] text-slate-400"><GitBranch size={11} /> {o.jornada}</div>
         </div>
@@ -333,6 +345,17 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
               })}
             </div>
             {o.suggestedId && <p className="mt-2 text-[11px] text-slate-500">ID canônico sugerido: <code className="font-bold text-cyan-700">{o.suggestedId}</code></p>}
+            {!!o.parsed.divergencias?.length && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+                <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-amber-700"><AlertTriangle size={11} /> Divergência jornada × coluna</p>
+                <ul className="mt-1 space-y-0.5">
+                  {o.parsed.divergencias.map((d, i) => (
+                    <li key={i} className="text-[11px] text-amber-800">{d}</li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-[10px] text-amber-600">Sugestão corrigida pela jornada. Revise o dado da coluna na origem.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
