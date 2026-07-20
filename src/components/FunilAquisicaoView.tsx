@@ -106,7 +106,7 @@ export const FunilAquisicaoView: React.FC = () => {
   return <div className="min-h-full bg-slate-50 px-4 py-5 text-slate-800">
     <div className="mx-auto max-w-[1780px] space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700">Análise · Serasa</p><h1 className="text-2xl font-semibold tracking-tight text-slate-950">Funil de Aquisição</h1><p className="text-sm text-slate-600">Acompanhamento de performance e evolução das etapas da jornada.</p></div>
+        <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700">Análise · Serasa</p><h1 className="text-2xl font-semibold tracking-tight text-slate-950">API Sersasa - Funil de Aquisição</h1><p className="text-sm text-slate-600">Acompanhamento de performance e evolução das etapas da jornada.</p></div>
         <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><CheckCircle2 size={15} /> Dados até {lastDate ? lastDate.toLocaleDateString('pt-BR') : '—'}</div>
       </header>
       <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900"><Info size={15} /><span><strong className="font-semibold">Escopo:</strong> somente Serasa. APP e total conciliado ficam fora até a série diária ser certificada.</span></div>
