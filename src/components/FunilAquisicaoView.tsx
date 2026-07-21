@@ -25,6 +25,7 @@ const percentage = (a: number, b: number) => b > 0 ? a / b * 100 : null;
 const percentageLabel = (v: number | null, digits = 1) => v == null ? '—' : `${v.toFixed(digits).replace('.', ',')}%`;
 const parseDate = (v: string) => { const [d, m, y] = v.split('/').map(Number); return new Date(y, m - 1, d, 12); };
 const shortDate = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+const shortWeekday = (d: Date) => d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toLowerCase();
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const delta = (current: number | null, previous: number | null) => current == null || previous == null || previous === 0 ? null : (current - previous) / previous * 100;
 
@@ -83,12 +84,15 @@ export const FunilAquisicaoView: React.FC = () => {
     const periods = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-limit).map(([key, values]) => {
       const t = sum(values), start = values[0].date;
       const label = granularity === 'daily' ? shortDate(start) : granularity === 'weekly' ? shortDate(start) : start.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-      return { key, period: label, ...t, taxaGeral: percentage(t.emitidos, t.consultas) };
+      return { key, period: label, weekday: shortWeekday(start), ...t, taxaFinalizacao: percentage(t.emitidos, t.pedidos) };
     });
     return periods.map((period, index) => {
       const previous = periods[index - 1];
       const evolution = Object.fromEntries(stageConfig.map(stage => [stage.key, previous ? delta(period[stage.key], previous[stage.key]) : null]));
-      return metricMode === 'volume' ? period : { ...period, ...evolution };
+      const taxaFinalizacaoVariacao = previous && period.taxaFinalizacao != null && previous.taxaFinalizacao != null
+        ? period.taxaFinalizacao - previous.taxaFinalizacao
+        : null;
+      return metricMode === 'volume' ? { ...period, taxaFinalizacaoVariacao } : { ...period, ...evolution, taxaFinalizacaoVariacao };
     });
   }, [current, granularity, metricMode]);
 
@@ -99,7 +103,7 @@ export const FunilAquisicaoView: React.FC = () => {
     ['Foto biometria', total.bio, null, 'cobertura parcial'],
     ['Documentos', total.docs, null, 'volume'],
     ['Assinaturas', total.assinatura, null, 'volume'],
-    ['Emitidos', total.emitidos, percentage(total.emitidos, total.consultas), 'resultado'],
+    ['Emitidos', total.emitidos, percentage(total.emitidos, total.pedidos), 'resultado'],
   ] as const;
   const toggleStage = (key: StageKey) => setSelectedStages(currentStages => currentStages.includes(key) ? currentStages.filter(item => item !== key) : [...currentStages, key]);
   const exportCsv = () => {
@@ -134,9 +138,26 @@ export const FunilAquisicaoView: React.FC = () => {
         </div>
         <div className="mt-3 h-[380px]">
           {selectedStages.length === 0 ? <div className="flex h-full items-center justify-center text-sm text-slate-400">Selecione ao menos uma etapa para visualizar.</div> :
-          <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 18, right: 28, left: 8, bottom: 4 }} barGap={2} barCategoryGap="22%"><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} /><YAxis yAxisId="primary" axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => metricMode === 'evolution' ? `${value}%` : value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} />{metricMode === 'volume' && <YAxis yAxisId="rate" orientation="right" domain={[0, 'auto']} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => `${value}%`} />}<Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ border: '1px solid #cbd5e1', borderRadius: 2, fontSize: 11, fontFamily: 'ui-monospace, monospace' }} labelStyle={{ color: '#0f172a', fontWeight: 700, marginBottom: 6 }} formatter={(value: number, name: string) => [metricMode === 'evolution' || name === 'taxaGeral' ? percentageLabel(value, name === 'taxaGeral' ? 2 : 1) : formatNumber(value), name === 'taxaGeral' ? 'Taxa geral' : stageConfig.find(stage => stage.key === name)?.label ?? name]} />{metricMode === 'evolution' && <ReferenceLine yAxisId="primary" y={0} stroke="#334155" strokeWidth={1.25} />}{stageConfig.filter(stage => selectedStages.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="primary" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={granularity === 'daily' ? 18 : 38} />)}{metricMode === 'volume' && <Line yAxisId="rate" type="linear" dataKey="taxaGeral" name="taxaGeral" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3, fill: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 5 }} />}</ComposedChart></ResponsiveContainer>}
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 18, right: 28, left: 8, bottom: granularity === 'daily' ? 34 : 4 }} barGap={2} barCategoryGap="22%">
+              <CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" />
+              <XAxis dataKey="period" height={granularity === 'daily' ? 54 : 30} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={granularity === 'daily' ? ({ x, y, payload }: any) => {
+                const point = chartData.find(item => item.period === payload.value);
+                const variation = point?.taxaFinalizacaoVariacao;
+                const variationColor = variation == null || variation === 0 ? '#94a3b8' : variation > 0 ? '#047857' : '#b91c1c';
+                const variationText = variation == null ? 'sem base' : `${variation > 0 ? '+' : ''}${variation.toFixed(1).replace('.', ',')} p.p.`;
+                return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={10} fontFamily="ui-monospace, monospace" fontWeight={600}>{payload.value}</text><text y={26} textAnchor="middle" fill="#94a3b8" fontSize={9}>{point?.weekday}</text><text y={40} textAnchor="middle" fill={variationColor} fontSize={9} fontFamily="ui-monospace, monospace" fontWeight={700}>{variationText}</text></g>;
+              } : { fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} />
+              <YAxis yAxisId="primary" axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => metricMode === 'evolution' ? `${value}%` : value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} />
+              {metricMode === 'volume' && <YAxis yAxisId="rate" orientation="right" domain={[0, 'auto']} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => `${value}%`} />}
+              <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ border: '1px solid #cbd5e1', borderRadius: 2, fontSize: 11, fontFamily: 'ui-monospace, monospace' }} labelStyle={{ color: '#0f172a', fontWeight: 700, marginBottom: 6 }} formatter={(value: number, name: string) => [metricMode === 'evolution' || name === 'taxaFinalizacao' ? percentageLabel(value, name === 'taxaFinalizacao' ? 2 : 1) : formatNumber(value), name === 'taxaFinalizacao' ? 'Finalização da proposta' : stageConfig.find(stage => stage.key === name)?.label ?? name]} />
+              {metricMode === 'evolution' && <ReferenceLine yAxisId="primary" y={0} stroke="#334155" strokeWidth={1.25} />}
+              {stageConfig.filter(stage => selectedStages.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="primary" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={granularity === 'daily' ? 18 : 38} />)}
+              {metricMode === 'volume' && <Line yAxisId="rate" type="linear" dataKey="taxaFinalizacao" name="taxaFinalizacao" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3, fill: '#ffffff', strokeWidth: 2 }} activeDot={{ r: 5 }} />}
+            </ComposedChart>
+          </ResponsiveContainer>}
         </div>
-        <p className="text-[10px] text-slate-500">{metricMode === 'evolution' ? 'Colunas acima/abaixo de zero representam a variação contra o período anterior. Sem base quando o período anterior é zero ou nulo.' : 'Colunas: volumes das etapas selecionadas · linha laranja/eixo direito: taxa geral de emitidos sobre consultas.'}</p>
+        <p className="text-[10px] text-slate-500">{metricMode === 'evolution' ? 'Colunas acima/abaixo de zero representam a variação contra o período anterior. Sem base quando o período anterior é zero ou nulo.' : 'Colunas: volumes das etapas selecionadas · linha laranja/eixo direito: taxa de finalização da proposta (emitidos ÷ pedidos).'}</p>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5">
@@ -147,10 +168,10 @@ export const FunilAquisicaoView: React.FC = () => {
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex items-center justify-between p-5"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe diário · {periodLabel}</h2><p className="text-xs text-slate-500">Volume e evolução contra o dia anterior. Destaques fortes indicam variação igual ou superior a 20%.</p></div><button onClick={exportCsv} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
-        <div className="max-h-[470px] overflow-auto"><table className="w-full min-w-[1120px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr>{['Data','Consultas','Aprovados','Pedidos','Biometria','Documentos','Assinaturas','Emitidos','Taxa geral'].map(h => <th key={h} className="px-3 py-2.5 text-right font-semibold first:text-left">{h}</th>)}</tr></thead><tbody>{current.map((row, rowIndex) => {
+        <div className="max-h-[470px] overflow-auto"><table className="w-full min-w-[1120px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr>{['Data','Consultas','Aprovados','Pedidos','Biometria','Documentos','Assinaturas','Emitidos','Finalização proposta'].map(h => <th key={h} className="px-3 py-2.5 text-right font-semibold first:text-left">{h}</th>)}</tr></thead><tbody>{current.map((row, rowIndex) => {
           const globalIndex = rows.findIndex(item => iso(item.date) === iso(row.date));
           const previous = globalIndex > 0 ? rows[globalIndex - 1] : null;
-          const currentRate = percentage(row.emitidos, row.consultas), previousRate = previous ? percentage(previous.emitidos, previous.consultas) : null;
+          const currentRate = percentage(row.emitidos, row.pedidos), previousRate = previous ? percentage(previous.emitidos, previous.pedidos) : null;
           const rateDelta = currentRate != null && previousRate != null ? currentRate - previousRate : null;
           return <tr key={iso(row.date)} className={`border-t border-slate-100 ${rowIndex % 2 ? 'bg-slate-50/40' : ''}`}><td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] font-semibold text-slate-800">{shortDate(row.date)}</td>{stageConfig.map(stage => <td key={stage.key} className="px-1.5 py-1"><EvolutionCell value={row[stage.key]} previous={previous?.[stage.key] ?? null} /></td>)}<td className="px-3 py-2 text-right"><div className="font-mono text-[11px] font-semibold text-slate-900">{percentageLabel(currentRate, 2)}</div><div className={`mt-0.5 flex items-center justify-end gap-0.5 text-[9px] font-semibold ${rateDelta == null ? 'text-slate-400' : rateDelta > 0 ? 'text-emerald-700' : rateDelta < 0 ? 'text-red-700' : 'text-slate-400'}`}>{rateDelta == null ? <ArrowRight size={10} /> : rateDelta > 0 ? <ArrowUp size={10} /> : rateDelta < 0 ? <ArrowDown size={10} /> : <ArrowRight size={10} />}{rateDelta == null ? 'sem base' : `${Math.abs(rateDelta).toFixed(2).replace('.', ',')} p.p.`}</div></td></tr>;
         })}</tbody></table></div>
