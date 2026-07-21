@@ -859,7 +859,10 @@ function downloadBuffer(buffer: BlobPart, filename: string): void {
 export async function exportMidiaPagaMonthlyXlsx(start: Date, end: Date): Promise<{ rows: number; filename: string }> {
   const currentStart = monthStart(start);
   const prevStart = previousMonthStart(currentStart);
-  const currentEnd = end >= currentStart ? end : monthEnd(currentStart);
+  // O report é mensal: o fim efetivo nunca passa do último dia do mês de `start`, mesmo que o
+  // período selecionado na tela cruze vários meses (igual ao exportAquisicaoCrmMonthlyXlsx).
+  const monthLastDay = monthEnd(currentStart);
+  const currentEnd = end >= currentStart && end < monthLastDay ? end : monthLastDay;
   const [paidRaw, activityRows] = await Promise.all([
     fetchPaidMediaRows(prevStart, currentEnd),
     fetchSupabaseRows(prevStart, currentEnd),

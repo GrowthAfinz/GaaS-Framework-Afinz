@@ -242,7 +242,10 @@ function buildReportAnalysis(rawRows: RawActivity[], currentStart: Date, current
   const maxDataDay = currentRows.length
     ? Math.max(...currentRows.map((row) => dayOfMonthReport(row.date)))
     : currentEnd.getDate();
-  const currentWindows = weekWindows(currentStart, Math.min(maxDataDay, currentEnd.getDate()));
+  // Limite da última janela = último dia do mês analisado. Usar currentEnd.getDate() cortava as
+  // semanas no dia-do-mês da data final quando o período cruzava meses (ex.: 15/04 → 20/07 cortava
+  // abril no dia 20), deixando disparos fora de toda janela e quebrando a reconciliação abaixo.
+  const currentWindows = weekWindows(currentStart, Math.min(maxDataDay, monthEnd(currentStart).getDate()));
   const prevWindows = previousWeekWindows(prevStart, currentWindows);
 
   const currentTotal = aggregateReportRows(currentRows);
