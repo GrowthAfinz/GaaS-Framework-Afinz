@@ -239,7 +239,7 @@ export const FunilAquisicaoView: React.FC = () => {
   const activeContext = {
     serasa: {
       eyebrow: 'Análise · Serasa',
-      title: 'API Sersasa - Funil de Aquisição',
+      title: 'API Serasa - Funil de Aquisição',
       description: 'Acompanhamento de performance e evolução das etapas da jornada.',
     },
     'paid-media': {
