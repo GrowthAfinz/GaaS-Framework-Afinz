@@ -130,8 +130,7 @@ export const AppAfinzFunnelView: React.FC = () => {
 
   return <div className="min-h-full bg-slate-50 px-4 pb-6 text-slate-800">
     <div className="mx-auto flex max-w-[1780px] flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700">Análise · App Afinz</p><h1 className="text-2xl font-semibold tracking-tight text-slate-950">Funil do App Afinz</h1><p className="text-sm text-slate-600">Leitura operacional de B2C + B2B2C e Plurix, sem misturar populações incompatíveis.</p></div>
+      <header className="flex justify-end">
         <div className="flex items-center gap-2 border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><CheckCircle2 size={15} /> Dados fechados até {lastClosed?.toLocaleDateString('pt-BR') ?? '—'}</div>
       </header>
       <div className="flex items-start gap-2 border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"><AlertTriangle size={15} className="mt-0.5 shrink-0" /><span><strong>Leitura certificada com limite:</strong> `SIM` identifica Plurix e `NAO` o restante do App, mas a fonte não separa B2C de B2B2C. A medida APROVADO da etapa 1 foi excluída por superar a entrada; ausência não vira zero.</span></div>

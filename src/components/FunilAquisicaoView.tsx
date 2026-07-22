@@ -184,8 +184,7 @@ const SerasaFunnelView: React.FC = () => {
 
   return <div className="min-h-full bg-slate-50 px-4 py-5 text-slate-800">
     <div className="mx-auto flex max-w-[1780px] flex-col gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700">Análise · Serasa</p><h1 className="text-2xl font-semibold tracking-tight text-slate-950">API Sersasa - Funil de Aquisição</h1><p className="text-sm text-slate-600">Acompanhamento de performance e evolução das etapas da jornada.</p></div>
+      <header className="flex justify-end">
         <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><CheckCircle2 size={15} /> Dados até {lastDate ? lastDate.toLocaleDateString('pt-BR') : '—'}</div>
       </header>
       <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900"><Info size={15} /><span><strong className="font-semibold">Escopo:</strong> somente Serasa. APP e total conciliado ficam fora até a série diária ser certificada.</span></div>
@@ -237,6 +236,23 @@ export const FunilAquisicaoView: React.FC = () => {
     { key: 'paid-media' as const, label: 'Funil Onboarding - Mídia Paga', detail: 'Aquisição App Install' },
     { key: 'app-afinz' as const, label: 'Funil Onboarding - Apps', detail: 'B2C + B2B2C + Plurix' },
   ];
+  const activeContext = {
+    serasa: {
+      eyebrow: 'Análise · Serasa',
+      title: 'API Sersasa - Funil de Aquisição',
+      description: 'Acompanhamento de performance e evolução das etapas da jornada.',
+    },
+    'paid-media': {
+      eyebrow: 'Análise · Mídia Paga B2C',
+      title: 'Funil de Aquisição · App Install',
+      description: 'Família de campanhas B2C App Install · atribuição Meta preservada por fase.',
+    },
+    'app-afinz': {
+      eyebrow: 'Análise · App Afinz',
+      title: 'Funil do App Afinz',
+      description: 'Leitura operacional de B2C + B2B2C e Plurix, sem misturar populações incompatíveis.',
+    },
+  }[funnel];
   return <div className="min-h-full bg-slate-50">
     <div className="border-b border-slate-200 bg-white px-6 py-4">
       <div className="mx-auto max-w-[1780px]">
@@ -247,9 +263,9 @@ export const FunilAquisicaoView: React.FC = () => {
     <div className="mx-auto mb-4 max-w-[1780px] px-4 pt-5">
       <div className="flex flex-wrap items-center gap-6 rounded-2xl bg-gradient-to-br from-[#063b3d] via-[#0a5f63] to-[#00838a] px-6 py-5 text-white shadow-sm">
         <div className="min-w-[280px] flex-1">
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-white/70">Selecione a visão do funil de onboarding independente</p>
-          <p className="mt-1.5 max-w-[520px] text-base font-bold leading-snug">Escolha a origem para analisar volumes, conversões, evolução e qualidade da fonte.</p>
-          <p className="mt-1 text-xs text-white/65">A troca preserva o período global e abre a leitura certificada de cada funil.</p>
+          <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-cyan-100">{activeContext.eyebrow}</p>
+          <h1 className="mt-1.5 max-w-[560px] text-xl font-bold leading-tight tracking-tight text-white">{activeContext.title}</h1>
+          <p className="mt-1 max-w-[560px] text-sm text-white/75">{activeContext.description}</p>
         </div>
         <nav aria-label="Selecionar funil de onboarding" className="grid min-w-0 flex-[1.6] grid-cols-1 gap-2 md:grid-cols-3">
           {options.map(option => {
