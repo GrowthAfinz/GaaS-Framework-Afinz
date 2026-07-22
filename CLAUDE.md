@@ -701,6 +701,37 @@ Status:
 - **Grid gaps:** gap-2/4
 - **Sidebar width:** w-64
 
+### Densidade da interface (`--ui-scale`)
+
+O app foi desenhado para um canvas de ~1920px. Em telas menores ele se auto-reduz
+via a propriedade CSS `zoom` na raiz — mesmo efeito do zoom do navegador, porem
+automatico e persistido.
+
+| Peca | Arquivo |
+|------|---------|
+| Estado + escala automatica + persistencia | `src/context/UIScaleContext.tsx` |
+| `html { zoom: var(--ui-scale) }` + compensacao de vh/vw | `src/App.css` |
+| Controle no header (Automatico / 100 / 90 / 80 / 67%) | `src/components/layout/UIScaleControl.tsx` |
+| DragDropContext ciente da escala | `src/components/dnd/ScaledDragDropContext.tsx` |
+
+Escala automatica = `largura da janela / 1920`, em passos de 5%, limitada a [0.67, 1].
+Ex.: 1280px -> 67% · 1366px -> 70% · 1536px -> 80% · 1920px -> 100%.
+
+**Tres invariantes que quebram silenciosamente se ignorados:**
+
+1. **Unidades de viewport precisam ser compensadas.** Dentro do subtree com zoom,
+   `100vh` vale `100vh × escala`. Toda classe nova com `vh`/`vw`
+   (ex.: `max-h-[75vh]`) precisa de uma regra `calc(75vh / var(--ui-scale))` no
+   bloco de compensacao no fim de `src/App.css` — senao o modal encolhe junto com
+   o conteudo e nao ganha area util nenhuma.
+2. **Existem dois espacos de coordenadas.** `getBoundingClientRect()` e
+   `event.clientX` retornam px FISICOS; `style.top/left/transform` sao lidos em px
+   LOCAIS (ja escalados). Qualquer codigo que meça com rect e posicione com style
+   precisa dividir pela escala — e o que o `ScaledDragDropContext` faz durante o
+   arraste (o @hello-pangea/dnd nao suporta zoom nativamente).
+3. **Novo `<DragDropContext>` deve usar `<ScaledDragDropContext>`.** Caso contrario
+   o card arrastado aparece deslocado quando a escala != 100%.
+
 ---
 
 ## KNOWN LIMITATIONS

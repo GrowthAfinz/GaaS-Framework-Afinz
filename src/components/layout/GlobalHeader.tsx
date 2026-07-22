@@ -25,6 +25,7 @@ import { FrenteSwitcher } from './FrenteSwitcher';
 import { BUDropdown } from './BUDropdown';
 import { useUserRole } from '../../context/UserRoleContext';
 import { FullscreenButton } from '../ui/FullscreenButton';
+import { UIScaleControl } from './UIScaleControl';
 import { useGlobalSearch, GlobalSearchResult, GlobalSearchResultType } from '../../hooks/useGlobalSearch';
 import { useExplorerStore, PendingNavigation } from '../../store/explorerStore';
 
@@ -333,6 +334,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-slate-200" />
+
+                {/* Densidade da interface */}
+                <UIScaleControl />
 
                 {/* Settings */}
                 <button

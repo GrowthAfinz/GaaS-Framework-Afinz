@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Download, BookOpen, Beaker } from 'lucide-react';
-import { DragDropContext, DropResult } from '@hello-pangea/dnd';
+import { DropResult } from '@hello-pangea/dnd';
+import { ScaledDragDropContext } from './dnd/ScaledDragDropContext';
 import { DayCell } from './DayCell';
 import { HoverCard } from './HoverCard';
 import { StatsCard } from './StatsCardTips';
@@ -262,7 +263,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <ScaledDragDropContext onDragEnd={handleDragEnd}>
       <div className="flex h-full bg-white overflow-hidden">
         {/* Calendário (esquerda) */}
         <div className="flex flex-col w-2/5 bg-white border-r border-slate-200 p-4 overflow-hidden">
@@ -580,6 +581,6 @@ export const Calendar: React.FC<CalendarProps> = ({
           }}
         />
       )}
-    </DragDropContext>
+    </ScaledDragDropContext>
   );
 };

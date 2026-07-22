@@ -8,6 +8,20 @@
   box-sizing: border-box;
 }
 
+/* ──────────────────────────────────────────────────────────────
+   DENSIDADE DA INTERFACE (zoom interno do app)
+   `--ui-scale` e controlado pelo UIScaleProvider (src/context/UIScaleContext.tsx).
+   `zoom` na raiz reproduz exatamente o zoom do navegador: escala tudo
+   (px, rem, SVG, graficos) e refaz o layout, sem quebrar position: fixed.
+   ────────────────────────────────────────────────────────────── */
+:root {
+  --ui-scale: 1;
+}
+
+html {
+  zoom: var(--ui-scale);
+}
+
 html,
 body,
 #root {
@@ -77,4 +91,88 @@ body {
 .drag-over-target {
   background-color: rgba(59, 130, 246, 0.2) !important;
   border: 2px dashed rgba(59, 130, 246, 0.5) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   COMPENSACAO DE UNIDADES DE VIEWPORT SOB `zoom`
+   Dentro de um subtree com zoom, 1vh/1vw sao multiplicados pela escala
+   (100vh com zoom 0.8 = 80% da tela). Sem isso, modais e telas cheias
+   encolheriam junto com o conteudo e nao ganhariam area util nenhuma.
+   Dividir pela escala devolve a proporcao real da tela.
+
+   Precisa vir DEPOIS de `@tailwind utilities` (mesma especificidade, ganha a ultima).
+   Ao introduzir uma classe nova com vh/vw, adicione-a aqui tambem.
+   ────────────────────────────────────────────────────────────── */
+html,
+body,
+#root {
+  min-height: calc(100vh / var(--ui-scale));
+}
+
+.min-h-screen {
+  min-height: calc(100vh / var(--ui-scale));
+}
+
+.h-screen {
+  height: calc(100vh / var(--ui-scale));
+}
+
+.min-h-\[60vh\] {
+  min-height: calc(60vh / var(--ui-scale));
+}
+
+.h-\[68vh\] {
+  height: calc(68vh / var(--ui-scale));
+}
+
+.h-\[76vh\] {
+  height: calc(76vh / var(--ui-scale));
+}
+
+.h-\[85vh\] {
+  height: calc(85vh / var(--ui-scale));
+}
+
+.max-h-\[60vh\] {
+  max-height: calc(60vh / var(--ui-scale));
+}
+
+.max-h-\[80vh\] {
+  max-height: calc(80vh / var(--ui-scale));
+}
+
+.max-h-\[85vh\] {
+  max-height: calc(85vh / var(--ui-scale));
+}
+
+.max-h-\[86vh\] {
+  max-height: calc(86vh / var(--ui-scale));
+}
+
+.max-h-\[88vh\] {
+  max-height: calc(88vh / var(--ui-scale));
+}
+
+.max-h-\[90vh\] {
+  max-height: calc(90vh / var(--ui-scale));
+}
+
+.max-h-\[95vh\] {
+  max-height: calc(95vh / var(--ui-scale));
+}
+
+.w-\[94vw\] {
+  width: calc(94vw / var(--ui-scale));
+}
+
+.w-\[95vw\] {
+  width: calc(95vw / var(--ui-scale));
+}
+
+.max-w-\[92vw\] {
+  max-width: calc(92vw / var(--ui-scale));
+}
+
+.max-w-\[94vw\] {
+  max-width: calc(94vw / var(--ui-scale));
 }

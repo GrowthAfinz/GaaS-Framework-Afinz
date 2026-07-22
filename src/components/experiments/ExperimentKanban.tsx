@@ -1,5 +1,6 @@
 import React from 'react';
-import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
+import { Droppable, DropResult } from '@hello-pangea/dnd';
+import { ScaledDragDropContext } from '../dnd/ScaledDragDropContext';
 import { ExperimentCard } from './ExperimentCard';
 import type { Experiment, ExperimentStats } from '../../types/experiments';
 
@@ -43,7 +44,7 @@ export function ExperimentKanban({ byStatus, metricsMap, onCardClick, onDragTran
   };
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <ScaledDragDropContext onDragEnd={handleDragEnd}>
       <div className="grid grid-cols-3 gap-4 h-full min-h-[350px]">
         {COLUMNS.map(col => (
           <div key={col.id} className="flex flex-col bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-sm h-full">
@@ -85,6 +86,6 @@ export function ExperimentKanban({ byStatus, metricsMap, onCardClick, onDragTran
           </div>
         ))}
       </div>
-    </DragDropContext>
+    </ScaledDragDropContext>
   );
 }
