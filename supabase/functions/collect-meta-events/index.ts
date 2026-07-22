@@ -635,8 +635,36 @@ Deno.serve(async (req) => {
   }
   const b = await req.json().catch(() => ({}));
   const mode = b.mode;
+  if (mode === "discover") {
+    if (!TOKEN || !ACCT) {
+      return json({ error: "META_ACCESS_TOKEN/META_AD_ACCOUNT_ID ausentes" }, 500);
+    }
+    const query = String(b.query ?? "").trim().toLocaleLowerCase("pt-BR");
+    if (query.length < 3) {
+      return json({ error: "discover exige query com ao menos 3 caracteres" }, 400);
+    }
+    try {
+      const { rows } = await fetchAllPagesCursor(`${ACCT}/campaigns`, {
+        fields: "id,name,objective,effective_status,start_time,stop_time",
+      });
+      return json({
+        campaigns: rows.filter((campaign: any) =>
+          String(campaign.name ?? "").toLocaleLowerCase("pt-BR").includes(query)
+        ).map((campaign: any) => ({
+          id: campaign.id,
+          name: campaign.name,
+          objective: campaign.objective ?? null,
+          effective_status: campaign.effective_status ?? null,
+          start_time: campaign.start_time ?? null,
+          stop_time: campaign.stop_time ?? null,
+        })),
+      });
+    } catch (e) {
+      return json({ error: redact((e as Error).message) }, 500);
+    }
+  }
   if (mode !== "daily" && mode !== "backfill") {
-    return json({ error: "mode deve ser 'daily' ou 'backfill'" }, 400);
+    return json({ error: "mode deve ser 'daily', 'backfill' ou 'discover'" }, 400);
   }
 
   let since: string, until: string, campaignId: string = b.campaign_id;
@@ -644,14 +672,6 @@ Deno.serve(async (req) => {
     until = lastClosedDay();
     since = new Date(new Date(until + "T00:00:00Z").getTime() - 27 * 864e5)
       .toISOString().slice(0, 10); // reprocessa 28d fechados
-    if (!campaignId && GOVERNED_CAMPAIGNS.size === 1) {
-      campaignId = [...GOVERNED_CAMPAIGNS][0];
-    }
-    if (!campaignId) {
-      return json({
-        error: "campaign_id obrigatrio (sem rotina diria governada)",
-      }, 400);
-    }
   } else {
     if (!b.since || !b.until || !campaignId) {
       return json({ error: "backfill exige since, until e campaign_id" }, 400);
@@ -670,11 +690,21 @@ Deno.serve(async (req) => {
       );
     }
   }
-  if (GOVERNED_CAMPAIGNS.size === 0 || !GOVERNED_CAMPAIGNS.has(campaignId)) {
+  const campaignIds = campaignId ? [campaignId] : [...GOVERNED_CAMPAIGNS];
+  if (campaignIds.length === 0 || campaignIds.some((id) => !GOVERNED_CAMPAIGNS.has(id))) {
     return json({ error: "campaign_id fora da allowlist governada" }, 403);
   }
   try {
-    return json(await collectMetaEvents({ mode, since, until, campaignId }));
+    const runs = [];
+    for (const governedCampaignId of campaignIds) {
+      runs.push(await collectMetaEvents({
+        mode,
+        since,
+        until,
+        campaignId: governedCampaignId,
+      }));
+    }
+    return json(campaignIds.length === 1 ? runs[0] : { runs });
   } catch (e) {
     const message = redact((e as Error).message);
     return json({ error: message }, 500);
