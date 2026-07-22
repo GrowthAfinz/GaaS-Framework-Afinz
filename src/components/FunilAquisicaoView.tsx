@@ -233,23 +233,31 @@ const SerasaFunnelView: React.FC = () => {
 export const FunilAquisicaoView: React.FC = () => {
   const [funnel, setFunnel] = useState<'serasa' | 'paid-media' | 'app-afinz'>('serasa');
   const options = [
-    { key: 'serasa' as const, label: 'Serasa', detail: 'Originação via API' },
-    { key: 'paid-media' as const, label: 'Mídia Paga', detail: 'App Install' },
-    { key: 'app-afinz' as const, label: 'App Afinz', detail: 'B2C + B2B2C + Plurix' },
+    { key: 'serasa' as const, label: 'Funil Onboarding - Serasa', detail: 'Originação via API' },
+    { key: 'paid-media' as const, label: 'Funil Onboarding - Mídia Paga', detail: 'Aquisição App Install' },
+    { key: 'app-afinz' as const, label: 'Funil Onboarding - Apps', detail: 'B2C + B2B2C + Plurix' },
   ];
-  return <div className="min-h-full bg-slate-50 pt-4">
-    <div className="mx-auto mb-4 max-w-[1780px] px-4">
-      <div className="flex flex-wrap items-end gap-4 border-b border-slate-300 bg-white px-4 pt-3 shadow-sm">
-        <div className="min-w-[170px] pb-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-700">Selecionar visão de Funil</p>
-          <p className="mt-0.5 text-xs text-slate-500">Alterne a fonte de análise</p>
+  return <div className="min-h-full bg-slate-50">
+    <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="mx-auto max-w-[1780px]">
+        <h2 className="text-2xl font-bold text-slate-900">Funis de onboarding</h2>
+        <p className="mt-0.5 text-sm text-slate-500">Acompanhe cada origem de aquisição em sua própria jornada, sem misturar fontes incompatíveis.</p>
+      </div>
+    </div>
+    <div className="mx-auto mb-4 max-w-[1780px] px-4 pt-5">
+      <div className="flex flex-wrap items-center gap-6 rounded-2xl bg-gradient-to-br from-[#063b3d] via-[#0a5f63] to-[#00838a] px-6 py-5 text-white shadow-sm">
+        <div className="min-w-[280px] flex-1">
+          <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-white/70">Selecione a visão do funil de onboarding independente</p>
+          <p className="mt-1.5 max-w-[520px] text-base font-bold leading-snug">Escolha a origem para analisar volumes, conversões, evolução e qualidade da fonte.</p>
+          <p className="mt-1 text-xs text-white/65">A troca preserva o período global e abre a leitura certificada de cada funil.</p>
         </div>
-        <nav aria-label="Selecionar funil" className="flex min-w-0 flex-1 flex-wrap items-stretch">
+        <nav aria-label="Selecionar funil de onboarding" className="grid min-w-0 flex-[1.6] grid-cols-1 gap-2 md:grid-cols-3">
           {options.map(option => {
             const active = funnel === option.key;
-            return <button key={option.key} onClick={() => setFunnel(option.key)} aria-current={active ? 'page' : undefined} className={`relative flex min-w-[190px] items-center border-x border-t px-5 py-2.5 text-left transition-colors first:border-l ${active ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-cyan-50 hover:text-cyan-900'}`}>
-              <span><span className="block text-xs font-bold">{option.label}</span><span className={`block text-[9px] ${active ? 'text-slate-300' : 'text-slate-500'}`}>{option.detail}</span></span>
-              {active && <span className="absolute inset-x-0 -bottom-px h-[3px] bg-cyan-400" />}
+            return <button key={option.key} onClick={() => setFunnel(option.key)} aria-current={active ? 'page' : undefined} className={`relative min-h-[72px] rounded-xl border px-4 py-3 text-left transition-colors ${active ? 'border-cyan-200 bg-white text-slate-900 shadow-lg' : 'border-white/20 bg-white/10 text-white hover:bg-white/15'}`}>
+              <span className="block text-xs font-bold leading-snug">{option.label}</span>
+              <span className={`mt-1 block text-[10px] ${active ? 'text-cyan-700' : 'text-white/65'}`}>{option.detail}</span>
+              {active && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-t bg-cyan-500" />}
             </button>;
           })}
         </nav>
