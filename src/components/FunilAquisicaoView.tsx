@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Download, Info } from 'lucide-react';
+import { AlertTriangle, AppWindow, ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, BarChart3, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Download, Info, ShieldCheck } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../contexts/PeriodContext';
 import { PaidMediaFunnelView } from './PaidMediaFunnelView';
+import { AppAfinzFunnelView } from './AppAfinzFunnelView';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'consultas' | 'aprovados' | 'pedidos' | 'bio' | 'docs' | 'assinatura' | 'emitidos';
@@ -230,14 +231,32 @@ const SerasaFunnelView: React.FC = () => {
 };
 
 export const FunilAquisicaoView: React.FC = () => {
-  const [funnel, setFunnel] = useState<'serasa' | 'paid-media'>('serasa');
+  const [funnel, setFunnel] = useState<'serasa' | 'paid-media' | 'app-afinz'>('serasa');
+  const options = [
+    { key: 'serasa' as const, label: 'Serasa', detail: 'Originação via API', icon: ShieldCheck },
+    { key: 'paid-media' as const, label: 'Mídia Paga', detail: 'App Install', icon: BarChart3 },
+    { key: 'app-afinz' as const, label: 'App Afinz', detail: 'B2C + B2B2C + Plurix', icon: AppWindow },
+  ];
   return <div className="min-h-full bg-slate-50 pt-4">
-    <div className="mx-auto mb-3 max-w-[1780px] px-4">
-      <nav aria-label="Selecionar funil" className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white text-xs font-semibold shadow-sm">
-        <button onClick={() => setFunnel('serasa')} className={`border-r border-slate-300 px-4 py-2 ${funnel === 'serasa' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Serasa</button>
-        <button onClick={() => setFunnel('paid-media')} className={`px-4 py-2 ${funnel === 'paid-media' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Mídia Paga · App Install</button>
-      </nav>
+    <div className="mx-auto mb-4 max-w-[1780px] px-4">
+      <div className="flex flex-wrap items-end gap-4 border-b border-slate-300 bg-white px-4 pt-3 shadow-sm">
+        <div className="min-w-[170px] pb-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-700">Central de funis</p>
+          <p className="mt-0.5 text-xs text-slate-500">Alterne a fonte de análise</p>
+        </div>
+        <nav aria-label="Selecionar funil" className="flex min-w-0 flex-1 flex-wrap items-stretch">
+          {options.map(option => {
+            const Icon = option.icon;
+            const active = funnel === option.key;
+            return <button key={option.key} onClick={() => setFunnel(option.key)} aria-current={active ? 'page' : undefined} className={`relative flex min-w-[190px] items-center gap-2.5 border-x border-t px-4 py-2.5 text-left transition-colors first:border-l ${active ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-cyan-50 hover:text-cyan-900'}`}>
+              <Icon size={17} className={active ? 'text-cyan-300' : 'text-cyan-700'} />
+              <span><span className="block text-xs font-bold">{option.label}</span><span className={`block text-[9px] ${active ? 'text-slate-300' : 'text-slate-500'}`}>{option.detail}</span></span>
+              {active && <span className="absolute inset-x-0 -bottom-px h-[3px] bg-cyan-400" />}
+            </button>;
+          })}
+        </nav>
+      </div>
     </div>
-    {funnel === 'serasa' ? <SerasaFunnelView /> : <PaidMediaFunnelView />}
+    {funnel === 'serasa' ? <SerasaFunnelView /> : funnel === 'paid-media' ? <PaidMediaFunnelView /> : <AppAfinzFunnelView />}
   </div>;
 };
