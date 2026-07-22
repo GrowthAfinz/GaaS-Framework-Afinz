@@ -100,6 +100,7 @@ async function fetchAllPagesCursor(
   let pages = 0;
   let after: string | undefined;
   let guard = 0;
+  let needsNextPage = false;
   while (guard++ < 500) {
     const p = {
       ...params,
@@ -110,9 +111,12 @@ async function fetchAllPagesCursor(
     if (body.data) rows.push(...body.data);
     pages++;
     after = body.paging?.cursors?.after;
-    if (!body.paging?.next || !after) break;
+    needsNextPage = Boolean(body.paging?.next && after);
+    if (!needsNextPage) break;
   }
-  if (after) throw new Error(`Graph pagination guard exceeded for ${path}`);
+  if (needsNextPage) {
+    throw new Error(`Graph pagination guard exceeded for ${path}`);
+  }
   return { rows, pages };
 }
 
