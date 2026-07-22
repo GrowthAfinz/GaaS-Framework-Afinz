@@ -460,9 +460,10 @@ async function upsert(rows: any[]) {
   return { written };
 }
 
-function fieldsFor(grain: Grain): string {
+function fieldsFor(grain: Grain, family: "actions" | "results"): string {
+  const metrics = family === "actions" ? "actions" : "results,cost_per_result";
   const base =
-    "date_start,date_stop,results,cost_per_result,spend,impressions,inline_link_clicks,mobile_app_install,actions,objective";
+    `date_start,date_stop,spend,impressions,inline_link_clicks,objective,${metrics}`;
   if (grain === "campaign") return "campaign_id,campaign_name," + base; // NO usar result_values (erro #100)
   if (grain === "adset") {
     return "campaign_id,campaign_name,adset_id,adset_name," + base;
@@ -513,28 +514,37 @@ export async function collectMetaEvents(
     for (const ch of dateChunks(opts.since, opts.until)) {
       for (const grain of ["campaign", "adset", "ad"] as Grain[]) {
         // (9) atmico por recorte/gro: qualquer falha de pgina aps retries lana e cai no catch
-        const { rows: raw, pages: pg } = await fetchAllPagesCursor(
+        const commonParams = {
+          level: grain,
+          time_range: JSON.stringify({ since: ch.since, until: ch.until }),
+          time_increment: "1",
+          filtering: JSON.stringify([{
+            field: "campaign.id",
+            operator: "IN",
+            value: [opts.campaignId],
+          }]),
+        };
+        const actionResponse = await fetchAllPagesCursor(
           `${ACCT}/insights`,
           {
-            level: grain,
-            fields: fieldsFor(grain),
-            time_range: JSON.stringify({ since: ch.since, until: ch.until }),
-            time_increment: "1",
+            ...commonParams,
+            fields: fieldsFor(grain, "actions"),
             action_attribution_windows: CERT_WINDOWS.join(","),
-            filtering: JSON.stringify([{
-              field: "campaign.id",
-              operator: "IN",
-              value: [opts.campaignId],
-            }]),
           },
         );
-        received += raw.length;
-        pages += pg;
+        const resultResponse = await fetchAllPagesCursor(
+          `${ACCT}/insights`,
+          { ...commonParams, fields: fieldsFor(grain, "results") },
+        );
+        received += actionResponse.rows.length + resultResponse.rows.length;
+        pages += actionResponse.pages + resultResponse.pages;
 
         const attrCache = new Map<string, AttribCtx>();
         const rows: any[] = [];
-        for (const row of raw) {
+        for (const row of actionResponse.rows) {
           rows.push(...normalizeActions(row, grain, map, runId, dataAsOf));
+        }
+        for (const row of resultResponse.rows) {
           // (6) attribution por gro
           let ck: string;
           let getter: () => Promise<AttribCtx>;
