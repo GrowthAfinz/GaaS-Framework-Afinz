@@ -29,7 +29,7 @@ export const PaidMediaView: React.FC = () => {
 
     if (!hasData) {
         return (
-            <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] animate-fade-in">
+            <div className="flex flex-col items-center justify-center h-[calc(var(--screen-h)-200px)] animate-fade-in">
                 <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 text-center max-w-md w-full shadow-2xl">
                     <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Upload size={32} className="text-blue-400" />

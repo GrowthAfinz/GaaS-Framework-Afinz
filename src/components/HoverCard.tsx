@@ -2,6 +2,7 @@ import React from 'react';
 import { Activity } from '../types/framework';
 import { ActivityRow } from './ActivityRow';
 import { formatDateDisplay } from '../utils/formatters';
+import { getLocalViewport, toLocalPx } from '../context/UIScaleContext';
 
 interface HoverCardProps {
   date: Date;
@@ -12,9 +13,11 @@ interface HoverCardProps {
 }
 
 export const HoverCard: React.FC<HoverCardProps> = ({ date, activities, x, y, onClose }) => {
-  // Limitar posição para não sair da tela
-  const maxX = Math.max(10, Math.min(x, window.innerWidth - 650));
-  const maxY = Math.max(10, Math.min(y, window.innerHeight - 550));
+  // x/y chegam do mouse em px fisicos; `left`/`top` sao lidos em px locais.
+  // Sem converter, o card aparece deslocado quando a interface esta reduzida.
+  const viewport = getLocalViewport();
+  const maxX = Math.max(10, Math.min(toLocalPx(x), viewport.width - 650));
+  const maxY = Math.max(10, Math.min(toLocalPx(y), viewport.height - 550));
 
   return (
     <div

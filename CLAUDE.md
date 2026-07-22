@@ -705,32 +705,38 @@ Status:
 
 O app foi desenhado para um canvas de ~1920px. Em telas menores ele se auto-reduz
 via a propriedade CSS `zoom` na raiz — mesmo efeito do zoom do navegador, porem
-automatico e persistido.
+automatico. **Nao ha controle manual, por decisao de produto:** o usuario nao deve
+precisar configurar nada para ter a tela bem aproveitada (o zoom nativo do
+navegador continua disponivel para ajuste fino e se multiplica a este).
 
 | Peca | Arquivo |
 |------|---------|
-| Estado + escala automatica + persistencia | `src/context/UIScaleContext.tsx` |
-| `html { zoom: var(--ui-scale) }` + compensacao de vh/vw | `src/App.css` |
-| Controle no header (Automatico / 100 / 90 / 80 / 67%) | `src/components/layout/UIScaleControl.tsx` |
+| Escala automatica + helpers de coordenada | `src/context/UIScaleContext.tsx` |
+| `html { zoom }`, tokens `--screen-h/w` e compensacao de vh/vw | `src/App.css` |
 | DragDropContext ciente da escala | `src/components/dnd/ScaledDragDropContext.tsx` |
 
-Escala automatica = `largura da janela / 1920`, em passos de 5%, limitada a [0.67, 1].
+Escala = `largura da janela / 1920`, em passos de 5%, limitada a [0.67, 1].
 Ex.: 1280px -> 67% · 1366px -> 70% · 1536px -> 80% · 1920px -> 100%.
 
 **Tres invariantes que quebram silenciosamente se ignorados:**
 
 1. **Unidades de viewport precisam ser compensadas.** Dentro do subtree com zoom,
-   `100vh` vale `100vh × escala`. Toda classe nova com `vh`/`vw`
-   (ex.: `max-h-[75vh]`) precisa de uma regra `calc(75vh / var(--ui-scale))` no
-   bloco de compensacao no fim de `src/App.css` — senao o modal encolhe junto com
-   o conteudo e nao ganha area util nenhuma.
-2. **Existem dois espacos de coordenadas.** `getBoundingClientRect()` e
-   `event.clientX` retornam px FISICOS; `style.top/left/transform` sao lidos em px
-   LOCAIS (ja escalados). Qualquer codigo que meça com rect e posicione com style
-   precisa dividir pela escala — e o que o `ScaledDragDropContext` faz durante o
-   arraste (o @hello-pangea/dnd nao suporta zoom nativamente).
+   `100vh` vale `100vh × escala`. Duas formas de resolver, conforme o caso:
+   - classe simples (`max-h-[75vh]`): adicionar a regra
+     `calc(75vh / var(--ui-scale))` no bloco de compensacao no fim de `src/App.css`;
+   - dentro de `calc()` (`h-[calc(100vh-80px)]`): usar os tokens
+     `h-[calc(var(--screen-h)-80px)]` / `--screen-w`, que ja vem compensados.
+
+   Sem isso o conteudo e cortado: `calc(100vh - 80px)` rende so ~60% da tela a 67%.
+2. **Existem dois espacos de coordenadas.** `getBoundingClientRect()`,
+   `event.clientX/Y` e `window.innerWidth/Height` retornam px FISICOS;
+   `style.top/left/transform` sao lidos em px LOCAIS (ja escalados). Todo tooltip,
+   hover card ou popover que meça em um e posicione no outro aparece deslocado.
+   Converta com `toLocalPx` / `toLocalRect` / `getLocalViewport` do `UIScaleContext`
+   (ver `Tooltip.tsx` e `HoverCard.tsx` como referencia).
 3. **Novo `<DragDropContext>` deve usar `<ScaledDragDropContext>`.** Caso contrario
-   o card arrastado aparece deslocado quando a escala != 100%.
+   o card arrastado aparece deslocado — o @hello-pangea/dnd mede em fisico e escreve
+   em local, e nao suporta zoom nativamente.
 
 ---
 

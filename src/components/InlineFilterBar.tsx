@@ -204,7 +204,7 @@ const FilterDropdownInner: React.FC<FilterDropdownProps> = ({
                 <ChevronDown size={13} className={`transition-transform duration-250 ${isOpen ? 'rotate-180 opacity-100 text-cyan-600' : 'opacity-40'}`} />
             </button>
 
-            {isOpen && <div className={`absolute top-full pt-2 z-50 ${wide ? 'w-[560px] max-w-[calc(100vw-2rem)]' : 'min-w-[280px] max-w-sm'} ${align === 'right' ? 'right-0' : 'left-0'}`}>
+            {isOpen && <div className={`absolute top-full pt-2 z-50 ${wide ? 'w-[560px] max-w-[calc(var(--screen-w)-2rem)]' : 'min-w-[280px] max-w-sm'} ${align === 'right' ? 'right-0' : 'left-0'}`}>
 
                 <div className="bg-white border border-slate-200/80 rounded-xl shadow-[0_12px_40px_-8px_rgba(0,0,0,0.12)] p-2 relative overflow-hidden ring-1 ring-slate-900/5">
                     <div className="relative z-10 flex items-center justify-between px-3 py-2 mb-1.5 border-b border-slate-100 bg-slate-50/50 -mx-2 -mt-2">

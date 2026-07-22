@@ -362,7 +362,7 @@ function App() {
 
       <div className="flex-1 pb-10">
         {loading && !hasData && (
-          <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+          <div className="flex flex-col items-center justify-center h-[calc(var(--screen-h)-200px)]">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
                 <Menu size={32} className="text-blue-400" />
@@ -374,7 +374,7 @@ function App() {
         )}
 
         {!loading && !hasData && (
-          <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+          <div className="flex flex-col items-center justify-center h-[calc(var(--screen-h)-200px)]">
             <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-lg">
               <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Menu size={32} className="text-blue-400" />

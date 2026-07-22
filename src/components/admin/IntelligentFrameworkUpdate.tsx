@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { getLocalViewport, toLocalRect } from '../../context/UIScaleContext';
 import {
     AlertCircle,
     CheckCircle,
@@ -2616,10 +2617,12 @@ const HistoryCombobox = ({
     useEffect(() => setDraft(value), [value]);
     useEffect(() => {
         if (!open || !anchorRef.current) return;
-        const rect = anchorRef.current.getBoundingClientRect();
+        // px locais: e a unidade em que top/left sao aplicados (ver UIScaleContext).
+        const rect = toLocalRect(anchorRef.current.getBoundingClientRect());
+        const viewport = getLocalViewport();
         setPosition({
-            top: Math.min(window.innerHeight - 360, rect.bottom + 4),
-            left: Math.min(window.innerWidth - 320, rect.left),
+            top: Math.min(viewport.height - 360, rect.bottom + 4),
+            left: Math.min(viewport.width - 320, rect.left),
             width: Math.max(280, rect.width),
         });
     }, [open]);

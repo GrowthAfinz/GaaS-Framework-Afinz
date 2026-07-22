@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Info } from 'lucide-react';
+import { getLocalViewport, toLocalRect } from '../context/UIScaleContext';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -17,7 +18,8 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', size = 
 
   useEffect(() => {
     if (!visible || !anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
+    // Rect vem em px fisicos; `top`/`left` do portal sao lidos em px locais.
+    const rect = toLocalRect(anchorRef.current.getBoundingClientRect());
 
     const gap = 8; // 8px de espaçamento
     let top = rect.top;
@@ -43,8 +45,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', size = 
     }
 
     // Clamp para manter na viewport
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const { width: vw, height: vh } = getLocalViewport();
     left = Math.max(8, Math.min(vw - 8, left));
     top = Math.max(8, Math.min(vh - 8, top));
     setPos({ top, left });

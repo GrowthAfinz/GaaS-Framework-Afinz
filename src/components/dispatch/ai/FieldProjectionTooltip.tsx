@@ -3,6 +3,7 @@ import { X, Check, Sparkles, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import type { FieldProjection, ProjectableMetric } from '../../../services/ml/types';
 import { formatMetricValue, generateTooltipTitle } from '../../../services/ml/explanationGenerator';
 import { ConfidenceBar } from './ConfidenceBar';
+import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
 import { CausalFactorsList } from './CausalFactorsList';
 import { SimilarCampaignsList } from './SimilarCampaignsList';
 
@@ -39,16 +40,17 @@ export const FieldProjectionTooltip: React.FC<FieldProjectionTooltipProps> = ({
         if (!isOpen || !anchorRect || !tooltipRef.current) return;
 
         const tooltip = tooltipRef.current;
-        const tooltipRect = tooltip.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
+        // Tudo convertido para px locais: e nessa unidade que top/left sao aplicados.
+        const tooltipRect = toLocalRect(tooltip.getBoundingClientRect());
+        const anchor = toLocalRect(anchorRect);
+        const { width: viewportWidth, height: viewportHeight } = getLocalViewport();
 
-        let top = anchorRect.top;
-        let left = anchorRect.right + 8;
+        let top = anchor.top;
+        let left = anchor.right + 8;
 
         // Ajustar se sair da tela pela direita
         if (left + tooltipRect.width > viewportWidth - 20) {
-            left = anchorRect.left - tooltipRect.width - 8;
+            left = anchor.left - tooltipRect.width - 8;
         }
 
         // Ajustar se sair da tela por baixo

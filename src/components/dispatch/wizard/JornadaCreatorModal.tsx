@@ -129,7 +129,7 @@ export const JornadaCreatorModal: React.FC<JornadaCreatorModalProps> = ({ isOpen
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col"
-        style={{ maxHeight: '90vh' }}>
+        style={{ maxHeight: 'calc(90vh / var(--ui-scale))' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
           <div className="flex items-center gap-3">

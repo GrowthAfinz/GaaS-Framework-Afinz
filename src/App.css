@@ -16,6 +16,11 @@
    ────────────────────────────────────────────────────────────── */
 :root {
   --ui-scale: 1;
+  /* Tela cheia ja compensada. Use estes tokens em vez de 100vh/100vw dentro de
+     calc() — ex.: h-[calc(var(--screen-h)-80px)]. Sem eles, `calc(100vh - 80px)`
+     rende apenas 67% da tela nos notebooks e o conteudo e cortado. */
+  --screen-h: calc(100vh / var(--ui-scale));
+  --screen-w: calc(100vw / var(--ui-scale));
 }
 
 html {
