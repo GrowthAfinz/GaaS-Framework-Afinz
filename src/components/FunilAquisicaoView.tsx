@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Download, Info } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../contexts/PeriodContext';
+import { PaidMediaFunnelView } from './PaidMediaFunnelView';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'consultas' | 'aprovados' | 'pedidos' | 'bio' | 'docs' | 'assinatura' | 'emitidos';
@@ -86,7 +87,7 @@ const EvolutionCell = ({ value, previous, onEnter, onLeave }: { value: number | 
   </div>;
 };
 
-export const FunilAquisicaoView: React.FC = () => {
+const SerasaFunnelView: React.FC = () => {
   const { startDate, endDate } = usePeriod();
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
@@ -225,5 +226,18 @@ export const FunilAquisicaoView: React.FC = () => {
     </div>
 
     {hoverDetail && hoverMeta && <div className="fixed z-50 w-[274px] rounded-lg border border-slate-200 bg-white p-3 shadow-xl" style={{ left: hoverDetail.x, top: hoverDetail.y }}><div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-semibold text-slate-900">{hoverMeta.label}</p><p className="text-[9px] capitalize text-slate-400">{shortDate(hoverDetail.row.date)} · {fullWeekday(hoverDetail.row.date)}</p></div><p className="font-mono text-sm font-semibold text-slate-950">{hoverMeta.percentage ? percentageLabel(metricValue(hoverDetail.row, hoverDetail.metric), 2) : metricValue(hoverDetail.row, hoverDetail.metric) == null ? '—' : formatNumber(metricValue(hoverDetail.row, hoverDetail.metric) as number)}</p></div><div className="mt-2 h-12"><ResponsiveContainer width="100%" height="100%"><LineChart data={hoverSeries} margin={{ top: 3, right: 3, bottom: 2, left: 3 }}>{hoverAverage != null && <ReferenceLine y={hoverAverage} stroke="#94a3b8" strokeDasharray="3 3" />}<Line type="linear" dataKey="value" stroke="#0891b2" strokeWidth={1.75} dot={false} activeDot={{ r: 3 }} connectNulls={false} /></LineChart></ResponsiveContainer></div><div className="mt-1 flex justify-between font-mono text-[8px] text-slate-400"><span>mín. {hoverValues.length ? hoverMeta.percentage ? percentageLabel(Math.min(...hoverValues), 1) : formatNumber(Math.min(...hoverValues)) : '—'}</span><span>média {hoverAverage == null ? '—' : hoverMeta.percentage ? percentageLabel(hoverAverage, 1) : formatNumber(Math.round(hoverAverage))}</span><span>máx. {hoverValues.length ? hoverMeta.percentage ? percentageLabel(Math.max(...hoverValues), 1) : formatNumber(Math.max(...hoverValues)) : '—'}</span></div><p className="mt-2 border-t border-slate-100 pt-2 text-[9px] text-slate-500">15 dias fechados · {hoverMeta.formula}</p></div>}
+  </div>;
+};
+
+export const FunilAquisicaoView: React.FC = () => {
+  const [funnel, setFunnel] = useState<'serasa' | 'paid-media'>('serasa');
+  return <div className="min-h-full bg-slate-50 pt-4">
+    <div className="mx-auto mb-3 max-w-[1780px] px-4">
+      <nav aria-label="Selecionar funil" className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white text-xs font-semibold shadow-sm">
+        <button onClick={() => setFunnel('serasa')} className={`border-r border-slate-300 px-4 py-2 ${funnel === 'serasa' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Serasa</button>
+        <button onClick={() => setFunnel('paid-media')} className={`px-4 py-2 ${funnel === 'paid-media' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>Mídia Paga · App Install</button>
+      </nav>
+    </div>
+    {funnel === 'serasa' ? <SerasaFunnelView /> : <PaidMediaFunnelView />}
   </div>;
 };
