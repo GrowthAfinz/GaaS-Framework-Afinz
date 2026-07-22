@@ -6,6 +6,7 @@ import { usePeriod } from '../contexts/PeriodContext';
 type Scope = 'total' | 'afinz' | 'plurix';
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'cpf' | 'onboarding' | 'geo' | 'docs' | 'bio' | 'address' | 'personalization' | 'signature' | 'completed';
+type RateKey = 'onboardingRate' | 'geoRate' | 'docsRate' | 'bioRate' | 'addressRate' | 'personalizationRate' | 'signatureRate' | 'completionRate';
 type RawRow = { date: Date; stage: string; status: string; plurix: string; value: number };
 type DailyRow = Record<StageKey, number | null> & { date: Date; auto: number | null; loss: number | null };
 
@@ -19,6 +20,16 @@ const stages: Array<{ key: StageKey; label: string; color: string }> = [
   { key: 'personalization', label: 'Personalização', color: '#0891b2' },
   { key: 'signature', label: 'Assinatura', color: '#0d9488' },
   { key: 'completed', label: 'Cartão concluído', color: '#047857' },
+];
+const rates: Array<{ key: RateKey; label: string; numerator: StageKey; denominator: StageKey; color: string }> = [
+  { key: 'onboardingRate', label: 'CPF → onboarding', numerator: 'onboarding', denominator: 'cpf', color: '#dc2626' },
+  { key: 'geoRate', label: 'Onboarding → geolocalização', numerator: 'geo', denominator: 'onboarding', color: '#7c3aed' },
+  { key: 'docsRate', label: 'Geolocalização → documentos', numerator: 'docs', denominator: 'geo', color: '#db2777' },
+  { key: 'bioRate', label: 'Documentos → biometria', numerator: 'bio', denominator: 'docs', color: '#ea580c' },
+  { key: 'addressRate', label: 'Biometria → endereço', numerator: 'address', denominator: 'bio', color: '#d97706' },
+  { key: 'personalizationRate', label: 'Endereço → personalização', numerator: 'personalization', denominator: 'address', color: '#0891b2' },
+  { key: 'signatureRate', label: 'Personalização → assinatura', numerator: 'signature', denominator: 'personalization', color: '#2563eb' },
+  { key: 'completionRate', label: 'Assinatura → cartão concluído', numerator: 'completed', denominator: 'signature', color: '#059669' },
 ];
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -86,6 +97,7 @@ export const AppAfinzFunnelView: React.FC = () => {
   const [scope, setScope] = useState<Scope>('total');
   const [granularity, setGranularity] = useState<Granularity>('daily');
   const [selected, setSelected] = useState<StageKey[]>(['cpf', 'onboarding', 'geo', 'completed']);
+  const [selectedRates, setSelectedRates] = useState<RateKey[]>(['geoRate', 'completionRate']);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}data/app-afinz-funnel-raw.tsv`).then(response => response.ok ? response.text() : Promise.reject(new Error('Fonte do App Afinz indisponível'))).then(text => setRaw(parseTsv(text))).catch(reason => setError(reason.message));
@@ -99,6 +111,7 @@ export const AppAfinzFunnelView: React.FC = () => {
   const current = useMemo(() => allDaily.filter(row => row.date >= startDate && row.date <= endDate && (!lastClosed || row.date <= lastClosed)), [allDaily, startDate, endDate, lastClosed]);
   const totals = useMemo(() => Object.fromEntries(stages.map(stage => [stage.key, sumStage(current, stage.key)])) as Record<StageKey, number | null>, [current]);
   const availableStages = stages.filter(stage => totals[stage.key] != null);
+  const availableRates = rates.filter(rate => compatibleDailyRate(totals[rate.numerator], totals[rate.denominator]) != null);
 
   const chartData = useMemo(() => {
     const groups = new Map<string, DailyRow[]>();
@@ -112,7 +125,8 @@ export const AppAfinzFunnelView: React.FC = () => {
       const values = Object.fromEntries(stages.map(stage => [stage.key, sumStage(rows, stage.key)])) as Record<StageKey, number | null>;
       const first = rows[0].date, last = rows.at(-1)?.date ?? first;
       const label = granularity === 'daily' ? shortDate(first) : granularity === 'weekly' ? `${shortDate(first)}–${shortDate(last)}` : first.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-      return { period: label, weekday: weekday(first), ...values, completionRate: compatibleDailyRate(values.completed, scope === 'total' ? values.onboarding : values.geo) };
+      const rateValues = Object.fromEntries(rates.map(rate => [rate.key, compatibleDailyRate(values[rate.numerator], values[rate.denominator])])) as Record<RateKey, number | null>;
+      return { period: label, weekday: weekday(first), ...values, ...rateValues };
     });
   }, [current, granularity, scope]);
 
@@ -120,6 +134,9 @@ export const AppAfinzFunnelView: React.FC = () => {
   const firstComparable = scope === 'total' ? totals.onboarding : totals.geo;
   const completedRate = pct(totals.completed, firstComparable);
   const scopeLabel = scope === 'total' ? 'App completo' : scope === 'plurix' ? 'Plurix' : 'Afinz (B2C + B2B2C)';
+  const toggleRate = (key: RateKey) => setSelectedRates(currentRates => currentRates.includes(key)
+    ? currentRates.filter(item => item !== key)
+    : currentRates.length < 4 ? [...currentRates, key] : currentRates);
 
   const exportCsv = () => {
     const header = ['Data', ...availableStages.map(stage => stage.label)];
@@ -149,8 +166,9 @@ export const AppAfinzFunnelView: React.FC = () => {
 
       <section className="border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">Evolução do funil</h2><p className="text-xs text-slate-500">Acompanhe volume e taxa de conclusão observada no mesmo eixo temporal.</p></div><div className="flex border border-slate-300 text-[11px] font-semibold">{(['daily', 'weekly', 'monthly'] as Granularity[]).map(key => <button key={key} onClick={() => setGranularity(key)} className={`border-r border-slate-300 px-3 py-1.5 last:border-r-0 ${granularity === key ? 'bg-slate-800 text-white' : 'text-slate-600'}`}>{key === 'daily' ? 'Diária' : key === 'weekly' ? 'Semanal' : 'Mensal'}</button>)}</div></div>
-        <div className="mt-4 flex flex-wrap items-center border-y border-slate-200 bg-slate-50 text-[10px]"><span className="border-r border-slate-200 px-2 py-2 font-bold uppercase text-slate-500">Volumes</span>{availableStages.map(stage => <button key={stage.key} onClick={() => setSelected(value => value.includes(stage.key) ? value.filter(item => item !== stage.key) : [...value, stage.key])} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selected.includes(stage.key) ? 'bg-white text-slate-900' : 'text-slate-400'}`}><span className="h-2 w-2" style={{ background: selected.includes(stage.key) ? stage.color : '#cbd5e1' }} />{stage.label}</button>)}</div>
-        <div className="h-[370px] pt-3"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 14, right: 42, left: 8, bottom: 20 }}><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" height={42} tick={({ x, y, payload }: any) => { const point = chartData.find(item => item.period === payload.value); return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={9} fontFamily="monospace">{payload.value}</text>{granularity === 'daily' && <text y={26} textAnchor="middle" fill="#94a3b8" fontSize={8}>{point?.weekday}</text>}</g>; }} /><YAxis yAxisId="volume" hide={!selected.length} tick={{ fontSize: 9 }} tickFormatter={value => value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><YAxis yAxisId="rate" orientation="right" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={value => `${value}%`} /><Tooltip contentStyle={{ borderRadius: 0, border: '1px solid #cbd5e1', fontSize: 10, fontFamily: 'monospace' }} formatter={(value: number, name: string) => [name === 'completionRate' ? pctLabel(value) : fmt(value), name === 'completionRate' ? 'Conclusão observada' : stages.find(stage => stage.key === name)?.label ?? name]} />{availableStages.filter(stage => selected.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="volume" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={18} isAnimationActive={false} />)}<Line yAxisId="rate" type="linear" dataKey="completionRate" name="completionRate" stroke="#dc2626" strokeWidth={2.5} dot={{ r: 3, fill: '#fff', strokeWidth: 2 }} isAnimationActive={false} connectNulls={false} /></ComposedChart></ResponsiveContainer></div>
+        <div className="mt-4 flex flex-wrap items-center border-y border-slate-200 bg-slate-50 text-[10px]"><span className="border-r border-slate-200 px-2 py-2 font-bold uppercase text-slate-500">Volumes</span>{availableStages.map(stage => <button key={stage.key} onClick={() => setSelected(value => value.includes(stage.key) ? value.filter(item => item !== stage.key) : [...value, stage.key])} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selected.includes(stage.key) ? 'bg-white text-slate-900' : 'text-slate-400'}`}><span className="h-2 w-2" style={{ background: selected.includes(stage.key) ? stage.color : '#cbd5e1' }} />{stage.label}</button>)}<button onClick={() => setSelected(availableStages.map(stage => stage.key))} className="px-2.5 py-2 font-semibold text-cyan-700">Todos</button><button onClick={() => setSelected([])} className="border-l border-slate-200 px-2.5 py-2 font-semibold text-slate-500">Limpar</button></div>
+        <div className="flex flex-wrap items-center border-b border-slate-200 bg-slate-50 text-[10px]"><span className="border-r border-slate-200 px-2 py-2 font-bold uppercase text-slate-500">Taxas</span>{availableRates.map(rate => <button key={rate.key} onClick={() => toggleRate(rate.key)} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(rate.key) ? 'bg-white text-slate-900' : 'text-slate-400'}`}><span className="h-2 w-2" style={{ background: selectedRates.includes(rate.key) ? rate.color : '#cbd5e1' }} />{rate.label}</button>)}<span className="px-2 py-2 text-slate-400">máx. 4</span></div>
+        <div className="h-[370px] pt-3"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 14, right: 42, left: 8, bottom: 20 }}><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" height={42} tick={({ x, y, payload }: any) => { const point = chartData.find(item => item.period === payload.value); return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={9} fontFamily="monospace">{payload.value}</text>{granularity === 'daily' && <text y={26} textAnchor="middle" fill="#94a3b8" fontSize={8}>{point?.weekday}</text>}</g>; }} /><YAxis yAxisId="volume" hide={!selected.length} tick={{ fontSize: 9 }} tickFormatter={value => value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><YAxis yAxisId="rate" orientation="right" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={value => `${value}%`} /><Tooltip contentStyle={{ borderRadius: 0, border: '1px solid #cbd5e1', fontSize: 10, fontFamily: 'monospace' }} formatter={(value: number, name: string) => { const rate = rates.find(item => item.key === name); return [rate ? pctLabel(value) : fmt(value), rate?.label ?? stages.find(stage => stage.key === name)?.label ?? name]; }} />{availableStages.filter(stage => selected.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="volume" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={18} isAnimationActive={false} />)}{availableRates.filter(rate => selectedRates.includes(rate.key)).map(rate => <Line key={rate.key} yAxisId="rate" type="linear" dataKey={rate.key} name={rate.key} stroke={rate.color} strokeWidth={2.5} dot={{ r: 3, fill: '#fff', stroke: rate.color, strokeWidth: 2 }} activeDot={{ r: 4, fill: '#fff', stroke: rate.color, strokeWidth: 2 }} isAnimationActive={false} connectNulls={false} />)}</ComposedChart></ResponsiveContainer></div>
         <p className="mt-1 text-[10px] text-slate-500">Vazio = combinação ausente na fonte, não resultado zero. A taxa diária é omitida quando falta denominador ou quando as contagens não formam uma sequência compatível.</p>
       </section>
 

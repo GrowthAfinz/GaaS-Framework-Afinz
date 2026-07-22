@@ -230,11 +230,11 @@ const SerasaFunnelView: React.FC = () => {
 };
 
 export const FunilAquisicaoView: React.FC = () => {
-  const [funnel, setFunnel] = useState<'serasa' | 'paid-media' | 'app-afinz'>('serasa');
+  const [funnel, setFunnel] = useState<'serasa' | 'paid-media' | 'app-afinz'>('app-afinz');
   const options = [
+    { key: 'app-afinz' as const, label: 'Funil Onboarding - Apps', detail: 'B2C + B2B2C + Plurix' },
     { key: 'serasa' as const, label: 'Funil Onboarding - Serasa', detail: 'Originação via API' },
     { key: 'paid-media' as const, label: 'Funil Onboarding - Mídia Paga', detail: 'Aquisição App Install' },
-    { key: 'app-afinz' as const, label: 'Funil Onboarding - Apps', detail: 'B2C + B2B2C + Plurix' },
   ];
   const activeContext = {
     serasa: {
