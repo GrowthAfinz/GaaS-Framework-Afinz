@@ -52,3 +52,7 @@ backend = "postgres"
 [functions.collect-meta-creatives]
 enabled = true
 verify_jwt = true
+
+[functions.collect-meta-events]
+enabled = true
+verify_jwt = true
