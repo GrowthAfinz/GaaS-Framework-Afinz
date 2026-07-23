@@ -1,6 +1,11 @@
 import { supabase } from './supabaseClient';
 import type { Activity } from '../types/framework';
 import { classifyRentabilizacao } from '../utils/rentabilizacaoClassify';
+import {
+    getCustoUnitarioCanal,
+    calcularCustoTotalCanal,
+    calcularCustoTotalCampanha,
+} from '../constants/frameworkFields';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
 type CandidateStatus = 'ready' | 'review' | 'new' | 'duplicate' | 'conflict' | 'error' | 'ignored';
@@ -158,6 +163,31 @@ const optionalAuditColumnError = (error: any) => {
         && /column|schema cache|could not find|does not exist/i.test(message);
 };
 
+/**
+ * Custo do disparo derivado do canal + base acionável, na tarifa vigente para a data.
+ *   Custo total canal    = Base Acionável × Custo unitário do canal (tabela canônica ano-a-ano)
+ *   Custo Total Campanha = Custo total canal (+ custo de oferta, hoje 0)
+ * Pilar do projeto: o importador não pode gravar disparo sem custo — caso contrário o Report
+ * Live lê CAC/custo como `missing` e o scorecard integrado quebra. Retorna {} quando o canal
+ * não tem tarifa (ex.: ECRED-API/Indefinido) ou a base ainda não foi observada, para nunca
+ * gravar custo zero artificial.
+ */
+const custoPatch = (
+    channel: string | undefined,
+    baseAcionavel: number | null | undefined,
+    date: string | undefined,
+): Record<string, number> => {
+    if (!channel || baseAcionavel == null || !Number.isFinite(baseAcionavel)) return {};
+    const custoUnitCanal = getCustoUnitarioCanal(channel, date);
+    if (!custoUnitCanal) return {};
+    const custoTotalCanal = calcularCustoTotalCanal(custoUnitCanal, baseAcionavel);
+    return {
+        'Custo unitário do canal': custoUnitCanal,
+        'Custo total canal': custoTotalCanal,
+        'Custo Total Campanha': calcularCustoTotalCampanha(0, custoTotalCanal),
+    };
+};
+
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     const patch: Record<string, number | string | null> = {};
     const manuallyChanged = new Set((candidate.manualOverrides ?? []).map((override) => override.field));
@@ -186,8 +216,15 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     // (BI renomeou no SFMC). Aplicado apenas em candidatos aceitos pelo humano.
     if (candidate.journey && (!candidate.metricRefresh || candidate.canonicalDimensionRefresh)) patch['jornada'] = candidate.journey;
 
+    // Recalcula o custo sempre que a base acionável entra no patch — custo é determinístico
+    // a partir de base × tarifa do canal, então precisa acompanhar a base.
+    const custo = candidate.delivered !== undefined
+        ? custoPatch(candidate.channel, candidate.delivered, candidate.date)
+        : {};
+
     return {
         ...patch,
+        ...custo,
         updated_at: new Date().toISOString(),
     };
 };
@@ -222,6 +259,8 @@ const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
     'Propostas': candidate.proposals ?? 0,
     'Emissões Independentes': candidate.independent ?? 0,
     'Emissões Assistidas': candidate.assisted ?? 0,
+    // Custo determinístico por canal × base acionável — sem isto o Report Live lê CAC ausente.
+    ...custoPatch(candidate.channel, candidate.delivered ?? null, candidate.date),
     updated_at: new Date().toISOString(),
 });
 
