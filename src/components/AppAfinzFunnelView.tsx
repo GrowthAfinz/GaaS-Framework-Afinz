@@ -6,7 +6,7 @@ import { usePeriod } from '../contexts/PeriodContext';
 type Scope = 'total' | 'afinz' | 'plurix';
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'cpf' | 'onboarding' | 'geo' | 'docs' | 'bio' | 'address' | 'personalization' | 'signature' | 'completed';
-type RateKey = 'onboardingRate' | 'geoRate' | 'docsRate' | 'bioRate' | 'addressRate' | 'personalizationRate' | 'signatureRate' | 'completionRate' | 'overallRate';
+type RateKey = 'onboardingRate' | 'geoRate' | 'docsRate' | 'bioRate' | 'addressRate' | 'personalizationRate' | 'signatureRate' | 'completionRate' | 'geoCompletionRate' | 'overallRate';
 type RawRow = { date: Date; stage: string; status: string; plurix: string; value: number };
 type DailyRow = Record<StageKey, number | null> & { date: Date; auto: number | null; loss: number | null };
 
@@ -30,6 +30,7 @@ const rates: Array<{ key: RateKey; label: string; numerator: StageKey; denominat
   { key: 'personalizationRate', label: 'Endereço → personalização', numerator: 'personalization', denominator: 'address', color: '#0891b2' },
   { key: 'signatureRate', label: 'Personalização → assinatura', numerator: 'signature', denominator: 'personalization', color: '#2563eb' },
   { key: 'completionRate', label: 'Assinatura → cartão concluído', numerator: 'completed', denominator: 'signature', color: '#059669' },
+  { key: 'geoCompletionRate', label: 'Geolocalização → cartão concluído', numerator: 'completed', denominator: 'geo', color: '#0891b2' },
   { key: 'overallRate', label: 'Conversão geral', numerator: 'completed', denominator: 'cpf', color: '#0f172a' },
 ];
 
