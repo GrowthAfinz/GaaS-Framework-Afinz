@@ -6,10 +6,12 @@ import { supabase } from '../services/supabaseClient';
 import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCell, granularityLabel, type FunnelGranularity } from './FunnelDetailControls';
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 
-type Source = 'api' | 'bi';
+type Source = 'marketplace' | 'bi';
 type MetricKey =
-  | 'propostasApi'
-  | 'emissoesApi'
+  | 'ofertasMarketplace'
+  | 'pedidosMarketplace'
+  | 'confirmadosMarketplace'
+  | 'aprovadosMarketplace'
   | 'consultasMotor'
   | 'cpfsUnicos'
   | 'aprovados'
@@ -41,9 +43,11 @@ type GroupedRow = {
   rows: FunnelRow[];
 };
 
-const apiStages: StageConfig[] = [
-  { key: 'propostasApi', label: 'Propostas', color: '#0f2d64' },
-  { key: 'emissoesApi', label: 'Emissões', color: '#0d9488' },
+const marketplaceStages: StageConfig[] = [
+  { key: 'ofertasMarketplace', label: 'Ofertas', color: '#0f2d64' },
+  { key: 'pedidosMarketplace', label: 'Pedidos', color: '#2563eb' },
+  { key: 'confirmadosMarketplace', label: 'Confirmados', color: '#7c3aed' },
+  { key: 'aprovadosMarketplace', label: 'Aprovados', color: '#0d9488' },
 ];
 
 const biStages: StageConfig[] = [
@@ -66,8 +70,10 @@ const costColumns: Array<{ key: CostKey; label: string; currency: boolean }> = [
 ];
 
 const emptyMetrics = (): Record<MetricKey | CostKey, null> => ({
-  propostasApi: null,
-  emissoesApi: null,
+  ofertasMarketplace: null,
+  pedidosMarketplace: null,
+  confirmadosMarketplace: null,
+  aprovadosMarketplace: null,
   consultasMotor: null,
   cpfsUnicos: null,
   aprovados: null,
@@ -164,27 +170,26 @@ const downloadCsv = (name: string, header: string[], rows: Array<Array<string | 
 
 const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.ReactNode }> = ({ source, navigation }) => {
   const { startDate, endDate } = usePeriod();
-  const stages = source === 'api' ? apiStages : biStages;
-  const [apiRows, setApiRows] = useState<FunnelRow[]>([]);
+  const stages = source === 'marketplace' ? marketplaceStages : biStages;
+  const [marketplaceRows, setMarketplaceRows] = useState<FunnelRow[]>([]);
   const [biRows, setBiRows] = useState<FunnelRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [granularity, setGranularity] = useState<FunnelGranularity>('daily');
   const [detailGranularity, setDetailGranularity] = useState<FunnelGranularity>('daily');
   const [selectedStages, setSelectedStages] = useState<MetricKey[]>(() => stages.map(stage => stage.key));
-  const [selectedRates, setSelectedRates] = useState<MetricKey[]>(() => source === 'api'
-    ? ['emissoesApi']
+  const [selectedRates, setSelectedRates] = useState<MetricKey[]>(() => source === 'marketplace'
+    ? ['pedidosMarketplace', 'confirmadosMarketplace', 'aprovadosMarketplace']
     : ['cpfsUnicos', 'aprovados', 'pedidosConfirmados', 'cartoes']);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
-      const [apiResult, biResult] = await Promise.all([
+      const [marketplaceResult, biResult] = await Promise.all([
         supabase
-          .from('b2c_daily_metrics')
-          .select('data, propostas_total, emissoes_total')
-          .eq('tipo', 'serasa_api')
+          .from('serasa_marketplace_daily_funnel')
+          .select('data, ofertas, pedidos, confirmados, aprovados, quality_status, quality_notes, source_hash')
           .order('data', { ascending: true }),
         supabase
           .from('serasa_bi_daily_funnel')
@@ -192,19 +197,21 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
           .order('data', { ascending: true }),
       ]);
       if (!active) return;
-      if (apiResult.error || biResult.error) {
-        setError([apiResult.error?.message, biResult.error?.message].filter(Boolean).join(' · '));
+      if (marketplaceResult.error || biResult.error) {
+        setError([marketplaceResult.error?.message, biResult.error?.message].filter(Boolean).join(' · '));
       }
-      setApiRows((apiResult.data ?? []).map(raw => ({
+      setMarketplaceRows((marketplaceResult.data ?? []).map(raw => ({
         ...emptyMetrics(),
         data: raw.data,
         date: parseDate(raw.data),
-        propostasApi: asNumber(raw.propostas_total),
-        emissoesApi: asNumber(raw.emissoes_total),
-        qualityStatus: raw.propostas_total == null || raw.emissoes_total == null ? 'partial' : 'complete',
-        qualityNotes: [],
+        ofertasMarketplace: asNumber(raw.ofertas),
+        pedidosMarketplace: asNumber(raw.pedidos),
+        confirmadosMarketplace: asNumber(raw.confirmados),
+        aprovadosMarketplace: asNumber(raw.aprovados),
+        qualityStatus: (raw.quality_status as QualityStatus) ?? 'partial',
+        qualityNotes: Array.isArray(raw.quality_notes) ? raw.quality_notes : [],
         sourceSheet: null,
-        sourceHash: null,
+        sourceHash: raw.source_hash,
       })));
       setBiRows((biResult.data ?? []).map(raw => ({
         ...emptyMetrics(),
@@ -234,11 +241,11 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
     return () => { active = false; };
   }, []);
 
-  const sourceRows = source === 'api' ? apiRows : biRows;
+  const sourceRows = source === 'marketplace' ? marketplaceRows : biRows;
   const start = useMemo(() => new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()), [startDate]);
   const end = useMemo(() => new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999), [endDate]);
   const current = useMemo(() => sourceRows.filter(row => row.date >= start && row.date <= end), [sourceRows, start, end]);
-  const currentApi = useMemo(() => apiRows.filter(row => row.date >= start && row.date <= end), [apiRows, start, end]);
+  const currentMarketplace = useMemo(() => marketplaceRows.filter(row => row.date >= start && row.date <= end), [marketplaceRows, start, end]);
   const currentBi = useMemo(() => biRows.filter(row => row.date >= start && row.date <= end), [biRows, start, end]);
   const periodLabel = `${startDate.toLocaleDateString('pt-BR')} – ${endDate.toLocaleDateString('pt-BR')}`;
   const lastDate = sourceRows.at(-1)?.date ?? null;
@@ -260,27 +267,34 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
 
   const detailRows = useMemo(() => groupRows(current, detailGranularity), [current, detailGranularity]);
   const biByDate = useMemo(() => new Map(currentBi.map(row => [row.data, row])), [currentBi]);
-  const apiByDate = useMemo(() => new Map(currentApi.map(row => [row.data, row])), [currentApi]);
-  const reconciliation = useMemo(() => currentApi
-    .map(api => ({ api, bi: biByDate.get(api.data) }))
-    .filter((pair): pair is { api: FunnelRow; bi: FunnelRow } =>
+  const reconciliation = useMemo(() => currentMarketplace
+    .map(marketplace => ({ marketplace, bi: biByDate.get(marketplace.data) }))
+    .filter((pair): pair is { marketplace: FunnelRow; bi: FunnelRow } =>
       pair.bi != null
-      && pair.api.propostasApi != null
-      && pair.api.emissoesApi != null
-      && pair.bi.cpfsUnicos != null
-      && pair.bi.cartoes != null), [currentApi, biByDate]);
+      && pair.marketplace.ofertasMarketplace != null
+      && pair.marketplace.pedidosMarketplace != null
+      && pair.marketplace.confirmadosMarketplace != null
+      && pair.bi.ofertas != null
+      && pair.bi.pedidosCriados != null
+      && pair.bi.pedidosConfirmados != null), [currentMarketplace, biByDate]);
   const reconciliationTotals = useMemo(() => {
-    const apiProposals = reconciliation.reduce((total, pair) => total + (pair.api.propostasApi ?? 0), 0);
-    const biProposals = reconciliation.reduce((total, pair) => total + (pair.bi.cpfsUnicos ?? 0), 0);
-    const apiIssues = reconciliation.reduce((total, pair) => total + (pair.api.emissoesApi ?? 0), 0);
-    const biIssues = reconciliation.reduce((total, pair) => total + (pair.bi.cartoes ?? 0), 0);
+    const marketplaceOffers = reconciliation.reduce((total, pair) => total + (pair.marketplace.ofertasMarketplace ?? 0), 0);
+    const biOffers = reconciliation.reduce((total, pair) => total + (pair.bi.ofertas ?? 0), 0);
+    const marketplaceOrders = reconciliation.reduce((total, pair) => total + (pair.marketplace.pedidosMarketplace ?? 0), 0);
+    const biOrders = reconciliation.reduce((total, pair) => total + (pair.bi.pedidosCriados ?? 0), 0);
+    const marketplaceConfirmed = reconciliation.reduce((total, pair) => total + (pair.marketplace.confirmadosMarketplace ?? 0), 0);
+    const biConfirmed = reconciliation.reduce((total, pair) => total + (pair.bi.pedidosConfirmados ?? 0), 0);
+    const delta = (marketplace: number, bi: number) => bi ? (marketplace - bi) / bi * 100 : null;
     return {
-      apiProposals,
-      biProposals,
-      apiIssues,
-      biIssues,
-      proposalDelta: biProposals ? (apiProposals - biProposals) / biProposals * 100 : null,
-      issueDelta: biIssues ? (apiIssues - biIssues) / biIssues * 100 : null,
+      marketplaceOffers,
+      biOffers,
+      marketplaceOrders,
+      biOrders,
+      marketplaceConfirmed,
+      biConfirmed,
+      offersDelta: delta(marketplaceOffers, biOffers),
+      ordersDelta: delta(marketplaceOrders, biOrders),
+      confirmedDelta: delta(marketplaceConfirmed, biConfirmed),
     };
   }, [reconciliation]);
 
@@ -292,24 +306,26 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
       : values.length >= 4 ? [...values.slice(1), key] : [...values, key]);
 
   const exportData = () => {
-    if (source === 'api') {
+    if (source === 'marketplace') {
       downloadCsv(
-        `funil-api-serasa-${iso(start)}-${iso(end)}.csv`,
-        ['Data', 'Propostas API', 'Emissões API', 'Conversão API', 'CPFs BI', 'Cartões BI', 'Delta propostas', 'Delta emissões', 'Status comparação'],
-        currentApi.map(api => {
-          const bi = apiByDate.get(api.data);
-          const proposalDelta = api.propostasApi != null && bi?.cpfsUnicos != null ? api.propostasApi - bi.cpfsUnicos : null;
-          const issueDelta = api.emissoesApi != null && bi?.cartoes != null ? api.emissoesApi - bi.cartoes : null;
+        `funil-api-serasa-marketplace-${iso(start)}-${iso(end)}.csv`,
+        ['Data', 'Ofertas Marketplace', 'Pedidos Marketplace', 'Taxa pedidos', 'Confirmados Marketplace', 'Taxa confirmação', 'Aprovados Marketplace', 'Taxa aprovação', 'Ofertas BI', 'Pedidos criados BI', 'Pedidos confirmados BI', 'Qualidade', 'Notas'],
+        currentMarketplace.map(marketplace => {
+          const bi = biByDate.get(marketplace.data);
           return [
-            api.data,
-            api.propostasApi,
-            api.emissoesApi,
-            comparableRate([api], 'emissoesApi', 'propostasApi'),
-            bi?.cpfsUnicos ?? null,
-            bi?.cartoes ?? null,
-            proposalDelta,
-            issueDelta,
-            bi?.cpfsUnicos != null && bi?.cartoes != null ? 'comparável' : 'sem par BI',
+            marketplace.data,
+            marketplace.ofertasMarketplace,
+            marketplace.pedidosMarketplace,
+            comparableRate([marketplace], 'pedidosMarketplace', 'ofertasMarketplace'),
+            marketplace.confirmadosMarketplace,
+            comparableRate([marketplace], 'confirmadosMarketplace', 'pedidosMarketplace'),
+            marketplace.aprovadosMarketplace,
+            comparableRate([marketplace], 'aprovadosMarketplace', 'confirmadosMarketplace'),
+            bi?.ofertas ?? null,
+            bi?.pedidosCriados ?? null,
+            bi?.pedidosConfirmados ?? null,
+            marketplace.qualityStatus,
+            marketplace.qualityNotes.join(','),
           ];
         }),
       );
@@ -341,9 +357,9 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
   });
 
   const sourceComplete = sourceStatus(current);
-  const sourceLabel = source === 'api' ? 'b2c_daily_metrics · tipo serasa_api' : 'Integrado_diario_2026.xlsx · 7 abas mensais';
-  const sourceDescription = source === 'api'
-    ? 'Fonte transacional viva com propostas e emissões. O funil não inventa etapas que a API não entrega.'
+  const sourceLabel = source === 'marketplace' ? 'Marketplace · ofertas e pedidos diários' : 'Integrado_diario_2026.xlsx · 7 abas mensais';
+  const sourceDescription = source === 'marketplace'
+    ? 'Fonte Marketplace com 100% dos volumes recebidos. O dia corrente permanece parcial e as taxas são recalculadas a partir dos volumes.'
     : 'Fonte BI normalizada no Supabase. Valores ausentes permanecem nulos e as quatro datas incompletas ficam sinalizadas.';
 
   return (
@@ -435,7 +451,7 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
           <section className="order-1 px-4 pb-3 pt-4">
             <h2 className="text-lg font-semibold text-slate-950">Funil completo</h2>
             <p className="mb-3 text-xs text-slate-500">Cada razão usa apenas a interseção de dias preenchidos das duas etapas.</p>
-            <div className={`grid gap-2 sm:grid-cols-2 ${source === 'api' ? 'lg:grid-cols-2' : 'lg:grid-cols-7'}`}>
+            <div className={`grid gap-2 sm:grid-cols-2 ${source === 'marketplace' ? 'lg:grid-cols-4' : 'lg:grid-cols-7'}`}>
               {stageCards.map((card, index) => (
                 <div key={card.key} className={`rounded-lg border px-3 py-2.5 ${card.coverage < current.length ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex items-center justify-between">
@@ -451,17 +467,18 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
           </section>
         </OnboardingFunnelWorkspace>
 
-        {source === 'api' && (
+        {source === 'marketplace' && (
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="border-b border-slate-200 p-5">
-              <h2 className="text-lg font-semibold text-slate-950">Reconciliação API × BI</h2>
-              <p className="text-xs text-slate-500">Comparação somente na interseção: Propostas API × CPFs únicos BI e Emissões API × Cartões BI.</p>
+              <h2 className="text-lg font-semibold text-slate-950">Marketplace × Serasa BI</h2>
+              <p className="text-xs text-slate-500">Comparação apenas nas etapas semanticamente compatíveis e na interseção de datas. “Aprovados” não é comparado porque representa conceitos diferentes nas duas fontes.</p>
             </div>
-            <div className="grid gap-3 p-5 md:grid-cols-4">
+            <div className="grid gap-3 p-5 md:grid-cols-5">
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Dias comparáveis</p><p className="mt-1 font-mono text-xl font-semibold">{reconciliation.length}</p></div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Propostas API × BI</p><p className="mt-1 font-mono text-sm font-semibold">{formatNumber(reconciliationTotals.apiProposals)} × {formatNumber(reconciliationTotals.biProposals)}</p><p className="mt-1 text-[10px] text-cyan-700">Delta {formatRate(reconciliationTotals.proposalDelta, 3)}</p></div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Emissões API × BI</p><p className="mt-1 font-mono text-sm font-semibold">{formatNumber(reconciliationTotals.apiIssues)} × {formatNumber(reconciliationTotals.biIssues)}</p><p className="mt-1 text-[10px] text-cyan-700">Delta {formatRate(reconciliationTotals.issueDelta, 3)}</p></div>
-              <div className={`rounded-lg border p-3 ${Math.abs(reconciliationTotals.issueDelta ?? 0) <= 0.1 && Math.abs(reconciliationTotals.proposalDelta ?? 0) <= 0.1 ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}><p className="text-[10px] uppercase tracking-wide text-slate-500">Leitura</p><p className="mt-1 text-xs font-semibold text-slate-800">{reconciliation.length ? 'Fontes conciliadas no mesmo corte de datas' : 'Sem interseção suficiente no período'}</p><p className="mt-1 text-[10px] text-slate-600">BI é uma segunda fonte operacional, não validação independente.</p></div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Ofertas Mkt. × BI</p><p className="mt-1 font-mono text-sm font-semibold">{formatNumber(reconciliationTotals.marketplaceOffers)} × {formatNumber(reconciliationTotals.biOffers)}</p><p className="mt-1 text-[10px] text-cyan-700">Delta {formatRate(reconciliationTotals.offersDelta, 1)}</p></div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Pedidos Mkt. × BI</p><p className="mt-1 font-mono text-sm font-semibold">{formatNumber(reconciliationTotals.marketplaceOrders)} × {formatNumber(reconciliationTotals.biOrders)}</p><p className="mt-1 text-[10px] text-cyan-700">Delta {formatRate(reconciliationTotals.ordersDelta, 1)}</p></div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Confirmados Mkt. × BI</p><p className="mt-1 font-mono text-sm font-semibold">{formatNumber(reconciliationTotals.marketplaceConfirmed)} × {formatNumber(reconciliationTotals.biConfirmed)}</p><p className="mt-1 text-[10px] text-cyan-700">Delta {formatRate(reconciliationTotals.confirmedDelta, 1)}</p></div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">Leitura</p><p className="mt-1 text-xs font-semibold text-slate-800">{reconciliation.length ? 'Fontes com universos diferentes' : 'Sem interseção suficiente no período'}</p><p className="mt-1 text-[10px] text-slate-600">Os deltas são reconciliação operacional, não soma nem validação independente.</p></div>
             </div>
           </section>
         )}
@@ -482,7 +499,7 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <div><h2 className="text-lg font-semibold text-slate-950">Detalhe {granularityLabel(detailGranularity).toLowerCase()} · {periodLabel}</h2><p className="text-xs text-slate-500">{source === 'api' ? 'A exportação inclui o par BI e os deltas por data.' : 'A exportação inclui todas as etapas, custos e sinalizadores de qualidade.'}</p></div>
+            <div><h2 className="text-lg font-semibold text-slate-950">Detalhe {granularityLabel(detailGranularity).toLowerCase()} · {periodLabel}</h2><p className="text-xs text-slate-500">{source === 'marketplace' ? 'A exportação inclui as quatro etapas Marketplace, taxas recalculadas, pares BI compatíveis e qualidade.' : 'A exportação inclui todas as etapas, custos e sinalizadores de qualidade.'}</p></div>
             <div className="flex flex-wrap items-center gap-2"><GranularityToggle value={detailGranularity} onChange={setDetailGranularity} /><button type="button" onClick={exportData} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
           </div>
           <div className="max-h-[470px] overflow-auto">
@@ -524,8 +541,8 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
   );
 };
 
-export const SerasaApiFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigation }) => (
-  <SerasaSourceFunnelView source="api" navigation={navigation} />
+export const SerasaMarketplaceFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigation }) => (
+  <SerasaSourceFunnelView source="marketplace" navigation={navigation} />
 );
 
 export const SerasaBiFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigation }) => (

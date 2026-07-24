@@ -6,7 +6,7 @@ import { PaidMediaFunnelView } from './PaidMediaFunnelView';
 import { AppAfinzFunnelView } from './AppAfinzFunnelView';
 import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCell, granularityLabel } from './FunnelDetailControls';
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
-import { SerasaApiFunnelView, SerasaBiFunnelView } from './SerasaSourceFunnelView';
+import { SerasaBiFunnelView, SerasaMarketplaceFunnelView } from './SerasaSourceFunnelView';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'consultas' | 'aprovados' | 'pedidos' | 'bio' | 'docs' | 'assinatura' | 'emitidos';
@@ -309,18 +309,18 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
 };
 
 export const FunilAquisicaoView: React.FC = () => {
-  const [funnel, setFunnel] = useState<'serasa-api' | 'serasa-bi' | 'paid-media' | 'app-afinz'>('app-afinz');
+  const [funnel, setFunnel] = useState<'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz'>('app-afinz');
   const options = [
     { key: 'app-afinz' as const, label: 'Funil Onboarding — Apps', detail: 'B2C + B2B2C + Plurix' },
-    { key: 'serasa-api' as const, label: 'Funil API Serasa', detail: 'Fonte transacional Supabase' },
+    { key: 'serasa-marketplace' as const, label: 'Funil API Serasa Marketplace', detail: 'Ofertas · pedidos · confirmações · aprovações' },
     { key: 'serasa-bi' as const, label: 'Funil API Serasa BI', detail: 'Fonte BI · Integrado diário' },
     { key: 'paid-media' as const, label: 'Funil Onboarding — Mídia Paga', detail: 'Aquisição App Install' },
   ];
   const activeContext = {
-    'serasa-api': {
-      eyebrow: 'Análise · API Serasa',
-      title: 'Funil API Serasa',
-      description: 'Propostas e emissões da fonte transacional, conciliadas com o BI no mesmo corte.',
+    'serasa-marketplace': {
+      eyebrow: 'Análise · Serasa Marketplace',
+      title: 'Funil API Serasa Marketplace',
+      description: 'Ofertas, pedidos, confirmações e aprovações do Marketplace, sem misturar o universo do BI.',
     },
     'serasa-bi': {
       eyebrow: 'Análise · Serasa BI',
@@ -363,8 +363,8 @@ export const FunilAquisicaoView: React.FC = () => {
       </div>
     </div>
     <div className="pt-4">
-      {funnel === 'serasa-api'
-        ? <SerasaApiFunnelView navigation={navigation} />
+      {funnel === 'serasa-marketplace'
+        ? <SerasaMarketplaceFunnelView navigation={navigation} />
         : funnel === 'serasa-bi'
           ? <SerasaBiFunnelView navigation={navigation} />
           : funnel === 'paid-media'
