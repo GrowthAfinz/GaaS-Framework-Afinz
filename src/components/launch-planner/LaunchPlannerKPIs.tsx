@@ -3,7 +3,7 @@ import { Activity, Goal } from '../../types/framework';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
-import { Info } from 'lucide-react';
+import { Eye, EyeOff, Info } from 'lucide-react';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 import { useAppStore } from '../../store/useAppStore';
 import { ChartTooltip } from '../ui/ChartTooltip';
@@ -27,6 +27,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const { isBUSelected, selectedBUs } = useBU();
 
     const [showSerasa, setShowSerasa] = useState(false);
+    const [showOtherB2C, setShowOtherB2C] = useState(true);
     // O trabalho operacional começa no dia a dia; o modo mensal segue disponível
     // para leitura de tendência, mas não é mais o estado inicial.
     const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('daily');
@@ -49,7 +50,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const activeSegments = useMemo(() => {
         const segments = new Set<string>();
         const targetActivities = isMonthly 
-            ? allStoreActivities.filter(a => selectedBUs.includes(a.bu))
+            ? allStoreActivities.filter(a => selectedBUs.some((selectedBU) => selectedBU === a.bu))
             : activities;
 
         targetActivities.forEach(activity => {
@@ -75,9 +76,9 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         } else {
             activeSegments.forEach(s => names.add(s));
         }
-        names.add('Outros B2C');
+        if (showOtherB2C) names.add('Outros B2C');
         return names;
-    }, [showSerasa, activeSegments]);
+    }, [showSerasa, showOtherB2C, activeSegments]);
 
     // Se a série selecionada deixar de existir (ex.: alternar Serasa API, mudar de BU),
     // limpa a seleção para não esconder todas as barras e deixar o gráfico vazio.
@@ -95,16 +96,18 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         onClick: (o: any) => {
             const name = o?.value ?? o?.payload?.value;
             if (!name) return;
+            if (name === 'Outros B2C' && !showOtherB2C) return;
             setSelectedSeries(prev => (prev === name ? null : name));
         },
         formatter: (value: string) => {
-            const dimmed = !!selectedSeries && selectedSeries !== value;
+            const disabled = value === 'Outros B2C' && !showOtherB2C;
+            const dimmed = disabled || (!!selectedSeries && selectedSeries !== value);
             return (
                 <span
                     style={{
                         color: dimmed ? '#cbd5e1' : '#475569',
-                        opacity: dimmed ? 0.6 : 1,
-                        cursor: 'pointer',
+                        opacity: disabled ? 0.45 : dimmed ? 0.6 : 1,
+                        cursor: disabled ? 'not-allowed' : 'pointer',
                         fontWeight: selectedSeries === value ? 700 : 400,
                     }}
                 >
@@ -137,7 +140,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const monthlySegmentsMap = useMemo(() => {
         const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
-        const targetActivities = allStoreActivities.filter(a => selectedBUs.includes(a.bu));
+        const targetActivities = allStoreActivities.filter(a => selectedBUs.some((selectedBU) => selectedBU === a.bu));
         targetActivities.forEach(activity => {
             const date = activity.dataDisparo;
             if (!date || isNaN(date.getTime())) return;
@@ -491,6 +494,33 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         </button>
     );
 
+    const OtherB2CToggle = () => {
+        const toggleOtherB2C = () => {
+            const next = !showOtherB2C;
+            setShowOtherB2C(next);
+            if (!next && selectedSeries === 'Outros B2C') {
+                setSelectedSeries(null);
+            }
+        };
+
+        return (
+            <button
+                type="button"
+                aria-pressed={showOtherB2C}
+                onClick={toggleOtherB2C}
+                title={showOtherB2C ? 'Ocultar Outros B2C dos gráficos' : 'Exibir Outros B2C nos gráficos'}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition-all duration-200 ring-1 ${
+                    showOtherB2C
+                        ? 'bg-slate-200 text-slate-700 ring-slate-300/80 hover:bg-slate-300/70 shadow-sm'
+                        : 'bg-white text-slate-400 ring-slate-200 hover:bg-slate-50'
+                }`}
+            >
+                {showOtherB2C ? <Eye size={12} aria-hidden="true" /> : <EyeOff size={12} aria-hidden="true" />}
+                Outros B2C
+            </button>
+        );
+    };
+
     const engagementData = useMemo(() => {
         const byDate = new Map<string, { data: string; displayDate: string; aberturas: number; cliques: number; custo: number }>();
         activities.forEach((activity) => {
@@ -591,8 +621,9 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     return (
         <div className="mb-2">
             {showCharts && (
-                <div className="flex justify-end items-center gap-3 mb-2">
+                <div className="flex flex-wrap justify-end items-center gap-2 mb-2">
                     <SerasaToggle />
+                    <OtherB2CToggle />
                     <ChartModeToggle />
                 </div>
             )}
@@ -762,7 +793,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                         />
                                     ))}
                                     {showSerasa && <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
-                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={isSeriesHidden('Outros B2C')} />
+                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -800,7 +831,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                         />
                                     ))}
                                     {showSerasa && <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
-                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={isSeriesHidden('Outros B2C')} />
+                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
