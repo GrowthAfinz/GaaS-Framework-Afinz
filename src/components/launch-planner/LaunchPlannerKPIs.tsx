@@ -17,6 +17,35 @@ interface LaunchPlannerKPIsProps {
     currentMonth: string;
 }
 
+interface ChartHeadingProps {
+    title: string;
+    helpText: string;
+    onClick?: () => void;
+}
+
+const ChartHeading: React.FC<ChartHeadingProps> = ({ title, helpText, onClick }) => (
+    <div className="flex min-w-0 items-center gap-2">
+        <span aria-hidden="true" className="h-3.5 w-0.5 shrink-0 bg-cyan-500" />
+        {onClick ? (
+            <button
+                type="button"
+                onClick={onClick}
+                className="truncate text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 transition-colors hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/30"
+                title={`${title} — abrir Análise no modo Diário`}
+            >
+                {title}
+            </button>
+        ) : (
+            <h3 className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                {title}
+            </h3>
+        )}
+        <span title={helpText} className="shrink-0">
+            <Info size={11} className="cursor-help text-slate-400" />
+        </span>
+    </div>
+);
+
 export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities, goals, currentMonth }) => {
 
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
@@ -453,9 +482,9 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
     const chartClick = isMonthly ? undefined : handleChartClick;
     const dotClick = isMonthly ? undefined : handleDotClick;
 
-    // Toggle Mensal | Diário — segmented control em pill (fica no cabeçalho do CAC).
+    // Toggle Mensal | Diário — segmented control compacto, inspirado em planilhas.
     const ChartModeToggle = () => (
-        <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 p-1 ring-1 ring-slate-200/70">
+        <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             {([
                 { key: 'monthly', label: 'Mensal' },
                 { key: 'daily', label: 'Diário' },
@@ -466,10 +495,11 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                         key={key}
                         type="button"
                         onClick={() => setChartMode(key)}
-                        className={`px-3 py-1 text-[11px] font-semibold rounded-full transition-all duration-200 ${
+                        aria-pressed={active}
+                        className={`border-l border-slate-200 px-3 py-1.5 text-[11px] font-semibold first:border-l-0 transition-colors duration-150 ${
                             active
-                                ? 'bg-white text-emerald-600 shadow-sm ring-1 ring-slate-200'
-                                : 'text-slate-500 hover:text-slate-700'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                         }`}
                     >
                         {label}
@@ -479,15 +509,16 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         </div>
     );
 
-    // Toggle Serasa API — botão simplificado
+    // Toggle Serasa API — controle de série com estado explícito.
     const SerasaToggle = () => (
         <button
             type="button"
+            aria-pressed={showSerasa}
             onClick={() => setShowSerasa(!showSerasa)}
-            className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 ring-1 ${
+            className={`px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 ${
                 showSerasa
-                    ? 'bg-amber-50 text-amber-700 ring-amber-200/70 hover:bg-amber-100/80 shadow-sm'
-                    : 'bg-slate-100 text-slate-500 ring-slate-200/70 hover:bg-slate-200/50'
+                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    : 'bg-white text-slate-500 hover:bg-slate-50'
             }`}
         >
             Serasa API
@@ -509,10 +540,10 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 aria-pressed={showOtherB2C}
                 onClick={toggleOtherB2C}
                 title={showOtherB2C ? 'Ocultar Outros B2C dos gráficos' : 'Exibir Outros B2C nos gráficos'}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition-all duration-200 ring-1 ${
+                className={`inline-flex items-center gap-1.5 border-l border-slate-200 px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 ${
                     showOtherB2C
-                        ? 'bg-slate-200 text-slate-700 ring-slate-300/80 hover:bg-slate-300/70 shadow-sm'
-                        : 'bg-white text-slate-400 ring-slate-200 hover:bg-slate-50'
+                        ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        : 'bg-white text-slate-400 hover:bg-slate-50'
                 }`}
             >
                 {showOtherB2C ? <Eye size={12} aria-hidden="true" /> : <EyeOff size={12} aria-hidden="true" />}
@@ -622,22 +653,23 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         <div className="mb-2">
             {showCharts && (
                 <div className="flex flex-wrap justify-end items-center gap-2 mb-2">
-                    <SerasaToggle />
-                    <OtherB2CToggle />
+                    <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                        <SerasaToggle />
+                        <OtherB2CToggle />
+                    </div>
                     <ChartModeToggle />
                 </div>
             )}
             <div className={`grid gap-4 ${showCharts ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
             <div className="space-y-4">
-                <div className="bg-white border border-slate-200 rounded-lg p-3 flex flex-col justify-between h-48 relative overflow-hidden group shadow-sm">
-                    <div className="flex justify-between items-start mb-1 relative z-10">
+                <div className="relative flex h-52 flex-col justify-between overflow-hidden rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+                    <div className="relative z-10 mb-2 flex items-start justify-between gap-4">
                         <div>
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-slate-500 text-xs font-medium">Cartões acumulados vs Meta</h3>
-                                <span title="Realizado acumulado até o último dia observado versus a meta acumulada esperada até o fim do mês">
-                                    <Info size={12} className="text-slate-500 cursor-help" />
-                                </span>
-                            </div>
+                            <ChartHeading
+                                title="ACUMULADO TOTAL CARTÕES B2C VS META"
+                                helpText="Realizado acumulado até o último dia observado versus a meta acumulada esperada até o fim do mês"
+                                onClick={openDailyResults}
+                            />
                             <div className="flex items-baseline gap-2 mt-0.5">
                                 <span className="text-xl font-bold text-slate-800">{metrics.totalCards.toLocaleString()}</span>
                                 <span className="text-xs text-slate-400">/ {metrics.goalCards.toLocaleString()}</span>
@@ -654,7 +686,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${metrics.goalProgress >= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-cyan-100 text-cyan-700'}`}>
+                            <div className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-bold ${metrics.goalProgress >= 100 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-cyan-200 bg-cyan-50 text-cyan-700'}`}>
                                 {metrics.goalProgress.toFixed(1)}%
                             </div>
                             {cardsPacing.paceDelta != null && cardsPacing.lastObservedPoint && (
@@ -665,10 +697,10 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                             )}
                         </div>
                     </div>
-                    <div className="flex-1 w-full min-h-0 relative z-10">
+                    <div className="relative z-10 min-h-0 w-full flex-1">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={cardsPacing.data} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
                                 <XAxis
                                     dataKey="displayDate"
                                     tickLine={false}
@@ -703,6 +735,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     stroke="#10B981"
                                     strokeWidth={2}
                                     strokeDasharray="5 4"
+                                    strokeLinecap="square"
                                     dot={false}
                                     activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff', fill: '#10B981' }}
                                 />
@@ -713,6 +746,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                     connectNulls={false}
                                     stroke="#3B82F6"
                                     strokeWidth={2.5}
+                                    strokeLinecap="square"
                                     dot={false}
                                     activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff', fill: '#3B82F6' }}
                                 />
@@ -722,22 +756,18 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 </div>
 
                 {showCharts && (
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
-                        <div className="mb-1 flex items-center gap-1.5">
-                            <button
-                                type="button"
+                    <div className="flex h-52 flex-col rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+                        <div className="mb-2">
+                            <ChartHeading
+                                title="EVOLUÇÃO DE CAC CRM B2C"
+                                helpText={`CAC ${isMonthly ? 'do mês = custo do mês / cartões do mês' : 'do dia = custo do dia / cartões do dia'}. Sem custo ou cartão, o gráfico preserva uma lacuna.`}
                                 onClick={openDailyResults}
-                                className="rounded-sm text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
-                                title="Abrir Análise > Relatórios no modo Diário"
-                            >
-                                Evolução de CAC <span className="font-medium normal-case text-slate-400">(R$)</span>
-                            </button>
-                            <span title={`CAC ${isMonthly ? 'do mês = custo do mês / cartões do mês' : 'do dia = custo do dia / cartões do dia'}. Sem custo ou cartão, o gráfico preserva uma lacuna.`}><Info size={10} className="text-slate-400" /></span>
+                            />
                         </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={timeChartData} onClick={chartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                    <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(v) => `R$${Number(v).toFixed(0)}`} />
                                     <Tooltip content={chartTooltip} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
@@ -748,6 +778,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                         connectNulls={false}
                                         stroke="#10B981"
                                         strokeWidth={2.25}
+                                        strokeLinecap="square"
                                         dot={{ r: 3, strokeWidth: 1.5, stroke: '#fff', fill: '#10B981' }}
                                         activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }}
                                     />
@@ -761,22 +792,18 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
             {showCharts && (
                 <div className="space-y-4">
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
-                        <div className="mb-2 flex items-center gap-1.5">
-                            <button
-                                type="button"
+                    <div className="flex h-52 flex-col rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+                        <div className="mb-2">
+                            <ChartHeading
+                                title="EVOLUÇÃO DE PROPOSTAS CRM B2C"
+                                helpText="Evolução das propostas dos segmentos acionados por CRM e, quando visível, do residual de outros canais B2C"
                                 onClick={openDailyResults}
-                                className="rounded-sm text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
-                                title="Abrir Análise > Relatórios no modo Diário"
-                            >
-                                Propostas: CRM vs B2C
-                            </button>
-                            <span title="Comparativo entre propostas geradas via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
+                            />
                         </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="30%" maxBarSize={18} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
+                                    <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
                                     <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
@@ -793,28 +820,24 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                         />
                                     ))}
                                     {showSerasa && <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
-                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
+                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 h-48 flex flex-col shadow-sm">
-                        <div className="mb-2 flex items-center gap-1.5">
-                            <button
-                                type="button"
+                    <div className="flex h-52 flex-col rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+                        <div className="mb-2">
+                            <ChartHeading
+                                title="EVOLUÇÃO DE EMISSÕES CRM B2C"
+                                helpText="Evolução dos cartões emitidos pelos segmentos acionados por CRM e, quando visível, do residual de outros canais B2C"
                                 onClick={openDailyResults}
-                                className="rounded-sm text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
-                                title="Abrir Análise > Relatórios no modo Diário"
-                            >
-                                Emissoes: CRM vs B2C
-                            </button>
-                            <span title="Comparativo entre cartoes emitidos via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
+                            />
                         </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="30%" maxBarSize={18} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
+                                    <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
                                     <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
@@ -831,7 +854,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                         />
                                     ))}
                                     {showSerasa && <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
-                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" radius={[3, 3, 0, 0]} hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
+                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
