@@ -296,12 +296,12 @@ export const PaidMediaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({
       <OnboardingFunnelWorkspace
         navigation={navigation}
         sidebarMeta={<>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-3 sm:grid-cols-2 min-[1180px]:grid-cols-1">
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200/40 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900"><CheckCircle2 size={15} /> Dados até {lastDate ? parseDate(lastDate).toLocaleDateString('pt-BR') : '—'}</div>
             <div className="flex items-start gap-2 rounded-lg border border-blue-200/50 bg-blue-50 px-3 py-2 text-[10px] leading-relaxed text-blue-950"><Info size={14} className="mt-0.5 shrink-0" /><span><strong>Escopo:</strong> App Install usa 1d click + 1d view; Onboarding usa StartTrial em 7d click. CP início de proposta considera somente investimento elegível. CPA de plataforma não é CAC.</span></div>
           </div>
           {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</div>}
-          <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 xl:grid-cols-1">
+          <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 min-[1180px]:grid-cols-1">
             <div><span className="text-white/55">Resultado principal</span><p className="font-semibold text-white">{fmt(totals.startTrials)} StartTrials atribuídos</p></div>
             <div><span className="text-white/55">Taxa CORE elegível</span><p className="font-semibold text-white">{pctLabel(totals.installToTrial)} instalação → StartTrial</p></div>
             <div><span className="text-white/55">Eficiência de mídia</span><p className="font-semibold text-white">{money(totals.cpStartTrial)} por StartTrial</p></div>

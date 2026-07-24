@@ -254,12 +254,12 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
       <OnboardingFunnelWorkspace
         navigation={navigation}
         sidebarMeta={<>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-3 sm:grid-cols-2 min-[1180px]:grid-cols-1">
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200/40 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900"><CheckCircle2 size={15} /> Dados até {lastDate ? lastDate.toLocaleDateString('pt-BR') : '—'}</div>
             <div className="flex items-start gap-2 rounded-lg border border-blue-200/50 bg-blue-50 px-3 py-2 text-[10px] leading-relaxed text-blue-950"><Info size={14} className="mt-0.5 shrink-0" /><span><strong>Escopo:</strong> somente Serasa. APP e total conciliado ficam fora até a série diária ser certificada.</span></div>
           </div>
           {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</div>}
-          <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 xl:grid-cols-1">
+          <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 min-[1180px]:grid-cols-1">
             <div><span className="text-white/55">Maior perda</span><p className="font-semibold text-white">{largestLoss?.label ?? '—'} · {percentageLabel(largestLoss?.rate ?? null)}</p></div>
             <div><span className="text-white/55">Melhor evolução</span><p className="font-semibold text-white">{bestEvolution ? `${bestEvolution.label} · ${bestEvolution.change > 0 ? '+' : ''}${bestEvolution.change.toFixed(1).replace('.', ',')} p.p.` : 'Sem base anterior'}</p></div>
             <div><span className="text-white/55">Qualidade da fonte</span><p className={`font-semibold ${total.bioNulls ? 'text-amber-200' : 'text-emerald-200'}`}>{total.bioNulls ? `${total.bioNulls} dias sem biometria` : 'Período completo'}</p></div>
@@ -344,13 +344,13 @@ export const FunilAquisicaoView: React.FC = () => {
       <h1 className="mt-1.5 text-xl font-bold leading-tight tracking-tight text-white">{activeContext.title}</h1>
       <p className="mt-1 text-sm leading-relaxed text-white/75">{activeContext.description}</p>
     </div>
-    <nav aria-label="Selecionar funil de onboarding" className="mt-5 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
+    <nav aria-label="Selecionar funil de onboarding" className="mt-5 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 min-[1180px]:grid-cols-1">
       {options.map(option => {
         const active = funnel === option.key;
         return <button key={option.key} onClick={() => setFunnel(option.key)} aria-current={active ? 'page' : undefined} className={`relative min-h-[66px] rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 ${active ? 'border-cyan-200 bg-white text-slate-900 shadow-lg' : 'border-white/20 bg-white/10 text-white hover:bg-white/15'}`}>
           <span className="block text-xs font-bold leading-snug">{option.label}</span>
           <span className={`mt-1 block text-[10px] ${active ? 'text-cyan-700' : 'text-white/65'}`}>{option.detail}</span>
-          {active && <span className="absolute inset-y-3 left-0 w-[3px] rounded-r bg-cyan-500 sm:inset-x-3 sm:bottom-0 sm:top-auto sm:h-[3px] sm:w-auto sm:rounded-t xl:inset-y-3 xl:bottom-auto xl:left-0 xl:right-auto xl:h-auto xl:w-[3px] xl:rounded-r" />}
+          {active && <span className="absolute inset-y-3 left-0 w-[3px] rounded-r bg-cyan-500 sm:inset-x-3 sm:bottom-0 sm:top-auto sm:h-[3px] sm:w-auto sm:rounded-t min-[1180px]:inset-y-3 min-[1180px]:bottom-auto min-[1180px]:left-0 min-[1180px]:right-auto min-[1180px]:h-auto min-[1180px]:w-[3px] min-[1180px]:rounded-r" />}
         </button>;
       })}
     </nav>

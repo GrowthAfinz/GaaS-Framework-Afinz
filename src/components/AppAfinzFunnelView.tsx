@@ -215,12 +215,12 @@ export const AppAfinzFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ 
       <OnboardingFunnelWorkspace
         navigation={navigation}
         sidebarMeta={<>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-3 sm:grid-cols-2 min-[1180px]:grid-cols-1">
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200/40 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900"><CheckCircle2 size={15} /> Dados fechados até {lastClosed?.toLocaleDateString('pt-BR') ?? '—'}</div>
             <div className="flex items-start gap-2 rounded-lg border border-amber-200/50 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-950"><AlertTriangle size={14} className="mt-0.5 shrink-0" /><span><strong>Leitura certificada com limite:</strong> `SIM` identifica Plurix e `NAO` o restante do App, mas a fonte não separa B2C de B2B2C. Propostas iniciadas e Onboarding são referências do App total nos recortes segmentados. Ausência não vira zero.</span></div>
           </div>
           {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</div>}
-          <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 xl:grid-cols-1">
+          <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 min-[1180px]:grid-cols-1">
             <div><span className="text-white/55">Cobertura temporal</span><p className="font-semibold text-white">CPF: 01/01 · funil detalhado: 23/05</p></div>
             <div><span className="text-white/55">Segmentação disponível</span><p className="font-semibold text-white">Total · Afinz combinado · Plurix</p></div>
             <div><span className="text-white/55">Etapa auxiliar</span><p className="font-semibold text-white">Finalização automática: cobertura parcial</p></div>
