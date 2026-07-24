@@ -313,7 +313,7 @@ export const FunilAquisicaoView: React.FC = () => {
   const options = [
     { key: 'app-afinz' as const, label: 'Funil Onboarding — Apps', detail: 'B2C + B2B2C + Plurix' },
     { key: 'serasa-marketplace' as const, label: 'Funil API Serasa Marketplace', detail: 'Ofertas · pedidos · confirmações · aprovações' },
-    { key: 'serasa-bi' as const, label: 'Funil API Serasa BI', detail: 'Fonte BI · Integrado diário' },
+    { key: 'serasa-bi' as const, label: 'Funil API Serasa BI', detail: 'Neurotech + Integrado diário' },
     { key: 'paid-media' as const, label: 'Funil Onboarding — Mídia Paga', detail: 'Aquisição App Install' },
   ];
   const activeContext = {
@@ -325,7 +325,7 @@ export const FunilAquisicaoView: React.FC = () => {
     'serasa-bi': {
       eyebrow: 'Análise · Serasa BI',
       title: 'Funil API Serasa BI',
-      description: 'Jornada completa e custos do Integrado diário, preservando lacunas e qualidade.',
+      description: 'Funil histórico Neurotech restaurado, com o Integrado diário preservado como base complementar.',
     },
     'paid-media': {
       eyebrow: 'Análise · Mídia Paga B2C',

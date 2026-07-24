@@ -12,6 +12,13 @@ type MetricKey =
   | 'pedidosMarketplace'
   | 'confirmadosMarketplace'
   | 'aprovadosMarketplace'
+  | 'consultasNeurotech'
+  | 'aprovadosNeurotech'
+  | 'pedidosConfirmadosJourney'
+  | 'fotoBiometria'
+  | 'documentos'
+  | 'assinaturas'
+  | 'emitidos'
   | 'consultasMotor'
   | 'cpfsUnicos'
   | 'aprovados'
@@ -35,6 +42,7 @@ type StageConfig = {
   key: MetricKey;
   label: string;
   color: string;
+  denominatorKey?: MetricKey;
 };
 
 type GroupedRow = {
@@ -51,6 +59,16 @@ const marketplaceStages: StageConfig[] = [
 ];
 
 const biStages: StageConfig[] = [
+  { key: 'consultasNeurotech', label: 'Consultas Neurotech', color: '#0f2d64' },
+  { key: 'aprovadosNeurotech', label: 'Aprovados Neurotech', color: '#2563eb', denominatorKey: 'consultasNeurotech' },
+  { key: 'pedidosConfirmadosJourney', label: 'Pedidos confirmados', color: '#7c3aed', denominatorKey: 'aprovadosNeurotech' },
+  { key: 'fotoBiometria', label: 'Envio foto biometria', color: '#d97706', denominatorKey: 'pedidosConfirmadosJourney' },
+  { key: 'documentos', label: 'Envio documento', color: '#ea580c', denominatorKey: 'pedidosConfirmadosJourney' },
+  { key: 'assinaturas', label: 'Assinatura do cartão', color: '#db2777', denominatorKey: 'pedidosConfirmadosJourney' },
+  { key: 'emitidos', label: 'Total emitidos', color: '#0d9488', denominatorKey: 'pedidosConfirmadosJourney' },
+];
+
+const integratedBiStages: StageConfig[] = [
   { key: 'consultasMotor', label: 'Consultas motor', color: '#0f2d64' },
   { key: 'cpfsUnicos', label: 'CPFs únicos', color: '#2563eb' },
   { key: 'aprovados', label: 'Aprovados', color: '#7c3aed' },
@@ -74,6 +92,13 @@ const emptyMetrics = (): Record<MetricKey | CostKey, null> => ({
   pedidosMarketplace: null,
   confirmadosMarketplace: null,
   aprovadosMarketplace: null,
+  consultasNeurotech: null,
+  aprovadosNeurotech: null,
+  pedidosConfirmadosJourney: null,
+  fotoBiometria: null,
+  documentos: null,
+  assinaturas: null,
+  emitidos: null,
   consultasMotor: null,
   cpfsUnicos: null,
   aprovados: null,
@@ -119,6 +144,8 @@ const comparableRate = (rows: FunnelRow[], numerator: MetricKey, denominator: Me
 };
 const comparableDays = (rows: FunnelRow[], numerator: MetricKey, denominator: MetricKey) =>
   rows.filter(row => row[numerator] != null && row[denominator] != null).length;
+const stageDenominator = (stages: StageConfig[], index: number): MetricKey | null =>
+  stages[index]?.denominatorKey ?? stages[index - 1]?.key ?? null;
 
 const periodKey = (date: Date, granularity: FunnelGranularity) => {
   if (granularity === 'daily') return iso(date);
@@ -172,7 +199,8 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
   const { startDate, endDate } = usePeriod();
   const stages = source === 'marketplace' ? marketplaceStages : biStages;
   const [marketplaceRows, setMarketplaceRows] = useState<FunnelRow[]>([]);
-  const [biRows, setBiRows] = useState<FunnelRow[]>([]);
+  const [biJourneyRows, setBiJourneyRows] = useState<FunnelRow[]>([]);
+  const [biIntegratedRows, setBiIntegratedRows] = useState<FunnelRow[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [granularity, setGranularity] = useState<FunnelGranularity>('daily');
@@ -180,16 +208,20 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
   const [selectedStages, setSelectedStages] = useState<MetricKey[]>(() => stages.map(stage => stage.key));
   const [selectedRates, setSelectedRates] = useState<MetricKey[]>(() => source === 'marketplace'
     ? ['pedidosMarketplace', 'confirmadosMarketplace', 'aprovadosMarketplace']
-    : ['cpfsUnicos', 'aprovados', 'pedidosConfirmados', 'cartoes']);
+    : ['aprovadosNeurotech', 'pedidosConfirmadosJourney', 'documentos', 'emitidos']);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
-      const [marketplaceResult, biResult] = await Promise.all([
+      const [marketplaceResult, biJourneyResult, biIntegratedResult] = await Promise.all([
         supabase
           .from('serasa_marketplace_daily_funnel')
           .select('data, ofertas, pedidos, confirmados, aprovados, quality_status, quality_notes, source_hash')
+          .order('data', { ascending: true }),
+        supabase
+          .from('serasa_bi_neurotech_daily_funnel')
+          .select('data, consultas_neurotech, aprovados_neurotech, pedidos_confirmados, env_foto_biometria, env_documento, assinatura_cartao, total_emitidos, quality_status, quality_notes, source_file, source_hash')
           .order('data', { ascending: true }),
         supabase
           .from('serasa_bi_daily_funnel')
@@ -197,8 +229,12 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
           .order('data', { ascending: true }),
       ]);
       if (!active) return;
-      if (marketplaceResult.error || biResult.error) {
-        setError([marketplaceResult.error?.message, biResult.error?.message].filter(Boolean).join(' · '));
+      if (marketplaceResult.error || biJourneyResult.error || biIntegratedResult.error) {
+        setError([
+          marketplaceResult.error?.message,
+          biJourneyResult.error?.message,
+          biIntegratedResult.error?.message,
+        ].filter(Boolean).join(' · '));
       }
       setMarketplaceRows((marketplaceResult.data ?? []).map(raw => ({
         ...emptyMetrics(),
@@ -213,7 +249,23 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
         sourceSheet: null,
         sourceHash: raw.source_hash,
       })));
-      setBiRows((biResult.data ?? []).map(raw => ({
+      setBiJourneyRows((biJourneyResult.data ?? []).map(raw => ({
+        ...emptyMetrics(),
+        data: raw.data,
+        date: parseDate(raw.data),
+        consultasNeurotech: asNumber(raw.consultas_neurotech),
+        aprovadosNeurotech: asNumber(raw.aprovados_neurotech),
+        pedidosConfirmadosJourney: asNumber(raw.pedidos_confirmados),
+        fotoBiometria: asNumber(raw.env_foto_biometria),
+        documentos: asNumber(raw.env_documento),
+        assinaturas: asNumber(raw.assinatura_cartao),
+        emitidos: asNumber(raw.total_emitidos),
+        qualityStatus: (raw.quality_status as QualityStatus) ?? 'partial',
+        qualityNotes: Array.isArray(raw.quality_notes) ? raw.quality_notes : [],
+        sourceSheet: raw.source_file,
+        sourceHash: raw.source_hash,
+      })));
+      setBiIntegratedRows((biIntegratedResult.data ?? []).map(raw => ({
         ...emptyMetrics(),
         data: raw.data,
         date: parseDate(raw.data),
@@ -241,12 +293,13 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
     return () => { active = false; };
   }, []);
 
-  const sourceRows = source === 'marketplace' ? marketplaceRows : biRows;
+  const sourceRows = source === 'marketplace' ? marketplaceRows : biJourneyRows;
   const start = useMemo(() => new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()), [startDate]);
   const end = useMemo(() => new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999), [endDate]);
   const current = useMemo(() => sourceRows.filter(row => row.date >= start && row.date <= end), [sourceRows, start, end]);
   const currentMarketplace = useMemo(() => marketplaceRows.filter(row => row.date >= start && row.date <= end), [marketplaceRows, start, end]);
-  const currentBi = useMemo(() => biRows.filter(row => row.date >= start && row.date <= end), [biRows, start, end]);
+  const currentBiJourney = useMemo(() => biJourneyRows.filter(row => row.date >= start && row.date <= end), [biJourneyRows, start, end]);
+  const currentBiIntegrated = useMemo(() => biIntegratedRows.filter(row => row.date >= start && row.date <= end), [biIntegratedRows, start, end]);
   const periodLabel = `${startDate.toLocaleDateString('pt-BR')} – ${endDate.toLocaleDateString('pt-BR')}`;
   const lastDate = sourceRows.at(-1)?.date ?? null;
   const lastComplete = [...sourceRows].reverse().find(row => row.qualityStatus === 'complete')?.date ?? null;
@@ -259,14 +312,15 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
       const values: Record<string, string | number | null> = { period: group.label };
       stages.forEach(stage => { values[stage.key] = sumMetric(group.rows, stage.key); });
       stages.slice(1).forEach((stage, index) => {
-        values[`rate_${stage.key}`] = comparableRate(group.rows, stage.key, stages[index].key);
+        const denominator = stageDenominator(stages, index + 1);
+        values[`rate_${stage.key}`] = denominator ? comparableRate(group.rows, stage.key, denominator) : null;
       });
       return values;
     });
   }, [current, granularity, stages]);
 
   const detailRows = useMemo(() => groupRows(current, detailGranularity), [current, detailGranularity]);
-  const biByDate = useMemo(() => new Map(currentBi.map(row => [row.data, row])), [currentBi]);
+  const biByDate = useMemo(() => new Map(currentBiIntegrated.map(row => [row.data, row])), [currentBiIntegrated]);
   const reconciliation = useMemo(() => currentMarketplace
     .map(marketplace => ({ marketplace, bi: biByDate.get(marketplace.data) }))
     .filter((pair): pair is { marketplace: FunnelRow; bi: FunnelRow } =>
@@ -333,34 +387,57 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
     }
     downloadCsv(
       `funil-api-serasa-bi-${iso(start)}-${iso(end)}.csv`,
-      ['Data', ...biStages.map(stage => stage.label), ...costColumns.map(column => column.label), 'Qualidade', 'Notas', 'Aba origem'],
-      currentBi.map(row => [
-        row.data,
-        ...biStages.map(stage => row[stage.key]),
-        ...costColumns.map(column => row[column.key]),
-        row.qualityStatus,
-        row.qualityNotes.join(','),
-        row.sourceSheet,
-      ]),
+      [
+        'Data',
+        ...biStages.map(stage => stage.label),
+        'Qualidade Neurotech',
+        'Notas Neurotech',
+        'Fonte histórica',
+        ...integratedBiStages.map(stage => `Integrado · ${stage.label}`),
+        ...costColumns.map(column => `Integrado · ${column.label}`),
+        'Qualidade Integrado',
+        'Notas Integrado',
+        'Aba Integrado',
+      ],
+      currentBiJourney.map(row => {
+        const integrated = biByDate.get(row.data);
+        return [
+          row.data,
+          ...biStages.map(stage => row[stage.key]),
+          row.qualityStatus,
+          row.qualityNotes.join(','),
+          row.sourceSheet,
+          ...integratedBiStages.map(stage => integrated?.[stage.key] ?? null),
+          ...costColumns.map(column => integrated?.[column.key] ?? null),
+          integrated?.qualityStatus ?? null,
+          integrated?.qualityNotes.join(',') ?? null,
+          integrated?.sourceSheet ?? null,
+        ];
+      }),
     );
   };
 
   const stageCards = stages.map((stage, index) => {
-    const previous = index > 0 ? stages[index - 1] : null;
+    const denominator = stageDenominator(stages, index);
     return {
       ...stage,
       value: sumMetric(current, stage.key),
-      rate: previous ? comparableRate(current, stage.key, previous.key) : null,
-      comparable: previous ? comparableDays(current, stage.key, previous.key) : current.filter(row => row[stage.key] != null).length,
+      rate: denominator ? comparableRate(current, stage.key, denominator) : null,
+      comparable: denominator ? comparableDays(current, stage.key, denominator) : current.filter(row => row[stage.key] != null).length,
       coverage: current.filter(row => row[stage.key] != null).length,
     };
   });
+  const integratedStageCards = integratedBiStages.map(stage => ({
+    ...stage,
+    value: sumMetric(currentBiIntegrated, stage.key),
+    coverage: currentBiIntegrated.filter(row => row[stage.key] != null).length,
+  }));
 
   const sourceComplete = sourceStatus(current);
-  const sourceLabel = source === 'marketplace' ? 'Marketplace · ofertas e pedidos diários' : 'Integrado_diario_2026.xlsx · 7 abas mensais';
+  const sourceLabel = source === 'marketplace' ? 'Marketplace · ofertas e pedidos diários' : 'Serasa BI · Neurotech + Integrado diário';
   const sourceDescription = source === 'marketplace'
     ? 'Fonte Marketplace com 100% dos volumes recebidos. O dia corrente permanece parcial e as taxas são recalculadas a partir dos volumes.'
-    : 'Fonte BI normalizada no Supabase. Valores ausentes permanecem nulos e as quatro datas incompletas ficam sinalizadas.';
+    : 'Funil histórico Neurotech restaurado na sequência principal. Ausências continuam nulas; o Integrado diário permanece separado como base complementar.';
 
   return (
     <div className="min-h-full bg-slate-50 px-4 py-5 text-slate-800">
@@ -423,7 +500,7 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
                 {rateStages.map((stage, index) => (
                   <button key={stage.key} type="button" onClick={() => toggleRate(stage.key)} aria-pressed={selectedRates.includes(stage.key)} className={`flex shrink-0 items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(stage.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-white'}`}>
                     <span className="h-2 w-2" style={{ backgroundColor: selectedRates.includes(stage.key) ? stage.color : '#cbd5e1' }} />
-                    {stage.label} ÷ {stages[index].label}
+                    {stage.label} ÷ {stages.find(candidate => candidate.key === stageDenominator(stages, index + 1))?.label ?? 'base'}
                   </button>
                 ))}
                 <span className="shrink-0 px-2 py-2 text-slate-400">máx. 4</span>
@@ -485,12 +562,30 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
 
         {source === 'bi' && (
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 p-5">
+              <h2 className="text-lg font-semibold text-slate-950">Base complementar · Integrado diário</h2>
+              <p className="text-xs text-slate-500">Mantida separada do funil Neurotech para não misturar universos. Os volumes e custos continuam disponíveis no mesmo corte e também entram na exportação.</p>
+            </div>
+            <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-7">
+              {integratedStageCards.map((card, index) => (
+                <div key={card.key} className={`rounded-lg border p-3 ${card.coverage < currentBiIntegrated.length ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500">{index + 1}. {card.label}</p>
+                  <p className="mt-1 font-mono text-sm font-semibold text-slate-950">{formatNumber(card.value)}</p>
+                  <p className="mt-1 text-[9px] text-slate-500">{card.coverage}/{currentBiIntegrated.length} dias preenchidos</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {source === 'bi' && (
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="border-b border-slate-200 p-5"><h2 className="text-lg font-semibold text-slate-950">Leitura econômica do BI</h2><p className="text-xs text-slate-500">Todos os campos de valor do XLSX estão preservados; CPA e CAC são médias ponderadas por cartões.</p></div>
             <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-6">
               {costColumns.map(column => {
                 const value = column.key === 'cpa' || column.key === 'cacCanal'
-                  ? weightedMetric(current, column.key, 'cartoes')
-                  : sumMetric(current, column.key);
+                  ? weightedMetric(currentBiIntegrated, column.key, 'cartoes')
+                  : sumMetric(currentBiIntegrated, column.key);
                 return <div key={column.key} className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="text-[10px] uppercase tracking-wide text-slate-500">{column.label}</p><p className="mt-1 font-mono text-sm font-semibold text-slate-950">{column.currency ? formatCurrency(value) : formatNumber(value)}</p></div>;
               })}
             </div>
@@ -499,16 +594,15 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <div><h2 className="text-lg font-semibold text-slate-950">Detalhe {granularityLabel(detailGranularity).toLowerCase()} · {periodLabel}</h2><p className="text-xs text-slate-500">{source === 'marketplace' ? 'A exportação inclui as quatro etapas Marketplace, taxas recalculadas, pares BI compatíveis e qualidade.' : 'A exportação inclui todas as etapas, custos e sinalizadores de qualidade.'}</p></div>
+            <div><h2 className="text-lg font-semibold text-slate-950">Detalhe {granularityLabel(detailGranularity).toLowerCase()} · {periodLabel}</h2><p className="text-xs text-slate-500">{source === 'marketplace' ? 'A exportação inclui as quatro etapas Marketplace, taxas recalculadas, pares BI compatíveis e qualidade.' : 'A tabela restaura todas as linhas Neurotech; a exportação acrescenta também o Integrado diário e seus custos.'}</p></div>
             <div className="flex flex-wrap items-center gap-2"><GranularityToggle value={detailGranularity} onChange={setDetailGranularity} /><button type="button" onClick={exportData} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
           </div>
           <div className="max-h-[470px] overflow-auto">
-            <table className={`w-full text-[10px] ${source === 'bi' ? 'min-w-[1500px]' : 'min-w-[620px]'}`}>
+            <table className={`w-full text-[10px] ${source === 'bi' ? 'min-w-[1050px]' : 'min-w-[620px]'}`}>
               <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
                 <tr>
                   <th className="sticky left-0 z-20 bg-slate-100 px-3 py-2 text-left">Período</th>
                   {stages.map((stage, index) => <th key={stage.key} className="px-3 py-2 text-right"><span className="flex justify-end"><FunnelStageLabel index={index} label={stage.label} compact /></span></th>)}
-                  {source === 'bi' && costColumns.map(column => <th key={column.key} className="px-3 py-2 text-right">{column.label}</th>)}
                   <th className="px-3 py-2 text-right">Qualidade</th>
                 </tr>
               </thead>
@@ -519,14 +613,8 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
                     <tr key={group.key} className={`border-t border-slate-100 ${rowIndex % 2 ? 'bg-slate-50/40' : ''}`}>
                       <td className="sticky left-0 z-[5] whitespace-nowrap bg-white px-3 py-2 font-mono text-[11px] font-semibold text-slate-800">{group.label}</td>
                       {stages.map((stage, index) => {
-                        const previous = index > 0 ? stages[index - 1] : null;
-                        return <td key={stage.key} className="px-3 py-2"><StageMetricCell value={formatNumber(sumMetric(group.rows, stage.key))} rate={previous ? formatRate(comparableRate(group.rows, stage.key, previous.key)) : null} note={previous ? 'razão' : 'base'} tone={sumMetric(group.rows, stage.key) == null ? 'amber' : index === 0 ? 'slate' : 'teal'} /></td>;
-                      })}
-                      {source === 'bi' && costColumns.map(column => {
-                        const value = column.key === 'cpa' || column.key === 'cacCanal'
-                          ? weightedMetric(group.rows, column.key, 'cartoes')
-                          : sumMetric(group.rows, column.key);
-                        return <td key={column.key} className="px-3 py-2 text-right font-mono text-[11px] font-semibold text-slate-800">{formatCurrency(value)}</td>;
+                        const denominator = stageDenominator(stages, index);
+                        return <td key={stage.key} className="px-3 py-2"><StageMetricCell value={formatNumber(sumMetric(group.rows, stage.key))} rate={denominator ? formatRate(comparableRate(group.rows, stage.key, denominator)) : null} note={denominator ? 'razão' : 'base'} tone={sumMetric(group.rows, stage.key) == null ? 'amber' : index === 0 ? 'slate' : 'teal'} /></td>;
                       })}
                       <td className="px-3 py-2 text-right"><span className={`inline-flex rounded-sm px-2 py-1 font-semibold ${quality === 'complete' ? 'bg-emerald-50 text-emerald-700' : quality === 'suspect' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{quality === 'complete' ? 'completo' : quality === 'suspect' ? 'suspeito' : 'parcial'}</span></td>
                     </tr>
