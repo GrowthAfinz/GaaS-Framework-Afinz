@@ -4,6 +4,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine, Resp
 import { usePeriod } from '../contexts/PeriodContext';
 import { PaidMediaFunnelView } from './PaidMediaFunnelView';
 import { AppAfinzFunnelView } from './AppAfinzFunnelView';
+import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'consultas' | 'aprovados' | 'pedidos' | 'bio' | 'docs' | 'assinatura' | 'emitidos';
@@ -88,7 +89,7 @@ const EvolutionCell = ({ value, previous, onEnter, onLeave }: { value: number | 
   </div>;
 };
 
-const SerasaFunnelView: React.FC = () => {
+const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigation }) => {
   const { startDate, endDate } = usePeriod();
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
@@ -183,41 +184,51 @@ const SerasaFunnelView: React.FC = () => {
   const SortIcon = ({ column }: { column: SortKey }) => sortKey !== column ? <ArrowUpDown size={11} className="text-slate-400" /> : sortDirection === 'asc' ? <ChevronUp size={12} className="text-cyan-700" /> : <ChevronDown size={12} className="text-cyan-700" />;
 
   return <div className="min-h-full bg-slate-50 px-4 py-5 text-slate-800">
-    <div className="mx-auto flex max-w-[1780px] flex-col gap-4">
-      <header className="flex justify-end">
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800"><CheckCircle2 size={15} /> Dados até {lastDate ? lastDate.toLocaleDateString('pt-BR') : '—'}</div>
-      </header>
-      <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900"><Info size={15} /><span><strong className="font-semibold">Escopo:</strong> somente Serasa. APP e total conciliado ficam fora até a série diária ser certificada.</span></div>
-      {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-
-      <section className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+    <div className="mx-auto max-w-[1780px] space-y-4">
+      <OnboardingFunnelWorkspace
+        navigation={navigation}
+        sidebarMeta={<>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200/40 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900"><CheckCircle2 size={15} /> Dados até {lastDate ? lastDate.toLocaleDateString('pt-BR') : '—'}</div>
+            <div className="flex items-start gap-2 rounded-lg border border-blue-200/50 bg-blue-50 px-3 py-2 text-[10px] leading-relaxed text-blue-950"><Info size={14} className="mt-0.5 shrink-0" /><span><strong>Escopo:</strong> somente Serasa. APP e total conciliado ficam fora até a série diária ser certificada.</span></div>
+          </div>
+          {error && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{error}</div>}
+          <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 xl:grid-cols-1">
+            <div><span className="text-white/55">Maior perda</span><p className="font-semibold text-white">{largestLoss?.label ?? '—'} · {percentageLabel(largestLoss?.rate ?? null)}</p></div>
+            <div><span className="text-white/55">Melhor evolução</span><p className="font-semibold text-white">{bestEvolution ? `${bestEvolution.label} · ${bestEvolution.change > 0 ? '+' : ''}${bestEvolution.change.toFixed(1).replace('.', ',')} p.p.` : 'Sem base anterior'}</p></div>
+            <div><span className="text-white/55">Qualidade da fonte</span><p className={`font-semibold ${total.bioNulls ? 'text-amber-200' : 'text-emerald-200'}`}>{total.bioNulls ? `${total.bioNulls} dias sem biometria` : 'Período completo'}</p></div>
+            <div><span className="text-white/55">Último dia fechado</span><p className="font-semibold text-white">{lastDate?.toLocaleDateString('pt-BR') ?? '—'}</p></div>
+          </div>
+          {total.bioNulls > 0 && <p className="mt-3 flex items-start gap-2 text-[10px] text-amber-200"><AlertTriangle size={13} className="mt-0.5 shrink-0" /> Ausência de biometria é tratada como dado não informado, não como zero.</p>}
+        </>}
+      >
+      <section className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Período analisado</p><p className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-800"><CalendarDays size={16} /> {periodLabel}</p></div>
       </section>
 
-      <section className="order-2 rounded-xl border border-slate-200 bg-white p-5">
+      <section className="order-2 border-t border-slate-200 px-4 pb-4 pt-3">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div><h2 className="text-lg font-semibold text-slate-950">Evolução do funil</h2><p className="text-xs text-slate-500">Combine volumes e taxas no mesmo período de análise.</p></div>
-          <div className="inline-flex border border-slate-300 bg-white text-[11px] font-semibold">{(['daily', 'weekly', 'monthly'] as Granularity[]).map(g => <button key={g} onClick={() => setGranularity(g)} className={`border-r border-slate-300 px-3 py-1.5 last:border-r-0 ${granularity === g ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{g === 'daily' ? 'Diária' : g === 'weekly' ? 'Semanal' : 'Mensal'}</button>)}</div>
+          <div className="inline-flex border border-slate-300 bg-white text-[11px] font-semibold">{(['daily', 'weekly', 'monthly'] as Granularity[]).map(g => <button key={g} onClick={() => setGranularity(g)} aria-pressed={granularity === g} className={`border-r border-slate-300 px-3 py-1.5 last:border-r-0 ${granularity === g ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{g === 'daily' ? 'Diária' : g === 'weekly' ? 'Semanal' : 'Mensal'}</button>)}</div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center border-y border-slate-200 bg-slate-50/60 text-[10px]">
+        <div className="-mx-4 mt-3 flex flex-nowrap items-center overflow-x-auto whitespace-nowrap border-y border-slate-200 bg-slate-50/60 text-[10px]">
           <span className="border-r border-slate-200 px-2 py-2 font-semibold uppercase tracking-wide text-slate-500">Volumes</span>
-          {stageConfig.map(stage => <button key={stage.key} onClick={() => toggleStage(stage.key)} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedStages.includes(stage.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-white'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedStages.includes(stage.key) ? stage.color : '#cbd5e1' }} />{stage.label}</button>)}
+          {stageConfig.map(stage => <button key={stage.key} onClick={() => toggleStage(stage.key)} aria-pressed={selectedStages.includes(stage.key)} className={`flex shrink-0 items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedStages.includes(stage.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-white'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedStages.includes(stage.key) ? stage.color : '#cbd5e1' }} />{stage.label}</button>)}
           <button onClick={() => setSelectedStages(stageConfig.map(stage => stage.key))} className="px-2.5 py-2 font-semibold text-cyan-700">Todos</button><button onClick={() => setSelectedStages([])} className="border-l border-slate-200 px-2.5 py-2 font-semibold text-slate-500">Limpar</button>
         </div>
-        <div className="flex flex-wrap items-center border-b border-slate-200 text-[10px]"><span className="border-r border-slate-200 px-2 py-2 font-semibold uppercase tracking-wide text-slate-500">Taxas</span>{rateConfig.map(rate => <button key={rate.key} title={rate.formula} onClick={() => toggleRate(rate.key)} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(rate.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-slate-50'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedRates.includes(rate.key) ? rate.color : '#cbd5e1' }} />{rate.label}</button>)}<span className="px-2 py-2 text-slate-400">máx. 4</span></div>
-        <div className="mt-3 h-[380px]">
+        <div className="-mx-4 flex flex-nowrap items-center overflow-x-auto whitespace-nowrap border-b border-slate-200 text-[10px]"><span className="border-r border-slate-200 px-2 py-2 font-semibold uppercase tracking-wide text-slate-500">Taxas</span>{rateConfig.map(rate => <button key={rate.key} title={rate.formula} onClick={() => toggleRate(rate.key)} aria-pressed={selectedRates.includes(rate.key)} className={`flex shrink-0 items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(rate.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-slate-50'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedRates.includes(rate.key) ? rate.color : '#cbd5e1' }} />{rate.label}</button>)}<span className="shrink-0 px-2 py-2 text-slate-400">máx. 4</span></div>
+        <div className="mt-2 h-[355px]">
           {selectedStages.length === 0 && selectedRates.length === 0 ? <div className="flex h-full items-center justify-center text-sm text-slate-400">Selecione ao menos uma métrica para visualizar.</div> :
           <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 18, right: 42, left: 8, bottom: granularity === 'daily' ? 20 : 4 }} barGap={2} barCategoryGap="22%"><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" height={granularity === 'daily' ? 42 : 30} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={granularity === 'daily' ? ({ x, y, payload }: any) => { const point = chartData.find(item => item.period === payload.value); return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={10} fontFamily="ui-monospace, monospace" fontWeight={600}>{payload.value}</text><text y={26} textAnchor="middle" fill="#94a3b8" fontSize={9}>{point?.weekday}</text></g>; } : { fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} /><YAxis yAxisId="volume" hide={selectedStages.length === 0} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><YAxis yAxisId="rate" orientation="right" domain={[0, 'auto']} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => `${value}%`} /><Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ border: '1px solid #cbd5e1', borderRadius: 2, fontSize: 11, fontFamily: 'ui-monospace, monospace' }} labelStyle={{ color: '#0f172a', fontWeight: 700, marginBottom: 6 }} formatter={(value: number, name: string) => { const rate = rateConfig.find(item => item.key === name); return [rate ? percentageLabel(value, 2) : formatNumber(value), rate ? `${rate.label} · ${rate.formula}` : stageConfig.find(stage => stage.key === name)?.label ?? name]; }} />{stageConfig.filter(stage => selectedStages.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="volume" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={granularity === 'daily' ? 18 : 38} isAnimationActive={false} />)}{rateConfig.filter(rate => selectedRates.includes(rate.key)).map(rate => <Line key={rate.key} yAxisId="rate" type="linear" dataKey={rate.key} name={rate.key} stroke={rate.color} strokeWidth={3} connectNulls={false} dot={{ r: 3.5, fill: '#fff', strokeWidth: 2.5 }} activeDot={{ r: 5.5 }} isAnimationActive={false} />)}</ComposedChart></ResponsiveContainer>}
         </div>
         <p className="text-[10px] text-slate-500">Barras/eixo esquerdo: volumes absolutos · linhas/eixo direito: taxas selecionadas.</p>
       </section>
 
-      <section className="order-1 rounded-xl border border-slate-200 bg-white p-4">
+      <section className="order-1 px-4 pb-3 pt-4">
         <h2 className="text-lg font-semibold text-slate-950">Funil completo</h2><p className="mb-3 text-xs text-slate-500">Síntese compacta do período, com comparação contra a janela imediatamente anterior.</p>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">{stageCards.map((card, index) => { const rateChange = card.rate != null && card.previousRate != null ? card.rate - card.previousRate : null; const volumeChange = card.key === 'consultas' ? delta(card.value, previousTotal.consultas) : null; const change = rateChange ?? volumeChange; return <div key={card.key} className={`rounded-lg border px-3 py-2.5 ${card.status === 'cobertura parcial' ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}><div className="flex items-center justify-between"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold">{index + 1}</span><span className="text-[8px] font-semibold uppercase tracking-wide text-slate-400">{card.status}</span></div><p className="mt-1.5 text-[11px] font-semibold text-slate-700">{card.label}</p><div className="mt-0.5 flex items-end justify-between gap-2"><p className="font-mono text-lg font-semibold leading-none text-slate-950">{formatNumber(card.value)}</p>{change != null && <span className={`flex items-center text-[9px] font-semibold ${change > 0 ? 'text-emerald-700' : change < 0 ? 'text-red-700' : 'text-slate-400'}`}>{change > 0 ? <ArrowUp size={10} /> : change < 0 ? <ArrowDown size={10} /> : <ArrowRight size={10} />}{Math.abs(change).toFixed(1).replace('.', ',')}{rateChange != null ? ' p.p.' : '%'}</span>}</div><p className="mt-1 text-[10px] font-semibold text-cyan-700">{card.rate == null ? 'Volume do período' : percentageLabel(card.rate)}</p></div>; })}</div>
-        <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 text-[10px] sm:grid-cols-2 lg:grid-cols-4"><div><span className="text-slate-400">Maior perda</span><p className="font-semibold text-slate-800">{largestLoss?.label ?? '—'} · {percentageLabel(largestLoss?.rate ?? null)}</p></div><div><span className="text-slate-400">Melhor evolução</span><p className="font-semibold text-slate-800">{bestEvolution ? `${bestEvolution.label} · ${bestEvolution.change > 0 ? '+' : ''}${bestEvolution.change.toFixed(1).replace('.', ',')} p.p.` : 'Sem base anterior'}</p></div><div><span className="text-slate-400">Qualidade da fonte</span><p className={`font-semibold ${total.bioNulls ? 'text-amber-800' : 'text-emerald-700'}`}>{total.bioNulls ? `${total.bioNulls} dias sem biometria` : 'Período completo'}</p></div><div><span className="text-slate-400">Último dia fechado</span><p className="font-semibold text-slate-800">{lastDate?.toLocaleDateString('pt-BR') ?? '—'}</p></div></div>
-        {total.bioNulls > 0 && <p className="mt-2 flex items-center gap-2 text-[10px] text-amber-800"><AlertTriangle size={13} /> Ausência de biometria é tratada como dado não informado, não como zero.</p>}
       </section>
+      </OnboardingFunnelWorkspace>
 
       <section className="order-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex items-center justify-between p-5"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe diário · {periodLabel}</h2><p className="text-xs text-slate-500">Ordene pelos cabeçalhos. Passe o mouse sobre uma célula para ver os últimos 15 dias da métrica.</p></div><button onClick={exportCsv} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
@@ -253,6 +264,23 @@ export const FunilAquisicaoView: React.FC = () => {
       description: 'Leitura operacional de B2C + B2B2C e Plurix, sem misturar populações incompatíveis.',
     },
   }[funnel];
+  const navigation = <>
+    <div>
+      <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-cyan-100">{activeContext.eyebrow}</p>
+      <h1 className="mt-1.5 text-xl font-bold leading-tight tracking-tight text-white">{activeContext.title}</h1>
+      <p className="mt-1 text-sm leading-relaxed text-white/75">{activeContext.description}</p>
+    </div>
+    <nav aria-label="Selecionar funil de onboarding" className="mt-5 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-1">
+      {options.map(option => {
+        const active = funnel === option.key;
+        return <button key={option.key} onClick={() => setFunnel(option.key)} aria-current={active ? 'page' : undefined} className={`relative min-h-[66px] rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 ${active ? 'border-cyan-200 bg-white text-slate-900 shadow-lg' : 'border-white/20 bg-white/10 text-white hover:bg-white/15'}`}>
+          <span className="block text-xs font-bold leading-snug">{option.label}</span>
+          <span className={`mt-1 block text-[10px] ${active ? 'text-cyan-700' : 'text-white/65'}`}>{option.detail}</span>
+          {active && <span className="absolute inset-y-3 left-0 w-[3px] rounded-r bg-cyan-500 sm:inset-x-3 sm:bottom-0 sm:top-auto sm:h-[3px] sm:w-auto sm:rounded-t xl:inset-y-3 xl:bottom-auto xl:left-0 xl:right-auto xl:h-auto xl:w-[3px] xl:rounded-r" />}
+        </button>;
+      })}
+    </nav>
+  </>;
   return <div className="min-h-full bg-slate-50">
     <div className="border-b border-slate-200 bg-white px-6 py-4">
       <div className="mx-auto max-w-[1780px]">
@@ -260,25 +288,8 @@ export const FunilAquisicaoView: React.FC = () => {
         <p className="mt-0.5 text-sm text-slate-500">Acompanhe cada origem de aquisição em sua própria jornada, sem misturar fontes incompatíveis.</p>
       </div>
     </div>
-    <div className="mx-auto mb-4 max-w-[1780px] px-4 pt-5">
-      <div className="flex flex-wrap items-center gap-6 rounded-2xl bg-gradient-to-br from-[#063b3d] via-[#0a5f63] to-[#00838a] px-6 py-5 text-white shadow-sm">
-        <div className="min-w-[280px] flex-1">
-          <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-cyan-100">{activeContext.eyebrow}</p>
-          <h1 className="mt-1.5 max-w-[560px] text-xl font-bold leading-tight tracking-tight text-white">{activeContext.title}</h1>
-          <p className="mt-1 max-w-[560px] text-sm text-white/75">{activeContext.description}</p>
-        </div>
-        <nav aria-label="Selecionar funil de onboarding" className="grid min-w-0 flex-[1.6] grid-cols-1 gap-2 md:grid-cols-3">
-          {options.map(option => {
-            const active = funnel === option.key;
-            return <button key={option.key} onClick={() => setFunnel(option.key)} aria-current={active ? 'page' : undefined} className={`relative min-h-[72px] rounded-xl border px-4 py-3 text-left transition-colors ${active ? 'border-cyan-200 bg-white text-slate-900 shadow-lg' : 'border-white/20 bg-white/10 text-white hover:bg-white/15'}`}>
-              <span className="block text-xs font-bold leading-snug">{option.label}</span>
-              <span className={`mt-1 block text-[10px] ${active ? 'text-cyan-700' : 'text-white/65'}`}>{option.detail}</span>
-              {active && <span className="absolute inset-x-3 bottom-0 h-[3px] rounded-t bg-cyan-500" />}
-            </button>;
-          })}
-        </nav>
-      </div>
+    <div className="pt-4">
+      {funnel === 'serasa' ? <SerasaFunnelView navigation={navigation} /> : funnel === 'paid-media' ? <PaidMediaFunnelView navigation={navigation} /> : <AppAfinzFunnelView navigation={navigation} />}
     </div>
-    {funnel === 'serasa' ? <SerasaFunnelView /> : funnel === 'paid-media' ? <PaidMediaFunnelView /> : <AppAfinzFunnelView />}
   </div>;
 };

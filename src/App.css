@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+.onboarding-funnel-workspace .overflow-x-auto {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.onboarding-funnel-workspace .overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}
+
 * {
   margin: 0;
   padding: 0;
