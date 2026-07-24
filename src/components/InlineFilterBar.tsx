@@ -3,6 +3,8 @@ import { MessageCircle, Map, Users, HeartHandshake, Layers, ChevronDown, Check, 
 import { useAppStore } from '../store/useAppStore';
 import { FilterState } from '../types/framework';
 import { PeriodSelector } from './period-selector/PeriodSelector';
+import { QuickViewsButton } from './quick-views/QuickViewsButton';
+import { QuickViewBUNode } from '../hooks/useQuickViewTree';
 
 interface InlineFilterBarProps {
     availableCanais?: string[];
@@ -16,6 +18,7 @@ interface InlineFilterBarProps {
     countByParceiro?: { [parceiro: string]: number };
     countBySubgrupo?: { [subgrupo: string]: number };
     totalRemainingDisparos?: number;
+    quickViewTree?: QuickViewBUNode[];
     onMenuLockChange?: (locked: boolean) => void;
     onApplyFilters?: (filters: Partial<FilterState>) => void;
     isPending?: boolean;
@@ -317,6 +320,7 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
     countByParceiro = {},
     countBySubgrupo = {},
     totalRemainingDisparos = 0,
+    quickViewTree = [],
     onMenuLockChange,
     onApplyFilters,
     isPending = false
@@ -367,6 +371,20 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
             setGlobalFilters({ [field]: values });
         }
     };
+
+    // Visões rápidas escrevem várias dimensões de uma vez (substituição, não acúmulo).
+    const handleApplyPatch = React.useCallback((patch: Partial<FilterState>) => {
+        if (onApplyFilters) {
+            onApplyFilters(patch);
+        } else {
+            setGlobalFilters(patch);
+        }
+    }, [onApplyFilters, setGlobalFilters]);
+
+    const handleQuickViewsOpenChange = React.useCallback(
+        (isOpen: boolean) => handleMenuOpenChange('quickviews', isOpen),
+        [handleMenuOpenChange]
+    );
 
     return (
         <div className="relative w-full flex flex-col">
@@ -450,6 +468,12 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                 )}
 
                 <div className="ml-auto flex items-center gap-2">
+                    {/* Alinhado sob o seletor Aquisição/Rentabilização do header. */}
+                    <QuickViewsButton
+                        tree={quickViewTree}
+                        onApply={handleApplyPatch}
+                        onOpenChange={handleQuickViewsOpenChange}
+                    />
                     {isPending && (
                         <div className="flex items-center gap-1.5 text-[11px] text-cyan-600 font-semibold bg-cyan-50/50 border border-cyan-200/30 px-2.5 py-1 rounded-full">
                             <Loader2 size={11} className="animate-spin text-cyan-500" />

@@ -18,6 +18,7 @@ import { CommunicationsView } from './components/communications/CommunicationsVi
 import { DisparoExplorer } from './components/explorer/DisparoExplorer';
 import { useFrameworkData } from './hooks/useFrameworkData';
 import { useAdvancedFilters } from './hooks/useAdvancedFilters';
+import { useQuickViewTree } from './hooks/useQuickViewTree';
 import { useCalendarFilter } from './hooks/useCalendarFilter';
 import { useResultadosMetrics } from './hooks/useResultadosMetrics';
 import { useAppStore } from './store/useAppStore';
@@ -207,6 +208,13 @@ function App() {
 
   const { filteredData } = useCalendarFilter(advancedFilteredData, filters);
 
+  // Árvore das Visões Rápidas: respeita o período, ignora as demais seleções de
+  // propósito — é ela que serve para trocar de recorte sem limpar filtros antes.
+  const quickViewTree = useQuickViewTree(
+    shouldRunFilters ? sourceData : {},
+    { dataInicio: filters.dataInicio, dataFim: filters.dataFim }
+  );
+
   const previousFilters = useMemo(() => {
     if (!compareMode) return null;
 
@@ -341,6 +349,7 @@ function App() {
                 countByParceiro={countByParceiro}
                 countBySubgrupo={countBySubgrupo}
                 totalRemainingDisparos={totalRemainingDisparos}
+                quickViewTree={quickViewTree}
                 onMenuLockChange={setIsFilterMenuLocked}
                 onApplyFilters={handleApplyFilters}
                 isPending={false}
