@@ -68,6 +68,10 @@ interface AppState {
     // Deep-link transitório entre abas de Comunicações (Cadastro → Performance do Conteúdo)
     perfDeepLink: { view: 'overview' | 'gallery' | 'table'; query: string } | null;
     setPerfDeepLink: (dl: { view: 'overview' | 'gallery' | 'table'; query: string } | null) => void;
+
+    // Deep-link transitório do Launch Planner para um modo específico de Relatórios.
+    reportDeepLink: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' } | null;
+    setReportDeepLink: (dl: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' } | null) => void;
 }
 
 const INITIAL_FILTERS: FilterState = {
@@ -161,6 +165,8 @@ export const useAppStore = create<AppState>()(
 
             perfDeepLink: null,
             setPerfDeepLink: (dl) => set({ perfDeepLink: dl }),
+            reportDeepLink: null,
+            setReportDeepLink: (dl) => set({ reportDeepLink: dl }),
 
             // B2C State
             b2cData: [],

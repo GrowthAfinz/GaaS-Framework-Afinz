@@ -185,11 +185,17 @@ const PARCEIRO_COLORS: Record<string, string> = {
 };
 
 export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData, compareMode = null, selectedBU, periodStart, periodEnd }) => {
-  const { viewSettings, setGlobalFilters } = useAppStore();
+  const { viewSettings, setGlobalFilters, reportDeepLink, setReportDeepLink } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
   const rentab = viewSettings.frente === 'rentabilizacao';
   const { selectedBUs } = useBU();
   const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly' | 'xlsx'>('performance');
+
+  useEffect(() => {
+    if (!reportDeepLink) return;
+    setReportMode(reportDeepLink.mode);
+    setReportDeepLink(null);
+  }, [reportDeepLink, setReportDeepLink]);
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
   const previousAllActivities = useMemo(() => Object.values(previousData ?? {}).flat(), [previousData]);
   const filterReportActivities = useCallback((activities: Activity[]) => (

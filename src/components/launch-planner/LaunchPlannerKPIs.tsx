@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Goal } from '../../types/framework';
-import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, CartesianGrid } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, CartesianGrid } from 'recharts';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
 import { Info } from 'lucide-react';
@@ -21,13 +21,15 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
     const allStoreActivities = useAppStore((state) => state.activities);
-    const { dailyAnalysis, yearMonthlyAnalysis, ytdDailyAnalysis } = useB2CAnalysis();
+    const setTab = useAppStore((state) => state.setTab);
+    const setReportDeepLink = useAppStore((state) => state.setReportDeepLink);
+    const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
     const { isBUSelected, selectedBUs } = useBU();
 
     const [showSerasa, setShowSerasa] = useState(false);
-    // Modo dos gráficos de série temporal (Metas & Resultados): Mensal (padrão) = ano
-    // corrente quebrado por mês; Diário = dia a dia do período selecionado.
-    const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('monthly');
+    // O trabalho operacional começa no dia a dia; o modo mensal segue disponível
+    // para leitura de tendência, mas não é mais o estado inicial.
+    const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('daily');
     const isMonthly = chartMode === 'monthly';
 
     const SEGMENT_COLORS: Record<string, string> = {
@@ -178,6 +180,11 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         }
     };
 
+    const openDailyResults = () => {
+        setReportDeepLink({ mode: 'daily' });
+        setTab('relatorio');
+    };
+
     const selectedActivities = useMemo(() => {
         if (!selectedDate) return [];
         return activities.filter(act => {
@@ -275,28 +282,13 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         cac_medio: d.cac_medio
     });
 
-    // CAC diário isolado (custo do dia / cartões do dia) é muito volátil — dias sem
-    // cartão zeram e dias de baixo volume disparam picos. Usamos o CAC ACUMULADO
-    // (custo acumulado / cartões acumulados desde o início do ano): linha suave.
-    // Importante: a acumulação usa a série YTD completa (ytdDailyAnalysis), não a
-    // janela selecionada — senão o acumulado "reinicia" do zero sempre que o usuário
-    // troca o período (ex.: olhar só os últimos 28 dias zerava o acumulado e deixava
-    // o gráfico em branco até o período acumular cartões suficientes).
-    const cumulativeCacByDate = useMemo(() => {
-        const map = new Map<string, number | null>();
-        let cumCusto = 0;
-        let cumEmis = 0;
-        ytdDailyAnalysis.forEach(d => {
-            cumCusto += d.custo_crm || 0;
-            cumEmis += d.emissoes_crm || 0;
-            map.set(d.data, cumEmis > 0 ? cumCusto / cumEmis : null);
-        });
-        return map;
-    }, [ytdDailyAnalysis]);
-
     const comparisonData = useMemo(() => {
         return dailyAnalysis.map(d => {
-            const cacAcumulado = cumulativeCacByDate.get(d.data) ?? null;
+            // CAC do dia só existe quando há custo positivo e cartão emitido no mesmo dia.
+            // Ausência de denominador/custo é lacuna analítica (null), não CAC zero.
+            const cacDoDia = d.emissoes_crm > 0 && d.custo_crm > 0
+                ? d.custo_crm / d.emissoes_crm
+                : null;
 
             const [y, m, day] = d.data.split('-').map(Number);
             const dateObj = new Date(y, m - 1, day);
@@ -313,21 +305,19 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
             return {
                 ...withChannels(d),
                 ...segmentDataObj,
-                cac_medio: cacAcumulado,
+                cac_medio: cacDoDia,
                 displayDate: format(dateObj, 'dd/MM', { locale: ptBR })
             };
         });
-    }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa, cumulativeCacByDate]);
+    }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa]);
 
     // Série mensal do ano corrente (jan → hoje), para o modo Mensal dos gráficos.
-    // CAC acumulado por mês (custo acumulado desde jan / cartões acumulados desde jan).
+    // Mantém a mesma semântica: custo do mês / cartões do mês, sem carregar valores.
     const monthlyData = useMemo(() => {
-        let cumCusto = 0;
-        let cumEmis = 0;
         return yearMonthlyAnalysis.map(d => {
-            cumCusto += d.custo_crm || 0;
-            cumEmis += d.emissoes_crm || 0;
-            const cacAcumulado = cumEmis > 0 ? cumCusto / cumEmis : null;
+            const cacDoMes = d.emissoes_crm > 0 && d.custo_crm > 0
+                ? d.custo_crm / d.emissoes_crm
+                : null;
 
             const dateObj = new Date(d.ano, d.mes - 1, 1);
             const monthKey = format(dateObj, 'yyyy-MM');
@@ -343,7 +333,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
             return {
                 ...withChannels(d),
                 ...segmentDataObj,
-                cac_medio: cacAcumulado,
+                cac_medio: cacDoMes,
                 displayDate: format(dateObj, 'MMM/yy', { locale: ptBR })
             };
         });
@@ -547,25 +537,35 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
                 {showCharts && (
                     <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
-                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                            Evolução de CAC <span className="text-slate-400 font-medium normal-case">(R$)</span>
-                            <span title="CAC acumulado desde o início do ano (custo acumulado / cartões acumulados até a data)"><Info size={10} className="text-slate-400" /></span>
-                        </h3>
+                        <div className="mb-1 flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={openDailyResults}
+                                className="rounded-sm text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
+                                title="Abrir Análise > Relatórios no modo Diário"
+                            >
+                                Evolução de CAC <span className="font-medium normal-case text-slate-400">(R$)</span>
+                            </button>
+                            <span title={`CAC ${isMonthly ? 'do mês = custo do mês / cartões do mês' : 'do dia = custo do dia / cartões do dia'}. Sem custo ou cartão, o gráfico preserva uma lacuna.`}><Info size={10} className="text-slate-400" /></span>
+                        </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={timeChartData} onClick={chartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <defs>
-                                        <linearGradient id="cacGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#10B981" stopOpacity={0.28} />
-                                            <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
+                                <LineChart data={timeChartData} onClick={chartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
                                     <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(v) => `R$${Number(v).toFixed(0)}`} />
                                     <Tooltip content={chartTooltip} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
-                                    <Area type="monotone" dataKey="cac_medio" name="CAC acumulado" connectNulls stroke="#10B981" strokeWidth={2.5} fill="url(#cacGradient)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }} />
-                                </AreaChart>
+                                    <Line
+                                        type="linear"
+                                        dataKey="cac_medio"
+                                        name={isMonthly ? 'CAC do mês' : 'CAC do dia'}
+                                        connectNulls={false}
+                                        stroke="#10B981"
+                                        strokeWidth={2.25}
+                                        dot={{ r: 3, strokeWidth: 1.5, stroke: '#fff', fill: '#10B981' }}
+                                        activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }}
+                                    />
+                                </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
@@ -576,9 +576,17 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
             {showCharts && (
                 <div className="space-y-4">
                     <div className="bg-white border border-slate-200 rounded-xl p-4 h-52 flex flex-col shadow-sm">
-                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                            Propostas: CRM vs B2C <span title="Comparativo entre propostas geradas via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
-                        </h3>
+                        <div className="mb-2 flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={openDailyResults}
+                                className="rounded-sm text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
+                                title="Abrir Análise > Relatórios no modo Diário"
+                            >
+                                Propostas: CRM vs B2C
+                            </button>
+                            <span title="Comparativo entre propostas geradas via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
+                        </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
@@ -606,9 +614,17 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                     </div>
 
                     <div className="bg-white border border-slate-200 rounded-xl p-4 h-48 flex flex-col shadow-sm">
-                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                            Emissoes: CRM vs B2C <span title="Comparativo entre cartoes emitidos via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
-                        </h3>
+                        <div className="mb-2 flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={openDailyResults}
+                                className="rounded-sm text-[10px] font-bold uppercase tracking-wide text-slate-500 transition-colors hover:text-cyan-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40"
+                                title="Abrir Análise > Relatórios no modo Diário"
+                            >
+                                Emissoes: CRM vs B2C
+                            </button>
+                            <span title="Comparativo entre cartoes emitidos via CRM e outros canais B2C"><Info size={10} className="text-slate-400" /></span>
+                        </div>
                         <div className="flex-1 w-full min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="28%" style={{ cursor: isMonthly ? 'default' : 'pointer' }}>

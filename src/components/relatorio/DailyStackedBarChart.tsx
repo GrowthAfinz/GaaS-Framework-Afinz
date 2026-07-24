@@ -70,12 +70,31 @@ function axisTickFormatter(family: MetricFamily | undefined) {
   };
 }
 
+function positiveBarMinPointSize(value: number | null | undefined): number {
+  return Number(value) > 0 ? 3 : 0;
+}
+
+function lowVolumeZoomConfig(values: number[]): { available: boolean; ceiling: number } {
+  const positive = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  if (positive.length < 3) return { available: false, ceiling: 0 };
+
+  const middle = Math.floor(positive.length / 2);
+  const median = positive.length % 2 === 0
+    ? (positive[middle - 1] + positive[middle]) / 2
+    : positive[middle];
+  const max = positive[positive.length - 1];
+
+  if (median <= 0 || max / median < 20) return { available: false, ceiling: 0 };
+  return { available: true, ceiling: Math.max(1, Math.ceil(median * 1.5)) };
+}
+
 export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ title, rows, dimension, rentabilizacao = false, accumulated = false }) => {
   const [pinnedMetrics, setPinnedMetrics] = useState<MetricKey[]>(
     rentabilizacao ? DEFAULT_ENGAGEMENT_PINNED_METRICS : DEFAULT_PINNED_METRICS,
   );
   const [activeMetrics, setActiveMetrics] = useState<MetricKey[]>([rentabilizacao ? 'cliques' : 'emissoes']);
   const [focusedSeries, setFocusedSeries] = useState<string | null>(null);
+  const [zoomLowVolumes, setZoomLowVolumes] = useState(false);
 
   const { viewSettings, setGlobalFilters } = useAppStore();
   const globalFilters = viewSettings.filtrosGlobais;
@@ -206,6 +225,27 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
     return { chartData: data, series: visibleSeries, seriesTotals: totalsBySeries };
   }, [isMultiMetric, activeMetrics, rows, focusedSeries, accumulated]);
 
+  const lowVolumeZoom = useMemo(() => {
+    if (isMultiMetric || getMetricFamily(activeMetrics[0]) === 'percent') {
+      return { available: false, ceiling: 0 };
+    }
+
+    const metric = activeMetrics[0];
+    const valuesByDay = new Map<string, number>();
+    rows.forEach((row) => {
+      if (focusedSeries && row.label !== focusedSeries) return;
+      const value = Number(row[metric]);
+      if (!Number.isFinite(value)) return;
+      const current = valuesByDay.get(row.dayKey) ?? 0;
+      valuesByDay.set(row.dayKey, isStackable ? current + value : Math.max(current, value));
+    });
+    return lowVolumeZoomConfig(Array.from(valuesByDay.values()));
+  }, [activeMetrics, focusedSeries, isMultiMetric, isStackable, rows]);
+
+  useEffect(() => {
+    if (!lowVolumeZoom.available) setZoomLowVolumes(false);
+  }, [lowVolumeZoom.available]);
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex flex-col gap-3">
@@ -238,6 +278,25 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
               );
             })}
           </div>
+          {lowVolumeZoom.available && (
+            <button
+              type="button"
+              onClick={() => setZoomLowVolumes((current) => !current)}
+              className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                zoomLowVolumes
+                  ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:text-cyan-700'
+              }`}
+              title="Amplia a faixa de baixos volumes. Picos acima do teto visual continuam no tooltip e ficam recortados no topo."
+            >
+              Zoom baixos volumes
+            </button>
+          )}
+          {zoomLowVolumes && lowVolumeZoom.available && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+              Teto visual {formatChartValue(lowVolumeZoom.ceiling, activeMetrics[0])} · picos recortados
+            </span>
+          )}
           {isMultiMetric && (
             <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold text-cyan-700">
               Comparando {activeMetrics.length} métricas · total (sem quebra por {dimension === 'segmento' ? 'segmento' : 'canal'})
@@ -356,6 +415,8 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
               axisLine={false}
               tickLine={false}
               tickFormatter={axisTickFormatter(leftFamily)}
+              domain={zoomLowVolumes && lowVolumeZoom.available ? [0, lowVolumeZoom.ceiling] : undefined}
+              allowDataOverflow={zoomLowVolumes && lowVolumeZoom.available}
             />
             {isMultiMetric && rightFamily && (
               <YAxis
@@ -410,6 +471,7 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
                       fill={color}
                       radius={[4, 4, 0, 0]}
                       maxBarSize={28}
+                      minPointSize={positiveBarMinPointSize}
                     />
                   );
                 })
@@ -422,6 +484,7 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
                     fill={label === SERASA_SEGMENT_LABEL ? SERASA_SERIES_COLOR : SERIES_COLORS[index % SERIES_COLORS.length]}
                     radius={isStackable ? [0, 0, 0, 0] : [4, 4, 0, 0]}
                     maxBarSize={isStackable ? 48 : 28}
+                    minPointSize={positiveBarMinPointSize}
                   />
                 ))}
           </ComposedChart>
