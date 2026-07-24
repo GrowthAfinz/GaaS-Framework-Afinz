@@ -7,6 +7,7 @@ import { Eye, EyeOff, Info } from 'lucide-react';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 import { useAppStore } from '../../store/useAppStore';
 import { ChartTooltip } from '../ui/ChartTooltip';
+import { deriveActivityMetrics } from '../../utils/activityMetrics';
 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -167,6 +168,22 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         return map;
     }, [activities]);
 
+    const dailyCacMap = useMemo(() => {
+        const map = new Map<string, { custoTotal: number; cartoes: number }>();
+        activities.forEach((activity) => {
+            const date = activity.dataDisparo;
+            if (!date || isNaN(date.getTime())) return;
+
+            const dateKey = format(date, 'yyyy-MM-dd');
+            const current = map.get(dateKey) ?? { custoTotal: 0, cartoes: 0 };
+            const metrics = deriveActivityMetrics(activity);
+            current.custoTotal += metrics.custoTotal;
+            current.cartoes += metrics.cartoes;
+            map.set(dateKey, current);
+        });
+        return map;
+    }, [activities]);
+
     const monthlySegmentsMap = useMemo(() => {
         const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
         const targetActivities = allStoreActivities.filter(a => selectedBUs.some((selectedBU) => selectedBU === a.bu));
@@ -185,6 +202,26 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
             }
             segments[segment].propostas += activity.kpis?.propostas || 0;
             segments[segment].emissoes += activity.kpis?.emissoes || activity.kpis?.cartoes || 0;
+        });
+        return map;
+    }, [allStoreActivities, selectedBUs]);
+
+    const monthlyCacMap = useMemo(() => {
+        const map = new Map<string, { custoTotal: number; cartoes: number }>();
+        const targetActivities = allStoreActivities.filter(
+            (activity) => selectedBUs.length === 0 || selectedBUs.some((selectedBU) => selectedBU === activity.bu),
+        );
+
+        targetActivities.forEach((activity) => {
+            const date = activity.dataDisparo;
+            if (!date || isNaN(date.getTime())) return;
+
+            const monthKey = format(date, 'yyyy-MM');
+            const current = map.get(monthKey) ?? { custoTotal: 0, cartoes: 0 };
+            const metrics = deriveActivityMetrics(activity);
+            current.custoTotal += metrics.custoTotal;
+            current.cartoes += metrics.cartoes;
+            map.set(monthKey, current);
         });
         return map;
     }, [allStoreActivities, selectedBUs]);
@@ -420,15 +457,15 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
     const comparisonData = useMemo(() => {
         return dailyAnalysis.map(d => {
-            // CAC do dia só existe quando há custo positivo e cartão emitido no mesmo dia.
-            // Ausência de denominador/custo é lacuna analítica (null), não CAC zero.
-            const cacDoDia = d.emissoes_crm > 0 && d.custo_crm > 0
-                ? d.custo_crm / d.emissoes_crm
-                : null;
-
             const [y, m, day] = d.data.split('-').map(Number);
             const dateObj = new Date(y, m - 1, day);
             const dateKey = d.data;
+            const cacTotals = dailyCacMap.get(dateKey);
+            // O mesmo cálculo derivado usado nos KPIs e no modal mantém o histórico
+            // visível mesmo quando custo/cartões não vierem materializados em dailyAnalysis.
+            const cacDoDia = cacTotals && cacTotals.cartoes > 0 && cacTotals.custoTotal > 0
+                ? cacTotals.custoTotal / cacTotals.cartoes
+                : null;
 
             const segmentDataObj: Record<string, number> = {};
             const segmentMap = dailySegmentsMap.get(dateKey) || {};
@@ -445,18 +482,18 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 displayDate: format(dateObj, 'dd/MM', { locale: ptBR })
             };
         });
-    }, [dailyAnalysis, dailySegmentsMap, activeSegments, showSerasa]);
+    }, [dailyAnalysis, dailyCacMap, dailySegmentsMap, activeSegments, showSerasa]);
 
     // Série mensal do ano corrente (jan → hoje), para o modo Mensal dos gráficos.
     // Mantém a mesma semântica: custo do mês / cartões do mês, sem carregar valores.
     const monthlyData = useMemo(() => {
         return yearMonthlyAnalysis.map(d => {
-            const cacDoMes = d.emissoes_crm > 0 && d.custo_crm > 0
-                ? d.custo_crm / d.emissoes_crm
-                : null;
-
             const dateObj = new Date(d.ano, d.mes - 1, 1);
             const monthKey = format(dateObj, 'yyyy-MM');
+            const cacTotals = monthlyCacMap.get(monthKey);
+            const cacDoMes = cacTotals && cacTotals.cartoes > 0 && cacTotals.custoTotal > 0
+                ? cacTotals.custoTotal / cacTotals.cartoes
+                : null;
 
             const segmentDataObj: Record<string, number> = {};
             const segmentMap = monthlySegmentsMap.get(monthKey) || {};
@@ -473,7 +510,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                 displayDate: format(dateObj, 'MMM/yy', { locale: ptBR })
             };
         });
-    }, [yearMonthlyAnalysis, monthlySegmentsMap, activeSegments, showSerasa]);
+    }, [yearMonthlyAnalysis, monthlyCacMap, monthlySegmentsMap, activeSegments, showSerasa]);
 
     // Dados efetivos usados pelos 3 gráficos de série temporal (CAC, Propostas, Emissões).
     const timeChartData = isMonthly ? monthlyData : comparisonData;

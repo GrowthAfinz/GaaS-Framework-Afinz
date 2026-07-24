@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, AnomalyType } from '../../types/framework';
-import { X, Edit2, Check, ExternalLink, ArrowRight, Layers } from 'lucide-react';
+import { X, Edit2, Check, ExternalLink, ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Layers } from 'lucide-react';
 import { deriveActivityMetrics, aggregateMetrics } from '../../utils/activityMetrics';
 import { useAppStore } from '../../store/useAppStore';
 import { useExplorerStore } from '../../store/explorerStore';
@@ -15,6 +15,18 @@ interface DailyDetailsModalProps {
     onConfirmDraft?: (activity: Activity) => void;
     titleOverride?: string;
 }
+
+type DailySortKey =
+    | 'baseEnviada'
+    | 'baseEntregue'
+    | 'aberturas'
+    | 'cliques'
+    | 'cartoes'
+    | 'taxaConversao'
+    | 'custoTotal'
+    | 'cac';
+
+type SortDirection = 'desc' | 'asc';
 
 // ── Helpers de formatação ──────────────────────────────────────────────
 const fmtInt = (v: number) => Math.round(v).toLocaleString('pt-BR');
@@ -74,6 +86,8 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
     const rentab = isRentabilizacao(frente);
     const funnelSteps = getDailyFunnelSteps(frente);
     const setPendingNavigation = useExplorerStore((s) => s.setPendingNavigation);
+    const [sortKey, setSortKey] = React.useState<DailySortKey | null>(null);
+    const [sortDirection, setSortDirection] = React.useState<SortDirection>('desc');
 
     if (!date && !titleOverride) return null;
 
@@ -100,6 +114,48 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
     });
 
     const summary = aggregateMetrics(filteredActivities);
+    const activityRows = filteredActivities.map((activity, originalIndex) => ({
+        activity,
+        metrics: deriveActivityMetrics(activity),
+        originalIndex,
+    }));
+    const sortedActivityRows = sortKey
+        ? [...activityRows].sort((a, b) => {
+            const delta = a.metrics[sortKey] - b.metrics[sortKey];
+            if (delta === 0) return a.originalIndex - b.originalIndex;
+            return sortDirection === 'desc' ? -delta : delta;
+        })
+        : activityRows;
+
+    const summaryItems: Array<{
+        label: string;
+        value: string;
+        sortKey: DailySortKey;
+        accent?: string;
+    }> = rentab
+        ? [
+            { label: 'Enviado', value: fmtInt(summary.baseEnviada), sortKey: 'baseEnviada' },
+            { label: 'Entregue', value: fmtInt(summary.baseEntregue), sortKey: 'baseEntregue' },
+            { label: 'Aberturas', value: fmtInt(summary.aberturas), sortKey: 'aberturas', accent: 'text-cyan-700' },
+            { label: 'Cliques', value: fmtInt(summary.cliques), sortKey: 'cliques', accent: 'text-emerald-600' },
+        ]
+        : [
+            { label: 'Enviado', value: fmtInt(summary.baseEnviada), sortKey: 'baseEnviada' },
+            { label: 'Entregue', value: fmtInt(summary.baseEntregue), sortKey: 'baseEntregue' },
+            { label: 'Cartões', value: fmtInt(summary.cartoes), sortKey: 'cartoes', accent: 'text-cyan-700' },
+            { label: 'Conversão', value: fmtPct(summary.taxaConversao), sortKey: 'taxaConversao', accent: 'text-emerald-600' },
+            { label: 'Custo Total', value: fmtBRL(summary.custoTotal), sortKey: 'custoTotal' },
+            { label: 'CAC médio', value: fmtBRL(summary.cac), sortKey: 'cac' },
+        ];
+
+    const handleSort = (nextSortKey: DailySortKey) => {
+        if (sortKey === nextSortKey) {
+            setSortDirection((current) => current === 'desc' ? 'asc' : 'desc');
+            return;
+        }
+        setSortKey(nextSortKey);
+        setSortDirection('desc');
+    };
 
     const openInFramework = (activity: Activity) => {
         setPendingNavigation({ type: 'activity', label: activity.id, bu: activity.bu });
@@ -133,33 +189,38 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
 
                 {/* ── Resumo do dia ──────────────────────────────────── */}
                 <div className={`grid grid-cols-3 ${rentab ? 'sm:grid-cols-4' : 'sm:grid-cols-6'} gap-px bg-slate-200 border-b border-slate-200 shrink-0`}>
-                    {(rentab
-                        ? [
-                            { label: 'Enviado', value: fmtInt(summary.baseEnviada) },
-                            { label: 'Entregue', value: fmtInt(summary.baseEntregue) },
-                            { label: 'Aberturas', value: fmtInt(summary.aberturas), accent: 'text-cyan-700' },
-                            { label: 'Cliques', value: fmtInt(summary.cliques), accent: 'text-emerald-600' },
-                        ]
-                        : [
-                            { label: 'Enviado', value: fmtInt(summary.baseEnviada) },
-                            { label: 'Entregue', value: fmtInt(summary.baseEntregue) },
-                            { label: 'Cartões', value: fmtInt(summary.cartoes), accent: 'text-cyan-700' },
-                            { label: 'Conversão', value: fmtPct(summary.taxaConversao), accent: 'text-emerald-600' },
-                            { label: 'Custo Total', value: fmtBRL(summary.custoTotal) },
-                            { label: 'CAC médio', value: fmtBRL(summary.cac) },
-                        ]
-                    ).map((kpi) => (
-                        <div key={kpi.label} className="bg-white px-3 py-2.5 text-center">
-                            <div className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">{kpi.label}</div>
-                            <div className={`text-sm font-bold tabular-nums ${kpi.accent ?? 'text-slate-900'}`}>{kpi.value}</div>
-                        </div>
-                    ))}
+                    {summaryItems.map((kpi) => {
+                        const active = sortKey === kpi.sortKey;
+                        const SortIcon = active
+                            ? sortDirection === 'desc' ? ArrowDown : ArrowUp
+                            : ArrowUpDown;
+
+                        return (
+                            <button
+                                key={kpi.label}
+                                type="button"
+                                onClick={() => handleSort(kpi.sortKey)}
+                                aria-pressed={active}
+                                title={`Ordenar disparos por ${kpi.label}: ${active && sortDirection === 'desc' ? 'menores primeiro' : 'maiores primeiro'}`}
+                                className={`group px-3 py-2.5 text-center transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500 ${
+                                    active ? 'bg-cyan-50' : 'bg-white hover:bg-slate-50'
+                                }`}
+                            >
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide ${
+                                    active ? 'text-cyan-700' : 'text-slate-400 group-hover:text-slate-600'
+                                }`}>
+                                    {kpi.label}
+                                    <SortIcon size={11} aria-hidden="true" />
+                                </span>
+                                <span className={`block text-sm font-bold tabular-nums ${kpi.accent ?? 'text-slate-900'}`}>{kpi.value}</span>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* ── Lista de disparos ──────────────────────────────── */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {filteredActivities.map((activity) => {
-                        const m = deriveActivityMetrics(activity);
+                    {sortedActivityRows.map(({ activity, metrics: m }) => {
                         const style = buStyle(activity.bu);
 
                         const rawCartoes = String(activity.raw['Cartões Gerados'] || '').toLowerCase().trim();
