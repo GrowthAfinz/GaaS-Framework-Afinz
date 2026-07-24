@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Goal } from '../../types/framework';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend, CartesianGrid } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
 import { Info } from 'lucide-react';
@@ -200,7 +200,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
 
         const isOnlyBU = (bu: string) => selectedBUs.length === 1 && selectedBUs[0] === bu;
         // selectedBUs vazio = todas as BUs ativas
-        const hasBU = (bu: string) => selectedBUs.length === 0 || selectedBUs.includes(bu);
+        const hasBU = (bu: string) => selectedBUs.length === 0 || selectedBUs.some((selectedBU) => selectedBU === bu);
         // BUs não-Seguros ativas
         const activeCoreB2Us = ['B2C', 'B2B2C', 'Plurix'].filter(bu => hasBU(bu));
 
@@ -267,10 +267,114 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
         return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label };
     }, [goals, currentMonth, dailyAnalysis, selectedBUs, activities, isOnlySeguros, segurosActivities]);
 
-    const metaChartData = [
-        { name: 'Realizado', value: metrics.totalCards, color: '#3B82F6' },
-        { name: metrics.label, value: metrics.goalCards, color: '#10B981' }
-    ];
+    const cardsPacing = useMemo(() => {
+        const [year, month] = currentMonth.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+        const isOnlyBU = (bu: string) => selectedBUs.length === 1 && selectedBUs[0] === bu;
+        const hasBU = (bu: string) => selectedBUs.length === 0 || selectedBUs.some((selectedBU) => selectedBU === bu);
+
+        const activityCardsByDate = new Map<string, Record<string, number>>();
+        const observedActivityDates = new Set<string>();
+
+        activities.forEach((activity) => {
+            const date = activity.dataDisparo;
+            if (!date || isNaN(date.getTime())) return;
+
+            const dateKey = format(date, 'yyyy-MM-dd');
+            if (!dateKey.startsWith(monthPrefix)) return;
+
+            const byBU = activityCardsByDate.get(dateKey) ?? {};
+            byBU[activity.bu] = (byBU[activity.bu] ?? 0) + (activity.kpis?.cartoes || 0);
+            activityCardsByDate.set(dateKey, byBU);
+
+            // Uma atividade com qualquer resultado preenchido confirma que o dia já foi observado,
+            // mesmo quando a quantidade de cartões foi zero.
+            if (
+                (activity.kpis?.cartoes || 0) > 0 ||
+                (activity.kpis?.propostas || 0) > 0 ||
+                (activity.kpis?.baseEntregue || 0) > 0 ||
+                (activity.kpis?.baseEnviada || 0) > 0
+            ) {
+                observedActivityDates.add(dateKey);
+            }
+        });
+
+        const b2cFromDaily = dailyAnalysis.reduce((sum, day) => sum + day.emissoes_b2c_total, 0);
+        const useB2CDailySource = b2cFromDaily > 0;
+        const b2cDailyByDate = new Map(
+            dailyAnalysis
+                .filter((day) => day.data.startsWith(monthPrefix))
+                .map((day) => [day.data, day] as const),
+        );
+
+        const selectedActivityBUs = isOnlySeguros
+            ? ['Seguros']
+            : isOnlyBU('B2C')
+                ? ['B2C']
+                : isOnlyBU('B2B2C')
+                    ? ['B2B2C']
+                    : isOnlyBU('Plurix')
+                        ? ['Plurix']
+                        : ['B2C', 'B2B2C', 'Plurix'].filter(hasBU);
+
+        const dailyCards = Array.from({ length: daysInMonth }, (_, index) => {
+            const dayOfMonth = index + 1;
+            const dateKey = `${monthPrefix}-${String(dayOfMonth).padStart(2, '0')}`;
+            const activityValues = activityCardsByDate.get(dateKey) ?? {};
+            const b2cDay = b2cDailyByDate.get(dateKey);
+
+            let cards = 0;
+            selectedActivityBUs.forEach((bu) => {
+                if (bu === 'B2C' && useB2CDailySource) {
+                    cards += b2cDay?.emissoes_b2c_total ?? 0;
+                } else {
+                    cards += activityValues[bu] ?? 0;
+                }
+            });
+
+            const hasObservedB2CData = selectedActivityBUs.includes('B2C') && useB2CDailySource && !!b2cDay && (
+                b2cDay.emissoes_b2c_total > 0 ||
+                b2cDay.propostas_b2c_total > 0
+            );
+            const hasObservedActivityData = selectedActivityBUs.some((bu) => {
+                if (bu === 'B2C' && useB2CDailySource) return false;
+                return observedActivityDates.has(dateKey) && activityValues[bu] !== undefined;
+            });
+
+            return {
+                dateKey,
+                displayDate: `${String(dayOfMonth).padStart(2, '0')}/${String(month).padStart(2, '0')}`,
+                dayOfMonth,
+                cards,
+                observed: hasObservedB2CData || hasObservedActivityData,
+            };
+        });
+
+        const lastObservedIndex = dailyCards.reduce(
+            (lastIndex, day, index) => day.observed ? index : lastIndex,
+            -1,
+        );
+
+        let cumulativeCards = 0;
+        const data = dailyCards.map((day, index) => {
+            cumulativeCards += day.cards;
+            return {
+                ...day,
+                realizadoAcumulado: index <= lastObservedIndex ? cumulativeCards : null,
+                metaAcumulada: metrics.goalCards > 0
+                    ? (metrics.goalCards * day.dayOfMonth) / daysInMonth
+                    : 0,
+            };
+        });
+
+        const lastObservedPoint = lastObservedIndex >= 0 ? data[lastObservedIndex] : null;
+        const paceDelta = lastObservedPoint?.realizadoAcumulado != null
+            ? lastObservedPoint.realizadoAcumulado - lastObservedPoint.metaAcumulada
+            : null;
+
+        return { data, lastObservedPoint, paceDelta };
+    }, [activities, currentMonth, dailyAnalysis, isOnlySeguros, metrics.goalCards, selectedBUs]);
 
     // Serasa é subconjunto do Total B2C; "Outros B2C" = Total − CRM − Serasa (residual).
     const withChannels = (d: typeof dailyAnalysis[number]) => ({
@@ -498,8 +602,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                     <div className="flex justify-between items-start mb-1 relative z-10">
                         <div>
                             <div className="flex items-center gap-2">
-                                <h3 className="text-slate-500 text-xs font-medium">Cartoes vs Meta</h3>
-                                <span title="Visualizacao do realizado contra a meta definida para o periodo">
+                                <h3 className="text-slate-500 text-xs font-medium">Cartões acumulados vs Meta</h3>
+                                <span title="Realizado acumulado até o último dia observado versus a meta acumulada esperada até o fim do mês">
                                     <Info size={12} className="text-slate-500 cursor-help" />
                                 </span>
                             </div>
@@ -507,30 +611,81 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities
                                 <span className="text-xl font-bold text-slate-800">{metrics.totalCards.toLocaleString()}</span>
                                 <span className="text-xs text-slate-400">/ {metrics.goalCards.toLocaleString()}</span>
                             </div>
+                            <div className="mt-0.5 flex items-center gap-3 text-[9px] text-slate-500">
+                                <span className="flex items-center gap-1">
+                                    <span className="h-0.5 w-3 rounded bg-blue-500" />
+                                    Realizado
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <span className="h-0.5 w-3 border-t-2 border-dashed border-emerald-500" />
+                                    Meta acumulada
+                                </span>
+                            </div>
                         </div>
-                        <div className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${metrics.goalProgress >= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-cyan-100 text-cyan-700'}`}>
-                            {metrics.goalProgress.toFixed(1)}%
+                        <div className="text-right">
+                            <div className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${metrics.goalProgress >= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-cyan-100 text-cyan-700'}`}>
+                                {metrics.goalProgress.toFixed(1)}%
+                            </div>
+                            {cardsPacing.paceDelta != null && cardsPacing.lastObservedPoint && (
+                                <div className={`mt-1 text-[9px] font-medium ${cardsPacing.paceDelta >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                    {cardsPacing.paceDelta >= 0 ? '+' : ''}
+                                    {Math.round(cardsPacing.paceDelta).toLocaleString('pt-BR')} vs ritmo em {cardsPacing.lastObservedPoint.displayDate}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="flex-1 w-full min-h-0 relative z-10">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={metaChartData} barSize={12}>
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="name" type="category" width={50} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+                            <LineChart data={cardsPacing.data} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="4 4" stroke="#eef2f6" vertical={false} />
+                                <XAxis
+                                    dataKey="displayDate"
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                    minTickGap={18}
+                                    dy={4}
+                                />
+                                <YAxis
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                    width={44}
+                                    domain={[0, 'auto']}
+                                    tickFormatter={(value) => Number(value).toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 })}
+                                />
                                 <Tooltip
-                                    cursor={{ fill: 'transparent' }}
+                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
                                     wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
                                     content={
-                                        // Realizado e Meta são leituras do mesmo indicador — somar não faz sentido.
-                                        <ChartTooltip formatValue={(value) => value.toLocaleString('pt-BR')} showTotal={false} />
+                                        <ChartTooltip
+                                            labelPrefix="Dia"
+                                            formatValue={(value) => value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+                                            showTotal={false}
+                                        />
                                     }
                                 />
-                                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                                    {metaChartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
+                                <Line
+                                    type="linear"
+                                    dataKey="metaAcumulada"
+                                    name="Meta acumulada"
+                                    stroke="#10B981"
+                                    strokeWidth={2}
+                                    strokeDasharray="5 4"
+                                    dot={false}
+                                    activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff', fill: '#10B981' }}
+                                />
+                                <Line
+                                    type="linear"
+                                    dataKey="realizadoAcumulado"
+                                    name="Realizado acumulado"
+                                    connectNulls={false}
+                                    stroke="#3B82F6"
+                                    strokeWidth={2.5}
+                                    dot={false}
+                                    activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff', fill: '#3B82F6' }}
+                                />
+                            </LineChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
