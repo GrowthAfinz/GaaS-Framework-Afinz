@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { CalendarData } from '../types/framework';
 
 /**
- * Árvore BU > Parceiro > Segmento para o seletor de Visões Rápidas.
+ * Árvore de Visualização Filtrada (BU > duas dimensões) para a barra de filtros.
  *
  * IMPORTANTE — por que este hook não reusa `useAdvancedFilters`:
  * o orquestrador de facetas poda as opções pela seleção corrente (semântica
@@ -15,22 +15,20 @@ import { CalendarData } from '../types/framework';
 /** Valor bruto usado para filtrar quando a dimensão vem vazia no dado. */
 export const EMPTY_DIMENSION = '';
 
-export interface QuickViewSegmentoNode {
+export type QuickViewDimension = 'parceiro' | 'segmento';
+
+export interface QuickViewNode {
   /** Valor bruto — é o que vai para o filtro. */
   value: string;
+  dimension: QuickViewDimension;
   count: number;
-}
-
-export interface QuickViewParceiroNode {
-  value: string;
-  count: number;
-  segmentos: QuickViewSegmentoNode[];
+  children: QuickViewNode[];
 }
 
 export interface QuickViewBUNode {
   value: string;
   count: number;
-  parceiros: QuickViewParceiroNode[];
+  children: QuickViewNode[];
 }
 
 interface QuickViewPeriod {
@@ -40,6 +38,19 @@ interface QuickViewPeriod {
 
 // Ordem canônica das BUs (mesma do seletor de BU do header).
 const BU_ORDER = ['B2C', 'B2B2C', 'Plurix', 'Seguros'];
+
+/**
+ * BUs em que o Parceiro é atributo DO segmento, não o contrário:
+ *  - B2C é institucional (base própria da Afinz); o parceiro só faz sentido
+ *    dentro de um segmento — ex.: Serasa aparece em Abandonados e Leads_Parceiros.
+ *  - Plurix tem parceiro N/A em 100% da base.
+ * Nelas a árvore é BU > Segmento > Parceiro. Nas demais (B2B2C, Seguros), onde o
+ * parceiro é o próprio dono da base, segue BU > Parceiro > Segmento.
+ */
+const SEGMENTO_FIRST_BUS = new Set(['B2C', 'Plurix']);
+
+const levelsFor = (bu: string): [QuickViewDimension, QuickViewDimension] =>
+  SEGMENTO_FIRST_BUS.has(bu) ? ['segmento', 'parceiro'] : ['parceiro', 'segmento'];
 
 const parseISODate = (value?: string) => {
   if (!value) return null;
@@ -56,13 +67,30 @@ const parseISODate = (value?: string) => {
 const isResidual = (value: string) => value === EMPTY_DIMENSION || value.toUpperCase() === 'N/A';
 
 /** Maior volume primeiro; residuais ("sem X" / "N/A") sempre no fim. */
-const byCountResidualLast = <T extends { value: string; count: number }>(a: T, b: T) => {
+const byCountResidualLast = (a: QuickViewNode, b: QuickViewNode) => {
   const aResidual = isResidual(a.value);
   const bResidual = isResidual(b.value);
   if (aResidual !== bResidual) return aResidual ? 1 : -1;
   if (b.count !== a.count) return b.count - a.count;
   return a.value.localeCompare(b.value);
 };
+
+/**
+ * Remove níveis que não oferecem escolha: um nó com um único filho produz
+ * exatamente o mesmo recorte que o filho, então o filho é substituído pelos
+ * netos. É lossless e resolve dois casos reais de uma vez:
+ *  - B2C > Negados, que só tem Proprietaria: vira folha (um clique a menos);
+ *  - Rentabilização, onde o parceiro é N/A em 100% das linhas: o nível de
+ *    parceiro some e os segmentos sobem para baixo da BU.
+ */
+const collapseSingletons = (nodes: QuickViewNode[]): QuickViewNode[] =>
+  nodes.map(node => {
+    let children = collapseSingletons(node.children);
+    while (children.length === 1) {
+      children = children[0].children;
+    }
+    return { ...node, children };
+  });
 
 export const useQuickViewTree = (
   data: CalendarData,
@@ -83,7 +111,7 @@ export const useQuickViewTree = (
   }, [period.dataFim]);
 
   return useMemo(() => {
-    // bu -> parceiro -> segmento -> count
+    // bu -> nivel1 -> nivel2 -> count (a ordem dos níveis depende da BU)
     const buckets = new Map<string, Map<string, Map<string, number>>>();
 
     Object.values(data).forEach(activities => {
@@ -103,45 +131,61 @@ export const useQuickViewTree = (
         const bu = activity.bu ?? EMPTY_DIMENSION;
         if (!bu) return; // sem BU não há caminho na árvore
 
+        const [level1] = levelsFor(bu);
         const parceiro = activity.parceiro ?? EMPTY_DIMENSION;
         const segmento = activity.segmento ?? EMPTY_DIMENSION;
+        const first = level1 === 'segmento' ? segmento : parceiro;
+        const second = level1 === 'segmento' ? parceiro : segmento;
 
-        let parceiros = buckets.get(bu);
-        if (!parceiros) {
-          parceiros = new Map();
-          buckets.set(bu, parceiros);
+        let firstLevel = buckets.get(bu);
+        if (!firstLevel) {
+          firstLevel = new Map();
+          buckets.set(bu, firstLevel);
         }
 
-        let segmentos = parceiros.get(parceiro);
-        if (!segmentos) {
-          segmentos = new Map();
-          parceiros.set(parceiro, segmentos);
+        let secondLevel = firstLevel.get(first);
+        if (!secondLevel) {
+          secondLevel = new Map();
+          firstLevel.set(first, secondLevel);
         }
 
-        segmentos.set(segmento, (segmentos.get(segmento) ?? 0) + 1);
+        secondLevel.set(second, (secondLevel.get(second) ?? 0) + 1);
       });
     });
 
-    const tree: QuickViewBUNode[] = Array.from(buckets.entries()).map(([bu, parceirosMap]) => {
-      const parceiros: QuickViewParceiroNode[] = Array.from(parceirosMap.entries()).map(
-        ([parceiro, segmentosMap]) => {
-          const segmentos: QuickViewSegmentoNode[] = Array.from(segmentosMap.entries())
-            .map(([value, count]) => ({ value, count }))
+    const tree: QuickViewBUNode[] = Array.from(buckets.entries()).map(([bu, firstLevel]) => {
+      const [dim1, dim2] = levelsFor(bu);
+
+      const children: QuickViewNode[] = Array.from(firstLevel.entries()).map(
+        ([value, secondLevel]) => {
+          const grandChildren: QuickViewNode[] = Array.from(secondLevel.entries())
+            .map(([childValue, count]) => ({
+              value: childValue,
+              dimension: dim2,
+              count,
+              children: [] as QuickViewNode[]
+            }))
             .sort(byCountResidualLast);
 
           return {
-            value: parceiro,
-            count: segmentos.reduce((acc, s) => acc + s.count, 0),
-            segmentos
+            value,
+            dimension: dim1,
+            count: grandChildren.reduce((acc, c) => acc + c.count, 0),
+            children: grandChildren
           };
         }
       ).sort(byCountResidualLast);
 
-      return {
-        value: bu,
-        count: parceiros.reduce((acc, p) => acc + p.count, 0),
-        parceiros
-      };
+      const count = children.reduce((acc, c) => acc + c.count, 0);
+
+      // O colapso vale também para o primeiro nível: em Rentabilização o parceiro
+      // é N/A em 100% das linhas, então a BU teria um único filho inútil.
+      let buChildren = collapseSingletons(children);
+      while (buChildren.length === 1) {
+        buChildren = buChildren[0].children;
+      }
+
+      return { value: bu, count, children: buChildren };
     });
 
     return tree.sort((a, b) => {

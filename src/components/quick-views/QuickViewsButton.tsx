@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronDown, ChevronRight, Crosshair, Search, RotateCcw } from 'lucide-react';
 import { FilterState } from '../../types/framework';
-import { QuickViewBUNode, EMPTY_DIMENSION } from '../../hooks/useQuickViewTree';
+import { QuickViewBUNode, QuickViewNode, EMPTY_DIMENSION } from '../../hooks/useQuickViewTree';
 import { formatSegmentText } from '../relatorio/segmentLabels';
 import { useBU, BU } from '../../contexts/BUContext';
 
@@ -22,21 +22,38 @@ const BU_DOT: Record<string, string> = {
  * Rótulo de dimensão residual. O valor bruto continua sendo o que vai ao filtro —
  * isto é só leitura humana (ver nota sobre "N/A" ambíguo em `useQuickViewTree`).
  */
-const dimensionLabel = (value: string, kind: 'parceiro' | 'segmento') => {
-    if (value === EMPTY_DIMENSION) return kind === 'parceiro' ? 'Sem parceiro' : 'Sem segmento';
-    if (value.toUpperCase() === 'N/A') return 'Não mapeado (N/A)';
-    return kind === 'segmento' ? formatSegmentText(value) : value;
+const nodeLabel = (node: QuickViewNode) => {
+    if (node.value === EMPTY_DIMENSION) {
+        return node.dimension === 'parceiro' ? 'Sem parceiro' : 'Sem segmento';
+    }
+    if (node.value.toUpperCase() === 'N/A') return 'Não mapeado (N/A)';
+    return node.dimension === 'segmento' ? formatSegmentText(node.value) : node.value;
 };
 
 const matches = (value: string, query: string) => value.toLowerCase().includes(query);
 
+/** Mantém o galho quando qualquer nível casa com a busca. */
+const filterNodes = (nodes: QuickViewNode[], query: string, parentHit: boolean): QuickViewNode[] =>
+    nodes
+        .map(node => {
+            const hit = parentHit || matches(nodeLabel(node), query);
+            const children = filterNodes(node.children, query, hit);
+            if (!hit && children.length === 0) return null;
+            return { ...node, children };
+        })
+        .filter(Boolean) as QuickViewNode[];
+
 /**
- * Visões Rápidas: árvore BU > Parceiro > Segmento com aplicação em 1 clique.
+ * Visualização Filtrada: árvore BU > dimensões, com aplicação em 1 clique.
  *
  * Duas regras de produto que este componente implementa e que não são óbvias no código:
  *  1. Aplicar é SUBSTITUIÇÃO, não acúmulo — canais/jornadas/subgrupos/ofertas são
  *     limpos junto, para que a visão seja sempre um estado previsível.
  *  2. O período NÃO é tocado — é dimensão ortogonal, controlada pelo PeriodSelector.
+ *
+ * A ordem dos níveis abaixo da BU é decidida no hook (B2C/Plurix vão para o
+ * segmento primeiro), então aqui a renderização é agnóstica de dimensão: o que
+ * define o filtro é o `dimension` de cada nó no caminho clicado.
  */
 export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onApply, onOpenChange }) => {
     const { selectedBUs, setSelectedBUs, isBULocked } = useBU();
@@ -54,27 +71,14 @@ export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onAppl
 
     const query = searchTerm.trim().toLowerCase();
 
-    // Na busca, mantém o galho inteiro quando qualquer nível casa e força a expansão —
-    // buscar "bem barato" precisa revelar os segmentos dele sem clique extra.
     const filteredTree = React.useMemo(() => {
         if (!query) return visibleTree;
-
         return visibleTree
             .map(bu => {
                 const buHit = matches(bu.value, query);
-                const parceiros = bu.parceiros
-                    .map(parceiro => {
-                        const parceiroHit = matches(dimensionLabel(parceiro.value, 'parceiro'), query);
-                        const segmentos = parceiro.segmentos.filter(seg =>
-                            buHit || parceiroHit || matches(dimensionLabel(seg.value, 'segmento'), query)
-                        );
-                        if (!buHit && !parceiroHit && segmentos.length === 0) return null;
-                        return { ...parceiro, segmentos };
-                    })
-                    .filter(Boolean) as QuickViewBUNode['parceiros'];
-
-                if (!buHit && parceiros.length === 0) return null;
-                return { ...bu, parceiros };
+                const children = filterNodes(bu.children, query, buHit);
+                if (!buHit && children.length === 0) return null;
+                return { ...bu, children };
             })
             .filter(Boolean) as QuickViewBUNode[];
     }, [visibleTree, query]);
@@ -121,24 +125,30 @@ export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onAppl
 
     /**
      * A visão vive em DOIS estados distintos: a BU no BUContext (localStorage) e
-     * parceiro/segmento nos filtros globais do store. Aplicar precisa escrever nos dois.
+     * parceiro/segmento nos filtros globais do store. Aplicar escreve nos dois.
      */
-    const applyView = (bu: string, parceiro?: string, segmento?: string) => {
+    const applyView = (bu: string, path: QuickViewNode[]) => {
         if (!isBULocked) {
             setSelectedBUs([bu as BU]);
         }
 
-        onApply({
-            parceiros: parceiro !== undefined ? [parceiro] : [],
-            segmentos: segmento !== undefined ? [segmento] : [],
+        const patch: Partial<FilterState> = {
+            parceiros: [],
+            segmentos: [],
             // Substituição, não acúmulo — sem isto um canal esquecido devolve tela vazia.
             canais: [],
             jornadas: [],
             subgrupos: [],
             ofertas: [],
             disparado: 'Todos'
+        };
+
+        path.forEach(node => {
+            if (node.dimension === 'parceiro') patch.parceiros = [node.value];
+            else patch.segmentos = [node.value];
         });
 
+        onApply(patch);
         setIsOpen(false);
         setSearchTerm('');
     };
@@ -160,6 +170,56 @@ export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onAppl
         setSearchTerm('');
     };
 
+    const renderNode = (bu: string, node: QuickViewNode, path: QuickViewNode[], key: string, depth: number) => {
+        const nextPath = [...path, node];
+        const hasChildren = node.children.length > 0;
+        const open = isExpanded(key);
+        // Folhas alinham com o texto dos nós que têm seta, no mesmo nível.
+        const indent = depth === 0 ? 'pl-4' : 'pl-9';
+
+        return (
+            <div key={key}>
+                <div className={`flex items-center gap-1 rounded-lg hover:bg-slate-50/80 ${indent}`}>
+                    {hasChildren ? (
+                        <button
+                            type="button"
+                            onClick={() => toggleExpand(key)}
+                            className="p-1 text-slate-300 hover:text-slate-500 transition-colors shrink-0"
+                            aria-label={open ? 'Recolher' : 'Expandir'}
+                        >
+                            {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                        </button>
+                    ) : (
+                        <span className="w-[22px] shrink-0" aria-hidden="true" />
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => applyView(bu, nextPath)}
+                        className="flex items-center gap-2 flex-1 min-w-0 py-1.5 pr-2 text-left group/node"
+                    >
+                        <span
+                            title={nodeLabel(node)}
+                            className={`text-xs truncate flex-1 transition-colors ${
+                                depth === 0
+                                    ? 'font-semibold text-slate-605 group-hover/node:text-cyan-700'
+                                    : 'text-slate-500 group-hover/node:text-cyan-700'
+                            }`}
+                        >
+                            {nodeLabel(node)}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-450 tabular-nums bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 shrink-0">
+                            {node.count}
+                        </span>
+                    </button>
+                </div>
+
+                {open && node.children.map(child =>
+                    renderNode(bu, child, nextPath, `${key}|${child.dimension}:${child.value}`, depth + 1)
+                )}
+            </div>
+        );
+    };
+
     if (tree.length === 0) return null;
 
     return (
@@ -169,15 +229,15 @@ export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onAppl
                     setIsOpen(prev => !prev);
                     if (isOpen) setSearchTerm('');
                 }}
-                title="Visões rápidas: BU › Parceiro › Segmento"
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all border shadow-sm select-none ${
+                title="Visualização filtrada: BU › Segmento › Parceiro"
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-all border shadow-sm select-none whitespace-nowrap ${
                     isOpen
                         ? 'bg-white border-afinz-teal text-cyan-700 shadow-md ring-1 ring-cyan-500/10'
                         : 'bg-white border-cyan-100 hover:border-cyan-200 text-slate-600'
                 }`}
             >
                 <Crosshair size={15} className={isOpen ? 'text-cyan-600' : 'text-slate-450'} />
-                <span className="text-xs font-semibold tracking-tight">Visões</span>
+                <span className="text-xs font-semibold tracking-tight">Visualização filtrada</span>
                 <ChevronDown
                     size={13}
                     className={`transition-transform duration-250 ${isOpen ? 'rotate-180 opacity-100 text-cyan-600' : 'opacity-40'}`}
@@ -189,10 +249,7 @@ export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onAppl
                     <div className="bg-white border border-slate-200/80 rounded-xl shadow-[0_12px_40px_-8px_rgba(0,0,0,0.12)] p-2 relative overflow-hidden ring-1 ring-slate-900/5">
                         <div className="flex items-center justify-between px-3 py-2 mb-1.5 border-b border-slate-100 bg-slate-50/50 -mx-2 -mt-2">
                             <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
-                                Visões rápidas
-                            </span>
-                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">
-                                BU › Parceiro › Segmento
+                                Visualização filtrada
                             </span>
                         </div>
 
@@ -204,7 +261,7 @@ export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onAppl
                                     autoFocus
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
-                                    placeholder="Buscar parceiro ou segmento..."
+                                    placeholder="Buscar segmento ou parceiro..."
                                     className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400 font-medium"
                                 />
                             </div>
@@ -220,84 +277,39 @@ export const QuickViewsButton: React.FC<QuickViewsButtonProps> = ({ tree, onAppl
                             {filteredTree.map(bu => {
                                 const buKey = `bu:${bu.value}`;
                                 const buOpen = isExpanded(buKey);
+                                const hasChildren = bu.children.length > 0;
 
                                 return (
                                     <div key={buKey}>
-                                        <div className="flex items-center gap-1 rounded-lg hover:bg-slate-50/80 group/row">
+                                        <div className="flex items-center gap-1 rounded-lg hover:bg-slate-50/80">
+                                            {hasChildren ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleExpand(buKey)}
+                                                    className="p-1 text-slate-300 hover:text-slate-500 transition-colors shrink-0"
+                                                    aria-label={buOpen ? 'Recolher' : 'Expandir'}
+                                                >
+                                                    {buOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                                </button>
+                                            ) : (
+                                                <span className="w-[22px] shrink-0" aria-hidden="true" />
+                                            )}
                                             <button
                                                 type="button"
-                                                onClick={() => toggleExpand(buKey)}
-                                                className="p-1 text-slate-300 hover:text-slate-500 transition-colors"
-                                                aria-label={buOpen ? 'Recolher' : 'Expandir'}
-                                            >
-                                                {buOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => applyView(bu.value)}
+                                                onClick={() => applyView(bu.value, [])}
                                                 className="flex items-center gap-2 flex-1 min-w-0 py-1.5 pr-2 text-left"
                                             >
                                                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${BU_DOT[bu.value] ?? 'bg-slate-300'}`} />
                                                 <span className="text-xs font-bold text-slate-700 truncate flex-1">{bu.value}</span>
-                                                <span className="text-[10px] font-bold text-slate-450 tabular-nums bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
+                                                <span className="text-[10px] font-bold text-slate-450 tabular-nums bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5 shrink-0">
                                                     {bu.count}
                                                 </span>
                                             </button>
                                         </div>
 
-                                        {buOpen && bu.parceiros.map(parceiro => {
-                                            const parceiroKey = `${buKey}|p:${parceiro.value}`;
-                                            const parceiroOpen = isExpanded(parceiroKey);
-
-                                            return (
-                                                <div key={parceiroKey}>
-                                                    <div className="flex items-center gap-1 rounded-lg hover:bg-slate-50/80 pl-4">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => toggleExpand(parceiroKey)}
-                                                            className="p-1 text-slate-300 hover:text-slate-500 transition-colors"
-                                                            aria-label={parceiroOpen ? 'Recolher' : 'Expandir'}
-                                                        >
-                                                            {parceiroOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => applyView(bu.value, parceiro.value)}
-                                                            className="flex items-center gap-2 flex-1 min-w-0 py-1.5 pr-2 text-left"
-                                                        >
-                                                            <span
-                                                                title={dimensionLabel(parceiro.value, 'parceiro')}
-                                                                className="text-xs font-semibold text-slate-605 truncate flex-1"
-                                                            >
-                                                                {dimensionLabel(parceiro.value, 'parceiro')}
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-slate-450 tabular-nums bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
-                                                                {parceiro.count}
-                                                            </span>
-                                                        </button>
-                                                    </div>
-
-                                                    {parceiroOpen && parceiro.segmentos.map(segmento => (
-                                                        <button
-                                                            key={`${parceiroKey}|s:${segmento.value}`}
-                                                            type="button"
-                                                            onClick={() => applyView(bu.value, parceiro.value, segmento.value)}
-                                                            className="w-full flex items-center gap-2 py-1.5 pl-[3.25rem] pr-2 rounded-lg hover:bg-cyan-50/50 text-left transition-colors group/seg"
-                                                        >
-                                                            <span
-                                                                title={dimensionLabel(segmento.value, 'segmento')}
-                                                                className="text-xs text-slate-500 truncate flex-1 group-hover/seg:text-cyan-700 transition-colors"
-                                                            >
-                                                                {dimensionLabel(segmento.value, 'segmento')}
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-slate-450 tabular-nums bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
-                                                                {segmento.count}
-                                                            </span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
+                                        {buOpen && bu.children.map(child =>
+                                            renderNode(bu.value, child, [], `${buKey}|${child.dimension}:${child.value}`, 0)
+                                        )}
                                     </div>
                                 );
                             })}

@@ -393,6 +393,23 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                 <div className="absolute -top-3 left-0 right-0 h-[3px] bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-400 animate-pulse z-50 rounded-t-lg" />
             )}
 
+            {/*
+              Ancorado para cair sob o toggle Aquisição|Rentabilização do header.
+              O 338px é a distância entre a borda direita daquele toggle e a borda
+              direita do conteúdo do header (gap-3 + divisor + busca w-52 + gap-3 +
+              divisor + gap-3 + dois botões de ícone p-2). Header e barra usam o
+              mesmo px-6, então as duas bordas direitas coincidem. Posicionamento
+              absoluto — e não margem — porque a largura do contador de disparos
+              varia com o número e desalinharia o botão.
+            */}
+            <div className="absolute right-[338px] top-0 bottom-0 flex items-center z-20">
+                <QuickViewsButton
+                    tree={quickViewTree}
+                    onApply={handleApplyPatch}
+                    onOpenChange={handleQuickViewsOpenChange}
+                />
+            </div>
+
             <div className="flex items-center gap-2 flex-wrap">
                 <PeriodSelector compact onOpenChange={(isOpen) => handleMenuOpenChange('period', isOpen)} />
                 <FilterDropdown
@@ -468,12 +485,6 @@ export const InlineFilterBar: React.FC<InlineFilterBarProps> = ({
                 )}
 
                 <div className="ml-auto flex items-center gap-2">
-                    {/* Alinhado sob o seletor Aquisição/Rentabilização do header. */}
-                    <QuickViewsButton
-                        tree={quickViewTree}
-                        onApply={handleApplyPatch}
-                        onOpenChange={handleQuickViewsOpenChange}
-                    />
                     {isPending && (
                         <div className="flex items-center gap-1.5 text-[11px] text-cyan-600 font-semibold bg-cyan-50/50 border border-cyan-200/30 px-2.5 py-1 rounded-full">
                             <Loader2 size={11} className="animate-spin text-cyan-500" />
