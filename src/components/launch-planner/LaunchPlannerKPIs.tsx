@@ -15,7 +15,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Eye, EyeOff, Info, Layers3 } from 'lucide-react';
-import { Activity, Goal } from '../../types/framework';
+import { Activity, FilterState, Goal } from '../../types/framework';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
 import { useAppStore } from '../../store/useAppStore';
@@ -116,6 +116,19 @@ const formatCompact = (value: number) =>
 const formatCurrency = (value: number) =>
     value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const matchesGlobalFilters = (
+    activity: Activity,
+    filters: FilterState,
+    excludedField?: 'segmentos' | 'parceiros',
+) => {
+    if (filters.canais.length > 0 && !filters.canais.includes(activity.canal)) return false;
+    if (filters.jornadas.length > 0 && !filters.jornadas.includes(activity.jornada)) return false;
+    if (excludedField !== 'segmentos' && filters.segmentos.length > 0 && !filters.segmentos.includes(activity.segmento)) return false;
+    if (excludedField !== 'parceiros' && filters.parceiros.length > 0 && !filters.parceiros.includes(activity.parceiro)) return false;
+    if ((filters.subgrupos ?? []).length > 0 && !(filters.subgrupos ?? []).includes(activity.subgrupo ?? '')) return false;
+    return true;
+};
+
 export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
     activities,
     goals,
@@ -123,6 +136,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
 }) => {
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
     const allStoreActivities = useAppStore((state) => state.activities);
+    const globalFilters = useAppStore((state) => state.viewSettings.filtrosGlobais);
+    const setGlobalFilters = useAppStore((state) => state.setGlobalFilters);
     const setTab = useAppStore((state) => state.setTab);
     const setReportDeepLink = useAppStore((state) => state.setReportDeepLink);
     const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
@@ -153,6 +168,15 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
     const isConsolidated = isMultiBU && multiBUMode === 'consolidated' && canConsolidate;
     const isMonthly = chartMode === 'monthly';
     const currentGoal = goals.find((goal) => goal.mes === currentMonth);
+    const profileFilterField = profile?.breakdown === 'parceiro' ? 'parceiros' : 'segmentos';
+    const profileFilterValues = profile ? globalFilters[profileFilterField] : [];
+    const hasGranularGlobalFilters =
+        globalFilters.canais.length > 0 ||
+        globalFilters.jornadas.length > 0 ||
+        globalFilters.segmentos.length > 0 ||
+        globalFilters.parceiros.length > 0 ||
+        (globalFilters.subgrupos ?? []).length > 0;
+    const canUseB2CExternalSeries = singleBU === 'B2C' && !hasGranularGlobalFilters;
 
     useEffect(() => {
         if (!canConsolidate && multiBUMode === 'consolidated') {
@@ -164,11 +188,22 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
         setSelectedSeries(null);
     }, [chartMode, singleBU, multiBUMode]);
 
+    useEffect(() => {
+        if (hasGranularGlobalFilters) {
+            setShowSerasa(false);
+            if (selectedSeries === 'Outros B2C' || selectedSeries === 'Serasa API' || selectedSeries === 'CRM B2C') {
+                setSelectedSeries(null);
+            }
+        }
+    }, [hasGranularGlobalFilters, selectedSeries]);
+
     const sourceActivities = useMemo(
         () => (isMonthly ? allStoreActivities : activities).filter(
-            (activity) => chartBUs.includes(activity.bu as AcquisitionBU),
+            (activity) =>
+                chartBUs.includes(activity.bu as AcquisitionBU) &&
+                matchesGlobalFilters(activity, globalFilters),
         ),
-        [activities, allStoreActivities, chartBUs, isMonthly],
+        [activities, allStoreActivities, chartBUs, globalFilters, isMonthly],
     );
 
     const periodRows = useMemo(() => {
@@ -190,6 +225,23 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
             };
         });
     }, [dailyAnalysis, isMonthly, yearMonthlyAnalysis]);
+
+    const dimensionUniverseActivities = useMemo(() => {
+        if (!profile) return [];
+
+        const periodKeys = new Set(periodRows.map((row) => row.periodKey));
+        const excludedField = profile.breakdown === 'parceiro' ? 'parceiros' : 'segmentos';
+
+        return allStoreActivities.filter((activity) => {
+            const date = activity.dataDisparo;
+            if (!date || Number.isNaN(date.getTime())) return false;
+            return (
+                activity.bu === profile.bu &&
+                periodKeys.has(getPeriodKey(date, chartMode)) &&
+                matchesGlobalFilters(activity, globalFilters, excludedField)
+            );
+        });
+    }, [allStoreActivities, chartMode, globalFilters, periodRows, profile]);
 
     const aggregates = useMemo(() => {
         const byPeriod = new Map<string, Record<AcquisitionBU, ActivityAggregate>>();
@@ -216,15 +268,21 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                 periodDimensions[dimension] = periodDimensions[dimension] ?? { ...EMPTY_AGGREGATE };
                 addAggregate(periodDimensions[dimension], value);
                 byPeriodDimension.set(periodKey, periodDimensions);
-                dimensionTotals.set(
-                    dimension,
-                    (dimensionTotals.get(dimension) ?? 0) + value.propostas + value.cartoes,
-                );
             }
         });
 
+        dimensionUniverseActivities.forEach((activity) => {
+            if (!profile) return;
+            const dimension = getDimensionValue(activity, profile.breakdown);
+            const value = metricValue(activity);
+            dimensionTotals.set(
+                dimension,
+                (dimensionTotals.get(dimension) ?? 0) + value.propostas + value.cartoes,
+            );
+        });
+
         return { byPeriod, byPeriodDimension, dimensionTotals };
-    }, [chartBUs, chartMode, profile, sourceActivities]);
+    }, [chartBUs, chartMode, dimensionUniverseActivities, profile, sourceActivities]);
 
     const dimensionSeries = useMemo(() => {
         if (!profile) return [] as Array<{ name: string; sourceNames: string[]; color: string }>;
@@ -232,7 +290,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
         const sorted = Array.from(aggregates.dimensionTotals.entries())
             .sort((a, b) => b[1] - a[1])
             .map(([name]) => name);
-        const maximumDimensionSeries = profile.bu === 'B2C' && showOtherB2C ? 3 : 4;
+        const maximumDimensionSeries = profile.bu === 'B2C' && showOtherB2C && canUseB2CExternalSeries ? 3 : 4;
         const needsRemainderGroup = sorted.length > maximumDimensionSeries;
         const namedSeriesLimit = needsRemainderGroup
             ? maximumDimensionSeries - 1
@@ -255,7 +313,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
         }
 
         return series;
-    }, [aggregates.dimensionTotals, profile, showOtherB2C]);
+    }, [aggregates.dimensionTotals, canUseB2CExternalSeries, profile, showOtherB2C]);
 
     const timeChartData = useMemo(() => periodRows.map((row) => {
         const periodBU = aggregates.byPeriod.get(row.periodKey) ?? {} as Record<AcquisitionBU, ActivityAggregate>;
@@ -339,7 +397,9 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                 .filter((day) => day.data.startsWith(monthPrefix))
                 .map((day) => [day.data, Number(day.emissoes_b2c_total) || 0] as const),
         );
-        const b2cHasExternal = Array.from(b2cByDate.values()).some((value) => value > 0);
+        const b2cHasExternal =
+            !hasGranularGlobalFilters &&
+            Array.from(b2cByDate.values()).some((value) => value > 0);
         const cumulativeByBU: Record<AcquisitionBU, number> = { B2C: 0, B2B2C: 0, Plurix: 0 };
         const goalsByBU = Object.fromEntries(
             chartBUs.map((bu) => [bu, getCardsGoal(currentGoal, bu)]),
@@ -410,7 +470,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
         })) as Record<AcquisitionBU, number>;
 
         return { data, totalsByBU, goalsByBU, lastObservedIndex };
-    }, [activities, chartBUs, currentGoal, currentMonth, dailyAnalysis, isConsolidated, singleBU]);
+    }, [activities, chartBUs, currentGoal, currentMonth, dailyAnalysis, hasGranularGlobalFilters, isConsolidated, singleBU]);
 
     const singleSummary = useMemo(() => {
         const included = singleBU ? [singleBU] : chartBUs;
@@ -457,20 +517,61 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
     const toggleSeries = (name: string) => {
         setSelectedSeries((current) => current === name ? null : name);
     };
-    const isSeriesHidden = (name: string) => Boolean(selectedSeries && selectedSeries !== name);
+
+    const profileSeriesForName = (name: string) =>
+        dimensionSeries.find((series) => series.name === name);
+
+    const isProfileSeriesActive = (name: string) => {
+        const series = profileSeriesForName(name);
+        if (!profile || !series || profileFilterValues.length === 0) return false;
+        return profileFilterValues.some((value) => series.sourceNames.includes(value));
+    };
+
+    const isSeriesHidden = (name: string) => {
+        const series = profileSeriesForName(name);
+        if (profile && series && profileFilterValues.length > 0) {
+            return !isProfileSeriesActive(name);
+        }
+        return Boolean(selectedSeries && selectedSeries !== name);
+    };
+
+    const handleLegendClick = (name: string) => {
+        const profileSeries = profileSeriesForName(name);
+        if (profile && profileSeries) {
+            const currentValues = globalFilters[profileFilterField];
+            const currentSelectionBelongsToSeries =
+                currentValues.length > 0 &&
+                currentValues.every((value) => profileSeries.sourceNames.includes(value));
+            setGlobalFilters({
+                [profileFilterField]: currentSelectionBelongsToSeries ? [] : profileSeries.sourceNames,
+            });
+            setSelectedSeries(null);
+            return;
+        }
+
+        // Séries externas ou comparativas não correspondem a uma dimensão real de
+        // `activities`; mantêm o comportamento visual local para não zerar o painel.
+        toggleSeries(name);
+    };
+
     const legendProps = {
         iconSize: 8,
         wrapperStyle: { fontSize: '10px', paddingTop: '5px' },
         onClick: (entry: any) => {
             const name = entry?.value ?? entry?.payload?.value;
-            if (name) toggleSeries(String(name));
+            if (name) handleLegendClick(String(name));
         },
         formatter: (value: string) => (
-            <span style={{
-                color: isSeriesHidden(value) ? '#cbd5e1' : '#475569',
-                cursor: 'pointer',
-                fontWeight: selectedSeries === value ? 700 : 400,
-            }}>
+            <span
+                title={profileSeriesForName(value)
+                    ? `${isProfileSeriesActive(value) ? 'Remover' : 'Aplicar'} filtro global`
+                    : 'Destacar série no gráfico'}
+                style={{
+                    color: isSeriesHidden(value) ? '#cbd5e1' : '#475569',
+                    cursor: 'pointer',
+                    fontWeight: selectedSeries === value || isProfileSeriesActive(value) ? 700 : 400,
+                }}
+            >
                 {value}
             </span>
         ),
@@ -530,7 +631,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                 </div>
             )}
 
-            {singleBU === 'B2C' && (
+            {singleBU === 'B2C' && canUseB2CExternalSeries && (
                 <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
                     <button
                         type="button"
@@ -561,6 +662,14 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                         Outros B2C
                     </button>
                 </div>
+            )}
+            {singleBU === 'B2C' && hasGranularGlobalFilters && (
+                <span
+                    className="rounded-md border border-cyan-100 bg-cyan-50 px-2.5 py-1.5 text-[10px] font-semibold text-cyan-700"
+                    title="Serasa API e Outros B2C são contextos externos e não podem ser atribuídos ao filtro granular atual."
+                >
+                    Visão CRM filtrada
+                </span>
             )}
 
             <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
@@ -843,7 +952,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                         <Legend {...legendProps} />
                                         {profile ? (
                                             <>
-                                                {showSerasa && profile.bu === 'B2C' ? (
+                                                {showSerasa && profile.bu === 'B2C' && canUseB2CExternalSeries ? (
                                                     <>
                                                         <Bar dataKey="propostas_crm" name="CRM B2C" stackId="a" fill={profile.color} hide={isSeriesHidden('CRM B2C')} />
                                                         <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />
@@ -858,7 +967,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                                         hide={isSeriesHidden(series.name)}
                                                     />
                                                 ))}
-                                                {profile.bu === 'B2C' && showOtherB2C && (
+                                                {profile.bu === 'B2C' && showOtherB2C && canUseB2CExternalSeries && (
                                                     <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#CBD5E1" hide={isSeriesHidden('Outros B2C')} />
                                                 )}
                                             </>
@@ -928,7 +1037,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                         <Legend {...legendProps} />
                                         {profile ? (
                                             <>
-                                                {showSerasa && profile.bu === 'B2C' ? (
+                                                {showSerasa && profile.bu === 'B2C' && canUseB2CExternalSeries ? (
                                                     <>
                                                         <Bar dataKey="cartoes_crm" name="CRM B2C" stackId="a" fill={profile.color} hide={isSeriesHidden('CRM B2C')} />
                                                         <Bar dataKey="serasa_cartoes" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />
@@ -943,7 +1052,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                                         hide={isSeriesHidden(series.name)}
                                                     />
                                                 ))}
-                                                {profile.bu === 'B2C' && showOtherB2C && (
+                                                {profile.bu === 'B2C' && showOtherB2C && canUseB2CExternalSeries && (
                                                     <Bar dataKey="outros_cartoes" name="Outros B2C" stackId="a" fill="#CBD5E1" hide={isSeriesHidden('Outros B2C')} />
                                                 )}
                                             </>
