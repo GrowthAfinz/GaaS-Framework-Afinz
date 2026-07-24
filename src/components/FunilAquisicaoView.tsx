@@ -6,6 +6,7 @@ import { PaidMediaFunnelView } from './PaidMediaFunnelView';
 import { AppAfinzFunnelView } from './AppAfinzFunnelView';
 import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCell, granularityLabel } from './FunnelDetailControls';
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
+import { SerasaApiFunnelView, SerasaBiFunnelView } from './SerasaSourceFunnelView';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'consultas' | 'aprovados' | 'pedidos' | 'bio' | 'docs' | 'assinatura' | 'emitidos';
@@ -308,17 +309,23 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
 };
 
 export const FunilAquisicaoView: React.FC = () => {
-  const [funnel, setFunnel] = useState<'serasa' | 'paid-media' | 'app-afinz'>('app-afinz');
+  const [funnel, setFunnel] = useState<'serasa-api' | 'serasa-bi' | 'paid-media' | 'app-afinz'>('app-afinz');
   const options = [
-    { key: 'app-afinz' as const, label: 'Funil Onboarding - Apps', detail: 'B2C + B2B2C + Plurix' },
-    { key: 'serasa' as const, label: 'Funil Onboarding - Serasa', detail: 'Originação via API' },
-    { key: 'paid-media' as const, label: 'Funil Onboarding - Mídia Paga', detail: 'Aquisição App Install' },
+    { key: 'app-afinz' as const, label: 'Funil Onboarding — Apps', detail: 'B2C + B2B2C + Plurix' },
+    { key: 'serasa-api' as const, label: 'Funil API Serasa', detail: 'Fonte transacional Supabase' },
+    { key: 'serasa-bi' as const, label: 'Funil API Serasa BI', detail: 'Fonte BI · Integrado diário' },
+    { key: 'paid-media' as const, label: 'Funil Onboarding — Mídia Paga', detail: 'Aquisição App Install' },
   ];
   const activeContext = {
-    serasa: {
-      eyebrow: 'Análise · Serasa',
-      title: 'API Serasa - Funil de Aquisição',
-      description: 'Acompanhamento de performance e evolução das etapas da jornada.',
+    'serasa-api': {
+      eyebrow: 'Análise · API Serasa',
+      title: 'Funil API Serasa',
+      description: 'Propostas e emissões da fonte transacional, conciliadas com o BI no mesmo corte.',
+    },
+    'serasa-bi': {
+      eyebrow: 'Análise · Serasa BI',
+      title: 'Funil API Serasa BI',
+      description: 'Jornada completa e custos do Integrado diário, preservando lacunas e qualidade.',
     },
     'paid-media': {
       eyebrow: 'Análise · Mídia Paga B2C',
@@ -337,7 +344,7 @@ export const FunilAquisicaoView: React.FC = () => {
       <h1 className="mt-1.5 text-xl font-bold leading-tight tracking-tight text-white">{activeContext.title}</h1>
       <p className="mt-1 text-sm leading-relaxed text-white/75">{activeContext.description}</p>
     </div>
-    <nav aria-label="Selecionar funil de onboarding" className="mt-5 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-1">
+    <nav aria-label="Selecionar funil de onboarding" className="mt-5 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
       {options.map(option => {
         const active = funnel === option.key;
         return <button key={option.key} onClick={() => setFunnel(option.key)} aria-current={active ? 'page' : undefined} className={`relative min-h-[66px] rounded-xl border px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 ${active ? 'border-cyan-200 bg-white text-slate-900 shadow-lg' : 'border-white/20 bg-white/10 text-white hover:bg-white/15'}`}>
@@ -356,7 +363,13 @@ export const FunilAquisicaoView: React.FC = () => {
       </div>
     </div>
     <div className="pt-4">
-      {funnel === 'serasa' ? <SerasaFunnelView navigation={navigation} /> : funnel === 'paid-media' ? <PaidMediaFunnelView navigation={navigation} /> : <AppAfinzFunnelView navigation={navigation} />}
+      {funnel === 'serasa-api'
+        ? <SerasaApiFunnelView navigation={navigation} />
+        : funnel === 'serasa-bi'
+          ? <SerasaBiFunnelView navigation={navigation} />
+          : funnel === 'paid-media'
+            ? <PaidMediaFunnelView navigation={navigation} />
+            : <AppAfinzFunnelView navigation={navigation} />}
     </div>
   </div>;
 };
