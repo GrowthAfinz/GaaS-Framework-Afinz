@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CalendarDays, CheckCircle2, Download, Info } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../contexts/PeriodContext';
+import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCell, granularityLabel } from './FunnelDetailControls';
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 
 type Scope = 'total' | 'afinz' | 'plurix';
@@ -34,6 +35,27 @@ const rates: Array<{ key: RateKey; label: string; numerator: StageKey; denominat
   { key: 'geoCompletionRate', label: 'Geolocalização → cartão concluído', numerator: 'completed', denominator: 'geo', color: '#0891b2' },
   { key: 'overallRate', label: 'Conversão geral', numerator: 'completed', denominator: 'cpf', color: '#0f172a' },
 ];
+const appSeriesOrder = new Map<string, number>([
+  ['cpf', 0],
+  ['onboarding', 10],
+  ['onboardingRate', 11],
+  ['geo', 20],
+  ['geoRate', 21],
+  ['docs', 30],
+  ['docsRate', 31],
+  ['bio', 40],
+  ['bioRate', 41],
+  ['address', 50],
+  ['addressRate', 51],
+  ['personalization', 60],
+  ['personalizationRate', 61],
+  ['signature', 70],
+  ['signatureRate', 71],
+  ['completed', 80],
+  ['completionRate', 81],
+  ['geoCompletionRate', 90],
+  ['overallRate', 91],
+]);
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const stageKey = (label: string): StageKey | 'auto' | 'loss' | null => {
@@ -92,12 +114,38 @@ const sumStage = (rows: DailyRow[], key: StageKey) => {
   return values.length ? values.reduce((total, value) => total + value, 0) : null;
 };
 
+function groupAppRows(rows: DailyRow[], granularity: Granularity) {
+  const groups = new Map<string, DailyRow[]>();
+  rows.forEach(row => {
+    let key = iso(row.date);
+    if (granularity === 'monthly') key = key.slice(0, 7);
+    if (granularity === 'weekly') {
+      const monday = new Date(row.date);
+      monday.setDate(row.date.getDate() - ((row.date.getDay() + 6) % 7));
+      key = iso(monday);
+    }
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  });
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, groupedRows]) => {
+    const first = groupedRows[0].date;
+    const last = groupedRows.at(-1)?.date ?? first;
+    const label = granularity === 'daily'
+      ? shortDate(first)
+      : granularity === 'weekly'
+        ? `${shortDate(first)}–${shortDate(last)}`
+        : first.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
+    const values = Object.fromEntries(stages.map(stage => [stage.key, sumStage(groupedRows, stage.key)])) as Record<StageKey, number | null>;
+    return { key, label, weekday: granularity === 'daily' ? weekday(first) : '', values };
+  });
+}
+
 export const AppAfinzFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigation }) => {
   const { startDate, endDate } = usePeriod();
   const [raw, setRaw] = useState<RawRow[]>([]);
   const [error, setError] = useState('');
   const [scope, setScope] = useState<Scope>('total');
   const [granularity, setGranularity] = useState<Granularity>('daily');
+  const [detailGranularity, setDetailGranularity] = useState<Granularity>('daily');
   const [selected, setSelected] = useState<StageKey[]>(['cpf', 'onboarding', 'geo', 'completed']);
   const [selectedRates, setSelectedRates] = useState<RateKey[]>(['geoRate', 'completionRate']);
 
@@ -134,6 +182,7 @@ export const AppAfinzFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ 
       return { period: label, weekday: weekday(first), ...values, ...rateValues };
     });
   }, [current, granularity, scope]);
+  const detailRows = useMemo(() => groupAppRows(current, detailGranularity), [current, detailGranularity]);
 
   const cardStages = availableStages;
   const firstComparable = scope === 'total' ? totals.cpf : totals.geo;
@@ -144,10 +193,21 @@ export const AppAfinzFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ 
     : currentRates.length < 4 ? [...currentRates, key] : currentRates);
 
   const exportCsv = () => {
-    const header = ['Data', ...availableStages.map(stage => scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding') ? `${stage.label} (total app)` : stage.label)];
-    const csv = [header.join(';'), ...current.map(row => [iso(row.date), ...availableStages.map(stage => row[stage.key] ?? '')].join(';'))].join('\n');
+    const header = ['Periodo', ...availableStages.flatMap((stage, index) => {
+      const label = scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding') ? `${stage.label} (total app)` : stage.label;
+      return index === 0 ? [label] : [label, `Taxa avanco ${label}`];
+    })];
+    const csv = [header.join(';'), ...detailRows.map(row => {
+      const cells = availableStages.flatMap((stage, index) => {
+        const incompatible = scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding' || stage.key === 'geo');
+        const previousStage = index > 0 ? availableStages[index - 1] : null;
+        const rate = previousStage && !incompatible ? compatibleDailyRate(row.values[stage.key], row.values[previousStage.key]) : null;
+        return index === 0 ? [row.values[stage.key] ?? ''] : [row.values[stage.key] ?? '', rate ?? ''];
+      });
+      return [row.label, ...cells].join(';');
+    })].join('\n');
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `funil-app-afinz-${scope}.csv`; anchor.click(); URL.revokeObjectURL(url);
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `funil-app-afinz-${scope}-${detailGranularity}.csv`; anchor.click(); URL.revokeObjectURL(url);
   };
 
   return <div className="min-h-full bg-slate-50 px-4 pb-6 text-slate-800">
@@ -180,16 +240,18 @@ export const AppAfinzFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ 
 
       <section className="border-t border-slate-200 px-4 pb-4 pt-3">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">Evolução do funil</h2><p className="text-xs text-slate-500">Acompanhe volume e taxa de conclusão observada no mesmo eixo temporal.</p></div><div className="flex border border-slate-300 text-[11px] font-semibold">{(['daily', 'weekly', 'monthly'] as Granularity[]).map(key => <button key={key} onClick={() => setGranularity(key)} aria-pressed={granularity === key} className={`border-r border-slate-300 px-3 py-1.5 last:border-r-0 ${granularity === key ? 'bg-slate-800 text-white' : 'text-slate-600'}`}>{key === 'daily' ? 'Diária' : key === 'weekly' ? 'Semanal' : 'Mensal'}</button>)}</div></div>
-        <div className="-mx-4 mt-3 overflow-x-auto border-y border-slate-200 bg-slate-50 text-[10px]"><div className="flex min-w-max items-center"><span className="border-r border-slate-200 px-2 py-2 font-bold uppercase text-slate-500">Volumes</span>{availableStages.map(stage => { const referenceOnly = scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding'); return <button key={stage.key} aria-pressed={selected.includes(stage.key)} title={referenceOnly ? 'Referência do App total; não compõe taxas do recorte' : undefined} onClick={() => setSelected(value => value.includes(stage.key) ? value.filter(item => item !== stage.key) : [...value, stage.key])} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selected.includes(stage.key) ? referenceOnly ? 'bg-amber-50 text-amber-900' : 'bg-white text-slate-900' : 'text-slate-400'}`}><span className="h-2 w-2" style={{ background: selected.includes(stage.key) ? stage.color : '#cbd5e1' }} />{stage.label}{referenceOnly ? ' · total app' : ''}</button>; })}<button onClick={() => setSelected(availableStages.map(stage => stage.key))} className="px-2.5 py-2 font-semibold text-cyan-700">Todos</button><button onClick={() => setSelected([])} className="border-l border-slate-200 px-2.5 py-2 font-semibold text-slate-500">Limpar</button></div></div>
-        <div className="-mx-4 overflow-x-auto border-b border-slate-200 bg-slate-50 text-[10px]"><div className="flex min-w-max items-center"><span className="border-r border-slate-200 px-2 py-2 font-bold uppercase text-slate-500">Taxas</span>{availableRates.map(rate => <button key={rate.key} aria-pressed={selectedRates.includes(rate.key)} onClick={() => toggleRate(rate.key)} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(rate.key) ? 'bg-white text-slate-900' : 'text-slate-400'}`}><span className="h-2 w-2" style={{ background: selectedRates.includes(rate.key) ? rate.color : '#cbd5e1' }} />{rate.label}</button>)}<span className="px-2 py-2 text-slate-400">máx. 4</span></div></div>
-        <div className="h-[355px] pt-2"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 14, right: 42, left: 8, bottom: 20 }}><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" height={42} tick={({ x, y, payload }: any) => { const point = chartData.find(item => item.period === payload.value); return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={9} fontFamily="monospace">{payload.value}</text>{granularity === 'daily' && <text y={26} textAnchor="middle" fill="#94a3b8" fontSize={8}>{point?.weekday}</text>}</g>; }} /><YAxis yAxisId="volume" hide={!selected.length} tick={{ fontSize: 9 }} tickFormatter={value => value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><YAxis yAxisId="rate" orientation="right" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={value => `${value}%`} /><Tooltip contentStyle={{ borderRadius: 0, border: '1px solid #cbd5e1', fontSize: 10, fontFamily: 'monospace' }} formatter={(value: number, name: string) => { const rate = rates.find(item => item.key === name); return [rate ? pctLabel(value) : fmt(value), rate?.label ?? stages.find(stage => stage.key === name)?.label ?? name]; }} />{availableStages.filter(stage => selected.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="volume" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={18} isAnimationActive={false} />)}{availableRates.filter(rate => selectedRates.includes(rate.key)).map(rate => <Line key={rate.key} yAxisId="rate" type="linear" dataKey={rate.key} name={rate.key} stroke={rate.color} strokeWidth={2.5} dot={{ r: 3, fill: '#fff', stroke: rate.color, strokeWidth: 2 }} activeDot={{ r: 4, fill: '#fff', stroke: rate.color, strokeWidth: 2 }} isAnimationActive={false} connectNulls={false} />)}</ComposedChart></ResponsiveContainer></div>
+        <SeriesConfigurator summary={`${selected.length} volumes · ${selectedRates.length}/4 taxas`}>
+          <div className="overflow-x-auto bg-slate-50 text-[10px]"><div className="flex min-w-max items-center"><span className="border-r border-slate-200 px-2 py-2 font-bold uppercase text-slate-500">Volumes</span>{availableStages.map((stage, index) => { const referenceOnly = scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding'); return <button key={stage.key} aria-pressed={selected.includes(stage.key)} title={referenceOnly ? 'Referência do App total; não compõe taxas do recorte' : undefined} onClick={() => setSelected(value => value.includes(stage.key) ? value.filter(item => item !== stage.key) : [...value, stage.key])} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selected.includes(stage.key) ? referenceOnly ? 'bg-amber-50 text-amber-900' : 'bg-white text-slate-900' : 'text-slate-400'}`}><span className="h-2 w-2" style={{ background: selected.includes(stage.key) ? stage.color : '#cbd5e1' }} /><FunnelStageLabel index={index} label={`${stage.label}${referenceOnly ? ' · total app' : ''}`} compact /></button>; })}<button onClick={() => setSelected(availableStages.map(stage => stage.key))} className="px-2.5 py-2 font-semibold text-cyan-700">Todos</button><button onClick={() => setSelected([])} className="border-l border-slate-200 px-2.5 py-2 font-semibold text-slate-500">Limpar</button></div></div>
+          <div className="overflow-x-auto border-t border-slate-200 bg-slate-50 text-[10px]"><div className="flex min-w-max items-center"><span className="border-r border-slate-200 px-2 py-2 font-bold uppercase text-slate-500">Taxas</span>{availableRates.map(rate => <button key={rate.key} aria-pressed={selectedRates.includes(rate.key)} onClick={() => toggleRate(rate.key)} className={`flex items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(rate.key) ? 'bg-white text-slate-900' : 'text-slate-400'}`}><span className="h-2 w-2" style={{ background: selectedRates.includes(rate.key) ? rate.color : '#cbd5e1' }} />{rate.label}</button>)}<span className="px-2 py-2 text-slate-400">máx. 4</span></div></div>
+        </SeriesConfigurator>
+        <div className="h-[355px] pt-2"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 14, right: 42, left: 8, bottom: 20 }} reverseStackOrder={false}><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" height={42} tick={({ x, y, payload }: any) => { const point = chartData.find(item => item.period === payload.value); return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={9} fontFamily="monospace">{payload.value}</text>{granularity === 'daily' && <text y={26} textAnchor="middle" fill="#94a3b8" fontSize={8}>{point?.weekday}</text>}</g>; }} /><YAxis yAxisId="volume" hide={!selected.length} tick={{ fontSize: 9 }} tickFormatter={value => value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><YAxis yAxisId="rate" orientation="right" domain={[0, 100]} tick={{ fontSize: 9 }} tickFormatter={value => `${value}%`} /><Tooltip itemSorter={(item: any) => appSeriesOrder.get(String(item.dataKey ?? item.name)) ?? 999} contentStyle={{ borderRadius: 0, border: '1px solid #cbd5e1', fontSize: 10, fontFamily: 'monospace' }} formatter={(value: number, name: string) => { const rate = rates.find(item => item.key === name); return [rate ? pctLabel(value) : fmt(value), rate?.label ?? stages.find(stage => stage.key === name)?.label ?? name]; }} />{availableStages.filter(stage => selected.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="volume" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={18} isAnimationActive={false} />)}{availableRates.filter(rate => selectedRates.includes(rate.key)).map(rate => <Line key={rate.key} yAxisId="rate" type="linear" dataKey={rate.key} name={rate.key} stroke={rate.color} strokeWidth={2.5} dot={{ r: 3, fill: '#fff', stroke: rate.color, strokeWidth: 2 }} activeDot={{ r: 4, fill: '#fff', stroke: rate.color, strokeWidth: 2 }} isAnimationActive={false} connectNulls={false} />)}</ComposedChart></ResponsiveContainer></div>
         <p className="mt-1 text-[10px] text-slate-500">Vazio = combinação ausente na fonte, não resultado zero. No Funil Completo, as taxas seguem a etapa anterior como no acompanhamento em Excel; nos recortes, referências totais não são usadas como denominador.</p>
       </section>
       </OnboardingFunnelWorkspace>
 
       <section className="overflow-hidden border border-slate-200 bg-white">
-        <div className="flex items-center justify-between p-4"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe diário</h2><p className="text-xs text-slate-500">Ausências permanecem vazias; os dados de 22/07 foram excluídos por serem parciais.</p></div><button onClick={exportCsv} className="flex items-center gap-2 border border-slate-300 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
-        <div className="max-h-[430px] overflow-auto"><table className="w-full min-w-[1100px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100"><tr><th className="px-3 py-2 text-left">Data</th>{availableStages.map(stage => <th key={stage.key} className="px-3 py-2 text-right">{stage.label}{scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding') ? ' · total app' : ''}</th>)}<th className="px-3 py-2 text-right">{scope === 'total' ? 'Conversão geral' : 'Conclusão pós-geoloc.'}</th></tr></thead><tbody>{current.map((row, index) => { const rate = compatibleDailyRate(row.completed, scope === 'total' ? row.cpf : row.geo); const previous = index > 0 ? compatibleDailyRate(current[index - 1].completed, scope === 'total' ? current[index - 1].cpf : current[index - 1].geo) : null; const change = rate != null && previous != null ? rate - previous : null; return <tr key={iso(row.date)} className="border-t border-slate-100 odd:bg-slate-50/40"><td className="px-3 py-2"><span className="font-mono font-semibold">{shortDate(row.date)}</span><span className="ml-2 text-slate-400">{weekday(row.date)}</span></td>{availableStages.map(stage => <td key={stage.key} className={`px-3 py-2 text-right font-mono font-semibold ${scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding') ? 'bg-amber-50/70 text-amber-900' : ''}`}>{fmt(row[stage.key])}</td>)}<td className="px-3 py-2 text-right"><span className="font-mono font-bold">{pctLabel(rate)}</span><span className={`ml-2 inline-flex items-center font-semibold ${change == null ? 'text-slate-400' : change > 0 ? 'text-emerald-700' : change < 0 ? 'text-red-700' : 'text-slate-400'}`}>{change == null ? <ArrowRight size={10} /> : change > 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}{change == null ? ' sem base' : ` ${Math.abs(change).toFixed(1).replace('.', ',')} p.p.`}</span></td></tr>; })}</tbody></table></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe {granularityLabel(detailGranularity).toLowerCase()}</h2><p className="text-xs text-slate-500">Volume e taxa de avanço na mesma célula; ausências permanecem como n/d.</p></div><div className="flex flex-wrap items-center gap-2"><GranularityToggle value={detailGranularity} onChange={setDetailGranularity} /><button onClick={exportCsv} className="flex items-center gap-2 border border-slate-300 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div></div>
+        <div className="max-h-[430px] overflow-auto"><table className="w-full min-w-[1180px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100"><tr><th className="px-3 py-2 text-left">Período</th>{availableStages.map((stage, index) => <th key={stage.key} className="px-3 py-2 text-right"><FunnelStageLabel index={index} label={`${stage.label}${scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding') ? ' · total app' : ''}`} compact /></th>)}<th className="px-3 py-2 text-right">{scope === 'total' ? 'Conversão geral' : 'Conclusão pós-geoloc.'}</th></tr></thead><tbody>{detailRows.map((row, rowIndex) => { const finalRate = compatibleDailyRate(row.values.completed, scope === 'total' ? row.values.cpf : row.values.geo); const previousRow = rowIndex > 0 ? detailRows[rowIndex - 1] : null; const previousRate = previousRow ? compatibleDailyRate(previousRow.values.completed, scope === 'total' ? previousRow.values.cpf : previousRow.values.geo) : null; const change = finalRate != null && previousRate != null ? finalRate - previousRate : null; return <tr key={row.key} className="border-t border-slate-100 odd:bg-slate-50/40"><td className="whitespace-nowrap px-3 py-2"><span className="font-mono font-semibold">{row.label}</span>{row.weekday && <span className="ml-2 text-slate-400">{row.weekday}</span>}</td>{availableStages.map((stage, stageIndex) => { const referenceOnly = scope !== 'total' && (stage.key === 'cpf' || stage.key === 'onboarding'); const incompatibleTransition = scope !== 'total' && stage.key === 'geo'; const previousStage = stageIndex > 0 ? availableStages[stageIndex - 1] : null; const advanceRate = previousStage && !referenceOnly && !incompatibleTransition ? compatibleDailyRate(row.values[stage.key], row.values[previousStage.key]) : null; const tone = referenceOnly ? 'amber' : stageIndex === 0 || incompatibleTransition ? 'slate' : 'teal'; const note = referenceOnly ? 'ref. total' : incompatibleTransition ? 'base segmentada' : 'avanço'; return <td key={stage.key} className={`px-3 py-2 ${referenceOnly ? 'bg-amber-50/40' : ''}`}><StageMetricCell value={fmt(row.values[stage.key])} rate={advanceRate == null ? null : pctLabel(advanceRate)} note={note} tone={tone} /></td>; })}<td className="px-3 py-2 text-right"><div className="font-mono text-[11px] font-bold">{pctLabel(finalRate)}</div><div className={`mt-1 inline-flex items-center gap-0.5 text-[9px] font-semibold ${change == null ? 'text-slate-400' : change > 0 ? 'text-emerald-700' : change < 0 ? 'text-red-700' : 'text-slate-400'}`}>{change == null ? <ArrowRight size={10} /> : change > 0 ? <ArrowUp size={10} /> : <ArrowDown size={10} />}{change == null ? ' sem base' : ` ${Math.abs(change).toFixed(1).replace('.', ',')} p.p.`}</div></td></tr>; })}</tbody></table></div>
       </section>
       <p className="flex items-center gap-2 text-[10px] text-slate-500"><Info size={13} /> Fonte recebida em 22/07/2026 · 1.267 linhas · chave composta sem duplicidades.</p>
     </div>

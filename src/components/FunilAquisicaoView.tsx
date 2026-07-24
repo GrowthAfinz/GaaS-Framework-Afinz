@@ -4,6 +4,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine, Resp
 import { usePeriod } from '../contexts/PeriodContext';
 import { PaidMediaFunnelView } from './PaidMediaFunnelView';
 import { AppAfinzFunnelView } from './AppAfinzFunnelView';
+import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCell, granularityLabel } from './FunnelDetailControls';
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
@@ -28,11 +29,26 @@ const stageConfig: Array<{ key: StageKey; label: string; color: string; status: 
 const rateConfig: Array<{ key: RateKey; label: string; shortLabel: string; color: string; group: 'Conversão' | 'Cobertura'; formula: string; calculate: (t: Totals) => number | null }> = [
   { key: 'taxaAprovacao', label: 'Aprovação', shortLabel: 'Aprovados ÷ Consultas', color: '#dc2626', group: 'Conversão', formula: 'Aprovados ÷ Consultas', calculate: t => percentage(t.aprovados, t.consultas) },
   { key: 'taxaConfirmacao', label: 'Confirmação da proposta', shortLabel: 'Pedidos ÷ Aprovados', color: '#9333ea', group: 'Conversão', formula: 'Pedidos ÷ Aprovados', calculate: t => percentage(t.pedidos, t.aprovados) },
-  { key: 'taxaFinalizacao', label: 'Finalização da proposta', shortLabel: 'Emitidos ÷ Pedidos', color: '#059669', group: 'Conversão', formula: 'Emitidos ÷ Pedidos', calculate: t => percentage(t.emitidos, t.pedidos) },
   { key: 'coberturaBio', label: 'Cobertura de biometria', shortLabel: 'Biometria ÷ Pedidos', color: '#d97706', group: 'Cobertura', formula: 'Biometria ÷ Pedidos', calculate: t => percentage(t.bio, t.pedidos) },
   { key: 'coberturaDocs', label: 'Cobertura de documentos', shortLabel: 'Documentos ÷ Pedidos', color: '#0284c7', group: 'Cobertura', formula: 'Documentos ÷ Pedidos', calculate: t => percentage(t.docs, t.pedidos) },
   { key: 'coberturaAssinatura', label: 'Cobertura de assinatura', shortLabel: 'Assinaturas ÷ Pedidos', color: '#c026d3', group: 'Cobertura', formula: 'Assinaturas ÷ Pedidos', calculate: t => percentage(t.assinatura, t.pedidos) },
+  { key: 'taxaFinalizacao', label: 'Finalização da proposta', shortLabel: 'Emitidos ÷ Pedidos', color: '#059669', group: 'Conversão', formula: 'Emitidos ÷ Pedidos', calculate: t => percentage(t.emitidos, t.pedidos) },
 ];
+const serasaSeriesOrder = new Map<string, number>([
+  ['consultas', 0],
+  ['aprovados', 10],
+  ['taxaAprovacao', 11],
+  ['pedidos', 20],
+  ['taxaConfirmacao', 21],
+  ['bio', 30],
+  ['coberturaBio', 31],
+  ['docs', 40],
+  ['coberturaDocs', 41],
+  ['assinatura', 50],
+  ['coberturaAssinatura', 51],
+  ['emitidos', 60],
+  ['taxaFinalizacao', 61],
+]);
 
 const empty: Totals = { consultas: 0, aprovados: 0, pedidos: 0, bio: 0, docs: 0, assinatura: 0, emitidos: 0, bioNulls: 0 };
 const parseNumber = (v = '') => v.trim() === '' ? null : Number(v.replaceAll('.', '').replace(',', '.'));
@@ -61,6 +77,45 @@ function periodKey(date: Date, granularity: Granularity) {
   if (granularity === 'daily') return iso(date);
   if (granularity === 'monthly') return iso(date).slice(0, 7);
   const monday = new Date(date); monday.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return iso(monday);
+}
+
+function groupSerasaRows(rows: Row[], granularity: Granularity) {
+  const groups = new Map<string, Row[]>();
+  rows.forEach(row => {
+    const key = periodKey(row.date, granularity);
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  });
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, values]) => {
+    const totals = sum(values);
+    const first = values[0].date;
+    const last = values.at(-1)?.date ?? first;
+    const row: Row = {
+      date: first,
+      consultas: totals.consultas,
+      aprovados: totals.aprovados,
+      pedidos: totals.pedidos,
+      bio: values.some(item => item.bio != null) ? totals.bio : null,
+      docs: totals.docs,
+      assinatura: values.some(item => item.assinatura != null) ? totals.assinatura : null,
+      emitidos: totals.emitidos,
+    };
+    const label = granularity === 'daily'
+      ? shortDate(first)
+      : granularity === 'weekly'
+        ? `${shortDate(first)}–${shortDate(last)}`
+        : first.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }).replace('.', '');
+    return { key, label, weekday: granularity === 'daily' ? fullWeekday(first) : '', row };
+  });
+}
+
+function serasaAdvanceRate(row: Row, stage: StageKey) {
+  if (stage === 'consultas') return null;
+  if (stage === 'aprovados') return percentage(row.aprovados, row.consultas);
+  if (stage === 'pedidos') return percentage(row.pedidos, row.aprovados);
+  if (stage === 'bio') return row.bio == null ? null : percentage(row.bio, row.pedidos);
+  if (stage === 'docs') return percentage(row.docs, row.pedidos);
+  if (stage === 'assinatura') return row.assinatura == null ? null : percentage(row.assinatura, row.pedidos);
+  return percentage(row.emitidos, row.pedidos);
 }
 
 function metricValue(row: Row, metric: SortKey): number | null {
@@ -94,6 +149,7 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState('');
   const [granularity, setGranularity] = useState<Granularity>('daily');
+  const [detailGranularity, setDetailGranularity] = useState<Granularity>('daily');
   const [selectedStages, setSelectedStages] = useState<StageKey[]>(['consultas', 'aprovados', 'pedidos', 'emitidos']);
   const [selectedRates, setSelectedRates] = useState<RateKey[]>(['taxaAprovacao', 'taxaConfirmacao', 'taxaFinalizacao']);
   const [sortKey, setSortKey] = useState<SortKey>('date');
@@ -131,14 +187,15 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
       return { key, period: label, weekday: shortWeekday(start), ...totals, ...Object.fromEntries(rateConfig.map(rate => [rate.key, rate.calculate(totals)])) };
     });
   }, [current, granularity]);
+  const detailRows = useMemo(() => groupSerasaRows(current, detailGranularity), [current, detailGranularity]);
 
-  const sortedCurrent = useMemo(() => [...current].sort((a, b) => {
-    const aValue = metricValue(a, sortKey), bValue = metricValue(b, sortKey);
+  const sortedDetailRows = useMemo(() => [...detailRows].sort((a, b) => {
+    const aValue = metricValue(a.row, sortKey), bValue = metricValue(b.row, sortKey);
     if (aValue == null && bValue == null) return 0;
     if (aValue == null) return 1;
     if (bValue == null) return -1;
     return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
-  }), [current, sortKey, sortDirection]);
+  }), [detailRows, sortKey, sortDirection]);
 
   const stageCards = useMemo(() => [
     { key: 'consultas' as StageKey, label: 'Consultas', value: total.consultas, rate: null, previousRate: null, status: 'confirmado' },
@@ -176,9 +233,17 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
   const hoverMeta = hoverDetail ? metricMeta(hoverDetail.metric) : null;
 
   const exportCsv = () => {
-    const csv = ['Data;Consultas;Aprovados;Pedidos;Foto biometria;Documentos;Assinaturas;Emitidos', ...current.map(r => [shortDate(r.date), r.consultas, r.aprovados, r.pedidos, r.bio ?? '', r.docs, r.assinatura ?? '', r.emitidos].join(';'))].join('\n');
+    const header = ['Periodo', ...stageConfig.flatMap((stage, index) => index === 0 ? [stage.label] : [stage.label, `Taxa avanco ${stage.label}`])];
+    const csv = [header.join(';'), ...detailRows.map(item => {
+      const values = stageConfig.flatMap((stage, index) => {
+        const value = item.row[stage.key];
+        const rate = serasaAdvanceRate(item.row, stage.key);
+        return index === 0 ? [value ?? ''] : [value ?? '', rate ?? ''];
+      });
+      return [item.label, ...values].join(';');
+    })].join('\n');
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a'); a.href = url; a.download = `funil-serasa-${iso(periodStart)}-${iso(periodEnd)}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = `funil-serasa-${detailGranularity}-${iso(periodStart)}-${iso(periodEnd)}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => sortKey !== column ? <ArrowUpDown size={11} className="text-slate-400" /> : sortDirection === 'asc' ? <ChevronUp size={12} className="text-cyan-700" /> : <ChevronDown size={12} className="text-cyan-700" />;
@@ -211,15 +276,17 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
           <div><h2 className="text-lg font-semibold text-slate-950">Evolução do funil</h2><p className="text-xs text-slate-500">Combine volumes e taxas no mesmo período de análise.</p></div>
           <div className="inline-flex border border-slate-300 bg-white text-[11px] font-semibold">{(['daily', 'weekly', 'monthly'] as Granularity[]).map(g => <button key={g} onClick={() => setGranularity(g)} aria-pressed={granularity === g} className={`border-r border-slate-300 px-3 py-1.5 last:border-r-0 ${granularity === g ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{g === 'daily' ? 'Diária' : g === 'weekly' ? 'Semanal' : 'Mensal'}</button>)}</div>
         </div>
-        <div className="-mx-4 mt-3 flex flex-nowrap items-center overflow-x-auto whitespace-nowrap border-y border-slate-200 bg-slate-50/60 text-[10px]">
-          <span className="border-r border-slate-200 px-2 py-2 font-semibold uppercase tracking-wide text-slate-500">Volumes</span>
-          {stageConfig.map(stage => <button key={stage.key} onClick={() => toggleStage(stage.key)} aria-pressed={selectedStages.includes(stage.key)} className={`flex shrink-0 items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedStages.includes(stage.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-white'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedStages.includes(stage.key) ? stage.color : '#cbd5e1' }} />{stage.label}</button>)}
-          <button onClick={() => setSelectedStages(stageConfig.map(stage => stage.key))} className="px-2.5 py-2 font-semibold text-cyan-700">Todos</button><button onClick={() => setSelectedStages([])} className="border-l border-slate-200 px-2.5 py-2 font-semibold text-slate-500">Limpar</button>
-        </div>
-        <div className="-mx-4 flex flex-nowrap items-center overflow-x-auto whitespace-nowrap border-b border-slate-200 text-[10px]"><span className="border-r border-slate-200 px-2 py-2 font-semibold uppercase tracking-wide text-slate-500">Taxas</span>{rateConfig.map(rate => <button key={rate.key} title={rate.formula} onClick={() => toggleRate(rate.key)} aria-pressed={selectedRates.includes(rate.key)} className={`flex shrink-0 items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(rate.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-slate-50'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedRates.includes(rate.key) ? rate.color : '#cbd5e1' }} />{rate.label}</button>)}<span className="shrink-0 px-2 py-2 text-slate-400">máx. 4</span></div>
+        <SeriesConfigurator summary={`${selectedStages.length} volumes · ${selectedRates.length}/4 taxas`}>
+          <div className="flex flex-nowrap items-center overflow-x-auto whitespace-nowrap bg-slate-50/60 text-[10px]">
+            <span className="border-r border-slate-200 px-2 py-2 font-semibold uppercase tracking-wide text-slate-500">Volumes</span>
+            {stageConfig.map((stage, index) => <button key={stage.key} onClick={() => toggleStage(stage.key)} aria-pressed={selectedStages.includes(stage.key)} className={`flex shrink-0 items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedStages.includes(stage.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-white'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedStages.includes(stage.key) ? stage.color : '#cbd5e1' }} /><FunnelStageLabel index={index} label={stage.label} compact /></button>)}
+            <button onClick={() => setSelectedStages(stageConfig.map(stage => stage.key))} className="px-2.5 py-2 font-semibold text-cyan-700">Todos</button><button onClick={() => setSelectedStages([])} className="border-l border-slate-200 px-2.5 py-2 font-semibold text-slate-500">Limpar</button>
+          </div>
+          <div className="flex flex-nowrap items-center overflow-x-auto whitespace-nowrap border-t border-slate-200 text-[10px]"><span className="border-r border-slate-200 px-2 py-2 font-semibold uppercase tracking-wide text-slate-500">Taxas</span>{rateConfig.map(rate => <button key={rate.key} title={rate.formula} onClick={() => toggleRate(rate.key)} aria-pressed={selectedRates.includes(rate.key)} className={`flex shrink-0 items-center gap-1.5 border-r border-slate-200 px-2.5 py-2 font-semibold ${selectedRates.includes(rate.key) ? 'bg-white text-slate-900' : 'text-slate-400 hover:bg-slate-50'}`}><span className="h-2 w-2" style={{ backgroundColor: selectedRates.includes(rate.key) ? rate.color : '#cbd5e1' }} />{rate.label}</button>)}<span className="shrink-0 px-2 py-2 text-slate-400">máx. 4</span></div>
+        </SeriesConfigurator>
         <div className="mt-2 h-[355px]">
           {selectedStages.length === 0 && selectedRates.length === 0 ? <div className="flex h-full items-center justify-center text-sm text-slate-400">Selecione ao menos uma métrica para visualizar.</div> :
-          <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 18, right: 42, left: 8, bottom: granularity === 'daily' ? 20 : 4 }} barGap={2} barCategoryGap="22%"><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" height={granularity === 'daily' ? 42 : 30} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={granularity === 'daily' ? ({ x, y, payload }: any) => { const point = chartData.find(item => item.period === payload.value); return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={10} fontFamily="ui-monospace, monospace" fontWeight={600}>{payload.value}</text><text y={26} textAnchor="middle" fill="#94a3b8" fontSize={9}>{point?.weekday}</text></g>; } : { fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} /><YAxis yAxisId="volume" hide={selectedStages.length === 0} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><YAxis yAxisId="rate" orientation="right" domain={[0, 'auto']} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => `${value}%`} /><Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ border: '1px solid #cbd5e1', borderRadius: 2, fontSize: 11, fontFamily: 'ui-monospace, monospace' }} labelStyle={{ color: '#0f172a', fontWeight: 700, marginBottom: 6 }} formatter={(value: number, name: string) => { const rate = rateConfig.find(item => item.key === name); return [rate ? percentageLabel(value, 2) : formatNumber(value), rate ? `${rate.label} · ${rate.formula}` : stageConfig.find(stage => stage.key === name)?.label ?? name]; }} />{stageConfig.filter(stage => selectedStages.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="volume" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={granularity === 'daily' ? 18 : 38} isAnimationActive={false} />)}{rateConfig.filter(rate => selectedRates.includes(rate.key)).map(rate => <Line key={rate.key} yAxisId="rate" type="linear" dataKey={rate.key} name={rate.key} stroke={rate.color} strokeWidth={3} connectNulls={false} dot={{ r: 3.5, fill: '#fff', strokeWidth: 2.5 }} activeDot={{ r: 5.5 }} isAnimationActive={false} />)}</ComposedChart></ResponsiveContainer>}
+          <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 18, right: 42, left: 8, bottom: granularity === 'daily' ? 20 : 4 }} barGap={2} barCategoryGap="22%" reverseStackOrder={false}><CartesianGrid stroke="#dbe3ec" strokeDasharray="3 3" /><XAxis dataKey="period" height={granularity === 'daily' ? 42 : 30} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={granularity === 'daily' ? ({ x, y, payload }: any) => { const point = chartData.find(item => item.period === payload.value); return <g transform={`translate(${x},${y})`}><text y={12} textAnchor="middle" fill="#334155" fontSize={10} fontFamily="ui-monospace, monospace" fontWeight={600}>{payload.value}</text><text y={26} textAnchor="middle" fill="#94a3b8" fontSize={9}>{point?.weekday}</text></g>; } : { fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} /><YAxis yAxisId="volume" hide={selectedStages.length === 0} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => value >= 1000 ? `${Math.round(value / 1000)} mil` : String(value)} /><YAxis yAxisId="rate" orientation="right" domain={[0, 'auto']} axisLine={{ stroke: '#64748b' }} tickLine={{ stroke: '#64748b' }} tick={{ fontSize: 10, fontFamily: 'ui-monospace, monospace', fill: '#475569' }} tickFormatter={value => `${value}%`} /><Tooltip itemSorter={(item: any) => serasaSeriesOrder.get(String(item.dataKey ?? item.name)) ?? 999} cursor={{ fill: '#f1f5f9' }} contentStyle={{ border: '1px solid #cbd5e1', borderRadius: 2, fontSize: 11, fontFamily: 'ui-monospace, monospace' }} labelStyle={{ color: '#0f172a', fontWeight: 700, marginBottom: 6 }} formatter={(value: number, name: string) => { const rate = rateConfig.find(item => item.key === name); return [rate ? percentageLabel(value, 2) : formatNumber(value), rate ? `${rate.label} · ${rate.formula}` : stageConfig.find(stage => stage.key === name)?.label ?? name]; }} />{stageConfig.filter(stage => selectedStages.includes(stage.key)).map(stage => <Bar key={stage.key} yAxisId="volume" dataKey={stage.key} name={stage.key} fill={stage.color} maxBarSize={granularity === 'daily' ? 18 : 38} isAnimationActive={false} />)}{rateConfig.filter(rate => selectedRates.includes(rate.key)).map(rate => <Line key={rate.key} yAxisId="rate" type="linear" dataKey={rate.key} name={rate.key} stroke={rate.color} strokeWidth={3} connectNulls={false} dot={{ r: 3.5, fill: '#fff', strokeWidth: 2.5 }} activeDot={{ r: 5.5 }} isAnimationActive={false} />)}</ComposedChart></ResponsiveContainer>}
         </div>
         <p className="text-[10px] text-slate-500">Barras/eixo esquerdo: volumes absolutos · linhas/eixo direito: taxas selecionadas.</p>
       </section>
@@ -231,8 +298,8 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
       </OnboardingFunnelWorkspace>
 
       <section className="order-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <div className="flex items-center justify-between p-5"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe diário · {periodLabel}</h2><p className="text-xs text-slate-500">Ordene pelos cabeçalhos. Passe o mouse sobre uma célula para ver os últimos 15 dias da métrica.</p></div><button onClick={exportCsv} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
-        <div className="max-h-[470px] overflow-auto"><table className="w-full min-w-[1120px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr><th className="sticky left-0 z-20 bg-slate-100 px-3 py-2 text-left"><button onClick={() => changeSort('date')} className="flex items-center gap-1 font-semibold">Data <SortIcon column="date" /></button></th>{stageConfig.map(stage => <th key={stage.key} className="px-3 py-2 text-right"><button onClick={() => changeSort(stage.key)} className="ml-auto flex items-center gap-1 font-semibold">{stage.label === 'Foto biometria' ? 'Biometria' : stage.label}<SortIcon column={stage.key} /></button></th>)}<th className="px-3 py-2 text-right"><button onClick={() => changeSort('finalization')} className="ml-auto flex items-center gap-1 font-semibold">Finalização proposta <SortIcon column="finalization" /></button></th></tr></thead><tbody>{sortedCurrent.map((row, rowIndex) => { const globalIndex = rows.findIndex(item => iso(item.date) === iso(row.date)); const previous = globalIndex > 0 ? rows[globalIndex - 1] : null; const currentRate = percentage(row.emitidos, row.pedidos), previousRate = previous ? percentage(previous.emitidos, previous.pedidos) : null; const rateDelta = currentRate != null && previousRate != null ? currentRate - previousRate : null; return <tr key={iso(row.date)} className={`border-t border-slate-100 ${rowIndex % 2 ? 'bg-slate-50/40' : ''}`}><td onMouseEnter={event => showHover(event, row, 'date')} onMouseLeave={() => setHoverDetail(null)} className="sticky left-0 z-[5] whitespace-nowrap bg-white px-3 py-2"><div className="font-mono text-[11px] font-semibold text-slate-800">{shortDate(row.date)}</div><div className="mt-0.5 text-[9px] capitalize text-slate-400">{fullWeekday(row.date)}</div></td>{stageConfig.map(stage => <td key={stage.key} className="px-1.5 py-1"><EvolutionCell value={row[stage.key]} previous={previous?.[stage.key] ?? null} onEnter={event => showHover(event, row, stage.key)} onLeave={() => setHoverDetail(null)} /></td>)}<td onMouseEnter={event => showHover(event, row, 'finalization')} onMouseLeave={() => setHoverDetail(null)} className="px-3 py-2 text-right"><div className="font-mono text-[11px] font-semibold text-slate-900">{percentageLabel(currentRate, 2)}</div><div className={`mt-0.5 flex items-center justify-end gap-0.5 text-[9px] font-semibold ${rateDelta == null ? 'text-slate-400' : rateDelta > 0 ? 'text-emerald-700' : rateDelta < 0 ? 'text-red-700' : 'text-slate-400'}`}>{rateDelta == null ? <ArrowRight size={10} /> : rateDelta > 0 ? <ArrowUp size={10} /> : rateDelta < 0 ? <ArrowDown size={10} /> : <ArrowRight size={10} />}{rateDelta == null ? 'sem base' : `${Math.abs(rateDelta).toFixed(2).replace('.', ',')} p.p.`}</div></td></tr>; })}</tbody></table></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-5"><div><h2 className="text-lg font-semibold text-slate-950">Detalhe {granularityLabel(detailGranularity).toLowerCase()} · {periodLabel}</h2><p className="text-xs text-slate-500">Cada etapa mostra volume e taxa de avanço ou cobertura compatível.</p></div><div className="flex flex-wrap items-center gap-2"><GranularityToggle value={detailGranularity} onChange={setDetailGranularity} /><button onClick={exportCsv} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div></div>
+        <div className="max-h-[470px] overflow-auto"><table className="w-full min-w-[1120px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr><th className="sticky left-0 z-20 bg-slate-100 px-3 py-2 text-left"><button onClick={() => changeSort('date')} className="flex items-center gap-1 font-semibold">Período <SortIcon column="date" /></button></th>{stageConfig.map((stage, index) => <th key={stage.key} className="px-3 py-2 text-right"><button onClick={() => changeSort(stage.key)} className="ml-auto flex items-center gap-1 font-semibold"><FunnelStageLabel index={index} label={stage.label === 'Foto biometria' ? 'Biometria' : stage.label} compact /><SortIcon column={stage.key} /></button></th>)}</tr></thead><tbody>{sortedDetailRows.map((item, rowIndex) => <tr key={item.key} className={`border-t border-slate-100 ${rowIndex % 2 ? 'bg-slate-50/40' : ''}`}><td onMouseEnter={event => detailGranularity === 'daily' && showHover(event, item.row, 'date')} onMouseLeave={() => setHoverDetail(null)} className="sticky left-0 z-[5] whitespace-nowrap bg-white px-3 py-2"><div className="font-mono text-[11px] font-semibold text-slate-800">{item.label}</div>{item.weekday && <div className="mt-0.5 text-[9px] capitalize text-slate-400">{item.weekday}</div>}</td>{stageConfig.map(stage => { const rate = serasaAdvanceRate(item.row, stage.key); const note = stage.key === 'consultas' ? 'base' : ['bio', 'docs', 'assinatura'].includes(stage.key) ? 'cobertura' : 'avanço'; return <td key={stage.key} onMouseEnter={event => detailGranularity === 'daily' && showHover(event, item.row, stage.key)} onMouseLeave={() => setHoverDetail(null)} className="px-3 py-2"><StageMetricCell value={item.row[stage.key] == null ? '—' : formatNumber(item.row[stage.key] as number)} rate={rate == null ? null : percentageLabel(rate, 2)} note={note} tone={stage.key === 'consultas' ? 'slate' : stage.key === 'bio' && item.row.bio == null ? 'amber' : 'teal'} /></td>; })}</tr>)}</tbody></table></div>
       </section>
     </div>
 
