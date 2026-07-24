@@ -1,16 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, Goal } from '../../types/framework';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid } from 'recharts';
-import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
-import { useBU } from '../../contexts/BUContext';
-import { Eye, EyeOff, Info } from 'lucide-react';
-import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
-import { useAppStore } from '../../store/useAppStore';
-import { ChartTooltip } from '../ui/ChartTooltip';
-import { deriveActivityMetrics } from '../../utils/activityMetrics';
-
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Legend,
+    Line,
+    LineChart,
+    ReferenceLine,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Eye, EyeOff, Info, Layers3 } from 'lucide-react';
+import { Activity, Goal } from '../../types/framework';
+import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
+import { useBU } from '../../contexts/BUContext';
+import { useAppStore } from '../../store/useAppStore';
+import { deriveActivityMetrics } from '../../utils/activityMetrics';
+import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
+import { ChartTooltip } from '../ui/ChartTooltip';
+import {
+    ACQUISITION_BUS,
+    AcquisitionBU,
+    BU_ANALYTICS_PROFILES,
+    canConsolidateBUs,
+    getCardsGoal,
+    getCacGoal,
+} from './buAnalyticsProfiles';
 
 interface LaunchPlannerKPIsProps {
     activities: Activity[];
@@ -23,6 +42,25 @@ interface ChartHeadingProps {
     helpText: string;
     onClick?: () => void;
 }
+
+type ChartMode = 'monthly' | 'daily';
+type MultiBUMode = 'comparison' | 'consolidated';
+
+interface ActivityAggregate {
+    propostas: number;
+    cartoes: number;
+    custo: number;
+    base: number;
+}
+
+const EMPTY_AGGREGATE: ActivityAggregate = {
+    propostas: 0,
+    cartoes: 0,
+    custo: 0,
+    base: 0,
+};
+
+const DIMENSION_COLORS = ['#2563EB', '#7C3AED', '#10B981', '#F97316'];
 
 const ChartHeading: React.FC<ChartHeadingProps> = ({ title, helpText, onClick }) => (
     <div className="flex min-w-0 items-center gap-2">
@@ -47,864 +85,919 @@ const ChartHeading: React.FC<ChartHeadingProps> = ({ title, helpText, onClick })
     </div>
 );
 
-export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({ activities, goals, currentMonth }) => {
+const metricValue = (activity: Activity): ActivityAggregate => {
+    const metrics = deriveActivityMetrics(activity);
+    return {
+        propostas: Number(activity.kpis?.propostas) || 0,
+        cartoes: metrics.cartoes,
+        custo: metrics.custoTotal,
+        base: Number(activity.kpis?.baseEntregue) || Number(activity.kpis?.baseEnviada) || 0,
+    };
+};
 
+const addAggregate = (target: ActivityAggregate, value: ActivityAggregate) => {
+    target.propostas += value.propostas;
+    target.cartoes += value.cartoes;
+    target.custo += value.custo;
+    target.base += value.base;
+};
+
+const getPeriodKey = (date: Date, mode: ChartMode) =>
+    format(date, mode === 'daily' ? 'yyyy-MM-dd' : 'yyyy-MM');
+
+const getDimensionValue = (activity: Activity, dimension: 'segmento' | 'parceiro') => {
+    const value = dimension === 'parceiro' ? activity.parceiro : activity.segmento;
+    return value?.trim() || (dimension === 'parceiro' ? 'Sem parceiro' : 'Sem segmento');
+};
+
+const formatCompact = (value: number) =>
+    value.toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+
+const formatCurrency = (value: number) =>
+    value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
+    activities,
+    goals,
+    currentMonth,
+}) => {
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
     const allStoreActivities = useAppStore((state) => state.activities);
     const setTab = useAppStore((state) => state.setTab);
     const setReportDeepLink = useAppStore((state) => state.setReportDeepLink);
     const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
-    const { isBUSelected, selectedBUs } = useBU();
+    const { selectedBUs } = useBU();
 
+    const [chartMode, setChartMode] = useState<ChartMode>('daily');
+    const [multiBUMode, setMultiBUMode] = useState<MultiBUMode>('comparison');
     const [showSerasa, setShowSerasa] = useState(false);
     const [showOtherB2C, setShowOtherB2C] = useState(true);
-    // O trabalho operacional começa no dia a dia; o modo mensal segue disponível
-    // para leitura de tendência, mas não é mais o estado inicial.
-    const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('daily');
-    const isMonthly = chartMode === 'monthly';
-
-    const SEGMENT_COLORS: Record<string, string> = {
-        'Abandonados': '#3B82F6',
-        'Negados': '#10B981',
-        'Base_Proprietaria': '#A855F7',
-        'Base Proprietaria': '#A855F7',
-        'Aprovados_nao_convertedos': '#F97316',
-        'Aprovados não convertidos': '#F97316',
-        'Leads_Parceiros': '#EC4899',
-        'Leads Parceiros': '#EC4899',
-        'Instabilidade': '#14B8A6',
-    };
-
-    const DEFAULT_COLORS = ['#2563EB', '#10B981', '#A855F7', '#F97316', '#EC4899', '#14B8A6', '#F59E0B', '#64748B'];
-
-    const activeSegments = useMemo(() => {
-        const segments = new Set<string>();
-        const targetActivities = isMonthly 
-            ? allStoreActivities.filter(a => selectedBUs.some((selectedBU) => selectedBU === a.bu))
-            : activities;
-
-        targetActivities.forEach(activity => {
-            if (activity.segmento) {
-                segments.add(activity.segmento);
-            }
-        });
-        return Array.from(segments);
-    }, [activities, allStoreActivities, selectedBUs, isMonthly]);
-
-    // Filtro por clique na legenda: ao clicar num segmento (ou canal), os gráficos de
-    // Propostas/Emissões passam a exibir apenas aquela série; as demais somem do gráfico
-    // e ficam cinza na legenda. Clicar de novo (ou em outra) limpa/troca a seleção.
-    // A chave é o NOME da série, então a seleção vale para os dois gráficos e persiste
-    // entre os modos Mensal e Diário.
     const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
-
-    const validSeriesNames = useMemo(() => {
-        const names = new Set<string>();
-        if (showSerasa) {
-            names.add('CRM B2C');
-            names.add('Serasa API');
-        } else {
-            activeSegments.forEach(s => names.add(s));
-        }
-        if (showOtherB2C) names.add('Outros B2C');
-        return names;
-    }, [showSerasa, showOtherB2C, activeSegments]);
-
-    // Se a série selecionada deixar de existir (ex.: alternar Serasa API, mudar de BU),
-    // limpa a seleção para não esconder todas as barras e deixar o gráfico vazio.
-    useEffect(() => {
-        if (selectedSeries && !validSeriesNames.has(selectedSeries)) {
-            setSelectedSeries(null);
-        }
-    }, [selectedSeries, validSeriesNames]);
-
-    const isSeriesHidden = (name: string) => !!selectedSeries && selectedSeries !== name;
-
-    const segmentLegendProps = {
-        iconSize: 8,
-        wrapperStyle: { fontSize: '10px', paddingTop: '5px' },
-        onClick: (o: any) => {
-            const name = o?.value ?? o?.payload?.value;
-            if (!name) return;
-            if (name === 'Outros B2C' && !showOtherB2C) return;
-            setSelectedSeries(prev => (prev === name ? null : name));
-        },
-        formatter: (value: string) => {
-            const disabled = value === 'Outros B2C' && !showOtherB2C;
-            const dimmed = disabled || (!!selectedSeries && selectedSeries !== value);
-            return (
-                <span
-                    style={{
-                        color: dimmed ? '#cbd5e1' : '#475569',
-                        opacity: disabled ? 0.45 : dimmed ? 0.6 : 1,
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                        fontWeight: selectedSeries === value ? 700 : 400,
-                    }}
-                >
-                    {value}
-                </span>
-            );
-        },
-    };
-
-    const dailySegmentsMap = useMemo(() => {
-        const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
-        activities.forEach(activity => {
-            const date = activity.dataDisparo;
-            if (!date || isNaN(date.getTime())) return;
-            const dateKey = format(date, 'yyyy-MM-dd');
-            const segment = activity.segmento || 'Sem Segmento';
-
-            if (!map.has(dateKey)) {
-                map.set(dateKey, {});
-            }
-            const segments = map.get(dateKey)!;
-            if (!segments[segment]) {
-                segments[segment] = { propostas: 0, emissoes: 0 };
-            }
-            segments[segment].propostas += activity.kpis?.propostas || 0;
-            segments[segment].emissoes += activity.kpis?.emissoes || activity.kpis?.cartoes || 0;
-        });
-        return map;
-    }, [activities]);
-
-    const dailyCacMap = useMemo(() => {
-        const map = new Map<string, { custoTotal: number; cartoes: number }>();
-        activities.forEach((activity) => {
-            const date = activity.dataDisparo;
-            if (!date || isNaN(date.getTime())) return;
-
-            const dateKey = format(date, 'yyyy-MM-dd');
-            const current = map.get(dateKey) ?? { custoTotal: 0, cartoes: 0 };
-            const metrics = deriveActivityMetrics(activity);
-            current.custoTotal += metrics.custoTotal;
-            current.cartoes += metrics.cartoes;
-            map.set(dateKey, current);
-        });
-        return map;
-    }, [activities]);
-
-    const monthlySegmentsMap = useMemo(() => {
-        const map = new Map<string, Record<string, { propostas: number, emissoes: number }>>();
-        const targetActivities = allStoreActivities.filter(a => selectedBUs.some((selectedBU) => selectedBU === a.bu));
-        targetActivities.forEach(activity => {
-            const date = activity.dataDisparo;
-            if (!date || isNaN(date.getTime())) return;
-            const monthKey = format(date, 'yyyy-MM');
-            const segment = activity.segmento || 'Sem Segmento';
-
-            if (!map.has(monthKey)) {
-                map.set(monthKey, {});
-            }
-            const segments = map.get(monthKey)!;
-            if (!segments[segment]) {
-                segments[segment] = { propostas: 0, emissoes: 0 };
-            }
-            segments[segment].propostas += activity.kpis?.propostas || 0;
-            segments[segment].emissoes += activity.kpis?.emissoes || activity.kpis?.cartoes || 0;
-        });
-        return map;
-    }, [allStoreActivities, selectedBUs]);
-
-    const monthlyCacMap = useMemo(() => {
-        const map = new Map<string, { custoTotal: number; cartoes: number }>();
-        const targetActivities = allStoreActivities.filter(
-            (activity) => selectedBUs.length === 0 || selectedBUs.some((selectedBU) => selectedBU === activity.bu),
-        );
-
-        targetActivities.forEach((activity) => {
-            const date = activity.dataDisparo;
-            if (!date || isNaN(date.getTime())) return;
-
-            const monthKey = format(date, 'yyyy-MM');
-            const current = map.get(monthKey) ?? { custoTotal: 0, cartoes: 0 };
-            const metrics = deriveActivityMetrics(activity);
-            current.custoTotal += metrics.custoTotal;
-            current.cartoes += metrics.cartoes;
-            map.set(monthKey, current);
-        });
-        return map;
-    }, [allStoreActivities, selectedBUs]);
-
-
-    const isOnlySeguros = selectedBUs.length === 1 && selectedBUs[0] === 'Seguros';
-    const segurosActivities = useMemo(() => activities.filter((activity) => activity.bu === 'Seguros'), [activities]);
-
-    const showCharts = !isOnlySeguros && selectedBUs.includes('B2C') && !isBUSelected('B2B2C') && !isBUSelected('Plurix');
-
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [selectedDrillBU, setSelectedDrillBU] = useState<AcquisitionBU | null>(null);
 
-    const handleChartClick = (data: any) => {
-        if (data && data.activePayload && data.activePayload[0]) {
-            const payload = data.activePayload[0].payload;
-            if (payload.data) {
-                setSelectedDate(payload.data);
+    const chartBUs = useMemo<AcquisitionBU[]>(() => {
+        if (selectedBUs.length === 0) return ACQUISITION_BUS;
+        return ACQUISITION_BUS.filter((bu) => selectedBUs.includes(bu));
+    }, [selectedBUs]);
+
+    const excludedBUs = useMemo(
+        () => selectedBUs.filter((bu) => !ACQUISITION_BUS.includes(bu as AcquisitionBU)),
+        [selectedBUs],
+    );
+
+    const singleBU = chartBUs.length === 1 ? chartBUs[0] : null;
+    const profile = singleBU ? BU_ANALYTICS_PROFILES[singleBU] : null;
+    const isMultiBU = chartBUs.length > 1;
+    const canConsolidate = canConsolidateBUs(chartBUs);
+    const isConsolidated = isMultiBU && multiBUMode === 'consolidated' && canConsolidate;
+    const isMonthly = chartMode === 'monthly';
+    const currentGoal = goals.find((goal) => goal.mes === currentMonth);
+
+    useEffect(() => {
+        if (!canConsolidate && multiBUMode === 'consolidated') {
+            setMultiBUMode('comparison');
+        }
+    }, [canConsolidate, multiBUMode]);
+
+    useEffect(() => {
+        setSelectedSeries(null);
+    }, [chartMode, singleBU, multiBUMode]);
+
+    const sourceActivities = useMemo(
+        () => (isMonthly ? allStoreActivities : activities).filter(
+            (activity) => chartBUs.includes(activity.bu as AcquisitionBU),
+        ),
+        [activities, allStoreActivities, chartBUs, isMonthly],
+    );
+
+    const periodRows = useMemo(() => {
+        const source = isMonthly ? yearMonthlyAnalysis : dailyAnalysis;
+        return source.map((item) => {
+            const dateKey = isMonthly ? item.data.slice(0, 7) : item.data;
+            const date = isMonthly
+                ? new Date(Number(dateKey.slice(0, 4)), Number(dateKey.slice(5, 7)) - 1, 1)
+                : new Date(`${dateKey}T12:00:00`);
+
+            return {
+                data: isMonthly ? `${dateKey}-01` : dateKey,
+                periodKey: dateKey,
+                displayDate: format(date, isMonthly ? 'MMM/yy' : 'dd/MM', { locale: ptBR }),
+                b2cTotalPropostas: Number(item.propostas_b2c_total) || 0,
+                b2cTotalCartoes: Number(item.emissoes_b2c_total) || 0,
+                serasaPropostas: Number(item.propostas_serasa) || 0,
+                serasaCartoes: Number(item.emissoes_serasa) || 0,
+            };
+        });
+    }, [dailyAnalysis, isMonthly, yearMonthlyAnalysis]);
+
+    const aggregates = useMemo(() => {
+        const byPeriod = new Map<string, Record<AcquisitionBU, ActivityAggregate>>();
+        const byPeriodDimension = new Map<string, Record<string, ActivityAggregate>>();
+        const dimensionTotals = new Map<string, number>();
+
+        sourceActivities.forEach((activity) => {
+            const date = activity.dataDisparo;
+            if (!date || Number.isNaN(date.getTime())) return;
+
+            const bu = activity.bu as AcquisitionBU;
+            if (!chartBUs.includes(bu)) return;
+
+            const periodKey = getPeriodKey(date, chartMode);
+            const periodBU = byPeriod.get(periodKey) ?? {} as Record<AcquisitionBU, ActivityAggregate>;
+            const value = metricValue(activity);
+            periodBU[bu] = periodBU[bu] ?? { ...EMPTY_AGGREGATE };
+            addAggregate(periodBU[bu], value);
+            byPeriod.set(periodKey, periodBU);
+
+            if (profile) {
+                const dimension = getDimensionValue(activity, profile.breakdown);
+                const periodDimensions = byPeriodDimension.get(periodKey) ?? {};
+                periodDimensions[dimension] = periodDimensions[dimension] ?? { ...EMPTY_AGGREGATE };
+                addAggregate(periodDimensions[dimension], value);
+                byPeriodDimension.set(periodKey, periodDimensions);
+                dimensionTotals.set(
+                    dimension,
+                    (dimensionTotals.get(dimension) ?? 0) + value.propostas + value.cartoes,
+                );
+            }
+        });
+
+        return { byPeriod, byPeriodDimension, dimensionTotals };
+    }, [chartBUs, chartMode, profile, sourceActivities]);
+
+    const dimensionSeries = useMemo(() => {
+        if (!profile) return [] as Array<{ name: string; sourceNames: string[]; color: string }>;
+
+        const sorted = Array.from(aggregates.dimensionTotals.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([name]) => name);
+        const maximumDimensionSeries = profile.bu === 'B2C' && showOtherB2C ? 3 : 4;
+        const needsRemainderGroup = sorted.length > maximumDimensionSeries;
+        const namedSeriesLimit = needsRemainderGroup
+            ? maximumDimensionSeries - 1
+            : maximumDimensionSeries;
+        const visible = sorted.slice(0, namedSeriesLimit);
+        const remaining = sorted.slice(namedSeriesLimit);
+
+        const series = visible.map((name, index) => ({
+            name,
+            sourceNames: [name],
+            color: DIMENSION_COLORS[index % DIMENSION_COLORS.length],
+        }));
+
+        if (remaining.length > 0) {
+            series.push({
+                name: profile.breakdown === 'parceiro' ? 'Demais parceiros' : 'Demais segmentos',
+                sourceNames: remaining,
+                color: '#64748B',
+            });
+        }
+
+        return series;
+    }, [aggregates.dimensionTotals, profile, showOtherB2C]);
+
+    const timeChartData = useMemo(() => periodRows.map((row) => {
+        const periodBU = aggregates.byPeriod.get(row.periodKey) ?? {} as Record<AcquisitionBU, ActivityAggregate>;
+        const result: Record<string, string | number | null> = { ...row };
+
+        chartBUs.forEach((bu) => {
+            const value = periodBU[bu] ?? EMPTY_AGGREGATE;
+            result[`propostas_${bu}`] = value.propostas;
+            result[`cartoes_${bu}`] = value.cartoes;
+            result[`cac_${bu}`] = value.cartoes > 0 && value.custo > 0 ? value.custo / value.cartoes : null;
+            result[`conversao_${bu}`] = value.base > 0 ? (value.cartoes / value.base) * 100 : null;
+        });
+
+        if (profile) {
+            const dimensions = aggregates.byPeriodDimension.get(row.periodKey) ?? {};
+            dimensionSeries.forEach((series, index) => {
+                const combined = series.sourceNames.reduce<ActivityAggregate>((total, name) => {
+                    addAggregate(total, dimensions[name] ?? EMPTY_AGGREGATE);
+                    return total;
+                }, { ...EMPTY_AGGREGATE });
+                result[`dim_propostas_${index}`] = combined.propostas;
+                result[`dim_cartoes_${index}`] = combined.cartoes;
+            });
+
+            const profileValue = periodBU[profile.bu] ?? EMPTY_AGGREGATE;
+            result.cac_single = profileValue.cartoes > 0 && profileValue.custo > 0
+                ? profileValue.custo / profileValue.cartoes
+                : null;
+
+            if (profile.bu === 'B2C') {
+                result.propostas_crm = profileValue.propostas;
+                result.cartoes_crm = profileValue.cartoes;
+                result.serasa_propostas = row.serasaPropostas;
+                result.serasa_cartoes = row.serasaCartoes;
+                result.outros_propostas = Math.max(
+                    0,
+                    row.b2cTotalPropostas - profileValue.propostas - row.serasaPropostas,
+                );
+                result.outros_cartoes = Math.max(
+                    0,
+                    row.b2cTotalCartoes - profileValue.cartoes - row.serasaCartoes,
+                );
             }
         }
-    };
 
-    const handleDotClick = (props: any) => {
-        if (props && props.payload && props.payload.data) {
-            setSelectedDate(props.payload.data);
+        if (isConsolidated) {
+            const consolidated = chartBUs.reduce<ActivityAggregate>((total, bu) => {
+                addAggregate(total, periodBU[bu] ?? EMPTY_AGGREGATE);
+                return total;
+            }, { ...EMPTY_AGGREGATE });
+            result.cac_consolidado = consolidated.cartoes > 0 && consolidated.custo > 0
+                ? consolidated.custo / consolidated.cartoes
+                : null;
         }
-    };
+
+        return result;
+    }), [aggregates.byPeriod, aggregates.byPeriodDimension, chartBUs, dimensionSeries, isConsolidated, periodRows, profile]);
+
+    const pacingData = useMemo(() => {
+        const [year, month] = currentMonth.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+        const dailyActivities = activities.filter(
+            (activity) =>
+                chartBUs.includes(activity.bu as AcquisitionBU) &&
+                format(activity.dataDisparo, 'yyyy-MM').startsWith(monthPrefix),
+        );
+        const activityByDate = new Map<string, Record<AcquisitionBU, ActivityAggregate>>();
+
+        dailyActivities.forEach((activity) => {
+            const dateKey = format(activity.dataDisparo, 'yyyy-MM-dd');
+            const period = activityByDate.get(dateKey) ?? {} as Record<AcquisitionBU, ActivityAggregate>;
+            const bu = activity.bu as AcquisitionBU;
+            period[bu] = period[bu] ?? { ...EMPTY_AGGREGATE };
+            addAggregate(period[bu], metricValue(activity));
+            activityByDate.set(dateKey, period);
+        });
+
+        const b2cByDate = new Map(
+            dailyAnalysis
+                .filter((day) => day.data.startsWith(monthPrefix))
+                .map((day) => [day.data, Number(day.emissoes_b2c_total) || 0] as const),
+        );
+        const b2cHasExternal = Array.from(b2cByDate.values()).some((value) => value > 0);
+        const cumulativeByBU: Record<AcquisitionBU, number> = { B2C: 0, B2B2C: 0, Plurix: 0 };
+        const goalsByBU = Object.fromEntries(
+            chartBUs.map((bu) => [bu, getCardsGoal(currentGoal, bu)]),
+        ) as Record<AcquisitionBU, number>;
+
+        const data = Array.from({ length: daysInMonth }, (_, index) => {
+            const day = index + 1;
+            const dateKey = `${monthPrefix}-${String(day).padStart(2, '0')}`;
+            const byBU = activityByDate.get(dateKey) ?? {} as Record<AcquisitionBU, ActivityAggregate>;
+            const result: Record<string, string | number | null> = {
+                data: dateKey,
+                displayDate: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`,
+            };
+
+            chartBUs.forEach((bu) => {
+                const dayCards = bu === 'B2C' && b2cHasExternal
+                    ? b2cByDate.get(dateKey) ?? 0
+                    : byBU[bu]?.cartoes ?? 0;
+                cumulativeByBU[bu] += dayCards;
+                const goal = goalsByBU[bu] ?? 0;
+                result[`realizado_${bu}`] = cumulativeByBU[bu];
+                result[`meta_${bu}`] = goal > 0 ? (goal * day) / daysInMonth : 0;
+                result[`atingimento_${bu}`] = goal > 0 ? (cumulativeByBU[bu] / goal) * 100 : null;
+            });
+
+            if (singleBU || isConsolidated) {
+                const included = singleBU ? [singleBU] : chartBUs;
+                result.realizado_consolidado = included.reduce(
+                    (sum, bu) => sum + cumulativeByBU[bu],
+                    0,
+                );
+                const totalGoal = included.reduce((sum, bu) => sum + (goalsByBU[bu] ?? 0), 0);
+                result.meta_consolidada = totalGoal > 0 ? (totalGoal * day) / daysInMonth : 0;
+            }
+
+            return result;
+        });
+
+        const lastActivityDate = dailyActivities.reduce<string | null>((latest, activity) => {
+            const dateKey = format(activity.dataDisparo, 'yyyy-MM-dd');
+            return !latest || dateKey > latest ? dateKey : latest;
+        }, null);
+        const lastExternalB2CDate = b2cHasExternal
+            ? Array.from(b2cByDate.entries()).reduce<string | null>(
+                (latest, [dateKey, value]) => value > 0 && (!latest || dateKey > latest) ? dateKey : latest,
+                null,
+            )
+            : null;
+        const observedDates = [lastActivityDate, lastExternalB2CDate]
+            .filter((value): value is string => Boolean(value))
+            .sort();
+        const lastObservedDate = observedDates[observedDates.length - 1] ?? null;
+        const lastObservedIndex = lastObservedDate ? Number(lastObservedDate.slice(-2)) - 1 : -1;
+
+        data.forEach((row, index) => {
+            if (index > lastObservedIndex) {
+                chartBUs.forEach((bu) => {
+                    row[`realizado_${bu}`] = null;
+                    row[`atingimento_${bu}`] = null;
+                });
+                row.realizado_consolidado = null;
+            }
+        });
+
+        const totalsByBU = Object.fromEntries(chartBUs.map((bu) => {
+            const lastValue = lastObservedIndex >= 0 ? data[lastObservedIndex]?.[`realizado_${bu}`] : 0;
+            return [bu, Number(lastValue) || 0];
+        })) as Record<AcquisitionBU, number>;
+
+        return { data, totalsByBU, goalsByBU, lastObservedIndex };
+    }, [activities, chartBUs, currentGoal, currentMonth, dailyAnalysis, isConsolidated, singleBU]);
+
+    const singleSummary = useMemo(() => {
+        const included = singleBU ? [singleBU] : chartBUs;
+        const totalCards = included.reduce((sum, bu) => sum + (pacingData.totalsByBU[bu] ?? 0), 0);
+        const goalCards = included.reduce((sum, bu) => sum + (pacingData.goalsByBU[bu] ?? 0), 0);
+        return {
+            totalCards,
+            goalCards,
+            progress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0,
+        };
+    }, [chartBUs, pacingData.goalsByBU, pacingData.totalsByBU, singleBU]);
+
+    const selectedActivities = useMemo(() => {
+        if (!selectedDate) return [];
+        return activities.filter((activity) => {
+            const activityDate = format(activity.dataDisparo, 'yyyy-MM-dd');
+            return activityDate === selectedDate && (!selectedDrillBU || activity.bu === selectedDrillBU);
+        });
+    }, [activities, selectedDate, selectedDrillBU]);
 
     const openDailyResults = () => {
         setReportDeepLink({ mode: 'daily' });
         setTab('relatorio');
     };
 
-    const selectedActivities = useMemo(() => {
-        if (!selectedDate) return [];
-        return activities.filter(act => {
-            const actDate = act.dataDisparo instanceof Date
-                ? format(act.dataDisparo, 'yyyy-MM-dd')
-                : typeof act.dataDisparo === 'string' ? (act.dataDisparo as string).split('T')[0] : '';
-            return actDate === selectedDate;
-        });
-    }, [selectedDate, activities]);
+    const handleChartClick = (event: any) => {
+        if (isMonthly) return;
+        const active = event?.activePayload?.[0];
+        const payload = active?.payload;
+        if (!payload?.data) return;
 
-    const metrics = useMemo(() => {
-        const currentGoal = goals.find(g => g.mes === currentMonth);
-
-        const isOnlyBU = (bu: string) => selectedBUs.length === 1 && selectedBUs[0] === bu;
-        // selectedBUs vazio = todas as BUs ativas
-        const hasBU = (bu: string) => selectedBUs.length === 0 || selectedBUs.some((selectedBU) => selectedBU === bu);
-        // BUs não-Seguros ativas
-        const activeCoreB2Us = ['B2C', 'B2B2C', 'Plurix'].filter(bu => hasBU(bu));
-
-        // Cartões B2C: preferimos a originação real (b2c_daily_metrics via dailyAnalysis),
-        // mas caímos para as emissões do CRM quando não há dado B2C no período — caso
-        // contrário a meta mostra 0 mesmo havendo cartões reais (ex.: mês sem b2c_daily_metrics).
-        const b2cFromDaily = dailyAnalysis.reduce((sum, d) => sum + d.emissoes_b2c_total, 0);
-        const b2cFromCrm = activities.filter(a => a.bu === 'B2C').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-        const b2cCards = b2cFromDaily > 0 ? b2cFromDaily : b2cFromCrm;
-
-        // ── Seguros isolado ──────────────────────────────────────────────────
-        if (isOnlySeguros) {
-            const totalCards = segurosActivities.reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-            const goalCards  = currentGoal?.bus?.Seguros?.cartoes || 0;
-            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (Seguros)' };
-        }
-
-        // ── B2C sozinho ou nenhuma BU especial filtrada (estado padrão) ─────
-        if (isOnlyBU('B2C') || activeCoreB2Us.every(bu => bu === 'B2C')) {
-            const totalCards = b2cCards;
-            const goalCards  = currentGoal?.b2c_meta || 0;
-            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (B2C)' };
-        }
-
-        // ── B2B2C isolado ────────────────────────────────────────────────────
-        if (isOnlyBU('B2B2C')) {
-            const totalCards = activities.filter(a => a.bu === 'B2B2C').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-            const goalCards  = currentGoal?.b2b2c_meta || 0;
-            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (B2B2C)' };
-        }
-
-        // ── Plurix isolado ───────────────────────────────────────────────────
-        if (isOnlyBU('Plurix')) {
-            const totalCards = activities.filter(a => a.bu === 'Plurix').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-            const goalCards  = currentGoal?.plurix_meta || 0;
-            return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label: 'Meta (Plurix)' };
-        }
-
-        // ── Múltiplas BUs — soma proporcional ────────────────────────────────
-        let totalCards = 0;
-        let goalCards  = 0;
-        const labelParts: string[] = [];
-
-        if (hasBU('B2C')) {
-            totalCards += b2cCards;
-            const g = currentGoal?.b2c_meta || 0;
-            goalCards += g;
-            if (g > 0) labelParts.push('B2C');
-        }
-        if (hasBU('B2B2C')) {
-            totalCards += activities.filter(a => a.bu === 'B2B2C').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-            const g = currentGoal?.b2b2c_meta || 0;
-            goalCards += g;
-            if (g > 0) labelParts.push('B2B2C');
-        }
-        if (hasBU('Plurix')) {
-            totalCards += activities.filter(a => a.bu === 'Plurix').reduce((sum, act) => sum + (act.kpis?.cartoes || 0), 0);
-            const g = currentGoal?.plurix_meta || 0;
-            goalCards += g;
-            if (g > 0) labelParts.push('Plurix');
-        }
-
-        const label = labelParts.length > 0 ? `Meta (${labelParts.join(' + ')})` : 'Meta combinada';
-        return { totalCards, goalCards, goalProgress: goalCards > 0 ? (totalCards / goalCards) * 100 : 0, label };
-    }, [goals, currentMonth, dailyAnalysis, selectedBUs, activities, isOnlySeguros, segurosActivities]);
-
-    const cardsPacing = useMemo(() => {
-        const [year, month] = currentMonth.split('-').map(Number);
-        const daysInMonth = new Date(year, month, 0).getDate();
-        const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
-        const isOnlyBU = (bu: string) => selectedBUs.length === 1 && selectedBUs[0] === bu;
-        const hasBU = (bu: string) => selectedBUs.length === 0 || selectedBUs.some((selectedBU) => selectedBU === bu);
-
-        const activityCardsByDate = new Map<string, Record<string, number>>();
-        const observedActivityDates = new Set<string>();
-
-        activities.forEach((activity) => {
-            const date = activity.dataDisparo;
-            if (!date || isNaN(date.getTime())) return;
-
-            const dateKey = format(date, 'yyyy-MM-dd');
-            if (!dateKey.startsWith(monthPrefix)) return;
-
-            const byBU = activityCardsByDate.get(dateKey) ?? {};
-            byBU[activity.bu] = (byBU[activity.bu] ?? 0) + (activity.kpis?.cartoes || 0);
-            activityCardsByDate.set(dateKey, byBU);
-
-            // Uma atividade com qualquer resultado preenchido confirma que o dia já foi observado,
-            // mesmo quando a quantidade de cartões foi zero.
-            if (
-                (activity.kpis?.cartoes || 0) > 0 ||
-                (activity.kpis?.propostas || 0) > 0 ||
-                (activity.kpis?.baseEntregue || 0) > 0 ||
-                (activity.kpis?.baseEnviada || 0) > 0
-            ) {
-                observedActivityDates.add(dateKey);
-            }
-        });
-
-        const b2cFromDaily = dailyAnalysis.reduce((sum, day) => sum + day.emissoes_b2c_total, 0);
-        const useB2CDailySource = b2cFromDaily > 0;
-        const b2cDailyByDate = new Map(
-            dailyAnalysis
-                .filter((day) => day.data.startsWith(monthPrefix))
-                .map((day) => [day.data, day] as const),
-        );
-
-        const selectedActivityBUs = isOnlySeguros
-            ? ['Seguros']
-            : isOnlyBU('B2C')
-                ? ['B2C']
-                : isOnlyBU('B2B2C')
-                    ? ['B2B2C']
-                    : isOnlyBU('Plurix')
-                        ? ['Plurix']
-                        : ['B2C', 'B2B2C', 'Plurix'].filter(hasBU);
-
-        const dailyCards = Array.from({ length: daysInMonth }, (_, index) => {
-            const dayOfMonth = index + 1;
-            const dateKey = `${monthPrefix}-${String(dayOfMonth).padStart(2, '0')}`;
-            const activityValues = activityCardsByDate.get(dateKey) ?? {};
-            const b2cDay = b2cDailyByDate.get(dateKey);
-
-            let cards = 0;
-            selectedActivityBUs.forEach((bu) => {
-                if (bu === 'B2C' && useB2CDailySource) {
-                    cards += b2cDay?.emissoes_b2c_total ?? 0;
-                } else {
-                    cards += activityValues[bu] ?? 0;
-                }
-            });
-
-            const hasObservedB2CData = selectedActivityBUs.includes('B2C') && useB2CDailySource && !!b2cDay && (
-                b2cDay.emissoes_b2c_total > 0 ||
-                b2cDay.propostas_b2c_total > 0
-            );
-            const hasObservedActivityData = selectedActivityBUs.some((bu) => {
-                if (bu === 'B2C' && useB2CDailySource) return false;
-                return observedActivityDates.has(dateKey) && activityValues[bu] !== undefined;
-            });
-
-            return {
-                dateKey,
-                displayDate: `${String(dayOfMonth).padStart(2, '0')}/${String(month).padStart(2, '0')}`,
-                dayOfMonth,
-                cards,
-                observed: hasObservedB2CData || hasObservedActivityData,
-            };
-        });
-
-        const lastObservedIndex = dailyCards.reduce(
-            (lastIndex, day, index) => day.observed ? index : lastIndex,
-            -1,
-        );
-
-        let cumulativeCards = 0;
-        const data = dailyCards.map((day, index) => {
-            cumulativeCards += day.cards;
-            return {
-                ...day,
-                realizadoAcumulado: index <= lastObservedIndex ? cumulativeCards : null,
-                metaAcumulada: metrics.goalCards > 0
-                    ? (metrics.goalCards * day.dayOfMonth) / daysInMonth
-                    : 0,
-            };
-        });
-
-        const lastObservedPoint = lastObservedIndex >= 0 ? data[lastObservedIndex] : null;
-        const paceDelta = lastObservedPoint?.realizadoAcumulado != null
-            ? lastObservedPoint.realizadoAcumulado - lastObservedPoint.metaAcumulada
-            : null;
-
-        return { data, lastObservedPoint, paceDelta };
-    }, [activities, currentMonth, dailyAnalysis, isOnlySeguros, metrics.goalCards, selectedBUs]);
-
-    // Serasa é subconjunto do Total B2C; "Outros B2C" = Total − CRM − Serasa (residual).
-    const withChannels = (d: typeof dailyAnalysis[number]) => ({
-        ...d,
-        serasa_propostas: showSerasa ? d.propostas_serasa : 0,
-        serasa_emissoes: showSerasa ? d.emissoes_serasa : 0,
-        outros_propostas: Math.max(0, d.propostas_b2c_total - d.propostas_crm - d.propostas_serasa),
-        outros_emissoes: Math.max(0, d.emissoes_b2c_total - d.emissoes_crm - d.emissoes_serasa),
-        cac_medio: d.cac_medio
-    });
-
-    const comparisonData = useMemo(() => {
-        return dailyAnalysis.map(d => {
-            const [y, m, day] = d.data.split('-').map(Number);
-            const dateObj = new Date(y, m - 1, day);
-            const dateKey = d.data;
-            const cacTotals = dailyCacMap.get(dateKey);
-            // O mesmo cálculo derivado usado nos KPIs e no modal mantém o histórico
-            // visível mesmo quando custo/cartões não vierem materializados em dailyAnalysis.
-            const cacDoDia = cacTotals && cacTotals.cartoes > 0 && cacTotals.custoTotal > 0
-                ? cacTotals.custoTotal / cacTotals.cartoes
-                : null;
-
-            const segmentDataObj: Record<string, number> = {};
-            const segmentMap = dailySegmentsMap.get(dateKey) || {};
-            activeSegments.forEach(segment => {
-                const segVals = segmentMap[segment] || { propostas: 0, emissoes: 0 };
-                segmentDataObj[`crm_propostas_${segment}`] = segVals.propostas;
-                segmentDataObj[`crm_emissoes_${segment}`] = segVals.emissoes;
-            });
-
-            return {
-                ...withChannels(d),
-                ...segmentDataObj,
-                cac_medio: cacDoDia,
-                displayDate: format(dateObj, 'dd/MM', { locale: ptBR })
-            };
-        });
-    }, [dailyAnalysis, dailyCacMap, dailySegmentsMap, activeSegments, showSerasa]);
-
-    // Série mensal do ano corrente (jan → hoje), para o modo Mensal dos gráficos.
-    // Mantém a mesma semântica: custo do mês / cartões do mês, sem carregar valores.
-    const monthlyData = useMemo(() => {
-        return yearMonthlyAnalysis.map(d => {
-            const dateObj = new Date(d.ano, d.mes - 1, 1);
-            const monthKey = format(dateObj, 'yyyy-MM');
-            const cacTotals = monthlyCacMap.get(monthKey);
-            const cacDoMes = cacTotals && cacTotals.cartoes > 0 && cacTotals.custoTotal > 0
-                ? cacTotals.custoTotal / cacTotals.cartoes
-                : null;
-
-            const segmentDataObj: Record<string, number> = {};
-            const segmentMap = monthlySegmentsMap.get(monthKey) || {};
-            activeSegments.forEach(segment => {
-                const segVals = segmentMap[segment] || { propostas: 0, emissoes: 0 };
-                segmentDataObj[`crm_propostas_${segment}`] = segVals.propostas;
-                segmentDataObj[`crm_emissoes_${segment}`] = segVals.emissoes;
-            });
-
-            return {
-                ...withChannels(d),
-                ...segmentDataObj,
-                cac_medio: cacDoMes,
-                displayDate: format(dateObj, 'MMM/yy', { locale: ptBR })
-            };
-        });
-    }, [yearMonthlyAnalysis, monthlyCacMap, monthlySegmentsMap, activeSegments, showSerasa]);
-
-    // Dados efetivos usados pelos 3 gráficos de série temporal (CAC, Propostas, Emissões).
-    const timeChartData = isMonthly ? monthlyData : comparisonData;
-
-    // No modo Mensal não faz sentido abrir o modal de detalhes de um único dia.
-    const chartClick = isMonthly ? undefined : handleChartClick;
-    const dotClick = isMonthly ? undefined : handleDotClick;
-
-    // Toggle Mensal | Diário — segmented control compacto, inspirado em planilhas.
-    const ChartModeToggle = () => (
-        <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-            {([
-                { key: 'monthly', label: 'Mensal' },
-                { key: 'daily', label: 'Diário' },
-            ] as const).map(({ key, label }) => {
-                const active = chartMode === key;
-                return (
-                    <button
-                        key={key}
-                        type="button"
-                        onClick={() => setChartMode(key)}
-                        aria-pressed={active}
-                        className={`border-l border-slate-200 px-3 py-1.5 text-[11px] font-semibold first:border-l-0 transition-colors duration-150 ${
-                            active
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-                        }`}
-                    >
-                        {label}
-                    </button>
-                );
-            })}
-        </div>
-    );
-
-    // Toggle Serasa API — controle de série com estado explícito.
-    const SerasaToggle = () => (
-        <button
-            type="button"
-            aria-pressed={showSerasa}
-            onClick={() => setShowSerasa(!showSerasa)}
-            className={`px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 ${
-                showSerasa
-                    ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                    : 'bg-white text-slate-500 hover:bg-slate-50'
-            }`}
-        >
-            Serasa API
-        </button>
-    );
-
-    const OtherB2CToggle = () => {
-        const toggleOtherB2C = () => {
-            const next = !showOtherB2C;
-            setShowOtherB2C(next);
-            if (!next && selectedSeries === 'Outros B2C') {
-                setSelectedSeries(null);
-            }
-        };
-
-        return (
-            <button
-                type="button"
-                aria-pressed={showOtherB2C}
-                onClick={toggleOtherB2C}
-                title={showOtherB2C ? 'Ocultar Outros B2C dos gráficos' : 'Exibir Outros B2C nos gráficos'}
-                className={`inline-flex items-center gap-1.5 border-l border-slate-200 px-3 py-1.5 text-[11px] font-semibold transition-colors duration-150 ${
-                    showOtherB2C
-                        ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        : 'bg-white text-slate-400 hover:bg-slate-50'
-                }`}
-            >
-                {showOtherB2C ? <Eye size={12} aria-hidden="true" /> : <EyeOff size={12} aria-hidden="true" />}
-                Outros B2C
-            </button>
-        );
+        const dataKey = String(active?.dataKey ?? '');
+        const clickedBU = chartBUs.find((bu) => dataKey.endsWith(`_${bu}`)) ?? singleBU;
+        setSelectedDrillBU(clickedBU ?? null);
+        setSelectedDate(payload.data);
     };
 
-    const engagementData = useMemo(() => {
-        const byDate = new Map<string, { data: string; displayDate: string; aberturas: number; cliques: number; custo: number }>();
-        activities.forEach((activity) => {
-            const data = format(activity.dataDisparo, 'yyyy-MM-dd');
-            const current = byDate.get(data) ?? {
-                data,
-                displayDate: format(activity.dataDisparo, 'dd/MM', { locale: ptBR }),
-                aberturas: 0,
-                cliques: 0,
-                custo: 0,
-            };
-            current.aberturas += activity.kpis.aberturas || 0;
-            current.cliques += activity.kpis.cliques || 0;
-            current.custo += activity.kpis.custoTotal || 0;
-            byDate.set(data, current);
-        });
-        return Array.from(byDate.values()).sort((a, b) => a.data.localeCompare(b.data)).map((item) => ({
-            ...item,
-            taxaClique: item.aberturas > 0 ? (item.cliques / item.aberturas) * 100 : 0,
-        }));
-    }, [activities]);
+    const handleDotClick = (props: any) => {
+        if (isMonthly || !props?.payload?.data) return;
+        setSelectedDrillBU(singleBU);
+        setSelectedDate(props.payload.data);
+    };
 
-    // Moeda (CAC) é uma taxa — é listada, mas não entra na soma das séries.
-    const isCacEntry = (entry: any) => Boolean(entry?.name && String(entry.name).includes('CAC'));
+    const toggleSeries = (name: string) => {
+        setSelectedSeries((current) => current === name ? null : name);
+    };
+    const isSeriesHidden = (name: string) => Boolean(selectedSeries && selectedSeries !== name);
+    const legendProps = {
+        iconSize: 8,
+        wrapperStyle: { fontSize: '10px', paddingTop: '5px' },
+        onClick: (entry: any) => {
+            const name = entry?.value ?? entry?.payload?.value;
+            if (name) toggleSeries(String(name));
+        },
+        formatter: (value: string) => (
+            <span style={{
+                color: isSeriesHidden(value) ? '#cbd5e1' : '#475569',
+                cursor: 'pointer',
+                fontWeight: selectedSeries === value ? 700 : 400,
+            }}>
+                {value}
+            </span>
+        ),
+    };
 
     const chartTooltip = (
         <ChartTooltip
             totalLabel={`Total no ${isMonthly ? 'mês' : 'dia'}`}
-            formatValue={(value, entry) =>
-                isCacEntry(entry)
-                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-                    : value.toLocaleString('pt-BR')
-            }
+            formatValue={(value, entry) => {
+                const name = String(entry?.name ?? '');
+                if (name.includes('CAC')) return formatCurrency(value);
+                if (name.includes('%') || name.includes('Conversão') || name.includes('Atingimento')) {
+                    return `${value.toFixed(2).replace('.', ',')}%`;
+                }
+                return value.toLocaleString('pt-BR');
+            }}
             formatTotal={(total) => total.toLocaleString('pt-BR')}
-            isRate={isCacEntry}
+            isRate={(entry) => {
+                const name = String(entry?.name ?? '');
+                return name.includes('CAC') || name.includes('%') || name.includes('Conversão') || name.includes('Atingimento');
+            }}
         />
     );
 
-    if (rentab) {
-        const totalCliques = engagementData.reduce((sum, item) => sum + item.cliques, 0);
-        const totalAberturas = engagementData.reduce((sum, item) => sum + item.aberturas, 0);
-        const taxaClique = totalAberturas > 0 ? (totalCliques / totalAberturas) * 100 : 0;
-        const custoTotal = engagementData.reduce((sum, item) => sum + item.custo, 0);
+    const renderModeControls = () => (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+            {isMultiBU && (
+                <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                    <button
+                        type="button"
+                        aria-pressed={!isConsolidated}
+                        onClick={() => setMultiBUMode('comparison')}
+                        className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                            !isConsolidated ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'
+                        }`}
+                    >
+                        Comparativo
+                    </button>
+                    <button
+                        type="button"
+                        aria-pressed={isConsolidated}
+                        disabled={!canConsolidate}
+                        onClick={() => canConsolidate && setMultiBUMode('consolidated')}
+                        title={!canConsolidate
+                            ? 'O total B2C pode compartilhar universo com B2B2C. Use o modo Comparativo.'
+                            : 'Somar B2B2C e Plurix com taxas recalculadas'}
+                        className={`border-l border-slate-200 px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                            isConsolidated
+                                ? 'bg-cyan-600 text-white'
+                                : canConsolidate
+                                    ? 'text-slate-500 hover:bg-slate-50'
+                                    : 'cursor-not-allowed bg-slate-50 text-slate-300'
+                        }`}
+                    >
+                        Consolidado
+                    </button>
+                </div>
+            )}
+
+            {singleBU === 'B2C' && (
+                <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                    <button
+                        type="button"
+                        aria-pressed={showSerasa}
+                        onClick={() => setShowSerasa((value) => !value)}
+                        className={`px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                            showSerasa
+                                ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                : 'text-slate-500 hover:bg-slate-50'
+                        }`}
+                    >
+                        Serasa API
+                    </button>
+                    <button
+                        type="button"
+                        aria-pressed={showOtherB2C}
+                        onClick={() => {
+                            setShowOtherB2C((value) => !value);
+                            if (selectedSeries === 'Outros B2C') setSelectedSeries(null);
+                        }}
+                        className={`inline-flex items-center gap-1.5 border-l border-slate-200 px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                            showOtherB2C
+                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                : 'text-slate-400 hover:bg-slate-50'
+                        }`}
+                    >
+                        {showOtherB2C ? <Eye size={12} /> : <EyeOff size={12} />}
+                        Outros B2C
+                    </button>
+                </div>
+            )}
+
+            <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                {([
+                    { key: 'monthly', label: 'Mensal' },
+                    { key: 'daily', label: 'Diário' },
+                ] as const).map(({ key, label }) => (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => setChartMode(key)}
+                        aria-pressed={chartMode === key}
+                        className={`border-l border-slate-200 px-3 py-1.5 text-[11px] font-semibold first:border-l-0 ${
+                            chartMode === key
+                                ? 'bg-emerald-600 text-white'
+                                : 'text-slate-500 hover:bg-slate-50'
+                        }`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
+    if (rentab || chartBUs.length === 0) {
+        const title = rentab ? 'Rentabilização fora desta leitura' : 'Seguros fora desta leitura';
+        const description = rentab
+            ? 'Os gráficos de metas, cartões e CAC são exclusivos da frente de Aquisição.'
+            : 'Selecione B2C, B2B2C ou Plurix para visualizar metas e resultados de aquisição.';
         return (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="bg-white border border-slate-200 rounded-lg p-4 h-64 shadow-sm">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-slate-500">Cliques no período</h3>
-                            <p className="mt-1 text-2xl font-bold text-slate-800">{totalCliques.toLocaleString('pt-BR')}</p>
-                            <p className="text-xs text-slate-400">Taxa de clique: {taxaClique.toFixed(1)}%</p>
-                        </div>
-                        <p className="text-sm font-semibold text-slate-700">
-                            {custoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </p>
-                    </div>
-                    <ResponsiveContainer width="100%" height="75%">
-                        <BarChart data={engagementData} onClick={handleChartClick}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                            <XAxis dataKey="displayDate" tick={{ fontSize: 9 }} />
-                            <YAxis tick={{ fontSize: 9 }} />
-                            <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
-                            <Bar dataKey="cliques" name="Cliques" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+            <div className="flex min-h-52 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+                <div className="max-w-md">
+                    <Layers3 className="mx-auto mb-3 text-slate-400" size={24} />
+                    <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-lg p-4 h-64 shadow-sm">
-                    <h3 className="text-xs font-bold uppercase text-slate-500">Evolução da taxa de clique</h3>
-                    <ResponsiveContainer width="100%" height="88%">
-                        <LineChart data={engagementData} onClick={handleChartClick}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                            <XAxis dataKey="displayDate" tick={{ fontSize: 9 }} />
-                            <YAxis tick={{ fontSize: 9 }} unit="%" />
-                            <Tooltip
-                                cursor={{ stroke: '#10b981', strokeWidth: 1, strokeDasharray: '4 4' }}
-                                wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
-                                content={
-                                    <ChartTooltip
-                                        formatValue={(value) => `${value.toFixed(1).replace('.', ',')}%`}
-                                        isRate={() => true}
-                                        showTotal={false}
-                                    />
-                                }
-                            />
-                            <Line type="monotone" dataKey="taxaClique" name="% Clique" stroke="#10b981" strokeWidth={2} />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </div>
-                <DailyDetailsModal
-                    date={selectedDate ? new Date(selectedDate + 'T12:00:00') : null}
-                    activities={selectedActivities}
-                    onClose={() => setSelectedDate(null)}
-                />
             </div>
         );
     }
 
+    const chartCardClass = 'flex h-52 flex-col rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]';
+    const lineCommonProps = {
+        type: 'linear' as const,
+        connectNulls: false,
+        strokeWidth: 2.25,
+        strokeLinecap: 'square' as const,
+        dot: { r: 2.5, strokeWidth: 1.5, stroke: '#fff' },
+    };
+
+    const excludedNotice = excludedBUs.length > 0
+        ? `${excludedBUs.join(', ')} ${excludedBUs.length > 1 ? 'ficam' : 'fica'} fora destes gráficos`
+        : null;
+
     return (
         <div className="mb-2">
-            {showCharts && (
-                <div className="flex flex-wrap justify-end items-center gap-2 mb-2">
-                    <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-                        <SerasaToggle />
-                        <OtherB2CToggle />
-                    </div>
-                    <ChartModeToggle />
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {chartBUs.map((bu) => (
+                        <span
+                            key={bu}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600"
+                        >
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: BU_ANALYTICS_PROFILES[bu].color }} />
+                            {bu}
+                        </span>
+                    ))}
+                    {excludedNotice && (
+                        <span className="text-[10px] text-slate-400">{excludedNotice}</span>
+                    )}
                 </div>
-            )}
-            <div className={`grid gap-4 ${showCharts ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
-            <div className="space-y-4">
-                <div className="relative flex h-52 flex-col justify-between overflow-hidden rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
-                    <div className="relative z-10 mb-2 flex items-start justify-between gap-4">
-                        <div>
-                            <ChartHeading
-                                title="ACUMULADO TOTAL CARTÕES B2C VS META"
-                                helpText="Realizado acumulado até o último dia observado versus a meta acumulada esperada até o fim do mês"
-                                onClick={openDailyResults}
-                            />
-                            <div className="flex items-baseline gap-2 mt-0.5">
-                                <span className="text-xl font-bold text-slate-800">{metrics.totalCards.toLocaleString()}</span>
-                                <span className="text-xs text-slate-400">/ {metrics.goalCards.toLocaleString()}</span>
+                {renderModeControls()}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-4">
+                    <div className={chartCardClass}>
+                        <div className="mb-2 flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                                <ChartHeading
+                                    title={
+                                        profile
+                                            ? profile.accumulatedTitle
+                                            : isConsolidated
+                                                ? 'ACUMULADO TOTAL B2B2C + PLURIX VS META'
+                                                : 'ATINGIMENTO ACUMULADO DA META POR BU'
+                                    }
+                                    helpText={
+                                        profile || isConsolidated
+                                            ? 'Realizado acumulado até o último dia observado versus a meta acumulada esperada.'
+                                            : 'Cada BU é comparada contra sua própria meta; os percentuais não são somados.'
+                                    }
+                                    onClick={openDailyResults}
+                                />
+                                {(profile || isConsolidated) && (
+                                    <div className="mt-0.5 flex items-baseline gap-2">
+                                        <span className="text-xl font-bold text-slate-800">
+                                            {singleSummary.totalCards.toLocaleString('pt-BR')}
+                                        </span>
+                                        <span className="text-xs text-slate-400">
+                                            / {singleSummary.goalCards.toLocaleString('pt-BR')}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
-                            <div className="mt-0.5 flex items-center gap-3 text-[9px] text-slate-500">
-                                <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 rounded bg-blue-500" />
-                                    Realizado
+                            {(profile || isConsolidated) && (
+                                <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
+                                    singleSummary.progress >= 100
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                        : 'border-cyan-200 bg-cyan-50 text-cyan-700'
+                                }`}>
+                                    {singleSummary.progress.toFixed(1)}%
                                 </span>
-                                <span className="flex items-center gap-1">
-                                    <span className="h-0.5 w-3 border-t-2 border-dashed border-emerald-500" />
-                                    Meta acumulada
-                                </span>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className={`inline-block rounded-md border px-2 py-0.5 text-[10px] font-bold ${metrics.goalProgress >= 100 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-cyan-200 bg-cyan-50 text-cyan-700'}`}>
-                                {metrics.goalProgress.toFixed(1)}%
-                            </div>
-                            {cardsPacing.paceDelta != null && cardsPacing.lastObservedPoint && (
-                                <div className={`mt-1 text-[9px] font-medium ${cardsPacing.paceDelta >= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                    {cardsPacing.paceDelta >= 0 ? '+' : ''}
-                                    {Math.round(cardsPacing.paceDelta).toLocaleString('pt-BR')} vs ritmo em {cardsPacing.lastObservedPoint.displayDate}
-                                </div>
                             )}
                         </div>
-                    </div>
-                    <div className="relative z-10 min-h-0 w-full flex-1">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={cardsPacing.data} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
-                                <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
-                                <XAxis
-                                    dataKey="displayDate"
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tick={{ fontSize: 9, fill: '#94a3b8' }}
-                                    minTickGap={18}
-                                    dy={4}
-                                />
-                                <YAxis
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tick={{ fontSize: 9, fill: '#94a3b8' }}
-                                    width={44}
-                                    domain={[0, 'auto']}
-                                    tickFormatter={(value) => Number(value).toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 })}
-                                />
-                                <Tooltip
-                                    cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
-                                    wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
-                                    content={
-                                        <ChartTooltip
-                                            labelPrefix="Dia"
-                                            formatValue={(value) => value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
-                                            showTotal={false}
-                                        />
-                                    }
-                                />
-                                <Line
-                                    type="linear"
-                                    dataKey="metaAcumulada"
-                                    name="Meta acumulada"
-                                    stroke="#10B981"
-                                    strokeWidth={2}
-                                    strokeDasharray="5 4"
-                                    strokeLinecap="square"
-                                    dot={false}
-                                    activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff', fill: '#10B981' }}
-                                />
-                                <Line
-                                    type="linear"
-                                    dataKey="realizadoAcumulado"
-                                    name="Realizado acumulado"
-                                    connectNulls={false}
-                                    stroke="#3B82F6"
-                                    strokeWidth={2.5}
-                                    strokeLinecap="square"
-                                    dot={false}
-                                    activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff', fill: '#3B82F6' }}
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {showCharts && (
-                    <div className="flex h-52 flex-col rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
-                        <div className="mb-2">
-                            <ChartHeading
-                                title="EVOLUÇÃO DE CAC CRM B2C"
-                                helpText={`CAC ${isMonthly ? 'do mês = custo do mês / cartões do mês' : 'do dia = custo do dia / cartões do dia'}. Sem custo ou cartão, o gráfico preserva uma lacuna.`}
-                                onClick={openDailyResults}
-                            />
-                        </div>
-                        <div className="flex-1 w-full min-h-0">
+                        <div className="min-h-0 flex-1">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={timeChartData} onClick={chartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
-                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
-                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(v) => `R$${Number(v).toFixed(0)}`} />
-                                    <Tooltip content={chartTooltip} cursor={{ stroke: '#10B981', strokeWidth: 1, strokeDasharray: '4 4' }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
-                                    <Line
-                                        type="linear"
-                                        dataKey="cac_medio"
-                                        name={isMonthly ? 'CAC do mês' : 'CAC do dia'}
-                                        connectNulls={false}
-                                        stroke="#10B981"
-                                        strokeWidth={2.25}
-                                        strokeLinecap="square"
-                                        dot={{ r: 3, strokeWidth: 1.5, stroke: '#fff', fill: '#10B981' }}
-                                        activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff', fill: '#10B981', onClick: dotClick, style: { cursor: isMonthly ? 'default' : 'pointer' } }}
+                                <LineChart data={pacingData.data} onClick={handleChartClick} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+                                    <CartesianGrid stroke="#e8edf3" vertical={false} />
+                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={18} />
+                                    <YAxis
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                        width={44}
+                                        tickFormatter={(value) => profile || isConsolidated ? formatCompact(value) : `${Number(value).toFixed(0)}%`}
                                     />
+                                    <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                    {profile || isConsolidated ? (
+                                        <>
+                                            <Line
+                                                {...lineCommonProps}
+                                                dataKey="meta_consolidada"
+                                                name="Meta acumulada"
+                                                stroke="#10B981"
+                                                strokeDasharray="5 4"
+                                                dot={false}
+                                            />
+                                            <Line
+                                                {...lineCommonProps}
+                                                dataKey="realizado_consolidado"
+                                                name="Realizado acumulado"
+                                                stroke={profile?.color ?? '#2563EB'}
+                                                dot={false}
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ReferenceLine
+                                                y={100}
+                                                stroke="#94A3B8"
+                                                strokeDasharray="4 4"
+                                                label={{ value: 'Meta', position: 'insideTopRight', fontSize: 9, fill: '#64748B' }}
+                                            />
+                                            {chartBUs.map((bu) => (
+                                                <Line
+                                                    key={bu}
+                                                    {...lineCommonProps}
+                                                    dataKey={`atingimento_${bu}`}
+                                                    name={`Atingimento ${bu}`}
+                                                    stroke={BU_ANALYTICS_PROFILES[bu].color}
+                                                    hide={isSeriesHidden(`Atingimento ${bu}`)}
+                                                />
+                                            ))}
+                                        </>
+                                    )}
+                                    {!profile && !isConsolidated && <Legend {...legendProps} />}
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
-                )}
 
-            </div>
-
-            {showCharts && (
-                <div className="space-y-4">
-                    <div className="flex h-52 flex-col rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+                    <div className={chartCardClass}>
                         <div className="mb-2">
                             <ChartHeading
-                                title="EVOLUÇÃO DE PROPOSTAS CRM B2C"
-                                helpText="Evolução das propostas dos segmentos acionados por CRM e, quando visível, do residual de outros canais B2C"
+                                title={
+                                    profile
+                                        ? profile.cacTitle
+                                        : isConsolidated
+                                            ? 'EVOLUÇÃO DE CAC CONSOLIDADO B2B2C + PLURIX'
+                                            : 'EVOLUÇÃO DE CAC POR BU'
+                                }
+                                helpText="CAC recalculado como custo total dividido pelos cartões do período. Dias sem cartão ou custo permanecem como lacuna."
                                 onClick={openDailyResults}
                             />
                         </div>
-                        <div className="flex-1 w-full min-h-0">
+                        <div className="min-h-0 flex-1">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="30%" maxBarSize={18} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
-                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
-                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
-                                    <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
-                                    <Legend {...segmentLegendProps} />
-                                    {showSerasa && <Bar dataKey="propostas_crm" name="CRM B2C" stackId="a" fill="#3B82F6" hide={isSeriesHidden('CRM B2C')} />}
-                                    {!showSerasa && activeSegments.map((segment, index) => (
-                                        <Bar
-                                            key={segment}
-                                            dataKey={`crm_propostas_${segment}`}
-                                            name={segment}
-                                            stackId="a"
-                                            fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
-                                            hide={isSeriesHidden(segment)}
+                                <LineChart data={timeChartData} onClick={handleChartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }}>
+                                    <CartesianGrid stroke="#e8edf3" vertical={false} />
+                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} />
+                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(value) => `R$${Number(value).toFixed(0)}`} />
+                                    <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                    {profile && getCacGoal(currentGoal, profile.bu) > 0 && (
+                                        <ReferenceLine
+                                            y={getCacGoal(currentGoal, profile.bu)}
+                                            stroke="#94A3B8"
+                                            strokeDasharray="4 4"
+                                            label={{ value: 'Limite', position: 'insideTopRight', fontSize: 9, fill: '#64748B' }}
                                         />
-                                    ))}
-                                    {showSerasa && <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
-                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#cbd5e1" hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    <div className="flex h-52 flex-col rounded-lg border border-slate-200/90 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
-                        <div className="mb-2">
-                            <ChartHeading
-                                title="EVOLUÇÃO DE EMISSÕES CRM B2C"
-                                helpText="Evolução dos cartões emitidos pelos segmentos acionados por CRM e, quando visível, do residual de outros canais B2C"
-                                onClick={openDailyResults}
-                            />
-                        </div>
-                        <div className="flex-1 w-full min-h-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={timeChartData} onClick={chartClick} barCategoryGap="30%" maxBarSize={18} style={{ cursor: isMonthly ? 'default' : 'pointer' }}>
-                                    <CartesianGrid stroke="#e8edf3" strokeWidth={1} vertical={false} />
-                                    <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} dy={4} />
-                                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
-                                    <Tooltip content={chartTooltip} cursor={{ fill: '#f1f5f9', opacity: 0.6 }} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
-                                    <Legend {...segmentLegendProps} />
-                                    {showSerasa && <Bar dataKey="emissoes_crm" name="CRM B2C" stackId="a" fill="#10B981" hide={isSeriesHidden('CRM B2C')} />}
-                                    {!showSerasa && activeSegments.map((segment, index) => (
-                                        <Bar
-                                            key={segment}
-                                            dataKey={`crm_emissoes_${segment}`}
-                                            name={segment}
-                                            stackId="a"
-                                            fill={SEGMENT_COLORS[segment] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
-                                            hide={isSeriesHidden(segment)}
+                                    )}
+                                    {!profile && !isConsolidated && chartBUs.map((bu) => {
+                                        const cacGoal = getCacGoal(currentGoal, bu);
+                                        return cacGoal > 0 ? (
+                                            <ReferenceLine
+                                                key={`cac-goal-${bu}`}
+                                                y={cacGoal}
+                                                stroke={BU_ANALYTICS_PROFILES[bu].color}
+                                                strokeOpacity={0.45}
+                                                strokeDasharray="3 4"
+                                            />
+                                        ) : null;
+                                    })}
+                                    {profile ? (
+                                        <Line
+                                            {...lineCommonProps}
+                                            dataKey="cac_single"
+                                            name={isMonthly ? 'CAC do mês' : 'CAC do dia'}
+                                            stroke={profile.color}
+                                            dot={{ ...lineCommonProps.dot, fill: profile.color }}
+                                            activeDot={{ r: 5, onClick: handleDotClick, fill: profile.color, stroke: '#fff', strokeWidth: 2 }}
                                         />
-                                    ))}
-                                    {showSerasa && <Bar dataKey="serasa_emissoes" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />}
-                                    <Bar dataKey="outros_emissoes" name="Outros B2C" stackId="a" fill="#cbd5e1" hide={!showOtherB2C || isSeriesHidden('Outros B2C')} />
-                                </BarChart>
+                                    ) : isConsolidated ? (
+                                        <Line
+                                            {...lineCommonProps}
+                                            dataKey="cac_consolidado"
+                                            name="CAC consolidado"
+                                            stroke="#0EA5E9"
+                                            dot={{ ...lineCommonProps.dot, fill: '#0EA5E9' }}
+                                        />
+                                    ) : (
+                                        chartBUs.map((bu) => (
+                                            <Line
+                                                key={bu}
+                                                {...lineCommonProps}
+                                                dataKey={`cac_${bu}`}
+                                                name={`CAC ${bu}`}
+                                                stroke={BU_ANALYTICS_PROFILES[bu].color}
+                                                dot={{ ...lineCommonProps.dot, fill: BU_ANALYTICS_PROFILES[bu].color }}
+                                                hide={isSeriesHidden(`CAC ${bu}`)}
+                                            />
+                                        ))
+                                    )}
+                                    {!profile && !isConsolidated && <Legend {...legendProps} />}
+                                </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
                 </div>
-            )}
+
+                <div className="space-y-4">
+                    <div className={chartCardClass}>
+                        <div className="mb-2">
+                            <ChartHeading
+                                title={
+                                    profile
+                                        ? profile.proposalsTitle
+                                        : isConsolidated
+                                            ? 'EVOLUÇÃO DE PROPOSTAS B2B2C + PLURIX'
+                                            : 'EVOLUÇÃO DE RESULTADOS POR BU'
+                                }
+                                helpText={
+                                    profile
+                                        ? `Propostas distribuídas por ${profile.breakdownLabel}, limitadas às quatro séries mais relevantes.`
+                                        : isConsolidated
+                                            ? 'Propostas das BUs compatíveis, mantendo cada BU visível na composição.'
+                                            : 'Cartões do período por BU em valores absolutos; use o atingimento para comparar ritmos.'
+                                }
+                                onClick={openDailyResults}
+                            />
+                        </div>
+                        <div className="min-h-0 flex-1">
+                            <ResponsiveContainer width="100%" height="100%">
+                                {profile || isConsolidated ? (
+                                    <BarChart data={timeChartData} onClick={handleChartClick} barCategoryGap="30%" maxBarSize={18}>
+                                        <CartesianGrid stroke="#e8edf3" vertical={false} />
+                                        <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} />
+                                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
+                                        <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                        <Legend {...legendProps} />
+                                        {profile ? (
+                                            <>
+                                                {showSerasa && profile.bu === 'B2C' ? (
+                                                    <>
+                                                        <Bar dataKey="propostas_crm" name="CRM B2C" stackId="a" fill={profile.color} hide={isSeriesHidden('CRM B2C')} />
+                                                        <Bar dataKey="serasa_propostas" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />
+                                                    </>
+                                                ) : dimensionSeries.map((series, index) => (
+                                                    <Bar
+                                                        key={series.name}
+                                                        dataKey={`dim_propostas_${index}`}
+                                                        name={series.name}
+                                                        stackId="a"
+                                                        fill={series.color}
+                                                        hide={isSeriesHidden(series.name)}
+                                                    />
+                                                ))}
+                                                {profile.bu === 'B2C' && showOtherB2C && (
+                                                    <Bar dataKey="outros_propostas" name="Outros B2C" stackId="a" fill="#CBD5E1" hide={isSeriesHidden('Outros B2C')} />
+                                                )}
+                                            </>
+                                        ) : chartBUs.map((bu) => (
+                                            <Bar
+                                                key={bu}
+                                                dataKey={`propostas_${bu}`}
+                                                name={bu}
+                                                stackId="a"
+                                                fill={BU_ANALYTICS_PROFILES[bu].color}
+                                                hide={isSeriesHidden(bu)}
+                                            />
+                                        ))}
+                                    </BarChart>
+                                ) : (
+                                    <LineChart data={timeChartData} onClick={handleChartClick}>
+                                        <CartesianGrid stroke="#e8edf3" vertical={false} />
+                                        <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} />
+                                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
+                                        <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                        <Legend {...legendProps} />
+                                        {chartBUs.map((bu) => (
+                                            <Line
+                                                key={bu}
+                                                {...lineCommonProps}
+                                                dataKey={`cartoes_${bu}`}
+                                                name={bu}
+                                                stroke={BU_ANALYTICS_PROFILES[bu].color}
+                                                dot={{ ...lineCommonProps.dot, fill: BU_ANALYTICS_PROFILES[bu].color }}
+                                                hide={isSeriesHidden(bu)}
+                                            />
+                                        ))}
+                                    </LineChart>
+                                )}
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    <div className={chartCardClass}>
+                        <div className="mb-2">
+                            <ChartHeading
+                                title={
+                                    profile
+                                        ? profile.emissionsTitle
+                                        : isConsolidated
+                                            ? 'EVOLUÇÃO DE EMISSÕES B2B2C + PLURIX'
+                                            : 'CONVERSÃO DO FUNIL POR BU'
+                                }
+                                helpText={
+                                    profile
+                                        ? `Cartões emitidos distribuídos por ${profile.breakdownLabel}.`
+                                        : isConsolidated
+                                            ? 'Cartões emitidos por BU; o total é a soma apenas das BUs compatíveis.'
+                                            : 'Conversão recalculada como cartões divididos pela base entregue, sem média de percentuais.'
+                                }
+                                onClick={openDailyResults}
+                            />
+                        </div>
+                        <div className="min-h-0 flex-1">
+                            <ResponsiveContainer width="100%" height="100%">
+                                {profile || isConsolidated ? (
+                                    <BarChart data={timeChartData} onClick={handleChartClick} barCategoryGap="30%" maxBarSize={18}>
+                                        <CartesianGrid stroke="#e8edf3" vertical={false} />
+                                        <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} />
+                                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} />
+                                        <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                        <Legend {...legendProps} />
+                                        {profile ? (
+                                            <>
+                                                {showSerasa && profile.bu === 'B2C' ? (
+                                                    <>
+                                                        <Bar dataKey="cartoes_crm" name="CRM B2C" stackId="a" fill={profile.color} hide={isSeriesHidden('CRM B2C')} />
+                                                        <Bar dataKey="serasa_cartoes" name="Serasa API" stackId="a" fill="#F59E0B" hide={isSeriesHidden('Serasa API')} />
+                                                    </>
+                                                ) : dimensionSeries.map((series, index) => (
+                                                    <Bar
+                                                        key={series.name}
+                                                        dataKey={`dim_cartoes_${index}`}
+                                                        name={series.name}
+                                                        stackId="a"
+                                                        fill={series.color}
+                                                        hide={isSeriesHidden(series.name)}
+                                                    />
+                                                ))}
+                                                {profile.bu === 'B2C' && showOtherB2C && (
+                                                    <Bar dataKey="outros_cartoes" name="Outros B2C" stackId="a" fill="#CBD5E1" hide={isSeriesHidden('Outros B2C')} />
+                                                )}
+                                            </>
+                                        ) : chartBUs.map((bu) => (
+                                            <Bar
+                                                key={bu}
+                                                dataKey={`cartoes_${bu}`}
+                                                name={bu}
+                                                stackId="a"
+                                                fill={BU_ANALYTICS_PROFILES[bu].color}
+                                                hide={isSeriesHidden(bu)}
+                                            />
+                                        ))}
+                                    </BarChart>
+                                ) : (
+                                    <LineChart data={timeChartData} onClick={handleChartClick}>
+                                        <CartesianGrid stroke="#e8edf3" vertical={false} />
+                                        <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} />
+                                        <YAxis
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tick={{ fontSize: 9, fill: '#94a3b8' }}
+                                            width={42}
+                                            tickFormatter={(value) => `${Number(value).toFixed(2)}%`}
+                                        />
+                                        <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                        <Legend {...legendProps} />
+                                        {chartBUs.map((bu) => (
+                                            <Line
+                                                key={bu}
+                                                {...lineCommonProps}
+                                                dataKey={`conversao_${bu}`}
+                                                name={`Conversão ${bu}`}
+                                                stroke={BU_ANALYTICS_PROFILES[bu].color}
+                                                dot={{ ...lineCommonProps.dot, fill: BU_ANALYTICS_PROFILES[bu].color }}
+                                                hide={isSeriesHidden(`Conversão ${bu}`)}
+                                            />
+                                        ))}
+                                    </LineChart>
+                                )}
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <DailyDetailsModal
-                date={selectedDate ? new Date(selectedDate + 'T12:00:00') : null}
+                date={selectedDate ? new Date(`${selectedDate}T12:00:00`) : null}
                 activities={selectedActivities}
-                onClose={() => setSelectedDate(null)}
+                onClose={() => {
+                    setSelectedDate(null);
+                    setSelectedDrillBU(null);
+                }}
             />
-            </div>
         </div>
     );
 };

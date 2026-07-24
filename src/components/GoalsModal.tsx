@@ -55,22 +55,24 @@ export const GoalsModal: React.FC<GoalsModalProps> = ({
     const totals = useMemo(() => {
         let totalCartoes = 0;
         let totalAprovacoes = 0;
-        let totalCacSum = 0;
-        let count = 0;
+        let weightedCacBudget = 0;
+        let weightedCacCards = 0;
 
         Object.values(buGoals).forEach(g => {
-            totalCartoes += Number(g.cartoes) || 0;
+            const cards = Number(g.cartoes) || 0;
+            const cac = Number(g.cac) || 0;
+            totalCartoes += cards;
             totalAprovacoes += Number(g.aprovacoes) || 0;
-            if (Number(g.cac) > 0) {
-                totalCacSum += Number(g.cac);
-                count++;
+            if (cac > 0 && cards > 0) {
+                weightedCacBudget += cac * cards;
+                weightedCacCards += cards;
             }
         });
 
         return {
             cartoes: totalCartoes,
             aprovacoes: totalAprovacoes,
-            cacMedio: count > 0 ? totalCacSum / count : 0
+            cacMedio: weightedCacCards > 0 ? weightedCacBudget / weightedCacCards : 0
         };
     }, [buGoals]);
 
@@ -142,7 +144,7 @@ export const GoalsModal: React.FC<GoalsModalProps> = ({
                                 <span className="text-slate-200 font-mono">{totals.aprovacoes.toLocaleString('pt-BR')}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-slate-500">CAC Médio</span>
+                                <span className="text-slate-500">CAC ponderado</span>
                                 <span className="text-emerald-400 font-mono">R$ {totals.cacMedio.toFixed(2)}</span>
                             </div>
                         </div>
