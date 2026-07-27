@@ -598,12 +598,12 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
             <div className="flex flex-wrap items-center gap-2"><GranularityToggle value={detailGranularity} onChange={setDetailGranularity} /><button type="button" onClick={exportData} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold"><Download size={14} /> Exportar</button></div>
           </div>
           <div className="max-h-[470px] overflow-auto">
-            <table className={`w-full text-[10px] ${source === 'bi' ? 'min-w-[1050px]' : 'min-w-[620px]'}`}>
+            <table className={`w-full text-[10px] ${source === 'bi' ? 'min-w-[980px]' : 'min-w-[620px]'}`}>
               <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
                 <tr>
                   <th className="sticky left-0 z-20 bg-slate-100 px-3 py-2 text-left">Período</th>
                   {stages.map((stage, index) => <th key={stage.key} className="px-3 py-2 text-right"><span className="flex justify-end"><FunnelStageLabel index={index} label={stage.label} compact /></span></th>)}
-                  <th className="px-3 py-2 text-right">Qualidade</th>
+                  {source !== 'bi' && <th className="px-3 py-2 text-right">Qualidade</th>}
                 </tr>
               </thead>
               <tbody>
@@ -614,9 +614,9 @@ const SerasaSourceFunnelView: React.FC<{ source: Source; navigation: React.React
                       <td className="sticky left-0 z-[5] whitespace-nowrap bg-white px-3 py-2 font-mono text-[11px] font-semibold text-slate-800">{group.label}</td>
                       {stages.map((stage, index) => {
                         const denominator = stageDenominator(stages, index);
-                        return <td key={stage.key} className="px-3 py-2"><StageMetricCell value={formatNumber(sumMetric(group.rows, stage.key))} rate={denominator ? formatRate(comparableRate(group.rows, stage.key, denominator)) : null} note={denominator ? 'razão' : 'base'} tone={sumMetric(group.rows, stage.key) == null ? 'amber' : index === 0 ? 'slate' : 'teal'} /></td>;
+                        return <td key={stage.key} className="px-3 py-2"><StageMetricCell value={formatNumber(sumMetric(group.rows, stage.key))} rate={denominator ? formatRate(comparableRate(group.rows, stage.key, denominator)) : null} note={denominator ? (source === 'bi' ? 'taxa de sucesso' : 'razão') : 'base'} tone={sumMetric(group.rows, stage.key) == null ? 'amber' : index === 0 ? 'slate' : 'teal'} /></td>;
                       })}
-                      <td className="px-3 py-2 text-right"><span className={`inline-flex rounded-sm px-2 py-1 font-semibold ${quality === 'complete' ? 'bg-emerald-50 text-emerald-700' : quality === 'suspect' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{quality === 'complete' ? 'completo' : quality === 'suspect' ? 'suspeito' : 'parcial'}</span></td>
+                      {source !== 'bi' && <td className="px-3 py-2 text-right"><span className={`inline-flex rounded-sm px-2 py-1 font-semibold ${quality === 'complete' ? 'bg-emerald-50 text-emerald-700' : quality === 'suspect' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{quality === 'complete' ? 'completo' : quality === 'suspect' ? 'suspeito' : 'parcial'}</span></td>}
                     </tr>
                   );
                 })}
