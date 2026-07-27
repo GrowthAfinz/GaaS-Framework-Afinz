@@ -55,3 +55,67 @@ Gabarito certificado (campanha `[B2C]App_Install_Onboarding_Afinz`):
 - 2225: token seguro; poltica na chave; run complete substitui failed; BI s complete.
 
 
+
+---
+
+## Execucao real — 27/07/2026
+
+Ambiente: projeto `mipiwxadnpwtcgfcedym` (producao). Legado intocado.
+
+### Backfill da lacuna 22/07 → 26/07
+
+| Campanha | Run | Status | Recebidas | Gravadas | Rejeitadas | Warnings |
+|---|---|---|---|---|---|---|
+| 120250049222750723 (Onboarding) | `eabe8a76` | complete | 67 | 1870 | 0 | 0 |
+| 120210447970060723 (App Install) | `7ffb6b16` | complete | 0 | 0 | 0 | 0 |
+
+### Execucao diaria automatica (dispatch governado)
+
+| Campanha | Run | Status | Recebidas | Gravadas | Rejeitadas |
+|---|---|---|---|---|---|
+| 120210447970060723 | `fbf79133` | complete | 64 | 2048 | 0 |
+| 120250049222750723 | `2f32250d` | complete | 382 | 10902 | 0 |
+
+### Verificacoes estruturais
+
+| Verificacao | Resultado |
+|---|---|
+| Linhas em dia aberto ou futuro | 0 |
+| Duplicidades na chave natural | 0 |
+| Divergencia ad × adset × campanha (22–26/07) | 0 |
+| Runs `pending`/`failed` visiveis no BI | 0 (views filtram `status='complete'`) |
+| Cron jobs duplicados apos reaplicar migration | 0 (unschedule guardado + `cron.schedule` por nome) |
+| Cron jobs legados reativados | 0 (permanecem `active=false`) |
+
+### Reconciliacao StartTrial governado × legado (01/07 → 26/07)
+
+Diferenca **zero em todos os dias** de 01/07 a 21/07 e de 22/07 a 25/07 apos o backfill.
+Os 13 eventos de diferenca relatados (74 governado × 87 legado) correspondiam **integralmente**
+a lacuna de coleta 22–25/07 (3 + 4 + 3 + 3), nao a divergencia de janela, fonte ou granularidade.
+Nenhum valor foi forcado: o governado subiu para 87 porque os dias faltantes foram coletados.
+
+### Ultima data observada por evento (apos correcao)
+
+| Evento | Ultima observacao | Esperado (ultimo dia fechado) | Status |
+|---|---|---|---|
+| Impressoes (entrega) | 26/07/2026 | 26/07/2026 | atualizado |
+| link_click | 26/07/2026 | 26/07/2026 | atualizado |
+| install (legado) | 26/07/2026 | 26/07/2026 | atualizado |
+| app_session | 26/07/2026 | 26/07/2026 | atualizado |
+| initiated_checkout | 26/07/2026 | 26/07/2026 | atualizado |
+| start_trial | 25/07/2026 | 26/07/2026 | **desatualizado (1 dia)** |
+| card_order | — | — | **nao instrumentado** |
+
+> StartTrial em 25/07 nao e falha de coleta: em 26/07 a Meta nao reportou o evento, o que
+> gera `not_available`. Ausencia NAO foi convertida em zero. A tela mostra o estado de
+> atencao e o valor permanece `n/d` ate a maturacao da atribuicao.
+
+### Gate de corte do legado
+
+| Metrica | Dias reconciliados | Dias de execucao diaria | Pronto para cortar |
+|---|---|---|---|
+| start_trial | 60 | 1 / 14 | **nao** |
+| install | 20 | 1 / 14 | **nao** |
+
+A reconciliacao ja passa, mas a operacao diaria automatica comecou hoje. O legado so pode
+ser cortado quando as duas condicoes fecharem.
