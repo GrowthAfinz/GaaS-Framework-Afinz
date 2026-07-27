@@ -5,6 +5,7 @@ import {
     getCustoUnitarioCanal,
     calcularCustoTotalCanal,
     calcularCustoTotalCampanha,
+    calcularCACPrevisto,
 } from '../constants/frameworkFields';
 
 type Channel = 'WhatsApp' | 'E-mail' | 'SMS' | 'Push' | 'ECRED-API' | 'Indefinido';
@@ -188,6 +189,21 @@ const custoPatch = (
     };
 };
 
+/**
+ * CAC derivado do custo total × cartões gerados — CAC = Custo Total Campanha ÷ Cartões.
+ * Sem isto o importador gravava custo mas deixava CAC nulo, e o Report Live/scorecard
+ * lia CAC ausente mesmo em disparos que converteram. Retorna null quando não há cartões
+ * (CAC indefinido) ou custo, para nunca gravar CAC zero/artificial.
+ */
+const cacFromCusto = (
+    custoTotalCampanha: number | null | undefined,
+    cartoes: number | null | undefined,
+): number | null => {
+    if (custoTotalCampanha == null || !Number.isFinite(custoTotalCampanha)) return null;
+    if (cartoes == null || !Number.isFinite(cartoes) || cartoes <= 0) return null;
+    return Number(calcularCACPrevisto(custoTotalCampanha, cartoes).toFixed(2));
+};
+
 const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     const patch: Record<string, number | string | null> = {};
     const manuallyChanged = new Set((candidate.manualOverrides ?? []).map((override) => override.field));
@@ -222,14 +238,27 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
         ? custoPatch(candidate.channel, candidate.delivered, candidate.date)
         : {};
 
+    // Recalcula o CAC quando custo e cartões estão ambos determinados neste patch
+    // (custo acompanha a base; cartões vêm em `finalized`). Só grava quando os dois
+    // são conhecidos aqui — evita sobrescrever com valor parcial em refresh isolado.
+    const cacUpdate: Record<string, number | null> = {};
+    if ('Custo Total Campanha' in custo && candidate.finalized !== undefined) {
+        cacUpdate['CAC'] = cacFromCusto(custo['Custo Total Campanha'], candidate.finalized);
+    }
+
     return {
         ...patch,
         ...custo,
+        ...cacUpdate,
         updated_at: new Date().toISOString(),
     };
 };
 
-const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
+const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
+  // Custo determinístico por canal × base acionável e CAC derivado dele — calculados
+  // uma vez para gravar ambos coerentes no insert (sem isto o CAC nascia nulo).
+  const custo = custoPatch(candidate.channel, candidate.delivered ?? null, candidate.date);
+  return {
     prog_gaas: false,
     status: 'Realizado',
     BU: textOrFallback(candidate.bu, 'B2C'),
@@ -259,10 +288,11 @@ const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => ({
     'Propostas': candidate.proposals ?? 0,
     'Emissões Independentes': candidate.independent ?? 0,
     'Emissões Assistidas': candidate.assisted ?? 0,
-    // Custo determinístico por canal × base acionável — sem isto o Report Live lê CAC ausente.
-    ...custoPatch(candidate.channel, candidate.delivered ?? null, candidate.date),
+    ...custo,
+    'CAC': cacFromCusto(custo['Custo Total Campanha'], candidate.finalized ?? 0),
     updated_at: new Date().toISOString(),
-});
+  };
+};
 
 const buildRentabilizacaoInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
   // Segmento/Subgrupo determinísticos a partir da jornada (taxonomia de Rentabilização).
