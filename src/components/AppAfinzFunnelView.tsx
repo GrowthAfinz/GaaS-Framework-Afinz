@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CalendarDays, CheckCircle2, Download, Info } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../contexts/PeriodContext';
+import { supabase } from '../services/supabaseClient';
 import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCell, granularityLabel } from './FunnelDetailControls';
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 
@@ -10,7 +11,9 @@ type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'cpf' | 'onboarding' | 'geo' | 'docs' | 'bio' | 'address' | 'personalization' | 'signature' | 'completed';
 type RateKey = 'onboardingRate' | 'geoRate' | 'docsRate' | 'bioRate' | 'addressRate' | 'personalizationRate' | 'signatureRate' | 'completionRate' | 'geoCompletionRate' | 'overallRate';
 type RawRow = { date: Date; stage: string; status: string; plurix: string; value: number };
+type DatabaseRow = { business_date: string; stage_label: string; status: string; marc_plurix: string; cpf_count: number };
 type DailyRow = Record<StageKey, number | null> & { date: Date; auto: number | null; loss: number | null };
+type SourceMode = 'supabase' | 'fallback';
 
 const stages: Array<{ key: StageKey; label: string; color: string }> = [
   { key: 'cpf', label: 'Propostas iniciadas', color: '#102f65' },
@@ -91,6 +94,14 @@ function parseTsv(text: string): RawRow[] {
   }));
 }
 
+const databaseRowToRaw = (row: DatabaseRow): RawRow => ({
+  date: parseDate(row.business_date.split('-').reverse().join('/')),
+  stage: row.stage_label,
+  status: row.status,
+  plurix: row.marc_plurix,
+  value: Number(row.cpf_count),
+});
+
 function buildDaily(raw: RawRow[], scope: Scope): DailyRow[] {
   const dates = [...new Set(raw.map(row => iso(row.date)))].sort();
   return dates.map(key => {
@@ -148,9 +159,49 @@ export const AppAfinzFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ 
   const [detailGranularity, setDetailGranularity] = useState<Granularity>('daily');
   const [selected, setSelected] = useState<StageKey[]>(['cpf', 'onboarding', 'geo', 'completed']);
   const [selectedRates, setSelectedRates] = useState<RateKey[]>(['geoRate', 'completionRate']);
+  const [sourceMode, setSourceMode] = useState<SourceMode>('supabase');
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/app-afinz-funnel-raw.tsv`).then(response => response.ok ? response.text() : Promise.reject(new Error('Fonte do App Afinz indisponível'))).then(text => setRaw(parseTsv(text))).catch(reason => setError(reason.message));
+    let cancelled = false;
+    const loadFallback = async () => {
+      const response = await fetch(`${import.meta.env.BASE_URL}data/app-afinz-funnel-raw.tsv`);
+      if (!response.ok) throw new Error('Fonte do App Afinz indisponível');
+      const text = await response.text();
+      if (!cancelled) {
+        setRaw(parseTsv(text));
+        setSourceMode('fallback');
+      }
+    };
+    const load = async () => {
+      try {
+        const rows: DatabaseRow[] = [];
+        const pageSize = 1000;
+        for (let start = 0; ; start += pageSize) {
+          const { data, error: queryError } = await supabase
+            .from('app_afinz_funnel_daily_raw')
+            .select('business_date, stage_label, status, marc_plurix, cpf_count')
+            .order('business_date')
+            .order('stage_code')
+            .order('status')
+            .order('marc_plurix')
+            .range(start, start + pageSize - 1);
+          if (queryError) throw queryError;
+          const page = (data ?? []) as DatabaseRow[];
+          rows.push(...page);
+          if (page.length < pageSize) break;
+        }
+        if (!rows.length) throw new Error('Tabela do funil App Afinz sem dados');
+        if (!cancelled) {
+          setRaw(rows.map(databaseRowToRaw));
+          setSourceMode('supabase');
+        }
+      } catch {
+        await loadFallback();
+      }
+    };
+    setError('');
+    load().catch(reason => !cancelled && setError(reason.message));
+    return () => { cancelled = true; };
   }, []);
 
   const lastClosed = useMemo(() => {
@@ -223,6 +274,7 @@ export const AppAfinzFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ 
           <div className="mt-4 grid gap-x-4 gap-y-3 text-[10px] sm:grid-cols-2 min-[1180px]:grid-cols-1">
             <div><span className="text-white/55">Cobertura temporal</span><p className="font-semibold text-white">CPF: 01/01 · funil detalhado: 23/05</p></div>
             <div><span className="text-white/55">Segmentação disponível</span><p className="font-semibold text-white">Total · Afinz combinado · Plurix</p></div>
+            <div><span className="text-white/55">Fonte operacional</span><p className="font-semibold text-white">{sourceMode === 'supabase' ? 'Supabase · tabela diária' : 'TSV local · contingência'}</p></div>
             <div><span className="text-white/55">Etapa auxiliar</span><p className="font-semibold text-white">Finalização automática: cobertura parcial</p></div>
             <div><span className="text-white/55">Bloqueio atual</span><p className="font-semibold text-amber-200">B2C vs B2B2C sem dimensão de origem</p></div>
           </div>
