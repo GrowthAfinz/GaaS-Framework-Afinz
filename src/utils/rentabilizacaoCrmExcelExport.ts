@@ -222,6 +222,7 @@ const COPA_PARTNERS = ['B2C + B2B2C', 'Plurix', 'BB'] as const;
 const COPA_BLOCKS = ['Ativacao', 'Reativacao', 'Novos'] as const;
 const COPA_CHANNELS = ['WPP', 'E-MAIL', 'SMS', 'PUSH'] as const;
 const COPA_ACTION_START = new Date(2026, 3, 13);
+const COPA_BIG_NUMBERS_SHEET = 'Big Numbers Renta. Copa';
 type CopaPartner = typeof COPA_PARTNERS[number];
 type CopaBlock = typeof COPA_BLOCKS[number];
 type CopaChannel = typeof COPA_CHANNELS[number];
@@ -254,6 +255,22 @@ type CopaCrmSummary = {
   entregues: number;
   aberturas: number;
   taxaAbertura: number;
+};
+
+type CopaWeeklySummary = {
+  start: Date;
+  end: Date;
+  trafegoLp: number;
+  optinsGa4: number;
+  clientesCadastrados: number;
+  novosCartoes: number;
+  clientesComCartao: number;
+  media: Record<CopaMediaChannel, CopaMediaAgg>;
+  crm: Record<CopaChannel, CopaMetrics>;
+  lpDays: number;
+  visaDays: number;
+  mediaDays: number;
+  crmDays: number;
 };
 
 const MEDIA_SUB_HEADERS = ['Invt. (R$)', 'Cliques', 'CPC (R$)', 'Impressoes', 'CTR', 'CPM (R$)'];
@@ -498,6 +515,8 @@ function classifyCopa(row: RawRow): { partner: CopaPartner; block: CopaBlock } |
     jornada.includes('SORTEIO') ||
     jornada.includes('JOGO') ||
     jornada.includes('BANNER') ||
+    jornada.includes('PONTUAL') ||
+    jornada.includes('INCENTIVO_CADASTRO') ||
     jornada.startsWith('JOR_RENT_COPA')
   ) block = 'Ativacao';
 
@@ -837,6 +856,125 @@ function copaCrmChartSummary(idx: Map<string, CopaMetrics>, dates: Date[]): Copa
   return rows;
 }
 
+function emptyCopaCrmChannels(): Record<CopaChannel, CopaMetrics> {
+  return {
+    WPP: emptyCopaMetrics(),
+    'E-MAIL': emptyCopaMetrics(),
+    SMS: emptyCopaMetrics(),
+    PUSH: emptyCopaMetrics(),
+  };
+}
+
+function aggregateCopaCrmByChannel(
+  idx: Map<string, CopaMetrics>,
+  dates: Date[],
+): Record<CopaChannel, CopaMetrics> {
+  const result = emptyCopaCrmChannels();
+  for (const day of dates) {
+    const ds = isoDate(day);
+    for (const partner of COPA_PARTNERS) {
+      for (const block of COPA_BLOCKS) {
+        for (const channel of COPA_CHANNELS) {
+          const source = idx.get(copaKey(ds, partner, block, channel));
+          if (!source) continue;
+          const target = result[channel];
+          target.enviados += source.enviados;
+          target.entregues += source.entregues;
+          target.abertura += source.abertura;
+          target.cliques += source.cliques;
+        }
+      }
+    }
+  }
+  return result;
+}
+
+function startOfMondayWeek(date: Date): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() - ((result.getDay() + 6) % 7));
+  return result;
+}
+
+function buildCopaWeeklySummaries(
+  dates: Date[],
+  fixedIdx: CopaFixedIndex,
+  crmIdx: Map<string, CopaMetrics>,
+): CopaWeeklySummary[] {
+  const weekly = new Map<string, CopaWeeklySummary>();
+
+  for (const day of dates) {
+    const weekStart = startOfMondayWeek(day);
+    const key = isoDate(weekStart);
+    const current = weekly.get(key) ?? {
+      start: new Date(day),
+      end: new Date(day),
+      trafegoLp: 0,
+      optinsGa4: 0,
+      clientesCadastrados: 0,
+      novosCartoes: 0,
+      clientesComCartao: 0,
+      media: { total: emptyMediaAgg(), google: emptyMediaAgg(), meta: emptyMediaAgg() },
+      crm: emptyCopaCrmChannels(),
+      lpDays: 0,
+      visaDays: 0,
+      mediaDays: 0,
+      crmDays: 0,
+    };
+    current.end = new Date(day);
+
+    const fixed = fixedIdx.get(isoDate(day));
+    if (fixed) {
+      if (fixed.trafegoLp !== null || fixed.optinsGa4 !== null) current.lpDays++;
+      if (
+        fixed.clientesCadastrados !== null
+        || fixed.novosCartoes !== null
+        || fixed.clientesCadastradosComCartao !== null
+      ) current.visaDays++;
+      current.trafegoLp += fixed.trafegoLp ?? 0;
+      current.optinsGa4 += fixed.optinsGa4 ?? 0;
+      current.clientesCadastrados += fixed.clientesCadastrados ?? 0;
+      current.novosCartoes += fixed.novosCartoes ?? 0;
+      current.clientesComCartao += fixed.clientesCadastradosComCartao ?? 0;
+
+      const hasMedia = fixed.media.total.spend > 0
+        || fixed.media.total.clicks > 0
+        || fixed.media.total.impressions > 0;
+      if (hasMedia) current.mediaDays++;
+      for (const channel of ['total', 'google', 'meta'] as CopaMediaChannel[]) {
+        current.media[channel].spend += fixed.media[channel].spend;
+        current.media[channel].clicks += fixed.media[channel].clicks;
+        current.media[channel].impressions += fixed.media[channel].impressions;
+      }
+    }
+
+    const dailyCrm = aggregateCopaCrmByChannel(crmIdx, [day]);
+    const hasCrm = COPA_CHANNELS.some((channel) => hasCopaData(dailyCrm[channel]));
+    if (hasCrm) current.crmDays++;
+    for (const channel of COPA_CHANNELS) {
+      current.crm[channel].enviados += dailyCrm[channel].enviados;
+      current.crm[channel].entregues += dailyCrm[channel].entregues;
+      current.crm[channel].abertura += dailyCrm[channel].abertura;
+      current.crm[channel].cliques += dailyCrm[channel].cliques;
+    }
+    weekly.set(key, current);
+  }
+
+  return [...weekly.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString('pt-BR');
+}
+
+function sourceCoverage(
+  dates: Date[],
+  predicate: (date: Date) => boolean,
+): string {
+  const covered = dates.filter(predicate);
+  if (covered.length === 0) return `N/D | 0/${dates.length} dias`;
+  return `${formatShortDate(covered[0])} a ${formatShortDate(covered[covered.length - 1])} | ${covered.length}/${dates.length} dias`;
+}
+
 function applyTopThreeHighlights(ws: Worksheet, dates: Date[], maxCol: number): void {
   const dataStart = 5;
   const positiveCols = [3, 4, 5, 6, 8, 10, 11, 12, 14, 15, 17, 19, 20, 24, 26, 27, 30, 32, 33];
@@ -942,7 +1080,8 @@ function drawLineChart(
   const { canvas, ctx } = target;
   drawLegend(ctx, series);
   const plot = { x: 70, y: 115, w: 1120, h: 450 };
-  const max = Math.max(1, ...series.flatMap((item) => item.values));
+  const finiteValues = series.flatMap((item) => item.values).filter((value) => Number.isFinite(value));
+  const max = Math.max(1, ...finiteValues);
   ctx.strokeStyle = '#CBD5E1';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
@@ -953,10 +1092,20 @@ function drawLineChart(
     ctx.strokeStyle = item.color;
     ctx.lineWidth = 4;
     ctx.beginPath();
+    let started = false;
     item.values.forEach((value, index) => {
+      if (!Number.isFinite(value)) {
+        started = false;
+        return;
+      }
       const x = plot.x + (plot.w * index) / Math.max(1, labels.length - 1);
       const y = plot.y + plot.h - (value / max) * plot.h;
-      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (!started) {
+        ctx.moveTo(x, y);
+        started = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
     });
     ctx.stroke();
   });
@@ -1022,10 +1171,10 @@ function createCopaChartImages(
   const crmLabels = crmSummary.map((item) => `${item.partner} | ${item.block}`);
   return {
     funnel: drawLineChart('Funil LP Visa e Dashboard Visa', labels, [
-      { label: 'Trafego LP', color: '#F97316', values: fixed.map((item) => item.trafegoLp ?? 0) },
-      { label: 'Optins LP (GA4)', color: '#22C55E', values: fixed.map((item) => item.optinsGa4 ?? 0) },
-      { label: 'Clientes cadastrados', color: '#1D4ED8', values: fixed.map((item) => item.clientesCadastrados ?? 0) },
-      { label: 'Clientes com cartao', color: '#7C3AED', values: fixed.map((item) => item.clientesCadastradosComCartao ?? 0) },
+      { label: 'Trafego LP', color: '#F97316', values: fixed.map((item) => item.trafegoLp ?? Number.NaN) },
+      { label: 'Optins LP (GA4)', color: '#22C55E', values: fixed.map((item) => item.optinsGa4 ?? Number.NaN) },
+      { label: 'Clientes cadastrados', color: '#1D4ED8', values: fixed.map((item) => item.clientesCadastrados ?? Number.NaN) },
+      { label: 'Clientes com cartao', color: '#7C3AED', values: fixed.map((item) => item.clientesCadastradosComCartao ?? Number.NaN) },
     ]),
     spend: drawBarChart('Investimento de midia paga', labels, [
       { label: 'Google', color: '#15803D', values: fixed.map((item) => item.media.google.spend) },
@@ -1036,8 +1185,8 @@ function createCopaChartImages(
       { label: 'Meta', color: '#7E22CE', values: fixed.map((item) => item.media.meta.clicks) },
     ]),
     efficiency: drawLineChart('Eficiencia de midia', labels, [
-      { label: 'CPC total', color: '#0EA5E9', values: fixed.map((item) => item.media.total.clicks > 0 ? item.media.total.spend / item.media.total.clicks : 0) },
-      { label: 'Custo/cliente cadastrado', color: '#DC2626', values: fixed.map((item) => item.clientesCadastrados ? item.media.total.spend / item.clientesCadastrados : 0) },
+      { label: 'CPC total', color: '#0EA5E9', values: fixed.map((item) => item.media.total.clicks > 0 ? item.media.total.spend / item.media.total.clicks : Number.NaN) },
+      { label: 'Custo/cliente cadastrado', color: '#DC2626', values: fixed.map((item) => item.clientesCadastrados && item.media.total.spend > 0 ? item.media.total.spend / item.clientesCadastrados : Number.NaN) },
     ]),
     deliveries: drawBarChart('Entregas CRM por parceiro e segmento', crmLabels, [
       { label: 'Entregas', color: '#15803D', values: crmSummary.map((item) => item.entregues) },
@@ -1050,6 +1199,378 @@ function createCopaChartImages(
 }
 
 // ── Escrita de seção no worksheet ─────────────────────────────────────────────
+
+function writeCopaBigNumbersSheet(
+  wb: Workbook,
+  dates: Date[],
+  fixedIdx: CopaFixedIndex,
+  crmIdx: Map<string, CopaMetrics>,
+  chartImages?: CopaChartImages,
+): void {
+  const maxCol = 20;
+  const ws = wb.addWorksheet(COPA_BIG_NUMBERS_SHEET, {
+    views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', activeCell: 'A5', showGridLines: false }],
+  });
+  ws.pageSetup.orientation = 'landscape';
+  ws.pageSetup.fitToPage = true;
+  ws.pageSetup.fitToWidth = 1;
+  ws.pageSetup.fitToHeight = 0;
+  for (let col = 1; col <= maxCol; col++) ws.getColumn(col).width = col === 1 ? 15 : 11;
+
+  ws.mergeCells(1, 1, 1, maxCol);
+  setCell(ws.getCell(1, 1), 'BIG NUMBERS RENTABILIZAÇÃO COPA', {
+    bold: true, fillColor: COLORS.copaHeader, fontColor: 'FFFFFF', align: 'left', size: 18,
+  });
+  ws.getRow(1).height = 30;
+
+  ws.mergeCells(2, 1, 2, maxCol);
+  const periodText = dates.length > 0
+    ? `${formatShortDate(dates[0])} a ${formatShortDate(dates[dates.length - 1])} · somente dias fechados`
+    : 'Período sem dias fechados';
+  setCell(ws.getCell(2, 1), periodText, {
+    bold: true, fillColor: 'DCE6F1', fontColor: COLORS.copaHeader, align: 'left', size: 11,
+  });
+  ws.getRow(2).height = 21;
+
+  const crmCoverage = sourceCoverage(dates, (date) => {
+    const byChannel = aggregateCopaCrmByChannel(crmIdx, [date]);
+    return COPA_CHANNELS.some((channel) => hasCopaData(byChannel[channel]));
+  });
+  const lpCoverage = sourceCoverage(dates, (date) => {
+    const fixed = fixedIdx.get(isoDate(date));
+    return Boolean(fixed && (fixed.trafegoLp !== null || fixed.optinsGa4 !== null));
+  });
+  const visaCoverage = sourceCoverage(dates, (date) => {
+    const fixed = fixedIdx.get(isoDate(date));
+    return Boolean(fixed && (
+      fixed.clientesCadastrados !== null
+      || fixed.novosCartoes !== null
+      || fixed.clientesCadastradosComCartao !== null
+    ));
+  });
+  const mediaCoverage = sourceCoverage(dates, (date) => {
+    const media = fixedIdx.get(isoDate(date))?.media.total;
+    return Boolean(media && (media.spend > 0 || media.clicks > 0 || media.impressions > 0));
+  });
+
+  ws.mergeCells(3, 1, 3, maxCol);
+  setCell(ws.getCell(3, 1), `COBERTURA · CRM: ${crmCoverage} · LP/GA4: ${lpCoverage} · VISA: ${visaCoverage} · MÍDIA: ${mediaCoverage}`, {
+    fillColor: 'F8FAFC', fontColor: '334155', align: 'left', size: 9,
+  });
+  ws.getRow(3).height = 30;
+
+  ws.mergeCells(4, 1, 4, maxCol);
+  setCell(ws.getCell(4, 1), 'Leitura: volumes são somas do período. Taxas são recalculadas pelos volumes agregados. Custo/cliente não é CAC. Cliques de CRM estão preenchidos essencialmente em e-mail; ausência nos demais canais não deve ser interpretada como desempenho zero.', {
+    italic: true, fillColor: 'FFF2CC', fontColor: '7F6000', align: 'left', size: 9,
+  });
+  ws.getRow(4).height = 34;
+
+  if (dates.length === 0) {
+    ws.mergeCells(6, 1, 8, maxCol);
+    setCell(ws.getCell(6, 1), 'Sem dados da ação Copa no período fechado.', {
+      bold: true, fillColor: 'FEE2E2', fontColor: '991B1B', size: 12,
+    });
+    return;
+  }
+
+  const weekly = buildCopaWeeklySummaries(dates, fixedIdx, crmIdx);
+  const weeklyHeaderRow = 41;
+  const weeklyStartRow = weeklyHeaderRow + 1;
+  const weeklyEndRow = weeklyStartRow + weekly.length - 1;
+  const crmTableHeaderRow = 32;
+  const crmDataStartRow = crmTableHeaderRow + 1;
+  const emailTotalRow = crmDataStartRow + 1;
+  const weeklyRange = (col: string) => `${col}${weeklyStartRow}:${col}${weeklyEndRow}`;
+
+  type BigCard = {
+    label: string;
+    formula: string;
+    format: string;
+    fill: string;
+    note: string;
+  };
+  const cards: BigCard[] = [
+    { label: 'ACESSOS LP', formula: `SUM(${weeklyRange('B')})`, format: '#,##0', fill: '2E75B6', note: `GA4/Looker · ${lpCoverage}` },
+    { label: 'OPT-INS LP (GA4)', formula: `SUM(${weeklyRange('C')})`, format: '#,##0', fill: '0F766E', note: `Etapa opt-in · ${lpCoverage}` },
+    { label: 'CLIENTES CADASTRADOS', formula: `SUM(${weeklyRange('D')})`, format: '#,##0', fill: 'D6B656', note: `Dashboard Visa · ${visaCoverage}` },
+    { label: 'NOVOS CARTÕES', formula: `SUM(${weeklyRange('E')})`, format: '#,##0', fill: '334155', note: `Dashboard Visa · ${visaCoverage}` },
+    { label: 'CLIENTES COM CARTÃO', formula: `SUM(${weeklyRange('F')})`, format: '#,##0', fill: '7C3AED', note: `Dashboard Visa · ${visaCoverage}` },
+    { label: 'INVESTIMENTO MÍDIA', formula: `SUM(${weeklyRange('G')})`, format: '"R$" #,##0', fill: '4472C4', note: `Google + Meta · ${mediaCoverage}` },
+    { label: 'IMPRESSÕES MÍDIA', formula: `SUM(${weeklyRange('H')})`, format: '#,##0', fill: '1D4ED8', note: `Google + Meta · ${mediaCoverage}` },
+    { label: 'CLIQUES MÍDIA', formula: `SUM(${weeklyRange('I')})`, format: '#,##0', fill: '0369A1', note: `Google + Meta · ${mediaCoverage}` },
+    { label: 'CRM ENVIADOS', formula: `SUM(${weeklyRange('K')})`, format: '#,##0', fill: '475569', note: `WPP + E-mail + SMS + Push · ${crmCoverage}` },
+    { label: 'CRM ENTREGUES', formula: `SUM(${weeklyRange('L')})`, format: '#,##0', fill: '15803D', note: `WPP + E-mail + SMS + Push · ${crmCoverage}` },
+    { label: 'ABERTURAS E-MAIL', formula: `E${emailTotalRow}`, format: '#,##0', fill: '2563EB', note: 'Aberturas comparáveis apenas para e-mail' },
+    { label: 'CLIQUES CRM', formula: `SUM(${weeklyRange('N')})`, format: '#,##0', fill: 'C2410C', note: 'Tracking preenchido essencialmente em e-mail' },
+  ];
+
+  cards.forEach((card, index) => {
+    const row = 6 + Math.floor(index / 4) * 6;
+    const col = 1 + (index % 4) * 5;
+    ws.mergeCells(row, col, row, col + 4);
+    ws.mergeCells(row + 1, col, row + 3, col + 4);
+    ws.mergeCells(row + 4, col, row + 4, col + 4);
+    setCell(ws.getCell(row, col), card.label, {
+      bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 9,
+    });
+    setCell(ws.getCell(row + 1, col), { formula: card.formula }, {
+      bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 18,
+    });
+    ws.getCell(row + 1, col).numFmt = card.format;
+    setCell(ws.getCell(row + 4, col), card.note, {
+      fillColor: 'F8FAFC', fontColor: '475569', size: 8,
+    });
+    for (let currentRow = row; currentRow <= row + 4; currentRow++) {
+      for (let currentCol = col; currentCol <= col + 4; currentCol++) {
+        ws.getCell(currentRow, currentCol).border = {
+          top: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+          bottom: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+          left: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+          right: { style: 'thin', color: { argb: 'FFD7DEE8' } },
+        };
+      }
+    }
+  });
+
+  ws.mergeCells(24, 1, 24, maxCol);
+  setCell(ws.getCell(24, 1), 'EFICIÊNCIA DO PERÍODO', {
+    bold: true, fillColor: COLORS.copaHeader, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+  const efficiency: Array<{ label: string; formula: string; format: string; fill: string }> = [
+    { label: 'TX OPT-IN', formula: `IFERROR(SUM(${weeklyRange('C')})/SUM(${weeklyRange('B')}),"")`, format: '0.0%', fill: '0F766E' },
+    { label: 'CLIENTES / TRÁFEGO', formula: `IFERROR(SUM(${weeklyRange('D')})/SUM(${weeklyRange('B')}),"")`, format: '0.0%', fill: 'D6B656' },
+    { label: 'CARTÕES / TRÁFEGO', formula: `IFERROR(SUM(${weeklyRange('E')})/SUM(${weeklyRange('B')}),"")`, format: '0.0%', fill: '334155' },
+    { label: 'CLIENTES C/ CARTÃO / TRÁFEGO', formula: `IFERROR(SUM(${weeklyRange('F')})/SUM(${weeklyRange('B')}),"")`, format: '0.0%', fill: '7C3AED' },
+    { label: 'CARTÕES / CLIENTES', formula: `IFERROR(SUM(${weeklyRange('E')})/SUM(${weeklyRange('D')}),"")`, format: '0.0%', fill: '64748B' },
+    { label: 'CTR MÍDIA', formula: `IFERROR(SUM(${weeklyRange('I')})/SUM(${weeklyRange('H')}),"")`, format: '0.00%', fill: '1D4ED8' },
+    { label: 'CPC MÍDIA', formula: `IFERROR(SUM(${weeklyRange('G')})/SUM(${weeklyRange('I')}),"")`, format: '"R$" #,##0.00', fill: '0369A1' },
+    { label: 'CUSTO / CLIENTE', formula: `IFERROR(SUM(${weeklyRange('G')})/SUM(${weeklyRange('D')}),"")`, format: '"R$" #,##0.00', fill: 'DC2626' },
+    { label: 'TX ENTREGA CRM', formula: `IFERROR(SUM(${weeklyRange('L')})/SUM(${weeklyRange('K')}),"")`, format: '0.0%', fill: '15803D' },
+    { label: 'TX ABERTURA E-MAIL', formula: `IFERROR(E${emailTotalRow}/C${emailTotalRow},"")`, format: '0.0%', fill: '2563EB' },
+  ];
+  efficiency.forEach((metric, index) => {
+    const col = 1 + index * 2;
+    ws.mergeCells(25, col, 25, col + 1);
+    ws.mergeCells(26, col, 28, col + 1);
+    setCell(ws.getCell(25, col), metric.label, {
+      bold: true, fillColor: metric.fill, fontColor: 'FFFFFF', size: 8,
+    });
+    setCell(ws.getCell(26, col), { formula: metric.formula }, {
+      bold: true, fillColor: 'F8FAFC', fontColor: '0F172A', size: 13,
+    });
+    ws.getCell(26, col).numFmt = metric.format;
+  });
+
+  ws.mergeCells(30, 1, 30, maxCol);
+  setCell(ws.getCell(30, 1), 'TOTAIS POR CANAL · CRM E MÍDIA PAGA', {
+    bold: true, fillColor: COLORS.copaHeader, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+  ws.mergeCells(31, 1, 31, 8);
+  setCell(ws.getCell(31, 1), 'CRM', {
+    bold: true, fillColor: '15803D', fontColor: 'FFFFFF', align: 'left', size: 10,
+  });
+  ws.mergeCells(31, 11, 31, 20);
+  setCell(ws.getCell(31, 11), 'MÍDIA PAGA', {
+    bold: true, fillColor: COLORS.copaMedia, fontColor: 'FFFFFF', align: 'left', size: 10,
+  });
+
+  const crmHeaders = ['Canal', 'Enviados', 'Entregues', 'Tx entrega', 'Aberturas', 'Tx abertura', 'Cliques', 'Tx clique'];
+  crmHeaders.forEach((header, index) => setCell(ws.getCell(crmTableHeaderRow, index + 1), header, {
+    bold: true, fillColor: 'D9EAD3', fontColor: '1E5631', size: 8,
+  }));
+  const crmTotals = aggregateCopaCrmByChannel(crmIdx, dates);
+  const crmTotal = emptyCopaMetrics();
+  COPA_CHANNELS.forEach((channel) => {
+    crmTotal.enviados += crmTotals[channel].enviados;
+    crmTotal.entregues += crmTotals[channel].entregues;
+    crmTotal.cliques += crmTotals[channel].cliques;
+    if (channel === 'E-MAIL') crmTotal.abertura += crmTotals[channel].abertura;
+  });
+  [...COPA_CHANNELS, 'TOTAL' as const].forEach((channel, index) => {
+    const row = crmDataStartRow + index;
+    const metric = channel === 'TOTAL' ? crmTotal : crmTotals[channel];
+    const isEmail = channel === 'E-MAIL' || channel === 'TOTAL';
+    const hasClickTracking = isEmail;
+    const fill = channel === 'TOTAL' ? COLORS.copaTotal : index % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
+    const values: Array<string | number | object | undefined> = [
+      channel,
+      metric.enviados,
+      metric.entregues,
+      { formula: `IFERROR(C${row}/B${row},"")` },
+      isEmail ? metric.abertura : undefined,
+      isEmail
+        ? { formula: channel === 'TOTAL' ? `IFERROR(E${row}/C${emailTotalRow},"")` : `IFERROR(E${row}/C${row},"")` }
+        : undefined,
+      hasClickTracking ? metric.cliques : undefined,
+      hasClickTracking ? { formula: `IFERROR(G${row}/C${row},"")` } : undefined,
+    ];
+    values.forEach((value, colIndex) => setCell(ws.getCell(row, colIndex + 1), value, {
+      bold: channel === 'TOTAL', fillColor: fill, align: colIndex === 0 ? 'left' : 'right', size: 9,
+    }));
+    [2, 3].forEach((col) => { ws.getCell(row, col).numFmt = '#,##0'; });
+    ws.getCell(row, 4).numFmt = '0.0%';
+    if (isEmail) {
+      ws.getCell(row, 5).numFmt = '#,##0';
+      ws.getCell(row, 6).numFmt = '0.0%';
+    }
+    if (hasClickTracking) {
+      ws.getCell(row, 7).numFmt = '#,##0';
+      ws.getCell(row, 8).numFmt = '0.0%';
+    }
+  });
+
+  const mediaHeaders = ['Canal', 'Investimento', 'Impressões', 'Cliques', 'CTR', 'CPC', 'CPM', '% investimento', 'Dias', 'Fonte'];
+  mediaHeaders.forEach((header, index) => setCell(ws.getCell(crmTableHeaderRow, index + 11), header, {
+    bold: true, fillColor: 'DCE6F1', fontColor: COLORS.copaHeader, size: 8,
+  }));
+  const mediaTotals: Record<CopaMediaChannel, CopaMediaAgg> = {
+    total: emptyMediaAgg(), google: emptyMediaAgg(), meta: emptyMediaAgg(),
+  };
+  let mediaCoveredDays = 0;
+  dates.forEach((date) => {
+    const fixed = fixedIdx.get(isoDate(date));
+    if (!fixed) return;
+    if (fixed.media.total.spend > 0 || fixed.media.total.clicks > 0 || fixed.media.total.impressions > 0) mediaCoveredDays++;
+    for (const channel of ['total', 'google', 'meta'] as CopaMediaChannel[]) {
+      mediaTotals[channel].spend += fixed.media[channel].spend;
+      mediaTotals[channel].clicks += fixed.media[channel].clicks;
+      mediaTotals[channel].impressions += fixed.media[channel].impressions;
+    }
+  });
+  (['google', 'meta', 'total'] as CopaMediaChannel[]).forEach((channel, index) => {
+    const row = crmDataStartRow + index;
+    const metric = mediaTotals[channel];
+    const fill = channel === 'total' ? 'DCE6F1' : index % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
+    const values: Array<string | number | object> = [
+      channel === 'total' ? 'TOTAL' : channel.toUpperCase(),
+      metric.spend,
+      metric.impressions,
+      metric.clicks,
+      { formula: `IFERROR(N${row}/M${row},"")` },
+      { formula: `IFERROR(L${row}/N${row},"")` },
+      { formula: `IFERROR(L${row}/M${row}*1000,"")` },
+      channel === 'total' ? 1 : { formula: `IFERROR(L${row}/L${crmDataStartRow + 2},"")` },
+      mediaCoveredDays,
+      channel === 'google' ? 'Google Ads' : channel === 'meta' ? 'Meta Ads' : 'Google + Meta',
+    ];
+    values.forEach((value, colIndex) => setCell(ws.getCell(row, colIndex + 11), value, {
+      bold: channel === 'total', fillColor: fill, align: colIndex === 0 || colIndex === 9 ? 'left' : 'right', size: 9,
+    }));
+    ws.getCell(row, 12).numFmt = '"R$" #,##0.00';
+    [13, 14, 19].forEach((col) => { ws.getCell(row, col).numFmt = '#,##0'; });
+    [15, 18].forEach((col) => { ws.getCell(row, col).numFmt = '0.0%'; });
+    [16, 17].forEach((col) => { ws.getCell(row, col).numFmt = '"R$" #,##0.00'; });
+  });
+
+  ws.mergeCells(39, 1, 39, maxCol);
+  setCell(ws.getCell(39, 1), 'EVOLUÇÃO SEMANAL INTEGRADA · VISA, CRM E MÍDIA', {
+    bold: true, fillColor: COLORS.copaHeader, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+  ws.mergeCells(40, 1, 40, maxCol);
+  setCell(ws.getCell(40, 1), 'A semana respeita segunda a domingo; a primeira e a última podem ser parciais conforme início da ação e último dia fechado disponível.', {
+    italic: true, fillColor: 'F8FAFC', fontColor: '475569', align: 'left', size: 9,
+  });
+  const weeklyHeaders = [
+    'Semana', 'Tráfego LP', 'Opt-ins GA4', 'Clientes', 'Novos cartões', 'Clientes c/ cartão',
+    'Inv. mídia', 'Impressões mídia', 'Cliques mídia', 'CTR mídia',
+    'CRM enviados', 'CRM entregues', 'Aberturas e-mail', 'Cliques CRM', 'Tx entrega CRM', 'Tx clique CRM',
+    'Dias LP', 'Dias Visa', 'Dias mídia', 'Dias CRM',
+  ];
+  weeklyHeaders.forEach((header, index) => setCell(ws.getCell(weeklyHeaderRow, index + 1), header, {
+    bold: true, fillColor: 'DCE6F1', fontColor: COLORS.copaHeader, size: 8,
+  }));
+
+  weekly.forEach((week, index) => {
+    const row = weeklyStartRow + index;
+    const crm = emptyCopaMetrics();
+    COPA_CHANNELS.forEach((channel) => {
+      crm.enviados += week.crm[channel].enviados;
+      crm.entregues += week.crm[channel].entregues;
+      crm.cliques += week.crm[channel].cliques;
+      if (channel === 'E-MAIL') crm.abertura += week.crm[channel].abertura;
+    });
+    const fill = index % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
+    const values: Array<string | number | object | undefined> = [
+      `${formatShortDate(week.start)} a ${formatShortDate(week.end)}`,
+      week.lpDays > 0 ? week.trafegoLp : undefined,
+      week.lpDays > 0 ? week.optinsGa4 : undefined,
+      week.visaDays > 0 ? week.clientesCadastrados : undefined,
+      week.visaDays > 0 ? week.novosCartoes : undefined,
+      week.visaDays > 0 ? week.clientesComCartao : undefined,
+      week.mediaDays > 0 ? week.media.total.spend : undefined,
+      week.mediaDays > 0 ? week.media.total.impressions : undefined,
+      week.mediaDays > 0 ? week.media.total.clicks : undefined,
+      { formula: `IFERROR(I${row}/H${row},"")` },
+      week.crmDays > 0 ? crm.enviados : undefined,
+      week.crmDays > 0 ? crm.entregues : undefined,
+      week.crmDays > 0 ? crm.abertura : undefined,
+      week.crmDays > 0 ? crm.cliques : undefined,
+      { formula: `IFERROR(L${row}/K${row},"")` },
+      { formula: `IFERROR(N${row}/L${row},"")` },
+      week.lpDays, week.visaDays, week.mediaDays, week.crmDays,
+    ];
+    values.forEach((value, colIndex) => setCell(ws.getCell(row, colIndex + 1), value, {
+      fillColor: fill, align: colIndex === 0 ? 'left' : 'right', size: 9,
+    }));
+    [2, 3, 4, 5, 6, 8, 9, 11, 12, 13, 14, 17, 18, 19, 20].forEach((col) => { ws.getCell(row, col).numFmt = '#,##0'; });
+    ws.getCell(row, 7).numFmt = '"R$" #,##0.00';
+    [10, 15, 16].forEach((col) => { ws.getCell(row, col).numFmt = '0.0%'; });
+  });
+
+  const channelTitleRow = weeklyEndRow + 3;
+  const channelHeaderRow = channelTitleRow + 1;
+  const channelStartRow = channelHeaderRow + 1;
+  ws.mergeCells(channelTitleRow, 1, channelTitleRow, maxCol);
+  setCell(ws.getCell(channelTitleRow, 1), 'EVOLUÇÃO SEMANAL POR CANAL · CRM E MÍDIA PAGA', {
+    bold: true, fillColor: COLORS.copaHeader, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+  const channelHeaders = [
+    'Semana', 'WPP enviados', 'WPP entregues', 'WPP cliques',
+    'E-mail enviados', 'E-mail entregues', 'E-mail aberturas', 'E-mail cliques',
+    'SMS enviados', 'SMS entregues', 'Push enviados', 'Push entregues',
+    'Inv. Google', 'Inv. Meta', 'Inv. total', 'Cliques Google', 'Cliques Meta', 'Cliques mídia total',
+  ];
+  channelHeaders.forEach((header, index) => setCell(ws.getCell(channelHeaderRow, index + 1), header, {
+    bold: true, fillColor: 'D9EAD3', fontColor: '1E5631', size: 8,
+  }));
+  weekly.forEach((week, index) => {
+    const row = channelStartRow + index;
+    const fill = index % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
+    const values: Array<string | number | undefined> = [
+      `${formatShortDate(week.start)} a ${formatShortDate(week.end)}`,
+      week.crm.WPP.enviados, week.crm.WPP.entregues, undefined,
+      week.crm['E-MAIL'].enviados, week.crm['E-MAIL'].entregues, week.crm['E-MAIL'].abertura, week.crm['E-MAIL'].cliques,
+      week.crm.SMS.enviados, week.crm.SMS.entregues,
+      week.crm.PUSH.enviados, week.crm.PUSH.entregues,
+      week.media.google.spend, week.media.meta.spend, week.media.total.spend,
+      week.media.google.clicks, week.media.meta.clicks, week.media.total.clicks,
+    ];
+    values.forEach((value, colIndex) => setCell(ws.getCell(row, colIndex + 1), value, {
+      fillColor: fill, align: colIndex === 0 ? 'left' : 'right', size: 9,
+    }));
+    for (let col = 2; col <= 18; col++) ws.getCell(row, col).numFmt = col >= 13 && col <= 15 ? '"R$" #,##0.00' : '#,##0';
+  });
+
+  const noteRow = channelStartRow + weekly.length + 1;
+  ws.mergeCells(noteRow, 1, noteRow, maxCol);
+  setCell(ws.getCell(noteRow, 1), 'Fontes: rentabilizacao_activities (CRM Copa), copa_lp_daily (LP/GA4), copa_visa_daily (Dashboard Visa) e paid_media_metrics filtrada por campanhas mapeadas como rentabilização. Valores ausentes permanecem em branco nas abas detalhadas; nesta síntese, somas usam apenas dias cobertos.', {
+    italic: true, fillColor: 'FFF2CC', fontColor: '7F6000', align: 'left', size: 9,
+  });
+  ws.getRow(noteRow).height = 34;
+
+  if (chartImages) {
+    const chartStartRow = noteRow + 2;
+    const placements: Array<[keyof CopaChartImages, number, number]> = [
+      ['funnel', 1, chartStartRow], ['spend', 11, chartStartRow],
+      ['traffic', 1, chartStartRow + 20], ['efficiency', 11, chartStartRow + 20],
+      ['deliveries', 1, chartStartRow + 40], ['openings', 11, chartStartRow + 40],
+    ];
+    placements.forEach(([key, col, row]) => {
+      const imageId = wb.addImage({ base64: chartImages[key], extension: 'png' });
+      ws.addImage(imageId, { tl: { col: col - 1, row: row - 1 }, ext: { width: 620, height: 320 } });
+    });
+  }
+}
 
 function writeCopaSheet(
   wb: Workbook,
@@ -1674,12 +2195,14 @@ export function buildWorkbook(
   start: Date,
   end: Date,
   fixedIdx: CopaFixedIndex,
-  chartImages?: CopaChartImages,
+  detailChartImages?: CopaChartImages,
+  bigChartImages?: CopaChartImages,
 ): Workbook {
   const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
-  const copaStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
-  const copaDates = copaStart <= end ? allDates(copaStart, end) : [];
-  const copaAuditRows = copaStart <= end ? buildCopaAuditRows(rows, copaStart, end) : [];
+  const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
+  const copaDetailDates = copaDetailStart <= end ? allDates(copaDetailStart, end) : [];
+  const copaActionDates = COPA_ACTION_START <= end ? allDates(COPA_ACTION_START, end) : [];
+  const copaAuditRows = COPA_ACTION_START <= end ? buildCopaAuditRows(rows, COPA_ACTION_START, end) : [];
   const dates = allDates(start, end);
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = 'GaaS AFINZ — Rentabilização';
@@ -1688,10 +2211,11 @@ export function buildWorkbook(
   wb.calcProperties.forceFullCalc = true;
   wb.calcProperties.calcMode = 'auto';
 
-  const copaIdx = buildCopaIndex(rows, copaStart, end);
-  const crmSummary = copaCrmChartSummary(copaIdx, copaDates);
-  writeCopaSheet(wb, rows, copaDates, copaStart, end, fixedIdx, chartImages);
-  addDashboardDataSheet(wb, copaDates, fixedIdx, crmSummary);
+  const copaActionIdx = buildCopaIndex(rows, COPA_ACTION_START, end);
+  const crmSummary = copaCrmChartSummary(copaActionIdx, copaActionDates);
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, bigChartImages ?? detailChartImages);
+  writeCopaSheet(wb, rows, copaDetailDates, copaDetailStart, end, fixedIdx, detailChartImages);
+  addDashboardDataSheet(wb, copaActionDates, fixedIdx, crmSummary);
 
   // Aba 1: Seguros (cross-sell BU Seguros)
   buildTabSheet(wb, 'Seguros', seguros, dates, 'seguros');
@@ -1863,23 +2387,35 @@ export async function exportRentabilizacaoCrmXlsx(
 ): Promise<{ rows: number; filename: string }> {
   const effectiveEnd = closedEnd(end);
   if (effectiveEnd < start) throw new Error('O periodo selecionado ainda nao possui dias fechados.');
-  const copaFixedStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
+  const sourceStart = start < COPA_ACTION_START ? start : COPA_ACTION_START;
+  const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
   const [rawRows, fixedIdx, ExcelJSModule] = await Promise.all([
-    fetchRntRows(start, effectiveEnd),
-    fetchCopaFixedDaily(copaFixedStart, effectiveEnd),
+    fetchRntRows(sourceStart, effectiveEnd),
+    fetchCopaFixedDaily(COPA_ACTION_START, effectiveEnd),
     import('exceljs'),
   ]);
-  const copaDates = copaFixedStart <= effectiveEnd ? allDates(copaFixedStart, effectiveEnd) : [];
-  const crmSummary = copaCrmChartSummary(buildCopaIndex(rawRows, copaFixedStart, effectiveEnd), copaDates);
-  const chartImages = createCopaChartImages(copaDates, fixedIdx, crmSummary);
-  const workbook = buildWorkbook(ExcelJSModule.default, rawRows, start, effectiveEnd, fixedIdx, chartImages);
+  const copaDetailDates = copaDetailStart <= effectiveEnd ? allDates(copaDetailStart, effectiveEnd) : [];
+  const copaActionDates = COPA_ACTION_START <= effectiveEnd ? allDates(COPA_ACTION_START, effectiveEnd) : [];
+  const detailCrmSummary = copaCrmChartSummary(buildCopaIndex(rawRows, copaDetailStart, effectiveEnd), copaDetailDates);
+  const actionCrmSummary = copaCrmChartSummary(buildCopaIndex(rawRows, COPA_ACTION_START, effectiveEnd), copaActionDates);
+  const detailChartImages = createCopaChartImages(copaDetailDates, fixedIdx, detailCrmSummary);
+  const bigChartImages = createCopaChartImages(copaActionDates, fixedIdx, actionCrmSummary);
+  const workbook = buildWorkbook(
+    ExcelJSModule.default,
+    rawRows,
+    start,
+    effectiveEnd,
+    fixedIdx,
+    detailChartImages,
+    bigChartImages,
+  );
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = `rentabilizacao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(effectiveEnd).replace(/-/g, '')}.xlsx`;
   downloadBuffer(buffer, filename);
   return { rows: rawRows.length, filename };
 }
 
-// v3 (2026-07-28): C/D/E atualizadas e Dashboard Visa completo (diário + acumulado).
+// v4 (2026-07-28): Big Numbers Copa com CRM, mídia paga e evolução semanal desde 13/04.
 export function getCurrentMonthRange(): { start: Date; end: Date } {
   const now = new Date();
   return {
