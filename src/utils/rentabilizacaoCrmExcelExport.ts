@@ -226,18 +226,22 @@ type CopaPartner = typeof COPA_PARTNERS[number];
 type CopaBlock = typeof COPA_BLOCKS[number];
 type CopaChannel = typeof COPA_CHANNELS[number];
 
-// ── Colunas fixas (LP Looker + BI Visa + Mídia Paga) ──────────────────────────
+// ── Colunas fixas (LP Looker + Dashboard Visa + Mídia Paga) ──────────────────
 // Universos integrados (ver vault: Export-XLSX-Renta-Copa):
 //   LP (GA4/Looker)  → copa_lp_daily (origem='__total__'): tráfego e etapa opt-in (proxy)
-//   BI Visa (oficial) → copa_visa_daily: clientes (opt-ins) e cartões por dia
+//   Dashboard Visa (oficial) → copa_visa_daily: cadastros e cartões, diários e acumulados
 //   Mídia Paga       → paid_media_metrics × mappings (objective='rentabilizacao')
 type CopaMediaAgg = { spend: number; clicks: number; impressions: number };
 type CopaMediaChannel = 'total' | 'google' | 'meta';
 type CopaFixedDay = {
   trafegoLp: number | null;
   optinsGa4: number | null;
-  optinsVisa: number | null;
-  cartoesVisa: number | null;
+  clientesCadastrados: number | null;
+  clientesCadastradosAcumulado: number | null;
+  novosCartoes: number | null;
+  cartoesAcumulado: number | null;
+  clientesCadastradosComCartao: number | null;
+  clientesCadastradosComCartaoAcumulado: number | null;
   media: Record<CopaMediaChannel, CopaMediaAgg>;
 };
 type CopaFixedIndex = Map<string, CopaFixedDay>;
@@ -255,23 +259,49 @@ type CopaCrmSummary = {
 const MEDIA_SUB_HEADERS = ['Invt. (R$)', 'Cliques', 'CPC (R$)', 'Impressoes', 'CTR', 'CPM (R$)'];
 const COPA_FIXED_HEADERS = [
   'Data', 'Dia',
-  'Trafego LP', 'Optins LP (GA4)',
-  'Optins Visa', 'Cartoes Visa',
-  'Invt. Midia (R$)', 'Cliques Midia', 'CPC (R$)', 'Impressoes', 'CTR', 'CPM (R$)', 'Custo/Opt-in (R$)',
+  'Trafego LP', 'Optins LP (GA4)', 'Txa Optin',
+  'Clientes Cadastrados', 'Clientes Cadastrados | Acumulado',
+  'Novos Cartões', 'Cartões | Acumulado', 'Taxa de Cadastro',
+  'Clientes Cadastrados com Cartão', 'Taxa de Cadastro Completo',
+  'Clientes Cadastrados com Cartão | Acumulado',
+  '% Cartões/Clientes', '% Clientes com Cartão/Clientes',
+  'Invt. Midia (R$)', 'Cliques Midia', 'CPC (R$)', 'Impressoes', 'CTR', 'CPM (R$)', 'Custo/Cliente (R$)',
   ...MEDIA_SUB_HEADERS,
   ...MEDIA_SUB_HEADERS,
 ];
 
 // Grupos visuais do cabeçalho fixo (colunas 1-based, inclusivas)
-const COPA_FIXED_GROUPS: Array<{ from: number; to: number; label: string; fill: string }> = [
-  { from: 3, to: 4,   label: 'LP Visa (GA4)',      fill: '2E75B6' },
-  { from: 5, to: 6,   label: 'BI Visa (oficial)',  fill: '1F3864' },
-  { from: 7, to: 13,  label: 'Midia Paga — Total', fill: '4472C4' },
-  { from: 14, to: 19, label: 'Midia — Google',     fill: '1D7B2B' },
-  { from: 20, to: 25, label: 'Midia — Meta',       fill: '7030A0' },
+const COPA_FIXED_GROUPS: Array<{ from: number; to: number; label: string; fill: string; font?: string }> = [
+  { from: 3, to: 5,   label: 'LP Visa (GA4)',      fill: '2E75B6' },
+  { from: 6, to: 15,  label: 'DASHBOARD VISA',     fill: 'FFEA8F', font: '000000' },
+  { from: 16, to: 22, label: 'Midia Paga — Total', fill: '4472C4' },
+  { from: 23, to: 28, label: 'Midia — Google',     fill: '1D7B2B' },
+  { from: 29, to: 34, label: 'Midia — Meta',       fill: '7030A0' },
 ];
 
-const COPA_FIXED_COLS = 25;
+const COPA_FIXED_COLS = 34;
+const COPA_FIXED_SUM_COLS = [3, 4, 6, 8, 11, 16, 17, 19, 23, 24, 26, 29, 30, 32];
+const COPA_FIXED_LATEST_COLS = [7, 9, 13];
+const COPA_FIXED_DERIVED_COLS: Array<[number, number, number, number?]> = [
+  [5, 4, 3],
+  [10, 8, 3],
+  [12, 11, 3],
+  [14, 8, 6],
+  [15, 11, 6],
+  [18, 16, 17],
+  [20, 17, 19],
+  [21, 16, 19, 1000],
+  [22, 16, 6],
+  [25, 23, 24],
+  [27, 24, 26],
+  [28, 23, 26, 1000],
+  [31, 29, 30],
+  [33, 30, 32],
+  [34, 29, 32, 1000],
+];
+const COPA_MEDIA_BASE_COLS: Array<[CopaMediaChannel, number]> = [['total', 16], ['google', 23], ['meta', 29]];
+const COPA_CURRENCY_COLS = new Set([16, 18, 21, 22, 23, 25, 28, 29, 31, 34]);
+const COPA_RATE_COLS = new Set([5, 10, 12, 14, 15, 20, 27, 33]);
 const COPA_BLOCK_WIDTH = 14;
 const COPA_HEADER = [
   'wpp', 'entregas', 'cliques',
@@ -360,6 +390,19 @@ function ratioFormula(numeratorCol: number, denominatorCol: number, row: number,
   const numerator = `${colLetter(numeratorCol)}${row}`;
   const denominator = `${colLetter(denominatorCol)}${row}`;
   return `IFERROR(${numerator}/${denominator}${multiplier === 1 ? '' : `*${multiplier}`},\"\")`;
+}
+
+function latestValueFormula(col: number, fromRow: number, toRow: number): string {
+  const letter = colLetter(col);
+  return fromRow <= toRow
+    ? `IFERROR(LOOKUP(2,1/(${letter}${fromRow}:${letter}${toRow}<>\"\"),${letter}${fromRow}:${letter}${toRow}),\"\")`
+    : '""';
+}
+
+function copaFixedNumberFormat(col: number): string {
+  if (COPA_RATE_COLS.has(col)) return '0.00%';
+  if (COPA_CURRENCY_COLS.has(col)) return 'R$ #,##0.00';
+  return '#,##0';
 }
 
 /** Determina em qual aba o registro vai */
@@ -796,8 +839,8 @@ function copaCrmChartSummary(idx: Map<string, CopaMetrics>, dates: Date[]): Copa
 
 function applyTopThreeHighlights(ws: Worksheet, dates: Date[], maxCol: number): void {
   const dataStart = 5;
-  const positiveCols = [3, 4, 5, 6, 8, 10, 11, 15, 17, 18, 21, 23, 24];
-  const costCols = [9, 12, 13, 16, 19, 22, 25];
+  const positiveCols = [3, 4, 5, 6, 8, 10, 11, 12, 14, 15, 17, 19, 20, 24, 26, 27, 30, 32, 33];
+  const costCols = [18, 21, 22, 25, 28, 31, 34];
   const crmRateRels = [8, 9];
   const columns = new Set<number>([...positiveCols, ...costCols]);
   for (let start = COPA_FIXED_COLS + 1; start <= maxCol; start += COPA_BLOCK_WIDTH) {
@@ -829,7 +872,14 @@ function addDashboardDataSheet(
 ): void {
   const ws = wb.addWorksheet('_Copa Dashboard Data');
   ws.state = 'veryHidden';
-  ['Data', 'Acessos LP', 'Etapa GA4', 'Opt-ins Visa', 'Spend Google', 'Spend Meta', 'Cliques Google', 'Cliques Meta', 'CPC Total', 'Custo/Opt-in Visa']
+  [
+    'Data', 'Trafego LP', 'Optins LP (GA4)', 'Taxa Optin',
+    'Clientes Cadastrados', 'Clientes Acumulado',
+    'Novos Cartoes', 'Cartoes Acumulado',
+    'Clientes com Cartao', 'Clientes com Cartao Acumulado',
+    'Spend Google', 'Spend Meta', 'Cliques Google', 'Cliques Meta',
+    'CPC Total', 'Custo/Cliente Cadastrado',
+  ]
     .forEach((value, col) => setCell(ws.getCell(1, col + 1), value, { bold: true }));
   dates.forEach((date, index) => {
     const row = index + 2;
@@ -837,9 +887,14 @@ function addDashboardDataSheet(
     const totalSpend = fixed.media.total.spend;
     const totalClicks = fixed.media.total.clicks;
     [
-      isoDate(date), fixed.trafegoLp ?? '', fixed.optinsGa4 ?? '', fixed.optinsVisa ?? '',
+      isoDate(date), fixed.trafegoLp ?? '', fixed.optinsGa4 ?? '',
+      fixed.trafegoLp ? (fixed.optinsGa4 ?? 0) / fixed.trafegoLp : '',
+      fixed.clientesCadastrados ?? '', fixed.clientesCadastradosAcumulado ?? '',
+      fixed.novosCartoes ?? '', fixed.cartoesAcumulado ?? '',
+      fixed.clientesCadastradosComCartao ?? '', fixed.clientesCadastradosComCartaoAcumulado ?? '',
       fixed.media.google.spend, fixed.media.meta.spend, fixed.media.google.clicks, fixed.media.meta.clicks,
-      totalClicks > 0 ? totalSpend / totalClicks : '', fixed.optinsVisa ? totalSpend / fixed.optinsVisa : '',
+      totalClicks > 0 ? totalSpend / totalClicks : '',
+      fixed.clientesCadastrados ? totalSpend / fixed.clientesCadastrados : '',
     ].forEach((value, col) => setCell(ws.getCell(row, col + 1), value as string | number));
   });
   const start = dates.length + 4;
@@ -966,10 +1021,11 @@ function createCopaChartImages(
   const fixed = dates.map((date) => fixedIdx.get(isoDate(date)) ?? emptyFixedDay());
   const crmLabels = crmSummary.map((item) => `${item.partner} | ${item.block}`);
   return {
-    funnel: drawLineChart('Funil LP: comportamento x oficial', labels, [
-      { label: 'Acessos LP', color: '#F97316', values: fixed.map((item) => item.trafegoLp ?? 0) },
-      { label: 'Etapa GA4', color: '#22C55E', values: fixed.map((item) => item.optinsGa4 ?? 0) },
-      { label: 'Opt-ins Visa', color: '#1D4ED8', values: fixed.map((item) => item.optinsVisa ?? 0) },
+    funnel: drawLineChart('Funil LP Visa e Dashboard Visa', labels, [
+      { label: 'Trafego LP', color: '#F97316', values: fixed.map((item) => item.trafegoLp ?? 0) },
+      { label: 'Optins LP (GA4)', color: '#22C55E', values: fixed.map((item) => item.optinsGa4 ?? 0) },
+      { label: 'Clientes cadastrados', color: '#1D4ED8', values: fixed.map((item) => item.clientesCadastrados ?? 0) },
+      { label: 'Clientes com cartao', color: '#7C3AED', values: fixed.map((item) => item.clientesCadastradosComCartao ?? 0) },
     ]),
     spend: drawBarChart('Investimento de midia paga', labels, [
       { label: 'Google', color: '#15803D', values: fixed.map((item) => item.media.google.spend) },
@@ -981,7 +1037,7 @@ function createCopaChartImages(
     ]),
     efficiency: drawLineChart('Eficiencia de midia', labels, [
       { label: 'CPC total', color: '#0EA5E9', values: fixed.map((item) => item.media.total.clicks > 0 ? item.media.total.spend / item.media.total.clicks : 0) },
-      { label: 'Custo/Opt-in Visa', color: '#DC2626', values: fixed.map((item) => item.optinsVisa ? item.media.total.spend / item.optinsVisa : 0) },
+      { label: 'Custo/cliente cadastrado', color: '#DC2626', values: fixed.map((item) => item.clientesCadastrados ? item.media.total.spend / item.clientesCadastrados : 0) },
     ]),
     deliveries: drawBarChart('Entregas CRM por parceiro e segmento', crmLabels, [
       { label: 'Entregas', color: '#15803D', values: crmSummary.map((item) => item.entregues) },
@@ -1015,26 +1071,40 @@ function writeCopaSheet(
   const lastDataRow = 4 + dates.length;
   ws.mergeCells('A1:B1');
   setCell(ws.getCell(1, 1), 'TOTAL PERÍODO', { bold: true, fillColor: COLORS.copaAtivacao, fontColor: 'FFFFFF', size: 11 });
-  const FIXED_SUM_COLS = [3, 4, 5, 6, 7, 8, 10, 14, 15, 17, 20, 21, 23];
   for (let col = 3; col <= maxCol; col++) {
     const group = COPA_FIXED_GROUPS.find((g) => col >= g.from && col <= g.to);
-    setCell(ws.getCell(1, col), '', { bold: true, fillColor: group?.fill ?? COLORS.copaHeader, fontColor: 'FFFFFF', size: 10 });
-    if (FIXED_SUM_COLS.includes(col) && dates.length > 0) {
-      const letter = colLetter(col);
+    setCell(ws.getCell(1, col), undefined, {
+      bold: true,
+      fillColor: group?.fill ?? COLORS.copaHeader,
+      fontColor: group?.font ?? 'FFFFFF',
+      size: 10,
+    });
+    if (COPA_FIXED_SUM_COLS.includes(col) && dates.length > 0) {
       const c = ws.getCell(1, col);
-      c.value = { formula: `SUM(${letter}5:${letter}${lastDataRow})` };
-      c.numFmt = col === 7 || col === 14 || col === 20 ? '#,##0.00' : '#,##0';
+      c.value = { formula: sumRangeFormula(col, 5, lastDataRow) };
+      c.numFmt = copaFixedNumberFormat(col);
+    } else if (COPA_FIXED_LATEST_COLS.includes(col) && dates.length > 0) {
+      const c = ws.getCell(1, col);
+      c.value = { formula: latestValueFormula(col, 5, lastDataRow) };
+      c.numFmt = copaFixedNumberFormat(col);
+    } else {
+      const derived = COPA_FIXED_DERIVED_COLS.find(([target]) => target === col);
+      if (derived && dates.length > 0) {
+        const c = ws.getCell(1, col);
+        c.value = { formula: ratioFormula(derived[1], derived[2], 1, derived[3]) };
+        c.numFmt = copaFixedNumberFormat(col);
+      }
     }
   }
 
   // Linhas 2-3 (colunas fixas): grupos de universo
   for (let col = 1; col <= COPA_FIXED_COLS; col++) {
-    setCell(ws.getCell(2, col), '', { fillColor: COLORS.copaHeader });
-    setCell(ws.getCell(3, col), '', { fillColor: COLORS.copaHeader });
+    setCell(ws.getCell(2, col), undefined, { fillColor: COLORS.copaHeader });
+    setCell(ws.getCell(3, col), undefined, { fillColor: COLORS.copaHeader });
   }
   for (const g of COPA_FIXED_GROUPS) {
     ws.mergeCells(2, g.from, 3, g.to);
-    setCell(ws.getCell(2, g.from), g.label, { bold: true, fillColor: g.fill, fontColor: 'FFFFFF', size: 9 });
+    setCell(ws.getCell(2, g.from), g.label, { bold: true, fillColor: g.fill, fontColor: g.font ?? 'FFFFFF', size: 9 });
   }
 
   let blockStart = COPA_FIXED_COLS + 1;
@@ -1052,7 +1122,7 @@ function writeCopaSheet(
         const channelEnd = blockStart + Math.max(layout.labelRel, ...metricRels);
         ws.mergeCells(3, channelStart, 3, channelEnd);
         setCell(ws.getCell(3, channelStart), layout.label, { bold: true, fillColor: fill, fontColor: font, size: 9 });
-        for (let col = channelStart + 1; col <= channelEnd; col++) setCell(ws.getCell(3, col), '', { fillColor: fill, fontColor: font });
+        for (let col = channelStart + 1; col <= channelEnd; col++) setCell(ws.getCell(3, col), undefined, { fillColor: fill, fontColor: font });
       }
 
       COPA_HEADER.forEach((label, rel) => {
@@ -1070,7 +1140,7 @@ function writeCopaSheet(
     setCell(ws.getCell(4, col), label, {
       bold: true,
       fillColor: group?.fill ?? COLORS.copaHeader,
-      fontColor: 'FFFFFF',
+      fontColor: group?.font ?? 'FFFFFF',
       size: 8,
     });
   });
@@ -1095,26 +1165,44 @@ function writeCopaSheet(
     const isWeekend = day.getDay() === 0 || day.getDay() === 6;
     const baseFill = isWeekend ? 'E2E8F0' : dayIndex % 2 === 0 ? 'FFFFFF' : 'F2F2F2';
     ws.getRow(row).height = 15;
-    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), '', { fillColor: baseFill, size: 9 });
+    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), undefined, { fillColor: baseFill, size: 9 });
 
     setCell(ws.getCell(row, 1), day.toLocaleDateString('pt-BR'), { fillColor: baseFill, size: 9 });
     setCell(ws.getCell(row, 2), DAY_NAMES[day.getDay()], { fillColor: baseFill, size: 9 });
 
-    // Colunas fixas: LP (GA4) + BI Visa + Mídia Paga
+    // Colunas fixas: LP (GA4) + Dashboard Visa + Mídia Paga
     const fixed = fixedIdx.get(ds);
     if (fixed) {
       const num = (col: number, value: number | null | undefined, fmt: string = '#,##0') => {
-        if (!value) return;
+        if (value === null || value === undefined) return;
         const c = ws.getCell(row, col);
         setCell(c, value, { fillColor: baseFill, size: 9, align: 'right' });
         c.numFmt = fmt;
       };
       num(3, fixed.trafegoLp);
       num(4, fixed.optinsGa4);
-      num(5, fixed.optinsVisa);
-      num(6, fixed.cartoesVisa);
-      const mediaCols: Array<[CopaMediaChannel, number]> = [['total', 7], ['google', 14], ['meta', 20]];
-      for (const [ch, base] of mediaCols) {
+      if (fixed.trafegoLp !== null && fixed.optinsGa4 !== null) {
+        const c = ws.getCell(row, 5);
+        c.value = { formula: ratioFormula(4, 3, row) };
+        c.numFmt = '0.00%';
+      }
+      num(6, fixed.clientesCadastrados);
+      num(7, fixed.clientesCadastradosAcumulado);
+      num(8, fixed.novosCartoes);
+      num(9, fixed.cartoesAcumulado);
+      num(11, fixed.clientesCadastradosComCartao);
+      num(13, fixed.clientesCadastradosComCartaoAcumulado);
+      [
+        [10, 8, 3],
+        [12, 11, 3],
+        [14, 8, 6],
+        [15, 11, 6],
+      ].forEach(([col, numerator, denominator]) => {
+        const c = ws.getCell(row, col);
+        c.value = { formula: ratioFormula(numerator, denominator, row) };
+        c.numFmt = '0.00%';
+      });
+      for (const [ch, base] of COPA_MEDIA_BASE_COLS) {
         const m = fixed.media[ch];
         if (!m || (m.spend === 0 && m.clicks === 0 && m.impressions === 0)) continue;
         num(base, m.spend, '#,##0.00');
@@ -1124,9 +1212,9 @@ function writeCopaSheet(
         num(base + 4, m.impressions > 0 ? m.clicks / m.impressions : 0, '0.00%');
         num(base + 5, m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0, '#,##0.00');
       }
-      // Custo por Opt-in = spend / Optins Visa (nunca chamar de CAC — regra Copa-2026)
-      if (fixed.optinsVisa && fixed.media.total.spend > 0) {
-        num(13, fixed.media.total.spend / fixed.optinsVisa, '#,##0.00');
+      // Custo por cliente cadastrado = spend / clientes (nunca chamar de CAC — regra Copa-2026)
+      if (fixed.clientesCadastrados && fixed.media.total.spend > 0) {
+        num(22, fixed.media.total.spend / fixed.clientesCadastrados, '#,##0.00');
       }
     }
 
@@ -1191,30 +1279,28 @@ function writeCopaSheet(
     { from: 5 + current.start, to: 5 + current.end },
     { from: 5 + previous.start, to: 5 + previous.end },
   ];
-  const sumCols = [3, 4, 5, 6, 7, 8, 10, 14, 15, 17, 20, 21, 23];
-  const derivedCols: Array<[number, number, number, number?]> = [
-    [9, 7, 8], [11, 8, 10], [12, 7, 10, 1000], [13, 7, 5],
-    [16, 14, 15], [18, 15, 17], [19, 14, 17, 1000],
-    [22, 20, 21], [24, 21, 23], [25, 20, 23, 1000],
-  ];
-
   summaryRows.forEach((row, index) => {
     ws.getRow(row).height = 17;
-    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), '', { bold: true, fillColor: summaryFills[index], size: 9 });
+    for (let col = 1; col <= maxCol; col++) setCell(ws.getCell(row, col), undefined, { bold: true, fillColor: summaryFills[index], size: 9 });
     setCell(ws.getCell(row, 1), summaryLabels[index], { bold: true, fillColor: summaryFills[index], align: 'left', size: 9 });
   });
 
   dataRanges.forEach((range, index) => {
     const row = summaryRows[index];
-    sumCols.forEach((col) => {
+    COPA_FIXED_SUM_COLS.forEach((col) => {
       const cell = ws.getCell(row, col);
       cell.value = { formula: sumRangeFormula(col, range.from, range.to) };
-      cell.numFmt = [7, 14, 20].includes(col) ? 'R$ #,##0.00' : '#,##0';
+      cell.numFmt = copaFixedNumberFormat(col);
     });
-    derivedCols.forEach(([col, numerator, denominator, multiplier]) => {
+    COPA_FIXED_LATEST_COLS.forEach((col) => {
+      const cell = ws.getCell(row, col);
+      cell.value = { formula: latestValueFormula(col, range.from, range.to) };
+      cell.numFmt = copaFixedNumberFormat(col);
+    });
+    COPA_FIXED_DERIVED_COLS.forEach(([col, numerator, denominator, multiplier]) => {
       const cell = ws.getCell(row, col);
       cell.value = { formula: ratioFormula(numerator, denominator, row, multiplier) };
-      cell.numFmt = [11, 18, 24].includes(col) ? '0.00%' : 'R$ #,##0.00';
+      cell.numFmt = copaFixedNumberFormat(col);
     });
   });
   for (let col = 3; col <= maxCol; col++) {
@@ -1272,20 +1358,28 @@ function writeCopaSheet(
 
   const cardRow = legendRow + 3;
   const crmDeliveryCols: number[] = [];
+  const emailDeliveryCols: number[] = [];
+  const emailOpenCols: number[] = [];
   for (let start = COPA_FIXED_COLS + 1; start <= maxCol; start += COPA_BLOCK_WIDTH) {
     [1, 4, 11, 13].forEach((rel) => crmDeliveryCols.push(start + rel));
+    const emailLayout = COPA_CHANNEL_LAYOUT['E-MAIL'];
+    emailDeliveryCols.push(start + (emailLayout.metricRels.entregues ?? 4));
+    emailOpenCols.push(start + (emailLayout.metricRels.abertura ?? 5));
   }
   const crmDeliveriesFormula = (row: number) => `SUM(${crmDeliveryCols.map((col) => `${colLetter(col)}${row}`).join(',')})`;
-  const emailOpenRateFormula = (row: number) => `IFERROR(SUM(AE${row},AS${row},BG${row},BU${row},CI${row},CW${row},DK${row},DY${row},EM${row})/SUM(AD${row},AR${row},BF${row},BT${row},CH${row},CV${row},DJ${row},DX${row},EL${row}),\"\")`;
+  const emailOpenRateFormula = (row: number) =>
+    `IFERROR(SUM(${emailOpenCols.map((col) => `${colLetter(col)}${row}`).join(',')})/SUM(${emailDeliveryCols.map((col) => `${colLetter(col)}${row}`).join(',')}),\"\")`;
   const cards: Array<{ label: string; formula: string; currentFormula: string; previousFormula: string; format: string; fill: string; coverage: string; coverageCol: string }> = [
     { label: 'ACESSOS LP', formula: `C${totalRow}`, currentFormula: `C${totalRow + 1}`, previousFormula: `C${totalRow + 2}`, format: '#,##0', fill: '2E75B6', coverage: 'GA4 / Looker', coverageCol: 'C' },
-    { label: 'OPT-INS VISA', formula: `E${totalRow}`, currentFormula: `E${totalRow + 1}`, previousFormula: `E${totalRow + 2}`, format: '#,##0', fill: '1F3864', coverage: 'BI Visa oficial', coverageCol: 'E' },
-    { label: 'TX LP -> OPT-IN', formula: `IFERROR(E${totalRow}/C${totalRow},\"\")`, currentFormula: `IFERROR(E${totalRow + 1}/C${totalRow + 1},\"\")`, previousFormula: `IFERROR(E${totalRow + 2}/C${totalRow + 2},\"\")`, format: '0.0%', fill: '0F766E', coverage: 'Visa / acessos LP', coverageCol: 'E' },
-    { label: 'CARTOES VISA', formula: `F${totalRow}`, currentFormula: `F${totalRow + 1}`, previousFormula: `F${totalRow + 2}`, format: '#,##0', fill: '334155', coverage: 'BI Visa oficial', coverageCol: 'F' },
-    { label: 'INVESTIMENTO', formula: `G${totalRow}`, currentFormula: `G${totalRow + 1}`, previousFormula: `G${totalRow + 2}`, format: 'R$ #,##0.00', fill: '4472C4', coverage: 'Google + Meta', coverageCol: 'G' },
-    { label: 'CUSTO / OPT-IN', formula: `M${totalRow}`, currentFormula: `M${totalRow + 1}`, previousFormula: `M${totalRow + 2}`, format: 'R$ #,##0.00', fill: '7C3AED', coverage: 'Nunca CAC', coverageCol: 'M' },
-    { label: 'ENTREGAS CRM', formula: crmDeliveriesFormula(totalRow), currentFormula: crmDeliveriesFormula(totalRow + 1), previousFormula: crmDeliveriesFormula(totalRow + 2), format: '#,##0', fill: '15803D', coverage: 'Canais CRM', coverageCol: 'AA' },
-    { label: 'TX ABERTURA EMAIL', formula: emailOpenRateFormula(totalRow), currentFormula: emailOpenRateFormula(totalRow + 1), previousFormula: emailOpenRateFormula(totalRow + 2), format: '0.0%', fill: '0369A1', coverage: 'E-mail CRM', coverageCol: 'AE' },
+    { label: 'OPTINS LP (GA4)', formula: `D${totalRow}`, currentFormula: `D${totalRow + 1}`, previousFormula: `D${totalRow + 2}`, format: '#,##0', fill: '2E75B6', coverage: 'GA4 / Looker', coverageCol: 'D' },
+    { label: 'TXA OPTIN', formula: `E${totalRow}`, currentFormula: `E${totalRow + 1}`, previousFormula: `E${totalRow + 2}`, format: '0.0%', fill: '0F766E', coverage: 'Optins LP / trafego LP', coverageCol: 'E' },
+    { label: 'CLIENTES CADASTRADOS', formula: `F${totalRow}`, currentFormula: `F${totalRow + 1}`, previousFormula: `F${totalRow + 2}`, format: '#,##0', fill: 'D6B656', coverage: 'Dashboard Visa oficial', coverageCol: 'F' },
+    { label: 'NOVOS CARTOES', formula: `H${totalRow}`, currentFormula: `H${totalRow + 1}`, previousFormula: `H${totalRow + 2}`, format: '#,##0', fill: '334155', coverage: 'Dashboard Visa oficial', coverageCol: 'H' },
+    { label: 'CLIENTES COM CARTAO', formula: `K${totalRow}`, currentFormula: `K${totalRow + 1}`, previousFormula: `K${totalRow + 2}`, format: '#,##0', fill: '7C3AED', coverage: 'Dashboard Visa oficial', coverageCol: 'K' },
+    { label: 'INVESTIMENTO', formula: `P${totalRow}`, currentFormula: `P${totalRow + 1}`, previousFormula: `P${totalRow + 2}`, format: 'R$ #,##0.00', fill: '4472C4', coverage: 'Google + Meta', coverageCol: 'P' },
+    { label: 'CUSTO / CLIENTE', formula: `V${totalRow}`, currentFormula: `V${totalRow + 1}`, previousFormula: `V${totalRow + 2}`, format: 'R$ #,##0.00', fill: 'DC2626', coverage: 'Nunca CAC', coverageCol: 'V' },
+    { label: 'ENTREGAS CRM', formula: crmDeliveriesFormula(totalRow), currentFormula: crmDeliveriesFormula(totalRow + 1), previousFormula: crmDeliveriesFormula(totalRow + 2), format: '#,##0', fill: '15803D', coverage: 'Canais CRM', coverageCol: colLetter(crmDeliveryCols[0]) },
+    { label: 'TX ABERTURA EMAIL', formula: emailOpenRateFormula(totalRow), currentFormula: emailOpenRateFormula(totalRow + 1), previousFormula: emailOpenRateFormula(totalRow + 2), format: '0.0%', fill: '0369A1', coverage: 'E-mail CRM', coverageCol: colLetter(emailOpenCols[0]) },
   ];
   cards.forEach((card, index) => {
     const col = 1 + index * 4;
@@ -1312,7 +1406,14 @@ function writeCopaSheet(
     });
   }
 
-  [11, 5, 10, 12, 10, 11, 12, 11, 9, 11, 8, 9, 13, 10, 9, 8, 10, 8, 9, 10, 9, 8, 10, 8, 9].forEach((width, idxWidth) => { ws.getColumn(idxWidth + 1).width = width; });
+  [
+    11, 5,
+    10, 12, 10,
+    16, 18, 12, 16, 12, 22, 18, 26, 14, 24,
+    11, 12, 11, 13, 10, 11, 13,
+    10, 12, 11, 13, 10, 11,
+    10, 12, 11, 13, 10, 11,
+  ].forEach((width, idxWidth) => { ws.getColumn(idxWidth + 1).width = width; });
   for (let col = COPA_FIXED_COLS + 1; col <= maxCol; col++) {
     const rel = (col - COPA_FIXED_COLS - 1) % COPA_BLOCK_WIDTH;
     ws.getColumn(col).width = [0, 3, 10, 12].includes(rel) ? 10 : rel >= 7 && rel <= 9 ? 11 : 13;
@@ -1567,7 +1668,7 @@ function writeAuditSheet(
 
 // ── Workbook principal ────────────────────────────────────────────────────────
 
-function buildWorkbook(
+export function buildWorkbook(
   ExcelJSRuntime: { Workbook: new () => Workbook },
   rows: RawRow[],
   start: Date,
@@ -1583,6 +1684,9 @@ function buildWorkbook(
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = 'GaaS AFINZ — Rentabilização';
   wb.created = new Date();
+  wb.calcProperties.fullCalcOnLoad = true;
+  wb.calcProperties.forceFullCalc = true;
+  wb.calcProperties.calcMode = 'auto';
 
   const copaIdx = buildCopaIndex(rows, copaStart, end);
   const crmSummary = copaCrmChartSummary(copaIdx, copaDates);
@@ -1633,15 +1737,19 @@ function emptyFixedDay(): CopaFixedDay {
   return {
     trafegoLp: null,
     optinsGa4: null,
-    optinsVisa: null,
-    cartoesVisa: null,
+    clientesCadastrados: null,
+    clientesCadastradosAcumulado: null,
+    novosCartoes: null,
+    cartoesAcumulado: null,
+    clientesCadastradosComCartao: null,
+    clientesCadastradosComCartaoAcumulado: null,
     media: { total: emptyMediaAgg(), google: emptyMediaAgg(), meta: emptyMediaAgg() },
   };
 }
 
 /**
  * Busca e indexa por data os 3 universos das colunas fixas da aba Copa:
- * LP (copa_lp_daily), BI Visa (copa_visa_daily) e Mídia Paga (paid_media_metrics
+ * LP (copa_lp_daily), Dashboard Visa (copa_visa_daily) e Mídia Paga (paid_media_metrics
  * filtrada pelas campanhas com objective='rentabilizacao').
  * Falha de uma fonte não derruba o export — a coluna fica vazia (console.warn).
  */
@@ -1673,18 +1781,26 @@ async function fetchCopaFixedDaily(start: Date, end: Date): Promise<CopaFixedInd
     console.warn('[renta-copa] copa_lp_daily indisponível:', err);
   }
 
-  // 2. BI Visa (oficial) — clientes/cartões por dia (delta do acumulado)
+  // 2. Dashboard Visa (oficial) — funil diário e acumulado
   try {
     const { data, error } = await supabase
       .from('copa_visa_daily')
-      .select('data, clientes_dia, cartoes_dia')
+      .select('data, clientes_dia, clientes_acum, cartoes_dia, cartoes_acum, clientes_com_cartao_dia, clientes_com_cartao_acum')
       .gte('data', startIso)
       .lt('data', endExclusiveIso);
     if (error) throw error;
     for (const row of data ?? []) {
       const d = day(String(row.data).slice(0, 10));
-      if (row.clientes_dia !== null && row.clientes_dia !== undefined) d.optinsVisa = asInt(row.clientes_dia);
-      if (row.cartoes_dia !== null && row.cartoes_dia !== undefined) d.cartoesVisa = asInt(row.cartoes_dia);
+      if (row.clientes_dia !== null && row.clientes_dia !== undefined) d.clientesCadastrados = asInt(row.clientes_dia);
+      if (row.clientes_acum !== null && row.clientes_acum !== undefined) d.clientesCadastradosAcumulado = asInt(row.clientes_acum);
+      if (row.cartoes_dia !== null && row.cartoes_dia !== undefined) d.novosCartoes = asInt(row.cartoes_dia);
+      if (row.cartoes_acum !== null && row.cartoes_acum !== undefined) d.cartoesAcumulado = asInt(row.cartoes_acum);
+      if (row.clientes_com_cartao_dia !== null && row.clientes_com_cartao_dia !== undefined) {
+        d.clientesCadastradosComCartao = asInt(row.clientes_com_cartao_dia);
+      }
+      if (row.clientes_com_cartao_acum !== null && row.clientes_com_cartao_acum !== undefined) {
+        d.clientesCadastradosComCartaoAcumulado = asInt(row.clientes_com_cartao_acum);
+      }
     }
   } catch (err) {
     console.warn('[renta-copa] copa_visa_daily indisponível:', err);
@@ -1763,7 +1879,7 @@ export async function exportRentabilizacaoCrmXlsx(
   return { rows: rawRows.length, filename };
 }
 
-// v2 (2026-06-11): colunas fixas integradas — LP Looker + BI Visa + Mídia Paga (vault: Export-XLSX-Renta-Copa)
+// v3 (2026-07-28): C/D/E atualizadas e Dashboard Visa completo (diário + acumulado).
 export function getCurrentMonthRange(): { start: Date; end: Date } {
   const now = new Date();
   return {
