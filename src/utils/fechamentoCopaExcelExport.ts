@@ -1,5 +1,6 @@
 import type { Workbook, Worksheet } from 'exceljs';
 import { fetchSupabaseRows } from './aquisicaoCrmExcelExport';
+import { supabase } from '../services/supabaseClient';
 import {
   allDates,
   isoDate,
@@ -33,11 +34,28 @@ import type { CopaChannel } from './rentabilizacaoCrmExcelExport';
 //   3. Aquisição Copa               (novo — funil de aquisição por BU × Segmento)
 //   4. Big Numbers Aquisição Copa   (novo — síntese modelo Big Numbers)
 //
-// Fonte de aquisição: tabela `activities`, jornada contém COPA + etapa de aquisição.
-// Sem colunas de LP/Visa (decisão do usuário) e sem mídia paga (fora de escopo).
+// Fontes de aquisição:
+//   CRM        → `activities`, jornada contém COPA + etapa de aquisição.
+//   Mídia paga → `v_b2c_app_install_daily`, com App Install e StartTrial separados.
+// Sem colunas de LP/Visa na aba de aquisição (decisão do usuário).
 // ─────────────────────────────────────────────────────────────────────────────
 
 type RawRow = Record<string, unknown>;
+
+type AqPaidPhase = 'app_install' | 'onboarding';
+
+export type AqPaidDay = {
+  businessDate: string;
+  phase: AqPaidPhase;
+  campaignLabel: string;
+  spend: number;
+  impressions: number;
+  linkClicks: number | null;
+  installs: number | null;
+  startTrials: number | null;
+  attributionLabel: string;
+  installSource: string;
+};
 
 type AqMetrics = {
   disparos: number;    // nº de linhas de disparo (1 por linha)
@@ -78,6 +96,10 @@ const COLORS = {
   coverFont: '334155',
   zebra: 'F8FAFC',
   weekend: 'E2E8F0',
+  mediaApp: '7C3AED',
+  mediaAppLight: 'EDE9FE',
+  mediaOnboarding: '0F766E',
+  mediaOnboardingLight: 'CCFBF1',
 };
 
 const BU_COLORS: Record<string, string> = {
@@ -234,6 +256,61 @@ export function buildAqIndex(rows: RawRow[], dates: Date[], start: Date, end: Da
   return { blocks, byChannel, total, weekly, coverageDays: daysWithData.size };
 }
 
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Fonte governada do funil de mídia paga B2C.
+ *
+ * A view preserva a semântica de resultado:
+ * - app_install: instalação atribuída à Meta;
+ * - onboarding: instalação legada/direcional + StartTrial atribuído à Meta.
+ *
+ * Conversões genéricas de outras campanhas não entram como instalação.
+ */
+export async function fetchAqPaidDaily(start: Date, end: Date): Promise<AqPaidDay[]> {
+  const rows: AqPaidDay[] = [];
+  const startIso = isoDate(start);
+  const endExclusiveIso = isoDate(addDays(end, 1));
+  const pageSize = 1000;
+
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from('v_b2c_app_install_daily')
+      .select('business_date, campaign_phase, campaign_label, spend, impressions, link_clicks, installs, start_trials, attribution_label, install_source')
+      .gte('business_date', startIso)
+      .lt('business_date', endExclusiveIso)
+      .order('business_date', { ascending: true })
+      .order('campaign_phase', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+
+    for (const row of data ?? []) {
+      const phase = String(row.campaign_phase ?? '');
+      if (phase !== 'app_install' && phase !== 'onboarding') continue;
+      rows.push({
+        businessDate: String(row.business_date).slice(0, 10),
+        phase,
+        campaignLabel: String(row.campaign_label ?? ''),
+        spend: nullableNumber(row.spend) ?? 0,
+        impressions: nullableNumber(row.impressions) ?? 0,
+        linkClicks: nullableNumber(row.link_clicks),
+        installs: nullableNumber(row.installs),
+        startTrials: nullableNumber(row.start_trials),
+        attributionLabel: String(row.attribution_label ?? ''),
+        installSource: String(row.install_source ?? ''),
+      });
+    }
+
+    if (!data || data.length < pageSize) break;
+  }
+
+  return rows;
+}
+
 // ── Aba diarizada "Aquisição Copa" (layout seccionado por BU × Segmento) ─────────
 
 const AQ_SECTION_HEADERS = [
@@ -316,12 +393,228 @@ function writeAqSection(ws: Worksheet, startRow: number, block: AqBlock, dates: 
   return totalRow + 2; // gap entre seções
 }
 
-function writeAquisicaoCopaSheet(wb: Workbook, index: AqIndex, dates: Date[]): void {
+type PaidTableConfig = {
+  phase: AqPaidPhase;
+  title: string;
+  color: string;
+  lightColor: string;
+  headers: string[];
+};
+
+const AQ_MEDIA_START_COL = 16; // P; O fica como gutter entre CRM e mídia.
+
+const PAID_TABLES: PaidTableConfig[] = [
+  {
+    phase: 'app_install',
+    title: 'MÍDIA PAGA · APP INSTALL · DIÁRIO',
+    color: COLORS.mediaApp,
+    lightColor: COLORS.mediaAppLight,
+    headers: ['Data', 'Dia', 'Investimento', 'Impressões', 'Cliques link', 'CTR', 'Installs', 'Clique → install', 'CPI'],
+  },
+  {
+    phase: 'onboarding',
+    title: 'MÍDIA PAGA · ONBOARDING / STARTTRIAL · DIÁRIO',
+    color: COLORS.mediaOnboarding,
+    lightColor: COLORS.mediaOnboardingLight,
+    headers: ['Data', 'Dia', 'Investimento', 'Impressões', 'Cliques link', 'CTR', 'Installs', 'StartTrial', 'Install → trial', 'CPI', 'Custo/StartTrial'],
+  },
+];
+
+function paidRowDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function paidTotal(rows: AqPaidDay[], field: 'spend' | 'impressions' | 'linkClicks' | 'installs' | 'startTrials'): number {
+  return rows.reduce((sum, row) => sum + (row[field] ?? 0), 0);
+}
+
+function formulaWithResult(formula: string, result: number | ''): { formula: string; result: number | '' } {
+  return { formula, result };
+}
+
+function writePaidMediaTable(
+  ws: Worksheet,
+  startRow: number,
+  config: PaidTableConfig,
+  sourceRows: AqPaidDay[],
+): number {
+  const rows = sourceRows.filter((row) => row.phase === config.phase);
+  const startCol = AQ_MEDIA_START_COL;
+  const endCol = startCol + config.headers.length - 1;
+  const paidCols = {
+    spend: colLetter(startCol + 2),
+    impressions: colLetter(startCol + 3),
+    linkClicks: colLetter(startCol + 4),
+    installs: colLetter(startCol + 6),
+    startTrials: colLetter(startCol + 7),
+  };
+
+  ws.mergeCells(startRow, startCol, startRow, endCol);
+  setCell(ws.getCell(startRow, startCol), config.title, {
+    bold: true, fillColor: config.color, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+  ws.getRow(startRow).height = 20;
+
+  ws.mergeCells(startRow + 1, startCol, startRow + 1, endCol);
+  const coverage = rows.length > 0
+    ? `${formatShortDate(paidRowDate(rows[0].businessDate))} a ${formatShortDate(paidRowDate(rows[rows.length - 1].businessDate))} · ${rows.length} dias com entrega`
+    : 'Sem entrega observada no período fechado';
+  const sourceNote = config.phase === 'app_install'
+    ? `${coverage} · Meta results: install · 1d click + 1d view`
+    : `${coverage} · StartTrial atribuído à Meta: 7d click · installs direcionais`;
+  setCell(ws.getCell(startRow + 1, startCol), sourceNote, {
+    italic: true, fillColor: config.lightColor, fontColor: '334155', align: 'left', size: 8,
+  });
+  ws.getRow(startRow + 1).height = 24;
+
+  const headerRow = startRow + 2;
+  config.headers.forEach((header, index) => {
+    setCell(ws.getCell(headerRow, startCol + index), header, {
+      bold: true, fillColor: config.color, fontColor: 'FFFFFF', size: 8,
+    });
+  });
+
+  const dataStartRow = headerRow + 1;
+  rows.forEach((paid, index) => {
+    const row = dataStartRow + index;
+    const date = paidRowDate(paid.businessDate);
+    const fill = date.getDay() === 0 || date.getDay() === 6
+      ? COLORS.weekend
+      : index % 2 === 0 ? 'FFFFFF' : COLORS.zebra;
+    const values: Array<Date | string | number | object | undefined> = config.phase === 'app_install'
+      ? [
+          date,
+          DAY_NAMES[date.getDay()],
+          paid.spend,
+          paid.impressions,
+          paid.linkClicks ?? undefined,
+          paid.linkClicks === null
+            ? undefined
+            : formulaWithResult(`IFERROR(${paidCols.linkClicks}${row}/${paidCols.impressions}${row},"")`, paid.impressions > 0 ? paid.linkClicks / paid.impressions : ''),
+          paid.installs ?? undefined,
+          paid.installs === null || paid.linkClicks === null
+            ? undefined
+            : formulaWithResult(`IFERROR(${paidCols.installs}${row}/${paidCols.linkClicks}${row},"")`, paid.linkClicks > 0 ? paid.installs / paid.linkClicks : ''),
+          paid.installs === null
+            ? undefined
+            : formulaWithResult(`IFERROR(${paidCols.spend}${row}/${paidCols.installs}${row},"")`, paid.installs > 0 ? paid.spend / paid.installs : ''),
+        ]
+      : [
+          date,
+          DAY_NAMES[date.getDay()],
+          paid.spend,
+          paid.impressions,
+          paid.linkClicks ?? undefined,
+          paid.linkClicks === null
+            ? undefined
+            : formulaWithResult(`IFERROR(${paidCols.linkClicks}${row}/${paidCols.impressions}${row},"")`, paid.impressions > 0 ? paid.linkClicks / paid.impressions : ''),
+          paid.installs ?? undefined,
+          paid.startTrials ?? undefined,
+          paid.startTrials === null || paid.installs === null
+            ? undefined
+            : formulaWithResult(`IFERROR(${paidCols.startTrials}${row}/${paidCols.installs}${row},"")`, paid.installs > 0 ? paid.startTrials / paid.installs : ''),
+          paid.installs === null
+            ? undefined
+            : formulaWithResult(`IFERROR(${paidCols.spend}${row}/${paidCols.installs}${row},"")`, paid.installs > 0 ? paid.spend / paid.installs : ''),
+          paid.startTrials === null
+            ? undefined
+            : formulaWithResult(`IFERROR(${paidCols.spend}${row}/${paidCols.startTrials}${row},"")`, paid.startTrials > 0 ? paid.spend / paid.startTrials : ''),
+        ];
+
+    values.forEach((value, index2) => {
+      setCell(ws.getCell(row, startCol + index2), value, {
+        fillColor: fill, align: index2 <= 1 ? 'left' : 'right', size: 9,
+      });
+    });
+    ws.getCell(row, startCol).numFmt = 'dd/mm/yyyy';
+    ws.getCell(row, startCol + 2).numFmt = '"R$" #,##0.00';
+    [startCol + 3, startCol + 4, startCol + 6].forEach((col) => { ws.getCell(row, col).numFmt = '#,##0'; });
+    ws.getCell(row, startCol + 5).numFmt = '0.0%';
+    if (config.phase === 'app_install') {
+      ws.getCell(row, startCol + 7).numFmt = '0.0%';
+      ws.getCell(row, startCol + 8).numFmt = '"R$" #,##0.00';
+    } else {
+      ws.getCell(row, startCol + 7).numFmt = '#,##0';
+      ws.getCell(row, startCol + 8).numFmt = '0.0%';
+      [startCol + 9, startCol + 10].forEach((col) => { ws.getCell(row, col).numFmt = '"R$" #,##0.00'; });
+    }
+  });
+
+  const totalRow = dataStartRow + rows.length;
+  for (let col = startCol; col <= endCol; col++) {
+    setCell(ws.getCell(totalRow, col), '', { bold: true, fillColor: config.lightColor, size: 9 });
+  }
+  setCell(ws.getCell(totalRow, startCol), 'TOTAL', {
+    bold: true, fillColor: config.lightColor, align: 'left', size: 9,
+  });
+  setCell(ws.getCell(totalRow, startCol + 1), '—', {
+    bold: true, fillColor: config.lightColor, align: 'center', size: 9,
+  });
+
+  if (rows.length > 0) {
+    const dataEndRow = totalRow - 1;
+    const spend = paidTotal(rows, 'spend');
+    const impressions = paidTotal(rows, 'impressions');
+    const clicks = paidTotal(rows, 'linkClicks');
+    const installs = paidTotal(rows, 'installs');
+    const startTrials = paidTotal(rows, 'startTrials');
+
+    const totals: Array<[number, string, number | '']> = [
+      [startCol + 2, `SUM(${paidCols.spend}${dataStartRow}:${paidCols.spend}${dataEndRow})`, spend],
+      [startCol + 3, `SUM(${paidCols.impressions}${dataStartRow}:${paidCols.impressions}${dataEndRow})`, impressions],
+      [startCol + 4, `SUM(${paidCols.linkClicks}${dataStartRow}:${paidCols.linkClicks}${dataEndRow})`, clicks],
+      [startCol + 5, `IFERROR(${paidCols.linkClicks}${totalRow}/${paidCols.impressions}${totalRow},"")`, impressions > 0 ? clicks / impressions : ''],
+      [startCol + 6, `SUM(${paidCols.installs}${dataStartRow}:${paidCols.installs}${dataEndRow})`, installs],
+    ];
+    if (config.phase === 'app_install') {
+      totals.push(
+        [startCol + 7, `IFERROR(${paidCols.installs}${totalRow}/${paidCols.linkClicks}${totalRow},"")`, clicks > 0 ? installs / clicks : ''],
+        [startCol + 8, `IFERROR(${paidCols.spend}${totalRow}/${paidCols.installs}${totalRow},"")`, installs > 0 ? spend / installs : ''],
+      );
+    } else {
+      totals.push(
+        [startCol + 7, `SUM(${paidCols.startTrials}${dataStartRow}:${paidCols.startTrials}${dataEndRow})`, startTrials],
+        [startCol + 8, `IFERROR(${paidCols.startTrials}${totalRow}/${paidCols.installs}${totalRow},"")`, installs > 0 ? startTrials / installs : ''],
+        [startCol + 9, `IFERROR(${paidCols.spend}${totalRow}/${paidCols.installs}${totalRow},"")`, installs > 0 ? spend / installs : ''],
+        [startCol + 10, `IFERROR(${paidCols.spend}${totalRow}/${paidCols.startTrials}${totalRow},"")`, startTrials > 0 ? spend / startTrials : ''],
+      );
+    }
+    totals.forEach(([col, formula, result]) => {
+      ws.getCell(totalRow, col).value = formulaWithResult(formula, result);
+    });
+    ws.getCell(totalRow, startCol + 2).numFmt = '"R$" #,##0.00';
+    [startCol + 3, startCol + 4, startCol + 6].forEach((col) => { ws.getCell(totalRow, col).numFmt = '#,##0'; });
+    ws.getCell(totalRow, startCol + 5).numFmt = '0.0%';
+    if (config.phase === 'app_install') {
+      ws.getCell(totalRow, startCol + 7).numFmt = '0.0%';
+      ws.getCell(totalRow, startCol + 8).numFmt = '"R$" #,##0.00';
+    } else {
+      ws.getCell(totalRow, startCol + 7).numFmt = '#,##0';
+      ws.getCell(totalRow, startCol + 8).numFmt = '0.0%';
+      [startCol + 9, startCol + 10].forEach((col) => { ws.getCell(totalRow, col).numFmt = '"R$" #,##0.00'; });
+    }
+  }
+
+  const noteRow = totalRow + 1;
+  ws.mergeCells(noteRow, startCol, noteRow, endCol);
+  const semanticNote = config.phase === 'app_install'
+    ? 'CPI = investimento / installs. Resultado de plataforma; não é CAC.'
+    : 'Custo/StartTrial = investimento / StartTrial. Installs e taxa diária são direcionais; a taxa pode superar 100% por diferença de janela de atribuição. Ausência fica em branco.';
+  setCell(ws.getCell(noteRow, startCol), semanticNote, {
+    italic: true, fillColor: COLORS.note, fontColor: COLORS.noteFont, align: 'left', size: 8,
+  });
+  ws.getRow(noteRow).height = 26;
+
+  return noteRow + 3;
+}
+
+function writeAquisicaoCopaSheet(wb: Workbook, index: AqIndex, dates: Date[], paidRows: AqPaidDay[]): void {
   const ws = wb.addWorksheet('Aquisição Copa', {
     views: [{ state: 'frozen', xSplit: 3, ySplit: 0, topLeftCell: 'D1', showGridLines: false }],
   });
 
-  if (index.blocks.length === 0) {
+  if (index.blocks.length === 0 && paidRows.length === 0) {
     ws.mergeCells(1, 1, 3, AQ_MAX_COL);
     setCell(ws.getCell(1, 1), 'Sem disparos de aquisição Copa no período fechado.', {
       bold: true, fillColor: 'FEE2E2', fontColor: '991B1B', size: 12,
@@ -329,12 +622,28 @@ function writeAquisicaoCopaSheet(wb: Workbook, index: AqIndex, dates: Date[]): v
     return;
   }
 
-  let nextRow = 1;
-  for (const block of index.blocks) {
-    nextRow = writeAqSection(ws, nextRow, block, dates);
+  if (index.blocks.length === 0) {
+    ws.mergeCells(1, 1, 3, AQ_MAX_COL);
+    setCell(ws.getCell(1, 1), 'Sem disparos CRM de aquisição Copa no período fechado.', {
+      bold: true, fillColor: COLORS.cover, fontColor: COLORS.coverFont, size: 11,
+    });
+  } else {
+    let nextRow = 1;
+    for (const block of index.blocks) {
+      nextRow = writeAqSection(ws, nextRow, block, dates);
+    }
   }
 
   [16, 6, 9, 12, 12, 11, 10, 11, 11, 11, 11, 12, 11, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  ws.getColumn(15).width = 3;
+  [13, 6, 14, 13, 13, 9, 11, 12, 12, 12, 15].forEach((width, index2) => {
+    ws.getColumn(AQ_MEDIA_START_COL + index2).width = width;
+  });
+
+  let paidStartRow = 1;
+  PAID_TABLES.forEach((config) => {
+    paidStartRow = writePaidMediaTable(ws, paidStartRow, config, paidRows);
+  });
 }
 
 // ── Aba "Big Numbers Aquisição Copa" ────────────────────────────────────────────
@@ -542,13 +851,14 @@ export function buildFechamentoCopaWorkbook(
   params: {
     rntRows: RawRow[];
     aqRows: RawRow[];
+    aqPaidRows?: AqPaidDay[];
     fixedIdx: Parameters<typeof writeCopaSheet>[5];
     start: Date;
     end: Date;
     createChartImages?: boolean;
   },
 ): Workbook {
-  const { rntRows, aqRows, fixedIdx, start, end } = params;
+  const { rntRows, aqRows, aqPaidRows = [], fixedIdx, start, end } = params;
   const copaStart = COPA_ACTION_START;
   const copaActionDates = copaStart <= end ? allDates(copaStart, end) : [];
   const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
@@ -569,7 +879,7 @@ export function buildFechamentoCopaWorkbook(
   // Ordem: 1) Rentabilização Copa 2) Big Numbers Renta 3) Aquisição Copa 4) Big Numbers Aquisição
   writeCopaSheet(wb, rntRows, copaDetailDates, copaDetailStart, end, fixedIdx, chartImages);
   writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages);
-  writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates);
+  writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates, aqPaidRows);
   writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates);
 
   return wb;
@@ -586,16 +896,18 @@ export async function exportFechamentoCopaXlsx(
   const copaStart = COPA_ACTION_START;
   if (copaStart > effectiveEnd) throw new Error('A acao Copa ainda nao possui dias fechados.');
 
-  const [rntRows, fixedIdx, aqRows, ExcelJSModule] = await Promise.all([
+  const [rntRows, fixedIdx, aqRows, aqPaidRows, ExcelJSModule] = await Promise.all([
     fetchRntRows(copaStart, effectiveEnd),
     fetchCopaFixedDaily(copaStart, effectiveEnd),
     fetchSupabaseRows(copaStart, effectiveEnd),
+    fetchAqPaidDaily(copaStart, effectiveEnd),
     import('exceljs'),
   ]);
 
   const wb = buildFechamentoCopaWorkbook(ExcelJSModule.default, {
     rntRows,
     aqRows: aqRows as RawRow[],
+    aqPaidRows,
     fixedIdx,
     start,
     end: effectiveEnd,
@@ -605,5 +917,5 @@ export async function exportFechamentoCopaXlsx(
   const buffer = await wb.xlsx.writeBuffer();
   const filename = `fechamento_copa_${isoDate(copaStart).replace(/-/g, '')}_${isoDate(effectiveEnd).replace(/-/g, '')}.xlsx`;
   downloadBuffer(buffer, filename);
-  return { rows: rntRows.length + (aqRows as RawRow[]).length, filename };
+  return { rows: rntRows.length + (aqRows as RawRow[]).length + aqPaidRows.length, filename };
 }
