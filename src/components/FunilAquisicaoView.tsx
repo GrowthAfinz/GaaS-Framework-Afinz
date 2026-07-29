@@ -4,6 +4,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine, Resp
 import { usePeriod } from '../contexts/PeriodContext';
 import { PaidMediaFunnelView } from './PaidMediaFunnelView';
 import { AppAfinzFunnelView } from './AppAfinzFunnelView';
+import { AppsFlyerFunnelView } from './AppsFlyerFunnelView';
 import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCell, granularityLabel } from './FunnelDetailControls';
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 import { SerasaBiFunnelView, SerasaMarketplaceFunnelView } from './SerasaSourceFunnelView';
@@ -309,9 +310,10 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
 };
 
 export const FunilAquisicaoView: React.FC = () => {
-  const [funnel, setFunnel] = useState<'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz'>('app-afinz');
+  const [funnel, setFunnel] = useState<'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz' | 'appsflyer'>('app-afinz');
   const options = [
     { key: 'app-afinz' as const, label: 'Funil Onboarding — Apps', detail: 'B2C + B2B2C + Plurix' },
+    { key: 'appsflyer' as const, label: 'Funil App Install — AppsFlyer', detail: 'Installs · sessões · origem (orgânico/pago/CRM)' },
     { key: 'serasa-marketplace' as const, label: 'Funil API Serasa Marketplace', detail: 'Ofertas · pedidos · confirmações · aprovações' },
     { key: 'serasa-bi' as const, label: 'Funil API Serasa BI', detail: 'Neurotech + Integrado diário' },
     { key: 'paid-media' as const, label: 'Funil Onboarding — Mídia Paga', detail: 'Aquisição App Install' },
@@ -336,6 +338,11 @@ export const FunilAquisicaoView: React.FC = () => {
       eyebrow: 'Análise · App Afinz',
       title: 'Funil do App Afinz',
       description: 'Leitura operacional de B2C + B2B2C e Plurix, sem misturar populações incompatíveis.',
+    },
+    'appsflyer': {
+      eyebrow: 'Análise · AppsFlyer',
+      title: 'Funil de Aquisição · App Install',
+      description: 'Topo de funil por origem — orgânico, pago e CRM na mesma régua. Meio/fundo por template aguardam raw data.',
     },
   }[funnel];
   const navigation = <>
@@ -369,7 +376,9 @@ export const FunilAquisicaoView: React.FC = () => {
           ? <SerasaBiFunnelView navigation={navigation} />
           : funnel === 'paid-media'
             ? <PaidMediaFunnelView navigation={navigation} />
-            : <AppAfinzFunnelView navigation={navigation} />}
+            : funnel === 'appsflyer'
+              ? <AppsFlyerFunnelView navigation={navigation} />
+              : <AppAfinzFunnelView navigation={navigation} />}
     </div>
   </div>;
 };
