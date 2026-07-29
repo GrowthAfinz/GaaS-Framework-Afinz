@@ -1384,23 +1384,24 @@ function writeCopaBigNumbersSheet(
     crmTotal.enviados += crmTotals[channel].enviados;
     crmTotal.entregues += crmTotals[channel].entregues;
     crmTotal.cliques += crmTotals[channel].cliques;
-    if (channel === 'E-MAIL') crmTotal.abertura += crmTotals[channel].abertura;
+    // Aberturas somadas de todos os canais (WPP = leituras, E-mail = aberturas).
+    crmTotal.abertura += crmTotals[channel].abertura;
   });
   [...COPA_CHANNELS, 'TOTAL' as const].forEach((channel, index) => {
     const row = crmDataStartRow + index;
     const metric = channel === 'TOTAL' ? crmTotal : crmTotals[channel];
     const isEmail = channel === 'E-MAIL' || channel === 'TOTAL';
     const hasClickTracking = isEmail;
+    // Abertura é preenchida para qualquer canal que tenha o dado (WPP incluso, sem ressalva).
+    const showOpen = metric.abertura > 0;
     const fill = channel === 'TOTAL' ? COLORS.copaTotal : index % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
     const values: Array<string | number | object | undefined> = [
       channel,
       metric.enviados,
       metric.entregues,
       { formula: `IFERROR(C${row}/B${row},"")` },
-      isEmail ? metric.abertura : undefined,
-      isEmail
-        ? { formula: channel === 'TOTAL' ? `IFERROR(E${row}/C${emailTotalRow},"")` : `IFERROR(E${row}/C${row},"")` }
-        : undefined,
+      showOpen ? metric.abertura : undefined,
+      showOpen ? { formula: `IFERROR(E${row}/C${row},"")` } : undefined,
       hasClickTracking ? metric.cliques : undefined,
       hasClickTracking ? { formula: `IFERROR(G${row}/C${row},"")` } : undefined,
     ];
@@ -1409,7 +1410,7 @@ function writeCopaBigNumbersSheet(
     }));
     [2, 3].forEach((col) => { ws.getCell(row, col).numFmt = '#,##0'; });
     ws.getCell(row, 4).numFmt = '0.0%';
-    if (isEmail) {
+    if (showOpen) {
       ws.getCell(row, 5).numFmt = '#,##0';
       ws.getCell(row, 6).numFmt = '0.0%';
     }
@@ -1525,7 +1526,7 @@ function writeCopaBigNumbersSheet(
     bold: true, fillColor: COLORS.copaHeader, fontColor: 'FFFFFF', align: 'left', size: 11,
   });
   const channelHeaders = [
-    'Semana', 'WPP enviados', 'WPP entregues', 'WPP cliques',
+    'Semana', 'WPP enviados', 'WPP entregues', 'WPP aberturas',
     'E-mail enviados', 'E-mail entregues', 'E-mail aberturas', 'E-mail cliques',
     'SMS enviados', 'SMS entregues', 'Push enviados', 'Push entregues',
     'Inv. Google', 'Inv. Meta', 'Inv. total', 'Cliques Google', 'Cliques Meta', 'Cliques mídia total',
@@ -1538,7 +1539,7 @@ function writeCopaBigNumbersSheet(
     const fill = index % 2 === 0 ? 'FFFFFF' : 'F8FAFC';
     const values: Array<string | number | undefined> = [
       `${formatShortDate(week.start)} a ${formatShortDate(week.end)}`,
-      week.crm.WPP.enviados, week.crm.WPP.entregues, undefined,
+      week.crm.WPP.enviados, week.crm.WPP.entregues, week.crm.WPP.abertura,
       week.crm['E-MAIL'].enviados, week.crm['E-MAIL'].entregues, week.crm['E-MAIL'].abertura, week.crm['E-MAIL'].cliques,
       week.crm.SMS.enviados, week.crm.SMS.entregues,
       week.crm.PUSH.enviados, week.crm.PUSH.entregues,
@@ -2208,8 +2209,6 @@ export function buildWorkbook(
   wb.creator = 'GaaS AFINZ — Rentabilização';
   wb.created = new Date();
   wb.calcProperties.fullCalcOnLoad = true;
-  wb.calcProperties.forceFullCalc = true;
-  wb.calcProperties.calcMode = 'auto';
 
   const copaActionIdx = buildCopaIndex(rows, COPA_ACTION_START, end);
   const crmSummary = copaCrmChartSummary(copaActionIdx, copaActionDates);
@@ -2423,3 +2422,34 @@ export function getCurrentMonthRange(): { start: Date; end: Date } {
     end:   new Date(now.getFullYear(), now.getMonth() + 1, 0),
   };
 }
+
+// ── Reuso pelo relatório FECHAMENTO COPA (fechamentoCopaExcelExport.ts) ─────────
+// Writers/fetchers de alto nível + primitivos de estilo/data compartilhados, para
+// que as abas de Aquisição Copa sigam exatamente o mesmo modelo visual do renta.
+export {
+  setCell,
+  isoDate,
+  allDates,
+  addDays,
+  colLetter,
+  normalizeCanal,
+  asInt,
+  formatShortDate,
+  startOfMondayWeek,
+  closedEnd,
+  safeRate,
+  comparisonWindows,
+  sumRangeFormula,
+  ratioFormula,
+  DAY_NAMES,
+  COPA_ACTION_START,
+  COPA_CHANNELS,
+  writeCopaSheet,
+  writeCopaBigNumbersSheet,
+  fetchRntRows,
+  fetchCopaFixedDaily,
+  buildCopaIndex,
+  copaCrmChartSummary,
+  createCopaChartImages,
+};
+export type { CopaChannel, CopaFixedIndex, CopaMetrics };

@@ -986,7 +986,14 @@ const inferTaxonomy = (metric: MetricRow) => {
     // o parceiro no campo errado. Ver: importador-segmento-parceiro-bug.
     const segmento = isPartnerValue(segmentoRaw) ? 'CRM' : segmentoRaw;
 
-    return { bu, parceiro, segmento, etapaAquisicao: deterministic.etapaAquisicao, subgrupo: isNovosCopa ? 'Copa' : undefined };
+    // Carrinho abandonado ⇒ etapa de funil "Reativacao" (reativação de AQUISIÇÃO,
+    // não confundir com a reativação de RENTABILIZAÇÃO). O sinal de carrinho por si
+    // só não pega o token abreviado `ABD`; amarrar à resolução de Segmento garante
+    // que todo carrinho (Segmento=Abandonados) fique Reativacao. Ver memory:
+    // fechamento-copa-report.
+    const etapaAquisicao = segmento === 'Abandonados' ? 'Reativacao' : deterministic.etapaAquisicao;
+
+    return { bu, parceiro, segmento, etapaAquisicao, subgrupo: isNovosCopa ? 'Copa' : undefined };
 };
 
 const emptySuggestions = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, FieldSuggestion[]>>>((acc, field) => {

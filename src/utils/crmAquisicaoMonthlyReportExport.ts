@@ -232,8 +232,10 @@ function buildReportAnalysis(rawRows: RawActivity[], currentStart: Date, current
       const status = String(getReportValue(row, ['status', 'Status']) ?? '');
       const etapa = String(getReportValue(row, ['Etapa de aquisição']) ?? '');
       const segmento = String(getReportValue(row, ['Segmento']) ?? '');
+      // 'Reativacao' = etapa de funil do CARRINHO ABANDONADO (reativação de aquisição,
+      // não de rentabilização) — faz parte do funil de aquisição. Ver: fechamento-copa-report.
       return status === 'Realizado'
-        && ['Aquisicao', 'Meio_de_Funil'].includes(etapa)
+        && ['Aquisicao', 'Meio_de_Funil', 'Reativacao'].includes(etapa)
         && segmento !== 'Rentabilizacao';
     })
     .map(toReportRow);

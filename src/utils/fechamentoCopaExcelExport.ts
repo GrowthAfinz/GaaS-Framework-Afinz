@@ -1,0 +1,609 @@
+import type { Workbook, Worksheet } from 'exceljs';
+import { fetchSupabaseRows } from './aquisicaoCrmExcelExport';
+import {
+  allDates,
+  isoDate,
+  addDays,
+  colLetter,
+  normalizeCanal,
+  asInt,
+  formatShortDate,
+  startOfMondayWeek,
+  closedEnd,
+  setCell,
+  DAY_NAMES,
+  COPA_ACTION_START,
+  COPA_CHANNELS,
+  writeCopaSheet,
+  writeCopaBigNumbersSheet,
+  fetchRntRows,
+  fetchCopaFixedDaily,
+  buildCopaIndex,
+  copaCrmChartSummary,
+  createCopaChartImages,
+} from './rentabilizacaoCrmExcelExport';
+import type { CopaChannel } from './rentabilizacaoCrmExcelExport';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FECHAMENTO COPA · AQUISIÇÃO E RENTABILIZAÇÃO
+//
+// Workbook único com 4 abas:
+//   1. Rentabilização Copa          (reuso de writeCopaSheet)
+//   2. Big Numbers Renta. Copa      (reuso de writeCopaBigNumbersSheet)
+//   3. Aquisição Copa               (novo — funil de aquisição por BU × Segmento)
+//   4. Big Numbers Aquisição Copa   (novo — síntese modelo Big Numbers)
+//
+// Fonte de aquisição: tabela `activities`, jornada contém COPA + etapa de aquisição.
+// Sem colunas de LP/Visa (decisão do usuário) e sem mídia paga (fora de escopo).
+// ─────────────────────────────────────────────────────────────────────────────
+
+type RawRow = Record<string, unknown>;
+
+type AqMetrics = {
+  disparos: number;    // nº de linhas de disparo (1 por linha)
+  enviados: number;    // Base Total
+  entregues: number;   // Base Acionável
+  abertura: number;    // Abertura (WPP = leitura, E-mail = abertura)
+  cliques: number;     // Cliques
+  propostas: number;   // Propostas
+  aprovados: number;   // Aprovados
+  cartoes: number;     // Cartões Gerados
+  custo: number;       // Custo Total Campanha
+};
+
+const AQ_METRIC_FIELDS: Array<keyof AqMetrics> = [
+  'disparos', 'enviados', 'entregues', 'abertura', 'cliques', 'propostas', 'aprovados', 'cartoes', 'custo',
+];
+
+type AqBlock = {
+  bu: string;
+  segmento: string;
+  total: AqMetrics;
+  byDayChannel: Map<string, Map<CopaChannel, AqMetrics>>;
+};
+
+const SEP = '';
+
+// Paleta alinhada às demais abas Copa (mesmos tons do writeCopaBigNumbersSheet).
+const COLORS = {
+  header: '1F3864',
+  subHeader: 'DCE6F1',
+  crm: '15803D',
+  crmHeaderFill: 'D9EAD3',
+  crmHeaderFont: '1E5631',
+  total: 'D9EAD3',
+  note: 'FFF2CC',
+  noteFont: '7F6000',
+  cover: 'F8FAFC',
+  coverFont: '334155',
+  zebra: 'F8FAFC',
+  weekend: 'E2E8F0',
+};
+
+const BU_COLORS: Record<string, string> = {
+  B2C: '2563EB',
+  B2B2C: '059669',
+  PLURIX: '7C3AED',
+};
+
+function buColor(bu: string): string {
+  return BU_COLORS[bu.toUpperCase()] ?? '374151';
+}
+
+// ── Helpers de leitura tolerante ────────────────────────────────────────────────
+
+function get(row: RawRow, ...keys: string[]): unknown {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(row, key)) return row[key];
+  }
+  return undefined;
+}
+
+function toNum(value: unknown): number {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const normalized = String(value)
+    .replace(/[R$\s]/g, '')
+    .replace(/\.(?=\d{3}(?:\D|$))/g, '')
+    .replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseRowDate(value: unknown): Date | null {
+  const raw = String(value ?? '').slice(0, 10);
+  const [y, m, d] = raw.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+function emptyAqMetrics(): AqMetrics {
+  return { disparos: 0, enviados: 0, entregues: 0, abertura: 0, cliques: 0, propostas: 0, aprovados: 0, cartoes: 0, custo: 0 };
+}
+
+function addAq(target: AqMetrics, source: AqMetrics): void {
+  for (const field of AQ_METRIC_FIELDS) target[field] += source[field];
+}
+
+function rowMetrics(row: RawRow): AqMetrics {
+  return {
+    disparos: 1,
+    enviados: asInt(get(row, 'Base Total', 'Base total')),
+    entregues: asInt(get(row, 'Base Acionável', 'Base Acionavel')),
+    abertura: asInt(get(row, 'Abertura')),
+    cliques: asInt(get(row, 'Cliques')),
+    propostas: asInt(get(row, 'Propostas')),
+    aprovados: asInt(get(row, 'Aprovados')),
+    cartoes: asInt(get(row, 'Cartões Gerados', 'Cartoes Gerados')),
+    custo: toNum(get(row, 'Custo Total Campanha')),
+  };
+}
+
+/** Copa + etapa de aquisição realizada (mesma regra do relatório mensal de aquisição). */
+export function isCopaAquisicao(row: RawRow): boolean {
+  const jornada = String(get(row, 'jornada', 'Jornada') ?? '').toUpperCase();
+  if (!jornada.includes('COPA')) return false;
+  const status = String(get(row, 'status', 'Status') ?? '');
+  const etapa = String(get(row, 'Etapa de aquisição', 'Etapa de aquisiçao') ?? '');
+  const segmento = String(get(row, 'Segmento') ?? '');
+  // 'Reativacao' = etapa do CARRINHO ABANDONADO (reativação de aquisição) — entra no funil.
+  return status === 'Realizado'
+    && ['Aquisicao', 'Meio_de_Funil', 'Reativacao'].includes(etapa)
+    && segmento !== 'Rentabilizacao';
+}
+
+// ── Indexação ───────────────────────────────────────────────────────────────────
+
+type AqIndex = {
+  blocks: AqBlock[];                                    // ordenados por cartões desc
+  byChannel: Record<CopaChannel, AqMetrics>;            // total do período por canal
+  total: AqMetrics;                                     // total geral
+  weekly: Array<{ start: Date; end: Date; days: number } & { metrics: AqMetrics }>;
+  coverageDays: number;                                 // dias com qualquer disparo
+};
+
+export function buildAqIndex(rows: RawRow[], dates: Date[], start: Date, end: Date): AqIndex {
+  const blockMap = new Map<string, AqBlock>();
+  const byChannel: Record<CopaChannel, AqMetrics> = {
+    WPP: emptyAqMetrics(), 'E-MAIL': emptyAqMetrics(), SMS: emptyAqMetrics(), PUSH: emptyAqMetrics(),
+  };
+  const total = emptyAqMetrics();
+  const daysWithData = new Set<string>();
+
+  for (const row of rows) {
+    if (!isCopaAquisicao(row)) continue;
+    const rowDate = parseRowDate(get(row, 'Data de Disparo'));
+    if (!rowDate || rowDate < start || rowDate > end) continue;
+
+    const canal = normalizeCanal(get(row, 'Canal')) as CopaChannel;
+    if (!COPA_CHANNELS.includes(canal)) continue;
+
+    const bu = String(get(row, 'BU') ?? 'N/A') || 'N/A';
+    const segmento = String(get(row, 'Segmento') ?? 'N/A') || 'N/A';
+    const ds = isoDate(rowDate);
+    const metrics = rowMetrics(row);
+
+    const blockKey = [bu, segmento].join(SEP);
+    let block = blockMap.get(blockKey);
+    if (!block) {
+      block = { bu, segmento, total: emptyAqMetrics(), byDayChannel: new Map() };
+      blockMap.set(blockKey, block);
+    }
+    addAq(block.total, metrics);
+
+    let dayMap = block.byDayChannel.get(ds);
+    if (!dayMap) { dayMap = new Map(); block.byDayChannel.set(ds, dayMap); }
+    const cur = dayMap.get(canal) ?? emptyAqMetrics();
+    addAq(cur, metrics);
+    dayMap.set(canal, cur);
+
+    addAq(byChannel[canal], metrics);
+    addAq(total, metrics);
+    daysWithData.add(ds);
+  }
+
+  const blocks = [...blockMap.values()].sort((a, b) => b.total.cartoes - a.total.cartoes);
+
+  // Resumo semanal (segunda a domingo), clampado ao período.
+  const weekly: AqIndex['weekly'] = [];
+  if (dates.length > 0) {
+    let cursor = startOfMondayWeek(dates[0]);
+    const last = dates[dates.length - 1];
+    while (cursor <= last) {
+      const weekEndRaw = addDays(cursor, 6);
+      const wStart = cursor < start ? start : cursor;
+      const wEnd = weekEndRaw > end ? end : weekEndRaw;
+      const metrics = emptyAqMetrics();
+      let days = 0;
+      for (let d = new Date(wStart); d <= wEnd; d = addDays(d, 1)) {
+        if (daysWithData.has(isoDate(d))) days++;
+      }
+      // Somar métricas da semana a partir dos blocos.
+      for (const block of blocks) {
+        for (let d = new Date(wStart); d <= wEnd; d = addDays(d, 1)) {
+          const dayMap = block.byDayChannel.get(isoDate(d));
+          if (!dayMap) continue;
+          for (const m of dayMap.values()) addAq(metrics, m);
+        }
+      }
+      weekly.push({ start: new Date(wStart), end: new Date(wEnd), days, metrics });
+      cursor = addDays(cursor, 7);
+    }
+  }
+
+  return { blocks, byChannel, total, weekly, coverageDays: daysWithData.size };
+}
+
+// ── Aba diarizada "Aquisição Copa" (layout seccionado por BU × Segmento) ─────────
+
+const AQ_SECTION_HEADERS = [
+  'Data', 'Dia', 'Canal', 'Enviados', 'Entregues', 'Aberturas', 'Cliques',
+  'Propostas', 'Aprovados', 'Cartões', 'Tx entrega', 'Tx abertura', 'Tx clique', 'CAC',
+];
+const AQ_MAX_COL = AQ_SECTION_HEADERS.length; // 14
+
+function writeAqRates(ws: Worksheet, row: number, fill: string): void {
+  // Tx entrega = Entregues/Enviados (E/D) · Tx abertura = Aberturas/Entregues (F/E)
+  // Tx clique = Cliques/Entregues (G/E) · CAC = CAC não; custo não está por linha → CAC no TOTAL
+  const D = colLetter(4), E = colLetter(5), F = colLetter(6), G = colLetter(7);
+  ws.getCell(row, 11).value = { formula: `IFERROR(${E}${row}/${D}${row},"")` };
+  ws.getCell(row, 12).value = { formula: `IFERROR(${F}${row}/${E}${row},"")` };
+  ws.getCell(row, 13).value = { formula: `IFERROR(${G}${row}/${E}${row},"")` };
+  [11, 12, 13].forEach((c) => {
+    ws.getCell(row, c).numFmt = '0.0%';
+    ws.getCell(row, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${fill}` } };
+  });
+}
+
+function writeAqSection(ws: Worksheet, startRow: number, block: AqBlock, dates: Date[]): number {
+  const color = buColor(block.bu);
+  const title = `${block.bu.toUpperCase()} · ${block.segmento}`;
+
+  ws.mergeCells(startRow, 1, startRow, AQ_MAX_COL);
+  setCell(ws.getCell(startRow, 1), title, { bold: true, fontColor: 'FFFFFF', fillColor: color, align: 'left', size: 11 });
+
+  AQ_SECTION_HEADERS.forEach((h, i) => {
+    setCell(ws.getCell(startRow + 1, i + 1), h, { bold: true, fontColor: 'FFFFFF', fillColor: color, size: 9 });
+  });
+
+  const dataStart = startRow + 2;
+  let rowNum = dataStart;
+
+  for (const day of dates) {
+    const ds = isoDate(day);
+    const dayMap = block.byDayChannel.get(ds);
+    if (!dayMap || dayMap.size === 0) continue;
+    const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+
+    for (const canal of COPA_CHANNELS) {
+      const m = dayMap.get(canal);
+      if (!m) continue;
+      const fill = isWeekend ? COLORS.weekend : (rowNum % 2 === 0 ? COLORS.zebra : 'FFFFFF');
+      const cac = m.cartoes > 0 ? m.custo / m.cartoes : '';
+      const values: Array<string | number> = [
+        day.toLocaleDateString('pt-BR'), DAY_NAMES[day.getDay()], canal,
+        m.enviados || '', m.entregues || '', m.abertura || '', m.cliques || '',
+        m.propostas || '', m.aprovados || '', m.cartoes || '', '', '', '', cac,
+      ];
+      values.forEach((v, i) => setCell(ws.getCell(rowNum, i + 1), v, {
+        fillColor: fill, align: i <= 2 ? 'left' : 'right', size: 9,
+      }));
+      [4, 5, 6, 7, 8, 9, 10].forEach((c) => { ws.getCell(rowNum, c).numFmt = '#,##0'; });
+      ws.getCell(rowNum, 14).numFmt = '"R$" #,##0.00';
+      writeAqRates(ws, rowNum, fill);
+      rowNum++;
+    }
+  }
+
+  // Linha TOTAL do bloco.
+  const totalRow = rowNum;
+  for (let c = 1; c <= AQ_MAX_COL; c++) setCell(ws.getCell(totalRow, c), '', { bold: true, fillColor: COLORS.total });
+  setCell(ws.getCell(totalRow, 1), 'TOTAL', { bold: true, fillColor: COLORS.total, align: 'left' });
+  setCell(ws.getCell(totalRow, 3), block.bu, { bold: true, fillColor: COLORS.total, align: 'left', size: 8 });
+  const sumCol = (col: number) => {
+    if (totalRow - 1 < dataStart) return;
+    const letter = colLetter(col);
+    ws.getCell(totalRow, col).value = { formula: `SUM(${letter}${dataStart}:${letter}${totalRow - 1})` };
+    ws.getCell(totalRow, col).numFmt = '#,##0';
+  };
+  [4, 5, 6, 7, 8, 9, 10].forEach(sumCol);
+  writeAqRates(ws, totalRow, COLORS.total);
+  // CAC do bloco = custo total / cartões total (valor calculado, custo não está por coluna).
+  const cacTotal = block.total.cartoes > 0 ? block.total.custo / block.total.cartoes : '';
+  setCell(ws.getCell(totalRow, 14), cacTotal, { bold: true, fillColor: COLORS.total, align: 'right' });
+  ws.getCell(totalRow, 14).numFmt = '"R$" #,##0.00';
+
+  return totalRow + 2; // gap entre seções
+}
+
+function writeAquisicaoCopaSheet(wb: Workbook, index: AqIndex, dates: Date[]): void {
+  const ws = wb.addWorksheet('Aquisição Copa', {
+    views: [{ state: 'frozen', xSplit: 3, ySplit: 0, topLeftCell: 'D1', showGridLines: false }],
+  });
+
+  if (index.blocks.length === 0) {
+    ws.mergeCells(1, 1, 3, AQ_MAX_COL);
+    setCell(ws.getCell(1, 1), 'Sem disparos de aquisição Copa no período fechado.', {
+      bold: true, fillColor: 'FEE2E2', fontColor: '991B1B', size: 12,
+    });
+    return;
+  }
+
+  let nextRow = 1;
+  for (const block of index.blocks) {
+    nextRow = writeAqSection(ws, nextRow, block, dates);
+  }
+
+  [16, 6, 9, 12, 12, 11, 10, 11, 11, 11, 11, 12, 11, 12].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+}
+
+// ── Aba "Big Numbers Aquisição Copa" ────────────────────────────────────────────
+
+function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: Date[]): void {
+  const maxCol = 14;
+  const ws = wb.addWorksheet('Big Numbers Aquisição Copa', {
+    views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', showGridLines: false }],
+  });
+  ws.pageSetup.orientation = 'landscape';
+  ws.pageSetup.fitToPage = true;
+  ws.pageSetup.fitToWidth = 1;
+  ws.pageSetup.fitToHeight = 0;
+  for (let col = 1; col <= maxCol; col++) ws.getColumn(col).width = col === 1 ? 16 : 12;
+
+  ws.mergeCells(1, 1, 1, maxCol);
+  setCell(ws.getCell(1, 1), 'BIG NUMBERS AQUISIÇÃO COPA', {
+    bold: true, fillColor: COLORS.header, fontColor: 'FFFFFF', align: 'left', size: 18,
+  });
+  ws.getRow(1).height = 30;
+
+  ws.mergeCells(2, 1, 2, maxCol);
+  const periodText = dates.length > 0
+    ? `${formatShortDate(dates[0])} a ${formatShortDate(dates[dates.length - 1])} · somente dias fechados`
+    : 'Período sem dias fechados';
+  setCell(ws.getCell(2, 1), periodText, { bold: true, fillColor: COLORS.subHeader, fontColor: COLORS.header, align: 'left', size: 11 });
+  ws.getRow(2).height = 21;
+
+  ws.mergeCells(3, 1, 3, maxCol);
+  setCell(ws.getCell(3, 1), `COBERTURA · CRM aquisição: ${index.coverageDays}/${dates.length} dias · fonte: activities (jornada COPA + etapa de aquisição)`, {
+    fillColor: COLORS.cover, fontColor: COLORS.coverFont, align: 'left', size: 9,
+  });
+  ws.getRow(3).height = 20;
+
+  ws.mergeCells(4, 1, 4, maxCol);
+  setCell(ws.getCell(4, 1), 'Leitura: volumes são somas do período; taxas são recalculadas pelos volumes agregados. CAC = Custo Total Campanha / Cartões Gerados. Aberturas incluem leitura de WhatsApp e abertura de e-mail.', {
+    italic: true, fillColor: COLORS.note, fontColor: COLORS.noteFont, align: 'left', size: 9,
+  });
+  ws.getRow(4).height = 34;
+
+  if (dates.length === 0 || index.total.enviados === 0) {
+    ws.mergeCells(6, 1, 8, maxCol);
+    setCell(ws.getCell(6, 1), 'Sem dados de aquisição Copa no período fechado.', {
+      bold: true, fillColor: 'FEE2E2', fontColor: '991B1B', size: 12,
+    });
+    return;
+  }
+
+  // Layout de linhas (espelha a aba Big Numbers de Renta).
+  const crmTableHeaderRow = 30;
+  const crmDataStartRow = crmTableHeaderRow + 1;   // 31
+  const weeklyHeaderRow = 40;
+  const weeklyStartRow = weeklyHeaderRow + 1;       // 41
+  const weeklyEndRow = weeklyStartRow + index.weekly.length - 1;
+  const wr = (col: string) => `${col}${weeklyStartRow}:${col}${weeklyEndRow}`;
+
+  // ── Cards (somam a tabela semanal) ──
+  type Card = { label: string; formula: string; format: string; fill: string; note: string };
+  const cards: Card[] = [
+    { label: 'DISPAROS', formula: `SUM(${wr('B')})`, format: '#,##0', fill: '475569', note: 'Linhas de disparo realizadas' },
+    { label: 'ENVIADOS', formula: `SUM(${wr('C')})`, format: '#,##0', fill: '334155', note: 'Base Total' },
+    { label: 'ENTREGUES', formula: `SUM(${wr('D')})`, format: '#,##0', fill: '15803D', note: 'Base Acionável' },
+    { label: 'PROPOSTAS', formula: `SUM(${wr('G')})`, format: '#,##0', fill: '0369A1', note: 'Propostas no período' },
+    { label: 'APROVADOS', formula: `SUM(${wr('H')})`, format: '#,##0', fill: '2563EB', note: 'Aprovados no período' },
+    { label: 'CARTÕES', formula: `SUM(${wr('I')})`, format: '#,##0', fill: '7C3AED', note: 'Cartões Gerados' },
+    { label: 'CUSTO', formula: `SUM(${wr('J')})`, format: '"R$" #,##0.00', fill: '4472C4', note: 'Custo Total Campanha' },
+    { label: 'CAC', formula: `IFERROR(SUM(${wr('J')})/SUM(${wr('I')}),"")`, format: '"R$" #,##0.00', fill: 'DC2626', note: 'Custo / Cartões' },
+    { label: 'ABERTURAS', formula: `SUM(${wr('E')})`, format: '#,##0', fill: '0F766E', note: 'WhatsApp + e-mail' },
+    { label: 'CLIQUES', formula: `SUM(${wr('F')})`, format: '#,##0', fill: 'C2410C', note: 'Cliques (essencialmente e-mail)' },
+  ];
+  cards.forEach((card, i) => {
+    const row = 6 + Math.floor(i / 4) * 6;
+    const col = 1 + (i % 4) * 3;
+    ws.mergeCells(row, col, row, col + 2);
+    ws.mergeCells(row + 1, col, row + 3, col + 2);
+    ws.mergeCells(row + 4, col, row + 4, col + 2);
+    setCell(ws.getCell(row, col), card.label, { bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 9 });
+    setCell(ws.getCell(row + 1, col), { formula: card.formula }, { bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 18 });
+    ws.getCell(row + 1, col).numFmt = card.format;
+    setCell(ws.getCell(row + 4, col), card.note, { fillColor: COLORS.cover, fontColor: '475569', size: 8 });
+  });
+
+  // ── Eficiência do período ──
+  ws.mergeCells(24, 1, 24, maxCol);
+  setCell(ws.getCell(24, 1), 'EFICIÊNCIA DO PERÍODO', { bold: true, fillColor: COLORS.header, fontColor: 'FFFFFF', align: 'left', size: 11 });
+  const efficiency: Array<{ label: string; formula: string; format: string; fill: string }> = [
+    { label: 'TX ENTREGA', formula: `IFERROR(SUM(${wr('D')})/SUM(${wr('C')}),"")`, format: '0.0%', fill: '15803D' },
+    { label: 'TX ABERTURA', formula: `IFERROR(SUM(${wr('E')})/SUM(${wr('D')}),"")`, format: '0.0%', fill: '0F766E' },
+    { label: 'TX CLIQUE', formula: `IFERROR(SUM(${wr('F')})/SUM(${wr('D')}),"")`, format: '0.0%', fill: 'C2410C' },
+    { label: 'TX PROPOSTA', formula: `IFERROR(SUM(${wr('G')})/SUM(${wr('D')}),"")`, format: '0.0%', fill: '0369A1' },
+    { label: 'TX APROVAÇÃO', formula: `IFERROR(SUM(${wr('H')})/SUM(${wr('G')}),"")`, format: '0.0%', fill: '2563EB' },
+    { label: 'TX CARTÃO', formula: `IFERROR(SUM(${wr('I')})/SUM(${wr('D')}),"")`, format: '0.0%', fill: '7C3AED' },
+    { label: 'CAC', formula: `IFERROR(SUM(${wr('J')})/SUM(${wr('I')}),"")`, format: '"R$" #,##0.00', fill: 'DC2626' },
+  ];
+  efficiency.forEach((metric, i) => {
+    const col = 1 + i * 2;
+    ws.mergeCells(25, col, 25, col + 1);
+    ws.mergeCells(26, col, 28, col + 1);
+    setCell(ws.getCell(25, col), metric.label, { bold: true, fillColor: metric.fill, fontColor: 'FFFFFF', size: 8 });
+    setCell(ws.getCell(26, col), { formula: metric.formula }, { bold: true, fillColor: COLORS.cover, fontColor: '0F172A', size: 13 });
+    ws.getCell(26, col).numFmt = metric.format;
+  });
+
+  // ── Totais por canal (CRM) ──
+  ws.mergeCells(crmTableHeaderRow - 1, 1, crmTableHeaderRow - 1, maxCol);
+  setCell(ws.getCell(crmTableHeaderRow - 1, 1), 'TOTAIS POR CANAL · CRM AQUISIÇÃO', {
+    bold: true, fillColor: COLORS.header, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+  const crmHeaders = ['Canal', 'Enviados', 'Entregues', 'Tx entrega', 'Aberturas', 'Tx abertura', 'Cliques', 'Tx clique', 'Propostas', 'Aprovados', 'Cartões', 'CAC'];
+  crmHeaders.forEach((h, i) => setCell(ws.getCell(crmTableHeaderRow, i + 1), h, {
+    bold: true, fillColor: COLORS.crmHeaderFill, fontColor: COLORS.crmHeaderFont, size: 8,
+  }));
+
+  const channelRows: Array<CopaChannel | 'TOTAL'> = [...COPA_CHANNELS, 'TOTAL'];
+  channelRows.forEach((channel, index2) => {
+    const row = crmDataStartRow + index2;
+    const m = channel === 'TOTAL' ? index.total : index.byChannel[channel];
+    const isTotal = channel === 'TOTAL';
+    const showOpen = m.abertura > 0;
+    const showClick = m.cliques > 0;
+    const fill = isTotal ? COLORS.total : index2 % 2 === 0 ? 'FFFFFF' : COLORS.zebra;
+    const values: Array<string | number | object | undefined> = [
+      channel,
+      m.enviados,
+      m.entregues,
+      { formula: `IFERROR(C${row}/B${row},"")` },
+      showOpen ? m.abertura : undefined,
+      showOpen ? { formula: `IFERROR(E${row}/C${row},"")` } : undefined,
+      showClick ? m.cliques : undefined,
+      showClick ? { formula: `IFERROR(G${row}/C${row},"")` } : undefined,
+      m.propostas,
+      m.aprovados,
+      m.cartoes,
+      m.cartoes > 0 ? m.custo / m.cartoes : undefined, // CAC = Custo Total Campanha / Cartões
+    ];
+    values.forEach((v, i) => setCell(ws.getCell(row, i + 1), v, {
+      bold: isTotal, fillColor: fill, align: i === 0 ? 'left' : 'right', size: 9,
+    }));
+    [2, 3, 9, 10, 11].forEach((c) => { ws.getCell(row, c).numFmt = '#,##0'; });
+    ws.getCell(row, 4).numFmt = '0.0%';
+    ws.getCell(row, 12).numFmt = '"R$" #,##0.00';
+    if (showOpen) { ws.getCell(row, 5).numFmt = '#,##0'; ws.getCell(row, 6).numFmt = '0.0%'; }
+    if (showClick) { ws.getCell(row, 7).numFmt = '#,##0'; ws.getCell(row, 8).numFmt = '0.0%'; }
+  });
+
+  // ── Evolução semanal ──
+  ws.mergeCells(weeklyHeaderRow - 1, 1, weeklyHeaderRow - 1, maxCol);
+  setCell(ws.getCell(weeklyHeaderRow - 1, 1), 'EVOLUÇÃO SEMANAL · CRM AQUISIÇÃO (seg a dom)', {
+    bold: true, fillColor: COLORS.header, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+  const weeklyHeaders = ['Semana', 'Disparos', 'Enviados', 'Entregues', 'Aberturas', 'Cliques', 'Propostas', 'Aprovados', 'Cartões', 'Custo', 'Tx entrega', 'Tx cartão', 'CAC', 'Dias'];
+  weeklyHeaders.forEach((h, i) => setCell(ws.getCell(weeklyHeaderRow, i + 1), h, {
+    bold: true, fillColor: COLORS.subHeader, fontColor: COLORS.header, size: 8,
+  }));
+  index.weekly.forEach((week, i) => {
+    const row = weeklyStartRow + i;
+    const fill = i % 2 === 0 ? 'FFFFFF' : COLORS.zebra;
+    const m = week.metrics;
+    // "Disparos" da semana não é rastreado separadamente aqui; usamos enviados como proxy de volume no card DISPAROS.
+    const values: Array<string | number | object> = [
+      `${formatShortDate(week.start)} a ${formatShortDate(week.end)}`,
+      m.disparos,
+      m.enviados, m.entregues, m.abertura, m.cliques, m.propostas, m.aprovados, m.cartoes, m.custo,
+      { formula: `IFERROR(D${row}/C${row},"")` },
+      { formula: `IFERROR(I${row}/D${row},"")` },
+      { formula: `IFERROR(J${row}/I${row},"")` },
+      week.days,
+    ];
+    values.forEach((v, idx) => setCell(ws.getCell(row, idx + 1), v, {
+      fillColor: fill, align: idx === 0 ? 'left' : 'right', size: 9,
+    }));
+    [2, 3, 4, 5, 6, 7, 8, 9, 14].forEach((c) => { ws.getCell(row, c).numFmt = '#,##0'; });
+    ws.getCell(row, 10).numFmt = '"R$" #,##0.00';
+    [11, 12].forEach((c) => { ws.getCell(row, c).numFmt = '0.0%'; });
+    ws.getCell(row, 13).numFmt = '"R$" #,##0.00';
+  });
+
+  const noteRow = weeklyEndRow + 2;
+  ws.mergeCells(noteRow, 1, noteRow, maxCol);
+  setCell(ws.getCell(noteRow, 1), 'Fonte: activities (jornada COPA + etapa Aquisição/Meio de Funil, status Realizado). CAC = Custo Total Campanha / Cartões Gerados, por canal e no total.', {
+    italic: true, fillColor: COLORS.note, fontColor: COLORS.noteFont, align: 'left', size: 9,
+  });
+  ws.getRow(noteRow).height = 30;
+}
+
+// ── Workbook + export público ────────────────────────────────────────────────────
+
+function downloadBuffer(buffer: BlobPart, filename: string): void {
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Monta o workbook FECHAMENTO COPA (4 abas) a partir de dados já buscados.
+ * Separado do fetch/download para permitir validação headless (Node) e reuso.
+ * `createChartImages` fica opcional porque depende de `document` (só no browser).
+ */
+export function buildFechamentoCopaWorkbook(
+  ExcelJSRuntime: { Workbook: new () => Workbook },
+  params: {
+    rntRows: RawRow[];
+    aqRows: RawRow[];
+    fixedIdx: Parameters<typeof writeCopaSheet>[5];
+    start: Date;
+    end: Date;
+    createChartImages?: boolean;
+  },
+): Workbook {
+  const { rntRows, aqRows, fixedIdx, start, end } = params;
+  const copaStart = COPA_ACTION_START;
+  const copaActionDates = copaStart <= end ? allDates(copaStart, end) : [];
+  const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
+  const copaDetailDates = copaDetailStart <= end ? allDates(copaDetailStart, end) : [];
+
+  const copaActionIdx = buildCopaIndex(rntRows, copaStart, end);
+  const crmSummary = copaCrmChartSummary(copaActionIdx, copaActionDates);
+  const chartImages = params.createChartImages
+    ? createCopaChartImages(copaActionDates, fixedIdx, crmSummary)
+    : undefined;
+  const aqIndex = buildAqIndex(aqRows, copaActionDates, copaStart, end);
+
+  const wb = new ExcelJSRuntime.Workbook();
+  wb.creator = 'GaaS AFINZ — Fechamento Copa';
+  wb.created = new Date();
+  wb.calcProperties.fullCalcOnLoad = true;
+
+  // Ordem: 1) Rentabilização Copa 2) Big Numbers Renta 3) Aquisição Copa 4) Big Numbers Aquisição
+  writeCopaSheet(wb, rntRows, copaDetailDates, copaDetailStart, end, fixedIdx, chartImages);
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages);
+  writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates);
+  writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates);
+
+  return wb;
+}
+
+export async function exportFechamentoCopaXlsx(
+  start: Date,
+  end: Date,
+): Promise<{ rows: number; filename: string }> {
+  const effectiveEnd = closedEnd(end);
+  if (effectiveEnd < start) throw new Error('O periodo selecionado ainda nao possui dias fechados.');
+
+  // A ação Copa tem janela fixa a partir de 13/04; as abas cobrem [COPA_ACTION_START, fim fechado].
+  const copaStart = COPA_ACTION_START;
+  if (copaStart > effectiveEnd) throw new Error('A acao Copa ainda nao possui dias fechados.');
+
+  const [rntRows, fixedIdx, aqRows, ExcelJSModule] = await Promise.all([
+    fetchRntRows(copaStart, effectiveEnd),
+    fetchCopaFixedDaily(copaStart, effectiveEnd),
+    fetchSupabaseRows(copaStart, effectiveEnd),
+    import('exceljs'),
+  ]);
+
+  const wb = buildFechamentoCopaWorkbook(ExcelJSModule.default, {
+    rntRows,
+    aqRows: aqRows as RawRow[],
+    fixedIdx,
+    start,
+    end: effectiveEnd,
+    createChartImages: true,
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const filename = `fechamento_copa_${isoDate(copaStart).replace(/-/g, '')}_${isoDate(effectiveEnd).replace(/-/g, '')}.xlsx`;
+  downloadBuffer(buffer, filename);
+  return { rows: rntRows.length + (aqRows as RawRow[]).length, filename };
+}

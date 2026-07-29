@@ -13,6 +13,7 @@ import { formatMonthLabel } from '../utils/monthlyAggregation';
 import { exportAquisicaoCrmMonthlyXlsx, exportAquisicaoCrmXlsx } from '../utils/aquisicaoCrmExcelExport';
 import { exportMidiaPagaMonthlyXlsx } from '../utils/midiaPagaMonthlyReportExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
+import { exportFechamentoCopaXlsx } from '../utils/fechamentoCopaExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import { ReportLiveCard } from './relatorio/ReportLiveCard';
 import {
@@ -244,6 +245,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const [isExportingAquisicaoMonthly, setIsExportingAquisicaoMonthly] = useState(false);
   const [isExportingMidiaPagaMonthly, setIsExportingMidiaPagaMonthly] = useState(false);
   const [isExportingRnt, setIsExportingRnt] = useState(false);
+  const [isExportingFechamentoCopa, setIsExportingFechamentoCopa] = useState(false);
 
   // ── Personalização de colunas / agrupamentos ──
   // Defaults por frente: Rentabilização usa visão de engajamento (sem aquisição).
@@ -624,6 +626,21 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     }
   }, [periodEnd, periodStart]);
 
+  const exportFechamentoCopa = useCallback(async () => {
+    const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
+    const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
+
+    setIsExportingFechamentoCopa(true);
+    try {
+      await exportFechamentoCopaXlsx(start, end);
+    } catch (error) {
+      console.error('Erro ao exportar XLSX de Fechamento Copa', error);
+      window.alert('Não foi possível gerar o XLSX de Fechamento Copa. Verifique a conexão com a base de dados e tente novamente.');
+    } finally {
+      setIsExportingFechamentoCopa(false);
+    }
+  }, [periodEnd, periodStart]);
+
   const exportCanal = useCallback(() => {
     const headers = ['Canal', 'Base Enviada', 'Base Entregue', '% Entrega', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base', '% Participação'];
     const toRow = (r: AggregatedRow, isTotal = false) => [
@@ -862,6 +879,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               { key: 'aqm', group: 'Mensais', title: 'Aquisição CRM — Mensal', desc: 'MoM por BU, segmento, semana e canal', onClick: exportAquisicaoCrmMonthly, loading: isExportingAquisicaoMonthly, color: 'text-cyan-600' },
               { key: 'aqd', group: 'Diarizados', title: 'Aquisição CRM — Diarizado', desc: 'por seção e bloco, com auditoria de mapeamento', onClick: exportAquisicaoCrm, loading: isExportingAquisicao, color: 'text-cyan-600' },
               { key: 'rnt', group: 'Diarizados', title: 'Rentabilização CRM — Diarizado', desc: 'cross-sell, ativação e seguros, com auditoria', onClick: exportRentabilizacaoCrm, loading: isExportingRnt, color: 'text-orange-500' },
+              { key: 'fcopa', group: 'Fechamentos', title: 'Fechamento Copa — Aquisição e Rentabilização', desc: 'Rentabilização Copa + Big Numbers + Aquisição Copa + Big Numbers', onClick: exportFechamentoCopa, loading: isExportingFechamentoCopa, color: 'text-emerald-600' },
             ].map((f, i, arr) => (
               <React.Fragment key={f.key}>
                 {(i === 0 || arr[i - 1].group !== f.group) && (
