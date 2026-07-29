@@ -433,6 +433,147 @@ function formulaWithResult(formula: string, result: number | ''): { formula: str
   return { formula, result };
 }
 
+type PaidPhaseLayout = {
+  startRow: number;
+  dataStartRow: number;
+  dataEndRow: number;
+  totalRow: number;
+  rowCount: number;
+};
+
+function paidPhaseLayouts(sourceRows: AqPaidDay[]): Record<AqPaidPhase, PaidPhaseLayout> {
+  const layouts = {} as Record<AqPaidPhase, PaidPhaseLayout>;
+  let startRow = 1;
+
+  PAID_TABLES.forEach((config) => {
+    const rowCount = sourceRows.filter((row) => row.phase === config.phase).length;
+    const dataStartRow = startRow + 3;
+    const totalRow = dataStartRow + rowCount;
+    layouts[config.phase] = {
+      startRow,
+      dataStartRow,
+      dataEndRow: totalRow - 1,
+      totalRow,
+      rowCount,
+    };
+    startRow = totalRow + 4;
+  });
+
+  return layouts;
+}
+
+function paidCoverageText(rows: AqPaidDay[]): string {
+  if (rows.length === 0) return 'sem entrega observada';
+  const dates = rows.map((row) => row.businessDate).sort();
+  return `${formatShortDate(paidRowDate(dates[0]))} a ${formatShortDate(paidRowDate(dates[dates.length - 1]))} · ${rows.length} dias`;
+}
+
+type PaidBigNumberCard = {
+  label: string;
+  formula: string;
+  result: number | '';
+  format: string;
+  note: string;
+};
+
+function writePaidBigNumberSection(
+  ws: Worksheet,
+  startRow: number,
+  config: PaidTableConfig,
+  coverage: string,
+  cards: PaidBigNumberCard[],
+): number {
+  const maxCol = 14;
+  ws.mergeCells(startRow, 1, startRow, maxCol);
+  setCell(ws.getCell(startRow, 1), config.title.replace(' · DIÁRIO', ''), {
+    bold: true, fillColor: config.color, fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+
+  ws.mergeCells(startRow + 1, 1, startRow + 1, maxCol);
+  setCell(ws.getCell(startRow + 1, 1), `COBERTURA · ${coverage} · fonte: v_b2c_app_install_daily`, {
+    fillColor: config.lightColor, fontColor: '334155', align: 'left', size: 8,
+  });
+
+  cards.forEach((card, index) => {
+    const row = startRow + 2 + Math.floor(index / 4) * 6;
+    const col = 1 + (index % 4) * 3;
+    ws.mergeCells(row, col, row, col + 2);
+    ws.mergeCells(row + 1, col, row + 3, col + 2);
+    ws.mergeCells(row + 4, col, row + 4, col + 2);
+    setCell(ws.getCell(row, col), card.label, {
+      bold: true, fillColor: config.color, fontColor: 'FFFFFF', size: 9,
+    });
+    setCell(ws.getCell(row + 1, col), formulaWithResult(card.formula, card.result), {
+      bold: true, fillColor: config.color, fontColor: 'FFFFFF', size: 18,
+    });
+    ws.getCell(row + 1, col).numFmt = card.format;
+    setCell(ws.getCell(row + 4, col), card.note, {
+      fillColor: config.lightColor, fontColor: '475569', size: 8,
+    });
+  });
+
+  return startRow + 14;
+}
+
+function writePaidBigNumbersDashboard(
+  ws: Worksheet,
+  startRow: number,
+  paidRows: AqPaidDay[],
+  layouts: Record<AqPaidPhase, PaidPhaseLayout>,
+): number {
+  let nextRow = startRow;
+
+  PAID_TABLES.forEach((config) => {
+    const rows = paidRows.filter((row) => row.phase === config.phase);
+    if (rows.length === 0) return;
+
+    const layout = layouts[config.phase];
+    const totalRef = (column: string) => `'Aquisição Copa'!${column}${layout.totalRow}`;
+    const spend = paidTotal(rows, 'spend');
+    const impressions = paidTotal(rows, 'impressions');
+    const linkClicks = paidTotal(rows, 'linkClicks');
+    const installs = paidTotal(rows, 'installs');
+    const startTrials = paidTotal(rows, 'startTrials');
+
+    const cards: PaidBigNumberCard[] = config.phase === 'app_install'
+      ? [
+          { label: 'INVESTIMENTO', formula: totalRef('R'), result: spend, format: '"R$" #,##0.00', note: 'Gasto da fase' },
+          { label: 'IMPRESSÕES', formula: totalRef('S'), result: impressions, format: '#,##0', note: 'Entrega de mídia' },
+          { label: 'CLIQUES LINK', formula: totalRef('T'), result: linkClicks, format: '#,##0', note: 'Cliques para destino' },
+          { label: 'CTR', formula: totalRef('U'), result: impressions > 0 ? linkClicks / impressions : '', format: '0.00%', note: 'Cliques / impressões' },
+          { label: 'INSTALLS', formula: totalRef('V'), result: installs, format: '#,##0', note: 'Resultado App Install' },
+          { label: 'CLIQUE → INSTALL', formula: totalRef('W'), result: linkClicks > 0 ? installs / linkClicks : '', format: '0.0%', note: 'Installs / cliques link' },
+          { label: 'CPI', formula: totalRef('X'), result: installs > 0 ? spend / installs : '', format: '"R$" #,##0.00', note: 'Investimento / installs' },
+          {
+            label: 'DIAS COM ENTREGA',
+            formula: `COUNT('Aquisição Copa'!R${layout.dataStartRow}:R${layout.dataEndRow})`,
+            result: layout.rowCount,
+            format: '#,##0',
+            note: 'Dias observados na fase',
+          },
+        ]
+      : [
+          { label: 'INVESTIMENTO', formula: totalRef('R'), result: spend, format: '"R$" #,##0.00', note: 'Gasto da fase' },
+          { label: 'IMPRESSÕES', formula: totalRef('S'), result: impressions, format: '#,##0', note: 'Entrega de mídia' },
+          { label: 'CLIQUES LINK', formula: totalRef('T'), result: linkClicks, format: '#,##0', note: 'Cliques para destino' },
+          { label: 'CTR', formula: totalRef('U'), result: impressions > 0 ? linkClicks / impressions : '', format: '0.00%', note: 'Cliques / impressões' },
+          { label: 'INSTALLS', formula: totalRef('V'), result: installs, format: '#,##0', note: 'Installs direcionais' },
+          { label: 'STARTTRIALS', formula: totalRef('W'), result: startTrials, format: '#,##0', note: 'Resultado StartTrial' },
+          { label: 'INSTALL → TRIAL', formula: totalRef('X'), result: installs > 0 ? startTrials / installs : '', format: '0.0%', note: 'StartTrials / installs' },
+          { label: 'CUSTO/STARTTRIAL', formula: totalRef('Z'), result: startTrials > 0 ? spend / startTrials : '', format: '"R$" #,##0.00', note: 'Investimento / StartTrial' },
+        ];
+
+    nextRow = writePaidBigNumberSection(ws, nextRow, config, paidCoverageText(rows), cards);
+  });
+
+  ws.mergeCells(nextRow, 1, nextRow, 14);
+  setCell(ws.getCell(nextRow, 1), 'Mídia paga: CPI e Custo/StartTrial são métricas de resultado de plataforma e não representam CAC/cartão. StartTrial usa atribuição Meta 7d click; installs de onboarding são direcionais.', {
+    italic: true, fillColor: COLORS.note, fontColor: COLORS.noteFont, align: 'left', size: 8,
+  });
+  ws.getRow(nextRow).height = 28;
+  return nextRow + 2;
+}
+
 function writePaidMediaTable(
   ws: Worksheet,
   startRow: number,
@@ -640,15 +781,15 @@ function writeAquisicaoCopaSheet(wb: Workbook, index: AqIndex, dates: Date[], pa
     ws.getColumn(AQ_MEDIA_START_COL + index2).width = width;
   });
 
-  let paidStartRow = 1;
+  const layouts = paidPhaseLayouts(paidRows);
   PAID_TABLES.forEach((config) => {
-    paidStartRow = writePaidMediaTable(ws, paidStartRow, config, paidRows);
+    writePaidMediaTable(ws, layouts[config.phase].startRow, config, paidRows);
   });
 }
 
 // ── Aba "Big Numbers Aquisição Copa" ────────────────────────────────────────────
 
-function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: Date[]): void {
+function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: Date[], paidRows: AqPaidDay[]): void {
   const maxCol = 14;
   const ws = wb.addWorksheet('Big Numbers Aquisição Copa', {
     views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', showGridLines: false }],
@@ -672,19 +813,25 @@ function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: 
   setCell(ws.getCell(2, 1), periodText, { bold: true, fillColor: COLORS.subHeader, fontColor: COLORS.header, align: 'left', size: 11 });
   ws.getRow(2).height = 21;
 
+  const paidLayouts = paidPhaseLayouts(paidRows);
+  const appPaidRows = paidRows.filter((row) => row.phase === 'app_install');
+  const onboardingPaidRows = paidRows.filter((row) => row.phase === 'onboarding');
+  const hasCrm = index.total.enviados > 0;
+  const hasPaid = paidRows.length > 0;
+
   ws.mergeCells(3, 1, 3, maxCol);
-  setCell(ws.getCell(3, 1), `COBERTURA · CRM aquisição: ${index.coverageDays}/${dates.length} dias · fonte: activities (jornada COPA + etapa de aquisição)`, {
+  setCell(ws.getCell(3, 1), `COBERTURA · CRM: ${index.coverageDays}/${dates.length} dias · App Install: ${paidCoverageText(appPaidRows)} · Onboarding: ${paidCoverageText(onboardingPaidRows)} · fontes: activities + v_b2c_app_install_daily`, {
     fillColor: COLORS.cover, fontColor: COLORS.coverFont, align: 'left', size: 9,
   });
-  ws.getRow(3).height = 20;
+  ws.getRow(3).height = 26;
 
   ws.mergeCells(4, 1, 4, maxCol);
-  setCell(ws.getCell(4, 1), 'Leitura: volumes são somas do período; taxas são recalculadas pelos volumes agregados. CAC = Custo Total Campanha / Cartões Gerados. Aberturas incluem leitura de WhatsApp e abertura de e-mail.', {
+  setCell(ws.getCell(4, 1), 'Leitura: volumes são somas do período e taxas são recalculadas pelos agregados. CRM: CAC = custo / cartões. Mídia: CPI = investimento / installs e Custo/StartTrial = investimento / StartTrial; métricas de plataforma não são CAC.', {
     italic: true, fillColor: COLORS.note, fontColor: COLORS.noteFont, align: 'left', size: 9,
   });
   ws.getRow(4).height = 34;
 
-  if (dates.length === 0 || index.total.enviados === 0) {
+  if (dates.length === 0 || (!hasCrm && !hasPaid)) {
     ws.mergeCells(6, 1, 8, maxCol);
     setCell(ws.getCell(6, 1), 'Sem dados de aquisição Copa no período fechado.', {
       bold: true, fillColor: 'FEE2E2', fontColor: '991B1B', size: 12,
@@ -692,11 +839,23 @@ function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: 
     return;
   }
 
+  if (!hasCrm) {
+    const nextRow = writePaidBigNumbersDashboard(ws, 6, paidRows, paidLayouts);
+    ws.mergeCells(nextRow, 1, nextRow, maxCol);
+    setCell(ws.getCell(nextRow, 1), 'CRM aquisição Copa sem dados no período fechado; Big Numbers exibidos apenas para mídia paga.', {
+      bold: true, fillColor: COLORS.cover, fontColor: COLORS.coverFont, align: 'left', size: 9,
+    });
+    return;
+  }
+
   // Layout de linhas (espelha a aba Big Numbers de Renta).
-  const crmTableHeaderRow = 30;
-  const crmDataStartRow = crmTableHeaderRow + 1;   // 31
-  const weeklyHeaderRow = 40;
-  const weeklyStartRow = weeklyHeaderRow + 1;       // 41
+  const efficiencyHeaderRow = hasPaid
+    ? writePaidBigNumbersDashboard(ws, 24, paidRows, paidLayouts)
+    : 24;
+  const crmTableHeaderRow = efficiencyHeaderRow + 6;
+  const crmDataStartRow = crmTableHeaderRow + 1;
+  const weeklyHeaderRow = crmTableHeaderRow + 10;
+  const weeklyStartRow = weeklyHeaderRow + 1;
   const weeklyEndRow = weeklyStartRow + index.weekly.length - 1;
   const wr = (col: string) => `${col}${weeklyStartRow}:${col}${weeklyEndRow}`;
 
@@ -727,8 +886,8 @@ function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: 
   });
 
   // ── Eficiência do período ──
-  ws.mergeCells(24, 1, 24, maxCol);
-  setCell(ws.getCell(24, 1), 'EFICIÊNCIA DO PERÍODO', { bold: true, fillColor: COLORS.header, fontColor: 'FFFFFF', align: 'left', size: 11 });
+  ws.mergeCells(efficiencyHeaderRow, 1, efficiencyHeaderRow, maxCol);
+  setCell(ws.getCell(efficiencyHeaderRow, 1), 'EFICIÊNCIA DO PERÍODO · CRM AQUISIÇÃO', { bold: true, fillColor: COLORS.header, fontColor: 'FFFFFF', align: 'left', size: 11 });
   const efficiency: Array<{ label: string; formula: string; format: string; fill: string }> = [
     { label: 'TX ENTREGA', formula: `IFERROR(SUM(${wr('D')})/SUM(${wr('C')}),"")`, format: '0.0%', fill: '15803D' },
     { label: 'TX ABERTURA', formula: `IFERROR(SUM(${wr('E')})/SUM(${wr('D')}),"")`, format: '0.0%', fill: '0F766E' },
@@ -740,11 +899,11 @@ function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: 
   ];
   efficiency.forEach((metric, i) => {
     const col = 1 + i * 2;
-    ws.mergeCells(25, col, 25, col + 1);
-    ws.mergeCells(26, col, 28, col + 1);
-    setCell(ws.getCell(25, col), metric.label, { bold: true, fillColor: metric.fill, fontColor: 'FFFFFF', size: 8 });
-    setCell(ws.getCell(26, col), { formula: metric.formula }, { bold: true, fillColor: COLORS.cover, fontColor: '0F172A', size: 13 });
-    ws.getCell(26, col).numFmt = metric.format;
+    ws.mergeCells(efficiencyHeaderRow + 1, col, efficiencyHeaderRow + 1, col + 1);
+    ws.mergeCells(efficiencyHeaderRow + 2, col, efficiencyHeaderRow + 4, col + 1);
+    setCell(ws.getCell(efficiencyHeaderRow + 1, col), metric.label, { bold: true, fillColor: metric.fill, fontColor: 'FFFFFF', size: 8 });
+    setCell(ws.getCell(efficiencyHeaderRow + 2, col), { formula: metric.formula }, { bold: true, fillColor: COLORS.cover, fontColor: '0F172A', size: 13 });
+    ws.getCell(efficiencyHeaderRow + 2, col).numFmt = metric.format;
   });
 
   // ── Totais por canal (CRM) ──
@@ -880,7 +1039,7 @@ export function buildFechamentoCopaWorkbook(
   writeCopaSheet(wb, rntRows, copaDetailDates, copaDetailStart, end, fixedIdx, chartImages);
   writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages);
   writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates, aqPaidRows);
-  writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates);
+  writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates, aqPaidRows);
 
   return wb;
 }
