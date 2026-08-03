@@ -14,6 +14,7 @@ import { exportAquisicaoCrmMonthlyXlsx, exportAquisicaoCrmXlsx } from '../utils/
 import { exportMidiaPagaMonthlyXlsx } from '../utils/midiaPagaMonthlyReportExport';
 import { exportRentabilizacaoCrmXlsx } from '../utils/rentabilizacaoCrmExcelExport';
 import { exportFechamentoCopaXlsx } from '../utils/fechamentoCopaExcelExport';
+import { exportHighFrequencyPartnerXlsx, HighFrequencyPartner } from '../utils/highFrequencyPartnersExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import { ReportLiveCard } from './relatorio/ReportLiveCard';
 import {
@@ -246,6 +247,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const [isExportingMidiaPagaMonthly, setIsExportingMidiaPagaMonthly] = useState(false);
   const [isExportingRnt, setIsExportingRnt] = useState(false);
   const [isExportingFechamentoCopa, setIsExportingFechamentoCopa] = useState(false);
+  const [exportingHighFrequencyPartner, setExportingHighFrequencyPartner] = useState<HighFrequencyPartner | null>(null);
 
   // ── Personalização de colunas / agrupamentos ──
   // Defaults por frente: Rentabilização usa visão de engajamento (sem aquisição).
@@ -641,6 +643,21 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     }
   }, [periodEnd, periodStart]);
 
+  const exportHighFrequencyPartner = useCallback(async (partner: HighFrequencyPartner) => {
+    const start = new Date(periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate());
+    const end = new Date(periodEnd.getFullYear(), periodEnd.getMonth(), periodEnd.getDate());
+
+    setExportingHighFrequencyPartner(partner);
+    try {
+      await exportHighFrequencyPartnerXlsx(start, end, partner);
+    } catch (error) {
+      console.error(`Erro ao exportar XLSX de Parceiros Alta Frequência — ${partner}`, error);
+      window.alert(`Não foi possível gerar o XLSX de Parceiros Alta Frequência — ${partner}. Verifique a conexão com a base de dados e tente novamente.`);
+    } finally {
+      setExportingHighFrequencyPartner(null);
+    }
+  }, [periodEnd, periodStart]);
+
   const exportCanal = useCallback(() => {
     const headers = ['Canal', 'Base Enviada', 'Base Entregue', '% Entrega', 'Propostas', '% Proposta', 'Aprovados', '% Aprovação', 'Emissões', '% Finalização', 'Custo/Cartão', 'Custo Total', '% Conv da Base', '% Participação'];
     const toRow = (r: AggregatedRow, isTotal = false) => [
@@ -872,7 +889,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           <p className="px-1 text-xs text-slate-500">
             Período <b className="text-slate-700">{format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</b> · aplica-se a todos os relatórios (mensais comparam vs mês anterior).
           </p>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] lg:items-start">
+          <div className="order-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700"><Files size={19} /></span>
@@ -888,7 +906,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             <ReportLiveCard periodStart={periodStart} periodEnd={periodEnd} />
           </div>
 
-          <div>
+          <div className="order-1 min-w-0">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><ArrowDownToLine size={18} /></span>
@@ -901,6 +919,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             </div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
             {[
+              { key: 'high-frequency-dia', group: 'Parceiros Alta Frequência', title: 'Dia', desc: 'resultado consolidado exclusivo do parceiro Dia', onClick: () => exportHighFrequencyPartner('Dia'), loading: exportingHighFrequencyPartner === 'Dia', color: 'text-blue-600' },
+              { key: 'high-frequency-bem-barato', group: 'Parceiros Alta Frequência', title: 'Bem Barato', desc: 'resultado consolidado exclusivo do parceiro Bem Barato', onClick: () => exportHighFrequencyPartner('Bem Barato'), loading: exportingHighFrequencyPartner === 'Bem Barato', color: 'text-cyan-600' },
               { key: 'mp', group: 'Mensais', title: 'Mídia Paga + CRM — Mensal', desc: 'frentes, criativo por grupo, Start Trial B2C, CRM e Diarizado', onClick: exportMidiaPagaMonthly, loading: isExportingMidiaPagaMonthly, color: 'text-violet-500' },
               { key: 'aqm', group: 'Mensais', title: 'Aquisição CRM — Mensal', desc: 'MoM por BU, segmento, semana e canal', onClick: exportAquisicaoCrmMonthly, loading: isExportingAquisicaoMonthly, color: 'text-cyan-600' },
               { key: 'aqd', group: 'Diarizados', title: 'Aquisição CRM — Diarizado', desc: 'por seção e bloco, com auditoria de mapeamento', onClick: exportAquisicaoCrm, loading: isExportingAquisicao, color: 'text-cyan-600' },
@@ -930,6 +950,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 </div>
               </React.Fragment>
             ))}
+          </div>
           </div>
           </div>
         </section>
