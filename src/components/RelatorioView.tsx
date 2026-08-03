@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download } from 'lucide-react';
+import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download, CalendarDays, Files, ArrowDownToLine } from 'lucide-react';
 import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
@@ -797,7 +797,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                     { key: 'performance' as const, label: 'Overview' },
                     { key: 'daily' as const, label: 'Diário' },
                     { key: 'monthly' as const, label: 'Mensal' },
-                    { key: 'xlsx' as const, label: 'XLSX Reports' },
+                    { key: 'xlsx' as const, label: 'Relatórios' },
                   ].map((option) => (
                     <button
                       key={option.key}
@@ -868,12 +868,38 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       )}
 
       {reportMode === 'xlsx' && (
-        <section className="max-w-3xl space-y-2">
+        <section className="mx-auto w-full max-w-6xl space-y-8">
           <p className="px-1 text-xs text-slate-500">
             Período <b className="text-slate-700">{format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</b> · aplica-se a todos os relatórios (mensais comparam vs mês anterior).
           </p>
-          <ReportLiveCard periodStart={periodStart} periodEnd={periodEnd} />
-          <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 overflow-hidden">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700"><Files size={19} /></span>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Report Google Live</h2>
+                  <p className="text-xs text-slate-500">Publicação contínua em uma planilha e uma apresentação com links fixos.</p>
+                </div>
+              </div>
+              <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
+                <CalendarDays size={14} className="text-cyan-600" /> Período selecionado
+              </span>
+            </div>
+            <ReportLiveCard periodStart={periodStart} periodEnd={periodEnd} />
+          </div>
+
+          <div>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><ArrowDownToLine size={18} /></span>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Relatórios para download</h2>
+                  <p className="text-xs text-slate-500">Arquivos XLSX gerados sob demanda para análises específicas.</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">Os mensais comparam com o mês anterior.</p>
+            </div>
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100">
             {[
               { key: 'mp', group: 'Mensais', title: 'Mídia Paga + CRM — Mensal', desc: 'frentes, criativo por grupo, Start Trial B2C, CRM e Diarizado', onClick: exportMidiaPagaMonthly, loading: isExportingMidiaPagaMonthly, color: 'text-violet-500' },
               { key: 'aqm', group: 'Mensais', title: 'Aquisição CRM — Mensal', desc: 'MoM por BU, segmento, semana e canal', onClick: exportAquisicaoCrmMonthly, loading: isExportingAquisicaoMonthly, color: 'text-cyan-600' },
@@ -885,8 +911,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 {(i === 0 || arr[i - 1].group !== f.group) && (
                   <div className="bg-slate-50/70 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{f.group}</div>
                 )}
-                <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/60">
-                  <FileSpreadsheet size={16} className={`shrink-0 ${f.color}`} />
+                <div className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/80">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-200">
+                    <FileSpreadsheet size={18} className={f.color} />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-slate-800">{f.title}</p>
                     <p className="truncate text-xs text-slate-400">{f.desc}</p>
@@ -894,7 +922,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                   <button
                     onClick={f.onClick}
                     disabled={f.loading}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:border-cyan-300 hover:text-cyan-700 disabled:cursor-wait disabled:opacity-60"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-800 disabled:cursor-wait disabled:opacity-60"
                   >
                     <Download size={13} />
                     {f.loading ? 'Gerando...' : 'Baixar'}
@@ -902,6 +930,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 </div>
               </React.Fragment>
             ))}
+          </div>
           </div>
         </section>
       )}
@@ -940,10 +969,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             <button
               onClick={() => setReportMode('xlsx')}
               className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-cyan-600 transition-colors font-medium"
-              title="Central de relatórios XLSX (Aquisição, Rentabilização e Mensal)"
+              title="Central de relatórios"
             >
               <FileSpreadsheet size={14} />
-              XLSX Reports
+              Relatórios
             </button>
           </div>
         </div>
