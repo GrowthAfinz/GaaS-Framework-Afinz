@@ -499,6 +499,65 @@ const normalizedOriginTokens = (value: unknown) =>
         return cadenceMatch?.[1] ? [token, cadenceMatch[1]] : [token];
     });
 
+const CANONICAL_JOURNEY_BU: Record<string, string> = {
+    b2c: 'B2C',
+    b2b2c: 'B2B2C',
+    plurix: 'Plurix',
+    seguros: 'Seguros',
+};
+
+const CANONICAL_JOURNEY_PARTNER: Record<string, string> = {
+    bb: 'Bem Barato',
+    bbt: 'Bem Barato',
+    dia: 'Dia',
+    serasa: 'Serasa',
+    srs: 'Serasa',
+    srsa: 'Serasa',
+    ecred: 'Serasa',
+    bpc: 'BpC',
+    bp: 'Proprietaria',
+    bsp: 'Proprietaria',
+    na: 'N/A',
+};
+
+const CANONICAL_JOURNEY_SEGMENT: Record<string, string> = {
+    crm: 'CRM',
+    ngd: 'Negados',
+    negados: 'Negados',
+    anc: 'Aprovados_nao_convertidos',
+    carrinho: 'Abandonados',
+    abandonados: 'Abandonados',
+    abd: 'Abandonados',
+    bp: 'Base_Proprietaria',
+    bsp: 'Base_Proprietaria',
+    lp: 'Leads_Parceiros',
+    leads: 'Leads_Parceiros',
+    recencia: 'Recencia_de_Compra',
+    cartonistas: 'Cartonistas',
+    cart: 'Cartonistas',
+};
+
+const parseCanonicalAcquisitionJourney = (journey: unknown) => {
+    const tokens = taxonomyTokens(journey);
+    const acquisitionAt = tokens.findIndex((token) => token === 'aquisicao');
+    const start = acquisitionAt >= 0 ? acquisitionAt + 1 : tokens[0] === 'jor' ? 1 : 0;
+    const buToken = tokens[start];
+    const bu = CANONICAL_JOURNEY_BU[buToken];
+    if (!bu) return {};
+
+    const parceiro = CANONICAL_JOURNEY_PARTNER[tokens[start + 1]];
+    const segmento = CANONICAL_JOURNEY_SEGMENT[tokens[start + 2]]
+        ?? (tokens.slice(start + 2).includes('carrinho') ? 'Abandonados' : undefined);
+
+    return {
+        bu,
+        parceiro,
+        segmento,
+        source: 'jornada canonica',
+        evidence: tokens.slice(start, start + 3).join('_'),
+    };
+};
+
 /**
  * Sugere a ordem de disparo a partir do activity_name, reaproveitando o
  * parser de sequência do taxonomy.ts (mesmo motor da Reconciliation Queue
@@ -530,8 +589,14 @@ const canonicalAcquisitionJourney = (journey: unknown, activityName: unknown) =>
 const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activityName'>) => {
     const activityTokens = normalizedOriginTokens(metric.activityName);
     const journeyTokens = normalizedOriginTokens(metric.journey);
+    const canonicalJourney = parseCanonicalAcquisitionJourney(metric.journey);
     const isAbandonedCart = hasAbandonedCartSignal(metric.journey, metric.activityName);
     const findOrigin = (tokens: string[]) => {
+        if (tokens.some((token) => ['bb', 'bbt'].includes(token))
+            || tokens.includes('bem') && tokens.includes('barato')
+            || tokens.includes('b2b2c') && tokens.includes('bb')) {
+            return { parceiro: 'Bem Barato', evidence: tokens.find((token) => ['bb', 'bbt'].includes(token)) ?? 'bem_barato' };
+        }
         if (tokens.some((token) => ['serasa', 'ecred', 'srs', 'srsa', 'parceiroserasa'].includes(token))) {
             return { parceiro: 'Serasa', evidence: tokens.find((token) => ['serasa', 'ecred', 'srs', 'srsa', 'parceiroserasa'].includes(token))! };
         }
@@ -541,9 +606,6 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
         if (tokens.some((token) => ['bp', 'bsp'].includes(token))
             || /base[_\s-]+propri(a|etaria)/.test(normalizeKey(tokens.join(' ')))) {
             return { parceiro: 'Proprietaria', evidence: tokens.find((token) => ['bp', 'bsp'].includes(token)) ?? 'base_propria' };
-        }
-        if (tokens.includes('bem') && tokens.includes('barato') || tokens.includes('b2b2c') && tokens.includes('bb')) {
-            return { parceiro: 'Bem Barato', evidence: 'bem_barato' };
         }
         // DIA is the B2B2C partner, not an acquisition segment. Without this
         // deterministic rule the generic segment-code parser interprets the
@@ -567,11 +629,12 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
         ?? resolveDim('variante', journeyTokens.join('_'))
         ?? undefined;
     return {
-        parceiro: origin?.parceiro,
-        segmento: isAbandonedCart ? 'Abandonados' : undefined,
+        bu: canonicalJourney.bu,
+        parceiro: canonicalJourney.parceiro ?? origin?.parceiro,
+        segmento: isAbandonedCart ? 'Abandonados' : canonicalJourney.segmento,
         etapaAquisicao: isAbandonedCart ? 'Reativacao' : undefined,
-        source: activityOrigin ? 'token determinístico da activity' : journeyOrigin ? 'token determinístico da jornada' : undefined,
-        evidence: origin?.evidence ?? (isAbandonedCart ? 'carrinho_abandonado' : undefined),
+        source: canonicalJourney.source ?? (activityOrigin ? 'token determinístico da activity' : journeyOrigin ? 'token determinístico da jornada' : undefined),
+        evidence: canonicalJourney.evidence ?? origin?.evidence ?? (isAbandonedCart ? 'carrinho_abandonado' : undefined),
         variante,
     };
 };
@@ -941,24 +1004,25 @@ const inferTaxonomy = (metric: MetricRow) => {
     const journeyText = normalizeKey(metric.journey);
     const tokens = taxonomyTokens(`${metric.journey} ${metric.activityName}`);
     const deterministic = inferDeterministicDimensions(metric);
+    const canonicalJourney = parseCanonicalAcquisitionJourney(metric.journey);
     const isNovosCopa = journeyText.includes('novos') && journeyText.includes('copa');
     const hasBasePropriaSignal = tokens.some((token) =>
         ['bp', 'bsp'].includes(token)
     ) || /base[_\s-]+propri(a|etaria)/.test(text);
 
-    if (hasBasePropriaSignal) {
+    if (hasBasePropriaSignal && !canonicalJourney.bu && !canonicalJourney.parceiro) {
         return { bu: 'B2C', parceiro: 'Proprietaria', segmento: 'Base_Proprietaria' };
     }
 
     const segmentByCode = inferSegmentFromTaxonomy(`${metric.journey} ${metric.activityName}`);
 
-    const bu = text.includes('plurix') || text.includes('_plu_') || text.startsWith('plu_')
+    const bu = deterministic.bu || (text.includes('plurix') || text.includes('_plu_') || text.startsWith('plu_')
         ? 'Plurix'
         : text.includes('b2b2c') || text.includes('_bb_') || text.includes('bem barato')
             ? 'B2B2C'
             : text.includes('seguro')
                 ? 'Seguros'
-                : 'B2C';
+                : 'B2C');
 
     const parceiro = deterministic.parceiro || (text.includes('serasa') || text.includes('ecred') || text.includes('_srs_')
         ? 'Serasa'
@@ -970,7 +1034,7 @@ const inferTaxonomy = (metric: MetricRow) => {
                     ? 'N/A'
                     : 'N/A');
 
-    const segmentoRaw = deterministic.segmento || (isNovosCopa
+    const segmentoRaw = deterministic.segmento || canonicalJourney.segmento || (isNovosCopa
         ? 'Novos'
         : segmentByCode
         || (text.includes('carrinho') || text.includes('_car_')
