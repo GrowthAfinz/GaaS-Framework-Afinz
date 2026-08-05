@@ -12,6 +12,7 @@ import { differenceInCalendarDays, format, startOfMonth, startOfWeek, subDays } 
 import { ptBR } from 'date-fns/locale';
 import { usePeriod } from '../contexts/PeriodContext';
 import { useAppsFlyerAnalytics } from '../hooks/useAppsFlyerAnalytics';
+import type { AppsFlyerSourceKey, AppsFlyerSourceStatuses } from '../hooks/useAppsFlyerAnalytics';
 import type {
   AppsFlyerAcquisitionRow, AppsFlyerCampaignRow, AppsFlyerMetricStatus,
   AppsFlyerOrigin, AppsFlyerQuality,
@@ -113,9 +114,35 @@ function QualityPill({ quality }: { quality: AppsFlyerQuality }) {
   return <span className={`px-1.5 py-0.5 text-[9px] font-semibold ${cls}`}>{qualityLabel[quality]}</span>;
 }
 
+const sourceLabels: Record<AppsFlyerSourceKey, string> = {
+  acquisition: 'Installs raw',
+  campaigns: 'Campanhas agregadas',
+  lifecycle: 'Lifecycle',
+  templates: 'Templates AppsFlyer',
+  templateCatalog: 'Catálogo de templates',
+  runs: 'Histórico de coleta',
+};
+
+function SourceStatusList({ statuses }: { statuses: AppsFlyerSourceStatuses }) {
+  return <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    {(Object.keys(sourceLabels) as AppsFlyerSourceKey[]).map(key => {
+      const status = statuses[key];
+      const available = status.state === 'available';
+      const failed = status.state === 'error';
+      return <div key={key} className={`border p-2.5 ${failed ? 'border-red-200 bg-red-50' : available ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold text-slate-700">{sourceLabels[key]}</span>
+          <span className={`text-[9px] font-bold uppercase ${failed ? 'text-red-700' : available ? 'text-emerald-700' : 'text-slate-500'}`}>{failed ? 'Indisponível' : available ? 'Disponível' : 'Sem dados'}</span>
+        </div>
+        <p className="mt-1 text-[9px] leading-snug text-slate-500">{failed ? status.message : available ? `${status.rowCount.toLocaleString('pt-BR')} linhas consultadas` : 'Consulta concluída sem registros na janela.'}</p>
+      </div>;
+    })}
+  </div>;
+}
+
 export const AppsFlyerFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigation }) => {
   const { startDate, endDate } = usePeriod();
-  const { acquisition, campaigns, lifecycle, templates, templateCatalog, runs, loading, error, refetch } = useAppsFlyerAnalytics(startDate, endDate);
+  const { acquisition, campaigns, lifecycle, templates, templateCatalog, runs, loading, sourceStatuses, refetch } = useAppsFlyerAnalytics(startDate, endDate);
   const [granularity, setGranularity] = useState<Granularity>('daily');
   const [platforms, setPlatforms] = useState<string[]>([]);
   const [sources, setSources] = useState<string[]>([]);
@@ -177,6 +204,16 @@ export const AppsFlyerFunnelView: React.FC<{ navigation: React.ReactNode }> = ({
   const currencies = [...new Set(comparableCampaigns.filter(r => r.cost != null).map(r => r.currency))];
   const cost = currencies.length === 1 ? sumBy(comparableCampaigns.filter(r => r.currency === currencies[0]), r => r.cost) : null;
   const latestRun = runs[0];
+  const unavailableSources = (Object.keys(sourceLabels) as AppsFlyerSourceKey[]).filter(key => sourceStatuses[key].state === 'error');
+  const collectionStatus = sourceStatuses.runs.state === 'error'
+    ? { label: 'Status da coleta indisponível', tone: 'error' as const }
+    : latestRun?.status === 'complete'
+      ? { label: 'Coleta saudável', tone: 'success' as const }
+      : latestRun?.status === 'partial'
+        ? { label: 'Coleta parcial', tone: 'warning' as const }
+        : latestRun?.status === 'failed'
+          ? { label: 'Coleta com falha', tone: 'error' as const }
+          : { label: 'Sem execução disponível', tone: 'neutral' as const };
   const sourceDates = [acquisition[acquisition.length - 1]?.business_date, campaigns[campaigns.length - 1]?.business_date].filter((value): value is string => Boolean(value)).sort();
   const latestDate = sourceDates[sourceDates.length - 1];
   const aggregateOnlyCount = currentCampaigns.filter(r => r.metric_status?.installs === 'confirmed_aggregate_ltv_cohort').length;
@@ -265,9 +302,10 @@ export const AppsFlyerFunnelView: React.FC<{ navigation: React.ReactNode }> = ({
   return <div className="min-h-full bg-slate-50 px-4 py-5 text-slate-800">
     <div className="mx-auto max-w-[1780px] space-y-4">
       <OnboardingFunnelWorkspace navigation={navigation} sidebarMeta={<>
-        <div className={`border p-3 text-xs ${latestRun?.status === 'complete' ? 'border-emerald-300/40 bg-emerald-50 text-emerald-900' : 'border-amber-300/40 bg-amber-50 text-amber-950'}`}>
-          <p className="flex items-center gap-2 font-bold">{latestRun?.status === 'complete' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />} Coleta {latestRun?.status === 'complete' ? 'saudável' : latestRun?.status === 'partial' ? 'parcial' : latestRun?.status === 'failed' ? 'com falha' : 'pendente'}</p>
+        <div className={`border p-3 text-xs ${collectionStatus.tone === 'success' ? 'border-emerald-300/40 bg-emerald-50 text-emerald-900' : collectionStatus.tone === 'error' ? 'border-red-300/40 bg-red-50 text-red-950' : 'border-amber-300/40 bg-amber-50 text-amber-950'}`}>
+          <p className="flex items-center gap-2 font-bold">{collectionStatus.tone === 'success' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />} {collectionStatus.label}</p>
           <p className="mt-1 text-[10px]">Última execução: {latestRun?.completed_at ? new Date(latestRun.completed_at).toLocaleString('pt-BR') : '—'}</p>
+          {unavailableSources.length > 0 && <p className="mt-1 text-[10px]">Indisponível: {unavailableSources.map(key => sourceLabels[key]).join(', ')}</p>}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 text-[10px]">
           <div><span className="text-white/55">Dado até</span><p className="font-semibold text-white">{latestDate ? format(new Date(`${latestDate}T12:00:00`), 'dd/MM/yyyy') : '—'}</p></div>
@@ -282,10 +320,10 @@ export const AppsFlyerFunnelView: React.FC<{ navigation: React.ReactNode }> = ({
             <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">Aquisição e engajamento · AppsFlyer</p><p className="mt-1 flex items-center gap-2 text-sm font-semibold"><CalendarDays size={15} />{period}</p></div>
             <button onClick={() => void refetch()} className="flex items-center gap-2 border border-slate-300 bg-white px-3 py-2 text-[11px] font-semibold"><RefreshCw size={13} />Atualizar</button>
           </div>
-          {error && <div className="mt-3 border border-red-200 bg-red-50 p-3 text-xs text-red-800">Falha ao carregar AppsFlyer: {error}</div>}
+          {unavailableSources.length > 0 && <div className="mt-3 border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><span className="font-semibold">Dados parciais.</span> As fontes disponíveis continuam visíveis. Consulte “Saúde do pipeline” para ver o que não pôde ser carregado.</div>}
         </section>
 
-        <section className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        {(acquisition.length > 0 || campaigns.length > 0) && <section className="border-b border-slate-200 bg-slate-50 px-4 py-3">
           <div className="mb-2 flex items-center justify-between"><p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-600"><Filter size={13} />Filtros</p><button onClick={clearFilters} className="text-[10px] font-semibold text-cyan-700">Limpar todos</button></div>
           <div className="flex flex-wrap gap-2">
             <MultiFilter label="Plataforma" options={options.platforms} selected={platforms} onChange={setPlatforms} />
@@ -297,20 +335,20 @@ export const AppsFlyerFunnelView: React.FC<{ navigation: React.ReactNode }> = ({
             <select value={templateMode} onChange={e => setTemplateMode(e.target.value as typeof templateMode)} className="border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold"><option value="all">Todos os links</option><option value="with">Só com template</option><option value="without">Sem template</option></select>
           </div>
           {advancedRawFilterActive && <p className="mt-2 flex items-center gap-2 text-[10px] text-amber-800"><AlertTriangle size={12} />Canal e presença de template existem apenas no raw. Cliques/sessões agregados ficam ocultos no gráfico enquanto esses filtros estiverem ativos.</p>}
-        </section>
+        </section>}
 
-        <section className="px-4 py-4">
+        {(hasRawData || hasCampaignData) && <section className="px-4 py-4">
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-            <MetricCard label="Installs oficiais" value={hasRawData ? numberLabel(rawInstalls) : '—'} previous={hasRawData ? { current: rawInstalls, previous: previousRawInstalls } : undefined} icon={Smartphone} status={hasRawData ? 'confirmed' : 'not_available'} note="Raw fino; respeita canal, campanha e template." />
-            <MetricCard label="Cliques atribuídos" value={!hasCampaignData ? '—' : numberLabel(clicks)} previous={hasCampaignData ? { current: clicks, previous: previousClicks } : undefined} icon={MousePointerClick} status={hasCampaignData ? 'confirmed_aggregate_ltv_cohort' : 'not_available'} note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : 'Agregado por coorte de instalação; não é clique total do CRM.'} />
-            <MetricCard label="Conversão clique → install" value={pctLabel(conversion)} icon={Gauge} status={hasCampaignData ? 'confirmed_aggregate_ltv_cohort' : 'not_available'} note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : 'Usa apenas installs não orgânicos do agregado da mesma campanha/coorte.'} />
-            <MetricCard label="Sessões" value={!hasCampaignData ? '—' : numberLabel(sessions)} previous={hasCampaignData ? { current: sessions, previous: previousSessions } : undefined} icon={Activity} status={hasCampaignData ? 'confirmed_aggregate_ltv_cohort' : 'not_available'} note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : `Intensidade: ${ratioLabel(intensity)} sessões por install não orgânico agregado.`} />
-            <MetricCard label="Custo" value={!hasCampaignData ? '—' : currencies.length > 1 ? 'múltiplas moedas' : moneyLabel(cost, currencies[0] || 'USD')} icon={ShieldCheck} status={hasCampaignData ? 'confirmed_aggregate_ltv_cohort' : 'not_available'} note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : 'Moeda preservada da fonte; nunca convertida silenciosamente.'} />
-            <MetricCard label="Cobertura de template" value={pctLabel(templateCoverage, 2)} icon={UsersRound} status={hasRawData ? 'confirmed' : 'not_available'} note={hasRawData ? `${numberLabel(templateInstalls)} de ${numberLabel(rawInstalls)} installs raw com af_sub3.` : 'Sem installs raw no período selecionado.'} />
+            {hasRawData && <MetricCard label="Installs oficiais" value={numberLabel(rawInstalls)} previous={{ current: rawInstalls, previous: previousRawInstalls }} icon={Smartphone} status="confirmed" note="Raw fino; respeita canal, campanha e template." />}
+            {hasCampaignData && <MetricCard label="Cliques atribuídos" value={numberLabel(clicks)} previous={{ current: clicks, previous: previousClicks }} icon={MousePointerClick} status="confirmed_aggregate_ltv_cohort" note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : 'Agregado por coorte de instalação; não é clique total do CRM.'} />}
+            {hasCampaignData && <MetricCard label="Conversão clique → install" value={pctLabel(conversion)} icon={Gauge} status="confirmed_aggregate_ltv_cohort" note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : 'Usa apenas installs não orgânicos do agregado da mesma campanha/coorte.'} />}
+            {hasCampaignData && <MetricCard label="Sessões" value={numberLabel(sessions)} previous={{ current: sessions, previous: previousSessions }} icon={Activity} status="confirmed_aggregate_ltv_cohort" note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : `Intensidade: ${ratioLabel(intensity)} sessões por install não orgânico agregado.`} />}
+            {hasCampaignData && <MetricCard label="Custo" value={currencies.length > 1 ? 'múltiplas moedas' : moneyLabel(cost, currencies[0] || 'USD')} icon={ShieldCheck} status="confirmed_aggregate_ltv_cohort" note={advancedRawFilterActive ? 'Recorte de canal/template não existe no agregado.' : 'Moeda preservada da fonte; nunca convertida silenciosamente.'} />}
+            {hasRawData && <MetricCard label="Cobertura de template" value={pctLabel(templateCoverage, 2)} icon={UsersRound} status="confirmed" note={`${numberLabel(templateInstalls)} de ${numberLabel(rawInstalls)} installs raw com af_sub3.`} />}
           </div>
-        </section>
+        </section>}
 
-        <section className="border-t border-slate-200 px-4 py-4">
+        {chartData.length > 0 && <section className="border-t border-slate-200 px-4 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-950">Evolução da aquisição</h2><p className="text-xs text-slate-500">Barras = installs raw · linhas tracejadas = cliques e sessões agregados/cohort.</p></div><div className="inline-flex border border-slate-300 bg-white text-[10px] font-semibold">{(['daily', 'weekly', 'monthly'] as Granularity[]).map(value => <button key={value} onClick={() => setGranularity(value)} className={`border-r border-slate-300 px-3 py-1.5 last:border-r-0 ${granularity === value ? 'bg-slate-800 text-white' : 'text-slate-600'}`}>{value === 'daily' ? 'Diária' : value === 'weekly' ? 'Semanal' : 'Mensal'}</button>)}</div></div>
           <div className="mt-3 h-[330px]">
             <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 10, right: 42, left: 4, bottom: 4 }}>
@@ -321,18 +359,18 @@ export const AppsFlyerFunnelView: React.FC<{ navigation: React.ReactNode }> = ({
               {!advancedRawFilterActive && <Line yAxisId="activity" type="monotone" dataKey="sessions" stroke="#7c3aed" strokeWidth={2} strokeDasharray="2 4" dot={{ r: 2, fill: '#fff' }} isAnimationActive={false} />}
             </ComposedChart></ResponsiveContainer>
           </div>
-        </section>
+        </section>}
       </OnboardingFunnelWorkspace>
 
-      <section className="overflow-hidden border border-slate-200 bg-white">
+      {acquisitionBreakdown.length > 0 && <section className="overflow-hidden border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-slate-950">Aquisição raw · media source × canal × campanha</h2><p className="text-xs text-slate-500">Fonte oficial de installs no grão fino; presença de template é medida por volume.</p></div><span className="text-[10px] text-slate-500">{acquisitionBreakdown.length} combinações</span></div>
         <div className="max-h-[430px] overflow-auto"><table className="w-full min-w-[920px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr><th className="px-3 py-2 text-left">Media source</th><th className="px-3 py-2 text-left">Canal</th><th className="px-3 py-2 text-left">Campanha</th><th className="px-3 py-2 text-left">Origem</th><th className="px-3 py-2 text-right">Installs raw</th><th className="px-3 py-2 text-right">Com template</th><th className="px-3 py-2 text-left">Qualidade</th></tr></thead><tbody>
           {acquisitionBreakdown.map((row, index) => <tr key={`${row.source}-${row.channel}-${row.campaign}-${index}`} className="border-t border-slate-100"><td className="px-3 py-2 font-mono font-semibold">{row.source}</td><td className="px-3 py-2">{row.channel}</td><td className="max-w-[360px] truncate px-3 py-2" title={row.campaign}>{row.campaign}</td><td className="px-3 py-2"><span className="flex items-center gap-1.5"><span className="h-2 w-2" style={{ backgroundColor: originMeta[row.origin].color }} />{originMeta[row.origin].label}</span></td><td className="px-3 py-2 text-right font-mono font-semibold">{numberLabel(row.installs)}</td><td className="px-3 py-2 text-right font-mono">{pctLabel(pct(row.templates, row.installs), 2)}</td><td className="px-3 py-2"><QualityPill quality={row.quality} /></td></tr>)}
           {!acquisitionBreakdown.length && <tr><td colSpan={7} className="p-8 text-center text-slate-500">Nenhum install raw no período e filtros selecionados.</td></tr>}
         </tbody></table></div>
-      </section>
+      </section>}
 
-      <section className="overflow-hidden border border-slate-200 bg-white">
+      {campaignBreakdown.length > 0 && <section className="overflow-hidden border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 p-4"><div><h2 className="text-lg font-semibold text-slate-950">Conversão e intensidade por campanha</h2><p className="text-xs text-slate-500">Clique → install é conversão. Sessões por install é intensidade de engajamento e pode superar 1.</p></div><button onClick={exportCampaigns} className="flex items-center gap-2 border border-slate-300 px-3 py-2 text-[11px] font-semibold"><Download size={13} />Exportar CSV</button></div>
         <div className="max-h-[520px] overflow-auto"><table className="w-full min-w-[1180px] text-[10px]"><thead className="sticky top-0 z-10 bg-slate-100 text-slate-600"><tr>
           <th className="px-3 py-2 text-left">Origem</th><th className="px-3 py-2 text-left">Media source</th><th onClick={() => setSortKey('campaign')} className="cursor-pointer px-3 py-2 text-left">Campanha</th><th onClick={() => setSortKey('clicks')} className="cursor-pointer px-3 py-2 text-right">Cliques</th><th onClick={() => setSortKey('installs')} className="cursor-pointer px-3 py-2 text-right">Installs</th><th className="px-3 py-2 text-left">Status install</th><th onClick={() => setSortKey('conversion')} className="cursor-pointer px-3 py-2 text-right">Clique → install</th><th onClick={() => setSortKey('sessions')} className="cursor-pointer px-3 py-2 text-right">Sessões</th><th onClick={() => setSortKey('intensity')} className="cursor-pointer px-3 py-2 text-right">Sessões/install</th><th onClick={() => setSortKey('cost')} className="cursor-pointer px-3 py-2 text-right">Custo</th>
@@ -340,28 +378,29 @@ export const AppsFlyerFunnelView: React.FC<{ navigation: React.ReactNode }> = ({
           {campaignBreakdown.map((row, index) => <tr key={`${row.source}-${row.campaign}-${index}`} className="border-t border-slate-100"><td className="px-3 py-2"><span className="flex items-center gap-1.5"><span className="h-2 w-2" style={{ backgroundColor: originMeta[row.origin].color }} />{originMeta[row.origin].label}</span></td><td className="px-3 py-2 font-mono">{row.source}</td><td className="max-w-[360px] truncate px-3 py-2 font-semibold" title={row.campaign}>{row.campaign}</td><td className="px-3 py-2 text-right font-mono">{row.clicks ? numberLabel(row.clicks) : '—'}</td><td className="px-3 py-2 text-right font-mono font-semibold">{numberLabel(row.installs)}</td><td className="px-3 py-2"><StatusBadge status={row.status} title="O badge define se o install já foi reconciliado contra o raw ou permanece somente agregado/cohort." /></td><td className="px-3 py-2 text-right font-mono text-cyan-700">{pctLabel(row.conversion)}</td><td className="px-3 py-2 text-right font-mono">{row.sessions ? numberLabel(row.sessions) : '—'}</td><td className="px-3 py-2 text-right font-mono text-violet-700">{ratioLabel(row.intensity)}</td><td className="px-3 py-2 text-right font-mono">{row.cost ? moneyLabel(row.cost, row.currency) : '—'}</td></tr>)}
           {!campaignBreakdown.length && <tr><td colSpan={10} className="p-8 text-center text-slate-500">Nenhuma campanha agregada no período e filtros selecionados.</td></tr>}
         </tbody></table></div>
-      </section>
+      </section>}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><div><h2 className="text-lg font-semibold text-slate-950">Lifecycle</h2><p className="text-xs text-slate-500">Uninstalls e reinstalls no mesmo recorte.</p></div><Unplug className="text-slate-400" size={20} /></div>
-          {!currentLifecycle.length ? <div className="mt-4 border border-dashed border-slate-300 bg-slate-50 p-6 text-center"><p className="font-semibold text-slate-700">Sem dados de lifecycle neste período</p><p className="mt-1 text-xs text-slate-500">Reinstalls estão indisponíveis no plano atual. Churn e movimento líquido permanecem bloqueados até existir dado real.</p><span className="mt-3 inline-flex"><StatusBadge status="not_available" /></span></div> : <div className="mt-4 grid grid-cols-3 gap-2"><MetricCard label="Uninstalls" value={numberLabel(uninstalls)} icon={Unplug} status="confirmed" note="Evento raw de lifecycle." /><MetricCard label="Reinstalls" value={numberLabel(reinstalls)} icon={RefreshCw} status="confirmed" note="Somente quando disponível no plano." /><MetricCard label="Movimento líquido" value={numberLabel(rawInstalls - uninstalls)} icon={Gauge} status="confirmed" note="Installs − uninstalls; não é churn." /></div>}
-        </section>
+        {currentLifecycle.length > 0 && <section className="border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><div><h2 className="text-lg font-semibold text-slate-950">Lifecycle</h2><p className="text-xs text-slate-500">Uninstalls e reinstalls no mesmo recorte.</p></div><Unplug className="text-slate-400" size={20} /></div>
+          <div className="mt-4 grid grid-cols-3 gap-2"><MetricCard label="Uninstalls" value={numberLabel(uninstalls)} icon={Unplug} status="confirmed" note="Evento raw de lifecycle." /><MetricCard label="Reinstalls" value={numberLabel(reinstalls)} icon={RefreshCw} status="confirmed" note="Somente quando disponível no plano." />{hasRawData && <MetricCard label="Movimento líquido" value={numberLabel(rawInstalls - uninstalls)} icon={Gauge} status="confirmed" note="Installs − uninstalls; não é churn." />}</div>
+        </section>}
 
         <section className="border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><div><h2 className="text-lg font-semibold text-slate-950">Saúde do pipeline</h2><p className="text-xs text-slate-500">Coletas recentes, frescor, cobertura e erros por relatório.</p></div><ShieldCheck className="text-slate-400" size={20} /></div>
-          <div className="mt-3 max-h-[300px] overflow-auto"><table className="w-full text-[10px]"><thead className="bg-slate-100"><tr><th className="px-2 py-2 text-left">Execução</th><th className="px-2 py-2 text-left">Status</th><th className="px-2 py-2 text-right">Raw rows</th><th className="px-2 py-2 text-right">Campanhas</th><th className="px-2 py-2 text-right">Templates %</th><th className="px-2 py-2 text-left">Erros</th></tr></thead><tbody>{runs.map(run => {
+          <div className="mt-3"><SourceStatusList statuses={sourceStatuses} /></div>
+          {runs.length > 0 && <div className="mt-3 max-h-[300px] overflow-auto"><table className="w-full text-[10px]"><thead className="bg-slate-100"><tr><th className="px-2 py-2 text-left">Execução</th><th className="px-2 py-2 text-left">Status</th><th className="px-2 py-2 text-right">Raw rows</th><th className="px-2 py-2 text-right">Campanhas</th><th className="px-2 py-2 text-right">Templates %</th><th className="px-2 py-2 text-left">Erros</th></tr></thead><tbody>{runs.map(run => {
             const summary = run.quality_summary ?? {}; const errors = summary.report_errors && typeof summary.report_errors === 'object' ? Object.keys(summary.report_errors as Record<string, unknown>) : [];
             return <tr key={run.id} className="border-t border-slate-100"><td className="px-2 py-2 whitespace-nowrap">{new Date(run.started_at).toLocaleString('pt-BR')}</td><td className="px-2 py-2"><span className={`font-semibold ${run.status === 'complete' ? 'text-emerald-700' : run.status === 'failed' ? 'text-red-700' : 'text-amber-700'}`}>{run.status}</span></td><td className="px-2 py-2 text-right font-mono">{numberLabel(run.row_count)}</td><td className="px-2 py-2 text-right font-mono">{numberLabel(typeof summary.campaign_rows_written === 'number' ? summary.campaign_rows_written : null)}</td><td className="px-2 py-2 text-right font-mono">{typeof summary.sub_param_3_coverage_pct === 'number' ? pctLabel(summary.sub_param_3_coverage_pct) : '—'}</td><td className="max-w-[220px] truncate px-2 py-2 text-red-700" title={errors.join(', ')}>{errors.length ? errors.join(', ') : '—'}</td></tr>;
-          })}</tbody></table></div>
+          })}</tbody></table></div>}
         </section>
       </div>
 
-      <section className="overflow-hidden border border-slate-200 bg-white">
+      {templatePerformance.length > 0 && <section className="overflow-hidden border border-slate-200 bg-white">
         <div className="flex items-center justify-between p-4"><div><h2 className="text-lg font-semibold text-slate-950">Performance por template</h2><p className="text-xs text-slate-500">Installs confirmados via af_sub3; cliques e sessões por template não existem no raw atual.</p></div><TableProperties size={20} className="text-slate-400" /></div>
         <div className="max-h-[440px] overflow-auto"><table className="w-full min-w-[900px] text-[10px]"><thead className="sticky top-0 bg-slate-100"><tr><th className="px-3 py-2 text-left">Template ID</th><th className="px-3 py-2 text-left">Título / catálogo</th><th className="px-3 py-2 text-left">Canal</th><th className="px-3 py-2 text-right">Dias</th><th className="px-3 py-2 text-right">Installs</th><th className="px-3 py-2 text-right">Cliques</th><th className="px-3 py-2 text-right">Sessões</th><th className="px-3 py-2 text-left">Qualidade</th></tr></thead><tbody>
           {templatePerformance.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="px-3 py-2 font-mono font-semibold">{row.id}</td><td className="px-3 py-2">{row.catalog?.title || 'Não reconciliado no catálogo'}</td><td className="px-3 py-2">{row.catalog?.channel || '—'}</td><td className="px-3 py-2 text-right font-mono">{row.days.size}</td><td className="px-3 py-2 text-right font-mono font-semibold">{numberLabel(row.installs)}</td><td className="px-3 py-2 text-right"><span title="Pull API não fornece clique no grão de template">—</span></td><td className="px-3 py-2 text-right"><span title="Sessão existe apenas no agregado sem af_sub3">—</span></td><td className="px-3 py-2"><QualityPill quality={row.quality} /></td></tr>)}
           {!templatePerformance.length && <tr><td colSpan={8} className="p-8 text-center text-slate-500">Nenhum template AppsFlyer no período selecionado.</td></tr>}
         </tbody></table></div>
-      </section>
+      </section>}
     </div>
   </div>;
 };

@@ -82,6 +82,7 @@ export interface AppsFlyerCollectionRun {
   quality_summary: Record<string, unknown>;
   started_at: string;
   completed_at: string | null;
-  min_business_date: string | null;
+  date_from: string | null;
+  date_to: string | null;
   max_business_date: string | null;
 }
