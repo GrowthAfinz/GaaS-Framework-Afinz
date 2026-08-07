@@ -9,9 +9,10 @@ import { TemplateCatalogView } from './TemplateCatalogView';
 import { TemplateComposerDrawer } from './TemplateComposerDrawer';
 import { TemplateIdChips } from './TemplateIdChips';
 import { PerformanceView } from './performance/PerformanceView';
+import { AppsFlyerAuditView } from './appsflyer-audit/AppsFlyerAuditView';
 
 interface CommunicationsViewProps {
-  mode: 'cadastro' | 'performance';
+  mode: 'cadastro' | 'performance' | 'appsflyer-audit';
 }
 
 type SubTab = 'fila' | 'asset' | 'auditoria';
@@ -19,6 +20,9 @@ type SubTab = 'fila' | 'asset' | 'auditoria';
 export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) => {
   if (mode === 'performance') {
     return <PerformanceView />;
+  }
+  if (mode === 'appsflyer-audit') {
+    return <AppsFlyerAuditView />;
   }
   return <CadastroTemplates />;
 };

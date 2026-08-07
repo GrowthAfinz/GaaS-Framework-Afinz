@@ -15,6 +15,7 @@ import { ConfiguracoesView } from './components/ConfiguracoesView';
 import { OriginacaoB2CView } from './components/OriginacaoB2CView';
 import { FunilAquisicaoView } from './components/FunilAquisicaoView';
 import { CommunicationsView } from './components/communications/CommunicationsView';
+import { AppsFlyerAuditView } from './components/communications/appsflyer-audit/AppsFlyerAuditView';
 import { DisparoExplorer } from './components/explorer/DisparoExplorer';
 import { useFrameworkData } from './hooks/useFrameworkData';
 import { useAdvancedFilters } from './hooks/useAdvancedFilters';
@@ -283,6 +284,10 @@ function App() {
     );
   }
 
+  if (import.meta.env.DEV && urlHash === '#appsflyer-audit-preview') {
+    return <AppsFlyerAuditView />;
+  }
+
   if (authLoading) {
     return <div className="h-screen w-full bg-slate-50 text-slate-500 flex items-center justify-center">Carregando...</div>;
   }
@@ -519,7 +524,12 @@ function App() {
                   <CommunicationsView mode="performance" />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance'].includes(activeTab) && (
+              {activeTab === 'comunicacoes-appsflyer-auditoria' && (
+                <PageTransition>
+                  <CommunicationsView mode="appsflyer-audit" />
+                </PageTransition>
+              )}
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>

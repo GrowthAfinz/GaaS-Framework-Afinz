@@ -16,6 +16,7 @@ import {
     Tag,
     Mail,
     LayoutGrid,
+    ShieldCheck,
     X,
 } from 'lucide-react';
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
@@ -134,6 +135,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             items: [
                 { id: 'comunicacoes-cadastro', label: 'Cadastro e Templates', icon: LayoutGrid, onClick: () => setTab('comunicacoes-cadastro') },
                 { id: 'comunicacoes-performance', label: 'Performance do Conteudo', icon: Mail, onClick: () => setTab('comunicacoes-performance') },
+                { id: 'comunicacoes-appsflyer-auditoria', label: 'Auditoria AppsFlyer', icon: ShieldCheck, onClick: () => setTab('comunicacoes-appsflyer-auditoria') },
             ]
         },
         {
