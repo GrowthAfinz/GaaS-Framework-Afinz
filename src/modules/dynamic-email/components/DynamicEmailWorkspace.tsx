@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Code2, Download, FileSpreadsheet, Mail, Plus, Save, ShieldAlert, Upload, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Code2, Download, ExternalLink, FileSpreadsheet, ImageIcon, Link2, Mail, Plus, Save, ShieldAlert, Trash2, Upload, Wand2 } from 'lucide-react';
 import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer';
 import { applyFix, BRIEFING_COLUMNS, emptyBriefingRow, exportBriefingCsv, parseBriefingCsv, rowKey, toDateInput, validateRows, type BriefingColumn, type BriefingRow, type ValidationIssue } from '../domain/briefing';
 import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
@@ -12,11 +12,17 @@ const COLOR_FIELDS = new Set<BriefingColumn>(['COR_COPY_1', 'COR_COPY_PRETO_1', 
 
 const FIELD_GROUPS: { label: string; fields: BriefingColumn[] }[] = [
   { label: 'Identidade e vigência', fields: ['DT_INICIO', 'DT_FIM', 'UTM_CAMPANHA', 'TP_CAMPANHA', 'SEQUENCIA', 'NM_PRODUTO_INTERNO', 'CARTAO_NM_COMERCIAL'] },
-  { label: 'Envelope', fields: ['ASSUNTO', 'PRE_CABECALHO', 'HEADER'] },
+  { label: 'Envelope', fields: ['ASSUNTO', 'PRE_CABECALHO'] },
   { label: 'Copy e CTA 1', fields: ['TITULO_COPY_1_AZUL', 'COR_COPY_1', 'TAMANHO_DA_FONTE_TITULO_COPY_1', 'COPY_1_PRETO', 'COR_COPY_PRETO_1', 'TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1', 'TITULO_CTA_1', 'LINK_CTA_1'] },
   { label: 'Copy e CTA 2', fields: ['TITULO_COPY_2', 'COR_TITULO_COPY_2', 'TAMANHO_DA_FONTE_TITULO_COPY_2', 'COPY_2_PRETO', 'COR_COPY_2', 'TAMANHO_DA_FONTE_COPY_2', 'TITULO_CTA_2', 'LINK_CTA_2'] },
-  { label: 'Banners', fields: ['BANNER_1_CORPO', 'LINK_BANNER_1_CORPO', 'BANNER_2_CORPO', 'LINK_BANNER_2_CORPO', 'BANNER_3_CORPO', 'LINK_BANNER_3_CORPO'] },
   { label: 'Legal e rodapé', fields: ['NOTA_LEGAL', 'COR_NOTA_LEGAL', 'TAMANHO_DA_FONTE_NOTA_LEGAL', 'RODAPE'] },
+];
+
+const IMAGE_SLOTS: { label: string; description: string; image: BriefingColumn; link?: BriefingColumn }[] = [
+  { label: 'Header', description: 'Imagem principal no topo do e-mail', image: 'HEADER' },
+  { label: 'Banner 1', description: 'Primeiro banner do corpo', image: 'BANNER_1_CORPO', link: 'LINK_BANNER_1_CORPO' },
+  { label: 'Banner 2', description: 'Segundo banner do corpo', image: 'BANNER_2_CORPO', link: 'LINK_BANNER_2_CORPO' },
+  { label: 'Banner 3', description: 'Terceiro banner do corpo', image: 'BANNER_3_CORPO', link: 'LINK_BANNER_3_CORPO' },
 ];
 
 function demoRows(): BriefingRow[] {
@@ -81,7 +87,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
         {selected ? <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 p-4"><h2 className="font-bold text-slate-900">{rowKey(selected)}</h2><p className="text-xs text-slate-500">Alterações salvas automaticamente neste navegador.</p></div><div className="max-h-[780px] overflow-y-auto p-4">
           {selectedIssues.length > 0 && <div className="mb-5 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
           <label className="mb-5 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(e) => updateSelected({ __journeyConfirmed: e.target.checked })} className="mt-0.5"/><span><b>Jornada ativa confirmada</b><br/><span className="text-xs text-slate-500">Validação manual no SFMC para esta campanha e sequência.</span></span></label>
-          {FIELD_GROUPS.map((group) => <fieldset key={group.label} className="mb-6"><legend className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">{group.label}</legend><div className="grid gap-3 md:grid-cols-2">{group.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateSelected({ [field]: value })}/>)}</div></fieldset>)}
+          {FIELD_GROUPS.map((group) => <React.Fragment key={group.label}><fieldset className="mb-6"><legend className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">{group.label}</legend><div className="grid gap-3 md:grid-cols-2">{group.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateSelected({ [field]: value })}/>)}</div></fieldset>{group.label === 'Envelope' && <ImageAssetsSection row={selected} onChange={(field, value) => updateSelected({ [field]: value })}/>}</React.Fragment>)}
         </div></section> : <div/>}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-200 p-4"><div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Preview local</h2><p className="text-xs text-slate-500">Fiel ao subconjunto AMPscript suportado · certificação final via Test Send</p></div><ChevronRight className="text-slate-300" size={18}/></div><div className="mt-3 grid grid-cols-2 gap-2"><MiniInput label="Nome" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((s) => ({ ...s, PRI_NOME: value }))}/><MiniInput label="Limite" value={subscriber.LIMITE} onChange={(value) => setSubscriber((s) => ({ ...s, LIMITE: value }))}/></div></div>{render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{render.diagnostics.map((d) => <div key={d}>{d}</div>)}</div> : <iframe title="Preview do e-mail dinâmico" sandbox="" srcDoc={render.html} className="h-[720px] w-full bg-slate-100"/>}</section>
       </div>
@@ -91,6 +97,27 @@ export const DynamicEmailWorkspace: React.FC = () => {
 
 const StatusCard = ({ label, value, icon, tone }: { label: string; value: number; icon: React.ReactNode; tone: 'slate' | 'red' | 'green' | 'amber' }) => { const colors = { slate: 'bg-slate-100 text-slate-600', red: 'bg-red-100 text-red-700', green: 'bg-emerald-100 text-emerald-700', amber: 'bg-amber-100 text-amber-700' }; return <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><span className={`grid h-10 w-10 place-items-center rounded-xl ${colors[tone]}`}>{icon}</span><div><div className="text-2xl font-bold text-slate-950">{value}</div><div className="text-xs text-slate-500">{label}</div></div></div>; };
 const MiniInput = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}<input value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs font-normal normal-case tracking-normal text-slate-700 outline-none focus:border-cyan-400"/></label>;
+
+const ImageAssetsSection = ({ row, onChange }: { row: BriefingRow; onChange: (field: BriefingColumn, value: string) => void }) => {
+  const configured = IMAGE_SLOTS.filter((slot) => row[slot.image].trim()).length;
+  return <fieldset className="mb-6"><legend className="mb-3 flex w-full items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400"><span>Imagens e destinos</span><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] normal-case tracking-normal text-slate-500">{configured} de {IMAGE_SLOTS.length} configuradas</span></legend><div className="space-y-3">{IMAGE_SLOTS.map((slot) => <ImageUrlCard key={slot.image} label={slot.label} description={slot.description} imageUrl={row[slot.image]} destinationUrl={slot.link ? row[slot.link] : undefined} onImageUrl={(value) => onChange(slot.image, value)} onDestinationUrl={slot.link ? (value) => onChange(slot.link!, value) : undefined}/>)}</div></fieldset>;
+};
+
+const isPublicImageUrl = (value: string) => { try { return new URL(value).protocol === 'https:'; } catch { return false; } };
+
+const ImageUrlCard = ({ label, description, imageUrl, destinationUrl, onImageUrl, onDestinationUrl }: { label: string; description: string; imageUrl: string; destinationUrl?: string; onImageUrl: (value: string) => void; onDestinationUrl?: (value: string) => void }) => {
+  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'loaded' | 'error'>(imageUrl ? 'loading' : 'idle');
+  const [dimensions, setDimensions] = useState('');
+  useEffect(() => { setLoadState(imageUrl ? 'loading' : 'idle'); setDimensions(''); }, [imageUrl]);
+  const validUrl = !imageUrl || isPublicImageUrl(imageUrl);
+  return <div className={`overflow-hidden rounded-xl border bg-white ${!validUrl || loadState === 'error' ? 'border-red-200' : loadState === 'loaded' ? 'border-emerald-200' : 'border-slate-200'}`}>
+    <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-3 py-2.5"><div><div className="flex items-center gap-2 text-sm font-bold text-slate-800"><ImageIcon size={15} className="text-cyan-600"/>{label}{loadState === 'loaded' && <CheckCircle2 size={14} className="text-emerald-500"/>}</div><div className="mt-0.5 text-[11px] text-slate-500">{description}{dimensions && ` · ${dimensions}`}</div></div>{imageUrl && <button type="button" onClick={() => onImageUrl('')} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title={`Remover ${label}`}><Trash2 size={14}/></button>}</div>
+    {imageUrl && validUrl ? <div className="flex min-h-28 items-center justify-center bg-slate-100 p-3">{loadState === 'error' ? <div className="px-4 py-6 text-center text-xs text-red-600"><AlertTriangle className="mx-auto mb-2" size={20}/>A imagem não pôde ser carregada. Confirme se a URL é pública.</div> : <img src={imageUrl} alt={`Preview de ${label}`} onLoad={(event) => { setLoadState('loaded'); setDimensions(`${event.currentTarget.naturalWidth} × ${event.currentTarget.naturalHeight}px`); }} onError={() => setLoadState('error')} className="max-h-44 max-w-full object-contain"/>}</div> : <div className="flex min-h-24 items-center justify-center bg-slate-50 px-4 text-center text-xs text-slate-400"><div><ImageIcon className="mx-auto mb-2 text-slate-300" size={24}/>{imageUrl ? 'Use uma URL pública iniciada por https://' : 'Cole abaixo a URL pública da imagem'}</div></div>}
+    <div className="space-y-2 p-3"><label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">URL pública da imagem<div className="mt-1 flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400"><Link2 size={14}/></span><input type="url" value={imageUrl} onChange={(event) => onImageUrl(event.target.value.trim())} placeholder="https://image.s.../arquivo.jpg" className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs font-normal normal-case tracking-normal outline-none ${validUrl ? 'border-slate-200 focus:border-cyan-400' : 'border-red-300 bg-red-50 focus:border-red-400'}`}/>{imageUrl && validUrl && <a href={imageUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:border-cyan-300 hover:text-cyan-700" title="Abrir imagem"><ExternalLink size={14}/></a>}</div></label>
+      {onDestinationUrl && <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Link ao clicar na imagem<input type="url" value={destinationUrl ?? ''} onChange={(event) => onDestinationUrl(event.target.value.trim())} placeholder="https://destino-da-campanha..." className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal normal-case tracking-normal outline-none focus:border-cyan-400"/></label>}
+    </div>
+  </div>;
+};
 
 const Field = ({ field, value, suggestions, onChange }: { field: BriefingColumn; value: string; suggestions: string[]; onChange: (value: string) => void }) => {
   const isDate = field === 'DT_INICIO' || field === 'DT_FIM'; const id = `dynamic-${field}`;

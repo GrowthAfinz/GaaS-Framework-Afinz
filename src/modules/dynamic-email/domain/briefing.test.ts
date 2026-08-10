@@ -22,4 +22,12 @@ describe('briefing SFMC', () => {
   });
 
   it('mantém exatamente as 36 colunas governadas', () => expect(BRIEFING_COLUMNS).toHaveLength(36));
+
+  it('bloqueia imagem local, base64 ou URL sem HTTPS', () => {
+    const row = emptyBriefingRow('image');
+    Object.assign(row, { DT_INICIO: '2026-01-01', DT_FIM: '2026-12-31', UTM_CAMPANHA: 'x', NM_PRODUTO_INTERNO: 'P', HEADER: 'data:image/png;base64,abc' });
+    expect(validateRows([row]).get('image')?.some((issue) => issue.code === 'image-url' && issue.field === 'HEADER')).toBe(true);
+    row.HEADER = 'https://image.s11.sfmc-content.com/lib/example.jpg';
+    expect(validateRows([row]).get('image')?.some((issue) => issue.code === 'image-url')).toBe(false);
+  });
 });

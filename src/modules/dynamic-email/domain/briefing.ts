@@ -97,6 +97,16 @@ export function validateRows(rows: BriefingRow[], today = new Date()): Map<strin
       if (invalidTokens.length) issues.push({ severity: 'error', code: 'personalization', field, ...(invalidTokens.every((token) => PERSONALIZATION_ALIASES.has(token[1].toUpperCase())) ? { fix: 'personalization' as const } : {}), message: `${field} contém personalização incompatível com TreatAsContent.` });
       if (/\r|\n/.test(value)) issues.push({ severity: 'warning', code: 'newline', field, fix: 'newlines', message: `${field} contém quebra de linha crua; converta para <br>.` });
     });
+    (['HEADER', 'BANNER_1_CORPO', 'BANNER_2_CORPO', 'BANNER_3_CORPO'] as BriefingColumn[]).forEach((field) => {
+      const value = row[field].trim();
+      if (value) {
+        try {
+          if (new URL(value).protocol !== 'https:') throw new Error('protocol');
+        } catch {
+          issues.push({ severity: 'error', code: 'image-url', field, message: `${field} precisa ser uma URL pública HTTPS válida.` });
+        }
+      }
+    });
     const start = parseBriefingDate(row.DT_INICIO); const end = parseBriefingDate(row.DT_FIM);
     if (!start) issues.push({ severity: 'error', code: 'date', field: 'DT_INICIO', message: 'DT_INICIO inválida.' });
     if (!end) issues.push({ severity: 'error', code: 'date', field: 'DT_FIM', message: 'DT_FIM inválida.' });
