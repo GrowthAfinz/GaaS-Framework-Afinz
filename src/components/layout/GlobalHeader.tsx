@@ -135,6 +135,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             items: [
                 { id: 'comunicacoes-cadastro', label: 'Cadastro e Templates', icon: LayoutGrid, onClick: () => setTab('comunicacoes-cadastro') },
                 { id: 'comunicacoes-performance', label: 'Performance do Conteudo', icon: Mail, onClick: () => setTab('comunicacoes-performance') },
+                { id: 'comunicacoes-email-dinamico', label: 'E-mail Dinâmico', icon: Mail, onClick: () => setTab('comunicacoes-email-dinamico') },
                 { id: 'comunicacoes-appsflyer-auditoria', label: 'Auditoria AppsFlyer', icon: ShieldCheck, onClick: () => setTab('comunicacoes-appsflyer-auditoria') },
             ]
         },

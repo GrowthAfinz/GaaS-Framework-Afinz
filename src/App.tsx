@@ -16,6 +16,7 @@ import { OriginacaoB2CView } from './components/OriginacaoB2CView';
 import { FunilAquisicaoView } from './components/FunilAquisicaoView';
 import { CommunicationsView } from './components/communications/CommunicationsView';
 import { AppsFlyerAuditView } from './components/communications/appsflyer-audit/AppsFlyerAuditView';
+import { DynamicEmailWorkspace } from './modules/dynamic-email/components/DynamicEmailWorkspace';
 import { DisparoExplorer } from './components/explorer/DisparoExplorer';
 import { useFrameworkData } from './hooks/useFrameworkData';
 import { useAdvancedFilters } from './hooks/useAdvancedFilters';
@@ -529,7 +530,12 @@ function App() {
                   <CommunicationsView mode="appsflyer-audit" />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria'].includes(activeTab) && (
+              {activeTab === 'comunicacoes-email-dinamico' && (
+                <PageTransition>
+                  <DynamicEmailWorkspace />
+                </PageTransition>
+              )}
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>
