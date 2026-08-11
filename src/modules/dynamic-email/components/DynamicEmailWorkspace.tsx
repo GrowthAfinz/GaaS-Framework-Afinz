@@ -195,11 +195,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
 
   return <div className="min-h-full bg-slate-50 p-4 lg:p-5">
     <div aria-live="polite" className="sr-only">{announcement}</div>
-    <header className="rounded-2xl bg-[#07595b] px-5 py-4 text-white shadow-sm lg:px-6" aria-label="Fábrica de e-mails">
+    <header className="rounded-2xl bg-[#07595b] px-5 py-4 text-white shadow-sm lg:px-6" aria-label="Fábrica de E-mails">
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
         <div className="min-w-[220px]">
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100"><Mail size={13}/> Comunicação</div>
-          <h1 className="mt-1 text-xl font-bold">Fábrica de e-mails</h1>
+          <h1 className="mt-1 text-xl font-bold">Fábrica de E-mails</h1>
           <p className="mt-0.5 text-xs text-cyan-50/80">Crie, revise e prepare briefings para envio pelo SFMC.</p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Resumo dos briefings">
@@ -208,7 +208,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <HeaderMetric icon={<AlertTriangle size={16}/>} value={warningCount} label={warningCount === 1 ? 'revisão sugerida' : 'revisões sugeridas'} tone="warning"/>
         </div>
         <div className="ml-auto flex flex-col items-end gap-2">
-          <div className="flex items-center rounded-xl bg-white/10 p-1" role="tablist" aria-label="Área da Fábrica de e-mails">
+          <div className="flex items-center rounded-xl bg-white/10 p-1" role="tablist" aria-label="Área da Fábrica de E-mails">
             <button role="tab" aria-selected={mode === 'briefings'} onClick={() => setMode('briefings')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'briefings' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}>Campanhas</button>
             <button role="tab" aria-selected={mode === 'template'} onClick={() => setMode('template')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'template' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Code2 className="mr-1.5 inline" size={14}/>Template-fonte</button>
           </div>
