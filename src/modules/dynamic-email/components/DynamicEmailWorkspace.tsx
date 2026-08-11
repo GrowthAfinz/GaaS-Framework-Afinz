@@ -8,18 +8,18 @@ import {
   Copy,
   Download,
   ExternalLink,
-  Eye,
   ImageIcon,
   Inbox,
   Link2,
   Mail,
+  Maximize2,
   Plus,
   Save,
   Search,
   Trash2,
   Upload,
-  UserRound,
   Wand2,
+  X,
 } from 'lucide-react';
 import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer';
 import {
@@ -118,13 +118,6 @@ function downloadText(name: string, content: string) {
 }
 
 const initials = (value: string) => (value.trim().slice(0, 2) || '—').toUpperCase();
-const filledFields = (row: BriefingRow, section: EditorSection) => {
-  const fields = section.fields ?? [];
-  const fieldCount = fields.filter((field) => row[field].trim()).length;
-  const imageCount = section.imageSlot && row[section.imageSlot.image].trim() ? 1 : 0;
-  return { filled: fieldCount + imageCount, total: fields.length + (section.imageSlot ? 1 : 0) };
-};
-
 export const DynamicEmailWorkspace: React.FC = () => {
   const [rows, setRows] = useState<BriefingRow[]>(() => { try { return JSON.parse(localStorage.getItem(ROWS_KEY) ?? 'null') ?? demoRows(); } catch { return demoRows(); } });
   const [selectedId, setSelectedId] = useState(rows[0]?.__id ?? '');
@@ -136,6 +129,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'needs-review'>('all');
   const [announcement, setAnnouncement] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
@@ -182,48 +177,57 @@ export const DynamicEmailWorkspace: React.FC = () => {
     setAnnouncement('E-mail duplicado. Revise a sequência e a vigência antes de exportar.');
     requestAnimationFrame(() => document.getElementById('dynamic-SEQUENCIA')?.focus());
   };
+  const deleteBriefing = () => {
+    if (!selected) return;
+    const nextRows = rows.filter((row) => row.__id !== selected.__id);
+    setRows(nextRows);
+    setSelectedId(nextRows[0]?.__id ?? '');
+    setDeleteOpen(false);
+    setAnnouncement('E-mail excluído da caixa de briefings.');
+  };
   const saveTemplate = () => {
     localStorage.setItem(TEMPLATE_KEY, template);
     setSavedTemplate(template);
     setAnnouncement('Template do SFMC salvo e aplicado à prévia.');
   };
 
-  return <div className="min-h-full bg-slate-50">
+  return <div className="min-h-full bg-slate-50 p-4 lg:p-5">
     <div aria-live="polite" className="sr-only">{announcement}</div>
-    <header className="border-b border-slate-200 bg-white px-5 py-4 lg:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-700"><Mail size={14}/> Comunicação</div>
-          <h1 className="mt-1 text-2xl font-bold text-slate-950">E-mail Dinâmico</h1>
-          <p className="mt-1 text-sm text-slate-500">Crie, revise e prepare briefings para envio pelo SFMC.</p>
+    <header className="rounded-2xl bg-[#07595b] px-5 py-4 text-white shadow-sm lg:px-6" aria-label="E-mail Dinâmico">
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+        <div className="min-w-[220px]">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100"><Mail size={13}/> Comunicação</div>
+          <h1 className="mt-1 text-xl font-bold">E-mail Dinâmico</h1>
+          <p className="mt-0.5 text-xs text-cyan-50/80">Crie, revise e prepare briefings para envio pelo SFMC.</p>
         </div>
-        <div className="flex items-center rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Área do E-mail Dinâmico">
-          <button role="tab" aria-selected={mode === 'briefings'} onClick={() => setMode('briefings')} className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${mode === 'briefings' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>Briefings</button>
-          <button role="tab" aria-selected={mode === 'template'} onClick={() => setMode('template')} className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${mode === 'template' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}><Code2 className="mr-2 inline" size={15}/>Template do SFMC</button>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Resumo dos briefings">
+          <HeaderMetric icon={<Inbox size={16}/>} value={rows.length} label={rows.length === 1 ? 'briefing' : 'briefings'}/>
+          <HeaderMetric icon={errorCount ? <CircleAlert size={16}/> : <CheckCircle2 size={16}/>} value={errorCount} label={errorCount === 1 ? 'ajuste necessário' : 'ajustes necessários'} tone={errorCount ? 'danger' : 'success'}/>
+          <HeaderMetric icon={<AlertTriangle size={16}/>} value={warningCount} label={warningCount === 1 ? 'revisão sugerida' : 'revisões sugeridas'} tone="warning"/>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center rounded-xl bg-white/10 p-1" role="tablist" aria-label="Área do E-mail Dinâmico">
+            <button role="tab" aria-selected={mode === 'briefings'} onClick={() => setMode('briefings')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'briefings' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}>Campanhas</button>
+            <button role="tab" aria-selected={mode === 'template'} onClick={() => setMode('template')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'template' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Code2 className="mr-1.5 inline" size={14}/>Template-fonte</button>
+          </div>
+          {mode === 'briefings' && <>
+            <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(event) => onFile(event.target.files?.[0])}/>
+            <HeaderAction onClick={() => fileRef.current?.click()} icon={<Upload size={15}/>} label="Importar CSV"/>
+            <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
+            <HeaderAction onClick={createBriefing} icon={<Plus size={15}/>} label="Novo"/>
+            <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
+            <HeaderAction onClick={() => setPreviewOpen(true)} disabled={!selected} icon={<Maximize2 size={15}/>} label="Visualizar e-mail" primary/>
+            <button disabled={!!errorCount || !rows.length} onClick={exportCsv} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
+          </>}
         </div>
       </div>
     </header>
 
-    {mode === 'template' ? <main className="p-5 lg:p-6"><div className="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><h2 className="font-bold text-slate-900">Código do Content Builder</h2><p className="text-sm text-slate-500">Cole o HTML com AMPscript. O conteúdo fica salvo somente neste navegador.</p></div><button onClick={saveTemplate} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar e aplicar</button></div><textarea aria-label="Código do template do SFMC" value={template} onChange={(event) => setTemplate(event.target.value)} spellCheck={false} className="h-[68vh] w-full resize-none bg-slate-950 p-5 font-mono text-xs leading-5 text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"/></div></main> :
-    <main className="p-4 lg:p-5">
-      <section className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm" aria-label="Resumo e ações dos briefings">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-          <StatusPill icon={<Inbox size={16}/>} value={rows.length} label={rows.length === 1 ? 'briefing' : 'briefings'} tone="slate"/>
-          <StatusPill icon={errorCount ? <CircleAlert size={16}/> : <CheckCircle2 size={16}/>} value={errorCount} label={errorCount === 1 ? 'ajuste necessário' : 'ajustes necessários'} tone={errorCount ? 'red' : 'green'}/>
-          <StatusPill icon={<AlertTriangle size={16}/>} value={warningCount} label={warningCount === 1 ? 'revisão sugerida' : 'revisões sugeridas'} tone="amber"/>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(event) => onFile(event.target.files?.[0])}/>
-          <ToolbarButton onClick={() => fileRef.current?.click()} icon={<Upload size={16}/>} label="Importar CSV"/>
-          <ToolbarButton onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={16}/>} label="Duplicar e-mail"/>
-          <ToolbarButton onClick={createBriefing} icon={<Plus size={16}/>} label="Novo e-mail"/>
-          <button disabled={!!errorCount || !rows.length} onClick={exportCsv} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-cyan-600 px-3.5 py-2 text-sm font-bold text-white outline-none transition hover:bg-cyan-700 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"><Download size={16}/>Exportar CSV</button>
-        </div>
-      </section>
-
+    {mode === 'template' ? <main className="pt-4"><div className="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><h2 className="font-bold text-slate-900">Código do Content Builder</h2><p className="text-sm text-slate-500">Cole o HTML com AMPscript. O conteúdo fica salvo somente neste navegador.</p></div><button onClick={saveTemplate} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar e aplicar</button></div><textarea aria-label="Código do template do SFMC" value={template} onChange={(event) => setTemplate(event.target.value)} spellCheck={false} className="h-[68vh] w-full resize-none bg-slate-950 p-5 font-mono text-xs leading-5 text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"/></div></main> :
+    <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
-      <div className="grid min-h-[720px] gap-4 xl:grid-cols-[minmax(300px,340px)_minmax(560px,1.25fr)_minmax(360px,0.75fr)] 2xl:grid-cols-[360px_minmax(620px,1.3fr)_minmax(400px,0.7fr)]">
+      <div className="mx-auto grid min-h-[720px] max-w-[1380px] gap-4 xl:grid-cols-[minmax(390px,460px)_minmax(0,900px)]">
         <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
           <div className="border-b border-slate-200 p-3.5">
             <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredRows.length} de {rows.length} e-mails</p></div><Inbox className="text-cyan-700" size={18}/></div>
@@ -265,11 +269,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
 
             <div className="space-y-2.5">
               {EDITOR_SECTIONS.map((section) => {
-                const progress = filledFields(selected, section);
                 return <details key={section.id} open className="group overflow-hidden rounded-xl border border-slate-200 bg-white">
                   <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500 [&::-webkit-details-marker]:hidden">
                     <div className="min-w-0"><div className="font-bold text-slate-800">{section.label}</div><div className="truncate text-xs text-slate-500">{section.description}</div></div>
-                    <div className="flex shrink-0 items-center gap-2"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">{progress.filled}/{progress.total}</span><ChevronDown className="text-slate-400 transition-transform group-open:rotate-180" size={16}/></div>
+                    <ChevronDown className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" size={16}/>
                   </summary>
                   <div className="border-t border-slate-100 px-3.5 py-3">
                     {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateSelected({ [field]: value })}/>)}</div>}
@@ -281,27 +284,27 @@ export const DynamicEmailWorkspace: React.FC = () => {
           </div>
         </section> : <div/>}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
-          <div className="border-b border-slate-200 bg-white p-3.5">
-            <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs leading-4 text-slate-500">Confira o conteúdo com dados de teste. Antes do envio, valide pelo Test Send do SFMC.</p></div><Eye className="shrink-0 text-cyan-700" size={18}/></div>
-            <div className="mt-3 grid grid-cols-2 gap-2"><MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/></div>
-          </div>
-          {selected && <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold leading-5 text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="mt-0.5 line-clamp-1 text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500"><span><b className="text-slate-700">De:</b> definido no SFMC</span><span className="inline-flex items-center gap-1"><UserRound size={11}/>{subscriber.PRI_NOME || 'Destinatário de teste'}</span><span>{selected.NM_PRODUTO_INTERNO || 'Produto'} · {selected.TP_CAMPANHA || 'Campanha'} · {selected.SEQUENCIA || 'Sequência'}</span></div></div></div>
-          </div>}
-          {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <iframe title="Conteúdo renderizado do e-mail dinâmico" sandbox="" srcDoc={render.html} className="h-[650px] w-full bg-slate-100"/>}
-        </section>
       </div>
     </main>}
+
+    {previewOpen && selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="email-preview-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }}>
+      <section className="flex max-h-[94vh] w-full max-w-[1320px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" aria-label="Prévia ampliada do e-mail">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><div className="flex items-center gap-2"><h2 id="email-preview-title" className="text-lg font-bold text-slate-900">Visualização do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs text-slate-500">Revise conteúdo e personalização. A certificação final acontece no Test Send do SFMC.</p></div><button autoFocus onClick={() => setPreviewOpen(false)} className="rounded-lg p-2 text-slate-500 outline-none hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label="Fechar visualização"><X size={19}/></button></div>
+        <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3 md:grid-cols-[1fr_180px_180px]"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="font-bold text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-1 text-[11px] text-slate-500">{selected.NM_PRODUTO_INTERNO || 'Produto'} · {selected.TP_CAMPANHA || 'Campanha'} · {selected.SEQUENCIA || 'Sequência'} · Remetente definido no SFMC</div></div></div><MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/></div>
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-100">{render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <iframe title="Conteúdo renderizado do e-mail dinâmico" sandbox="" srcDoc={render.html} className="h-[72vh] w-full bg-slate-100"/>}</div>
+      </section>
+    </div>}
+
+    {deleteOpen && selected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-email-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteOpen(false); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-600"><Trash2 size={18}/></span><div><h2 id="delete-email-title" className="font-bold text-slate-900">Excluir este e-mail?</h2><p className="mt-1 text-sm leading-5 text-slate-600"><b>{selected.NM_PRODUTO_INTERNO || 'Produto não informado'} · {selected.SEQUENCIA || 'Sequência pendente'}</b> será removido da caixa de briefings e não aparecerá no próximo CSV exportado.</p></div></div><div className="mt-5 flex justify-end gap-2"><button autoFocus onClick={() => setDeleteOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button><button onClick={deleteBriefing} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">Excluir e-mail</button></div></div></div>}
   </div>;
 };
 
-const StatusPill = ({ label, value, icon, tone }: { label: string; value: number; icon: React.ReactNode; tone: 'slate' | 'red' | 'green' | 'amber' }) => {
-  const colors = { slate: 'text-slate-600', red: 'text-red-700', green: 'text-emerald-700', amber: 'text-amber-700' };
-  return <div className={`inline-flex items-center gap-2 font-semibold ${colors[tone]}`}>{icon}<span className="text-base font-extrabold text-slate-950">{value}</span><span className="text-xs">{label}</span></div>;
+const HeaderMetric = ({ label, value, icon, tone = 'default' }: { label: string; value: number; icon: React.ReactNode; tone?: 'default' | 'success' | 'danger' | 'warning' }) => {
+  const colors = { default: 'text-cyan-50', success: 'text-emerald-200', danger: 'text-red-200', warning: 'text-amber-200' };
+  return <div className={`inline-flex items-center gap-2 ${colors[tone]}`}>{icon}<span className="text-lg font-extrabold text-white">{value}</span><span className="max-w-24 text-[11px] font-semibold leading-3">{label}</span></div>;
 };
 
-const ToolbarButton = ({ label, icon, onClick, disabled }: { label: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean }) => <button onClick={onClick} disabled={disabled} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">{icon}<span className="hidden 2xl:inline">{label}</span><span className="sr-only 2xl:hidden">{label}</span></button>;
+const HeaderAction = ({ label, icon, onClick, disabled, primary, danger }: { label: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean; primary?: boolean; danger?: boolean }) => <button onClick={onClick} disabled={disabled} title={label} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-40 ${primary ? 'bg-white text-[#07595b] hover:bg-cyan-50' : danger ? 'border border-red-200/30 bg-red-500/15 text-red-100 hover:bg-red-500/25' : 'border border-white/20 bg-white/10 text-white hover:bg-white/20'}`}>{icon}<span className="hidden 2xl:inline">{label}</span><span className="sr-only 2xl:hidden">{label}</span></button>;
 
 const MiniInput = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}<input value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2.5 text-xs font-normal normal-case tracking-normal text-slate-700 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"/></label>;
 

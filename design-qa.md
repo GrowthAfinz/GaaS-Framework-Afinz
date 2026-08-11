@@ -66,3 +66,15 @@ final result: passed
 ## Resultado
 
 final result: passed
+
+## Iteração 2026-08-11 — header unificado e prévia modal
+
+- O cabeçalho branco e a faixa separada de indicadores foram substituídos por um único header verde-petróleo, seguindo a referência de Cadastro e templates.
+- Título, contexto, métricas, abas e ações ficam no mesmo bloco e a página abre diretamente no conteúdo operacional.
+- A caixa de briefings foi ampliada e o editor limitado a uma largura mais compacta em uma grade de duas colunas.
+- A prévia fixa foi removida e substituída por um modal central de foco, com dados de teste, metadados e fechamento por botão ou clique externo.
+- Os contadores de preenchimento das seções foram removidos; as seções continuam minimizáveis.
+- A exclusão usa confirmação explícita, informa qual briefing será removido e mantém a seleção em uma linha válida.
+- Interações de abrir/fechar a prévia e abrir/cancelar a exclusão foram verificadas sem erros de console ou overflow horizontal.
+
+final result: passed
