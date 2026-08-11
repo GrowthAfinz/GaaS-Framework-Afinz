@@ -78,3 +78,15 @@ final result: passed
 - Interações de abrir/fechar a prévia e abrir/cancelar a exclusão foram verificadas sem erros de console ou overflow horizontal.
 
 final result: passed
+
+## Iteração 2026-08-11 — três painéis e divisor persistente
+
+- A caixa de briefings, o editor e a prévia voltaram a permanecer visíveis lado a lado.
+- O header organiza Campanhas e Template-fonte acima das ações operacionais e não contém mais o comando de visualização.
+- A prévia recuperou dados de teste, envelope, contexto e renderização completa; o botão Ampliar fica dentro do próprio painel.
+- O divisor entre editor e prévia responde a arraste, setas do teclado e duplo clique para restaurar a proporção padrão.
+- A proporção escolhida foi recarregada com sucesso após navegação, comprovando a persistência local por usuário.
+- Performance do Conteúdo usa ícone analítico e E-mail Dinâmico foi renomeado para Fábrica de e-mails.
+- Não houve overflow horizontal nem erros de console nas interações verificadas.
+
+final result: passed
