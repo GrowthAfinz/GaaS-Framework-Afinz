@@ -43,3 +43,26 @@ P3 follow-up: on narrower desktop widths the queue stacks below the chart; this 
 - Pass 2: verified at the user's desktop-like 1600 × 1000 viewport; timeline, queue, filters and evidence layout render without overlap or horizontal document overflow.
 
 final result: passed
+
+---
+
+# Design QA — E-mail Dinâmico
+
+- Referência: tela anterior fornecida pelo usuário, em 1907 × 759 px.
+- Implementação: rota de desenvolvimento `#dynamic-email-preview`, validada no mesmo viewport.
+- Estado: briefing PLURIX selecionado, painel editorial aberto e prévia local renderizada.
+
+## Verificações
+
+- A caixa de briefings ganhou largura, busca, filtros e hierarquia de caixa de entrada.
+- O editor permanece como área principal; a prévia ficou mais estreita e continua legível.
+- Os indicadores e comandos foram condensados em uma única barra, sem cartões redundantes.
+- As seções do CSV respeitam a ordem do e-mail e podem ser minimizadas individualmente.
+- A ação de duplicar cria uma nova linha, limpa a confirmação da jornada e força nova validação.
+- Assunto, preheader, remetente de referência, destinatário de teste e contexto da campanha aparecem na prévia.
+- Não há overflow horizontal no viewport validado.
+- Não houve erro de console durante seleção, minimização ou duplicação.
+
+## Resultado
+
+final result: passed

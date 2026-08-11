@@ -289,6 +289,14 @@ function App() {
     return <AppsFlyerAuditView />;
   }
 
+  if (import.meta.env.DEV && urlHash === '#dynamic-email-preview') {
+    return (
+      <MainLayout>
+        <DynamicEmailWorkspace />
+      </MainLayout>
+    );
+  }
+
   if (authLoading) {
     return <div className="h-screen w-full bg-slate-50 text-slate-500 flex items-center justify-center">Carregando...</div>;
   }
