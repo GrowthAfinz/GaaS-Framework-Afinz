@@ -10,6 +10,7 @@ import {
   Download,
   ExternalLink,
   ImageIcon,
+  Images,
   Inbox,
   Link2,
   Mail,
@@ -36,6 +37,8 @@ import {
   type ValidationIssue,
 } from '../domain/briefing';
 import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
+import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type LegalText, type WorkspaceBriefing } from '../domain/workspace';
+import { loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, onlyCsvRows, recordExport, saveAsset, saveBriefing } from '../services/workspaceService';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
 const ROWS_KEY = 'gaas-dynamic-email-briefings-v1';
@@ -102,9 +105,9 @@ const EDITOR_SECTIONS: EditorSection[] = [
 ];
 
 function demoRows(): BriefingRow[] {
-  const visa = emptyBriefingRow('fixture-visa');
+  const visa = emptyBriefingRow('00000000-0000-4000-8000-000000000001');
   Object.assign(visa, { DT_INICIO: '2026-06-01T00:00', DT_FIM: '2026-12-31T23:59', UTM_CAMPANHA: 'repescagem_visa', TP_CAMPANHA: 'Repescagem', SEQUENCIA: 'E-mail 1', ASSUNTO: 'Seu cartão Afinz Visa com limite pré-aprovado!', PRE_CABECALHO: 'Peça já o seu! Limite disponível para usar na hora', CARTAO_NM_COMERCIAL: 'Afinz Visa', NM_PRODUTO_INTERNO: 'INSTITUCIONAL', TITULO_COPY_1_AZUL: 'Sua aprovação chegou!', COR_COPY_1: '#00C6CC', TAMANHO_DA_FONTE_TITULO_COPY_1: '24', COPY_1_PRETO: 'Olá, %%=v(@FirstName)=%%!<br><br>Sua solicitação de cartão <b>%%=v(@CartaoNmComercial)=%%</b> foi reavaliada e aprovada: limite de %%=v(@LimiteNovo)=%% já disponível.', COR_COPY_PRETO_1: '#222222', TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '16', TITULO_CTA_1: 'PEÇA JÁ O SEU CARTÃO', LINK_CTA_1: 'https://cartao-afinz.onelink.me/I1Ur/zr4jy3g1' });
-  const plurix = emptyBriefingRow('fixture-plurix');
+  const plurix = emptyBriefingRow('00000000-0000-4000-8000-000000000002');
   Object.assign(plurix, { DT_INICIO: '2026-08-10T00:00', DT_FIM: '2026-08-31T23:59', UTM_CAMPANHA: 'mais_amigo', TP_CAMPANHA: 'Aquisição', SEQUENCIA: 'E-mail 1', ASSUNTO: 'O Clube Amigão mudou!', PRE_CABECALHO: 'Conheça o +amigo', CARTAO_NM_COMERCIAL: '+amigo', NM_PRODUTO_INTERNO: 'PLURIX', COPY_1_PRETO: '%%=v(@FirstName)=%%, o Clube Amigão agora é +amigo, e chega com muito mais ofertas exclusivas para você!', COR_COPY_PRETO_1: '#222222', TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '16', TITULO_COPY_2: 'E as novidades <br>não param por aí!', COR_TITULO_COPY_2: '#2C3490', TAMANHO_DA_FONTE_TITULO_COPY_2: '22' });
   return [visa, plurix];
 }
@@ -120,11 +123,16 @@ function downloadText(name: string, content: string) {
 
 const initials = (value: string) => (value.trim().slice(0, 2) || '—').toUpperCase();
 export const DynamicEmailWorkspace: React.FC = () => {
-  const [rows, setRows] = useState<BriefingRow[]>(() => { try { return JSON.parse(localStorage.getItem(ROWS_KEY) ?? 'null') ?? demoRows(); } catch { return demoRows(); } });
+  const [rows, setRows] = useState<WorkspaceBriefing[]>(() => { try { return normalizeLegacyRows(JSON.parse(localStorage.getItem(ROWS_KEY) ?? 'null') ?? demoRows()); } catch { return normalizeLegacyRows(demoRows()); } });
   const [selectedId, setSelectedId] = useState(rows[0]?.__id ?? '');
   const [template, setTemplate] = useState(() => localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE);
   const [savedTemplate, setSavedTemplate] = useState(template);
-  const [mode, setMode] = useState<'briefings' | 'template'>('briefings');
+  const [mode, setMode] = useState<'briefings' | 'library' | 'template'>('briefings');
+  const [assets, setAssets] = useState<EmailAsset[]>([]);
+  const [legalTexts, setLegalTexts] = useState<LegalText[]>([]);
+  const [taxonomy, setTaxonomy] = useState<ActivityTaxonomy[]>([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [syncState, setSyncState] = useState('Carregando dados compartilhados…');
   const [subscriber, setSubscriber] = useState<SubscriberSample>(SAMPLE);
   const [importMessages, setImportMessages] = useState<string[]>([]);
   const [query, setQuery] = useState('');
@@ -136,6 +144,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'gaas-email-editor-preview-v1', storage: localStorage });
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
+  useEffect(() => { Promise.allSettled([loadBriefings(), loadAssets(), loadLegalTexts(), loadActivityTaxonomy()]).then(([briefings, assetRows, legalRows, activities]) => {
+    if (briefings.status === 'fulfilled' && briefings.value.length) { setRows(briefings.value); setSelectedId(briefings.value[0].__id); }
+    if (assetRows.status === 'fulfilled') setAssets(assetRows.value);
+    if (legalRows.status === 'fulfilled') setLegalTexts(legalRows.value);
+    if (activities.status === 'fulfilled') setTaxonomy(activities.value);
+    setSyncState(briefings.status === 'fulfilled' ? 'Sincronizado com o GaaS' : 'Rascunho local — não sincronizado');
+  }); }, []);
   const issuesByRow = useMemo(() => validateRows(rows), [rows]);
   const selected = rows.find((row) => row.__id === selectedId) ?? rows[0];
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
@@ -152,28 +167,29 @@ export const DynamicEmailWorkspace: React.FC = () => {
     return haystack.includes(query.trim().toLowerCase());
   }), [issuesByRow, query, rows, statusFilter]);
 
-  const updateSelected = (patch: Partial<BriefingRow>) => setRows((current) => current.map((row) => row.__id === selected?.__id ? { ...row, ...patch } : row));
-  const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? applyFix(row, issue) : row)); };
-  const exportCsv = () => { if (!errorCount) downloadText(`TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`, exportBriefingCsv(rows)); };
+  const updateSelected = (patch: Partial<WorkspaceBriefing>) => setRows((current) => current.map((row) => row.__id === selected?.__id ? { ...row, ...patch } : row));
+  const updateField = (field: BriefingColumn, value: string) => selected && setRows((current) => applyWorkspaceField(current, selected.__id, field, value));
+  const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? { ...applyFix(row, issue), __meta: row.__meta } : row)); };
+  const exportCsv = () => { if (!errorCount) { const filename = `TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`; downloadText(filename, exportBriefingCsv(onlyCsvRows(rows))); void recordExport(filename, rows, []); } };
   const onFile = async (file?: File) => {
     if (!file) return;
     const parsed = parseBriefingCsv(await file.text());
     setImportMessages(parsed.errors);
     if (parsed.rows.length) {
-      setRows(parsed.rows);
+      setRows(normalizeLegacyRows(parsed.rows));
       setSelectedId(parsed.rows[0].__id);
       setAnnouncement(`${parsed.rows.length} briefings importados.`);
     }
   };
   const createBriefing = () => {
-    const row = emptyBriefingRow();
+    const row = withMeta(emptyBriefingRow());
     setRows((current) => [...current, row]);
     setSelectedId(row.__id);
     setAnnouncement('Novo e-mail criado. Preencha a campanha e a sequência.');
   };
   const duplicateBriefing = () => {
     if (!selected) return;
-    const copy: BriefingRow = { ...selected, __id: crypto.randomUUID(), __journeyConfirmed: false };
+    const copy: WorkspaceBriefing = { ...selected, __id: crypto.randomUUID(), __journeyConfirmed: false, __meta: { ...selected.__meta, campaignGroupId: crypto.randomUUID(), status: 'draft', version: 1 } };
     setRows((current) => [...current, copy]);
     setSelectedId(copy.__id);
     setAnnouncement('E-mail duplicado. Revise a sequência e a vigência antes de exportar.');
@@ -191,6 +207,12 @@ export const DynamicEmailWorkspace: React.FC = () => {
     localStorage.setItem(TEMPLATE_KEY, template);
     setSavedTemplate(template);
     setAnnouncement('Template do SFMC salvo e aplicado à prévia.');
+  };
+  const saveCurrent = async (ready: boolean) => {
+    if (!selected) return;
+    const group = rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId).map((row) => ({ ...row, __meta: { ...row.__meta, status: ready ? 'ready' as const : 'draft' as const, version: row.__meta.savedAt ? row.__meta.version + 1 : row.__meta.version } }));
+    try { const saved = await Promise.all(group.map((row) => saveBriefing(row, (issuesByRow.get(row.__id) ?? []).map((issue) => issue.message)))); setRows((current) => current.map((row) => saved.find((item) => item.__id === row.__id) ?? row)); setSyncState('Sincronizado com o GaaS'); setAnnouncement('Briefing e histórico de versão salvos.'); setSaveOpen(false); }
+    catch (error) { setSyncState('Rascunho local — falha ao sincronizar'); setAnnouncement(error instanceof Error ? error.message : 'Falha ao salvar.'); }
   };
 
   return <div className="min-h-full bg-slate-50 p-4 lg:p-5">
@@ -210,6 +232,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
         <div className="ml-auto flex flex-col items-end gap-2">
           <div className="flex items-center rounded-xl bg-white/10 p-1" role="tablist" aria-label="Área da Fábrica de E-mails">
             <button role="tab" aria-selected={mode === 'briefings'} onClick={() => setMode('briefings')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'briefings' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}>Campanhas</button>
+            <button role="tab" aria-selected={mode === 'library'} onClick={() => setMode('library')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'library' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Images className="mr-1.5 inline" size={14}/>Biblioteca de ativos</button>
             <button role="tab" aria-selected={mode === 'template'} onClick={() => setMode('template')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'template' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Code2 className="mr-1.5 inline" size={14}/>Template-fonte</button>
           </div>
           {mode === 'briefings' && <div className="flex flex-wrap items-center justify-end gap-2">
@@ -218,13 +241,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
             <HeaderAction onClick={createBriefing} icon={<Plus size={15}/>} label="Novo"/>
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
+            <HeaderAction onClick={() => setSaveOpen(true)} disabled={!selected} icon={<Save size={15}/>} label="Salvar briefing" primary/>
             <button disabled={!!errorCount || !rows.length} onClick={exportCsv} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
           </div>}
         </div>
       </div>
     </header>
 
-    {mode === 'template' ? <main className="pt-4"><div className="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><h2 className="font-bold text-slate-900">Código do Content Builder</h2><p className="text-sm text-slate-500">Cole o HTML com AMPscript. O conteúdo fica salvo somente neste navegador.</p></div><button onClick={saveTemplate} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar e aplicar</button></div><textarea aria-label="Código do template do SFMC" value={template} onChange={(event) => setTemplate(event.target.value)} spellCheck={false} className="h-[68vh] w-full resize-none bg-slate-950 p-5 font-mono text-xs leading-5 text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"/></div></main> :
+    {mode === 'template' ? <main className="pt-4"><div className="mx-auto max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><h2 className="font-bold text-slate-900">Código do Content Builder</h2><p className="text-sm text-slate-500">Cole o HTML com AMPscript. O conteúdo fica salvo somente neste navegador.</p></div><button onClick={saveTemplate} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar e aplicar</button></div><textarea aria-label="Código do template do SFMC" value={template} onChange={(event) => setTemplate(event.target.value)} spellCheck={false} className="h-[68vh] w-full resize-none bg-slate-950 p-5 font-mono text-xs leading-5 text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"/></div></main> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets}/> :
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
@@ -240,11 +264,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
             </div>
           </div>
           <div className="max-h-[790px] overflow-y-auto p-2.5">
+            <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">Parceiro › segmento › subgrupo › semana › briefing</div>
             {filteredRows.length ? filteredRows.map((row) => {
               const issues = issuesByRow.get(row.__id) ?? [];
               const errors = issues.filter((issue) => issue.severity === 'error').length;
               const isSelected = selected?.__id === row.__id;
               return <button key={row.__id} onClick={() => setSelectedId(row.__id)} className={`mb-2 w-full rounded-xl border p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 ${isSelected ? 'border-cyan-300 bg-cyan-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'}`}>
+                <div className="mb-2 truncate text-[10px] font-bold uppercase tracking-wide text-cyan-700">{partnerLabel(row.__meta.partner)} › {row.__meta.segment || 'Sem segmento'} › {row.__meta.subgroup || 'Sem subgrupo'} › {row.__meta.weekKey || 'Sem semana'}</div>
                 <div className="flex items-start gap-3">
                   <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-extrabold ${isSelected ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{initials(row.NM_PRODUTO_INTERNO)}</span>
                   <div className="min-w-0 flex-1">
@@ -263,12 +289,29 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <Panel id="editor" defaultSize="58%" minSize="32%" className="min-w-0">
         {selected ? <section id="email-editor-panel" className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
           <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-3.5 backdrop-blur">
-            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{rowKey(selected).replaceAll(' / ', ' · ')}</h2><p className="mt-0.5 text-xs text-slate-500">Suas alterações ficam salvas neste navegador.</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{rowKey(selected).replaceAll(' / ', ' · ')}</h2><p className="mt-0.5 text-xs text-slate-500">{syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
           </div>
           <div className="max-h-[790px] overflow-y-auto p-3.5">
+            <section className="mb-3 rounded-xl border border-cyan-100 bg-cyan-50/60 p-3" aria-label="Organização e auditoria">
+              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-cyan-800">Organização e auditoria</div>
+              <div className="grid gap-2 md:grid-cols-2">
+                <MetaField label="Parceiro" value={selected.__meta.partner} list="partners" onChange={(value) => updateSelected({ __meta: { ...selected.__meta, partner: value } } as Partial<BriefingRow>)}/>
+                <MetaField label="Segmento" value={selected.__meta.segment} list="segments" onChange={(value) => updateSelected({ __meta: { ...selected.__meta, segment: value } } as Partial<BriefingRow>)}/>
+                <MetaField label="Subgrupo" value={selected.__meta.subgroup} list="subgroups" onChange={(value) => updateSelected({ __meta: { ...selected.__meta, subgroup: value } } as Partial<BriefingRow>)}/>
+                <MetaField label="Semana / safra" value={selected.__meta.weekKey} list="weeks" onChange={(value) => updateSelected({ __meta: { ...selected.__meta, weekKey: value } } as Partial<BriefingRow>)}/>
+              </div>
+              <label className="mt-2 block text-xs font-semibold text-slate-700">Activity Name para auditoria <span className="font-normal text-slate-500">(opcional, mas recomendado)</span><input list="activity-names" value={selected.__meta.activityNames.join(', ')} onChange={(event) => updateSelected({ __meta: { ...selected.__meta, activityNames: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) } } as Partial<BriefingRow>)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400"/></label>
+              <datalist id="partners">{[...new Set(taxonomy.map((item) => item.partner))].map((value) => <option key={value} value={value}>{partnerLabel(value)}</option>)}</datalist>
+              <datalist id="segments">{[...new Set(taxonomy.map((item) => item.segment))].map((value) => <option key={value} value={value}/>)}</datalist>
+              <datalist id="subgroups">{[...new Set(taxonomy.map((item) => item.subgroup))].map((value) => <option key={value} value={value}/>)}</datalist>
+              <datalist id="weeks">{[...new Set(taxonomy.map((item) => item.weekKey))].map((value) => <option key={value} value={value}/>)}</datalist>
+              <datalist id="activity-names">{taxonomy.map((item) => <option key={item.activityName} value={item.activityName}/>)}</datalist>
+              {selected.__meta.partner === 'N/A' && <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900"><b>Parceiro não informado (N/A).</b> O valor de origem será preservado; isso não classifica o briefing como Proprietária.</p>}
+            </section>
             {selectedIssues.length > 0 && <div className="mb-3 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
 
             <label className="mb-3 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
+            <SignatureMatrix rows={rows} selected={selected} onEnsure={() => setRows((current) => ensurePlurixVariants(current, selected.__id))} onSelect={setSelectedId}/>
 
             <div className="space-y-2.5">
               {EDITOR_SECTIONS.map((section) => {
@@ -278,8 +321,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
                     <ChevronDown className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" size={16}/>
                   </summary>
                   <div className="border-t border-slate-100 px-3.5 py-3">
-                    {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateSelected({ [field]: value })}/>)}</div>}
-                    {section.imageSlot && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} onImageUrl={(value) => updateSelected({ [section.imageSlot!.image]: value })} onDestinationUrl={section.imageSlot.link ? (value) => updateSelected({ [section.imageSlot!.link!]: value }) : undefined}/></div>}
+                    {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
+                    {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)}/>)}</div>}
+                    {section.imageSlot && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined}/></div>}
                   </div>
                 </details>;
               })}
@@ -317,6 +361,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     </div>}
 
     {deleteOpen && selected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-email-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteOpen(false); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-600"><Trash2 size={18}/></span><div><h2 id="delete-email-title" className="font-bold text-slate-900">Excluir este e-mail?</h2><p className="mt-1 text-sm leading-5 text-slate-600"><b>{selected.NM_PRODUTO_INTERNO || 'Produto não informado'} · {selected.SEQUENCIA || 'Sequência pendente'}</b> será removido da caixa de briefings e não aparecerá no próximo CSV exportado.</p></div></div><div className="mt-5 flex justify-end gap-2"><button autoFocus onClick={() => setDeleteOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button><button onClick={deleteBriefing} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">Excluir e-mail</button></div></div></div>}
+    {saveOpen && selected && <SaveDialog selected={selected} errors={selectedIssues.filter((issue) => issue.severity === 'error').length} onClose={() => setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>}
   </div>;
 };
 
@@ -331,7 +376,27 @@ const MiniInput = ({ label, value, onChange }: { label: string; value: string; o
 
 const isPublicImageUrl = (value: string) => { try { return new URL(value).protocol === 'https:'; } catch { return false; } };
 
-const ImageUrlCard = ({ slot, imageUrl, destinationUrl, onImageUrl, onDestinationUrl }: { slot: ImageSlot; imageUrl: string; destinationUrl?: string; onImageUrl: (value: string) => void; onDestinationUrl?: (value: string) => void }) => {
+const MetaField = ({ label, value, list, onChange }: { label: string; value: string; list: string; onChange: (value: string) => void }) => <label className="text-xs font-semibold text-slate-700">{label}<input list={list} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400"/></label>;
+
+const SignatureMatrix = ({ rows, selected, onEnsure, onSelect }: { rows: WorkspaceBriefing[]; selected: WorkspaceBriefing; onEnsure: () => void; onSelect: (id: string) => void }) => {
+  const group = rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId);
+  const isPlurix = group.some((row) => PLURIX_SIGNATURES.some(({ key }) => key === row.NM_PRODUTO_INTERNO.toUpperCase()));
+  if (!isPlurix) return null;
+  return <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50 p-3"><div className="flex items-center justify-between gap-2"><div><b className="text-sm text-violet-950">Assinaturas Plurix</b><p className="text-xs text-violet-700">Um briefing visual; seis linhas técnicas no CSV.</p></div><button onClick={onEnsure} className="rounded-lg bg-violet-700 px-3 py-2 text-xs font-bold text-white">Completar 6 bandeiras</button></div><div className="mt-2 flex flex-wrap gap-1.5">{PLURIX_SIGNATURES.map(({ key, label }) => { const row = group.find((item) => item.NM_PRODUTO_INTERNO.toUpperCase() === key); return <button key={key} disabled={!row} onClick={() => row && onSelect(row.__id)} className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${row?.__id === selected.__id ? 'border-violet-700 bg-violet-700 text-white' : row ? 'border-violet-200 bg-white text-violet-800' : 'border-slate-200 text-slate-400'}`}>{label} {row ? '✓' : '—'}</button>; })}</div></div>;
+};
+
+const LegalTools = ({ selected, legalTexts, updateSelected }: { selected: WorkspaceBriefing; legalTexts: LegalText[]; updateSelected: (patch: Partial<WorkspaceBriefing>) => void }) => <div className="mb-3 rounded-lg bg-slate-50 p-3"><div className="flex flex-wrap items-end gap-2"><label className="min-w-52 flex-1 text-xs font-semibold text-slate-700">Texto legal salvo<select defaultValue="" onChange={(event) => { const item = legalTexts.find((legal) => legal.id === event.target.value); if (item) updateSelected({ NOTA_LEGAL: item.legalText, COR_NOTA_LEGAL: item.color, TAMANHO_DA_FONTE_NOTA_LEGAL: item.fontSize }); }} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="">Escolha um texto aprovado…</option>{legalTexts.map((item) => <option key={item.id} value={item.id}>{item.name} · v{item.version}</option>)}</select></label><label className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900"><input type="checkbox" checked={!!selected.__meta.legalOverride} onChange={(event) => updateSelected({ __meta: { ...selected.__meta, legalOverride: event.target.checked } })}/>Editar só esta linha</label></div><p className="mt-2 text-[11px] text-slate-500">Por padrão, a nota legal é compartilhada entre as assinaturas. O override avançado evita propagação e fica registrado na auditoria.</p></div>;
+
+const SaveDialog = ({ selected, errors, onClose, onSave, updateSelected }: { selected: WorkspaceBriefing; errors: number; onClose: () => void; onSave: (ready: boolean) => void; updateSelected: (patch: Partial<WorkspaceBriefing>) => void }) => { const missing = !selected.__meta.activityNames.length; return <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl"><h2 className="text-lg font-bold text-slate-900">Salvar briefing</h2><p className="mt-1 text-sm text-slate-600">Será criada a versão {selected.__meta.savedAt ? selected.__meta.version + 1 : selected.__meta.version} com registro de auditoria.</p>{missing && <label className="mt-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><input type="checkbox" checked={!!selected.__meta.acknowledgedMissingActivity} onChange={(event) => updateSelected({ __meta: { ...selected.__meta, acknowledgedMissingActivity: event.target.checked } })}/><span><b>Activity Name não informado.</b><br/>Confirmo que quero salvar sem o identificador recomendado para auditoria.</span></label>}{errors > 0 && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">Existem {errors} erros. Salve como rascunho e corrija antes de marcar como pronto.</p>}<div className="mt-5 flex justify-end gap-2"><button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold">Cancelar</button><button onClick={() => onSave(false)} disabled={missing && !selected.__meta.acknowledgedMissingActivity} className="rounded-lg border border-cyan-700 px-4 py-2 text-sm font-bold text-cyan-800 disabled:opacity-40">Salvar rascunho</button><button onClick={() => onSave(true)} disabled={errors > 0 || (missing && !selected.__meta.acknowledgedMissingActivity)} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40">Salvar como pronto</button></div></div></div>; };
+
+const AssetLibrary = ({ assets, setAssets }: { assets: EmailAsset[]; setAssets: React.Dispatch<React.SetStateAction<EmailAsset[]>> }) => {
+  const [draft, setDraft] = useState<EmailAsset>({ id: crypto.randomUUID(), name: '', externalUrl: '', slot: 'generic', tags: [], status: 'ready', version: 1 });
+  const [message, setMessage] = useState('');
+  const persist = async () => { if (!draft.name || !isPublicImageUrl(draft.externalUrl)) { setMessage('Informe um nome e uma URL pública HTTPS do Salesforce.'); return; } try { const saved = await saveAsset(draft); setAssets((current) => [saved, ...current.filter((item) => item.id !== saved.id)]); setDraft({ id: crypto.randomUUID(), name: '', externalUrl: '', slot: 'generic', tags: [], status: 'ready', version: 1 }); setMessage('Ativo salvo. Nenhuma imagem foi enviada ao Supabase.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Falha ao salvar ativo.'); } };
+  return <main className="pt-4"><div className="grid gap-4 xl:grid-cols-[380px_1fr]"><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-bold text-slate-900">Cadastrar URL do Salesforce</h2><p className="mt-1 text-sm text-slate-500">A biblioteca guarda só a referência e os metadados; o arquivo continua no Content Builder.</p><div className="mt-4 space-y-3"><MetaField label="Nome do ativo" value={draft.name} list="none" onChange={(name) => setDraft({ ...draft, name })}/><MetaField label="URL pública da imagem" value={draft.externalUrl} list="none" onChange={(externalUrl) => setDraft({ ...draft, externalUrl })}/><MetaField label="Link ao clicar (opcional)" value={draft.clickUrl ?? ''} list="none" onChange={(clickUrl) => setDraft({ ...draft, clickUrl })}/><label className="block text-xs font-semibold text-slate-700">Posição<select value={draft.slot} onChange={(event) => setDraft({ ...draft, slot: event.target.value as EmailAsset['slot'] })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">{['header','banner_1','banner_2','banner_3','signature','generic'].map((slot) => <option key={slot}>{slot}</option>)}</select></label><div className="grid grid-cols-2 gap-2"><MetaField label="Parceiro" value={draft.partner ?? ''} list="none" onChange={(partner) => setDraft({ ...draft, partner })}/><MetaField label="Subgrupo" value={draft.subgroup ?? ''} list="none" onChange={(subgroup) => setDraft({ ...draft, subgroup })}/></div><MetaField label="Texto alternativo" value={draft.altText ?? ''} list="none" onChange={(altText) => setDraft({ ...draft, altText })}/>{draft.externalUrl && isPublicImageUrl(draft.externalUrl) && <img src={draft.externalUrl} alt="Prévia do novo ativo" className="max-h-44 w-full rounded-lg bg-slate-100 object-contain"/>}<button onClick={persist} className="w-full rounded-lg bg-cyan-700 px-4 py-3 text-sm font-bold text-white"><Save className="mr-2 inline" size={15}/>Salvar na biblioteca</button>{message && <p className="text-xs text-slate-600">{message}</p>}</div></section><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Ativos disponíveis</h2><p className="text-sm text-slate-500">{assets.length} referências cadastradas</p></div><Images className="text-cyan-700"/></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{assets.map((asset) => <article key={asset.id} className="overflow-hidden rounded-xl border border-slate-200"><div className="grid h-36 place-items-center bg-slate-100"><img src={asset.externalUrl} alt={asset.altText || asset.name} className="max-h-36 w-full object-contain"/></div><div className="p-3"><div className="font-bold text-slate-800">{asset.name}</div><div className="mt-1 text-xs text-slate-500">{asset.slot} · {partnerLabel(asset.partner ?? '')}</div><button onClick={() => navigator.clipboard.writeText(asset.externalUrl)} className="mt-2 text-xs font-bold text-cyan-700">Copiar URL</button></div></article>)}</div></section></div></main>;
+};
+
+const ImageUrlCard = ({ slot, imageUrl, destinationUrl, assets = [], onImageUrl, onDestinationUrl }: { slot: ImageSlot; imageUrl: string; destinationUrl?: string; assets?: EmailAsset[]; onImageUrl: (value: string) => void; onDestinationUrl?: (value: string) => void }) => {
   const [loadState, setLoadState] = useState<'idle' | 'loading' | 'loaded' | 'error'>(imageUrl ? 'loading' : 'idle');
   const [dimensions, setDimensions] = useState('');
   useEffect(() => { setLoadState(imageUrl ? 'loading' : 'idle'); setDimensions(''); }, [imageUrl]);
@@ -340,6 +405,7 @@ const ImageUrlCard = ({ slot, imageUrl, destinationUrl, onImageUrl, onDestinatio
     <div className="flex items-start justify-between gap-3 px-3 py-2.5"><div><div className="flex items-center gap-2 text-sm font-bold text-slate-800"><ImageIcon size={15} className="text-cyan-600"/>{slot.label}{loadState === 'loaded' && <CheckCircle2 size={14} className="text-emerald-500"/>}</div><div className="mt-0.5 text-[11px] text-slate-500">{slot.description}{dimensions && ` · ${dimensions}`}</div></div>{imageUrl && <button type="button" onClick={() => onImageUrl('')} className="rounded-lg p-2 text-slate-400 outline-none hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-red-400" aria-label={`Remover ${slot.label}`}><Trash2 size={14}/></button>}</div>
     <div className="grid gap-3 border-t border-slate-100 p-3 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.7fr)]">
       <div className="space-y-2"><label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">URL pública da imagem<div className="mt-1 flex items-center gap-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400"><Link2 size={14}/></span><input type="url" value={imageUrl} onChange={(event) => onImageUrl(event.target.value.trim())} placeholder="https://.../imagem.jpg" className={`min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs font-normal normal-case tracking-normal outline-none focus-visible:ring-2 ${validUrl ? 'border-slate-200 focus:border-cyan-400 focus-visible:ring-cyan-100' : 'border-red-300 bg-red-50 focus-visible:ring-red-100'}`}/>{imageUrl && validUrl && <a href={imageUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 p-2 text-slate-500 outline-none hover:border-cyan-300 hover:text-cyan-700 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label={`Abrir ${slot.label}`}><ExternalLink size={14}/></a>}</div></label>
+        {assets.length > 0 && <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Escolher da biblioteca<select value="" onChange={(event) => { const asset = assets.find((item) => item.id === event.target.value); if (asset) { onImageUrl(asset.externalUrl); if (asset.clickUrl && onDestinationUrl) onDestinationUrl(asset.clickUrl); } }} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal normal-case"><option value="">Selecione um ativo…</option>{assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name} · {asset.slot}</option>)}</select></label>}
         {onDestinationUrl && <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Link ao clicar na imagem<input type="url" value={destinationUrl ?? ''} onChange={(event) => onDestinationUrl(event.target.value.trim())} placeholder="https://destino-da-campanha..." className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal normal-case tracking-normal outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"/></label>}
       </div>
       {imageUrl && validUrl ? <div className="flex min-h-24 items-center justify-center overflow-hidden rounded-lg bg-slate-100 p-2">{loadState === 'error' ? <div className="px-3 py-5 text-center text-xs text-red-700"><AlertTriangle className="mx-auto mb-2" size={19}/>Não foi possível carregar. Confirme se a URL é pública.</div> : <img src={imageUrl} alt={`Prévia de ${slot.label}`} onLoad={(event) => { setLoadState('loaded'); setDimensions(`${event.currentTarget.naturalWidth} × ${event.currentTarget.naturalHeight}px`); }} onError={() => setLoadState('error')} className="max-h-32 max-w-full object-contain"/>}</div> : <div className="flex min-h-24 items-center justify-center rounded-lg bg-slate-50 px-3 text-center text-xs text-slate-400"><div><ImageIcon className="mx-auto mb-2 text-slate-300" size={22}/>{imageUrl ? 'Use uma URL pública HTTPS' : 'A prévia aparecerá aqui'}</div></div>}
