@@ -134,5 +134,5 @@ export function exportBriefingCsv(rows: BriefingRow[]): string {
   const data = rows.map((row) => Object.fromEntries(BRIEFING_COLUMNS.map((column) => [column,
     column === 'DT_INICIO' || column === 'DT_FIM' ? toSfmcDate(row[column]) : row[column].replace(/\r?\n/g, '<br>'),
   ])));
-  return Papa.unparse(data, { columns: [...BRIEFING_COLUMNS], delimiter: ',', newline: '\r\n', quotes: false, escapeFormulae: false });
+  return Papa.unparse(data, { columns: [...BRIEFING_COLUMNS], delimiter: ';', newline: '\r\n', quotes: false, escapeFormulae: false });
 }
