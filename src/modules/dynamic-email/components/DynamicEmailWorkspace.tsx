@@ -44,9 +44,9 @@ import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partner
 import { loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveSignatureSetting } from '../services/workspaceService';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
-const TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v4';
-const LEGACY_TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v3';
-const OLDER_TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v2';
+const TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v5';
+const LEGACY_TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v4';
+const OLDER_TEMPLATE_SLOTS_KEYS = ['gaas-dynamic-email-template-slots-v3', 'gaas-dynamic-email-template-slots-v2'];
 const PRIMARY_TEMPLATE_KEY = 'gaas-dynamic-email-primary-template-v2';
 const ROWS_KEY = 'gaas-dynamic-email-briefings-v1';
 const SAMPLE: SubscriberSample = { CPF: '00000000000', PRI_NOME: 'VANIA', LIMITE: 'R$ 3.500', PRODUTO: 'INSTITUCIONAL', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'Repescagem' };
@@ -144,14 +144,16 @@ const initialTemplateSlots = (): TemplateSlot[] => {
     if (Array.isArray(legacy) && legacy.length) migrated = legacy;
   } catch { /* usa o template principal legado abaixo */ }
   if (!migrated.length) {
-    try {
-      const older = JSON.parse(localStorage.getItem(OLDER_TEMPLATE_SLOTS_KEY) ?? 'null');
-      if (Array.isArray(older) && older.length) migrated = older;
-    } catch { /* usa o template principal legado abaixo */ }
+    for (const key of OLDER_TEMPLATE_SLOTS_KEYS) {
+      try {
+        const older = JSON.parse(localStorage.getItem(key) ?? 'null');
+        if (Array.isArray(older) && older.length) { migrated = older; break; }
+      } catch { /* tenta a versão anterior */ }
+    }
   }
   if (!migrated.length) migrated = [{ id: crypto.randomUUID(), name: 'Template principal', source: localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE, updatedAt: new Date().toISOString() }];
-  const refreshed = migrated.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T16:30:00.000Z' } : slot);
-  return refreshed.some((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID) ? refreshed : [...refreshed, { id: PLURIX_UX_V2_TEMPLATE_ID, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T16:30:00.000Z' }];
+  const refreshed = migrated.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T18:00:00.000Z' } : slot);
+  return refreshed.some((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID) ? refreshed : [...refreshed, { id: PLURIX_UX_V2_TEMPLATE_ID, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T18:00:00.000Z' }];
 };
 
 export const DynamicEmailWorkspace: React.FC = () => {

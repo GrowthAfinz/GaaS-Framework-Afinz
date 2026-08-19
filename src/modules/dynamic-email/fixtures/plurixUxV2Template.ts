@@ -66,6 +66,9 @@ ENDIF
       .cta-cell, .cta-link { display: block !important; width: 100% !important; box-sizing: border-box !important; }
       .cta-link { padding-left: 18px !important; padding-right: 18px !important; }
       .legal-pad { padding-left: 22px !important; padding-right: 22px !important; }
+      .stack-column { display: block !important; width: 100% !important; box-sizing: border-box !important; }
+      .stack-copy { padding: 24px 22px 10px 22px !important; text-align: center !important; }
+      .stack-image { padding: 8px 22px 24px 22px !important; }
     }
   </style>
 </head>
@@ -91,11 +94,10 @@ ENDIF
             </td>
           </tr>
           %%[ ENDIF ]%%
+          %%[ IF @Sequencia == "E-mail 1" THEN ]%%
+          <!-- E-mail 1: descoberta dos benefícios e passo a passo -->
           <tr>
             <td align="center" class="content-pad" style="padding:30px 32px 8px 32px; text-align:center;">
-              %%[ IF NOT EMPTY(@TituloCopy1) THEN ]%%
-              <h1 class="headline" style="max-width:500px; margin:0 auto 14px auto; color:%%=v(@CorCopy1)=%%; font-size:%%=v(@TamanhoFonteTituloCopy1)=%%px; line-height:1.25; font-weight:700; text-align:center;">%%=TreatAsContent(@TituloCopy1)=%%</h1>
-              %%[ ENDIF ]%%
               %%[ IF NOT EMPTY(@Copy1Preto) THEN ]%%
               <div class="body-copy" style="max-width:500px; margin:0 auto; color:%%=v(@CorCopyPreto1)=%%; font-size:%%=v(@TamanhoFonteCopyPreto1)=%%px; line-height:1.55; text-align:center;">%%=TreatAsContent(@Copy1Preto)=%%</div>
               %%[ ENDIF ]%%
@@ -110,40 +112,84 @@ ENDIF
             </td>
           </tr>
           %%[ ENDIF ]%%
-          %%[ IF NOT EMPTY(@TituloCTA1) AND NOT EMPTY(@LinkCTA1) THEN ]%%
+          %%[ IF NOT EMPTY(@TituloCopy2) THEN ]%%
           <tr>
-            <td align="center" class="content-pad cta-cell" style="padding:20px 32px 32px 32px;">
-              <a class="cta-link" href="%%=RedirectTo(TreatAsContent(@LinkCTA1))=%%" target="_blank" style="display:inline-block; min-width:280px; border-radius:10px; background-color:#2C3490; color:#ffffff; padding:15px 26px; font-size:15px; line-height:20px; text-align:center; text-decoration:none; font-weight:700;">%%=TreatAsContent(@TituloCTA1)=%%</a>
+            <td align="center" bgcolor="#F6F6FB" class="content-pad" style="padding:26px 32px 24px 32px; background-color:#F6F6FB;">
+              <h2 class="headline" style="max-width:500px; margin:0 auto 18px auto; color:%%=v(@CorTituloCopy2)=%%; font-size:%%=v(@TamanhoFonteTituloCopy2)=%%px; line-height:1.25; font-weight:700; text-align:center;">%%=TreatAsContent(@TituloCopy2)=%%</h2>
             </td>
           </tr>
           %%[ ENDIF ]%%
-          %%[ IF NOT EMPTY(@TituloCopy2) OR NOT EMPTY(@Copy2Preto) OR NOT EMPTY(@Banner2Corpo) THEN ]%%
-          <tr>
-            <td align="center" bgcolor="#F6F6FB" class="content-pad" style="padding:26px 32px 24px 32px; background-color:#F6F6FB;">
-              %%[ IF NOT EMPTY(@TituloCopy2) THEN ]%%
-              <h2 class="headline" style="max-width:500px; margin:0 auto 18px auto; color:%%=v(@CorTituloCopy2)=%%; font-size:%%=v(@TamanhoFonteTituloCopy2)=%%px; line-height:1.25; font-weight:700; text-align:center;">%%=TreatAsContent(@TituloCopy2)=%%</h2>
-              %%[ ENDIF ]%%
-              %%[ IF NOT EMPTY(@Copy2Preto) THEN ]%%
-              <div class="body-copy" style="max-width:480px; margin:0 auto; color:%%=v(@CorCopy2)=%%; font-size:%%=v(@TamanhoFonteCopy2)=%%px; line-height:1.65; text-align:left;">%%=TreatAsContent(@Copy2Preto)=%%</div>
-              %%[ ENDIF ]%%
-            </td>
-          </tr>
           %%[ IF NOT EMPTY(@Banner2Corpo) THEN ]%%
           <tr>
-            <td align="center" class="content-pad" style="padding:16px 32px 4px 32px;">
+            <td align="center" bgcolor="#F6F6FB" class="content-pad" style="padding:0 32px 24px 32px; background-color:#F6F6FB;">
               %%[ IF NOT EMPTY(@LinkBanner2) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@LinkBanner2))=%%" target="_blank" style="text-decoration:none;">%%[ ENDIF ]%%
               <img src="%%=v(@Banner2Corpo)=%%" alt="Como solicitar o cartão +amigo" width="536" style="display:block; width:100%; max-width:536px; height:auto; border:0;">
               %%[ IF NOT EMPTY(@LinkBanner2) THEN ]%%</a>%%[ ENDIF ]%%
             </td>
           </tr>
           %%[ ENDIF ]%%
-          %%[ IF NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2) THEN ]%%
+          %%[ IF NOT EMPTY(@Copy2Preto) OR (NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2)) THEN ]%%
           <tr>
-            <td align="center" class="content-pad cta-cell" style="padding:20px 32px 34px 32px;">
+            <td align="center" class="content-pad cta-cell" style="padding:24px 32px 32px 32px;">
+              %%[ IF NOT EMPTY(@Copy2Preto) THEN ]%%
+              <div class="body-copy" style="max-width:480px; margin:0 auto 18px auto; color:%%=v(@CorCopy2)=%%; font-size:%%=v(@TamanhoFonteCopy2)=%%px; line-height:1.6; text-align:center;">%%=TreatAsContent(@Copy2Preto)=%%</div>
+              %%[ ENDIF ]%%
+              %%[ IF NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2) THEN ]%%
               <a class="cta-link" href="%%=RedirectTo(TreatAsContent(@LinkCTA2))=%%" target="_blank" style="display:inline-block; min-width:280px; border-radius:10px; background-color:#2C3490; color:#ffffff; padding:15px 26px; font-size:15px; line-height:20px; text-align:center; text-decoration:none; font-weight:700;">%%=TreatAsContent(@TituloCTA2)=%%</a>
+              %%[ ENDIF ]%%
             </td>
           </tr>
           %%[ ENDIF ]%%
+          %%[ ELSE ]%%
+          <!-- E-mail 2: economia, benefícios e conversão -->
+          <tr>
+            <td align="center" class="content-pad" style="padding:30px 32px 12px 32px; text-align:center;">
+              %%[ IF NOT EMPTY(@Copy1Preto) THEN ]%%
+              <div class="body-copy" style="max-width:500px; margin:0 auto; color:%%=v(@CorCopyPreto1)=%%; font-size:%%=v(@TamanhoFonteCopyPreto1)=%%px; line-height:1.55; text-align:center;">%%=TreatAsContent(@Copy1Preto)=%%</div>
+              %%[ ENDIF ]%%
+            </td>
+          </tr>
+          %%[ IF NOT EMPTY(@TituloCTA1) AND NOT EMPTY(@LinkCTA1) THEN ]%%
+          <tr>
+            <td align="center" class="content-pad cta-cell" style="padding:14px 32px 30px 32px;">
+              <a class="cta-link" href="%%=RedirectTo(TreatAsContent(@LinkCTA1))=%%" target="_blank" style="display:inline-block; min-width:280px; border-radius:10px; background-color:#2C3490; color:#ffffff; padding:15px 26px; font-size:15px; line-height:20px; text-align:center; text-decoration:none; font-weight:700;">%%=TreatAsContent(@TituloCTA1)=%%</a>
+            </td>
+          </tr>
+          %%[ ENDIF ]%%
+          %%[ IF NOT EMPTY(@TituloCopy2) OR NOT EMPTY(@Copy2Preto) THEN ]%%
+          <tr>
+            <td align="center" bgcolor="#F6F6FB" class="content-pad" style="padding:28px 32px; background-color:#F6F6FB;">
+              %%[ IF NOT EMPTY(@TituloCopy2) THEN ]%%
+              <h2 class="headline" style="max-width:500px; margin:0 auto 20px auto; color:%%=v(@CorTituloCopy2)=%%; font-size:%%=v(@TamanhoFonteTituloCopy2)=%%px; line-height:1.25; font-weight:700; text-align:center;">%%=TreatAsContent(@TituloCopy2)=%%</h2>
+              %%[ ENDIF ]%%
+              %%[ IF NOT EMPTY(@Copy2Preto) THEN ]%%
+              <div class="body-copy" style="max-width:480px; margin:0 auto; padding:18px 20px; border:1px solid #E1E3F2; border-radius:12px; background-color:#ffffff; color:%%=v(@CorCopy2)=%%; font-size:%%=v(@TamanhoFonteCopy2)=%%px; line-height:1.75; text-align:left;">%%=TreatAsContent(@Copy2Preto)=%%</div>
+              %%[ ENDIF ]%%
+            </td>
+          </tr>
+          %%[ ENDIF ]%%
+          <tr>
+            <td style="padding:0; background-color:#ffffff;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="55%" valign="middle" class="stack-column stack-copy" style="width:55%; padding:30px 12px 30px 32px;">
+                    <h2 style="margin:0 0 10px 0; color:#2C3490; font-size:24px; line-height:1.25; font-weight:700;">Peça agora seu cartão +amigo</h2>
+                    <p style="margin:0 0 18px 0; color:#454A64; font-size:15px; line-height:1.55;">Comece a aproveitar os benefícios nas suas compras do dia a dia.</p>
+                    %%[ IF NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2) THEN ]%%
+                    <a href="%%=RedirectTo(TreatAsContent(@LinkCTA2))=%%" target="_blank" style="display:inline-block; border-radius:10px; background-color:#2C3490; color:#ffffff; padding:14px 20px; font-size:13px; line-height:18px; text-align:center; text-decoration:none; font-weight:700;">%%=TreatAsContent(@TituloCTA2)=%%</a>
+                    %%[ ENDIF ]%%
+                  </td>
+                  <td width="45%" align="center" valign="middle" class="stack-column stack-image" style="width:45%; padding:24px 28px 24px 8px;">
+                    %%[ IF NOT EMPTY(@Banner2Corpo) THEN ]%%
+                    %%[ IF NOT EMPTY(@LinkBanner2) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@LinkBanner2))=%%" target="_blank" style="text-decoration:none;">%%[ ENDIF ]%%
+                    <img src="%%=v(@Banner2Corpo)=%%" alt="Cartões +amigo" width="220" style="display:block; width:100%; max-width:220px; height:auto; border:0; margin:0 auto;">
+                    %%[ IF NOT EMPTY(@LinkBanner2) THEN ]%%</a>%%[ ENDIF ]%%
+                    %%[ ENDIF ]%%
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
           %%[ ENDIF ]%%
           %%[ IF NOT EMPTY(@Banner3Corpo) THEN ]%%
           <tr>
