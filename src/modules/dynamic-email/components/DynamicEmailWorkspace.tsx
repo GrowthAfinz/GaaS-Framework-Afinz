@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import html2canvas from 'html2canvas';
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 import {
   AlertTriangle,
@@ -16,6 +15,8 @@ import {
   Mail,
   Maximize2,
   Plus,
+  Printer,
+  RefreshCw,
   Save,
   Search,
   Trash2,
@@ -29,7 +30,6 @@ import {
   emptyBriefingRow,
   exportBriefingCsv,
   parseBriefingCsv,
-  rowKey,
   toDateInput,
   validateRows,
   type BriefingColumn,
@@ -45,6 +45,7 @@ const ROWS_KEY = 'gaas-dynamic-email-briefings-v1';
 const SAMPLE: SubscriberSample = { CPF: '00000000000', PRI_NOME: 'VANIA', LIMITE: 'R$ 3.500', PRODUTO: 'INSTITUCIONAL', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'Repescagem' };
 const LONG_FIELDS = new Set<BriefingColumn>(['COPY_1_PRETO', 'COPY_2_PRETO', 'NOTA_LEGAL', 'RODAPE', 'PRE_CABECALHO']);
 const COLOR_FIELDS = new Set<BriefingColumn>(['COR_COPY_1', 'COR_COPY_PRETO_1', 'COR_TITULO_COPY_2', 'COR_COPY_2', 'COR_NOTA_LEGAL']);
+const EDITORIAL_WEEKS = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4', 'Semana 5'];
 
 const FIELD_LABELS: Partial<Record<BriefingColumn, string>> = {
   DT_INICIO: 'Início da campanha',
@@ -131,6 +132,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [assets, setAssets] = useState<EmailAsset[]>([]);
   const [legalTexts, setLegalTexts] = useState<LegalText[]>([]);
   const [taxonomy, setTaxonomy] = useState<ActivityTaxonomy[]>([]);
+  const [taxonomyState, setTaxonomyState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saveOpen, setSaveOpen] = useState(false);
   const [syncState, setSyncState] = useState('Carregando dados compartilhados…');
   const [subscriber, setSubscriber] = useState<SubscriberSample>(SAMPLE);
@@ -140,54 +142,63 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [announcement, setAnnouncement] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [downloadingPreview, setDownloadingPreview] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const previewFrameRef = useRef<HTMLIFrameElement>(null);
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'gaas-email-editor-preview-v1', storage: localStorage });
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
-  useEffect(() => { Promise.allSettled([loadBriefings(), loadAssets(), loadLegalTexts(), loadActivityTaxonomy()]).then(([briefings, assetRows, legalRows, activities]) => {
+  const refreshTaxonomy = async () => {
+    setTaxonomyState('loading');
+    try { setTaxonomy(await loadActivityTaxonomy()); setTaxonomyState('ready'); }
+    catch { setTaxonomyState('error'); }
+  };
+  useEffect(() => { Promise.allSettled([loadBriefings(), loadAssets(), loadLegalTexts()]).then(([briefings, assetRows, legalRows]) => {
     if (briefings.status === 'fulfilled') { setRows(briefings.value); setSelectedId(briefings.value[0]?.__id ?? ''); }
     if (assetRows.status === 'fulfilled') setAssets(assetRows.value);
     if (legalRows.status === 'fulfilled') setLegalTexts(legalRows.value);
-    if (activities.status === 'fulfilled') setTaxonomy(activities.value);
     setSyncState(briefings.status === 'fulfilled' ? 'Sincronizado com o GaaS' : 'Rascunho local — não sincronizado');
-  }); }, []);
+  }); void refreshTaxonomy(); }, []);
   const issuesByRow = useMemo(() => validateRows(rows), [rows]);
   const selected = rows.find((row) => row.__id === selectedId) ?? rows[0];
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
   const render = useMemo(() => selected ? renderDynamicEmail(savedTemplate, selected, { ...subscriber, PRODUTO: selected.NM_PRODUTO_INTERNO, SEQUENCIA: selected.SEQUENCIA, TP_CAMPANHA: selected.TP_CAMPANHA }) : { html: '', diagnostics: [] }, [savedTemplate, selected, subscriber]);
   const allIssues = [...issuesByRow.values()].flat();
-  const errorCount = allIssues.filter((issue) => issue.severity === 'error').length;
-  const warningCount = allIssues.filter((issue) => issue.severity === 'warning').length;
-  const filteredRows = useMemo(() => rows.filter((row) => {
-    const issues = issuesByRow.get(row.__id) ?? [];
-    const hasErrors = issues.some((issue) => issue.severity === 'error');
+  const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
+  const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
+    const groupRows = rows.filter((row) => row.__meta.campaignGroupId === id);
+    const representative = groupRows.find((row) => row.NM_PRODUTO_INTERNO.toUpperCase() === 'AMIGAO') ?? groupRows[0];
+    const issues = groupRows.flatMap((row) => issuesByRow.get(row.__id) ?? []);
+    return { id, rows: groupRows, representative, hasErrors: issues.some((issue) => issue.severity === 'error') };
+  }), [issuesByRow, rows]);
+  const filteredGroups = useMemo(() => editorialGroups.filter((group) => {
+    const { representative: row, hasErrors } = group;
     if (statusFilter === 'ready' && hasErrors) return false;
     if (statusFilter === 'needs-review' && !hasErrors) return false;
-    const haystack = [row.NM_PRODUTO_INTERNO, row.TP_CAMPANHA, row.SEQUENCIA, row.UTM_CAMPANHA, row.ASSUNTO].join(' ').toLowerCase();
+    const haystack = [row.__meta.partner, row.__meta.segment, row.__meta.weekKey, row.TP_CAMPANHA, row.SEQUENCIA, row.UTM_CAMPANHA, row.ASSUNTO, ...group.rows.map((item) => item.__meta.subgroup)].join(' ').toLowerCase();
     return haystack.includes(query.trim().toLowerCase());
-  }), [issuesByRow, query, rows, statusFilter]);
+  }), [editorialGroups, query, statusFilter]);
+  const errorCount = editorialGroups.filter((group) => group.hasErrors).length;
+  const warningCount = editorialGroups.filter((group) => group.rows.some((row) => (issuesByRow.get(row.__id) ?? []).some((issue) => issue.severity === 'warning'))).length;
+  const selectedGroupErrorCount = selected ? rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId).flatMap((row) => issuesByRow.get(row.__id) ?? []).filter((issue) => issue.severity === 'error').length : 0;
   const taxonomyOptions = useMemo(() => {
     if (!selected) return { partners: [], segments: [], subgroups: [], weeks: [], activityNames: [] };
     const withCurrent = (values: string[], current: string) => [...new Set([...values.filter(Boolean), current].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     const partnerRows = taxonomy.filter((item) => !selected.__meta.partner || item.partner === selected.__meta.partner);
     const segmentRows = partnerRows.filter((item) => !selected.__meta.segment || item.segment === selected.__meta.segment);
-    const subgroupRows = segmentRows.filter((item) => !selected.__meta.subgroup || item.subgroup === selected.__meta.subgroup);
-    const weekRows = subgroupRows.filter((item) => !selected.__meta.weekKey || item.weekKey === selected.__meta.weekKey);
+    const isPlurix = selected.__meta.partner.toLowerCase() === 'plurix';
     return {
-      partners: withCurrent(taxonomy.map((item) => item.partner), selected.__meta.partner),
+      partners: withCurrent(['Institucional B2C', ...taxonomy.map((item) => item.partner).filter((partner) => partner !== 'N/A')], selected.__meta.partner),
       segments: withCurrent(partnerRows.map((item) => item.segment), selected.__meta.segment),
-      subgroups: withCurrent(segmentRows.map((item) => item.subgroup), selected.__meta.subgroup),
-      weeks: withCurrent(subgroupRows.map((item) => item.weekKey), selected.__meta.weekKey),
-      activityNames: withCurrent(weekRows.map((item) => item.activityName), selected.__meta.activityNames[0] ?? ''),
+      subgroups: withCurrent(isPlurix ? PLURIX_SIGNATURES.map((item) => item.label) : segmentRows.map((item) => item.subgroup), selected.__meta.subgroup),
+      weeks: withCurrent(EDITORIAL_WEEKS, selected.__meta.weekKey),
+      activityNames: withCurrent(segmentRows.map((item) => item.activityName), selected.__meta.activityNames[0] ?? ''),
     };
   }, [selected, taxonomy]);
 
   const updateSelected = (patch: Partial<WorkspaceBriefing>) => setRows((current) => current.map((row) => row.__id === selected?.__id ? { ...row, ...patch } : row));
+  const updateGroupMeta = (patch: Partial<WorkspaceBriefing['__meta']>) => selected && setRows((current) => current.map((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId ? { ...row, __meta: { ...row.__meta, ...patch } } : row));
   const updateField = (field: BriefingColumn, value: string) => selected && setRows((current) => applyWorkspaceField(current, selected.__id, field, value));
   const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? { ...applyFix(row, issue), __meta: row.__meta } : row)); };
-  const exportCsv = () => { if (!errorCount) { const filename = `TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`; downloadText(filename, exportBriefingCsv(onlyCsvRows(rows))); void recordExport(filename, rows, []); } };
+  const exportCsv = () => { if (!technicalErrorCount) { const filename = `TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`; downloadText(filename, exportBriefingCsv(onlyCsvRows(rows))); void recordExport(filename, rows, []); } };
   const onFile = async (file?: File) => {
     if (!file) return;
     const parsed = parseBriefingCsv(await file.text());
@@ -206,15 +217,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
   };
   const duplicateBriefing = () => {
     if (!selected) return;
-    const copy: WorkspaceBriefing = { ...selected, __id: crypto.randomUUID(), __journeyConfirmed: false, __meta: { ...selected.__meta, campaignGroupId: crypto.randomUUID(), status: 'draft', version: 1 } };
-    setRows((current) => [...current, copy]);
-    setSelectedId(copy.__id);
+    const campaignGroupId = crypto.randomUUID();
+    const copies = rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId).map((row) => ({ ...row, __id: crypto.randomUUID(), __journeyConfirmed: false, __meta: { ...row.__meta, campaignGroupId, status: 'draft' as const, version: 1, savedAt: undefined } }));
+    setRows((current) => [...current, ...copies]);
+    setSelectedId(copies[0].__id);
     setAnnouncement('E-mail duplicado. Revise a sequência e a vigência antes de exportar.');
     requestAnimationFrame(() => document.getElementById('dynamic-SEQUENCIA')?.focus());
   };
   const deleteBriefing = () => {
     if (!selected) return;
-    const nextRows = rows.filter((row) => row.__id !== selected.__id);
+    const nextRows = rows.filter((row) => row.__meta.campaignGroupId !== selected.__meta.campaignGroupId);
     setRows(nextRows);
     setSelectedId(nextRows[0]?.__id ?? '');
     setDeleteOpen(false);
@@ -231,26 +243,21 @@ export const DynamicEmailWorkspace: React.FC = () => {
     try { const saved = await Promise.all(group.map((row) => saveBriefing(row, (issuesByRow.get(row.__id) ?? []).map((issue) => issue.message)))); setRows((current) => current.map((row) => saved.find((item) => item.__id === row.__id) ?? row)); setSyncState('Sincronizado com o GaaS'); setAnnouncement('Briefing e histórico de versão salvos.'); setSaveOpen(false); }
     catch (error) { setSyncState('Rascunho local — falha ao sincronizar'); setAnnouncement(error instanceof Error ? error.message : 'Falha ao salvar.'); }
   };
-  const downloadPreview = async () => {
-    const frame = previewFrameRef.current;
-    const documentBody = frame?.contentDocument?.body;
-    if (!selected || !documentBody) { setAnnouncement('A prévia ainda não está pronta para baixar.'); return; }
-    setDownloadingPreview(true);
-    try {
-      await frame.contentDocument?.fonts?.ready;
-      await Promise.all([...documentBody.querySelectorAll('img')].map((image) => image.complete ? Promise.resolve() : new Promise<void>((resolve) => { image.addEventListener('load', () => resolve(), { once: true }); image.addEventListener('error', () => resolve(), { once: true }); })));
-      const canvas = await html2canvas(documentBody, { backgroundColor: '#ffffff', scale: 2, useCORS: true, allowTaint: false, logging: false, width: documentBody.scrollWidth, height: documentBody.scrollHeight, windowWidth: documentBody.scrollWidth, windowHeight: documentBody.scrollHeight });
-      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Falha ao gerar o JPEG.')), 'image/jpeg', 0.92));
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${rowKey(selected).replaceAll(' / ', '-').replace(/[^a-z0-9-_]+/gi, '-')}-preview.jpg`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setAnnouncement('Prévia renderizada e baixada em JPEG.');
-    } catch (error) {
-      setAnnouncement(error instanceof Error ? `Não foi possível gerar o JPEG: ${error.message}` : 'Não foi possível gerar o JPEG.');
-    } finally { setDownloadingPreview(false); }
+  const openRenderedPreview = (print = false) => {
+    if (!selected || render.diagnostics.length) { setAnnouncement('Corrija a prévia antes de abri-la.'); return; }
+    const popup = window.open('', '_blank');
+    if (!popup) { setAnnouncement('O navegador bloqueou a nova aba. Libere pop-ups para o GaaS e tente novamente.'); return; }
+    popup.opener = null;
+    popup.document.open(); popup.document.write(render.html); popup.document.close();
+    if (print) {
+      const printReady = async () => {
+        await popup.document.fonts?.ready;
+        await Promise.race([Promise.all([...popup.document.images].map((image) => image.complete ? Promise.resolve() : new Promise<void>((resolve) => { image.addEventListener('load', () => resolve(), { once: true }); image.addEventListener('error', () => resolve(), { once: true }); }))), new Promise((resolve) => window.setTimeout(resolve, 10000))]);
+        popup.focus(); popup.print();
+      };
+      if (popup.document.readyState === 'complete') void printReady(); else popup.addEventListener('load', () => void printReady(), { once: true });
+      setAnnouncement('Prévia aberta. Escolha “Salvar como PDF” na janela de impressão.');
+    } else setAnnouncement('Prévia aberta em uma nova aba.');
   };
 
   return <div className="min-h-full bg-slate-50 p-4 lg:p-5">
@@ -263,7 +270,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <p className="mt-0.5 text-xs text-cyan-50/80">Crie, revise e prepare briefings para envio pelo SFMC.</p>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Resumo dos briefings">
-          <HeaderMetric icon={<Inbox size={16}/>} value={rows.length} label={rows.length === 1 ? 'briefing' : 'briefings'}/>
+          <HeaderMetric icon={<Inbox size={16}/>} value={editorialGroups.length} label={editorialGroups.length === 1 ? 'e-mail editorial' : 'e-mails editoriais'}/>
+          <HeaderMetric icon={<Copy size={16}/>} value={rows.length} label="variantes técnicas"/>
           <HeaderMetric icon={errorCount ? <CircleAlert size={16}/> : <CheckCircle2 size={16}/>} value={errorCount} label={errorCount === 1 ? 'ajuste necessário' : 'ajustes necessários'} tone={errorCount ? 'danger' : 'success'}/>
           <HeaderMetric icon={<AlertTriangle size={16}/>} value={warningCount} label={warningCount === 1 ? 'revisão sugerida' : 'revisões sugeridas'} tone="warning"/>
         </div>
@@ -279,7 +287,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
             <HeaderAction onClick={createBriefing} icon={<Plus size={15}/>} label="Novo"/>
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
-            <button disabled={!!errorCount || !rows.length} onClick={exportCsv} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
+            <button disabled={!!technicalErrorCount || !rows.length} onClick={exportCsv} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
           </div>}
         </div>
       </div>
@@ -292,7 +300,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       <div className="grid min-h-[720px] gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
           <div className="border-b border-slate-200 p-3.5">
-            <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredRows.length} de {rows.length} e-mails</p></div><Inbox className="text-cyan-700" size={18}/></div>
+            <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredGroups.length} de {editorialGroups.length} e-mails · {rows.length} variantes</p></div><Inbox className="text-cyan-700" size={18}/></div>
             <label className="mt-3 flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-cyan-400 focus-within:bg-white">
               <Search size={15}/><span className="sr-only">Buscar briefings</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar parceiro, campanha..." className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"/>
             </label>
@@ -301,18 +309,18 @@ export const DynamicEmailWorkspace: React.FC = () => {
             </div>
           </div>
           <div className="max-h-[790px] overflow-y-auto p-2.5">
-            <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">Parceiro › segmento › subgrupo › semana › briefing</div>
-            {filteredRows.length ? filteredRows.map((row) => {
-              const issues = issuesByRow.get(row.__id) ?? [];
-              const errors = issues.filter((issue) => issue.severity === 'error').length;
-              const isSelected = selected?.__id === row.__id;
-              return <button key={row.__id} onClick={() => setSelectedId(row.__id)} className={`mb-2 w-full rounded-xl border p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 ${isSelected ? 'border-cyan-300 bg-cyan-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'}`}>
-                <div className="mb-2 truncate text-[10px] font-bold uppercase tracking-wide text-cyan-700">{partnerLabel(row.__meta.partner)} › {row.__meta.segment || 'Sem segmento'} › {row.__meta.subgroup || 'Sem subgrupo'} › {row.__meta.weekKey || 'Sem semana'}</div>
+            <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">Parceiro › segmento › semana › e-mail › assinaturas</div>
+            {filteredGroups.length ? filteredGroups.map((group) => {
+              const row = group.representative;
+              const errors = group.rows.flatMap((item) => issuesByRow.get(item.__id) ?? []).filter((issue) => issue.severity === 'error').length;
+              const isSelected = selected?.__meta.campaignGroupId === group.id;
+              return <button key={group.id} onClick={() => setSelectedId(group.rows.find((item) => item.NM_PRODUTO_INTERNO.toUpperCase() === 'AMIGAO')?.__id ?? row.__id)} className={`mb-2 w-full rounded-xl border p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 ${isSelected ? 'border-cyan-300 bg-cyan-50 shadow-sm' : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'}`}>
+                <div className="mb-2 truncate text-[10px] font-bold uppercase tracking-wide text-cyan-700">{partnerLabel(row.__meta.partner)} › {row.__meta.segment || 'Sem segmento'} › {row.__meta.weekKey || 'Sem semana'}</div>
                 <div className="flex items-start gap-3">
-                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-extrabold ${isSelected ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{initials(row.NM_PRODUTO_INTERNO)}</span>
+                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-extrabold ${isSelected ? 'bg-[#07595b] text-white' : 'bg-slate-100 text-slate-600'}`}>{initials(row.__meta.partner)}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2"><span className="truncate text-sm font-bold text-slate-900">{row.NM_PRODUTO_INTERNO || 'Produto não informado'}</span>{errors ? <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">{errors} {errors === 1 ? 'ajuste' : 'ajustes'}</span> : <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 size={13}/>Pronto</span>}</div>
-                    <div className="mt-1 truncate text-xs font-medium text-slate-600">{row.TP_CAMPANHA || 'Campanha não informada'} · {row.SEQUENCIA || 'Sequência pendente'}</div>
+                    <div className="flex items-start justify-between gap-2"><span className="truncate text-sm font-bold text-slate-900">{row.SEQUENCIA || 'E-mail sem sequência'}</span>{errors ? <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">{errors} {errors === 1 ? 'ajuste' : 'ajustes'}</span> : <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-emerald-700"><CheckCircle2 size={13}/>Pronto</span>}</div>
+                    <div className="mt-1 truncate text-xs font-medium text-slate-600">{row.__meta.partner || 'Parceiro pendente'} · {group.rows.length} assinaturas</div>
                     <div className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-slate-800">{row.ASSUNTO || 'Assunto não preenchido'}</div>
                     <div className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">{row.PRE_CABECALHO || row.UTM_CAMPANHA || 'Sem texto de pré-visualização'}</div>
                   </div>
@@ -326,19 +334,20 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <Panel id="editor" defaultSize="58%" minSize="32%" className="min-w-0">
         {selected ? <section id="email-editor-panel" className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
           <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-3.5 backdrop-blur">
-            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{rowKey(selected).replaceAll(' / ', ' · ')}</h2><p className="mt-0.5 text-xs text-slate-500">{syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">Assinatura em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
           </div>
           <div className="max-h-[790px] overflow-y-auto p-3.5">
             <section className="mb-3 rounded-xl border border-cyan-100 bg-cyan-50/60 p-3" aria-label="Organização e auditoria">
               <div className="mb-2 text-xs font-bold uppercase tracking-wide text-cyan-800">Organização e auditoria</div>
               <div className="grid gap-2 md:grid-cols-2">
-                <TaxonomySelect label="Parceiro" value={selected.__meta.partner} options={taxonomyOptions.partners} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, partner: value, segment: '', subgroup: '', weekKey: '', activityNames: [] } } as Partial<BriefingRow>)}/>
-                <TaxonomySelect label="Segmento" value={selected.__meta.segment} options={taxonomyOptions.segments} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, segment: value, subgroup: '', weekKey: '', activityNames: [] } } as Partial<BriefingRow>)}/>
-                <TaxonomySelect label="Subgrupo" value={selected.__meta.subgroup} options={taxonomyOptions.subgroups} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, subgroup: value, weekKey: '', activityNames: [] } } as Partial<BriefingRow>)}/>
-                <TaxonomySelect label="Semana / safra" value={selected.__meta.weekKey} options={taxonomyOptions.weeks} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, weekKey: value, activityNames: [] } } as Partial<BriefingRow>)}/>
+                <TaxonomySelect label="Parceiro" value={selected.__meta.partner} options={taxonomyOptions.partners} onChange={(value) => updateGroupMeta({ partner: value, segment: '', weekKey: '', activityNames: [], ...(value !== 'Plurix' ? { subgroup: '' } : {}) })}/>
+                <TaxonomySelect label="Segmento" value={selected.__meta.segment} options={taxonomyOptions.segments} onChange={(value) => updateGroupMeta({ segment: value, activityNames: [] })}/>
+                <TaxonomySelect label="Assinatura / subgrupo" value={selected.__meta.subgroup} options={taxonomyOptions.subgroups} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, subgroup: value } })}/>
+                <TaxonomySelect label="Semana editorial" value={selected.__meta.weekKey} options={taxonomyOptions.weeks} onChange={(value) => updateGroupMeta({ weekKey: value })}/>
               </div>
-              <div className="mt-2"><TaxonomySelect label="Activity Name para auditoria (opcional, mas recomendado)" value={selected.__meta.activityNames[0] ?? ''} options={taxonomyOptions.activityNames} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, activityNames: value ? [value] : [] } } as Partial<BriefingRow>)}/></div>
-              {selected.__meta.partner === 'N/A' && <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900"><b>Parceiro não informado (N/A).</b> O valor de origem será preservado; isso não classifica o briefing como Proprietária.</p>}
+              <div className="mt-2"><ActivityNameSelect value={selected.__meta.activityNames[0] ?? ''} options={taxonomyOptions.activityNames} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, activityNames: value ? [value] : [] } })}/></div>
+              {taxonomyState === 'loading' && <p className="mt-2 text-xs text-slate-500">Carregando opções da tabela activities…</p>}
+              {taxonomyState === 'error' && <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"><span>Não foi possível carregar a taxonomia de activities.</span><button type="button" onClick={() => void refreshTaxonomy()} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-bold"><RefreshCw size={12}/>Tentar novamente</button></div>}
             </section>
             {selectedIssues.length > 0 && <div className="mb-3 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
 
@@ -373,11 +382,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <Panel id="preview" defaultSize="42%" minSize="25%" className="min-w-0">
             <section id="email-preview-panel" className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
               <div className="border-b border-slate-200 bg-white p-3.5">
-                <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs leading-4 text-slate-500">Confira o conteúdo com dados de teste. Antes do envio, valide pelo Test Send do SFMC.</p></div><div className="flex shrink-0 gap-2"><button onClick={downloadPreview} disabled={!selected || downloadingPreview || render.diagnostics.length > 0} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Download size={15}/>{downloadingPreview ? 'Gerando…' : 'Baixar imagem'}</button><button onClick={() => setPreviewOpen(true)} disabled={!selected} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={15}/>Ampliar</button></div></div>
+                <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs leading-4 text-slate-500">Confira o conteúdo com dados de teste. Antes do envio, valide pelo Test Send do SFMC.</p></div><div className="flex shrink-0 flex-wrap justify-end gap-2"><button onClick={() => openRenderedPreview()} disabled={!selected || render.diagnostics.length > 0} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><ExternalLink size={15}/>Abrir em nova aba</button><button onClick={() => openRenderedPreview(true)} disabled={!selected || render.diagnostics.length > 0} title="Abre a impressão do navegador para salvar a prévia completa em PDF" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Printer size={15}/>Salvar em PDF</button><button onClick={() => setPreviewOpen(true)} disabled={!selected} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={15}/>Ampliar</button></div></div>
                 <div className="mt-3 grid grid-cols-2 gap-2"><MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/></div>
               </div>
-              {selected && <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold leading-5 text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="mt-0.5 line-clamp-1 text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-2 text-[11px] text-slate-500">{selected.NM_PRODUTO_INTERNO || 'Produto'} · {selected.TP_CAMPANHA || 'Campanha'} · {selected.SEQUENCIA || 'Sequência'} · Remetente definido no SFMC</div></div></div></div>}
-              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <iframe ref={previewFrameRef} title="Conteúdo renderizado do e-mail dinâmico" sandbox="allow-same-origin" srcDoc={render.html} className="h-[650px] w-full bg-slate-100"/>}
+              {selected && <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold leading-5 text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="mt-0.5 line-clamp-1 text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-2 text-[11px] text-slate-500">{selected.__meta.partner || 'Parceiro'} · {selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO || 'Assinatura'} · {selected.__meta.segment || selected.TP_CAMPANHA || 'Segmento'} · {selected.SEQUENCIA || 'Sequência'} · Remetente definido no SFMC</div></div></div></div>}
+              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <iframe title="Conteúdo renderizado do e-mail dinâmico" sandbox="" srcDoc={render.html} className="h-[650px] w-full bg-slate-100"/>}
             </section>
           </Panel>
         </Group>
@@ -393,8 +402,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
       </section>
     </div>}
 
-    {deleteOpen && selected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-email-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteOpen(false); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-600"><Trash2 size={18}/></span><div><h2 id="delete-email-title" className="font-bold text-slate-900">Excluir este e-mail?</h2><p className="mt-1 text-sm leading-5 text-slate-600"><b>{selected.NM_PRODUTO_INTERNO || 'Produto não informado'} · {selected.SEQUENCIA || 'Sequência pendente'}</b> será removido da caixa de briefings e não aparecerá no próximo CSV exportado.</p></div></div><div className="mt-5 flex justify-end gap-2"><button autoFocus onClick={() => setDeleteOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button><button onClick={deleteBriefing} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">Excluir e-mail</button></div></div></div>}
-    {saveOpen && selected && <SaveDialog selected={selected} errors={selectedIssues.filter((issue) => issue.severity === 'error').length} onClose={() => setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>}
+    {deleteOpen && selected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-email-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteOpen(false); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-600"><Trash2 size={18}/></span><div><h2 id="delete-email-title" className="font-bold text-slate-900">Excluir este e-mail editorial?</h2><p className="mt-1 text-sm leading-5 text-slate-600"><b>{selected.__meta.partner || 'Parceiro não informado'} · {selected.SEQUENCIA || 'Sequência pendente'}</b> e todas as suas {rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId).length} variantes de assinatura serão removidos.</p></div></div><div className="mt-5 flex justify-end gap-2"><button autoFocus onClick={() => setDeleteOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button><button onClick={deleteBriefing} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">Excluir e-mail</button></div></div></div>}
+    {saveOpen && selected && <SaveDialog selected={selected} errors={selectedGroupErrorCount} onClose={() => setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>}
   </div>;
 };
 
@@ -411,7 +420,13 @@ const isPublicImageUrl = (value: string) => { try { return new URL(value).protoc
 
 const MetaField = ({ label, value, list, onChange }: { label: string; value: string; list: string; onChange: (value: string) => void }) => <label className="text-xs font-semibold text-slate-700">{label}<input list={list} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400"/></label>;
 
-const TaxonomySelect = ({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) => <label className="block text-xs font-semibold text-slate-700">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"><option value="">Selecione na base de activities…</option>{options.map((option) => <option key={option} value={option}>{option === 'N/A' ? 'Parceiro não informado (N/A)' : option}</option>)}</select></label>;
+const TaxonomySelect = ({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) => <label className="block text-xs font-semibold text-slate-700">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"><option value="" disabled>Selecione uma opção…</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+
+const ActivityNameSelect = ({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) => {
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState('');
+  return <div><label className="block text-xs font-semibold text-slate-700">Activity Name para auditoria <span className="font-normal text-slate-500">(opcional, mas recomendado)</span><select value={creating ? '__new__' : value} onChange={(event) => { if (event.target.value === '__new__') { setCreating(true); setDraft(''); } else onChange(event.target.value); }} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"><option value="">Não informado (opcional)</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}<option value="__new__">+ Cadastrar novo Activity Name…</option></select></label>{creating && <div className="mt-2 flex gap-2"><input autoFocus value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Digite o novo Activity Name" className="min-w-0 flex-1 rounded-lg border border-cyan-300 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"/><button type="button" disabled={!draft.trim()} onClick={() => { onChange(draft.trim()); setCreating(false); }} className="rounded-lg bg-cyan-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Usar</button><button type="button" onClick={() => setCreating(false)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">Cancelar</button></div>}</div>;
+};
 
 const SignatureMatrix = ({ rows, selected, onEnsure, onSelect }: { rows: WorkspaceBriefing[]; selected: WorkspaceBriefing; onEnsure: () => void; onSelect: (id: string) => void }) => {
   const group = rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId);

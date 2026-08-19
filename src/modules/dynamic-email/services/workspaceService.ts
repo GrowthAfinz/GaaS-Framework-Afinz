@@ -104,7 +104,7 @@ export async function saveLegalText(item: LegalText): Promise<LegalText> {
 
 export async function loadActivityTaxonomy(): Promise<ActivityTaxonomy[]> {
   const { data, error } = await supabase.from('activities')
-    .select('Activity name / Taxonomia,BU,Parceiro,Segmento,Subgrupos,Safra,Produto,Ordem de disparo')
+    .select('"Activity name / Taxonomia","BU","Parceiro","Segmento","Subgrupos","Safra","Produto","Ordem de disparo"')
     .eq('Canal', 'E-mail').order('Data de Disparo', { ascending: false }).limit(3000);
   if (error) throw error;
   const seen = new Set<string>();
@@ -112,7 +112,9 @@ export async function loadActivityTaxonomy(): Promise<ActivityTaxonomy[]> {
     const activityName = String(row['Activity name / Taxonomia'] ?? '');
     if (!activityName || seen.has(activityName)) return [];
     seen.add(activityName);
-    return [{ activityName, bu: row.BU ?? '', partner: row.Parceiro ?? '', segment: row.Segmento ?? '', subgroup: row.Subgrupos ?? '', weekKey: row.Safra ?? '', product: row.Produto ?? '', order: row['Ordem de disparo'] ?? undefined }];
+    const bu = String(row.BU ?? '');
+    const rawPartner = String(row.Parceiro ?? '');
+    return [{ activityName, bu, partner: bu.toLowerCase() === 'plurix' ? 'Plurix' : rawPartner, segment: row.Segmento ?? '', subgroup: row.Subgrupos ?? '', weekKey: row.Safra ?? '', product: row.Produto ?? '', order: row['Ordem de disparo'] ?? undefined }];
   });
 }
 
