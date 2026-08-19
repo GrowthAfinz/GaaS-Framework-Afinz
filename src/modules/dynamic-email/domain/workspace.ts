@@ -79,6 +79,15 @@ export type SignatureSetting = {
   effectiveFrom?: string;
 };
 
+export type EmailTemplateSlot = {
+  id: string;
+  name: string;
+  source: string;
+  isPrincipal: boolean;
+  version: number;
+  updatedAt: string;
+};
+
 export const emptyMeta = (): EditorialMeta => ({
   partner: '', segment: '', subgroup: '', weekKey: '', activityNames: [],
   campaignGroupId: crypto.randomUUID(), status: 'draft', version: 1,

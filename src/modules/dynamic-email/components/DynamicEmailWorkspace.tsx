@@ -40,8 +40,8 @@ import {
 } from '../domain/briefing';
 import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
 import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plurixUxV2Template';
-import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
-import { loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveSignatureSetting } from '../services/workspaceService';
+import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
+import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
 const TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v5';
@@ -89,7 +89,6 @@ const FIELD_LABELS: Partial<Record<BriefingColumn, string>> = {
 type ImageSlot = { label: string; description: string; image: BriefingColumn; link?: BriefingColumn };
 type EditorialGroup = { id: string; rows: WorkspaceBriefing[]; visibleRows: WorkspaceBriefing[]; representative: WorkspaceBriefing; hasErrors: boolean };
 type NewBriefingConfig = { segment: string; weekKey: string; sequence: string; sourceGroupId: string; signatureKeys: string[] };
-type TemplateSlot = { id: string; name: string; source: string; updatedAt: string };
 const IMAGE_SLOTS: Record<'header' | 'banner1' | 'banner2' | 'banner3', ImageSlot> = {
   header: { label: 'Header do e-mail', description: 'Imagem principal exibida no topo', image: 'HEADER' },
   banner1: { label: 'Banner do bloco principal', description: 'Imagem exibida após o primeiro botão', image: 'BANNER_1_CORPO', link: 'LINK_BANNER_1_CORPO' },
@@ -133,12 +132,17 @@ function downloadText(name: string, content: string) {
 }
 
 const initials = (value: string) => (value.trim().slice(0, 2) || '—').toUpperCase();
-const initialTemplateSlots = (): TemplateSlot[] => {
+const initialTemplateSlots = (): EmailTemplateSlot[] => {
+  const storedPrincipalId = localStorage.getItem(PRIMARY_TEMPLATE_KEY) ?? '';
+  const normalize = (slots: Array<Partial<EmailTemplateSlot> & Pick<EmailTemplateSlot, 'id' | 'name' | 'source'>>): EmailTemplateSlot[] => {
+    const principalId = slots.some((slot) => slot.id === storedPrincipalId) ? storedPrincipalId : slots[0]?.id;
+    return slots.map((slot) => ({ ...slot, isPrincipal: slot.id === principalId, version: Number(slot.version ?? 1), updatedAt: slot.updatedAt ?? new Date().toISOString() }));
+  };
   try {
     const stored = JSON.parse(localStorage.getItem(TEMPLATE_SLOTS_KEY) ?? 'null');
-    if (Array.isArray(stored) && stored.length) return stored;
+    if (Array.isArray(stored) && stored.length) return normalize(stored);
   } catch { /* migra para o slot inicial abaixo */ }
-  let migrated: TemplateSlot[] = [];
+  let migrated: EmailTemplateSlot[] = [];
   try {
     const legacy = JSON.parse(localStorage.getItem(LEGACY_TEMPLATE_SLOTS_KEY) ?? 'null');
     if (Array.isArray(legacy) && legacy.length) migrated = legacy;
@@ -151,22 +155,24 @@ const initialTemplateSlots = (): TemplateSlot[] => {
       } catch { /* tenta a versão anterior */ }
     }
   }
-  if (!migrated.length) migrated = [{ id: crypto.randomUUID(), name: 'Template principal', source: localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE, updatedAt: new Date().toISOString() }];
+  if (!migrated.length) migrated = [{ id: crypto.randomUUID(), name: 'Template principal', source: localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE, isPrincipal: true, version: 1, updatedAt: new Date().toISOString() }];
   const refreshed = migrated.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T18:00:00.000Z' } : slot);
-  return refreshed.some((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID) ? refreshed : [...refreshed, { id: PLURIX_UX_V2_TEMPLATE_ID, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T18:00:00.000Z' }];
+  return normalize(refreshed.some((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID) ? refreshed : [...refreshed, { id: PLURIX_UX_V2_TEMPLATE_ID, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, isPrincipal: false, version: 1, updatedAt: '2026-08-19T18:00:00.000Z' }]);
 };
 
 export const DynamicEmailWorkspace: React.FC = () => {
   const [rows, setRows] = useState<WorkspaceBriefing[]>(() => { try { return normalizeLegacyRows(JSON.parse(localStorage.getItem(ROWS_KEY) ?? 'null') ?? demoRows()); } catch { return normalizeLegacyRows(demoRows()); } });
   const [selectedId, setSelectedId] = useState(rows[0]?.__id ?? '');
-  const [templateSlots, setTemplateSlots] = useState<TemplateSlot[]>(initialTemplateSlots);
-  const [principalTemplateId, setPrincipalTemplateId] = useState(() => localStorage.getItem(PRIMARY_TEMPLATE_KEY) ?? '');
+  const initialSlotsRef = useRef<EmailTemplateSlot[]>(initialTemplateSlots());
+  const [templateSlots, setTemplateSlots] = useState<EmailTemplateSlot[]>(initialSlotsRef.current);
+  const [principalTemplateId, setPrincipalTemplateId] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.id ?? initialSlotsRef.current[0].id);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const effectivePrincipalId = templateSlots.some((slot) => slot.id === principalTemplateId) ? principalTemplateId : templateSlots[0].id;
   const effectiveSelectedId = templateSlots.some((slot) => slot.id === selectedTemplateId) ? selectedTemplateId : effectivePrincipalId;
   const selectedTemplateSlot = templateSlots.find((slot) => slot.id === effectiveSelectedId)!;
-  const [template, setTemplate] = useState(() => initialTemplateSlots()[0].source);
-  const [savedTemplate, setSavedTemplate] = useState(() => initialTemplateSlots()[0].source);
+  const [template, setTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
+  const [savedTemplate, setSavedTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
+  const [templateSyncState, setTemplateSyncState] = useState('Carregando catálogo compartilhado…');
   const [mode, setMode] = useState<'briefings' | 'library' | 'template'>('briefings');
   const [assets, setAssets] = useState<EmailAsset[]>([]);
   const [legalTexts, setLegalTexts] = useState<LegalText[]>([]);
@@ -203,11 +209,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
     try { setTaxonomy(await loadActivityTaxonomy()); setTaxonomyState('ready'); }
     catch { setTaxonomyState('error'); }
   };
-  useEffect(() => { Promise.allSettled([loadBriefings(), loadAssets(), loadLegalTexts(), loadSignatureSettings()]).then(([briefings, assetRows, legalRows, settings]) => {
+  useEffect(() => { Promise.allSettled([loadBriefings(), loadAssets(), loadLegalTexts(), loadSignatureSettings(), migrateLocalTemplateSlots(initialSlotsRef.current)]).then(([briefings, assetRows, legalRows, settings, sharedTemplates]) => {
     if (briefings.status === 'fulfilled') { setRows(briefings.value); setSelectedId(briefings.value.find((row) => row.__meta.status !== 'archived')?.__id ?? briefings.value[0]?.__id ?? ''); }
     if (assetRows.status === 'fulfilled') setAssets(assetRows.value);
     if (legalRows.status === 'fulfilled') setLegalTexts(legalRows.value);
     if (settings.status === 'fulfilled' && settings.value.length) setSignatureSettings(settings.value);
+    if (sharedTemplates.status === 'fulfilled' && sharedTemplates.value.length) {
+      const principal = sharedTemplates.value.find((slot) => slot.isPrincipal) ?? sharedTemplates.value[0];
+      setTemplateSlots(sharedTemplates.value); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
+      setTemplateSyncState('Compartilhado com todos os usuários');
+    } else setTemplateSyncState('Cache local — falha ao sincronizar templates');
     setSyncState(briefings.status === 'fulfilled' ? 'Sincronizado com o GaaS' : 'Rascunho local — não sincronizado');
   }); void refreshTaxonomy(); }, []);
   const activeRows = useMemo(() => rows.filter((row) => row.__meta.status !== 'archived'), [rows]);
@@ -295,45 +306,57 @@ export const DynamicEmailWorkspace: React.FC = () => {
       setAnnouncement(archived.length ? 'E-mail editorial arquivado; histórico e versões foram preservados.' : 'Rascunho ainda não salvo removido.');
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao arquivar o e-mail.'); }
   };
-  const saveTemplate = () => {
-    const updatedAt = new Date().toISOString();
-    setTemplateSlots((current) => current.map((slot) => slot.id === effectiveSelectedId ? { ...slot, source: template, updatedAt } : slot));
-    if (effectiveSelectedId === effectivePrincipalId) {
-      localStorage.setItem(TEMPLATE_KEY, template);
-      setSavedTemplate(template);
-      setAnnouncement('Template principal salvo e aplicado à prévia.');
-    } else setAnnouncement('Slot salvo. Defina-o como principal para usá-lo na prévia.');
+  const saveTemplate = async () => {
+    const current = templateSlots.find((slot) => slot.id === effectiveSelectedId); if (!current) return;
+    try {
+      const saved = await saveTemplateSlot({ ...current, source: template, version: current.version + 1, updatedAt: new Date().toISOString() });
+      setTemplateSlots((slots) => slots.map((slot) => slot.id === saved.id ? saved : slot));
+      if (saved.isPrincipal) { localStorage.setItem(TEMPLATE_KEY, saved.source); setSavedTemplate(saved.source); }
+      setTemplateSyncState('Compartilhado com todos os usuários');
+      setAnnouncement(saved.isPrincipal ? 'Template principal salvo no Supabase e aplicado à prévia de todos.' : 'Slot salvo no catálogo compartilhado. Defina-o como principal para usá-lo na prévia.');
+    } catch (error) { setTemplateSyncState('Falha ao sincronizar templates'); setAnnouncement(error instanceof Error ? error.message : 'Falha ao salvar template.'); }
   };
-  const createTemplateSlot = () => {
-    const slot: TemplateSlot = { id: crypto.randomUUID(), name: `Template ${templateSlots.length + 1}`, source: DEFAULT_DYNAMIC_EMAIL_TEMPLATE, updatedAt: new Date().toISOString() };
-    setTemplateSlots((current) => [...current, slot]); setSelectedTemplateId(slot.id); setTemplate(slot.source); setAnnouncement('Novo slot criado. Cole ou edite o AMPscript e salve.');
+  const createTemplateSlot = async () => {
+    const slot: EmailTemplateSlot = { id: crypto.randomUUID(), name: `Template ${templateSlots.length + 1}`, source: DEFAULT_DYNAMIC_EMAIL_TEMPLATE, isPrincipal: false, version: 1, updatedAt: new Date().toISOString() };
+    try { const saved = await saveTemplateSlot(slot); setTemplateSlots((current) => [...current, saved]); setSelectedTemplateId(saved.id); setTemplate(saved.source); setAnnouncement('Novo slot criado no catálogo compartilhado.'); }
+    catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao criar template.'); }
   };
   const selectTemplateSlot = (id: string) => {
     setTemplateSlots((current) => current.map((slot) => slot.id === effectiveSelectedId ? { ...slot, source: template } : slot));
     setSelectedTemplateId(id);
   };
-  const duplicateTemplateSlot = (id: string) => {
+  const duplicateTemplateSlot = async (id: string) => {
     const source = templateSlots.find((slot) => slot.id === id); if (!source) return;
-    const slot: TemplateSlot = { ...source, id: crypto.randomUUID(), name: `${source.name} — cópia`, source: id === effectiveSelectedId ? template : source.source, updatedAt: new Date().toISOString() };
-    setTemplateSlots((current) => [...current, slot]); setSelectedTemplateId(slot.id); setTemplate(slot.source); setAnnouncement('Template duplicado em um novo slot.');
+    const slot: EmailTemplateSlot = { ...source, id: crypto.randomUUID(), name: `${source.name} — cópia`, source: id === effectiveSelectedId ? template : source.source, isPrincipal: false, version: 1, updatedAt: new Date().toISOString() };
+    try { const saved = await saveTemplateSlot(slot); setTemplateSlots((current) => [...current, saved]); setSelectedTemplateId(saved.id); setTemplate(saved.source); setAnnouncement('Template duplicado no catálogo compartilhado.'); }
+    catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao duplicar template.'); }
   };
-  const deleteTemplateSlot = (id: string) => {
+  const deleteTemplateSlot = async (id: string) => {
     if (templateSlots.length === 1) { setAnnouncement('Mantenha ao menos um template-fonte disponível.'); return; }
-    const target = templateSlots.find((slot) => slot.id === id); if (!target || !window.confirm(`Apagar o slot “${target.name}”? Esta ação remove apenas a cópia salva neste navegador.`)) return;
-    const remaining = templateSlots.filter((slot) => slot.id !== id); const nextPrincipal = id === effectivePrincipalId ? remaining[0] : templateSlots.find((slot) => slot.id === effectivePrincipalId) ?? remaining[0];
-    setTemplateSlots(remaining); setPrincipalTemplateId(nextPrincipal.id); setSelectedTemplateId(nextPrincipal.id); setTemplate(nextPrincipal.source); setSavedTemplate(nextPrincipal.source); localStorage.setItem(TEMPLATE_KEY, nextPrincipal.source); setAnnouncement(id === effectivePrincipalId ? 'Slot apagado; outro template foi definido como principal.' : 'Slot de template apagado.');
+    const target = templateSlots.find((slot) => slot.id === id); if (!target || !window.confirm(`Apagar o slot “${target.name}” para todos os usuários?`)) return;
+    try {
+      const remaining = templateSlots.filter((slot) => slot.id !== id); const nextPrincipal = id === effectivePrincipalId ? remaining[0] : templateSlots.find((slot) => slot.id === effectivePrincipalId) ?? remaining[0];
+      if (id === effectivePrincipalId) await setPrincipalTemplateSlot(nextPrincipal.id);
+      await deleteSharedTemplateSlot(id);
+      const normalized = remaining.map((slot) => ({ ...slot, isPrincipal: slot.id === nextPrincipal.id }));
+      setTemplateSlots(normalized); setPrincipalTemplateId(nextPrincipal.id); setSelectedTemplateId(nextPrincipal.id); setTemplate(nextPrincipal.source); setSavedTemplate(nextPrincipal.source); localStorage.setItem(TEMPLATE_KEY, nextPrincipal.source); setAnnouncement(id === effectivePrincipalId ? 'Slot apagado para todos; outro template foi definido como principal.' : 'Slot apagado do catálogo compartilhado.');
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao apagar template.'); }
   };
-  const makeTemplatePrincipal = (id: string) => {
+  const makeTemplatePrincipal = async (id: string) => {
     const source = templateSlots.find((slot) => slot.id === id); if (!source) return;
     const sourceCode = id === effectiveSelectedId ? template : source.source;
-    const updatedAt = new Date().toISOString();
-    setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, source: sourceCode, updatedAt } : slot)); setPrincipalTemplateId(id); setSavedTemplate(sourceCode); localStorage.setItem(TEMPLATE_KEY, sourceCode); setAnnouncement(`${source.name} definido como principal para a visualização.`);
+    try {
+      await saveTemplateSlot({ ...source, source: sourceCode, isPrincipal: false, version: source.version + 1, updatedAt: new Date().toISOString() });
+      const shared = await setPrincipalTemplateSlot(id); const principal = shared.find((slot) => slot.id === id)!;
+      setTemplateSlots(shared); setPrincipalTemplateId(id); setSavedTemplate(principal.source); localStorage.setItem(TEMPLATE_KEY, principal.source); setAnnouncement(`${principal.name} definido como principal para todos os usuários.`);
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao definir template principal.'); }
   };
   const uploadTemplate = async (file?: File) => {
     if (!file) return;
     const source = await file.text(); const cleanName = file.name.replace(/\.(html?|txt)$/i, '') || `Template ${templateSlots.length + 1}`;
-    const slot: TemplateSlot = { id: crypto.randomUUID(), name: cleanName, source, updatedAt: new Date().toISOString() };
-    setTemplateSlots((current) => [...current, slot]); setSelectedTemplateId(slot.id); setTemplate(source); setAnnouncement(`${file.name} carregado em um novo slot. Revise e defina como principal quando estiver pronto.`);
+    const slot: EmailTemplateSlot = { id: crypto.randomUUID(), name: cleanName, source, isPrincipal: false, version: 1, updatedAt: new Date().toISOString() };
+    try { const saved = await saveTemplateSlot(slot); setTemplateSlots((current) => [...current, saved]); setSelectedTemplateId(saved.id); setTemplate(source); setAnnouncement(`${file.name} carregado no catálogo compartilhado. Revise e defina como principal quando estiver pronto.`); }
+    catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao subir template.'); }
   };
   const openNewBriefing = (segment = 'CRM', weekKey = 'Semana 1') => { setNewDefaults({ segment, weekKey }); setNewOpen(true); };
   const duplicateGroup = (groupId: string) => {
@@ -448,7 +471,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       </div>
     </header>
 
-    {mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={saveTemplate} onCreate={createTemplateSlot} onUpload={(file) => void uploadTemplate(file)} onDuplicate={duplicateTemplateSlot} onDelete={deleteTemplateSlot} onMakePrincipal={makeTemplatePrincipal}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
+    {mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
@@ -568,10 +591,10 @@ const HeaderMetric = ({ label, value, icon, tone = 'default' }: { label: string;
 
 const HeaderAction = ({ label, icon, onClick, disabled, danger }: { label: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean; danger?: boolean }) => <button onClick={onClick} disabled={disabled} title={label} className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-40 ${danger ? 'border border-red-200/30 bg-red-500/15 text-red-100 hover:bg-red-500/25' : 'border border-white/20 bg-white/10 text-white hover:bg-white/20'}`}>{icon}<span className="hidden 2xl:inline">{label}</span><span className="sr-only 2xl:hidden">{label}</span></button>;
 
-const TemplateSourceWorkspace = ({ slots, selectedId, principalId, source, fileRef, onSelect, onSourceChange, onRename, onSave, onCreate, onUpload, onDuplicate, onDelete, onMakePrincipal }: { slots: TemplateSlot[]; selectedId: string; principalId: string; source: string; fileRef: React.RefObject<HTMLInputElement>; onSelect: (id: string) => void; onSourceChange: (source: string) => void; onRename: (id: string, name: string) => void; onSave: () => void; onCreate: () => void; onUpload: (file?: File) => void; onDuplicate: (id: string) => void; onDelete: (id: string) => void; onMakePrincipal: (id: string) => void }) => {
+const TemplateSourceWorkspace = ({ slots, selectedId, principalId, source, syncState, fileRef, onSelect, onSourceChange, onRename, onSave, onCreate, onUpload, onDuplicate, onDelete, onMakePrincipal }: { slots: EmailTemplateSlot[]; selectedId: string; principalId: string; source: string; syncState: string; fileRef: React.RefObject<HTMLInputElement>; onSelect: (id: string) => void; onSourceChange: (source: string) => void; onRename: (id: string, name: string) => void; onSave: () => void; onCreate: () => void; onUpload: (file?: File) => void; onDuplicate: (id: string) => void; onDelete: (id: string) => void; onMakePrincipal: (id: string) => void }) => {
   const selected = slots.find((slot) => slot.id === selectedId)!;
   return <main className="pt-4"><div className="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Templates do Content Builder</h2><span className="rounded-full bg-cyan-50 px-2 py-1 text-[10px] font-bold text-cyan-800">{slots.length} {slots.length === 1 ? 'slot' : 'slots'}</span></div><p className="mt-1 text-sm text-slate-500">Teste diferentes HTMLs e AMPscript no navegador. Somente o principal alimenta a prévia dos e-mails.</p></div><div className="flex flex-wrap gap-2"><input ref={fileRef} type="file" accept=".html,.htm,.txt,text/html,text/plain" hidden onChange={(event) => { onUpload(event.target.files?.[0]); event.currentTarget.value = ''; }}/><button onClick={() => fileRef.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Upload size={15}/>Subir HTML</button><button onClick={onCreate} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#07595b] px-3 text-xs font-bold text-white"><Plus size={15}/>Novo slot</button></div></header>
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Templates do Content Builder</h2><span className="rounded-full bg-cyan-50 px-2 py-1 text-[10px] font-bold text-cyan-800">{slots.length} {slots.length === 1 ? 'slot' : 'slots'}</span></div><p className="mt-1 text-sm text-slate-500">Catálogo hospedado no Supabase. Todos visualizam os mesmos slots; somente o principal alimenta a prévia.</p><p className="mt-1 text-[11px] font-semibold text-cyan-800">{syncState}</p></div><div className="flex flex-wrap gap-2"><input ref={fileRef} type="file" accept=".html,.htm,.txt,text/html,text/plain" hidden onChange={(event) => { onUpload(event.target.files?.[0]); event.currentTarget.value = ''; }}/><button onClick={() => fileRef.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Upload size={15}/>Subir HTML</button><button onClick={onCreate} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#07595b] px-3 text-xs font-bold text-white"><Plus size={15}/>Novo slot</button></div></header>
     <div className="grid min-h-[68vh] lg:grid-cols-[300px_minmax(0,1fr)]">
       <aside className="border-b border-slate-200 bg-slate-50 p-3 lg:border-b-0 lg:border-r" aria-label="Slots de template"><div className="space-y-2">{slots.map((slot) => { const principal = slot.id === principalId; const active = slot.id === selectedId; return <button type="button" key={slot.id} onClick={() => onSelect(slot.id)} className={`w-full rounded-xl border p-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 ${active ? 'border-cyan-400 bg-white shadow-sm' : 'border-slate-200 bg-white/70 hover:border-slate-300'}`}><span className="flex items-start justify-between gap-2"><span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-900">{slot.name}</span><span className="mt-1 block text-[10px] text-slate-500">Atualizado {new Date(slot.updatedAt).toLocaleString('pt-BR')}</span></span>{principal && <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-extrabold uppercase tracking-wide text-emerald-800">Principal</span>}</span></button>; })}</div></aside>
       <section className="min-w-0"><div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 p-4"><label className="min-w-[220px] flex-1 text-xs font-semibold text-slate-600">Nome do slot<input value={selected.name} onChange={(event) => onRename(selected.id, event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-cyan-400"/></label><div className="flex flex-wrap justify-end gap-2"><button onClick={() => onDuplicate(selected.id)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"><Copy size={14}/>Duplicar</button><button onClick={() => onDelete(selected.id)} disabled={slots.length === 1} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-red-200 px-3 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"><Trash2 size={14}/>Apagar</button>{selected.id !== principalId && <button onClick={() => onMakePrincipal(selected.id)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-cyan-300 bg-cyan-50 px-3 text-xs font-bold text-cyan-900 hover:bg-cyan-100"><CheckCircle2 size={14}/>Definir como principal para visualização</button>}<button onClick={onSave} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-cyan-600 px-3 text-xs font-bold text-white hover:bg-cyan-700"><Save size={14}/>{selected.id === principalId ? 'Salvar e aplicar' : 'Salvar slot'}</button></div></div><textarea aria-label={`Código do template ${selected.name}`} value={source} onChange={(event) => onSourceChange(event.target.value)} spellCheck={false} className="h-[58vh] min-h-[520px] w-full resize-none bg-slate-950 p-5 font-mono text-xs leading-5 text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400"/></section>

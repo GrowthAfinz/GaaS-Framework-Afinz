@@ -212,6 +212,15 @@ ENDIF
             </td>
           </tr>
           %%[ ENDIF ]%%
+          <tr>
+            <td align="center" class="legal-pad" style="padding:20px 32px 28px 32px; border-top:1px solid #e5e7eb; background-color:#ffffff; color:#6b7280; font-family:Arial, Helvetica, sans-serif; font-size:10px; line-height:1.5; text-align:center;">
+              Este e-mail foi enviado por:<br>
+              %%Member_Busname%%<br>
+              %%Member_Addr%%, %%Member_City%% - %%Member_State%%<br>
+              %%Member_PostalCode%% - %%Member_Country%%<br><br>
+              <a href="%%profile_center_url%%" alias="Central de Preferências" target="_blank" style="color:#2C3490; text-decoration:underline;">Gerenciar preferências</a>
+            </td>
+          </tr>
         </table>
       </td>
     </tr>

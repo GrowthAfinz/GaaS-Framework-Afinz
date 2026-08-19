@@ -1,6 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 import { BRIEFING_COLUMNS, emptyBriefingRow, type BriefingRow } from '../domain/briefing';
-import type { ActivityTaxonomy, EmailAsset, LegalText, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
+import type { ActivityTaxonomy, EmailAsset, EmailTemplateSlot, LegalText, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
 import { exportableRow, withMeta } from '../domain/workspace';
 
 const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
@@ -21,6 +21,75 @@ export async function loadBriefings(): Promise<WorkspaceBriefing[]> {
   const { data, error } = await supabase.from('dynamic_email_briefings').select('*').order('updated_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(toBriefing);
+}
+
+const toTemplateSlot = (row: Record<string, any>): EmailTemplateSlot => ({
+  id: row.id,
+  name: row.name,
+  source: row.source,
+  isPrincipal: Boolean(row.is_principal),
+  version: Number(row.version ?? 1),
+  updatedAt: row.updated_at,
+});
+
+export async function loadTemplateSlots(): Promise<EmailTemplateSlot[]> {
+  const { data, error } = await supabase.from('dynamic_email_template_slots')
+    .select('*').eq('status', 'active').order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(toTemplateSlot);
+}
+
+export async function migrateLocalTemplateSlots(slots: EmailTemplateSlot[]): Promise<EmailTemplateSlot[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Sessão autenticada necessária para compartilhar templates.');
+  let shared = await loadTemplateSlots();
+  if (!shared.length && slots.length) {
+    const { error } = await supabase.from('dynamic_email_template_slots').upsert(slots.map((slot) => ({
+      id: slot.id,
+      name: slot.name,
+      source: slot.source,
+      is_principal: false,
+      version: slot.version,
+      status: 'active',
+      updated_by: auth.user.id,
+    })), { onConflict: 'id', ignoreDuplicates: true });
+    if (error) throw error;
+    shared = await loadTemplateSlots();
+  }
+  if (shared.length && !shared.some((slot) => slot.isPrincipal)) {
+    const preferred = slots.find((slot) => slot.isPrincipal && shared.some((item) => item.id === slot.id))?.id ?? shared[0].id;
+    await setPrincipalTemplateSlot(preferred);
+    shared = await loadTemplateSlots();
+  }
+  return shared;
+}
+
+export async function saveTemplateSlot(slot: EmailTemplateSlot): Promise<EmailTemplateSlot> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Sessão autenticada necessária para salvar templates.');
+  const { data, error } = await supabase.from('dynamic_email_template_slots').upsert({
+    id: slot.id,
+    name: slot.name.trim(),
+    source: slot.source,
+    is_principal: slot.isPrincipal,
+    status: 'active',
+    version: slot.version,
+    updated_by: auth.user.id,
+    updated_at: new Date().toISOString(),
+  }).select().single();
+  if (error) throw error;
+  return toTemplateSlot(data);
+}
+
+export async function deleteTemplateSlot(id: string): Promise<void> {
+  const { error } = await supabase.from('dynamic_email_template_slots').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function setPrincipalTemplateSlot(id: string): Promise<EmailTemplateSlot[]> {
+  const { error } = await supabase.rpc('set_dynamic_email_principal', { slot_id: id });
+  if (error) throw error;
+  return loadTemplateSlots();
 }
 
 export async function loadSignatureSettings(): Promise<SignatureSetting[]> {
