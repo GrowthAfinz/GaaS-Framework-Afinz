@@ -21,6 +21,7 @@
     "date-fns": "^2.30.0",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.29.2",
+    "html2canvas": "1.4.1",
     "idb-keyval": "^6.2.2",
     "lucide-react": "^0.563.0",
     "papaparse": "^5.4.1",
