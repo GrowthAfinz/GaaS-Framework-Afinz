@@ -51,6 +51,8 @@ describe('AMPscript-lite', () => {
     expect(result.html).toContain('logo-mais-amigo.png');
     expect(result.html).toContain('Olá, VANIA!');
     expect(result.html.indexOf('beneficios.png')).toBeLessThan(result.html.indexOf('QUERO MEU CARTÃO +AMIGO'));
+    expect(result.html).toContain('background-color:#2C3490');
+    expect(result.html).toContain('text-align:center');
     expect(result.html).toContain('<!-- Bloco SFMC omitido no preview local -->');
     expect(PLURIX_UX_V2_TEMPLATE).toContain('<custom name="opencounter" type="tracking"/>');
   });
@@ -71,5 +73,7 @@ describe('AMPscript-lite', () => {
     expect(result.html).not.toContain('Benefícios do cartão +amigo');
     expect(result.html).not.toContain('class="cta-link"');
     expect(result.html).toContain('+5% de desconto');
+    expect(result.html).toContain('background-color:#F6F6FB');
+    expect(result.html).toContain('text-align:left');
   });
 });
