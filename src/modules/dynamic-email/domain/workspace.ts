@@ -71,6 +71,14 @@ export type ActivityTaxonomy = {
   order?: number;
 };
 
+export type SignatureSetting = {
+  partner: string;
+  signatureKey: string;
+  signatureLabel: string;
+  status: 'active' | 'inactive';
+  effectiveFrom?: string;
+};
+
 export const emptyMeta = (): EditorialMeta => ({
   partner: '', segment: '', subgroup: '', weekKey: '', activityNames: [],
   campaignGroupId: crypto.randomUUID(), status: 'draft', version: 1,
@@ -118,18 +126,18 @@ export const applyWorkspaceField = (rows: WorkspaceBriefing[], selectedId: strin
   const selected = rows.find((row) => row.__id === selectedId);
   if (!selected) return rows;
   const propagate = sharedFields.includes(field) && !selected.__meta.legalOverride;
-  return rows.map((row) => row.__id === selectedId || (propagate && row.__meta.campaignGroupId === selected.__meta.campaignGroupId)
+  return rows.map((row) => row.__id === selectedId || (propagate && row.__meta.status !== 'archived' && row.__meta.campaignGroupId === selected.__meta.campaignGroupId)
     ? { ...row, [field]: value }
     : row);
 };
 
-export const ensurePlurixVariants = (rows: WorkspaceBriefing[], selectedId: string): WorkspaceBriefing[] => {
+export const ensurePlurixVariants = (rows: WorkspaceBriefing[], selectedId: string, inactiveKeys: string[] = []): WorkspaceBriefing[] => {
   const selected = rows.find((row) => row.__id === selectedId);
   if (!selected) return rows;
   const group = rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId);
   const keys = new Set(group.map((row) => row.NM_PRODUTO_INTERNO.toUpperCase()));
-  const additions = PLURIX_SIGNATURES.filter(({ key }) => !keys.has(key)).map(({ key }) => withMeta({
+  const additions = PLURIX_SIGNATURES.filter(({ key }) => !keys.has(key) && !inactiveKeys.includes(key)).map(({ key, label }) => withMeta({
     ...selected, __id: crypto.randomUUID(), NM_PRODUTO_INTERNO: key,
-  }, { ...selected.__meta, version: 1, status: 'draft' }));
+  }, { ...selected.__meta, subgroup: label, version: 1, status: 'draft', savedAt: undefined }));
   return [...rows, ...additions];
 };

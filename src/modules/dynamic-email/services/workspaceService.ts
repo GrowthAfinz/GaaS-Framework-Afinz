@@ -1,6 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 import { BRIEFING_COLUMNS, emptyBriefingRow, type BriefingRow } from '../domain/briefing';
-import type { ActivityTaxonomy, EmailAsset, LegalText, WorkspaceBriefing } from '../domain/workspace';
+import type { ActivityTaxonomy, EmailAsset, LegalText, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
 import { exportableRow, withMeta } from '../domain/workspace';
 
 const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
@@ -18,9 +18,26 @@ const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
 };
 
 export async function loadBriefings(): Promise<WorkspaceBriefing[]> {
-  const { data, error } = await supabase.from('dynamic_email_briefings').select('*').neq('status', 'archived').order('updated_at', { ascending: false });
+  const { data, error } = await supabase.from('dynamic_email_briefings').select('*').order('updated_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(toBriefing);
+}
+
+export async function loadSignatureSettings(): Promise<SignatureSetting[]> {
+  const { data, error } = await supabase.from('dynamic_email_signature_settings').select('*').order('signature_label');
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ partner: row.partner, signatureKey: row.signature_key, signatureLabel: row.signature_label, status: row.status, effectiveFrom: row.effective_from ?? undefined }));
+}
+
+export async function saveSignatureSetting(setting: SignatureSetting): Promise<SignatureSetting> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Sessão autenticada necessária para gerenciar assinaturas.');
+  const { data, error } = await supabase.from('dynamic_email_signature_settings').upsert({
+    partner: setting.partner, signature_key: setting.signatureKey, signature_label: setting.signatureLabel,
+    status: setting.status, effective_from: setting.effectiveFrom || null, updated_by: auth.user.id, updated_at: new Date().toISOString(),
+  }).select().single();
+  if (error) throw error;
+  return { partner: data.partner, signatureKey: data.signature_key, signatureLabel: data.signature_label, status: data.status, effectiveFrom: data.effective_from ?? undefined };
 }
 
 export async function saveBriefing(row: WorkspaceBriefing, warnings: string[]): Promise<WorkspaceBriefing> {
@@ -126,4 +143,4 @@ export async function recordExport(filename: string, rows: WorkspaceBriefing[], 
   });
 }
 
-export const onlyCsvRows = (rows: WorkspaceBriefing[]): BriefingRow[] => rows.map(exportableRow);
+export const onlyCsvRows = (rows: WorkspaceBriefing[]): BriefingRow[] => rows.filter((row) => row.__meta.status !== 'archived').map(exportableRow);

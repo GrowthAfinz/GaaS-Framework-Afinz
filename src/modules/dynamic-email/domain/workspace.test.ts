@@ -23,4 +23,12 @@ describe('workspace da Fábrica de E-mails', () => {
     row.NM_PRODUTO_INTERNO = 'AMIGAO';
     expect(ensurePlurixVariants([row], row.__id)).toHaveLength(6);
   });
+
+  it('não recria uma assinatura desativada globalmente', () => {
+    const row = withMeta(emptyBriefingRow('00000000-0000-4000-8000-000000000040'), { campaignGroupId: '00000000-0000-4000-8000-000000000050' });
+    row.NM_PRODUTO_INTERNO = 'AMIGAO';
+    const variants = ensurePlurixVariants([row], row.__id, ['COMPRE MAIS']);
+    expect(variants).toHaveLength(5);
+    expect(variants.some((item) => item.NM_PRODUTO_INTERNO === 'COMPRE MAIS')).toBe(false);
+  });
 });
