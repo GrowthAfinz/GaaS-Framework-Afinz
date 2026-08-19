@@ -145,7 +145,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
   useEffect(() => { Promise.allSettled([loadBriefings(), loadAssets(), loadLegalTexts(), loadActivityTaxonomy()]).then(([briefings, assetRows, legalRows, activities]) => {
-    if (briefings.status === 'fulfilled' && briefings.value.length) { setRows(briefings.value); setSelectedId(briefings.value[0].__id); }
+    if (briefings.status === 'fulfilled') { setRows(briefings.value); setSelectedId(briefings.value[0]?.__id ?? ''); }
     if (assetRows.status === 'fulfilled') setAssets(assetRows.value);
     if (legalRows.status === 'fulfilled') setLegalTexts(legalRows.value);
     if (activities.status === 'fulfilled') setTaxonomy(activities.value);
