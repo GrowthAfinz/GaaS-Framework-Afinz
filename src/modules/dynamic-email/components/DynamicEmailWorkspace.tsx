@@ -39,11 +39,13 @@ import {
   type ValidationIssue,
 } from '../domain/briefing';
 import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
+import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plurixUxV2Template';
 import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveSignatureSetting } from '../services/workspaceService';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
-const TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v2';
+const TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v3';
+const LEGACY_TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v2';
 const PRIMARY_TEMPLATE_KEY = 'gaas-dynamic-email-primary-template-v2';
 const ROWS_KEY = 'gaas-dynamic-email-briefings-v1';
 const SAMPLE: SubscriberSample = { CPF: '00000000000', PRI_NOME: 'VANIA', LIMITE: 'R$ 3.500', PRODUTO: 'INSTITUCIONAL', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'Repescagem' };
@@ -135,7 +137,13 @@ const initialTemplateSlots = (): TemplateSlot[] => {
     const stored = JSON.parse(localStorage.getItem(TEMPLATE_SLOTS_KEY) ?? 'null');
     if (Array.isArray(stored) && stored.length) return stored;
   } catch { /* migra para o slot inicial abaixo */ }
-  return [{ id: crypto.randomUUID(), name: 'Template principal', source: localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE, updatedAt: new Date().toISOString() }];
+  let migrated: TemplateSlot[] = [];
+  try {
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_TEMPLATE_SLOTS_KEY) ?? 'null');
+    if (Array.isArray(legacy) && legacy.length) migrated = legacy;
+  } catch { /* usa o template principal legado abaixo */ }
+  if (!migrated.length) migrated = [{ id: crypto.randomUUID(), name: 'Template principal', source: localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE, updatedAt: new Date().toISOString() }];
+  return migrated.some((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID) ? migrated : [...migrated, { id: PLURIX_UX_V2_TEMPLATE_ID, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T12:00:00.000Z' }];
 };
 
 export const DynamicEmailWorkspace: React.FC = () => {
@@ -505,7 +513,18 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <section id="email-preview-panel" className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
               <div className="border-b border-slate-200 bg-white p-3.5">
                 <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs leading-4 text-slate-500">Confira o conteúdo com dados de teste. Antes do envio, valide pelo Test Send do SFMC.</p></div><div className="flex shrink-0 flex-wrap justify-end gap-2"><button onClick={() => openRenderedPreview()} disabled={!selected || render.diagnostics.length > 0} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><ExternalLink size={15}/>Abrir em nova aba</button><button onClick={() => openRenderedPreview(true)} disabled={!selected || render.diagnostics.length > 0} title="Abre a impressão do navegador para salvar a prévia completa em PDF" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Printer size={15}/>Salvar em PDF</button><button onClick={() => setPreviewOpen(true)} disabled={!selected} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={15}/>Ampliar</button></div></div>
-                <div className="mt-3 grid grid-cols-2 gap-2"><MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/></div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.25fr)_minmax(120px,0.75fr)_minmax(120px,0.75fr)]">
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Template da prévia
+                    <span className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 bg-white px-2 focus-within:border-cyan-400">
+                      <select value={effectivePrincipalId} onChange={(event) => { const id = event.target.value; setSelectedTemplateId(id); makeTemplatePrincipal(id); }} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none" aria-label="Template principal da prévia">
+                        {templateSlots.map((slot) => <option key={slot.id} value={slot.id}>{slot.name}</option>)}
+                      </select>
+                      <button type="button" onClick={() => { setSelectedTemplateId(effectivePrincipalId); setMode('template'); }} className="ml-1 rounded-md p-1.5 text-cyan-700 hover:bg-cyan-50" aria-label="Editar AMPscript completo do template selecionado" title="Editar HTML e AMPscript completo"><Code2 size={14}/></button>
+                    </span>
+                  </label>
+                  <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/>
+                  <MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
+                </div>
               </div>
               {selected && <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold leading-5 text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="mt-0.5 line-clamp-1 text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-2 text-[11px] text-slate-500">{selected.__meta.partner || 'Parceiro'} · {selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO || 'Assinatura'} · {selected.__meta.segment || selected.TP_CAMPANHA || 'Segmento'} · {selected.SEQUENCIA || 'Sequência'} · Remetente definido no SFMC</div></div></div></div>}
               {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <iframe title="Conteúdo renderizado do e-mail dinâmico" sandbox="" srcDoc={render.html} className="h-[650px] w-full bg-slate-100"/>}
