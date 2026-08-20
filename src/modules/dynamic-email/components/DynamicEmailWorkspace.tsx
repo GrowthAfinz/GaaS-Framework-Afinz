@@ -197,6 +197,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [showArchived, setShowArchived] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const templateFileRef = useRef<HTMLInputElement>(null);
+  const { defaultLayout: workspaceDefaultLayout, onLayoutChanged: onWorkspaceLayoutChanged } = useDefaultLayout({ id: 'gaas-email-briefing-workspace-v1', storage: localStorage });
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'gaas-email-editor-preview-v1', storage: localStorage });
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
@@ -488,8 +489,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
-      <div className="grid min-h-[720px] gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
+      <Group id="email-briefing-workspace" orientation="horizontal" defaultLayout={workspaceDefaultLayout ?? { briefings: 20, content: 80 }} onLayoutChanged={onWorkspaceLayoutChanged} className="min-h-[720px] min-w-0 overflow-hidden" resizeTargetMinimumSize={{ coarse: 20, fine: 10 }}>
+        <Panel id="briefings" defaultSize="20%" minSize="14%" maxSize="38%" className="min-w-0">
+        <aside className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
           <div className="border-b border-slate-200 p-3.5">
             <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredGroups.length} de {activeEditorialGroupCount} e-mails · {activeRows.length} variantes ativas</p></div><Inbox className="text-cyan-700" size={18}/></div>
             <label className="mt-3 flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-cyan-400 focus-within:bg-white">
@@ -505,7 +507,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
             {filteredGroups.length ? <BriefingTree groups={filteredGroups} selectedId={selected?.__id ?? ''} showArchived={showArchived} onSelect={setSelectedId} onManage={(id) => { const target = rows.find((row) => row.__meta.campaignGroupId === id && row.__meta.status !== 'archived') ?? rows.find((row) => row.__meta.campaignGroupId === id); if (target) setSelectedId(target.__id); setSignatureManagerOpen(true); }} onNewEmail={(segment, weekKey) => openNewBriefing(segment, weekKey)} onDuplicateWeek={duplicateWeek} onArchiveWeek={(partner, segment, weekKey) => setWeekArchiveTarget({ partner, segment, weekKey })} onDuplicateEmail={duplicateGroup} onArchiveEmail={(groupId) => { const target = rows.find((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived'); if (target) { setSelectedId(target.__id); setDeleteOpen(true); } }}/> : <div className="px-4 py-10 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={24}/><p className="font-semibold text-slate-700">Nenhum briefing encontrado</p><p className="mt-1 text-xs">Ajuste a busca ou o filtro de status.</p></div>}
           </div>
         </aside>
+        </Panel>
 
+        <Separator id="briefing-workspace-separator" aria-label="Ajustar largura da Caixa de briefings" className="group/sidebar-splitter relative mx-1.5 w-2 cursor-col-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-cyan-500" title="Arraste para ajustar a largura da Caixa de briefings. Use as setas do teclado ou dê dois cliques para restaurar.">
+          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-300 transition group-hover/sidebar-splitter:w-1 group-hover/sidebar-splitter:bg-cyan-500"/>
+          <span className="absolute left-1/2 top-1/2 h-10 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-300 bg-white shadow-sm transition group-hover/sidebar-splitter:border-cyan-500 group-hover/sidebar-splitter:bg-cyan-50"/>
+        </Separator>
+
+        <Panel id="content" defaultSize="80%" minSize="62%" className="min-w-0">
         <Group id="email-editor-preview" orientation="horizontal" defaultLayout={defaultLayout ?? { editor: 58, preview: 42 }} onLayoutChanged={onLayoutChanged} className="min-w-0 overflow-hidden rounded-2xl" resizeTargetMinimumSize={{ coarse: 20, fine: 10 }}>
           <Panel id="editor" defaultSize="58%" minSize="32%" className="min-w-0">
         {selected ? <section id="email-editor-panel" className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
@@ -577,8 +586,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
             </section>
           </Panel>
         </Group>
-
-      </div>
+        </Panel>
+      </Group>
     </main>}
 
     {previewOpen && selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="email-preview-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }}>
