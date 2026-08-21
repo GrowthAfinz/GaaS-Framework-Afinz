@@ -228,7 +228,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const issuesByRow = useMemo(() => validateRows(activeRows), [activeRows]);
   const selected = rows.find((row) => row.__id === selectedId) ?? rows[0];
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
-  const render = useMemo(() => selected ? renderDynamicEmail(savedTemplate, selected, { ...subscriber, PRODUTO: selected.NM_PRODUTO_INTERNO, SEQUENCIA: selected.SEQUENCIA, TP_CAMPANHA: selected.TP_CAMPANHA }) : { html: '', diagnostics: [] }, [savedTemplate, selected, subscriber]);
+  const linkedTemplateId = selected?.__meta.templateSlotId && templateSlots.some((slot) => slot.id === selected.__meta.templateSlotId)
+    ? selected.__meta.templateSlotId
+    : effectivePrincipalId;
+  const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
+  const render = useMemo(() => selected ? renderDynamicEmail(previewTemplate, selected, { ...subscriber, PRODUTO: selected.NM_PRODUTO_INTERNO, SEQUENCIA: selected.SEQUENCIA, TP_CAMPANHA: selected.TP_CAMPANHA }) : { html: '', diagnostics: [] }, [previewTemplate, selected, subscriber]);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
@@ -569,12 +573,12 @@ export const DynamicEmailWorkspace: React.FC = () => {
               <div className="border-b border-slate-200 bg-white p-3.5">
                 <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs leading-4 text-slate-500">Confira o conteúdo com dados de teste. Antes do envio, valide pelo Test Send do SFMC.</p></div><div className="flex shrink-0 flex-wrap justify-end gap-2"><button onClick={() => openRenderedPreview()} disabled={!selected || render.diagnostics.length > 0} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><ExternalLink size={15}/>Abrir em nova aba</button><button onClick={() => openRenderedPreview(true)} disabled={!selected || render.diagnostics.length > 0} title="Abre a impressão do navegador para salvar a prévia completa em PDF" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Printer size={15}/>Salvar em PDF</button><button onClick={() => setPreviewOpen(true)} disabled={!selected} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={15}/>Ampliar</button></div></div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.25fr)_minmax(120px,0.75fr)_minmax(120px,0.75fr)]">
-                  <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Template da prévia
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Template deste briefing
                     <span className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 bg-white px-2 focus-within:border-cyan-400">
-                      <select value={effectivePrincipalId} onChange={(event) => { const id = event.target.value; setSelectedTemplateId(id); makeTemplatePrincipal(id); }} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none" aria-label="Template principal da prévia">
+                      <select value={linkedTemplateId} onChange={(event) => { const id = event.target.value; setSelectedTemplateId(id); updateGroupMeta({ templateSlotId: id }); }} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none" aria-label="Template vinculado ao briefing">
                         {templateSlots.map((slot) => <option key={slot.id} value={slot.id}>{slot.name}</option>)}
                       </select>
-                      <button type="button" onClick={() => { setSelectedTemplateId(effectivePrincipalId); setMode('template'); }} className="ml-1 rounded-md p-1.5 text-cyan-700 hover:bg-cyan-50" aria-label="Editar AMPscript completo do template selecionado" title="Editar HTML e AMPscript completo"><Code2 size={14}/></button>
+                      <button type="button" onClick={() => { setSelectedTemplateId(linkedTemplateId); setMode('template'); }} className="ml-1 rounded-md p-1.5 text-cyan-700 hover:bg-cyan-50" aria-label="Editar HTML e AMPscript completo do template vinculado" title="Editar HTML e AMPscript completo"><Code2 size={14}/></button>
                     </span>
                   </label>
                   <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/>

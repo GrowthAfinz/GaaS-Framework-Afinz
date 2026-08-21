@@ -12,6 +12,7 @@ const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
     partner: record.partner ?? '', segment: record.segment ?? '', subgroup: record.subgroup ?? '', weekKey: record.week_key ?? '',
     activityNames: record.activity_names ?? [], campaignGroupId: record.campaign_group_id ?? record.id,
     status: record.status ?? 'draft', version: record.version ?? 1, savedAt: record.updated_at,
+    templateSlotId: record.template_slot_id ?? undefined,
     acknowledgedMissingActivity: Boolean(record.acknowledged_missing_activity),
     legalOverride: Boolean(record.legal_override),
   });
@@ -124,6 +125,7 @@ export async function saveBriefings(entries: Array<{ row: WorkspaceBriefing; war
     campaign_group_id: row.__meta.campaignGroupId,
     status: row.__meta.status,
     version: row.__meta.version,
+    template_slot_id: row.__meta.templateSlotId || null,
     journey_confirmed: Boolean(row.__journeyConfirmed),
     acknowledged_missing_activity: Boolean(row.__meta.acknowledgedMissingActivity),
     legal_override: Boolean(row.__meta.legalOverride),

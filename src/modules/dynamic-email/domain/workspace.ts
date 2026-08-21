@@ -20,6 +20,7 @@ export type EditorialMeta = {
   campaignGroupId: string;
   status: BriefingStatus;
   version: number;
+  templateSlotId?: string;
   savedAt?: string;
   acknowledgedMissingActivity?: boolean;
   legalOverride?: boolean;

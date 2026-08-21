@@ -1,0 +1,22 @@
+{
+  "templates": 8,
+  "unique_assets": 22,
+  "briefings": 8,
+  "warnings": [
+    {
+      "email": 5,
+      "type": "malformed-link",
+      "value": "https://cartao-afinz.onelink.me/9ODN/mtuc2zhn?chttps://cartao-afinz.onelink.me/9ODN/mtuc2zhn?c=b2c_topo_de_funil_vibe&af_sub1=base_proprietaria&af_sub2=s3&af_sub3=b2c_email_vibe_bsp_S3D01"
+    }
+  ],
+  "source_sha256": [
+    "b17717cf8366f6379b97e61d768f4f3e100efe7aa31e121c0d6a06b8d9c1a2de",
+    "7b5b2ef2da49cffcd6ebd40ede7a0c65cb5237ae35cbe10db7cea21b9d67bfd1",
+    "355c123d0fb09b6e7944f2f403d68cc1c9f3df0bcdb9b0aafb457ce90a6f85d8",
+    "7ab606a42bd9d98f905123075a92cbc839d3ac1a01a906ff539c1dce439a4a74",
+    "638482607f7e0ff046831202cbb894fba14593075caea6a3a07bb8ca9caf3092",
+    "3b37ba47274a673a1e499e4b35a95ec5b9fb9273811887813de12350863d1981",
+    "7b8ca7baaa3e2154768767b74c34596915e5167c0bb33c02ccd169fd3f1ad855",
+    "6c2719bd9ed77a95418259681e890cd8a28464540a3f919b0f1383a0fc973f7b"
+  ]
+}
