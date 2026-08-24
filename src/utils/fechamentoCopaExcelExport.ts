@@ -264,63 +264,104 @@ function nullableNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+// Campanhas reais da fase App Install / Onboarding (Meta, confirmadas como Copa
+// pelo usuário — o nome não carrega o token "COPA" mas a campanha rodou a ação toda,
+// com handoff direto: App Install até 22/06, Onboarding a partir de 22/06 até 15/08).
+const APP_INSTALL_CAMPAIGN = '[B2C]App_Install_Afinz';
+const APP_INSTALL_CAMPAIGN_ID = '120210447970060723';
+const ONBOARDING_CAMPAIGNS = [
+  '[Afinz | Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
+  '[Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
+];
+
 /**
- * Fonte governada do funil de mídia paga B2C.
+ * Fonte governada do funil de mídia paga B2C (App Install + Onboarding/StartTrial).
  *
- * A view preserva a semântica de resultado:
- * - app_install: instalação atribuída à Meta;
- * - onboarding: instalação legada/direcional + StartTrial atribuído à Meta.
+ * Antes lia de `v_b2c_app_install_daily`, uma view que empilha 3 camadas de dedup
+ * (paid_media_actions → v_paid_media_actions_latest [DISTINCT ON] → v_funnel_ad_latest)
+ * sem nenhum filtro seletivo disponível (channel/account_id/campaign_id são constantes
+ * em toda a tabela paid_media_actions) — confirmado por EXPLAIN ANALYZE: ~8-13s mesmo
+ * em janelas curtas, estourando o statement_timeout do client e derrubando o export.
  *
- * Conversões genéricas de outras campanhas não entram como instalação.
+ * Agora: spend/impressões/cliques + installs/start_trials nativos vêm direto de
+ * `paid_media_metrics` (rápido, mesmo padrão já usado no lado Rentabilização). O
+ * install "canônico" da fase App Install (que só existe via o pipeline de atribuição
+ * lento) vem de `copa_app_install_attribution_snapshot` — uma foto pré-computada via
+ * backfill manual, sem custo de query ao vivo. Ver memory: fechamento-copa-report.
  */
 export async function fetchAqPaidDaily(start: Date, end: Date): Promise<AqPaidDay[]> {
-  const rows: AqPaidDay[] = [];
   const startIso = isoDate(start);
   const endExclusiveIso = isoDate(addDays(end, 1));
   const pageSize = 1000;
+  const byKey = new Map<string, AqPaidDay>();
+  const knownCampaigns = [APP_INSTALL_CAMPAIGN, ...ONBOARDING_CAMPAIGNS];
 
-  // A view agrega camadas de dedup (v_paid_media_actions_latest, v_funnel_ad_latest)
-  // que hoje não têm o filtro de data empurrado pra dentro — em janelas mais largas
-  // isso pode estourar o statement_timeout do Postgres. Falha aqui não derruba o
-  // export inteiro (mesmo padrão de fetchCopaFixedDaily): a seção de mídia paga da
-  // Aquisição Copa fica vazia e o resto do relatório é gerado normalmente.
+  const phaseFor = (campaign: string): AqPaidPhase => (campaign === APP_INSTALL_CAMPAIGN ? 'app_install' : 'onboarding');
+  const labelFor = (phase: AqPaidPhase): string => (phase === 'app_install' ? '[B2C] App Install Afinz' : '[B2C] App Install Onboarding Afinz');
+  const attributionFor = (phase: AqPaidPhase): string => (phase === 'app_install' ? 'Meta results - install - 1d click + 1d view' : 'StartTrial atribuido a Meta - 7d click');
+  const sourceFor = (phase: AqPaidPhase): string => (phase === 'app_install' ? 'meta_results' : 'paid_media_metrics');
+  const getOrCreate = (businessDate: string, phase: AqPaidPhase): AqPaidDay => {
+    const key = `${businessDate}|${phase}`;
+    let row = byKey.get(key);
+    if (!row) {
+      row = {
+        businessDate, phase, campaignLabel: labelFor(phase),
+        spend: 0, impressions: 0, linkClicks: 0, installs: 0, startTrials: 0,
+        attributionLabel: attributionFor(phase), installSource: sourceFor(phase),
+      };
+      byKey.set(key, row);
+    }
+    return row;
+  };
+
   try {
     for (let offset = 0; ; offset += pageSize) {
       const { data, error } = await supabase
-        .from('v_b2c_app_install_daily')
-        .select('business_date, campaign_phase, campaign_label, spend, impressions, link_clicks, installs, start_trials, attribution_label, install_source')
-        .gte('business_date', startIso)
-        .lt('business_date', endExclusiveIso)
-        .order('business_date', { ascending: true })
-        .order('campaign_phase', { ascending: true })
+        .from('paid_media_metrics')
+        .select('date, campaign, spend, impressions, clicks, installs, start_trials')
+        .eq('channel', 'meta')
+        .in('campaign', knownCampaigns)
+        .gte('date', startIso)
+        .lt('date', endExclusiveIso)
         .range(offset, offset + pageSize - 1);
       if (error) throw error;
 
-      for (const row of data ?? []) {
-        const phase = String(row.campaign_phase ?? '');
-        if (phase !== 'app_install' && phase !== 'onboarding') continue;
-        rows.push({
-          businessDate: String(row.business_date).slice(0, 10),
-          phase,
-          campaignLabel: String(row.campaign_label ?? ''),
-          spend: nullableNumber(row.spend) ?? 0,
-          impressions: nullableNumber(row.impressions) ?? 0,
-          linkClicks: nullableNumber(row.link_clicks),
-          installs: nullableNumber(row.installs),
-          startTrials: nullableNumber(row.start_trials),
-          attributionLabel: String(row.attribution_label ?? ''),
-          installSource: String(row.install_source ?? ''),
-        });
+      for (const raw of data ?? []) {
+        const businessDate = String(raw.date).slice(0, 10);
+        const phase = phaseFor(String(raw.campaign ?? ''));
+        const row = getOrCreate(businessDate, phase);
+        row.spend += nullableNumber(raw.spend) ?? 0;
+        row.impressions += nullableNumber(raw.impressions) ?? 0;
+        row.linkClicks = (row.linkClicks ?? 0) + (nullableNumber(raw.clicks) ?? 0);
+        row.installs = (row.installs ?? 0) + (nullableNumber(raw.installs) ?? 0);
+        row.startTrials = (row.startTrials ?? 0) + (nullableNumber(raw.start_trials) ?? 0);
       }
 
       if (!data || data.length < pageSize) break;
     }
   } catch (err) {
-    console.warn('[fechamento-copa] v_b2c_app_install_daily indisponível (timeout ou erro de query):', err);
+    console.warn('[fechamento-copa] paid_media_metrics (aquisição) indisponível:', err);
     return [];
   }
 
-  return rows;
+  try {
+    const { data: snapshot, error: snapError } = await supabase
+      .from('copa_app_install_attribution_snapshot')
+      .select('business_date, canonical_installs')
+      .eq('campaign_id', APP_INSTALL_CAMPAIGN_ID)
+      .gte('business_date', startIso)
+      .lt('business_date', endExclusiveIso);
+    if (snapError) throw snapError;
+    for (const raw of snapshot ?? []) {
+      const businessDate = String(raw.business_date).slice(0, 10);
+      const row = getOrCreate(businessDate, 'app_install');
+      row.installs = nullableNumber(raw.canonical_installs);
+    }
+  } catch (err) {
+    console.warn('[fechamento-copa] copa_app_install_attribution_snapshot indisponível (installs da fase App Install ficam em branco):', err);
+  }
+
+  return [...byKey.values()].sort((a, b) => a.businessDate.localeCompare(b.businessDate) || a.phase.localeCompare(b.phase));
 }
 
 // ── Aba diarizada "Aquisição Copa" (layout seccionado por BU × Segmento) ─────────
