@@ -278,35 +278,45 @@ export async function fetchAqPaidDaily(start: Date, end: Date): Promise<AqPaidDa
   const endExclusiveIso = isoDate(addDays(end, 1));
   const pageSize = 1000;
 
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase
-      .from('v_b2c_app_install_daily')
-      .select('business_date, campaign_phase, campaign_label, spend, impressions, link_clicks, installs, start_trials, attribution_label, install_source')
-      .gte('business_date', startIso)
-      .lt('business_date', endExclusiveIso)
-      .order('business_date', { ascending: true })
-      .order('campaign_phase', { ascending: true })
-      .range(offset, offset + pageSize - 1);
-    if (error) throw error;
+  // A view agrega camadas de dedup (v_paid_media_actions_latest, v_funnel_ad_latest)
+  // que hoje não têm o filtro de data empurrado pra dentro — em janelas mais largas
+  // isso pode estourar o statement_timeout do Postgres. Falha aqui não derruba o
+  // export inteiro (mesmo padrão de fetchCopaFixedDaily): a seção de mídia paga da
+  // Aquisição Copa fica vazia e o resto do relatório é gerado normalmente.
+  try {
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from('v_b2c_app_install_daily')
+        .select('business_date, campaign_phase, campaign_label, spend, impressions, link_clicks, installs, start_trials, attribution_label, install_source')
+        .gte('business_date', startIso)
+        .lt('business_date', endExclusiveIso)
+        .order('business_date', { ascending: true })
+        .order('campaign_phase', { ascending: true })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
 
-    for (const row of data ?? []) {
-      const phase = String(row.campaign_phase ?? '');
-      if (phase !== 'app_install' && phase !== 'onboarding') continue;
-      rows.push({
-        businessDate: String(row.business_date).slice(0, 10),
-        phase,
-        campaignLabel: String(row.campaign_label ?? ''),
-        spend: nullableNumber(row.spend) ?? 0,
-        impressions: nullableNumber(row.impressions) ?? 0,
-        linkClicks: nullableNumber(row.link_clicks),
-        installs: nullableNumber(row.installs),
-        startTrials: nullableNumber(row.start_trials),
-        attributionLabel: String(row.attribution_label ?? ''),
-        installSource: String(row.install_source ?? ''),
-      });
+      for (const row of data ?? []) {
+        const phase = String(row.campaign_phase ?? '');
+        if (phase !== 'app_install' && phase !== 'onboarding') continue;
+        rows.push({
+          businessDate: String(row.business_date).slice(0, 10),
+          phase,
+          campaignLabel: String(row.campaign_label ?? ''),
+          spend: nullableNumber(row.spend) ?? 0,
+          impressions: nullableNumber(row.impressions) ?? 0,
+          linkClicks: nullableNumber(row.link_clicks),
+          installs: nullableNumber(row.installs),
+          startTrials: nullableNumber(row.start_trials),
+          attributionLabel: String(row.attribution_label ?? ''),
+          installSource: String(row.install_source ?? ''),
+        });
+      }
+
+      if (!data || data.length < pageSize) break;
     }
-
-    if (!data || data.length < pageSize) break;
+  } catch (err) {
+    console.warn('[fechamento-copa] v_b2c_app_install_daily indisponível (timeout ou erro de query):', err);
+    return [];
   }
 
   return rows;
