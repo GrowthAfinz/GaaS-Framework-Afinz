@@ -1209,6 +1209,7 @@ function writeCopaBigNumbersSheet(
   crmIdx: Map<string, CopaMetrics>,
   chartImages?: CopaChartImages,
   eventNotes?: CopaEventNote[],
+  ga4Snapshot?: CopaGa4UniqueSnapshot | null,
 ): void {
   const maxCol = 20;
   const ws = wb.addWorksheet(COPA_BIG_NUMBERS_SHEET, {
@@ -1294,13 +1295,18 @@ function writeCopaBigNumbersSheet(
 
   type BigCard = {
     label: string;
-    formula: string;
+    formula?: string;
+    value?: number | string;
     format: string;
     fill: string;
     note: string;
   };
+  const ga4Note = ga4Snapshot
+    ? `GA4 dedup · ${formatShortDate(parseIsoDate(ga4Snapshot.dataInicio))}–${formatShortDate(parseIsoDate(ga4Snapshot.dataFim))}`
+    : 'Sem snapshot GA4 para este fechamento';
   const cards: BigCard[] = [
     { label: 'ACESSOS LP', formula: `SUM(${weeklyRange('B')})`, format: '#,##0', fill: '2E75B6', note: `GA4/Looker · ${lpCoverage}` },
+    { label: 'USUÁRIOS ÚNICOS (PERÍODO)', value: ga4Snapshot?.usuariosUnicos ?? '', format: '#,##0', fill: '0EA5E9', note: ga4Note },
     { label: 'OPT-INS LP (GA4)', formula: `SUM(${weeklyRange('C')})`, format: '#,##0', fill: '0F766E', note: `Etapa opt-in · ${lpCoverage}` },
     { label: 'CLIENTES CADASTRADOS', formula: `SUM(${weeklyRange('D')})`, format: '#,##0', fill: 'D6B656', note: `Dashboard Visa · ${visaCoverage}` },
     { label: 'NOVOS CARTÕES', formula: `SUM(${weeklyRange('E')})`, format: '#,##0', fill: '334155', note: `Dashboard Visa · ${visaCoverage}` },
@@ -1314,16 +1320,23 @@ function writeCopaBigNumbersSheet(
     { label: 'CLIQUES CRM', formula: `SUM(${weeklyRange('N')})`, format: '#,##0', fill: 'C2410C', note: 'Tracking preenchido essencialmente em e-mail' },
   ];
 
+  // Grid dinâmico: mantém sempre 3 faixas de linhas (rows 6/12/18) — o número de
+  // colunas por card se ajusta ao total de cards, pra caber novas métricas sem
+  // deslocar as seções fixas abaixo (EFICIÊNCIA na row 24 etc.). Com 12 cards dá
+  // 4 por linha/5 colunas cada (comportamento original); com 13+ aperta a largura.
+  const cardsPerRow = Math.max(1, Math.ceil(cards.length / 3));
+  const cardWidth = Math.max(1, Math.floor(maxCol / cardsPerRow));
   cards.forEach((card, index) => {
-    const row = 6 + Math.floor(index / 4) * 6;
-    const col = 1 + (index % 4) * 5;
-    ws.mergeCells(row, col, row, col + 4);
-    ws.mergeCells(row + 1, col, row + 3, col + 4);
-    ws.mergeCells(row + 4, col, row + 4, col + 4);
+    const row = 6 + Math.floor(index / cardsPerRow) * 6;
+    const col = 1 + (index % cardsPerRow) * cardWidth;
+    const colEnd = col + cardWidth - 1;
+    ws.mergeCells(row, col, row, colEnd);
+    ws.mergeCells(row + 1, col, row + 3, colEnd);
+    ws.mergeCells(row + 4, col, row + 4, colEnd);
     setCell(ws.getCell(row, col), card.label, {
       bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 9,
     });
-    setCell(ws.getCell(row + 1, col), { formula: card.formula }, {
+    setCell(ws.getCell(row + 1, col), card.value !== undefined ? card.value : { formula: card.formula! }, {
       bold: true, fillColor: card.fill, fontColor: 'FFFFFF', size: 18,
     });
     ws.getCell(row + 1, col).numFmt = card.format;
@@ -1331,7 +1344,7 @@ function writeCopaBigNumbersSheet(
       fillColor: 'F8FAFC', fontColor: '475569', size: 8,
     });
     for (let currentRow = row; currentRow <= row + 4; currentRow++) {
-      for (let currentCol = col; currentCol <= col + 4; currentCol++) {
+      for (let currentCol = col; currentCol <= colEnd; currentCol++) {
         ws.getCell(currentRow, currentCol).border = {
           top: { style: 'thin', color: { argb: 'FFD7DEE8' } },
           bottom: { style: 'thin', color: { argb: 'FFD7DEE8' } },
@@ -2209,6 +2222,7 @@ export function buildWorkbook(
   detailChartImages?: CopaChartImages,
   bigChartImages?: CopaChartImages,
   eventNotes?: CopaEventNote[],
+  ga4Snapshot?: CopaGa4UniqueSnapshot | null,
 ): Workbook {
   const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
   const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
@@ -2223,7 +2237,7 @@ export function buildWorkbook(
 
   const copaActionIdx = buildCopaIndex(rows, COPA_ACTION_START, end);
   const crmSummary = copaCrmChartSummary(copaActionIdx, copaActionDates);
-  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, bigChartImages ?? detailChartImages, eventNotes);
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, bigChartImages ?? detailChartImages, eventNotes, ga4Snapshot);
   writeCopaSheet(wb, rows, copaDetailDates, copaDetailStart, end, fixedIdx, detailChartImages);
   addDashboardDataSheet(wb, copaActionDates, fixedIdx, crmSummary);
 
@@ -2402,6 +2416,36 @@ async function fetchCopaEventNotes(start: Date, end: Date): Promise<CopaEventNot
   }
 }
 
+type CopaGa4UniqueSnapshot = { dataInicio: string; dataFim: string; usuariosUnicos: number; visualizacoes: number | null };
+
+/**
+ * Snapshot de Usuários Únicos deduplicados pelo GA4 (dashboard Hyperativa), colado
+ * manualmente a cada fechamento — o GA4 não expõe dedup incremental por dia, então
+ * não dá pra derivar isso somando a série diária de `usuarios ativos` (que infla por
+ * visitantes recorrentes em dias diferentes). Busca a linha cujo `data_fim` bate
+ * exatamente com o fim do período do relatório; se não houver, o card fica vazio.
+ */
+async function fetchCopaGa4UniqueSnapshot(end: Date): Promise<CopaGa4UniqueSnapshot | null> {
+  try {
+    const { data, error } = await supabase
+      .from('copa_ga4_unique_snapshots')
+      .select('data_inicio, data_fim, usuarios_unicos, visualizacoes')
+      .eq('data_fim', isoDate(end))
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      dataInicio: String(data.data_inicio).slice(0, 10),
+      dataFim: String(data.data_fim).slice(0, 10),
+      usuariosUnicos: asInt(data.usuarios_unicos),
+      visualizacoes: data.visualizacoes !== null && data.visualizacoes !== undefined ? asInt(data.visualizacoes) : null,
+    };
+  } catch (err) {
+    console.warn('[renta-copa] copa_ga4_unique_snapshots indisponível:', err);
+    return null;
+  }
+}
+
 function downloadBuffer(buffer: BlobPart, filename: string): void {
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -2422,10 +2466,11 @@ export async function exportRentabilizacaoCrmXlsx(
   if (effectiveEnd < start) throw new Error('O periodo selecionado ainda nao possui dias fechados.');
   const sourceStart = start < COPA_ACTION_START ? start : COPA_ACTION_START;
   const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
-  const [rawRows, fixedIdx, eventNotes, ExcelJSModule] = await Promise.all([
+  const [rawRows, fixedIdx, eventNotes, ga4Snapshot, ExcelJSModule] = await Promise.all([
     fetchRntRows(sourceStart, effectiveEnd),
     fetchCopaFixedDaily(COPA_ACTION_START, effectiveEnd),
     fetchCopaEventNotes(COPA_ACTION_START, effectiveEnd),
+    fetchCopaGa4UniqueSnapshot(effectiveEnd),
     import('exceljs'),
   ]);
   const copaDetailDates = copaDetailStart <= effectiveEnd ? allDates(copaDetailStart, effectiveEnd) : [];
@@ -2443,6 +2488,7 @@ export async function exportRentabilizacaoCrmXlsx(
     detailChartImages,
     bigChartImages,
     eventNotes,
+    ga4Snapshot,
   );
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = `rentabilizacao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(effectiveEnd).replace(/-/g, '')}.xlsx`;
@@ -2486,8 +2532,9 @@ export {
   fetchRntRows,
   fetchCopaFixedDaily,
   fetchCopaEventNotes,
+  fetchCopaGa4UniqueSnapshot,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
 };
-export type { CopaChannel, CopaFixedIndex, CopaMetrics, CopaEventNote };
+export type { CopaChannel, CopaFixedIndex, CopaMetrics, CopaEventNote, CopaGa4UniqueSnapshot };
