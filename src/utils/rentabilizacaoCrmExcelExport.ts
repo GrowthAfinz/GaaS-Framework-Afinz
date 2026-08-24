@@ -1200,12 +1200,15 @@ function createCopaChartImages(
 
 // ── Escrita de seção no worksheet ─────────────────────────────────────────────
 
+type CopaEventNote = { data: string; nota: string };
+
 function writeCopaBigNumbersSheet(
   wb: Workbook,
   dates: Date[],
   fixedIdx: CopaFixedIndex,
   crmIdx: Map<string, CopaMetrics>,
   chartImages?: CopaChartImages,
+  eventNotes?: CopaEventNote[],
 ): void {
   const maxCol = 20;
   const ws = wb.addWorksheet(COPA_BIG_NUMBERS_SHEET, {
@@ -1259,11 +1262,18 @@ function writeCopaBigNumbersSheet(
   });
   ws.getRow(3).height = 30;
 
-  ws.mergeCells(4, 1, 4, maxCol);
-  setCell(ws.getCell(4, 1), 'Leitura: volumes são somas do período. Taxas são recalculadas pelos volumes agregados. Custo/cliente não é CAC. Cliques de CRM estão preenchidos essencialmente em e-mail; ausência nos demais canais não deve ser interpretada como desempenho zero.', {
-    italic: true, fillColor: 'FFF2CC', fontColor: '7F6000', align: 'left', size: 9,
+  const relevantNotes = (eventNotes ?? []).filter((n) => {
+    const d = parseIsoDate(n.data);
+    return dates.length > 0 && d >= dates[0] && d <= dates[dates.length - 1];
   });
-  ws.getRow(4).height = 34;
+  const eventsText = relevantNotes.length > 0
+    ? ` ⚠ EVENTOS DO PERÍODO: ${relevantNotes.map((n) => `${formatShortDate(parseIsoDate(n.data))} — ${n.nota}`).join(' | ')}`
+    : '';
+  ws.mergeCells(4, 1, 4, maxCol);
+  setCell(ws.getCell(4, 1), `Leitura: volumes são somas do período. Taxas são recalculadas pelos volumes agregados. Custo/cliente não é CAC. Cliques de CRM estão preenchidos essencialmente em e-mail; ausência nos demais canais não deve ser interpretada como desempenho zero.${eventsText}`, {
+    italic: true, fillColor: relevantNotes.length > 0 ? 'FDE68A' : 'FFF2CC', fontColor: '7F6000', align: 'left', size: 9,
+  });
+  ws.getRow(4).height = relevantNotes.length > 0 ? 60 : 34;
 
   if (dates.length === 0) {
     ws.mergeCells(6, 1, 8, maxCol);
@@ -2198,6 +2208,7 @@ export function buildWorkbook(
   fixedIdx: CopaFixedIndex,
   detailChartImages?: CopaChartImages,
   bigChartImages?: CopaChartImages,
+  eventNotes?: CopaEventNote[],
 ): Workbook {
   const { seguros, rentabilizacao, auditRows, summary } = buildIndexes(rows, start, end);
   const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
@@ -2212,7 +2223,7 @@ export function buildWorkbook(
 
   const copaActionIdx = buildCopaIndex(rows, COPA_ACTION_START, end);
   const crmSummary = copaCrmChartSummary(copaActionIdx, copaActionDates);
-  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, bigChartImages ?? detailChartImages);
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, bigChartImages ?? detailChartImages, eventNotes);
   writeCopaSheet(wb, rows, copaDetailDates, copaDetailStart, end, fixedIdx, detailChartImages);
   addDashboardDataSheet(wb, copaActionDates, fixedIdx, crmSummary);
 
@@ -2368,6 +2379,29 @@ async function fetchCopaFixedDaily(start: Date, end: Date): Promise<CopaFixedInd
   return idx;
 }
 
+/**
+ * Anotações dated de eventos de negócio (ex.: tombamento Afinz x Visa) gravadas em
+ * copa_visa_daily.raw_payload.nota. Surfaçadas como aviso no Big Numbers pra evitar
+ * que um pico legítimo do dashboard (não erro de dado) seja lido como anomalia.
+ */
+async function fetchCopaEventNotes(start: Date, end: Date): Promise<CopaEventNote[]> {
+  try {
+    const { data, error } = await supabase
+      .from('copa_visa_daily')
+      .select('data, raw_payload')
+      .gte('data', isoDate(start))
+      .lte('data', isoDate(end))
+      .not('raw_payload->>nota', 'is', null);
+    if (error) throw error;
+    return (data ?? [])
+      .map((row) => ({ data: String(row.data).slice(0, 10), nota: String((row.raw_payload as Record<string, unknown> | null)?.nota ?? '') }))
+      .filter((n) => n.nota);
+  } catch (err) {
+    console.warn('[renta-copa] copa_visa_daily.raw_payload.nota indisponível:', err);
+    return [];
+  }
+}
+
 function downloadBuffer(buffer: BlobPart, filename: string): void {
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -2388,9 +2422,10 @@ export async function exportRentabilizacaoCrmXlsx(
   if (effectiveEnd < start) throw new Error('O periodo selecionado ainda nao possui dias fechados.');
   const sourceStart = start < COPA_ACTION_START ? start : COPA_ACTION_START;
   const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
-  const [rawRows, fixedIdx, ExcelJSModule] = await Promise.all([
+  const [rawRows, fixedIdx, eventNotes, ExcelJSModule] = await Promise.all([
     fetchRntRows(sourceStart, effectiveEnd),
     fetchCopaFixedDaily(COPA_ACTION_START, effectiveEnd),
+    fetchCopaEventNotes(COPA_ACTION_START, effectiveEnd),
     import('exceljs'),
   ]);
   const copaDetailDates = copaDetailStart <= effectiveEnd ? allDates(copaDetailStart, effectiveEnd) : [];
@@ -2407,6 +2442,7 @@ export async function exportRentabilizacaoCrmXlsx(
     fixedIdx,
     detailChartImages,
     bigChartImages,
+    eventNotes,
   );
   const buffer = await workbook.xlsx.writeBuffer();
   const filename = `rentabilizacao_crm_${isoDate(start).replace(/-/g, '')}_${isoDate(effectiveEnd).replace(/-/g, '')}.xlsx`;
@@ -2429,6 +2465,7 @@ export function getCurrentMonthRange(): { start: Date; end: Date } {
 export {
   setCell,
   isoDate,
+  parseIsoDate,
   allDates,
   addDays,
   colLetter,
@@ -2448,8 +2485,9 @@ export {
   writeCopaBigNumbersSheet,
   fetchRntRows,
   fetchCopaFixedDaily,
+  fetchCopaEventNotes,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
 };
-export type { CopaChannel, CopaFixedIndex, CopaMetrics };
+export type { CopaChannel, CopaFixedIndex, CopaMetrics, CopaEventNote };

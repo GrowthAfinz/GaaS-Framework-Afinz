@@ -19,11 +19,12 @@ import {
   writeCopaBigNumbersSheet,
   fetchRntRows,
   fetchCopaFixedDaily,
+  fetchCopaEventNotes,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
 } from './rentabilizacaoCrmExcelExport';
-import type { CopaChannel } from './rentabilizacaoCrmExcelExport';
+import type { CopaChannel, CopaEventNote } from './rentabilizacaoCrmExcelExport';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FECHAMENTO COPA · AQUISIÇÃO E RENTABILIZAÇÃO
@@ -1015,9 +1016,10 @@ export function buildFechamentoCopaWorkbook(
     start: Date;
     end: Date;
     createChartImages?: boolean;
+    eventNotes?: CopaEventNote[];
   },
 ): Workbook {
-  const { rntRows, aqRows, aqPaidRows = [], fixedIdx, start, end } = params;
+  const { rntRows, aqRows, aqPaidRows = [], fixedIdx, start, end, eventNotes } = params;
   const copaStart = COPA_ACTION_START;
   const copaActionDates = copaStart <= end ? allDates(copaStart, end) : [];
   const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
@@ -1037,7 +1039,7 @@ export function buildFechamentoCopaWorkbook(
 
   // Ordem: 1) Rentabilização Copa 2) Big Numbers Renta 3) Aquisição Copa 4) Big Numbers Aquisição
   writeCopaSheet(wb, rntRows, copaDetailDates, copaDetailStart, end, fixedIdx, chartImages);
-  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages);
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages, eventNotes);
   writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates, aqPaidRows);
   writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates, aqPaidRows);
 
@@ -1055,11 +1057,12 @@ export async function exportFechamentoCopaXlsx(
   const copaStart = COPA_ACTION_START;
   if (copaStart > effectiveEnd) throw new Error('A acao Copa ainda nao possui dias fechados.');
 
-  const [rntRows, fixedIdx, aqRows, aqPaidRows, ExcelJSModule] = await Promise.all([
+  const [rntRows, fixedIdx, aqRows, aqPaidRows, eventNotes, ExcelJSModule] = await Promise.all([
     fetchRntRows(copaStart, effectiveEnd),
     fetchCopaFixedDaily(copaStart, effectiveEnd),
     fetchSupabaseRows(copaStart, effectiveEnd),
     fetchAqPaidDaily(copaStart, effectiveEnd),
+    fetchCopaEventNotes(copaStart, effectiveEnd),
     import('exceljs'),
   ]);
 
@@ -1071,6 +1074,7 @@ export async function exportFechamentoCopaXlsx(
     start,
     end: effectiveEnd,
     createChartImages: true,
+    eventNotes,
   });
 
   const buffer = await wb.xlsx.writeBuffer();
