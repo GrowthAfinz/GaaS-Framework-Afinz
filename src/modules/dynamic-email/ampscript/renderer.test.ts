@@ -73,6 +73,9 @@ describe('AMPscript-lite', () => {
     const row = emptyBriefingRow('plurix-v2-email-2');
     Object.assign(row, {
       NM_PRODUTO_INTERNO: 'BOA',
+      TITULO_COPY_1_AZUL: 'Economize ainda mais',
+      COR_COPY_1: '#2C3490',
+      TAMANHO_DA_FONTE_TITULO_COPY_1: '24',
       TITULO_COPY_2: 'Só quem tem o cartão +amigo aproveita mais',
       COR_TITULO_COPY_2: '#2C3490',
       TAMANHO_DA_FONTE_TITULO_COPY_2: '26',
@@ -86,6 +89,8 @@ describe('AMPscript-lite', () => {
     const result = renderDynamicEmail(PLURIX_UX_V2_TEMPLATE, row, { ...subscriber, SEQUENCIA: 'E-mail 2' });
     expect(result.diagnostics).toEqual([]);
     expect(result.html).not.toContain('Benefícios do cartão +amigo');
+    expect(result.html).toContain('<h1 class="headline"');
+    expect(result.html).toContain('Economize ainda mais');
     expect(result.html).toContain('+5% de desconto');
     expect(result.html.match(/Só quem tem o cartão \+amigo aproveita mais/g)).toHaveLength(1);
     expect(result.html).not.toContain('Peça agora seu cartão +amigo');

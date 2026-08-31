@@ -144,11 +144,23 @@ ENDIF
           <!-- E-mail 2: economia, benefícios e conversão -->
           <tr>
             <td align="center" class="content-pad" style="padding:30px 32px 12px 32px; text-align:center;">
+              %%[ IF NOT EMPTY(@TituloCopy1) THEN ]%%
+              <h1 class="headline" style="max-width:500px; margin:0 auto 16px auto; color:%%=v(@CorCopy1)=%%; font-size:%%=v(@TamanhoFonteTituloCopy1)=%%px; line-height:1.25; font-weight:700; text-align:center;">%%=TreatAsContent(@TituloCopy1)=%%</h1>
+              %%[ ENDIF ]%%
               %%[ IF NOT EMPTY(@Copy1Preto) THEN ]%%
               <div class="body-copy" style="max-width:500px; margin:0 auto; color:%%=v(@CorCopyPreto1)=%%; font-size:%%=v(@TamanhoFonteCopyPreto1)=%%px; line-height:1.55; text-align:center;">%%=TreatAsContent(@Copy1Preto)=%%</div>
               %%[ ENDIF ]%%
             </td>
           </tr>
+          %%[ IF NOT EMPTY(@Banner1Corpo) THEN ]%%
+          <tr>
+            <td align="center" class="content-pad" style="padding:8px 32px 16px 32px;">
+              %%[ IF NOT EMPTY(@LinkBanner1) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@LinkBanner1))=%%" target="_blank" style="text-decoration:none;">%%[ ENDIF ]%%
+              <img src="%%=v(@Banner1Corpo)=%%" alt="" width="536" style="display:block; width:100%; max-width:536px; height:auto; border:0;">
+              %%[ IF NOT EMPTY(@LinkBanner1) THEN ]%%</a>%%[ ENDIF ]%%
+            </td>
+          </tr>
+          %%[ ENDIF ]%%
           %%[ IF NOT EMPTY(@TituloCTA1) AND NOT EMPTY(@LinkCTA1) THEN ]%%
           <tr>
             <td align="center" class="content-pad cta-cell" style="padding:14px 32px 30px 32px;">

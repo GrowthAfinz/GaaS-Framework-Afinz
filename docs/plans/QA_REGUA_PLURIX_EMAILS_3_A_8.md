@@ -89,7 +89,8 @@ O texto do legado não foi promovido a promessa comercial. O vault atual registr
 
 ## Evidências técnicas
 
-- Template: 58 aberturas e 58 fechamentos AMPscript; 28 `IF` e 28 `ENDIF`.
+- Template: 60 aberturas e 60 fechamentos AMPscript; 29 `IF` e 29 `ENDIF`.
+- Nos E-mails 2 a 8, o título principal e o `BANNER_1_CORPO` agora renderizam no bloco principal; antes eram carregados, mas ignorados pelo HTML.
 - Nenhum texto fixo de CTA ou o antigo bloco “Peça agora...” permanece no ramo dos E-mails 2 a 8.
 - 36/36 registros com `briefing_data.__id = id`, `status = needs_review` e `version = 2` após a atualização.
 - Limites máximos observados: títulos 29/31; copies 169/186; CTAs 19/22.
