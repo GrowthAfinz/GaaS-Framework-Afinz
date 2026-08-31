@@ -94,4 +94,20 @@ describe('AMPscript-lite', () => {
     expect(result.html).toContain('PEDIR AGORA MEU CARTÃO +AMIGO');
     expect(result.html).not.toContain('Saiba como solicitar');
   });
+
+  it('troca assets pendentes por placeholders cinza apenas no preview local', () => {
+    const row = emptyBriefingRow('plurix-pending-asset');
+    Object.assign(row, {
+      HEADER: '[PENDENTE MKT] HEADER 600 px: criar peça de teste.',
+      COPY_1_PRETO: 'Conteúdo principal',
+      COR_COPY_PRETO_1: '#242424',
+      TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '18',
+    });
+    const result = renderDynamicEmail(PLURIX_UX_V2_TEMPLATE, row, { ...subscriber, SEQUENCIA: 'E-mail 3' });
+    expect(result.diagnostics).toEqual([]);
+    expect(result.html).toContain('background:#E5E7EB');
+    expect(result.html).toContain('HEADER 600 px: criar peça de teste.');
+    expect(result.html).not.toContain('src="[PENDENTE MKT]');
+    expect(PLURIX_UX_V2_TEMPLATE).not.toContain('background:#E5E7EB');
+  });
 });

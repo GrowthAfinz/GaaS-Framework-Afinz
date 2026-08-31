@@ -95,6 +95,16 @@ function interpolate(value: string, vars: Vars, depth = 0): string {
   return output;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function renderPendingAssetPlaceholders(html: string): string {
+  return html.replace(/<img\b(?=[^>]*\bsrc="(\[PENDENTE MKT\][^"]*)")[^>]*>/gi, (_, description: string) => (
+    `<div role="img" aria-label="${escapeHtml(description)}" style="box-sizing:border-box; width:100%; min-height:160px; display:flex; align-items:center; justify-content:center; padding:24px; border:2px dashed #A8AFBF; border-radius:10px; background:#E5E7EB; color:#4B5563; font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:1.45; text-align:center;">${escapeHtml(description)}</div>`
+  ));
+}
+
 export function renderDynamicEmail(source: string, row: BriefingRow, subscriber: SubscriberSample): RenderResult {
   const diagnostics = unsupported(source); if (diagnostics.length) return { html: '', diagnostics };
   const vars = readVars(source, row, subscriber);
@@ -103,6 +113,7 @@ export function renderDynamicEmail(source: string, row: BriefingRow, subscriber:
   html = renderConditionals(html, vars);
   html = html.replace(/%%\[\s*(?:SET|RaiseError)[\s\S]*?\]%%/gi, '');
   html = interpolate(html, vars);
+  html = renderPendingAssetPlaceholders(html);
   html = html.replace(/<custom\b[^>]*\/?\s*>/gi, '<!-- Bloco SFMC omitido no preview local -->');
   const unresolved = html.match(/%%(?:\[|=)[\s\S]*?%%/g) ?? [];
   if (unresolved.length) diagnostics.push(`Restaram ${unresolved.length} expressões AMPscript sem resolver.`);
