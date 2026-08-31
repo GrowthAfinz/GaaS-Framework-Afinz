@@ -240,8 +240,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
     if (legalRows.status === 'fulfilled') setLegalTexts(legalRows.value);
     if (settings.status === 'fulfilled' && settings.value.length) setSignatureSettings(settings.value);
     if (sharedTemplates.status === 'fulfilled' && sharedTemplates.value.length) {
-      const principal = sharedTemplates.value.find((slot) => slot.isPrincipal) ?? sharedTemplates.value[0];
-      setTemplateSlots(sharedTemplates.value); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
+      const effectiveSharedTemplates = sharedTemplates.value.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID
+        ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, version: Math.max(slot.version, 2), updatedAt: '2026-08-31T12:00:00.000Z' }
+        : slot);
+      const principal = effectiveSharedTemplates.find((slot) => slot.isPrincipal) ?? effectiveSharedTemplates[0];
+      setTemplateSlots(effectiveSharedTemplates); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
       setTemplateSyncState('Compartilhado com todos os usuários');
     } else setTemplateSyncState('Cache local — falha ao sincronizar templates');
     setSyncState(briefings.status === 'fulfilled' ? 'Sincronizado com o GaaS' : 'Rascunho local — não sincronizado');

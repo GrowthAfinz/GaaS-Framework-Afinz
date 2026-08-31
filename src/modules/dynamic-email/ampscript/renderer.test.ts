@@ -69,7 +69,7 @@ describe('AMPscript-lite', () => {
     expect(PLURIX_UX_V2_TEMPLATE).toContain('<custom name="opencounter" type="tracking"/>');
   });
 
-  it('renderiza o layout do E-mail 2 com benefícios e painel de conversão', () => {
+  it('renderiza o E-mail 2 com um único bloco secundário alimentado pelo briefing', () => {
     const row = emptyBriefingRow('plurix-v2-email-2');
     Object.assign(row, {
       NM_PRODUTO_INTERNO: 'BOA',
@@ -87,9 +87,9 @@ describe('AMPscript-lite', () => {
     expect(result.diagnostics).toEqual([]);
     expect(result.html).not.toContain('Benefícios do cartão +amigo');
     expect(result.html).toContain('+5% de desconto');
-    expect(result.html).toContain('background-color:#F6F6FB');
-    expect(result.html).toContain('text-align:left');
-    expect(result.html).toContain('Peça agora seu cartão +amigo');
+    expect(result.html.match(/Só quem tem o cartão \+amigo aproveita mais/g)).toHaveLength(1);
+    expect(result.html).not.toContain('Peça agora seu cartão +amigo');
+    expect(result.html).not.toContain('Comece a aproveitar os benefícios nas suas compras do dia a dia.');
     expect(result.html).toContain('max-width:220px');
     expect(result.html).toContain('PEDIR AGORA MEU CARTÃO +AMIGO');
     expect(result.html).not.toContain('Saiba como solicitar');
