@@ -1202,72 +1202,119 @@ function createCopaChartImages(
 
 type CopaEventNote = { data: string; nota: string };
 
-/**
- * Painel de referência/comparativo — colado à direita dos painéis "TOTAIS POR CANAL"
- * existentes, sem deslocar nada. Mostra a taxa de referência (histórica, fora da ação
- * em análise) e o delta contra a taxa real da mesma linha/canal do painel principal
- * (que está sempre nas colunas D/F/H — Tx entrega/Tx abertura/Tx clique).
- */
-function writeChannelBenchmarkPanel(
-  ws: Worksheet,
-  titleRow: number,
-  headerRow: number,
-  dataStartRow: number,
-  opts: { title: string; benchmark: ChannelBenchmark; startCol?: number },
-): void {
-  const startCol = opts.startCol ?? 22; // por padrão deixa col 21 como gutter (layout Renta).
-  const cols = { txEntregaRef: startCol, deltaEntrega: startCol + 1, txAberturaRef: startCol + 2, deltaAbertura: startCol + 3, txCliqueRef: startCol + 4, deltaClique: startCol + 5 };
-  const mainCol = { txEntrega: 4, txAbertura: 6, txClique: 8 }; // D/F/H do painel principal (mesmas linhas)
+type FunnelTotals = ChannelBenchmark[CopaChannel];
 
-  ws.mergeCells(titleRow, startCol, titleRow, cols.deltaClique);
-  setCell(ws.getCell(titleRow, startCol), opts.title, {
-    bold: true, fillColor: '92400E', fontColor: 'FFFFFF', align: 'left', size: 10,
+function sumChannelBenchmark(m: ChannelBenchmark): FunnelTotals {
+  return COPA_CHANNELS.reduce((acc, ch) => {
+    acc.enviados += m[ch].enviados;
+    acc.entregues += m[ch].entregues;
+    acc.abertura += m[ch].abertura;
+    acc.cliques += m[ch].cliques;
+    acc.propostas += m[ch].propostas;
+    acc.aprovados += m[ch].aprovados;
+    acc.cartoes += m[ch].cartoes;
+    acc.custo += m[ch].custo;
+    return acc;
+  }, { enviados: 0, entregues: 0, abertura: 0, cliques: 0, propostas: 0, aprovados: 0, cartoes: 0, custo: 0 });
+}
+
+type FunnelRateGroup = { label: string; num: (m: FunnelTotals) => number; den: (m: FunnelTotals) => number; format: string };
+
+const FUNNEL_RATE_GROUPS: FunnelRateGroup[] = [
+  { label: 'TX ENTREGA', num: (m) => m.entregues, den: (m) => m.enviados, format: '0.0%' },
+  { label: 'TX ABERTURA', num: (m) => m.abertura, den: (m) => m.entregues, format: '0.0%' },
+  { label: 'TX CLIQUE', num: (m) => m.cliques, den: (m) => m.entregues, format: '0.0%' },
+  { label: 'TX PROPOSTA', num: (m) => m.propostas, den: (m) => m.entregues, format: '0.0%' },
+  { label: 'TX APROVAÇÃO', num: (m) => m.aprovados, den: (m) => m.propostas, format: '0.0%' },
+  { label: 'TX CARTÃO (CONVERSÃO)', num: (m) => m.cartoes, den: (m) => m.entregues, format: '0.0%' },
+];
+
+/**
+ * Bloco largo, full-width, comparando o funil completo (entrega → abertura → clique
+ * → proposta → aprovação → cartão/conversão → CAC) da própria ação — canal a canal —
+ * contra uma referência histórica. Cada métrica ganha 3 colunas (valor real | valor de
+ * referência | delta), deliberadamente ocupando mais espaço do que um resumo simples,
+ * a pedido do usuário. É anexado como seção própria (não fica espremido ao lado de
+ * outro painel), então não depende de nenhuma linha fixa de layout ao redor.
+ */
+function writeFunnelComparativoBlock(
+  ws: Worksheet,
+  startRow: number,
+  opts: { title: string; actual: ChannelBenchmark; benchmark: ChannelBenchmark; actualLabel: string; refLabel: string },
+): number {
+  const groupWidth = 3; // Real | Ref. | Δ
+  const totalCols = 1 + FUNNEL_RATE_GROUPS.length * groupWidth + groupWidth; // Canal + 6 taxas + CAC
+  const titleRow = startRow;
+  const groupHeaderRow = startRow + 1;
+  const subHeaderRow = startRow + 2;
+  const dataStartRow = startRow + 3;
+
+  ws.mergeCells(titleRow, 1, titleRow, totalCols);
+  setCell(ws.getCell(titleRow, 1), opts.title, {
+    bold: true, fillColor: '92400E', fontColor: 'FFFFFF', align: 'left', size: 11,
   });
 
-  const headers = ['Tx entrega ref.', 'Δ vs. ref.', 'Tx abertura ref.', 'Δ vs. ref.', 'Tx clique ref.', 'Δ vs. ref.'];
-  headers.forEach((h, i) => setCell(ws.getCell(headerRow, startCol + i), h, {
+  setCell(ws.getCell(groupHeaderRow, 1), 'Canal', { bold: true, fillColor: 'FDE9D9', fontColor: '92400E', size: 8 });
+  ws.mergeCells(subHeaderRow, 1, groupHeaderRow, 1);
+
+  let col = 2;
+  FUNNEL_RATE_GROUPS.forEach((group) => {
+    ws.mergeCells(groupHeaderRow, col, groupHeaderRow, col + groupWidth - 1);
+    setCell(ws.getCell(groupHeaderRow, col), group.label, { bold: true, fillColor: '92400E', fontColor: 'FFFFFF', size: 8 });
+    [opts.actualLabel, opts.refLabel, 'Δ'].forEach((h, i) => setCell(ws.getCell(subHeaderRow, col + i), h, {
+      bold: true, fillColor: 'FDE9D9', fontColor: '92400E', size: 8,
+    }));
+    col += groupWidth;
+  });
+  const cacCol = col;
+  ws.mergeCells(groupHeaderRow, cacCol, groupHeaderRow, cacCol + groupWidth - 1);
+  setCell(ws.getCell(groupHeaderRow, cacCol), 'CAC', { bold: true, fillColor: '92400E', fontColor: 'FFFFFF', size: 8 });
+  [opts.actualLabel, opts.refLabel, 'Δ'].forEach((h, i) => setCell(ws.getCell(subHeaderRow, cacCol + i), h, {
     bold: true, fillColor: 'FDE9D9', fontColor: '92400E', size: 8,
   }));
 
-  const rates = (m: { enviados: number; entregues: number; abertura: number; cliques: number }) => ({
-    entrega: m.enviados > 0 ? m.entregues / m.enviados : '',
-    abertura: m.entregues > 0 ? m.abertura / m.entregues : '',
-    clique: m.entregues > 0 ? m.cliques / m.entregues : '',
-  });
-  const total = COPA_CHANNELS.reduce((acc, ch) => {
-    acc.enviados += opts.benchmark[ch].enviados;
-    acc.entregues += opts.benchmark[ch].entregues;
-    acc.abertura += opts.benchmark[ch].abertura;
-    acc.cliques += opts.benchmark[ch].cliques;
-    return acc;
-  }, { enviados: 0, entregues: 0, abertura: 0, cliques: 0 });
+  const actualTotal = sumChannelBenchmark(opts.actual);
+  const refTotal = sumChannelBenchmark(opts.benchmark);
 
   [...COPA_CHANNELS, 'TOTAL' as const].forEach((channel, index) => {
     const row = dataStartRow + index;
     const isTotal = channel === 'TOTAL';
-    const m = isTotal ? total : opts.benchmark[channel];
-    const r = rates(m);
+    const a = isTotal ? actualTotal : opts.actual[channel];
+    const r = isTotal ? refTotal : opts.benchmark[channel];
     const fill = isTotal ? 'FDE9D9' : index % 2 === 0 ? 'FFFFFF' : 'FFF7ED';
-    const mainRow = row; // painel principal usa exatamente as mesmas linhas (WPP/E-MAIL/SMS/PUSH/TOTAL).
-    const deltaFormula = (refCol: number, mainC: number) => ({
-      formula: `IFERROR(${colLetter(mainC)}${mainRow}-${colLetter(refCol)}${row},"")`,
+    setCell(ws.getCell(row, 1), channel, { bold: isTotal, fillColor: fill, align: 'left', size: 9 });
+
+    let c = 2;
+    FUNNEL_RATE_GROUPS.forEach((group) => {
+      const aRate = group.den(a) > 0 ? group.num(a) / group.den(a) : '';
+      const rRate = group.den(r) > 0 ? group.num(r) / group.den(r) : '';
+      setCell(ws.getCell(row, c), aRate, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+      setCell(ws.getCell(row, c + 1), rRate, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+      setCell(ws.getCell(row, c + 2), {
+        formula: `IFERROR(${colLetter(c)}${row}-${colLetter(c + 1)}${row},"")`,
+      }, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+      [c, c + 1, c + 2].forEach((col2) => { ws.getCell(row, col2).numFmt = group.format; });
+      c += groupWidth;
     });
-    setCell(ws.getCell(row, cols.txEntregaRef), r.entrega, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
-    setCell(ws.getCell(row, cols.deltaEntrega), deltaFormula(cols.txEntregaRef, mainCol.txEntrega), { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
-    setCell(ws.getCell(row, cols.txAberturaRef), r.abertura, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
-    setCell(ws.getCell(row, cols.deltaAbertura), deltaFormula(cols.txAberturaRef, mainCol.txAbertura), { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
-    setCell(ws.getCell(row, cols.txCliqueRef), r.clique, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
-    setCell(ws.getCell(row, cols.deltaClique), deltaFormula(cols.txCliqueRef, mainCol.txClique), { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
-    [cols.txEntregaRef, cols.deltaEntrega, cols.txAberturaRef, cols.deltaAbertura, cols.txCliqueRef, cols.deltaClique].forEach((c) => {
-      ws.getCell(row, c).numFmt = '0.0%';
-    });
+
+    const aCac = a.cartoes > 0 ? a.custo / a.cartoes : '';
+    const rCac = r.cartoes > 0 ? r.custo / r.cartoes : '';
+    setCell(ws.getCell(row, cacCol), aCac, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    setCell(ws.getCell(row, cacCol + 1), rCac, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    setCell(ws.getCell(row, cacCol + 2), {
+      formula: `IFERROR(${colLetter(cacCol)}${row}-${colLetter(cacCol + 1)}${row},"")`,
+    }, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    [cacCol, cacCol + 1, cacCol + 2].forEach((col2) => { ws.getCell(row, col2).numFmt = '"R$" #,##0.00'; });
   });
 
   const noteRow = dataStartRow + COPA_CHANNELS.length + 1;
-  ws.mergeCells(noteRow, startCol, noteRow, cols.deltaClique);
-  setCell(ws.getCell(noteRow, startCol), 'Δ = taxa real da Copa − taxa de referência (positivo = Copa acima da referência).', {
-    italic: true, fillColor: 'FFF7ED', fontColor: '92400E', size: 7,
+  ws.mergeCells(noteRow, 1, noteRow, totalCols);
+  setCell(ws.getCell(noteRow, 1), `Δ = ${opts.actualLabel} − ${opts.refLabel} (positivo = ação acima da referência). Tx aprovação = Aprovados/Propostas; Tx cartão = Cartões/Entregues; CAC = Custo Total Campanha/Cartões.`, {
+    italic: true, fillColor: 'FFF7ED', fontColor: '92400E', size: 8, align: 'left',
   });
+  ws.getRow(noteRow).height = 26;
+
+  return noteRow + 2;
 }
 
 function writeCopaBigNumbersSheet(
@@ -1279,8 +1326,9 @@ function writeCopaBigNumbersSheet(
   eventNotes?: CopaEventNote[],
   ga4Snapshot?: CopaGa4UniqueSnapshot | null,
   benchmark?: ChannelBenchmark,
+  benchmarkActual?: ChannelBenchmark,
 ): void {
-  const maxCol = benchmark ? 28 : 20;
+  const maxCol = 20;
   const ws = wb.addWorksheet(COPA_BIG_NUMBERS_SHEET, {
     views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', activeCell: 'A5', showGridLines: false }],
   });
@@ -1512,13 +1560,6 @@ function writeCopaBigNumbersSheet(
     }
   });
 
-  if (benchmark) {
-    writeChannelBenchmarkPanel(ws, 31, crmTableHeaderRow, crmDataStartRow, {
-      title: 'REFERÊNCIA · MÉDIA SEGURO (RENTABILIZAÇÃO)',
-      benchmark,
-    });
-  }
-
   const mediaHeaders = ['Canal', 'Investimento', 'Impressões', 'Cliques', 'CTR', 'CPC', 'CPM', '% investimento', 'Dias', 'Fonte'];
   mediaHeaders.forEach((header, index) => setCell(ws.getCell(crmTableHeaderRow, index + 11), header, {
     bold: true, fillColor: 'DCE6F1', fontColor: COLORS.copaHeader, size: 8,
@@ -1658,8 +1699,19 @@ function writeCopaBigNumbersSheet(
   });
   ws.getRow(noteRow).height = 34;
 
+  let afterComparativoRow = noteRow + 2;
+  if (benchmark && benchmarkActual) {
+    afterComparativoRow = writeFunnelComparativoBlock(ws, afterComparativoRow, {
+      title: 'COMPARATIVO COPA × REFERÊNCIA (MÉDIA SEGURO) · POR CANAL',
+      actual: benchmarkActual,
+      benchmark,
+      actualLabel: 'Copa',
+      refLabel: 'Seguro',
+    });
+  }
+
   if (chartImages) {
-    const chartStartRow = noteRow + 2;
+    const chartStartRow = afterComparativoRow;
     const placements: Array<[keyof CopaChartImages, number, number]> = [
       ['funnel', 1, chartStartRow], ['spend', 11, chartStartRow],
       ['traffic', 1, chartStartRow + 20], ['efficiency', 11, chartStartRow + 20],
@@ -2572,22 +2624,25 @@ export async function exportRentabilizacaoCrmXlsx(
   return { rows: rawRows.length, filename };
 }
 
-export type ChannelBenchmark = Record<CopaChannel, { enviados: number; entregues: number; abertura: number; cliques: number }>;
+// Funil completo por canal — usado tanto para o valor "real" da Copa quanto para a
+// referência/benchmark, para dar ao comparativo o mesmo grau de detalhe (entrega →
+// abertura → clique → proposta → aprovação → cartão/conversão → CAC).
+export type ChannelBenchmark = Record<CopaChannel, {
+  enviados: number; entregues: number; abertura: number; cliques: number;
+  propostas: number; aprovados: number; cartoes: number; custo: number;
+}>;
 
 function emptyChannelBenchmark(): ChannelBenchmark {
-  return {
-    WPP: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-    'E-MAIL': { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-    SMS: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-    PUSH: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-  };
+  const zero = () => ({ enviados: 0, entregues: 0, abertura: 0, cliques: 0, propostas: 0, aprovados: 0, cartoes: 0, custo: 0 });
+  return { WPP: zero(), 'E-MAIL': zero(), SMS: zero(), PUSH: zero() };
 }
 
 /**
  * Benchmark/parâmetro de comparação para a Rentabilização Copa: média histórica
  * (todo o período disponível, sem recorte de data) do segmento "Seguro" na mesma
  * tabela `rentabilizacao_activities` — a referência pedida pelo usuário para
- * contextualizar Tx entrega/abertura/clique da ação Copa. Não é a ação Copa em si.
+ * contextualizar o funil completo (entrega/abertura/clique/proposta/aprovação/
+ * cartão/CAC) da ação Copa. Não é a ação Copa em si.
  */
 export async function fetchRentaBenchmarkByChannel(): Promise<ChannelBenchmark> {
   const bench = emptyChannelBenchmark();
@@ -2605,10 +2660,15 @@ export async function fetchRentaBenchmarkByChannel(): Promise<ChannelBenchmark> 
       for (const row of (data ?? []) as RawRow[]) {
         const canal = normalizeCanal(row['Canal']) as CopaChannel;
         if (!COPA_CHANNELS.includes(canal)) continue;
-        bench[canal].enviados += asInt(row['Base Total']);
-        bench[canal].entregues += asInt(row['Base Acionável']);
-        bench[canal].abertura += asInt(row['Abertura']);
-        bench[canal].cliques += asInt(row['Cliques']);
+        const b = bench[canal];
+        b.enviados += asInt(row['Base Total']);
+        b.entregues += asInt(row['Base Acionável']);
+        b.abertura += asInt(row['Abertura']);
+        b.cliques += asInt(row['Cliques']);
+        b.propostas += asInt(row['Propostas']);
+        b.aprovados += asInt(row['Aprovados']);
+        b.cartoes += asInt(row['Cartões Gerados']);
+        b.custo += Number(row['Custo Total Campanha']) || 0;
       }
       if (!data || data.length < pageSize) break;
     }
@@ -2616,6 +2676,35 @@ export async function fetchRentaBenchmarkByChannel(): Promise<ChannelBenchmark> 
     console.warn('[renta-copa] benchmark Segmento=Seguro indisponível:', err);
   }
   return bench;
+}
+
+/**
+ * Funil completo (mesmos 8 campos do benchmark) da própria ação Copa, por canal —
+ * o lado "real" do comparativo. Reusa o gate de `classifyCopa` (jornada contém
+ * 'COPA') sobre as linhas já buscadas por `fetchRntRows`, sem tocar no pipeline
+ * de `buildCopaIndex`/`CopaMetrics` (que não carrega propostas/aprovados/cartões/
+ * custo por canal).
+ */
+export function computeCopaChannelActuals(rows: RawRow[], start: Date, end: Date): ChannelBenchmark {
+  const actual = emptyChannelBenchmark();
+  for (const row of rows) {
+    let rowDate: Date;
+    try { rowDate = parseRowDate(row['Data de Disparo']); } catch { continue; }
+    if (rowDate < start || rowDate > end) continue;
+    if (!classifyCopa(row)) continue;
+    const canal = normalizeCanal(row['Canal']) as CopaChannel;
+    if (!COPA_CHANNELS.includes(canal)) continue;
+    const a = actual[canal];
+    a.enviados += asInt(row['Base Total']);
+    a.entregues += asInt(row['Base Acionável']);
+    a.abertura += asInt(row['Abertura']);
+    a.cliques += asInt(row['Cliques']);
+    a.propostas += asInt(row['Propostas']);
+    a.aprovados += asInt(row['Aprovados']);
+    a.cartoes += asInt(row['Cartões Gerados']);
+    a.custo += Number(row['Custo Total Campanha']) || 0;
+  }
+  return actual;
 }
 
 // v4 (2026-07-28): Big Numbers Copa com CRM, mídia paga e evolução semanal desde 13/04.
@@ -2655,7 +2744,7 @@ export {
   fetchCopaFixedDaily,
   fetchCopaEventNotes,
   fetchCopaGa4UniqueSnapshot,
-  writeChannelBenchmarkPanel,
+  writeFunnelComparativoBlock,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,

@@ -22,7 +22,8 @@ import {
   fetchCopaEventNotes,
   fetchCopaGa4UniqueSnapshot,
   fetchRentaBenchmarkByChannel,
-  writeChannelBenchmarkPanel,
+  computeCopaChannelActuals,
+  writeFunnelComparativoBlock,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
@@ -374,12 +375,8 @@ export async function fetchAqPaidDaily(start: Date, end: Date): Promise<AqPaidDa
  * distinto do restante da aquisição e distorceria a referência.
  */
 export async function fetchAquisicaoBenchmarkByChannel(preCopaEnd: Date): Promise<ChannelBenchmark> {
-  const bench: ChannelBenchmark = {
-    WPP: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-    'E-MAIL': { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-    SMS: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-    PUSH: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
-  };
+  const zero = () => ({ enviados: 0, entregues: 0, abertura: 0, cliques: 0, propostas: 0, aprovados: 0, cartoes: 0, custo: 0 });
+  const bench: ChannelBenchmark = { WPP: zero(), 'E-MAIL': zero(), SMS: zero(), PUSH: zero() };
   const pageSize = 1000;
   try {
     for (let offset = 0; ; offset += pageSize) {
@@ -397,10 +394,15 @@ export async function fetchAquisicaoBenchmarkByChannel(preCopaEnd: Date): Promis
         const segmento = String(get(row, 'Segmento') ?? '');
         if (segmento === 'Rentabilizacao') continue;
         if (canal === 'WPP' && segmento === 'Abandonados') continue; // carrinho abandonado distorce a referência
-        bench[canal].enviados += asInt(get(row, 'Base Total', 'Base total'));
-        bench[canal].entregues += asInt(get(row, 'Base Acionável', 'Base Acionavel'));
-        bench[canal].abertura += asInt(get(row, 'Abertura'));
-        bench[canal].cliques += asInt(get(row, 'Cliques'));
+        const b = bench[canal];
+        b.enviados += asInt(get(row, 'Base Total', 'Base total'));
+        b.entregues += asInt(get(row, 'Base Acionável', 'Base Acionavel'));
+        b.abertura += asInt(get(row, 'Abertura'));
+        b.cliques += asInt(get(row, 'Cliques'));
+        b.propostas += asInt(get(row, 'Propostas'));
+        b.aprovados += asInt(get(row, 'Aprovados'));
+        b.cartoes += asInt(get(row, 'Cartões Gerados', 'Cartoes Gerados'));
+        b.custo += Number(get(row, 'Custo Total Campanha')) || 0;
       }
       if (!data || data.length < pageSize) break;
     }
@@ -895,7 +897,7 @@ function writeAquisicaoCopaBigNumbersSheet(
   paidRows: AqPaidDay[],
   benchmark?: ChannelBenchmark,
 ): void {
-  const maxCol = benchmark ? 22 : 14;
+  const maxCol = 14;
   const ws = wb.addWorksheet('Big Numbers Aquisição Copa', {
     views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', showGridLines: false }],
   });
@@ -1055,14 +1057,6 @@ function writeAquisicaoCopaBigNumbersSheet(
     if (showClick) { ws.getCell(row, 7).numFmt = '#,##0'; ws.getCell(row, 8).numFmt = '0.0%'; }
   });
 
-  if (benchmark) {
-    writeChannelBenchmarkPanel(ws, crmTableHeaderRow - 1, crmTableHeaderRow, crmDataStartRow, {
-      title: 'REFERÊNCIA · MÉDIA PRÉ-COPA (AQUISIÇÃO)',
-      benchmark,
-      startCol: 14,
-    });
-  }
-
   // ── Evolução semanal ──
   ws.mergeCells(weeklyHeaderRow - 1, 1, weeklyHeaderRow - 1, maxCol);
   setCell(ws.getCell(weeklyHeaderRow - 1, 1), 'EVOLUÇÃO SEMANAL · CRM AQUISIÇÃO (seg a dom)', {
@@ -1101,6 +1095,24 @@ function writeAquisicaoCopaBigNumbersSheet(
     italic: true, fillColor: COLORS.note, fontColor: COLORS.noteFont, align: 'left', size: 9,
   });
   ws.getRow(noteRow).height = 30;
+
+  if (benchmark) {
+    const actual: ChannelBenchmark = COPA_CHANNELS.reduce((acc, ch) => {
+      const m = index.byChannel[ch];
+      acc[ch] = {
+        enviados: m.enviados, entregues: m.entregues, abertura: m.abertura, cliques: m.cliques,
+        propostas: m.propostas, aprovados: m.aprovados, cartoes: m.cartoes, custo: m.custo,
+      };
+      return acc;
+    }, {} as ChannelBenchmark);
+    writeFunnelComparativoBlock(ws, noteRow + 2, {
+      title: 'COMPARATIVO COPA × REFERÊNCIA (MÉDIA PRÉ-COPA) · POR CANAL',
+      actual,
+      benchmark,
+      actualLabel: 'Copa',
+      refLabel: 'Pré-Copa',
+    });
+  }
 }
 
 // ── Workbook + export público ────────────────────────────────────────────────────
@@ -1159,7 +1171,8 @@ export function buildFechamentoCopaWorkbook(
 
   // Ordem: 1) Rentabilização Copa 2) Big Numbers Renta 3) Aquisição Copa 4) Big Numbers Aquisição
   writeCopaSheet(wb, rntRows, copaDetailDates, copaDetailStart, end, fixedIdx, chartImages);
-  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages, eventNotes, ga4Snapshot, rentaBenchmark);
+  const rentaBenchmarkActual = rentaBenchmark ? computeCopaChannelActuals(rntRows, copaStart, end) : undefined;
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages, eventNotes, ga4Snapshot, rentaBenchmark, rentaBenchmarkActual);
   writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates, aqPaidRows);
   writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates, aqPaidRows, aquisicaoBenchmark);
 
