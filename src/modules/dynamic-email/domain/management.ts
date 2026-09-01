@@ -97,9 +97,11 @@ export const strategyReadiness = (strategy?: EmailStrategy) => {
   return { label: 'Em revisão', tone: 'warning' as const };
 };
 
+export const STRATEGY_FIELD_COUNT = 11;
+
 export const countConfiguredStrategyFields = (strategy?: EmailStrategy) => {
   if (!strategy) return 0;
-  return [strategy.roleInRuler, strategy.emailObjective, strategy.keyMessage, strategy.expectedAction, strategy.valueProposition, strategy.primaryBenefit, strategy.ctaStrategy]
-    .filter((value) => Boolean(value?.trim())).length;
+  const textFields = [strategy.roleInRuler, strategy.emailObjective, strategy.keyMessage, strategy.expectedAction, strategy.valueProposition, strategy.primaryBenefit, strategy.objectionAddressed, strategy.proof, strategy.visualHierarchyStrategy, strategy.ctaStrategy];
+  return textFields.filter((value) => Boolean(value?.trim())).length + Number(strategy.secondaryBenefits.some((value) => Boolean(value.trim())));
 };
 

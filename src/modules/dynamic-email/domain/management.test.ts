@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countConfiguredStrategyFields, strategyReadiness, type EmailStrategy } from './management';
+import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy } from './management';
 
 const strategy = (overrides: Partial<EmailStrategy> = {}): EmailStrategy => ({
   id: 'strategy-1', campaignGroupId: 'group-1', partner: 'Plurix', segment: 'CRM', secondaryBenefits: [],
@@ -19,6 +19,8 @@ describe('dynamic email management readiness', () => {
 
   it('counts only the explicit strategic fields and never infers missing meaning', () => {
     expect(countConfiguredStrategyFields(strategy({ roleInRuler: 'Apresentar proposta', emailObjective: 'Gerar consideração', keyMessage: '' }))).toBe(2);
+    expect(countConfiguredStrategyFields(strategy({ secondaryBenefits: ['Cashback', ''] }))).toBe(1);
+    expect(STRATEGY_FIELD_COUNT).toBe(11);
   });
 });
 
