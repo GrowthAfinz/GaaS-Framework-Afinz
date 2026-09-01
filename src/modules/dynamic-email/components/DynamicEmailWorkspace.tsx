@@ -142,8 +142,15 @@ function downloadText(name: string, content: string) {
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = name;
+  anchor.style.display = 'none';
+  // O anchor precisa estar no DOM e o revoke precisa ser adiado: o Chrome busca
+  // o blob de forma assíncrona e um revoke síncrono cancela o download silenciosamente.
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    anchor.remove();
+  }, 0);
 }
 
 const initials = (value: string) => (value.trim().slice(0, 2) || '—').toUpperCase();
@@ -302,6 +309,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
     .sort((a, b) => naturalLabelSort(a.representative.SEQUENCIA, b.representative.SEQUENCIA)) : [], [editorialGroups, selectedSegment]);
   const errorCount = editorialGroups.filter((group) => group.hasErrors).length;
   const activeEditorialGroupCount = editorialGroups.filter((group) => group.visibleRows.length > 0).length;
+  const exportBlockReason = !rows.length
+    ? 'Crie ou importe pelo menos um briefing antes de exportar.'
+    : !activeRows.length
+      ? 'Todos os briefings estão arquivados — não há nada para exportar.'
+      : technicalErrorCount
+        ? `Corrija ${technicalErrorCount} ${technicalErrorCount === 1 ? 'erro bloqueante' : 'erros bloqueantes'} antes de exportar${(() => { const nomes = [...new Set(editorialGroups.filter((group) => group.visibleRows.length && group.hasErrors).map((group) => `${group.representative.__meta.partner || 'Parceiro'} · ${group.representative.SEQUENCIA || 'Sequência'}`))]; return nomes.length ? `: ${nomes.slice(0, 3).join('; ')}${nomes.length > 3 ? '…' : ''}` : ''; })()}.`
+        : '';
   const warningCount = editorialGroups.filter((group) => group.rows.some((row) => (issuesByRow.get(row.__id) ?? []).some((issue) => issue.severity === 'warning'))).length;
   const selectedGroupErrorCount = selected ? activeRows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId).flatMap((row) => issuesByRow.get(row.__id) ?? []).filter((issue) => issue.severity === 'error').length : 0;
   const taxonomyOptions = useMemo(() => {
@@ -323,7 +337,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const updateGroupMeta = (patch: Partial<WorkspaceBriefing['__meta']>) => selected && selected.__meta.status !== 'archived' && setRows((current) => current.map((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId && row.__meta.status !== 'archived' ? { ...row, __meta: { ...row.__meta, ...patch } } : row));
   const updateField = (field: BriefingColumn, value: string) => selected && selected.__meta.status !== 'archived' && setRows((current) => applyWorkspaceField(current, selected.__id, field, value));
   const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? { ...applyFix(row, issue), __meta: row.__meta } : row)); };
-  const exportCsv = () => { if (!technicalErrorCount) { const filename = `TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`; downloadText(filename, exportBriefingCsv(onlyCsvRows(rows))); void recordExport(filename, activeRows, []); } };
+  const exportCsv = () => {
+    if (exportBlockReason) { setAnnouncement(exportBlockReason); return; }
+    const filename = `TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadText(filename, exportBriefingCsv(onlyCsvRows(rows)));
+    setAnnouncement(`${filename} gerado para download.`);
+    void recordExport(filename, activeRows, []);
+  };
   const onFile = async (file?: File) => {
     if (!file) return;
     const parsed = parseBriefingCsv(await file.text());
@@ -546,7 +566,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
             <HeaderAction onClick={() => openNewBriefing()} icon={<Plus size={15}/>} label="Novo"/>
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
-            <button disabled={!!technicalErrorCount || !rows.length} onClick={exportCsv} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
+            <button disabled={Boolean(exportBlockReason)} onClick={exportCsv} title={exportBlockReason || 'Baixar CSV pronto para importar no SFMC'} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
+            {exportBlockReason && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportBlockReason}</p>}
           </div>}
         </div>
       </div>
