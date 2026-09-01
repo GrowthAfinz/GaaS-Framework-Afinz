@@ -12,6 +12,9 @@ const strategyFromRow = (row: Record<string, any>): EmailStrategy => ({
   visualHierarchyStrategy: row.visual_hierarchy_strategy ?? undefined, ctaStrategy: row.cta_strategy ?? undefined,
   technicalStatus: row.technical_status, editorialStatus: row.editorial_status, visualStatus: row.visual_status,
   certificationStatus: row.certification_status, fieldProvenance: row.field_provenance ?? {}, version: Number(row.version ?? 1),
+  updatedAt: row.updated_at ?? undefined, updatedBy: row.updated_by ?? undefined,
+  updatedByType: row.updated_by_type ?? 'system', updateSource: row.update_source ?? 'system',
+  changeReason: row.change_reason ?? undefined, llmModel: row.llm_model ?? undefined, llmRunId: row.llm_run_id ?? undefined,
 });
 
 export async function loadEmailStrategies(): Promise<EmailStrategy[]> {
@@ -32,15 +35,11 @@ export async function saveEmailStrategy(strategy: EmailStrategy): Promise<EmailS
     visual_hierarchy_strategy: strategy.visualHierarchyStrategy || null, cta_strategy: strategy.ctaStrategy || null,
     technical_status: strategy.technicalStatus, editorial_status: strategy.editorialStatus, visual_status: strategy.visualStatus,
     certification_status: strategy.certificationStatus, field_provenance: { ...strategy.fieldProvenance, semantic_fields: 'human' },
-    version: strategy.version + 1, updated_by: auth.user.id, updated_at: new Date().toISOString(),
+    updated_by: auth.user.id, updated_by_type: 'human', update_source: 'gaas',
+    change_reason: 'Edição humana na Fábrica de E-mails', llm_model: null, llm_run_id: null,
   };
   const { data, error } = await supabase.from('dynamic_email_email_strategies').update(payload).eq('id', strategy.id).eq('version', strategy.version).select().single();
   if (error) throw new Error(error.code === 'PGRST116' ? 'A estratégia mudou em outra sessão. Recarregue antes de salvar.' : error.message);
-  const { error: versionError } = await supabase.from('dynamic_email_management_versions').insert({
-    entity_type: 'email_strategy', entity_id: strategy.id, version: payload.version,
-    snapshot: data, change_reason: 'Edição humana na Fábrica de E-mails', saved_by: auth.user.id,
-  });
-  if (versionError) throw versionError;
   return strategyFromRow(data);
 }
 

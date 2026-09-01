@@ -4,7 +4,7 @@ import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness,
 const strategy = (overrides: Partial<EmailStrategy> = {}): EmailStrategy => ({
   id: 'strategy-1', campaignGroupId: 'group-1', partner: 'Plurix', segment: 'CRM', secondaryBenefits: [],
   technicalStatus: 'needs_review', editorialStatus: 'needs_enrichment', visualStatus: 'needs_review',
-  certificationStatus: 'not_tested', fieldProvenance: {}, version: 1, ...overrides,
+  certificationStatus: 'not_tested', fieldProvenance: {}, version: 1, updatedByType: 'system', updateSource: 'system', ...overrides,
 });
 
 describe('dynamic email management readiness', () => {

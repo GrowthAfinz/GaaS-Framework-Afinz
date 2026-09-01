@@ -28,6 +28,13 @@ export interface EmailStrategy {
   certificationStatus: CertificationStatus;
   fieldProvenance: Record<string, string>;
   version: number;
+  updatedAt?: string;
+  updatedBy?: string;
+  updatedByType: 'human' | 'llm' | 'system';
+  updateSource: 'gaas' | 'llm' | 'api' | 'system';
+  changeReason?: string;
+  llmModel?: string;
+  llmRunId?: string;
 }
 
 export interface ProductContext {
