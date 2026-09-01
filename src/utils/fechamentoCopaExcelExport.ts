@@ -21,11 +21,13 @@ import {
   fetchCopaFixedDaily,
   fetchCopaEventNotes,
   fetchCopaGa4UniqueSnapshot,
+  fetchRentaBenchmarkByChannel,
+  writeChannelBenchmarkPanel,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
 } from './rentabilizacaoCrmExcelExport';
-import type { CopaChannel, CopaEventNote, CopaGa4UniqueSnapshot } from './rentabilizacaoCrmExcelExport';
+import type { CopaChannel, CopaEventNote, CopaGa4UniqueSnapshot, ChannelBenchmark } from './rentabilizacaoCrmExcelExport';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FECHAMENTO COPA · AQUISIÇÃO E RENTABILIZAÇÃO
@@ -362,6 +364,50 @@ export async function fetchAqPaidDaily(start: Date, end: Date): Promise<AqPaidDa
   }
 
   return [...byKey.values()].sort((a, b) => a.businessDate.localeCompare(b.businessDate) || a.phase.localeCompare(b.phase));
+}
+
+/**
+ * Benchmark/parâmetro de comparação para a Aquisição Copa: mesma regra de funil de
+ * `isCopaAquisicao`, mas SEM exigir jornada COPA e limitado a antes do início da ação
+ * (pré-Copa) — todos os canais disponíveis no histórico. WhatsApp exclui o subgrupo
+ * carrinho abandonado (Segmento='Abandonados'): tem comportamento de funil muito
+ * distinto do restante da aquisição e distorceria a referência.
+ */
+export async function fetchAquisicaoBenchmarkByChannel(preCopaEnd: Date): Promise<ChannelBenchmark> {
+  const bench: ChannelBenchmark = {
+    WPP: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+    'E-MAIL': { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+    SMS: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+    PUSH: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+  };
+  const pageSize = 1000;
+  try {
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('status', 'Realizado')
+        .in('Etapa de aquisição', ['Aquisicao', 'Meio_de_Funil', 'Reativacao'])
+        .lt('Data de Disparo', isoDate(preCopaEnd))
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      for (const row of (data ?? []) as RawRow[]) {
+        const canal = normalizeCanal(get(row, 'Canal')) as CopaChannel;
+        if (!COPA_CHANNELS.includes(canal)) continue;
+        const segmento = String(get(row, 'Segmento') ?? '');
+        if (segmento === 'Rentabilizacao') continue;
+        if (canal === 'WPP' && segmento === 'Abandonados') continue; // carrinho abandonado distorce a referência
+        bench[canal].enviados += asInt(get(row, 'Base Total', 'Base total'));
+        bench[canal].entregues += asInt(get(row, 'Base Acionável', 'Base Acionavel'));
+        bench[canal].abertura += asInt(get(row, 'Abertura'));
+        bench[canal].cliques += asInt(get(row, 'Cliques'));
+      }
+      if (!data || data.length < pageSize) break;
+    }
+  } catch (err) {
+    console.warn('[fechamento-copa] benchmark Aquisição (pré-Copa) indisponível:', err);
+  }
+  return bench;
 }
 
 // ── Aba diarizada "Aquisição Copa" (layout seccionado por BU × Segmento) ─────────
@@ -842,8 +888,14 @@ function writeAquisicaoCopaSheet(wb: Workbook, index: AqIndex, dates: Date[], pa
 
 // ── Aba "Big Numbers Aquisição Copa" ────────────────────────────────────────────
 
-function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: Date[], paidRows: AqPaidDay[]): void {
-  const maxCol = 14;
+function writeAquisicaoCopaBigNumbersSheet(
+  wb: Workbook,
+  index: AqIndex,
+  dates: Date[],
+  paidRows: AqPaidDay[],
+  benchmark?: ChannelBenchmark,
+): void {
+  const maxCol = benchmark ? 22 : 14;
   const ws = wb.addWorksheet('Big Numbers Aquisição Copa', {
     views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', showGridLines: false }],
   });
@@ -960,7 +1012,9 @@ function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: 
   });
 
   // ── Totais por canal (CRM) ──
-  ws.mergeCells(crmTableHeaderRow - 1, 1, crmTableHeaderRow - 1, maxCol);
+  // Título fica restrito às colunas do próprio painel CRM (1..12) — quando há
+  // benchmark, o painel de referência (14+) ganha seu próprio título à direita.
+  ws.mergeCells(crmTableHeaderRow - 1, 1, crmTableHeaderRow - 1, 12);
   setCell(ws.getCell(crmTableHeaderRow - 1, 1), 'TOTAIS POR CANAL · CRM AQUISIÇÃO', {
     bold: true, fillColor: COLORS.header, fontColor: 'FFFFFF', align: 'left', size: 11,
   });
@@ -1000,6 +1054,14 @@ function writeAquisicaoCopaBigNumbersSheet(wb: Workbook, index: AqIndex, dates: 
     if (showOpen) { ws.getCell(row, 5).numFmt = '#,##0'; ws.getCell(row, 6).numFmt = '0.0%'; }
     if (showClick) { ws.getCell(row, 7).numFmt = '#,##0'; ws.getCell(row, 8).numFmt = '0.0%'; }
   });
+
+  if (benchmark) {
+    writeChannelBenchmarkPanel(ws, crmTableHeaderRow - 1, crmTableHeaderRow, crmDataStartRow, {
+      title: 'REFERÊNCIA · MÉDIA PRÉ-COPA (AQUISIÇÃO)',
+      benchmark,
+      startCol: 14,
+    });
+  }
 
   // ── Evolução semanal ──
   ws.mergeCells(weeklyHeaderRow - 1, 1, weeklyHeaderRow - 1, maxCol);
@@ -1070,9 +1132,14 @@ export function buildFechamentoCopaWorkbook(
     createChartImages?: boolean;
     eventNotes?: CopaEventNote[];
     ga4Snapshot?: CopaGa4UniqueSnapshot | null;
+    rentaBenchmark?: ChannelBenchmark;
+    aquisicaoBenchmark?: ChannelBenchmark;
   },
 ): Workbook {
-  const { rntRows, aqRows, aqPaidRows = [], fixedIdx, start, end, eventNotes, ga4Snapshot } = params;
+  const {
+    rntRows, aqRows, aqPaidRows = [], fixedIdx, start, end, eventNotes, ga4Snapshot,
+    rentaBenchmark, aquisicaoBenchmark,
+  } = params;
   const copaStart = COPA_ACTION_START;
   const copaActionDates = copaStart <= end ? allDates(copaStart, end) : [];
   const copaDetailStart = start < COPA_ACTION_START ? COPA_ACTION_START : start;
@@ -1092,9 +1159,9 @@ export function buildFechamentoCopaWorkbook(
 
   // Ordem: 1) Rentabilização Copa 2) Big Numbers Renta 3) Aquisição Copa 4) Big Numbers Aquisição
   writeCopaSheet(wb, rntRows, copaDetailDates, copaDetailStart, end, fixedIdx, chartImages);
-  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages, eventNotes, ga4Snapshot);
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages, eventNotes, ga4Snapshot, rentaBenchmark);
   writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates, aqPaidRows);
-  writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates, aqPaidRows);
+  writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates, aqPaidRows, aquisicaoBenchmark);
 
   return wb;
 }
@@ -1110,13 +1177,15 @@ export async function exportFechamentoCopaXlsx(
   const copaStart = COPA_ACTION_START;
   if (copaStart > effectiveEnd) throw new Error('A acao Copa ainda nao possui dias fechados.');
 
-  const [rntRows, fixedIdx, aqRows, aqPaidRows, eventNotes, ga4Snapshot, ExcelJSModule] = await Promise.all([
+  const [rntRows, fixedIdx, aqRows, aqPaidRows, eventNotes, ga4Snapshot, rentaBenchmark, aquisicaoBenchmark, ExcelJSModule] = await Promise.all([
     fetchRntRows(copaStart, effectiveEnd),
     fetchCopaFixedDaily(copaStart, effectiveEnd),
     fetchSupabaseRows(copaStart, effectiveEnd),
     fetchAqPaidDaily(copaStart, effectiveEnd),
     fetchCopaEventNotes(copaStart, effectiveEnd),
     fetchCopaGa4UniqueSnapshot(effectiveEnd),
+    fetchRentaBenchmarkByChannel(),
+    fetchAquisicaoBenchmarkByChannel(copaStart),
     import('exceljs'),
   ]);
 
@@ -1130,6 +1199,8 @@ export async function exportFechamentoCopaXlsx(
     createChartImages: true,
     eventNotes,
     ga4Snapshot,
+    rentaBenchmark,
+    aquisicaoBenchmark,
   });
 
   const buffer = await wb.xlsx.writeBuffer();

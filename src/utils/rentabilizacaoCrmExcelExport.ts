@@ -1202,6 +1202,74 @@ function createCopaChartImages(
 
 type CopaEventNote = { data: string; nota: string };
 
+/**
+ * Painel de referência/comparativo — colado à direita dos painéis "TOTAIS POR CANAL"
+ * existentes, sem deslocar nada. Mostra a taxa de referência (histórica, fora da ação
+ * em análise) e o delta contra a taxa real da mesma linha/canal do painel principal
+ * (que está sempre nas colunas D/F/H — Tx entrega/Tx abertura/Tx clique).
+ */
+function writeChannelBenchmarkPanel(
+  ws: Worksheet,
+  titleRow: number,
+  headerRow: number,
+  dataStartRow: number,
+  opts: { title: string; benchmark: ChannelBenchmark; startCol?: number },
+): void {
+  const startCol = opts.startCol ?? 22; // por padrão deixa col 21 como gutter (layout Renta).
+  const cols = { txEntregaRef: startCol, deltaEntrega: startCol + 1, txAberturaRef: startCol + 2, deltaAbertura: startCol + 3, txCliqueRef: startCol + 4, deltaClique: startCol + 5 };
+  const mainCol = { txEntrega: 4, txAbertura: 6, txClique: 8 }; // D/F/H do painel principal (mesmas linhas)
+
+  ws.mergeCells(titleRow, startCol, titleRow, cols.deltaClique);
+  setCell(ws.getCell(titleRow, startCol), opts.title, {
+    bold: true, fillColor: '92400E', fontColor: 'FFFFFF', align: 'left', size: 10,
+  });
+
+  const headers = ['Tx entrega ref.', 'Δ vs. ref.', 'Tx abertura ref.', 'Δ vs. ref.', 'Tx clique ref.', 'Δ vs. ref.'];
+  headers.forEach((h, i) => setCell(ws.getCell(headerRow, startCol + i), h, {
+    bold: true, fillColor: 'FDE9D9', fontColor: '92400E', size: 8,
+  }));
+
+  const rates = (m: { enviados: number; entregues: number; abertura: number; cliques: number }) => ({
+    entrega: m.enviados > 0 ? m.entregues / m.enviados : '',
+    abertura: m.entregues > 0 ? m.abertura / m.entregues : '',
+    clique: m.entregues > 0 ? m.cliques / m.entregues : '',
+  });
+  const total = COPA_CHANNELS.reduce((acc, ch) => {
+    acc.enviados += opts.benchmark[ch].enviados;
+    acc.entregues += opts.benchmark[ch].entregues;
+    acc.abertura += opts.benchmark[ch].abertura;
+    acc.cliques += opts.benchmark[ch].cliques;
+    return acc;
+  }, { enviados: 0, entregues: 0, abertura: 0, cliques: 0 });
+
+  [...COPA_CHANNELS, 'TOTAL' as const].forEach((channel, index) => {
+    const row = dataStartRow + index;
+    const isTotal = channel === 'TOTAL';
+    const m = isTotal ? total : opts.benchmark[channel];
+    const r = rates(m);
+    const fill = isTotal ? 'FDE9D9' : index % 2 === 0 ? 'FFFFFF' : 'FFF7ED';
+    const mainRow = row; // painel principal usa exatamente as mesmas linhas (WPP/E-MAIL/SMS/PUSH/TOTAL).
+    const deltaFormula = (refCol: number, mainC: number) => ({
+      formula: `IFERROR(${colLetter(mainC)}${mainRow}-${colLetter(refCol)}${row},"")`,
+    });
+    setCell(ws.getCell(row, cols.txEntregaRef), r.entrega, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    setCell(ws.getCell(row, cols.deltaEntrega), deltaFormula(cols.txEntregaRef, mainCol.txEntrega), { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    setCell(ws.getCell(row, cols.txAberturaRef), r.abertura, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    setCell(ws.getCell(row, cols.deltaAbertura), deltaFormula(cols.txAberturaRef, mainCol.txAbertura), { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    setCell(ws.getCell(row, cols.txCliqueRef), r.clique, { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    setCell(ws.getCell(row, cols.deltaClique), deltaFormula(cols.txCliqueRef, mainCol.txClique), { bold: isTotal, fillColor: fill, align: 'right', size: 9 });
+    [cols.txEntregaRef, cols.deltaEntrega, cols.txAberturaRef, cols.deltaAbertura, cols.txCliqueRef, cols.deltaClique].forEach((c) => {
+      ws.getCell(row, c).numFmt = '0.0%';
+    });
+  });
+
+  const noteRow = dataStartRow + COPA_CHANNELS.length + 1;
+  ws.mergeCells(noteRow, startCol, noteRow, cols.deltaClique);
+  setCell(ws.getCell(noteRow, startCol), 'Δ = taxa real da Copa − taxa de referência (positivo = Copa acima da referência).', {
+    italic: true, fillColor: 'FFF7ED', fontColor: '92400E', size: 7,
+  });
+}
+
 function writeCopaBigNumbersSheet(
   wb: Workbook,
   dates: Date[],
@@ -1210,8 +1278,9 @@ function writeCopaBigNumbersSheet(
   chartImages?: CopaChartImages,
   eventNotes?: CopaEventNote[],
   ga4Snapshot?: CopaGa4UniqueSnapshot | null,
+  benchmark?: ChannelBenchmark,
 ): void {
-  const maxCol = 20;
+  const maxCol = benchmark ? 28 : 20;
   const ws = wb.addWorksheet(COPA_BIG_NUMBERS_SHEET, {
     views: [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', activeCell: 'A5', showGridLines: false }],
   });
@@ -1442,6 +1511,13 @@ function writeCopaBigNumbersSheet(
       ws.getCell(row, 8).numFmt = '0.0%';
     }
   });
+
+  if (benchmark) {
+    writeChannelBenchmarkPanel(ws, 31, crmTableHeaderRow, crmDataStartRow, {
+      title: 'REFERÊNCIA · MÉDIA SEGURO (RENTABILIZAÇÃO)',
+      benchmark,
+    });
+  }
 
   const mediaHeaders = ['Canal', 'Investimento', 'Impressões', 'Cliques', 'CTR', 'CPC', 'CPM', '% investimento', 'Dias', 'Fonte'];
   mediaHeaders.forEach((header, index) => setCell(ws.getCell(crmTableHeaderRow, index + 11), header, {
@@ -2496,6 +2572,52 @@ export async function exportRentabilizacaoCrmXlsx(
   return { rows: rawRows.length, filename };
 }
 
+export type ChannelBenchmark = Record<CopaChannel, { enviados: number; entregues: number; abertura: number; cliques: number }>;
+
+function emptyChannelBenchmark(): ChannelBenchmark {
+  return {
+    WPP: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+    'E-MAIL': { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+    SMS: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+    PUSH: { enviados: 0, entregues: 0, abertura: 0, cliques: 0 },
+  };
+}
+
+/**
+ * Benchmark/parâmetro de comparação para a Rentabilização Copa: média histórica
+ * (todo o período disponível, sem recorte de data) do segmento "Seguro" na mesma
+ * tabela `rentabilizacao_activities` — a referência pedida pelo usuário para
+ * contextualizar Tx entrega/abertura/clique da ação Copa. Não é a ação Copa em si.
+ */
+export async function fetchRentaBenchmarkByChannel(): Promise<ChannelBenchmark> {
+  const bench = emptyChannelBenchmark();
+  const pageSize = 1000;
+  try {
+    for (let offset = 0; ; offset += pageSize) {
+      // rentabilizacao_activities não filtra por status (mesma convenção de fetchRntRows) —
+      // a imensa maioria das linhas de Segmento='Seguro' está marcada 'Enviado', não 'Realizado'.
+      const { data, error } = await supabase
+        .from('rentabilizacao_activities')
+        .select('*')
+        .eq('Segmento', 'Seguro')
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      for (const row of (data ?? []) as RawRow[]) {
+        const canal = normalizeCanal(row['Canal']) as CopaChannel;
+        if (!COPA_CHANNELS.includes(canal)) continue;
+        bench[canal].enviados += asInt(row['Base Total']);
+        bench[canal].entregues += asInt(row['Base Acionável']);
+        bench[canal].abertura += asInt(row['Abertura']);
+        bench[canal].cliques += asInt(row['Cliques']);
+      }
+      if (!data || data.length < pageSize) break;
+    }
+  } catch (err) {
+    console.warn('[renta-copa] benchmark Segmento=Seguro indisponível:', err);
+  }
+  return bench;
+}
+
 // v4 (2026-07-28): Big Numbers Copa com CRM, mídia paga e evolução semanal desde 13/04.
 export function getCurrentMonthRange(): { start: Date; end: Date } {
   const now = new Date();
@@ -2533,6 +2655,7 @@ export {
   fetchCopaFixedDaily,
   fetchCopaEventNotes,
   fetchCopaGa4UniqueSnapshot,
+  writeChannelBenchmarkPanel,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
