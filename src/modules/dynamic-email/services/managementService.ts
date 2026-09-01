@@ -1,9 +1,55 @@
 import { supabase } from '../../../services/supabaseClient';
 import type { EmailStrategy, ExternalReviewRun, ExternalSuggestion, ProductContext, ProductGuardrail } from '../domain/management';
 
+export type RulerManagementPlan = {
+  name: string;
+  description?: string;
+  businessFront: 'acquisition' | 'monetization';
+  rulerFamily: string;
+  partner: string;
+  adaptationPartners: string[];
+  product?: string;
+  segment: string;
+  objective?: string;
+  templateSlotId?: string;
+  campaignGroups: Array<{ id: string; partner: string; weekKey: string; sequence: string; functionalName: string; role: string }>;
+};
+
+export async function createRulerManagementPlan(plan: RulerManagementPlan): Promise<string> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Sessão autenticada necessária para criar a régua.');
+  const { data: ruler, error: rulerError } = await supabase.from('dynamic_email_ruler_strategies').insert({
+    name: plan.name, description: plan.description || null, business_front: plan.businessFront,
+    ruler_family: plan.rulerFamily, partner: plan.partner, product: plan.product || null,
+    segment: plan.segment, objective: plan.objective || null, template_slot_id: plan.templateSlotId || null,
+    audience: plan.segment, editorial_status: 'draft', created_by: auth.user.id, updated_by: auth.user.id,
+  }).select('id').single();
+  if (rulerError) throw rulerError;
+  const { error: emailError } = await supabase.from('dynamic_email_email_strategies').insert(plan.campaignGroups.map((item) => ({
+    ruler_strategy_id: ruler.id, campaign_group_id: item.id, partner: item.partner, segment: plan.segment,
+    week_key: item.weekKey, sequence: item.sequence, functional_name: item.functionalName,
+    role_in_ruler: item.role || null, email_objective: item.role || null,
+    technical_status: 'draft', editorial_status: 'needs_enrichment', visual_status: 'draft', certification_status: 'not_tested',
+    field_provenance: { ruler_creator: 'human' }, created_by: auth.user.id, updated_by: auth.user.id,
+  })));
+  if (emailError) { await supabase.from('dynamic_email_ruler_strategies').delete().eq('id', ruler.id); throw emailError; }
+  if (plan.adaptationPartners.length) {
+    const { error: adaptationError } = await supabase.from('dynamic_email_ruler_adaptations').insert(plan.adaptationPartners.map((targetPartner) => ({
+      source_ruler_strategy_id: ruler.id, target_partner: targetPartner, target_product: targetPartner,
+      target_segment: plan.segment, objective: plan.objective || null, status: 'drafting',
+      preservation_plan: { strategy: 'shared', template: plan.templateSlotId || null },
+      required_changes: { assets: true, links: true, legal: true, identity: true },
+      created_by: auth.user.id, updated_by: auth.user.id,
+    })));
+    if (adaptationError) throw adaptationError;
+  }
+  return ruler.id;
+}
+
 const strategyFromRow = (row: Record<string, any>): EmailStrategy => ({
   id: row.id, campaignGroupId: row.campaign_group_id, partner: row.partner, segment: row.segment,
   weekKey: row.week_key ?? undefined, sequence: row.sequence ?? undefined, subject: row.subject ?? undefined,
+  functionalName: row.functional_name ?? undefined,
   preheader: row.preheader ?? undefined, roleInRuler: row.role_in_ruler ?? undefined,
   emailObjective: row.email_objective ?? undefined, keyMessage: row.key_message ?? undefined,
   expectedAction: row.expected_action ?? undefined, valueProposition: row.value_proposition ?? undefined,
@@ -28,7 +74,7 @@ export async function saveEmailStrategy(strategy: EmailStrategy): Promise<EmailS
   if (!auth.user) throw new Error('Sessão autenticada necessária para salvar a estratégia.');
   const payload = {
     id: strategy.id, campaign_group_id: strategy.campaignGroupId, partner: strategy.partner, segment: strategy.segment,
-    week_key: strategy.weekKey || null, sequence: strategy.sequence || null, subject: strategy.subject || null, preheader: strategy.preheader || null,
+    week_key: strategy.weekKey || null, sequence: strategy.sequence || null, functional_name: strategy.functionalName || null, subject: strategy.subject || null, preheader: strategy.preheader || null,
     role_in_ruler: strategy.roleInRuler || null, email_objective: strategy.emailObjective || null, key_message: strategy.keyMessage || null,
     expected_action: strategy.expectedAction || null, value_proposition: strategy.valueProposition || null, primary_benefit: strategy.primaryBenefit || null,
     secondary_benefits: strategy.secondaryBenefits, objection_addressed: strategy.objectionAddressed || null, proof: strategy.proof || null,

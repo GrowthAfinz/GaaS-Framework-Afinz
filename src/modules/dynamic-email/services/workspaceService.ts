@@ -1,6 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 import { BRIEFING_COLUMNS, emptyBriefingRow, type BriefingRow } from '../domain/briefing';
-import type { ActivityTaxonomy, EmailAsset, EmailTemplateSlot, LegalText, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
+import type { ActivityTaxonomy, EmailAsset, EmailFactorySegment, EmailTemplateSlot, LegalText, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
 import { exportableRow, withMeta } from '../domain/workspace';
 
 const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
@@ -203,19 +203,60 @@ export async function saveLegalText(item: LegalText): Promise<LegalText> {
 }
 
 export async function loadActivityTaxonomy(): Promise<ActivityTaxonomy[]> {
-  const { data, error } = await supabase.from('activities')
-    .select('"Activity name / Taxonomia","BU","Parceiro","Segmento","Subgrupos","Safra","Produto","Ordem de disparo"')
-    .eq('Canal', 'E-mail').order('Data de Disparo', { ascending: false }).limit(3000);
-  if (error) throw error;
+  const columns = '"Activity name / Taxonomia","BU","Parceiro","Segmento","Subgrupos","Safra","Produto","Ordem de disparo"';
+  const [acquisition, monetization] = await Promise.all([
+    supabase.from('activities').select(columns).eq('Canal', 'E-mail').order('Data de Disparo', { ascending: false }).limit(3000),
+    supabase.from('rentabilizacao_activities').select(columns).eq('Canal', 'E-mail').order('Data de Disparo', { ascending: false }).limit(3000),
+  ]);
+  if (acquisition.error) throw acquisition.error;
+  if (monetization.error) throw monetization.error;
   const seen = new Set<string>();
-  return (data ?? []).flatMap((row: Record<string, any>) => {
+  const mapRows = (data: Record<string, any>[], businessFront: ActivityTaxonomy['businessFront'], sourceTable: ActivityTaxonomy['sourceTable']) => data.flatMap((row: Record<string, any>) => {
     const activityName = String(row['Activity name / Taxonomia'] ?? '');
-    if (!activityName || seen.has(activityName)) return [];
-    seen.add(activityName);
+    const uniqueKey = `${sourceTable}:${activityName}`;
+    if (!activityName || seen.has(uniqueKey)) return [];
+    seen.add(uniqueKey);
     const bu = String(row.BU ?? '');
     const rawPartner = String(row.Parceiro ?? '');
-    return [{ activityName, bu, partner: bu.toLowerCase() === 'plurix' ? 'Plurix' : rawPartner, segment: row.Segmento ?? '', subgroup: row.Subgrupos ?? '', weekKey: row.Safra ?? '', product: row.Produto ?? '', order: row['Ordem de disparo'] ?? undefined }];
+    return [{ activityName, bu, partner: bu.toLowerCase() === 'plurix' ? 'Plurix' : rawPartner, segment: row.Segmento ?? '', subgroup: row.Subgrupos ?? '', weekKey: row.Safra ?? '', product: row.Produto ?? '', order: row['Ordem de disparo'] ?? undefined, businessFront, sourceTable }];
   });
+  return [
+    ...mapRows(acquisition.data ?? [], 'acquisition', 'activities'),
+    ...mapRows(monetization.data ?? [], 'monetization', 'rentabilizacao_activities'),
+  ];
+}
+
+const segmentFromRow = (row: Record<string, any>): EmailFactorySegment => ({
+  id: row.id, technicalName: row.technical_name, displayName: row.display_name,
+  businessFront: row.business_front, sourceTable: row.source_table ?? undefined,
+  sourceValue: row.source_value ?? undefined, partner: row.partner ?? undefined, bu: row.bu ?? undefined,
+  lifecycleFamily: row.lifecycle_family ?? undefined, audienceDescription: row.audience_description ?? undefined,
+  origin: row.origin, governanceStatus: row.governance_status,
+});
+
+export async function loadEmailFactorySegments(): Promise<EmailFactorySegment[]> {
+  const { data, error } = await supabase.from('dynamic_email_segments').select('*').neq('governance_status', 'archived').order('display_name');
+  if (error) throw error;
+  return (data ?? []).map(segmentFromRow);
+}
+
+export async function saveDraftEmailFactorySegment(input: Omit<EmailFactorySegment, 'id' | 'origin' | 'governanceStatus'>): Promise<EmailFactorySegment> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Sessão autenticada necessária para propor um segmento.');
+  const { data: existing, error: findError } = await supabase.from('dynamic_email_segments').select('*')
+    .eq('business_front', input.businessFront).ilike('technical_name', input.technicalName)
+    .eq('partner', input.partner || '').neq('governance_status', 'archived').maybeSingle();
+  if (findError) throw findError;
+  if (existing) return segmentFromRow(existing);
+  const { data, error } = await supabase.from('dynamic_email_segments').insert({
+    technical_name: input.technicalName, display_name: input.displayName, business_front: input.businessFront,
+    source_table: input.sourceTable || null, source_value: input.sourceValue || null, partner: input.partner || null,
+    bu: input.bu || null, lifecycle_family: input.lifecycleFamily || null,
+    audience_description: input.audienceDescription || null, origin: 'planned', governance_status: 'draft',
+    created_by: auth.user.id, updated_by: auth.user.id,
+  }).select().single();
+  if (error) throw error;
+  return segmentFromRow(data);
 }
 
 export async function recordExport(filename: string, rows: WorkspaceBriefing[], warnings: string[]) {

@@ -51,10 +51,11 @@ import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plu
 import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
 import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
-import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
+import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveDraftEmailFactorySegment, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
 import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy, type ExternalReviewRun, type ExternalSuggestion, type ProductContext, type ProductGuardrail } from '../domain/management';
-import { decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy } from '../services/managementService';
+import { createRulerManagementPlan, decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy } from '../services/managementService';
 import { exportStrategyPlanXlsx } from '../export/strategyPlanXlsx';
+import { CreateRulerDialog, type CreateRulerConfig } from './CreateRulerDialog';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
 const TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v5';
@@ -229,6 +230,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [signatureManagerOpen, setSignatureManagerOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [rulerOpen, setRulerOpen] = useState(false);
   const [newDefaults, setNewDefaults] = useState({ partner: 'Plurix', segment: 'CRM', weekKey: 'Semana 1' });
   const [selectedWeek, setSelectedWeek] = useState<WeekSelection | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<SegmentSelection | null>(null);
@@ -368,6 +370,36 @@ export const DynamicEmailWorkspace: React.FC = () => {
     setRows((current) => [...current, ...created]);
     setSelectedWeek(null); setSelectedId(created[0]?.__id ?? ''); setNewOpen(false);
     setAnnouncement(isPlurix ? `Novo e-mail criado com ${created.length} assinaturas ativas.` : 'Novo e-mail criado usando um segmento existente em activities.');
+  };
+  const createRuler = async (config: CreateRulerConfig) => {
+    const partners = [...new Set([config.partner, ...config.adaptationPartners].filter(Boolean))];
+    const now = new Date();
+    const end = new Date(now); end.setFullYear(end.getFullYear() + 1);
+    const isoMinute = (date: Date) => date.toISOString().slice(0, 16);
+    const slug = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '').toUpperCase();
+    const created: WorkspaceBriefing[] = [];
+    const campaignGroups: Array<{ id: string; partner: string; weekKey: string; sequence: string; functionalName: string; role: string }> = [];
+    partners.forEach((partnerName) => config.emails.forEach((email, index) => {
+      const campaignGroupId = crypto.randomUUID();
+      const sequence = `E-mail ${index + 1}`;
+      const seed = emptyBriefingRow();
+      Object.assign(seed, {
+        DT_INICIO: isoMinute(now), DT_FIM: isoMinute(end),
+        UTM_CAMPANHA: slug(`${config.rulerName}_${partnerName}_${sequence}`),
+        TP_CAMPANHA: config.businessFront === 'acquisition' ? 'Aquisição' : 'Rentabilização',
+        SEQUENCIA: sequence, NM_PRODUTO_INTERNO: slug(partnerName),
+      });
+      const row = withMeta(seed, { partner: partnerName, segment: config.segment, subgroup: '', weekKey: email.weekKey, activityNames: [], campaignGroupId, status: 'draft', version: 1, templateSlotId: config.templateSlotId || undefined });
+      created.push(row);
+      campaignGroups.push({ id: campaignGroupId, partner: partnerName, weekKey: email.weekKey, sequence, functionalName: email.functionalName, role: email.role });
+    }));
+    if (config.segmentMode === 'draft') await saveDraftEmailFactorySegment({ technicalName: config.segment, displayName: config.segmentAlias, businessFront: config.businessFront, partner: config.partner, bu: config.bu || undefined, lifecycleFamily: config.rulerFamily, audienceDescription: config.audienceDescription || undefined });
+    const saved = await saveBriefings(created.map((row) => ({ row, warnings: ['Briefing criado pelo assistente de réguas; conteúdo, assets e Test Send ainda pendentes.'] })));
+    await createRulerManagementPlan({ name: config.rulerName, description: config.audienceDescription, businessFront: config.businessFront, rulerFamily: config.rulerFamily, partner: config.partner, adaptationPartners: config.adaptationPartners, product: config.partner, segment: config.segment, objective: config.objective, templateSlotId: config.templateSlotId, campaignGroups });
+    setRows((current) => [...current, ...saved]);
+    setSelectedId(saved[0]?.__id ?? ''); setSelectedWeek(null); setSelectedSegment({ partner: config.partner, segment: config.segment });
+    setRulerOpen(false); setAnnouncement(`${config.rulerName} criada com ${config.emails.length} e-mails, ${partners.length} ${partners.length === 1 ? 'parceiro' : 'parceiros'} e ${saved.length} briefings em rascunho.`);
+    await refreshManagement();
   };
   const duplicateBriefing = () => {
     if (!selected) return;
@@ -565,7 +597,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(event) => onFile(event.target.files?.[0])}/>
             <HeaderAction onClick={() => fileRef.current?.click()} icon={<Upload size={15}/>} label="Importar CSV"/>
             <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
-            <HeaderAction onClick={() => openNewBriefing()} icon={<Plus size={15}/>} label="Novo"/>
+            <HeaderAction onClick={() => setRulerOpen(true)} icon={<ListChecks size={15}/>} label="Criar régua"/>
+            <HeaderAction onClick={() => openNewBriefing()} icon={<Plus size={15}/>} label="Novo e-mail"/>
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
             <button disabled={Boolean(exportBlockReason)} onClick={exportCsv} title={exportBlockReason || 'Baixar CSV pronto para importar no SFMC'} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
             {exportBlockReason && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportBlockReason}</p>}
@@ -718,7 +751,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
     </div>}
 
     {deleteOpen && selected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-email-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteOpen(false); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-600"><Trash2 size={18}/></span><div><h2 id="delete-email-title" className="font-bold text-slate-900">Arquivar este e-mail editorial?</h2><p className="mt-1 text-sm leading-5 text-slate-600"><b>{selected.__meta.partner || 'Parceiro não informado'} · {selected.SEQUENCIA || 'Sequência pendente'}</b> e suas variantes deixarão os próximos CSVs. Registros salvos permanecem no histórico; somente rascunhos nunca salvos são removidos.</p></div></div><div className="mt-5 flex justify-end gap-2"><button autoFocus onClick={() => setDeleteOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button><button onClick={() => void deleteBriefing()} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">Arquivar e-mail</button></div></div></div>}
-    {newOpen && <NewBriefingDialog groups={editorialGroups.filter((group) => group.visibleRows.length)} settings={signatureSettings} taxonomy={taxonomy} defaultPartner={newDefaults.partner} defaultSegment={newDefaults.segment} defaultWeekKey={newDefaults.weekKey} defaultSequence={`E-mail ${activeEditorialGroupCount + 1}`} onClose={() => setNewOpen(false)} onCreate={createBriefing}/>}
+    {rulerOpen && <CreateRulerDialog taxonomy={taxonomy} templates={templateSlots} defaultPartner={newDefaults.partner} onClose={() => setRulerOpen(false)} onCreate={createRuler}/>}
+    {newOpen && <NewBriefingDialog groups={editorialGroups.filter((group) => group.visibleRows.length)} settings={signatureSettings} taxonomy={taxonomy.filter((item) => item.businessFront === 'acquisition')} defaultPartner={newDefaults.partner} defaultSegment={newDefaults.segment} defaultWeekKey={newDefaults.weekKey} defaultSequence={`E-mail ${activeEditorialGroupCount + 1}`} onClose={() => setNewOpen(false)} onCreate={createBriefing}/>}
     {weekArchiveTarget && <div className="fixed inset-0 z-[75] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-week-title"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="archive-week-title" className="font-bold text-slate-900">Arquivar {weekArchiveTarget.weekKey}?</h2><p className="mt-2 text-sm leading-5 text-slate-600">Todos os e-mails e variações ativos da semana sairão dos próximos CSVs. Registros já salvos continuarão no histórico.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => setWeekArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Cancelar</button><button onClick={() => void archiveWeek(weekArchiveTarget)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">Arquivar semana</button></div></div></div>}
     {signatureManagerOpen && selected && <SignatureManagerModal rows={rows} selected={selected} settings={signatureSettings} onClose={() => setSignatureManagerOpen(false)} onVariantStatus={(row, status) => void changeVariantStatus(row, status)} onGlobalStatus={(setting, status) => void changeGlobalSignature(setting, status)} onAdd={addSignatureToSelectedGroup}/>}
     {saveOpen && selected && <SaveDialog selected={selected} errors={selectedGroupErrorCount} saving={isSaving} onClose={() => !isSaving && setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>} 

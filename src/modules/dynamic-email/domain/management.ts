@@ -9,6 +9,7 @@ export interface EmailStrategy {
   segment: string;
   weekKey?: string;
   sequence?: string;
+  functionalName?: string;
   subject?: string;
   preheader?: string;
   roleInRuler?: string;

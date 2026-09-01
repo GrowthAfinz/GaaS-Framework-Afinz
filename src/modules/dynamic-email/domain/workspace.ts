@@ -70,6 +70,25 @@ export type ActivityTaxonomy = {
   weekKey: string;
   product: string;
   order?: number;
+  businessFront: 'acquisition' | 'monetization';
+  sourceTable: 'activities' | 'rentabilizacao_activities';
+};
+
+export type SegmentGovernanceStatus = 'existing' | 'draft' | 'approved' | 'observed';
+
+export type EmailFactorySegment = {
+  id: string;
+  technicalName: string;
+  displayName: string;
+  businessFront: 'acquisition' | 'monetization';
+  sourceTable?: 'activities' | 'rentabilizacao_activities';
+  sourceValue?: string;
+  partner?: string;
+  bu?: string;
+  lifecycleFamily?: string;
+  audienceDescription?: string;
+  origin: 'operational' | 'planned';
+  governanceStatus: SegmentGovernanceStatus;
 };
 
 export type SignatureSetting = {
