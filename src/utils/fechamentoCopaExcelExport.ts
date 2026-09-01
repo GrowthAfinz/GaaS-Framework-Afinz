@@ -27,7 +27,7 @@ import {
   writeMediaComparativoBlock,
   writeMediaRawNumbersTable,
   fetchMediaCampaignTotals,
-  MEDIA_RATE_GROUPS_WITH_CPI,
+  MEDIA_RATE_GROUPS_FULL_FUNNEL,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
@@ -276,6 +276,7 @@ function nullableNumber(value: unknown): number | null {
 // com handoff direto: App Install até 22/06, Onboarding a partir de 22/06 até 15/08).
 const APP_INSTALL_CAMPAIGN = '[B2C]App_Install_Afinz';
 const APP_INSTALL_CAMPAIGN_ID = '120210447970060723';
+const ONBOARDING_CAMPAIGN_ID = '120250049222750723';
 const ONBOARDING_CAMPAIGNS = [
   '[B2C]App_Install_Onboarding_Afinz',
   '[Afinz | Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
@@ -355,18 +356,20 @@ export async function fetchAqPaidDaily(start: Date, end: Date): Promise<AqPaidDa
   try {
     const { data: snapshot, error: snapError } = await supabase
       .from('copa_app_install_attribution_snapshot')
-      .select('business_date, canonical_installs')
-      .eq('campaign_id', APP_INSTALL_CAMPAIGN_ID)
+      .select('business_date, campaign_id, canonical_installs, canonical_start_trials')
+      .in('campaign_id', [APP_INSTALL_CAMPAIGN_ID, ONBOARDING_CAMPAIGN_ID])
       .gte('business_date', startIso)
       .lt('business_date', endExclusiveIso);
     if (snapError) throw snapError;
     for (const raw of snapshot ?? []) {
       const businessDate = String(raw.business_date).slice(0, 10);
-      const row = getOrCreate(businessDate, 'app_install');
+      const phase: AqPaidPhase = raw.campaign_id === APP_INSTALL_CAMPAIGN_ID ? 'app_install' : 'onboarding';
+      const row = getOrCreate(businessDate, phase);
       row.installs = nullableNumber(raw.canonical_installs);
+      if (phase === 'onboarding') row.startTrials = nullableNumber(raw.canonical_start_trials);
     }
   } catch (err) {
-    console.warn('[fechamento-copa] copa_app_install_attribution_snapshot indisponível (installs da fase App Install ficam em branco):', err);
+    console.warn('[fechamento-copa] copa_app_install_attribution_snapshot indisponível (installs/startTrials ficam em branco):', err);
   }
 
   return [...byKey.values()].sort((a, b) => a.businessDate.localeCompare(b.businessDate) || a.phase.localeCompare(b.phase));
@@ -1175,7 +1178,7 @@ function writeAquisicaoCopaBigNumbersSheet(
       title: 'COMPARATIVO MÍDIA PAGA COPA × REFERÊNCIA (MESMA CAMPANHA, PRÉ-COPA 06–12/04)',
       actual: actualMedia,
       benchmark: mediaBenchmarkRows,
-      groups: MEDIA_RATE_GROUPS_WITH_CPI,
+      groups: MEDIA_RATE_GROUPS_FULL_FUNNEL,
       actualLabel: 'Copa',
       refLabel: 'Pré-Copa',
     });

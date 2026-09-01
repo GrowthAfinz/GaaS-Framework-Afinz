@@ -1334,6 +1334,13 @@ export const MEDIA_RATE_GROUPS_WITH_CPI: MediaRateGroup[] = [
   { label: 'CPI', num: (m) => m.spend, den: (m) => m.installs ?? 0, format: '"R$" #,##0.00' },
 ];
 
+export const MEDIA_RATE_GROUPS_FULL_FUNNEL: MediaRateGroup[] = [
+  ...MEDIA_RATE_GROUPS_WITH_CPI,
+  { label: 'CPSTARTTRIAL', num: (m) => m.spend, den: (m) => m.startTrials ?? 0, format: '"R$" #,##0.00' },
+  { label: 'TX INSTALAÇÃO', num: (m) => m.installs ?? 0, den: (m) => m.clicks, format: '0.0%' },
+  { label: 'TX STARTTRIAL', num: (m) => m.startTrials ?? 0, den: (m) => m.installs ?? 0, format: '0.0%' },
+];
+
 /**
  * Mesmo formato do comparativo de funil (real | referência | Δ, uma linha por
  * "canal"/fase), mas para métricas de mídia paga (CTR/CPC/CPM e, quando aplicável,
