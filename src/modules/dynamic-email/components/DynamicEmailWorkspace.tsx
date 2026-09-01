@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
+import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -715,10 +717,52 @@ const TemplateSourceWorkspace = ({ slots, selectedId, principalId, source, syncS
 
 type TreeMenuItem = { label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean };
 
-const TreeActionMenu = ({ label, open, onToggle, items }: { label: string; open: boolean; onToggle: () => void; items: TreeMenuItem[] }) => <div className="relative shrink-0">
-  <button type="button" onClick={onToggle} className="rounded-lg p-2 text-slate-500 outline-none hover:bg-white hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label={label} aria-expanded={open}><Settings2 size={15}/></button>
-  {open && <div className="absolute right-0 top-9 z-40 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl" role="menu">{items.map((item) => <button type="button" key={item.label} onClick={item.onClick} className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${item.danger ? 'text-red-700 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'}`} role="menuitem">{item.icon}<span>{item.label}</span></button>)}</div>}
-</div>;
+const TREE_MENU_WIDTH = 224; // w-56
+
+const TreeActionMenu = ({ label, open, onToggle, items }: { label: string; open: boolean; onToggle: () => void; items: TreeMenuItem[] }) => {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  // O menu vive num portal com `position: fixed` porque a Caixa de briefings usa
+  // `overflow-y-auto` e cortava os últimos itens ("Arquivar semana"/"Arquivar e-mail").
+  // Rect vem em px físicos; `top`/`left` do portal são lidos em px locais (ver invariante 2 no CLAUDE.md).
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) { setPos(null); return; }
+    const rect = toLocalRect(buttonRef.current.getBoundingClientRect());
+    const { width: vw, height: vh } = getLocalViewport();
+    const estHeight = items.length * 40 + 12;
+    const left = Math.max(8, Math.min(vw - TREE_MENU_WIDTH - 8, rect.right - TREE_MENU_WIDTH));
+    let top = rect.bottom + 4;
+    if (top + estHeight > vh - 8) top = Math.max(8, rect.top - estHeight - 4);
+    setPos({ top, left });
+  }, [open, items.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (buttonRef.current?.contains(event.target as Node) || menuRef.current?.contains(event.target as Node)) return;
+      onToggle();
+    };
+    const closeOnScroll = () => onToggle();
+    document.addEventListener('pointerdown', closeOnOutside, true);
+    window.addEventListener('scroll', closeOnScroll, true);
+    window.addEventListener('resize', closeOnScroll);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside, true);
+      window.removeEventListener('scroll', closeOnScroll, true);
+      window.removeEventListener('resize', closeOnScroll);
+    };
+  }, [open, onToggle]);
+
+  return <div className="relative shrink-0">
+    <button ref={buttonRef} type="button" onClick={onToggle} className="rounded-lg p-2 text-slate-500 outline-none hover:bg-white hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label={label} aria-expanded={open}><Settings2 size={15}/></button>
+    {open && pos && createPortal(
+      <div ref={menuRef} className="fixed z-[80] w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl" role="menu" style={{ top: pos.top, left: pos.left }}>{items.map((item) => <button type="button" key={item.label} onClick={item.onClick} className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${item.danger ? 'text-red-700 hover:bg-red-50' : 'text-slate-700 hover:bg-slate-50'}`} role="menuitem">{item.icon}<span>{item.label}</span></button>)}</div>,
+      document.body,
+    )}
+  </div>;
+};
 
 const WeekReviewer = ({ selection, groups, strategies, issuesByRow, selectedId, onSelect, onEdit, onNewEmail, onDuplicate }: { selection: ReviewerSelection; groups: EditorialGroup[]; strategies: EmailStrategy[]; issuesByRow: Map<string, ValidationIssue[]>; selectedId: string; onSelect: (id: string) => void; onEdit: (id: string) => void; onNewEmail?: () => void; onDuplicate?: () => void }) => {
   const summaries = groups.map((group) => {
