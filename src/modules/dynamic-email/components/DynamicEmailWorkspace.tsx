@@ -17,6 +17,7 @@ import {
   LayoutPanelLeft,
   ListChecks,
   Mail,
+  MessageSquareText,
   Maximize2,
   Plus,
   Printer,
@@ -46,6 +47,7 @@ import {
 import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
 import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plurixUxV2Template';
 import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
+import { projectMarketingPreview } from '../domain/previewProjection';
 import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
 import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy, type ExternalReviewRun, type ExternalSuggestion, type ProductContext, type ProductGuardrail } from '../domain/management';
 import { decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy } from '../services/managementService';
@@ -207,6 +209,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'needs-review'>('all');
   const [announcement, setAnnouncement] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [showMarketingNotes, setShowMarketingNotes] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [signatureManagerOpen, setSignatureManagerOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
@@ -264,7 +267,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
     ? selected.__meta.templateSlotId
     : effectivePrincipalId;
   const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
-  const render = useMemo(() => selected ? renderDynamicEmail(previewTemplate, selected, { ...subscriber, PRODUTO: selected.NM_PRODUTO_INTERNO, SEQUENCIA: selected.SEQUENCIA, TP_CAMPANHA: selected.TP_CAMPANHA }) : { html: '', diagnostics: [] }, [previewTemplate, selected, subscriber]);
+  const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
+  const render = useMemo(() => previewRow ? renderDynamicEmail(previewTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden' }) : { html: '', diagnostics: [] }, [previewRow, previewTemplate, showMarketingNotes, subscriber]);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
@@ -640,8 +644,19 @@ export const DynamicEmailWorkspace: React.FC = () => {
 
           <Panel id="preview" defaultSize="42%" minSize="25%" className="min-w-0">
             <section id="email-preview-panel" className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
-              <div className="border-b border-slate-200 bg-white p-3.5">
-                <div className="flex items-start justify-between gap-3"><div><div className="flex items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs leading-4 text-slate-500">Confira o conteúdo com dados de teste. Antes do envio, valide pelo Test Send do SFMC.</p></div><div className="flex shrink-0 flex-wrap justify-end gap-2"><button onClick={() => openRenderedPreview()} disabled={!selected || render.diagnostics.length > 0} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><ExternalLink size={15}/>Abrir em nova aba</button><button onClick={() => openRenderedPreview(true)} disabled={!selected || render.diagnostics.length > 0} title="Abre a impressão do navegador para salvar a prévia completa em PDF" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Printer size={15}/>Salvar em PDF</button><button onClick={() => setPreviewOpen(true)} disabled={!selected} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={15}/>Ampliar</button></div></div>
+              <div className="border-b border-slate-200 bg-white px-3 py-2.5">
+                <div className="grid items-start gap-2 min-[1500px]:grid-cols-[minmax(220px,1fr)_auto]">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span><span className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${showMarketingNotes ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{showMarketingNotes ? 'Observações MKT' : 'E-mail projetado'}</span></div>
+                    <p className="mt-1 max-w-none whitespace-normal text-xs leading-[1.35rem] text-slate-500">Visualize a peça com conteúdo e ativos adaptados. Antes do envio, certifique pelo Test Send do SFMC.</p>
+                  </div>
+                  <div className="grid shrink-0 grid-cols-2 gap-1.5">
+                    <button onClick={() => openRenderedPreview()} disabled={!selected || render.diagnostics.length > 0} className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><ExternalLink size={14}/>Abrir em nova aba</button>
+                    <button onClick={() => openRenderedPreview(true)} disabled={!selected || render.diagnostics.length > 0} title="Abre a impressão do navegador para salvar a prévia completa em PDF" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Printer size={14}/>Salvar em PDF</button>
+                    <button type="button" aria-pressed={showMarketingNotes} onClick={() => setShowMarketingNotes((current) => !current)} disabled={!selected} title="Alternar entre a peça projetada e as instruções pendentes para Marketing" className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50 ${showMarketingNotes ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-800'}`}><MessageSquareText size={14}/>Observações MKT</button>
+                    <button onClick={() => setPreviewOpen(true)} disabled={!selected} className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={14}/>Ampliar</button>
+                  </div>
+                </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.25fr)_minmax(120px,0.75fr)_minmax(120px,0.75fr)]">
                   <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Template deste briefing
                     <span className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 bg-white px-2 focus-within:border-cyan-400">

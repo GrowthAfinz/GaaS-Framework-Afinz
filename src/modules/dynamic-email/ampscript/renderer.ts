@@ -2,6 +2,7 @@ import type { BriefingRow } from '../domain/briefing';
 
 export interface SubscriberSample { CPF: string; PRI_NOME: string; LIMITE: string; PRODUTO: string; SEQUENCIA: string; TP_CAMPANHA: string }
 export interface RenderResult { html: string; diagnostics: string[] }
+export interface RenderOptions { pendingAssets?: 'observations' | 'hidden' }
 
 type Vars = Record<string, string | number | boolean>;
 const MAX_RECURSION = 8;
@@ -105,7 +106,7 @@ function renderPendingAssetPlaceholders(html: string): string {
   ));
 }
 
-export function renderDynamicEmail(source: string, row: BriefingRow, subscriber: SubscriberSample): RenderResult {
+export function renderDynamicEmail(source: string, row: BriefingRow, subscriber: SubscriberSample, options: RenderOptions = {}): RenderResult {
   const diagnostics = unsupported(source); if (diagnostics.length) return { html: '', diagnostics };
   const vars = readVars(source, row, subscriber);
   // The leading setup block contains lookup/SET business logic; assignments were read above. Inline content IFs remain evaluable.
@@ -113,7 +114,9 @@ export function renderDynamicEmail(source: string, row: BriefingRow, subscriber:
   html = renderConditionals(html, vars);
   html = html.replace(/%%\[\s*(?:SET|RaiseError)[\s\S]*?\]%%/gi, '');
   html = interpolate(html, vars);
-  html = renderPendingAssetPlaceholders(html);
+  html = options.pendingAssets === 'hidden'
+    ? html.replace(/<img\b(?=[^>]*\bsrc="\[PENDENTE MKT\][^"]*")[^>]*>/gi, '')
+    : renderPendingAssetPlaceholders(html);
   html = html.replace(/<custom\b[^>]*\/?\s*>/gi, '<!-- Bloco SFMC omitido no preview local -->');
   const unresolved = html.match(/%%(?:\[|=)[\s\S]*?%%/g) ?? [];
   if (unresolved.length) diagnostics.push(`Restaram ${unresolved.length} expressões AMPscript sem resolver.`);

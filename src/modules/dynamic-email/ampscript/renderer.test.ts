@@ -115,4 +115,18 @@ describe('AMPscript-lite', () => {
     expect(result.html).not.toContain('src="[PENDENTE MKT]');
     expect(PLURIX_UX_V2_TEMPLATE).not.toContain('background:#E5E7EB');
   });
+
+  it('oculta instruções de asset ainda não projetadas no modo e-mail', () => {
+    const row = emptyBriefingRow('plurix-projected-preview');
+    Object.assign(row, {
+      HEADER: '[PENDENTE MKT] HEADER 600 px: criar peça de teste.',
+      COPY_1_PRETO: 'Conteúdo principal',
+      COR_COPY_PRETO_1: '#242424',
+      TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '18',
+    });
+    const result = renderDynamicEmail(PLURIX_UX_V2_TEMPLATE, row, { ...subscriber, SEQUENCIA: 'E-mail 3' }, { pendingAssets: 'hidden' });
+    expect(result.html).not.toContain('[PENDENTE MKT]');
+    expect(result.html).not.toContain('background:#E5E7EB');
+    expect(result.html).toContain('Conteúdo principal');
+  });
 });
