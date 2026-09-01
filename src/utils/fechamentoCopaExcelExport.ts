@@ -25,6 +25,7 @@ import {
   computeCopaChannelActuals,
   writeFunnelComparativoBlock,
   writeMediaComparativoBlock,
+  writeMediaRawNumbersTable,
   fetchMediaCampaignTotals,
   MEDIA_RATE_GROUPS_WITH_CPI,
   buildCopaIndex,
@@ -276,6 +277,7 @@ function nullableNumber(value: unknown): number | null {
 const APP_INSTALL_CAMPAIGN = '[B2C]App_Install_Afinz';
 const APP_INSTALL_CAMPAIGN_ID = '120210447970060723';
 const ONBOARDING_CAMPAIGNS = [
+  '[B2C]App_Install_Onboarding_Afinz',
   '[Afinz | Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
   '[Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
 ];
@@ -1166,15 +1168,24 @@ function writeAquisicaoCopaBigNumbersSheet(
     const onboardingRows = paidRows.filter((r) => r.phase === 'onboarding');
     const actualMedia: MediaComparativoRow[] = [
       { label: '[B2C] APP INSTALL AFINZ', spend: paidTotal(appInstallRows, 'spend'), impressions: paidTotal(appInstallRows, 'impressions'), clicks: paidTotal(appInstallRows, 'linkClicks'), installs: paidTotal(appInstallRows, 'installs') },
-      { label: '[B2C] ONBOARDING/STARTTRIAL', spend: paidTotal(onboardingRows, 'spend'), impressions: paidTotal(onboardingRows, 'impressions'), clicks: paidTotal(onboardingRows, 'linkClicks'), installs: paidTotal(onboardingRows, 'installs') },
+      { label: '[B2C] ONBOARDING/STARTTRIAL', spend: paidTotal(onboardingRows, 'spend'), impressions: paidTotal(onboardingRows, 'impressions'), clicks: paidTotal(onboardingRows, 'linkClicks'), installs: paidTotal(onboardingRows, 'installs'), startTrials: paidTotal(onboardingRows, 'startTrials') },
     ];
-    writeMediaComparativoBlock(ws, afterFunnelRow, {
+    const mediaBenchmarkRows = [mediaBenchmark, mediaBenchmark];
+    const afterMediaRow = writeMediaComparativoBlock(ws, afterFunnelRow, {
       title: 'COMPARATIVO MÍDIA PAGA COPA × REFERÊNCIA (MESMA CAMPANHA, PRÉ-COPA 06–12/04)',
       actual: actualMedia,
-      benchmark: [mediaBenchmark, mediaBenchmark],
+      benchmark: mediaBenchmarkRows,
       groups: MEDIA_RATE_GROUPS_WITH_CPI,
       actualLabel: 'Copa',
       refLabel: 'Pré-Copa',
+    });
+    writeMediaRawNumbersTable(ws, afterMediaRow, {
+      title: 'NÚMEROS ABSOLUTOS · MÍDIA PAGA (BASE DOS KPIs ACIMA)',
+      actual: actualMedia,
+      benchmark: mediaBenchmarkRows,
+      actualLabel: 'Copa',
+      refLabel: 'Pré-Copa',
+      showStartTrials: true,
     });
   }
 }

@@ -1319,7 +1319,7 @@ function writeFunnelComparativoBlock(
 
 // ── Comparativo de mídia paga (CTR/CPC/CPM/CPI) ─────────────────────────────────
 
-export type MediaComparativoRow = { label: string; spend: number; impressions: number; clicks: number; installs?: number };
+export type MediaComparativoRow = { label: string; spend: number; impressions: number; clicks: number; installs?: number; startTrials?: number };
 
 export type MediaRateGroup = { label: string; num: (m: MediaComparativoRow) => number; den: (m: MediaComparativoRow) => number; format: string };
 
@@ -1396,6 +1396,68 @@ function writeMediaComparativoBlock(
   ws.getRow(noteRow).height = 26;
 
   return noteRow + 2;
+}
+
+/**
+ * Tabela de números absolutos — os mesmos valores que originaram os KPIs do bloco
+ * comparativo acima (Investimento, Impressões, Cliques, Installs e, quando houver,
+ * StartTrials), lado a lado Copa/Referência. Sem taxas nem delta — só o dado bruto,
+ * para auditoria/conferência de quem for ler a planilha.
+ */
+function writeMediaRawNumbersTable(
+  ws: Worksheet,
+  startRow: number,
+  opts: { title: string; actual: MediaComparativoRow[]; benchmark: MediaComparativoRow[]; actualLabel: string; refLabel: string; showStartTrials?: boolean },
+): number {
+  const metrics: Array<{ label: string; get: (m: MediaComparativoRow) => number | ''; format: string }> = [
+    { label: 'Investimento', get: (m) => m.spend, format: '"R$" #,##0.00' },
+    { label: 'Impressões', get: (m) => m.impressions, format: '#,##0' },
+    { label: 'Cliques', get: (m) => m.clicks, format: '#,##0' },
+    { label: 'Installs', get: (m) => m.installs ?? '', format: '#,##0' },
+  ];
+  if (opts.showStartTrials) metrics.push({ label: 'StartTrials', get: (m) => m.startTrials ?? '', format: '#,##0' });
+
+  const groupWidth = 2; // Copa | Referência
+  const totalCols = 1 + metrics.length * groupWidth;
+  const titleRow = startRow;
+  const headerRow = startRow + 1;
+  const subHeaderRow = startRow + 2;
+  const dataStartRow = startRow + 3;
+
+  ws.mergeCells(titleRow, 1, titleRow, totalCols);
+  setCell(ws.getCell(titleRow, 1), opts.title, {
+    bold: true, fillColor: '475569', fontColor: 'FFFFFF', align: 'left', size: 10,
+  });
+
+  setCell(ws.getCell(headerRow, 1), 'Canal/Fase', { bold: true, fillColor: 'E2E8F0', fontColor: '334155', size: 8 });
+  ws.mergeCells(subHeaderRow, 1, headerRow, 1);
+
+  let col = 2;
+  metrics.forEach((metric) => {
+    ws.mergeCells(headerRow, col, headerRow, col + groupWidth - 1);
+    setCell(ws.getCell(headerRow, col), metric.label, { bold: true, fillColor: '475569', fontColor: 'FFFFFF', size: 8 });
+    [opts.actualLabel, opts.refLabel].forEach((h, i) => setCell(ws.getCell(subHeaderRow, col + i), h, {
+      bold: true, fillColor: 'E2E8F0', fontColor: '334155', size: 8,
+    }));
+    col += groupWidth;
+  });
+
+  opts.actual.forEach((a, index) => {
+    const r = opts.benchmark[index];
+    const row = dataStartRow + index;
+    const fill = index % 2 === 0 ? 'FFFFFF' : 'F1F5F9';
+    setCell(ws.getCell(row, 1), a.label, { fillColor: fill, align: 'left', size: 9 });
+    let c = 2;
+    metrics.forEach((metric) => {
+      setCell(ws.getCell(row, c), metric.get(a), { fillColor: fill, align: 'right', size: 9 });
+      setCell(ws.getCell(row, c + 1), r ? metric.get(r) : '', { fillColor: fill, align: 'right', size: 9 });
+      ws.getCell(row, c).numFmt = metric.format;
+      ws.getCell(row, c + 1).numFmt = metric.format;
+      c += groupWidth;
+    });
+  });
+
+  return dataStartRow + opts.actual.length + 2;
 }
 
 /**
@@ -1849,11 +1911,19 @@ function writeCopaBigNumbersSheet(
     const actualMedia: MediaComparativoRow[] = (['google', 'meta', 'total'] as CopaMediaChannel[]).map((ch) => ({
       label: ch.toUpperCase(), spend: mediaTotals[ch].spend, impressions: mediaTotals[ch].impressions, clicks: mediaTotals[ch].clicks,
     }));
+    const mediaBenchmarkRows = [mediaBenchmark.google, mediaBenchmark.meta, mediaBenchmark.total];
     afterComparativoRow = writeMediaComparativoBlock(ws, afterComparativoRow, {
       title: 'COMPARATIVO MÍDIA PAGA COPA × REFERÊNCIA (MÉDIA SEGUROS) · POR CANAL',
       actual: actualMedia,
-      benchmark: [mediaBenchmark.google, mediaBenchmark.meta, mediaBenchmark.total],
+      benchmark: mediaBenchmarkRows,
       groups: MEDIA_RATE_GROUPS_BASE,
+      actualLabel: 'Copa',
+      refLabel: 'Seguros',
+    });
+    afterComparativoRow = writeMediaRawNumbersTable(ws, afterComparativoRow, {
+      title: 'NÚMEROS ABSOLUTOS · MÍDIA PAGA (BASE DOS KPIs ACIMA)',
+      actual: actualMedia,
+      benchmark: mediaBenchmarkRows,
       actualLabel: 'Copa',
       refLabel: 'Seguros',
     });
@@ -2895,6 +2965,7 @@ export {
   fetchCopaGa4UniqueSnapshot,
   writeFunnelComparativoBlock,
   writeMediaComparativoBlock,
+  writeMediaRawNumbersTable,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
