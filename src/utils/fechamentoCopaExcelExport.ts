@@ -279,17 +279,6 @@ const ONBOARDING_CAMPAIGNS = [
   '[Afinz | Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
   '[Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
 ];
-// Todos os apelidos/variantes de nome das campanhas Copa em `paid_media_campaign_mappings`
-// (objective='aquisicao') — usados para excluir a própria Copa do cálculo do benchmark
-// de mídia pré-Copa (ver fetchAquisicaoMediaBenchmark).
-const COPA_AQUISICAO_MEDIA_CAMPAIGN_ALIASES = [
-  APP_INSTALL_CAMPAIGN,
-  ...ONBOARDING_CAMPAIGNS,
-  '[Afinz | Fábrica de Vendas] [B2C]App_Install_Afinz',
-  '[Fábrica de Vendas] [B2C]App_Install_Afinz',
-  '[COPA][AQUISICAO]APP_INSTALL_B2C',
-  '[Institucional] [COPA][AQUISICAO]APP_INSTALL_B2C',
-];
 
 /**
  * Fonte governada do funil de mídia paga B2C (App Install + Onboarding/StartTrial).
@@ -379,6 +368,48 @@ export async function fetchAqPaidDaily(start: Date, end: Date): Promise<AqPaidDa
   }
 
   return [...byKey.values()].sort((a, b) => a.businessDate.localeCompare(b.businessDate) || a.phase.localeCompare(b.phase));
+}
+
+/**
+ * Referência de mídia paga para a fase App Install: a MESMA campanha Meta
+ * (`[B2C]App_Install_Afinz`), na semana imediatamente anterior ao início da ação
+ * Copa (06/04–12/04/2026) — mesmo público/criativo, sem o boost da Copa. É a única
+ * referência de aquisição com install real disponível: `paid_media_metrics.installs`
+ * está zerado para toda campanha de aquisição que não seja esta (nenhuma outra tinha
+ * o pipeline de atribuição instrumentado); o install pré-Copa vem do backfill em
+ * `copa_app_install_attribution_snapshot` (campaign_phase='app_install_pre_copa';
+ * ver migration 20260901200000_copa_app_install_pre_copa_backfill.sql).
+ */
+export async function fetchAppInstallPreCopaBenchmark(): Promise<MediaComparativoRow> {
+  const row: MediaComparativoRow = { label: 'Pré-Copa (mesma campanha)', spend: 0, impressions: 0, clicks: 0, installs: 0 };
+  try {
+    const { data, error } = await supabase
+      .from('paid_media_metrics')
+      .select('spend, impressions, clicks')
+      .eq('campaign', APP_INSTALL_CAMPAIGN)
+      .eq('channel', 'meta')
+      .lt('date', isoDate(COPA_ACTION_START));
+    if (error) throw error;
+    for (const r of data ?? []) {
+      row.spend += Number(r.spend) || 0;
+      row.impressions += asInt(r.impressions);
+      row.clicks += asInt(r.clicks);
+    }
+  } catch (err) {
+    console.warn('[fechamento-copa] paid_media_metrics (pré-Copa App Install) indisponível:', err);
+  }
+  try {
+    const { data, error } = await supabase
+      .from('copa_app_install_attribution_snapshot')
+      .select('canonical_installs')
+      .eq('campaign_id', APP_INSTALL_CAMPAIGN_ID)
+      .eq('campaign_phase', 'app_install_pre_copa');
+    if (error) throw error;
+    row.installs = (data ?? []).reduce((sum, r) => sum + (Number(r.canonical_installs) || 0), 0);
+  } catch (err) {
+    console.warn('[fechamento-copa] copa_app_install_attribution_snapshot (app_install_pre_copa) indisponível:', err);
+  }
+  return row;
 }
 
 /**
@@ -1138,7 +1169,7 @@ function writeAquisicaoCopaBigNumbersSheet(
       { label: '[B2C] ONBOARDING/STARTTRIAL', spend: paidTotal(onboardingRows, 'spend'), impressions: paidTotal(onboardingRows, 'impressions'), clicks: paidTotal(onboardingRows, 'linkClicks'), installs: paidTotal(onboardingRows, 'installs') },
     ];
     writeMediaComparativoBlock(ws, afterFunnelRow, {
-      title: 'COMPARATIVO MÍDIA PAGA COPA × REFERÊNCIA (OUTRAS CAMPANHAS DE AQUISIÇÃO, PRÉ-COPA)',
+      title: 'COMPARATIVO MÍDIA PAGA COPA × REFERÊNCIA (MESMA CAMPANHA, PRÉ-COPA 06–12/04)',
       actual: actualMedia,
       benchmark: [mediaBenchmark, mediaBenchmark],
       groups: MEDIA_RATE_GROUPS_WITH_CPI,
@@ -1227,7 +1258,7 @@ export async function exportFechamentoCopaXlsx(
 
   const [
     rntRows, fixedIdx, aqRows, aqPaidRows, eventNotes, ga4Snapshot,
-    rentaBenchmark, aquisicaoBenchmark, rentaMediaBenchmark, aquisicaoMediaBenchmarkTotals, ExcelJSModule,
+    rentaBenchmark, aquisicaoBenchmark, rentaMediaBenchmark, aquisicaoMediaBenchmark, ExcelJSModule,
   ] = await Promise.all([
     fetchRntRows(copaStart, effectiveEnd),
     fetchCopaFixedDaily(copaStart, effectiveEnd),
@@ -1238,7 +1269,7 @@ export async function exportFechamentoCopaXlsx(
     fetchRentaBenchmarkByChannel(),
     fetchAquisicaoBenchmarkByChannel(copaStart),
     fetchMediaCampaignTotals('seguros'),
-    fetchMediaCampaignTotals('aquisicao', { excludeCampaigns: COPA_AQUISICAO_MEDIA_CAMPAIGN_ALIASES, beforeDate: copaStart }),
+    fetchAppInstallPreCopaBenchmark(),
     import('exceljs'),
   ]);
 
@@ -1255,7 +1286,7 @@ export async function exportFechamentoCopaXlsx(
     rentaBenchmark,
     aquisicaoBenchmark,
     rentaMediaBenchmark,
-    aquisicaoMediaBenchmark: aquisicaoMediaBenchmarkTotals.total,
+    aquisicaoMediaBenchmark,
   });
 
   const buffer = await wb.xlsx.writeBuffer();
