@@ -48,6 +48,7 @@ import {
 } from '../domain/briefing';
 import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
 import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plurixUxV2Template';
+import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
 import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
 import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
@@ -172,8 +173,13 @@ const initialTemplateSlots = (): EmailTemplateSlot[] => {
     }
   }
   if (!migrated.length) migrated = [{ id: crypto.randomUUID(), name: 'Template principal', source: localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE, isPrincipal: true, version: 1, updatedAt: new Date().toISOString() }];
-  const refreshed = migrated.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T18:00:00.000Z' } : slot);
-  return normalize(refreshed.some((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID) ? refreshed : [...refreshed, { id: PLURIX_UX_V2_TEMPLATE_ID, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, isPrincipal: false, version: 1, updatedAt: '2026-08-19T18:00:00.000Z' }]);
+  const refreshed = migrated.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID
+    ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T18:00:00.000Z' }
+    : slot.id === B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID
+      ? { ...slot, name: 'B2C Classic + Vibe · Dinâmico', source: B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, updatedAt: '2026-09-01T12:00:00.000Z' }
+      : slot);
+  const withPlurix = refreshed.some((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID) ? refreshed : [...refreshed, { id: PLURIX_UX_V2_TEMPLATE_ID, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, isPrincipal: false, version: 1, updatedAt: '2026-08-19T18:00:00.000Z' }];
+  return normalize(withPlurix.some((slot) => slot.id === B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID) ? withPlurix : [...withPlurix, { id: B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID, name: 'B2C Classic + Vibe · Dinâmico', source: B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, isPrincipal: false, version: 1, updatedAt: '2026-09-01T12:00:00.000Z' }]);
 };
 
 export const DynamicEmailWorkspace: React.FC = () => {
