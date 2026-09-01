@@ -10,6 +10,7 @@ Não existe chamada automática de IA no frontend, Edge Function, cron ou trigge
 
 - árvore `parceiro > segmento > semana > e-mail > assinatura`;
 - clique no nome da semana abre o Revisor; a seta só expande/recolhe;
+- clique no nome do segmento abre o Revisor da régua completa, agregando todos os e-mails editoriais do segmento em ordem de `SEQUENCIA`; a seta do segmento continua apenas expandindo/recolhendo;
 - painel direito continua mostrando a prévia do e-mail selecionado;
 - aliases de segmento são apenas visuais;
 - seis assinaturas Plurix permanecem variantes do mesmo e-mail editorial;
