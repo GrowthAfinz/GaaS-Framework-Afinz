@@ -24,11 +24,14 @@ import {
   fetchRentaBenchmarkByChannel,
   computeCopaChannelActuals,
   writeFunnelComparativoBlock,
+  writeMediaComparativoBlock,
+  fetchMediaCampaignTotals,
+  MEDIA_RATE_GROUPS_WITH_CPI,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
 } from './rentabilizacaoCrmExcelExport';
-import type { CopaChannel, CopaEventNote, CopaGa4UniqueSnapshot, ChannelBenchmark } from './rentabilizacaoCrmExcelExport';
+import type { CopaChannel, CopaEventNote, CopaGa4UniqueSnapshot, ChannelBenchmark, MediaComparativoRow } from './rentabilizacaoCrmExcelExport';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FECHAMENTO COPA · AQUISIÇÃO E RENTABILIZAÇÃO
@@ -275,6 +278,17 @@ const APP_INSTALL_CAMPAIGN_ID = '120210447970060723';
 const ONBOARDING_CAMPAIGNS = [
   '[Afinz | Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
   '[Fábrica de Vendas] [B2C]App_Install_Onboarding_Afinz',
+];
+// Todos os apelidos/variantes de nome das campanhas Copa em `paid_media_campaign_mappings`
+// (objective='aquisicao') — usados para excluir a própria Copa do cálculo do benchmark
+// de mídia pré-Copa (ver fetchAquisicaoMediaBenchmark).
+const COPA_AQUISICAO_MEDIA_CAMPAIGN_ALIASES = [
+  APP_INSTALL_CAMPAIGN,
+  ...ONBOARDING_CAMPAIGNS,
+  '[Afinz | Fábrica de Vendas] [B2C]App_Install_Afinz',
+  '[Fábrica de Vendas] [B2C]App_Install_Afinz',
+  '[COPA][AQUISICAO]APP_INSTALL_B2C',
+  '[Institucional] [COPA][AQUISICAO]APP_INSTALL_B2C',
 ];
 
 /**
@@ -896,6 +910,7 @@ function writeAquisicaoCopaBigNumbersSheet(
   dates: Date[],
   paidRows: AqPaidDay[],
   benchmark?: ChannelBenchmark,
+  mediaBenchmark?: MediaComparativoRow,
 ): void {
   const maxCol = 14;
   const ws = wb.addWorksheet('Big Numbers Aquisição Copa', {
@@ -1096,6 +1111,7 @@ function writeAquisicaoCopaBigNumbersSheet(
   });
   ws.getRow(noteRow).height = 30;
 
+  let afterFunnelRow = noteRow + 2;
   if (benchmark) {
     const actual: ChannelBenchmark = COPA_CHANNELS.reduce((acc, ch) => {
       const m = index.byChannel[ch];
@@ -1105,10 +1121,27 @@ function writeAquisicaoCopaBigNumbersSheet(
       };
       return acc;
     }, {} as ChannelBenchmark);
-    writeFunnelComparativoBlock(ws, noteRow + 2, {
+    afterFunnelRow = writeFunnelComparativoBlock(ws, noteRow + 2, {
       title: 'COMPARATIVO COPA × REFERÊNCIA (MÉDIA PRÉ-COPA) · POR CANAL',
       actual,
       benchmark,
+      actualLabel: 'Copa',
+      refLabel: 'Pré-Copa',
+    });
+  }
+
+  if (mediaBenchmark) {
+    const appInstallRows = paidRows.filter((r) => r.phase === 'app_install');
+    const onboardingRows = paidRows.filter((r) => r.phase === 'onboarding');
+    const actualMedia: MediaComparativoRow[] = [
+      { label: '[B2C] APP INSTALL AFINZ', spend: paidTotal(appInstallRows, 'spend'), impressions: paidTotal(appInstallRows, 'impressions'), clicks: paidTotal(appInstallRows, 'linkClicks'), installs: paidTotal(appInstallRows, 'installs') },
+      { label: '[B2C] ONBOARDING/STARTTRIAL', spend: paidTotal(onboardingRows, 'spend'), impressions: paidTotal(onboardingRows, 'impressions'), clicks: paidTotal(onboardingRows, 'linkClicks'), installs: paidTotal(onboardingRows, 'installs') },
+    ];
+    writeMediaComparativoBlock(ws, afterFunnelRow, {
+      title: 'COMPARATIVO MÍDIA PAGA COPA × REFERÊNCIA (OUTRAS CAMPANHAS DE AQUISIÇÃO, PRÉ-COPA)',
+      actual: actualMedia,
+      benchmark: [mediaBenchmark, mediaBenchmark],
+      groups: MEDIA_RATE_GROUPS_WITH_CPI,
       actualLabel: 'Copa',
       refLabel: 'Pré-Copa',
     });
@@ -1146,11 +1179,13 @@ export function buildFechamentoCopaWorkbook(
     ga4Snapshot?: CopaGa4UniqueSnapshot | null;
     rentaBenchmark?: ChannelBenchmark;
     aquisicaoBenchmark?: ChannelBenchmark;
+    rentaMediaBenchmark?: { google: MediaComparativoRow; meta: MediaComparativoRow; total: MediaComparativoRow };
+    aquisicaoMediaBenchmark?: MediaComparativoRow;
   },
 ): Workbook {
   const {
     rntRows, aqRows, aqPaidRows = [], fixedIdx, start, end, eventNotes, ga4Snapshot,
-    rentaBenchmark, aquisicaoBenchmark,
+    rentaBenchmark, aquisicaoBenchmark, rentaMediaBenchmark, aquisicaoMediaBenchmark,
   } = params;
   const copaStart = COPA_ACTION_START;
   const copaActionDates = copaStart <= end ? allDates(copaStart, end) : [];
@@ -1172,9 +1207,9 @@ export function buildFechamentoCopaWorkbook(
   // Ordem: 1) Rentabilização Copa 2) Big Numbers Renta 3) Aquisição Copa 4) Big Numbers Aquisição
   writeCopaSheet(wb, rntRows, copaDetailDates, copaDetailStart, end, fixedIdx, chartImages);
   const rentaBenchmarkActual = rentaBenchmark ? computeCopaChannelActuals(rntRows, copaStart, end) : undefined;
-  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages, eventNotes, ga4Snapshot, rentaBenchmark, rentaBenchmarkActual);
+  writeCopaBigNumbersSheet(wb, copaActionDates, fixedIdx, copaActionIdx, chartImages, eventNotes, ga4Snapshot, rentaBenchmark, rentaBenchmarkActual, rentaMediaBenchmark);
   writeAquisicaoCopaSheet(wb, aqIndex, copaActionDates, aqPaidRows);
-  writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates, aqPaidRows, aquisicaoBenchmark);
+  writeAquisicaoCopaBigNumbersSheet(wb, aqIndex, copaActionDates, aqPaidRows, aquisicaoBenchmark, aquisicaoMediaBenchmark);
 
   return wb;
 }
@@ -1190,7 +1225,10 @@ export async function exportFechamentoCopaXlsx(
   const copaStart = COPA_ACTION_START;
   if (copaStart > effectiveEnd) throw new Error('A acao Copa ainda nao possui dias fechados.');
 
-  const [rntRows, fixedIdx, aqRows, aqPaidRows, eventNotes, ga4Snapshot, rentaBenchmark, aquisicaoBenchmark, ExcelJSModule] = await Promise.all([
+  const [
+    rntRows, fixedIdx, aqRows, aqPaidRows, eventNotes, ga4Snapshot,
+    rentaBenchmark, aquisicaoBenchmark, rentaMediaBenchmark, aquisicaoMediaBenchmarkTotals, ExcelJSModule,
+  ] = await Promise.all([
     fetchRntRows(copaStart, effectiveEnd),
     fetchCopaFixedDaily(copaStart, effectiveEnd),
     fetchSupabaseRows(copaStart, effectiveEnd),
@@ -1199,6 +1237,8 @@ export async function exportFechamentoCopaXlsx(
     fetchCopaGa4UniqueSnapshot(effectiveEnd),
     fetchRentaBenchmarkByChannel(),
     fetchAquisicaoBenchmarkByChannel(copaStart),
+    fetchMediaCampaignTotals('seguros'),
+    fetchMediaCampaignTotals('aquisicao', { excludeCampaigns: COPA_AQUISICAO_MEDIA_CAMPAIGN_ALIASES, beforeDate: copaStart }),
     import('exceljs'),
   ]);
 
@@ -1214,6 +1254,8 @@ export async function exportFechamentoCopaXlsx(
     ga4Snapshot,
     rentaBenchmark,
     aquisicaoBenchmark,
+    rentaMediaBenchmark,
+    aquisicaoMediaBenchmark: aquisicaoMediaBenchmarkTotals.total,
   });
 
   const buffer = await wb.xlsx.writeBuffer();

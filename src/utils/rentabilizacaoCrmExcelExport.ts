@@ -1317,6 +1317,140 @@ function writeFunnelComparativoBlock(
   return noteRow + 2;
 }
 
+// ── Comparativo de mídia paga (CTR/CPC/CPM/CPI) ─────────────────────────────────
+
+export type MediaComparativoRow = { label: string; spend: number; impressions: number; clicks: number; installs?: number };
+
+export type MediaRateGroup = { label: string; num: (m: MediaComparativoRow) => number; den: (m: MediaComparativoRow) => number; format: string };
+
+export const MEDIA_RATE_GROUPS_BASE: MediaRateGroup[] = [
+  { label: 'CTR', num: (m) => m.clicks, den: (m) => m.impressions, format: '0.00%' },
+  { label: 'CPC', num: (m) => m.spend, den: (m) => m.clicks, format: '"R$" #,##0.00' },
+  { label: 'CPM', num: (m) => m.spend * 1000, den: (m) => m.impressions, format: '"R$" #,##0.00' },
+];
+
+export const MEDIA_RATE_GROUPS_WITH_CPI: MediaRateGroup[] = [
+  ...MEDIA_RATE_GROUPS_BASE,
+  { label: 'CPI', num: (m) => m.spend, den: (m) => m.installs ?? 0, format: '"R$" #,##0.00' },
+];
+
+/**
+ * Mesmo formato do comparativo de funil (real | referência | Δ, uma linha por
+ * "canal"/fase), mas para métricas de mídia paga (CTR/CPC/CPM e, quando aplicável,
+ * CPI). `actual` e `benchmark` andam pareados por índice (mesma ordem/rótulo).
+ */
+function writeMediaComparativoBlock(
+  ws: Worksheet,
+  startRow: number,
+  opts: { title: string; actual: MediaComparativoRow[]; benchmark: MediaComparativoRow[]; groups: MediaRateGroup[]; actualLabel: string; refLabel: string },
+): number {
+  const groupWidth = 3;
+  const totalCols = 1 + opts.groups.length * groupWidth;
+  const titleRow = startRow;
+  const groupHeaderRow = startRow + 1;
+  const subHeaderRow = startRow + 2;
+  const dataStartRow = startRow + 3;
+
+  ws.mergeCells(titleRow, 1, titleRow, totalCols);
+  setCell(ws.getCell(titleRow, 1), opts.title, {
+    bold: true, fillColor: '1D4ED8', fontColor: 'FFFFFF', align: 'left', size: 11,
+  });
+
+  setCell(ws.getCell(groupHeaderRow, 1), 'Canal/Fase', { bold: true, fillColor: 'DBEAFE', fontColor: '1D4ED8', size: 8 });
+  ws.mergeCells(subHeaderRow, 1, groupHeaderRow, 1);
+
+  let col = 2;
+  opts.groups.forEach((group) => {
+    ws.mergeCells(groupHeaderRow, col, groupHeaderRow, col + groupWidth - 1);
+    setCell(ws.getCell(groupHeaderRow, col), group.label, { bold: true, fillColor: '1D4ED8', fontColor: 'FFFFFF', size: 8 });
+    [opts.actualLabel, opts.refLabel, 'Δ'].forEach((h, i) => setCell(ws.getCell(subHeaderRow, col + i), h, {
+      bold: true, fillColor: 'DBEAFE', fontColor: '1D4ED8', size: 8,
+    }));
+    col += groupWidth;
+  });
+
+  opts.actual.forEach((a, index) => {
+    const r = opts.benchmark[index];
+    const row = dataStartRow + index;
+    const fill = index % 2 === 0 ? 'FFFFFF' : 'EFF6FF';
+    setCell(ws.getCell(row, 1), a.label, { fillColor: fill, align: 'left', size: 9 });
+    let c = 2;
+    opts.groups.forEach((group) => {
+      const aRate = group.den(a) > 0 ? group.num(a) / group.den(a) : '';
+      const rRate = r && group.den(r) > 0 ? group.num(r) / group.den(r) : '';
+      setCell(ws.getCell(row, c), aRate, { fillColor: fill, align: 'right', size: 9 });
+      setCell(ws.getCell(row, c + 1), rRate, { fillColor: fill, align: 'right', size: 9 });
+      setCell(ws.getCell(row, c + 2), {
+        formula: `IFERROR(${colLetter(c)}${row}-${colLetter(c + 1)}${row},"")`,
+      }, { fillColor: fill, align: 'right', size: 9 });
+      [c, c + 1, c + 2].forEach((col2) => { ws.getCell(row, col2).numFmt = group.format; });
+      c += groupWidth;
+    });
+  });
+
+  const noteRow = dataStartRow + opts.actual.length + 1;
+  ws.mergeCells(noteRow, 1, noteRow, totalCols);
+  setCell(ws.getCell(noteRow, 1), `Δ = ${opts.actualLabel} − ${opts.refLabel}. CPC/CPM/CPI são custos (Δ negativo = mais barato que a referência). CPI só aparece onde há instalação rastreada.`, {
+    italic: true, fillColor: 'EFF6FF', fontColor: '1D4ED8', size: 8, align: 'left',
+  });
+  ws.getRow(noteRow).height = 26;
+
+  return noteRow + 2;
+}
+
+/**
+ * Totais de spend/impressões/cliques (e installs, quando existir na tabela) por
+ * canal (google/meta/total), para todas as campanhas mapeadas com o `objective`
+ * dado em `paid_media_campaign_mappings` — usado como referência/benchmark de
+ * mídia paga. `excludeCampaigns` tira campanhas específicas (ex.: as da própria
+ * Copa) e `beforeDate` restringe a uma janela pré-ação.
+ */
+export async function fetchMediaCampaignTotals(
+  objective: string,
+  opts?: { excludeCampaigns?: string[]; beforeDate?: Date },
+): Promise<{ google: MediaComparativoRow; meta: MediaComparativoRow; total: MediaComparativoRow }> {
+  const result = {
+    google: { label: 'GOOGLE', spend: 0, impressions: 0, clicks: 0, installs: 0 },
+    meta: { label: 'META', spend: 0, impressions: 0, clicks: 0, installs: 0 },
+    total: { label: 'TOTAL', spend: 0, impressions: 0, clicks: 0, installs: 0 },
+  };
+  try {
+    const { data: maps, error: mapErr } = await supabase
+      .from('paid_media_campaign_mappings')
+      .select('campaign_name')
+      .eq('objective', objective);
+    if (mapErr) throw mapErr;
+    const exclude = new Set(opts?.excludeCampaigns ?? []);
+    const campaigns = (maps ?? []).map((m) => String(m.campaign_name)).filter((c) => !exclude.has(c));
+    if (campaigns.length === 0) return result;
+
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      let query = supabase
+        .from('paid_media_metrics')
+        .select('date, channel, spend, clicks, impressions, installs')
+        .in('campaign', campaigns)
+        .range(offset, offset + pageSize - 1);
+      if (opts?.beforeDate) query = query.lt('date', isoDate(opts.beforeDate));
+      const { data, error } = await query;
+      if (error) throw error;
+      for (const row of data ?? []) {
+        const channel = String(row.channel ?? '').toLowerCase() === 'google' ? 'google' : 'meta';
+        for (const target of ['total', channel] as Array<'total' | 'google' | 'meta'>) {
+          result[target].spend += Number(row.spend) || 0;
+          result[target].clicks += asInt(row.clicks);
+          result[target].impressions += asInt(row.impressions);
+          result[target].installs = (result[target].installs ?? 0) + (asInt((row as RawRow).installs));
+        }
+      }
+      if (!data || data.length < pageSize) break;
+    }
+  } catch (err) {
+    console.warn(`[media-benchmark] paid_media_campaign_mappings/paid_media_metrics (objective=${objective}) indisponível:`, err);
+  }
+  return result;
+}
+
 function writeCopaBigNumbersSheet(
   wb: Workbook,
   dates: Date[],
@@ -1327,6 +1461,7 @@ function writeCopaBigNumbersSheet(
   ga4Snapshot?: CopaGa4UniqueSnapshot | null,
   benchmark?: ChannelBenchmark,
   benchmarkActual?: ChannelBenchmark,
+  mediaBenchmark?: { google: MediaComparativoRow; meta: MediaComparativoRow; total: MediaComparativoRow },
 ): void {
   const maxCol = 20;
   const ws = wb.addWorksheet(COPA_BIG_NUMBERS_SHEET, {
@@ -1707,6 +1842,20 @@ function writeCopaBigNumbersSheet(
       benchmark,
       actualLabel: 'Copa',
       refLabel: 'Seguro',
+    });
+  }
+
+  if (mediaBenchmark) {
+    const actualMedia: MediaComparativoRow[] = (['google', 'meta', 'total'] as CopaMediaChannel[]).map((ch) => ({
+      label: ch.toUpperCase(), spend: mediaTotals[ch].spend, impressions: mediaTotals[ch].impressions, clicks: mediaTotals[ch].clicks,
+    }));
+    afterComparativoRow = writeMediaComparativoBlock(ws, afterComparativoRow, {
+      title: 'COMPARATIVO MÍDIA PAGA COPA × REFERÊNCIA (MÉDIA SEGUROS) · POR CANAL',
+      actual: actualMedia,
+      benchmark: [mediaBenchmark.google, mediaBenchmark.meta, mediaBenchmark.total],
+      groups: MEDIA_RATE_GROUPS_BASE,
+      actualLabel: 'Copa',
+      refLabel: 'Seguros',
     });
   }
 
@@ -2745,6 +2894,7 @@ export {
   fetchCopaEventNotes,
   fetchCopaGa4UniqueSnapshot,
   writeFunnelComparativoBlock,
+  writeMediaComparativoBlock,
   buildCopaIndex,
   copaCrmChartSummary,
   createCopaChartImages,
