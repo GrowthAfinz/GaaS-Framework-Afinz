@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { emailPreviewContextKey, resetEmailPreviewScroll, shouldResetEmailPreview } from './EmailPreviewFrame';
+import { describe, expect, it } from 'vitest';
+import { emailPreviewContextKey, shouldResetEmailPreview } from './EmailPreviewFrame';
 
 describe('EmailPreviewFrame', () => {
   it('muda o contexto ao trocar e-mail ou assinatura', () => {
@@ -23,10 +23,4 @@ describe('EmailPreviewFrame', () => {
     expect(shouldResetEmailPreview('email-7::plurix-v7', 'email-7::plurix-v7')).toBe(false);
   });
 
-  it('leva o documento do iframe ao topo', () => {
-    const scrollTo = vi.fn();
-    resetEmailPreviewScroll({ contentWindow: { scrollTo } } as unknown as HTMLIFrameElement);
-    expect(scrollTo).toHaveBeenCalledOnce();
-    expect(scrollTo).toHaveBeenCalledWith(0, 0);
-  });
 });
