@@ -7,10 +7,41 @@ export interface RenderOptions { pendingAssets?: 'observations' | 'hidden' }
 type Vars = Record<string, string | number | boolean>;
 const MAX_RECURSION = 8;
 
+function subscriberValue(subscriber: SubscriberSample, field: string): string {
+  const normalized = field.trim().toUpperCase();
+  if (normalized === '_SUBSCRIBERKEY') return subscriber.CPF;
+  return subscriber[normalized as keyof SubscriberSample] ?? '';
+}
+
 function readVars(source: string, row: BriefingRow, subscriber: SubscriberSample): Vars {
-  const vars: Vars = { Today: new Date().toISOString(), RowCount: 1 };
-  for (const match of source.matchAll(/SET\s+@(\w+)\s*=\s*\[([^\]]+)\]/gi)) vars[match[1]] = subscriber[match[2] as keyof SubscriberSample] ?? '';
-  for (const match of source.matchAll(/SET\s+@(\w+)\s*=\s*Field\s*\(\s*@Row\s*,\s*"([^"]+)"\s*\)/gi)) vars[match[1]] = row[match[2] as keyof BriefingRow] ?? '';
+  // The SFMC production template can hydrate these values either from the
+  // Journey snapshot (`[SEQUENCIA]`) or from the live audience row
+  // (`Field(@AudRow, "SEQUENCIA")`). The preview already receives the
+  // selected audience sample, so seed the canonical runtime variables before
+  // interpreting the template-specific assignments.
+  const vars: Vars = {
+    Today: new Date().toISOString(),
+    RowCount: 1,
+    FirstName: subscriber.PRI_NOME,
+    LimiteNovo: subscriber.LIMITE,
+    Produto: subscriber.PRODUTO,
+    Sequencia: subscriber.SEQUENCIA,
+    TpCampanha: subscriber.TP_CAMPANHA,
+    Chave: subscriber.CPF,
+  };
+
+  for (const match of source.matchAll(/SET\s+@(\w+)\s*=\s*\[([^\]]+)\]/gi)) {
+    vars[match[1]] = subscriberValue(subscriber, match[2]);
+  }
+  for (const match of source.matchAll(/SET\s+@(\w+)\s*=\s*(?:Trim\s*\(\s*)?AttributeValue\s*\(\s*["']([^"']+)["']\s*\)\s*\)?/gi)) {
+    vars[match[1]] = subscriberValue(subscriber, match[2]).trim();
+  }
+  for (const match of source.matchAll(/SET\s+@(\w+)\s*=\s*(?:Trim\s*\(\s*)?Field\s*\(\s*@AudRow\s*,\s*["']([^"']+)["']\s*\)\s*\)?/gi)) {
+    vars[match[1]] = subscriberValue(subscriber, match[2]).trim();
+  }
+  for (const match of source.matchAll(/SET\s+@(\w+)\s*=\s*(?:Trim\s*\(\s*)?Field\s*\(\s*@Row\s*,\s*["']([^"']+)["']\s*\)\s*\)?/gi)) {
+    vars[match[1]] = String(row[match[2] as keyof BriefingRow] ?? '').trim();
+  }
   return vars;
 }
 

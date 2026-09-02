@@ -6,6 +6,13 @@ import { PLURIX_UX_V2_TEMPLATE } from '../fixtures/plurixUxV2Template';
 
 const subscriber = { CPF: '1', PRI_NOME: 'VANIA', LIMITE: 'R$ 3.500', PRODUTO: 'INSTITUCIONAL', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'Repescagem' };
 
+const withLiveAudienceContext = (source: string) => source
+  .replace('SET @FirstName = [PRI_NOME]', 'SET @Chave = Trim(AttributeValue("CPF"))\nSET @FirstName = Field(@AudRow, "PRI_NOME")')
+  .replace('SET @LimiteNovo = [LIMITE]', 'SET @LimiteNovo = Field(@AudRow, "LIMITE")')
+  .replace('SET @Produto = [PRODUTO]', 'SET @Produto = Trim(Field(@AudRow, "PRODUTO"))')
+  .replace('SET @Sequencia = [SEQUENCIA]', 'SET @Sequencia = Trim(Field(@AudRow, "SEQUENCIA"))')
+  .replace('SET @TpCampanha = [TP_CAMPANHA]', 'SET @TpCampanha = Trim(Field(@AudRow, "TP_CAMPANHA"))');
+
 describe('AMPscript-lite', () => {
   it('renderiza o caso real Visa com TreatAsContent recursivo', () => {
     const row = emptyBriefingRow('visa');
@@ -98,6 +105,62 @@ describe('AMPscript-lite', () => {
     expect(result.html).toContain('max-width:220px');
     expect(result.html).toContain('PEDIR AGORA MEU CARTÃO +AMIGO');
     expect(result.html).not.toContain('Saiba como solicitar');
+  });
+
+  it('reproduz no preview o contexto vivo de audiência usado pelo PLURIX V6', () => {
+    const row = emptyBriefingRow('plurix-v6-email-1');
+    Object.assign(row, {
+      NM_PRODUTO_INTERNO: 'AMIGAO',
+      TP_CAMPANHA: 'CRM',
+      SEQUENCIA: 'E-mail 1',
+      TITULO_COPY_1_AZUL: 'Título que só existe no ramo genérico',
+      COPY_1_PRETO: 'Olá, %%=v(@FirstName)=%%!',
+      COR_COPY_PRETO_1: '#242424',
+      TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '18',
+      BANNER_1_CORPO: 'https://example.com/beneficios-email-1.png',
+    });
+
+    const result = renderDynamicEmail(withLiveAudienceContext(PLURIX_UX_V2_TEMPLATE), row, {
+      ...subscriber,
+      CPF: '00000000001',
+      PRI_NOME: 'VANIA',
+      PRODUTO: 'AMIGAO',
+      SEQUENCIA: 'E-mail 1',
+      TP_CAMPANHA: 'CRM',
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.html).toContain('Olá, VANIA!');
+    expect(result.html).toContain('beneficios-email-1.png');
+    expect(result.html).not.toContain('Título que só existe no ramo genérico');
+  });
+
+  it('mantém a sequência viva correta para os oito e-mails da régua', () => {
+    const template = withLiveAudienceContext(PLURIX_UX_V2_TEMPLATE);
+
+    for (let email = 1; email <= 8; email += 1) {
+      const sequence = `E-mail ${email}`;
+      const row = emptyBriefingRow(`plurix-v6-${email}`);
+      Object.assign(row, {
+        NM_PRODUTO_INTERNO: 'AMIGAO',
+        TP_CAMPANHA: 'CRM',
+        SEQUENCIA: sequence,
+        TITULO_COPY_1_AZUL: `Título genérico ${email}`,
+        COR_COPY_1: '#2C3490',
+        TAMANHO_DA_FONTE_TITULO_COPY_1: '24',
+        COPY_1_PRETO: `%%=v(@FirstName)=%% · ${sequence}`,
+        COR_COPY_PRETO_1: '#242424',
+        TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '18',
+        BANNER_1_CORPO: `https://example.com/banner-${email}.png`,
+      });
+
+      const result = renderDynamicEmail(template, row, { ...subscriber, PRODUTO: 'AMIGAO', SEQUENCIA: sequence, TP_CAMPANHA: 'CRM' });
+      expect(result.diagnostics, sequence).toEqual([]);
+      expect(result.html, sequence).toContain(`VANIA · ${sequence}`);
+      expect(result.html, sequence).toContain(`banner-${email}.png`);
+      if (email === 1) expect(result.html, sequence).not.toContain(`Título genérico ${email}`);
+      else expect(result.html, sequence).toContain(`Título genérico ${email}`);
+    }
   });
 
   it('troca assets pendentes por placeholders cinza apenas no preview local', () => {
