@@ -48,6 +48,7 @@ import {
 } from '../domain/briefing';
 import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
 import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plurixUxV2Template';
+import { PLURIX_V8_TEMPLATE, PLURIX_V8_TEMPLATE_ID, PLURIX_V8_TEMPLATE_NAME } from '../fixtures/plurixV8Template';
 import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
 import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
@@ -185,6 +186,8 @@ const initialTemplateSlots = (): EmailTemplateSlot[] => {
   if (!migrated.length) migrated = [{ id: crypto.randomUUID(), name: 'Template principal', source: localStorage.getItem(TEMPLATE_KEY) ?? DEFAULT_DYNAMIC_EMAIL_TEMPLATE, isPrincipal: true, version: 1, updatedAt: new Date().toISOString() }];
   const refreshed = migrated.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID
     ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, updatedAt: '2026-08-19T18:00:00.000Z' }
+    : slot.id === PLURIX_V8_TEMPLATE_ID
+      ? { ...slot, name: PLURIX_V8_TEMPLATE_NAME, source: PLURIX_V8_TEMPLATE, updatedAt: '2026-09-02T16:00:00.000Z' }
     : slot.id === B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID
       ? { ...slot, name: 'B2C Classic + Vibe · Dinâmico', source: B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, updatedAt: '2026-09-01T12:00:00.000Z' }
       : slot);
@@ -271,6 +274,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
     if (sharedTemplates.status === 'fulfilled' && sharedTemplates.value.length) {
       const effectiveSharedTemplates = sharedTemplates.value.map((slot) => slot.id === PLURIX_UX_V2_TEMPLATE_ID
         ? { ...slot, name: 'Plurix aquisição UX v2', source: PLURIX_UX_V2_TEMPLATE, version: Math.max(slot.version, 2), updatedAt: '2026-08-31T12:00:00.000Z' }
+        : slot.id === PLURIX_V8_TEMPLATE_ID
+          ? { ...slot, name: PLURIX_V8_TEMPLATE_NAME, source: PLURIX_V8_TEMPLATE, version: Math.max(slot.version, 1), updatedAt: '2026-09-02T16:00:00.000Z' }
         : slot);
       const principal = effectiveSharedTemplates.find((slot) => slot.isPrincipal) ?? effectiveSharedTemplates[0];
       setTemplateSlots(effectiveSharedTemplates); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
