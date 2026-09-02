@@ -56,6 +56,7 @@ import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness,
 import { createRulerManagementPlan, decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy } from '../services/managementService';
 import { exportStrategyPlanXlsx } from '../export/strategyPlanXlsx';
 import { CreateRulerDialog, type CreateRulerConfig } from './CreateRulerDialog';
+import { EmailPreviewFrame, emailPreviewContextKey } from './EmailPreviewFrame';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
 const TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v5';
@@ -287,6 +288,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
   const render = useMemo(() => previewRow ? renderDynamicEmail(previewTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden' }) : { html: '', diagnostics: [] }, [previewRow, previewTemplate, showMarketingNotes, subscriber]);
+  const previewContextKey = emailPreviewContextKey(selected?.__id ?? '', linkedTemplateId);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
@@ -734,7 +736,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 </div>
               </div>
               {selected && <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold leading-5 text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="mt-0.5 line-clamp-1 text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-2 text-[11px] text-slate-500">{selected.__meta.partner || 'Parceiro'} · {selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO || 'Assinatura'} · {selected.__meta.segment || selected.TP_CAMPANHA || 'Segmento'} · {selected.SEQUENCIA || 'Sequência'} · Remetente definido no SFMC</div></div></div></div>}
-              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <iframe title="Conteúdo renderizado do e-mail dinâmico" sandbox="" srcDoc={render.html} className="h-[650px] w-full bg-slate-100"/>}
+              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <EmailPreviewFrame html={render.html} contextKey={previewContextKey} className="h-[650px] w-full bg-slate-100"/>}
             </section>
           </Panel>
         </Group>
@@ -746,7 +748,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       <section className="flex max-h-[94vh] w-full max-w-[1320px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" aria-label="Prévia ampliada do e-mail">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><div className="flex items-center gap-2"><h2 id="email-preview-title" className="text-lg font-bold text-slate-900">Visualização do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs text-slate-500">Revise conteúdo e personalização. A certificação final acontece no Test Send do SFMC.</p></div><button autoFocus onClick={() => setPreviewOpen(false)} className="rounded-lg p-2 text-slate-500 outline-none hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label="Fechar visualização"><X size={19}/></button></div>
         <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3 md:grid-cols-[1fr_180px_180px]"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="font-bold text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-1 text-[11px] text-slate-500">{selected.NM_PRODUTO_INTERNO || 'Produto'} · {selected.TP_CAMPANHA || 'Campanha'} · {selected.SEQUENCIA || 'Sequência'} · Remetente definido no SFMC</div></div></div><MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/></div>
-        <div className="min-h-0 flex-1 overflow-auto bg-slate-100">{render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <iframe title="Conteúdo renderizado do e-mail dinâmico" sandbox="" srcDoc={render.html} className="h-[72vh] w-full bg-slate-100"/>}</div>
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-100">{render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <EmailPreviewFrame html={render.html} contextKey={`${previewContextKey}::expanded`} className="h-[72vh] w-full bg-slate-100"/>}</div>
       </section>
     </div>}
 
