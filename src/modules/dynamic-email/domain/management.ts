@@ -50,6 +50,8 @@ export interface ProductContext {
   status: 'draft' | 'active' | 'archived';
   provenance?: string;
   sourceUrl?: string;
+  validFrom?: string;
+  validTo?: string;
   version: number;
 }
 
@@ -65,6 +67,15 @@ export interface ProductGuardrail {
   sourceUrl?: string;
   confidence?: number;
   status: 'draft' | 'active' | 'archived';
+  // Campos da estrutura de benefício (migration `20260904_dynamic_email_benefit_structure`).
+  // Lidos de forma defensiva: quando a coluna ainda não existe no banco, vêm `undefined`.
+  category?: string;
+  valueExact?: string;
+  citationStatus?: 'pode' | 'nao' | 'cuidado' | 'checar';
+  sourceType?: 'oficial' | 'terceira' | 'interno';
+  validFrom?: string;
+  validTo?: string;
+  appliesTo?: Record<string, string[]>;
   version: number;
 }
 

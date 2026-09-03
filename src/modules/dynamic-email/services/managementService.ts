@@ -89,6 +89,27 @@ export async function saveEmailStrategy(strategy: EmailStrategy): Promise<EmailS
   return strategyFromRow(data);
 }
 
+const contextFromRow = (row: Record<string, any>): ProductContext => ({
+  id: row.id, product: row.product, partner: row.partner ?? undefined,
+  valueProposition: row.value_proposition ?? undefined, differentiators: row.differentiators ?? [],
+  eligibleAudience: row.eligible_audience ?? undefined, toneOfVoice: row.tone_of_voice ?? undefined,
+  brandContext: row.brand_context ?? undefined, status: row.status,
+  provenance: row.provenance ?? undefined, sourceUrl: row.source_url ?? undefined,
+  validFrom: row.valid_from ?? undefined, validTo: row.valid_to ?? undefined, version: row.version,
+});
+
+const guardrailFromRow = (row: Record<string, any>): ProductGuardrail => ({
+  id: row.id, productContextId: row.product_context_id, guardrailType: row.guardrail_type,
+  title: row.title, ruleText: row.rule_text, severity: row.severity, allowedStatus: row.allowed_status,
+  evidence: row.evidence ?? undefined, sourceUrl: row.source_url ?? undefined, confidence: row.confidence ?? undefined,
+  status: row.status,
+  category: row.category ?? undefined, valueExact: row.value_exact ?? undefined,
+  citationStatus: row.citation_status ?? undefined, sourceType: row.source_type ?? undefined,
+  validFrom: row.valid_from ?? undefined, validTo: row.valid_to ?? undefined,
+  appliesTo: row.applies_to && typeof row.applies_to === 'object' && !Array.isArray(row.applies_to) ? row.applies_to : undefined,
+  version: row.version,
+});
+
 export async function loadProductGovernance(): Promise<{ contexts: ProductContext[]; guardrails: ProductGuardrail[] }> {
   const [contextsResult, guardrailsResult] = await Promise.all([
     supabase.from('dynamic_email_product_contexts').select('*').neq('status', 'archived').order('product'),
@@ -97,9 +118,28 @@ export async function loadProductGovernance(): Promise<{ contexts: ProductContex
   if (contextsResult.error) throw contextsResult.error;
   if (guardrailsResult.error) throw guardrailsResult.error;
   return {
-    contexts: (contextsResult.data ?? []).map((row: Record<string, any>) => ({ id: row.id, product: row.product, partner: row.partner ?? undefined, valueProposition: row.value_proposition ?? undefined, differentiators: row.differentiators ?? [], eligibleAudience: row.eligible_audience ?? undefined, toneOfVoice: row.tone_of_voice ?? undefined, brandContext: row.brand_context ?? undefined, status: row.status, provenance: row.provenance ?? undefined, sourceUrl: row.source_url ?? undefined, version: row.version })),
-    guardrails: (guardrailsResult.data ?? []).map((row: Record<string, any>) => ({ id: row.id, productContextId: row.product_context_id, guardrailType: row.guardrail_type, title: row.title, ruleText: row.rule_text, severity: row.severity, allowedStatus: row.allowed_status, evidence: row.evidence ?? undefined, sourceUrl: row.source_url ?? undefined, confidence: row.confidence ?? undefined, status: row.status, version: row.version })),
+    contexts: (contextsResult.data ?? []).map(contextFromRow),
+    guardrails: (guardrailsResult.data ?? []).map(guardrailFromRow),
   };
+}
+
+export async function saveProductContext(context: ProductContext): Promise<ProductContext> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Sessão autenticada necessária para salvar a ficha do produto.');
+  const payload = {
+    value_proposition: context.valueProposition?.trim() || null,
+    differentiators: context.differentiators.map((item) => item.trim()).filter(Boolean),
+    eligible_audience: context.eligibleAudience?.trim() || null,
+    tone_of_voice: context.toneOfVoice?.trim() || null,
+    brand_context: context.brandContext?.trim() || null,
+    provenance: context.provenance?.trim() || null,
+    source_url: context.sourceUrl?.trim() || null,
+    updated_by: auth.user.id,
+  };
+  const { data, error } = await supabase.from('dynamic_email_product_contexts')
+    .update(payload).eq('id', context.id).eq('version', context.version).select().single();
+  if (error) throw new Error(error.code === 'PGRST116' ? 'A ficha mudou em outra sessão. Recarregue antes de salvar.' : error.message);
+  return contextFromRow(data);
 }
 
 export async function loadExternalReviews(): Promise<{ runs: ExternalReviewRun[]; suggestions: ExternalSuggestion[] }> {
