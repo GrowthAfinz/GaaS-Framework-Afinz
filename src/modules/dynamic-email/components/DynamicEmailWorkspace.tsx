@@ -79,6 +79,7 @@ const SAMPLE: SubscriberSample = { CPF: '00000000000', PRI_NOME: 'VANIA', LIMITE
 const LONG_FIELDS = new Set<BriefingColumn>(['COPY_1_PRETO', 'COPY_2_PRETO', 'NOTA_LEGAL', 'RODAPE', 'PRE_CABECALHO']);
 const COLOR_FIELDS = new Set<BriefingColumn>(['COR_COPY_1', 'COR_COPY_PRETO_1', 'COR_TITULO_COPY_2', 'COR_COPY_2', 'COR_NOTA_LEGAL']);
 const EDITORIAL_WEEKS = Array.from({ length: 12 }, (_, index) => `Semana ${index + 1}`);
+const ACQUISITION_PARTNER_SLOTS = ['Dia', 'Bem Barato', 'Super Nosso'] as const;
 
 const FIELD_LABELS: Partial<Record<BriefingColumn, string>> = {
   DT_INICIO: 'Início da campanha',
@@ -397,6 +398,12 @@ export const DynamicEmailWorkspace: React.FC = () => {
     if (!haystack.includes(query.trim().toLowerCase())) return [];
     return [{ ...group, rows: scopedRows, visibleRows: scopedRows, representative: row, hasErrors }];
   }), [editorialGroups, query, showArchived, statusFilter]);
+  const emptyPartnerSlots = useMemo(() => {
+    if (showArchived || statusFilter !== 'all') return [];
+    const usedPartners = new Set(editorialGroups.flatMap((group) => group.visibleRows.map((row) => row.__meta.partner)));
+    const search = query.trim().toLocaleLowerCase('pt-BR');
+    return ACQUISITION_PARTNER_SLOTS.filter((partner) => !usedPartners.has(partner) && (!search || partner.toLocaleLowerCase('pt-BR').includes(search)));
+  }, [editorialGroups, query, showArchived, statusFilter]);
   const selectedWeekGroups = useMemo(() => selectedWeek ? editorialGroups
     .filter((group) => group.visibleRows.length && group.representative.__meta.partner === selectedWeek.partner && group.representative.__meta.segment === selectedWeek.segment && group.representative.__meta.weekKey === selectedWeek.weekKey)
     .sort((a, b) => naturalLabelSort(a.representative.SEQUENCIA, b.representative.SEQUENCIA)) : [], [editorialGroups, selectedWeek]);
@@ -872,8 +879,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
             <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">Parceiro › segmento › semana › e-mail › assinaturas</div>
-            {filteredGroups.length ? <BriefingTree
-              groups={filteredGroups} selectedId={selected?.__id ?? ''} selectedWeek={selectedWeek} selectedSegment={selectedSegment} showArchived={showArchived}
+            {(filteredGroups.length || emptyPartnerSlots.length) ? <BriefingTree
+              groups={filteredGroups} emptyPartnerSlots={emptyPartnerSlots} selectedId={selected?.__id ?? ''} selectedWeek={selectedWeek} selectedSegment={selectedSegment} showArchived={showArchived}
               onSelect={selectEmail}
               onSelectSegment={(segment) => {
                 setSelectedWeek(null); setSelectedSegment(segment);
@@ -899,6 +906,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
               onArchiveSegment={(partner, segment) => setSegmentArchiveTarget({ partner, segment })}
               onRestoreSegment={(partner, segment) => void restoreSegment(partner, segment)}
               onMoveEmail={(groupId) => { const group = rows.find((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived'); if (group) setMoveTarget({ groupId, label: group.SEQUENCIA || 'E-mail', current: { partner: group.__meta.partner, segment: group.__meta.segment, weekKey: group.__meta.weekKey } }); }}
+              onCreatePartnerRuler={(partner) => { setNewDefaults((current) => ({ ...current, partner })); setRulerOpen(true); }}
             /> : <div className="px-4 py-10 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={24}/><p className="font-semibold text-slate-700">Nenhum briefing encontrado</p><p className="mt-1 text-xs">Ajuste a busca ou o filtro de status.</p></div>}
           </div>
         </aside>
@@ -1218,7 +1226,7 @@ const WeekReviewer = ({ selection, groups, strategies, issuesByRow, selectedId, 
 
 const ReviewMetric = ({ label, value, tone = 'default' }: { label: string; value: React.ReactNode; tone?: 'default' | 'success' | 'warning' | 'danger' }) => { const tones = { default: 'border-slate-200 bg-slate-50 text-slate-800', success: 'border-emerald-200 bg-emerald-50 text-emerald-800', warning: 'border-amber-200 bg-amber-50 text-amber-900', danger: 'border-red-200 bg-red-50 text-red-800' }; return <div className={`rounded-lg border px-3 py-2 ${tones[tone]}`}><div className="text-lg font-extrabold">{value}</div><div className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</div></div>; };
 
-const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment, onMoveEmail }: { groups: EditorialGroup[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void; onRenameWeek: (partner: string, segment: string, weekKey: string) => void; onRenameSegment: (partner: string, segment: string) => void; onDuplicateRulerFromTree: (partner: string, segment: string) => void; onArchiveSegment: (partner: string, segment: string) => void; onRestoreSegment: (partner: string, segment: string) => void; onMoveEmail: (groupId: string) => void }) => {
+const BriefingTree = ({ groups, emptyPartnerSlots, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment, onMoveEmail, onCreatePartnerRuler }: { groups: EditorialGroup[]; emptyPartnerSlots: readonly string[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void; onRenameWeek: (partner: string, segment: string, weekKey: string) => void; onRenameSegment: (partner: string, segment: string) => void; onDuplicateRulerFromTree: (partner: string, segment: string) => void; onArchiveSegment: (partner: string, segment: string) => void; onRestoreSegment: (partner: string, segment: string) => void; onMoveEmail: (groupId: string) => void; onCreatePartnerRuler: (partner: string) => void }) => {
   const [expanded, setExpanded] = useState<Set<string>>(() => { try { const saved = localStorage.getItem('gaas-email-tree-expanded-v1'); return saved ? new Set(JSON.parse(saved)) : new Set(['p:Plurix', 'p:Plurix/s:CRM', 'p:Plurix/s:CRM/w:Semana 1']); } catch { return new Set(); } });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const toggle = (key: string) => setExpanded((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); return next; });
@@ -1231,13 +1239,15 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
       if (!partners.get(partner)!.has(segment)) partners.get(partner)!.set(segment, new Map());
       const weeks = partners.get(partner)!.get(segment)!; weeks.set(week, [...(weeks.get(week) ?? []), group]);
     });
+    emptyPartnerSlots.forEach((partner) => { if (!partners.has(partner)) partners.set(partner, new Map()); });
     return partners;
-  }, [groups]);
+  }, [emptyPartnerSlots, groups]);
   const disclosure = (key: string, label: React.ReactNode, count?: string, level = 0) => <button type="button" onClick={() => toggle(key)} aria-expanded={expanded.has(key)} className="flex min-h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500" style={{ paddingLeft: `${8 + level * 12}px` }}>{expanded.has(key) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="min-w-0 flex-1 truncate">{label}</span>{count && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{count}</span>}</button>;
   return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{showArchived ? 'Lixeira' : 'Navegação'}</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Recolher tudo</button><button type="button" onClick={() => { const next = new Set<string>(); [...branches.entries()].forEach(([partner, segments]) => { next.add(`p:${partner}`); [...segments.keys()].forEach((segment) => next.add(`p:${partner}/s:${segment}`)); }); setExpanded(next); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); }} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Ver segmentos</button></div></div>{branches.size === 0 && <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center"><Trash2 className="mx-auto mb-2 text-slate-300" size={24}/><b className="text-sm text-slate-700">{showArchived ? 'A Lixeira está vazia' : 'Nenhum briefing neste filtro'}</b><p className="mt-1 text-xs leading-5 text-slate-500">{showArchived ? 'E-mails e semanas removidos aparecerão aqui e poderão ser restaurados.' : 'Ajuste a busca ou selecione outro status.'}</p></div>}<div className="space-y-1">{[...branches.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([partner, segments]) => {
     const partnerKey = `p:${partner}`;
     const partnerCount = [...segments.values()].reduce((total, weeks) => total + [...weeks.values()].flat().length, 0);
-    return <div key={partnerKey}>{disclosure(partnerKey, <span className="uppercase tracking-wide text-cyan-800">{partner}</span>, `${partnerCount} e-mails`)}{expanded.has(partnerKey) && [...segments.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([segment, weeks]) => {
+    const emptySlot = segments.size === 0;
+    return <div key={partnerKey}>{disclosure(partnerKey, <span className="uppercase tracking-wide text-cyan-800">{partner}</span>, emptySlot ? 'slot disponível' : `${partnerCount} e-mails`)}{expanded.has(partnerKey) && emptySlot && <div className="ml-7 mr-1 mt-1 rounded-xl border border-dashed border-cyan-200 bg-cyan-50/50 p-3"><div className="text-xs font-bold text-cyan-950">Campanha de aquisição</div><p className="mt-1 text-[11px] leading-4 text-slate-500">Espaço reservado. Nenhum briefing foi criado ainda.</p><button type="button" onClick={() => onCreatePartnerRuler(partner)} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-[#07595b] px-3 text-[11px] font-bold text-white outline-none hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500"><Plus size={13}/>Criar régua</button></div>}{expanded.has(partnerKey) && [...segments.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([segment, weeks]) => {
       const segmentKey = `${partnerKey}/s:${segment}`;
       const segmentMenuKey = `menu:${segmentKey}`;
       const segmentSelected = selectedSegment?.partner === partner && selectedSegment.segment === segment;
