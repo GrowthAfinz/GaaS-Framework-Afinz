@@ -1,9 +1,16 @@
 export type ReviewStatus = 'needs_enrichment' | 'draft' | 'needs_review' | 'ready' | 'blocked';
 export type TechnicalStatus = 'draft' | 'needs_review' | 'ready' | 'blocked';
 export type CertificationStatus = 'not_tested' | 'test_pending' | 'certified' | 'failed';
+export type JourneyFamily = 'Aquisição' | 'Ciclo de Vida' | 'Rentabilização' | string;
+export interface JourneyContext { family: JourneyFamily; type: string }
 
 export interface EmailStrategy {
   id: string;
+  rulerStrategyId?: string;
+  rulerName?: string;
+  businessFront?: 'acquisition' | 'monetization';
+  journeyFamily?: JourneyFamily;
+  journeyType?: string;
   campaignGroupId: string;
   partner: string;
   segment: string;
@@ -122,5 +129,15 @@ export const countConfiguredStrategyFields = (strategy?: EmailStrategy) => {
   if (!strategy) return 0;
   const textFields = [strategy.roleInRuler, strategy.emailObjective, strategy.keyMessage, strategy.expectedAction, strategy.valueProposition, strategy.primaryBenefit, strategy.objectionAddressed, strategy.proof, strategy.visualHierarchyStrategy, strategy.ctaStrategy];
   return textFields.filter((value) => Boolean(value?.trim())).length + Number(strategy.secondaryBenefits.some((value) => Boolean(value.trim())));
+};
+
+export const journeyContextForStrategy = (strategy: EmailStrategy | undefined, campaignType = '', segment = ''): JourneyContext => {
+  if (strategy?.journeyFamily && strategy?.journeyType) return { family: strategy.journeyFamily, type: strategy.journeyType };
+  const source = `${strategy?.rulerName ?? ''} ${campaignType} ${segment}`.toLocaleLowerCase('pt-BR');
+  if (source.includes('welcome')) return { family: 'Ciclo de Vida', type: 'Welcome' };
+  if (source.includes('desbloq')) return { family: 'Ciclo de Vida', type: 'Desbloqueio' };
+  if (source.includes('ativa')) return { family: 'Ciclo de Vida', type: 'Ativação' };
+  if (source.includes('rentabiliza')) return { family: 'Rentabilização', type: strategy?.rulerName || 'Outras jornadas' };
+  return { family: 'Aquisição', type: 'Topo de Funil' };
 };
 

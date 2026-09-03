@@ -6,6 +6,8 @@ export type RulerManagementPlan = {
   description?: string;
   businessFront: 'acquisition' | 'monetization';
   rulerFamily: string;
+  journeyFamily: string;
+  journeyType: string;
   partner: string;
   adaptationPartners: string[];
   product?: string;
@@ -20,7 +22,7 @@ export async function createRulerManagementPlan(plan: RulerManagementPlan): Prom
   if (!auth.user) throw new Error('Sessão autenticada necessária para criar a régua.');
   const { data: ruler, error: rulerError } = await supabase.from('dynamic_email_ruler_strategies').insert({
     name: plan.name, description: plan.description || null, business_front: plan.businessFront,
-    ruler_family: plan.rulerFamily, partner: plan.partner, product: plan.product || null,
+    ruler_family: plan.rulerFamily, journey_family: plan.journeyFamily, journey_type: plan.journeyType, partner: plan.partner, product: plan.product || null,
     segment: plan.segment, objective: plan.objective || null, template_slot_id: plan.templateSlotId || null,
     audience: plan.segment, editorial_status: 'draft', created_by: auth.user.id, updated_by: auth.user.id,
   }).select('id').single();
@@ -46,8 +48,11 @@ export async function createRulerManagementPlan(plan: RulerManagementPlan): Prom
   return ruler.id;
 }
 
-const strategyFromRow = (row: Record<string, any>): EmailStrategy => ({
-  id: row.id, campaignGroupId: row.campaign_group_id, partner: row.partner, segment: row.segment,
+const strategyFromRow = (row: Record<string, any>, ruler?: Record<string, any>): EmailStrategy => ({
+  id: row.id, rulerStrategyId: row.ruler_strategy_id ?? undefined, rulerName: ruler?.name ?? undefined,
+  businessFront: ruler?.business_front ?? undefined, journeyFamily: ruler?.journey_family ?? ruler?.ruler_family ?? undefined,
+  journeyType: ruler?.journey_type ?? ruler?.name ?? undefined,
+  campaignGroupId: row.campaign_group_id, partner: row.partner, segment: row.segment,
   weekKey: row.week_key ?? undefined, sequence: row.sequence ?? undefined, subject: row.subject ?? undefined,
   functionalName: row.functional_name ?? undefined,
   preheader: row.preheader ?? undefined, roleInRuler: row.role_in_ruler ?? undefined,
@@ -64,9 +69,14 @@ const strategyFromRow = (row: Record<string, any>): EmailStrategy => ({
 });
 
 export async function loadEmailStrategies(): Promise<EmailStrategy[]> {
-  const { data, error } = await supabase.from('dynamic_email_email_strategies').select('*').order('partner').order('segment').order('week_key').order('sequence');
-  if (error) throw error;
-  return (data ?? []).map(strategyFromRow);
+  const [emailResult, rulerResult] = await Promise.all([
+    supabase.from('dynamic_email_email_strategies').select('*').order('partner').order('segment').order('week_key').order('sequence'),
+    supabase.from('dynamic_email_ruler_strategies').select('id,name,business_front,ruler_family,journey_family,journey_type'),
+  ]);
+  if (emailResult.error) throw emailResult.error;
+  if (rulerResult.error) throw rulerResult.error;
+  const rulers = new Map((rulerResult.data ?? []).map((row: Record<string, any>) => [row.id, row]));
+  return (emailResult.data ?? []).map((row: Record<string, any>) => strategyFromRow(row, rulers.get(row.ruler_strategy_id)));
 }
 
 export async function saveEmailStrategy(strategy: EmailStrategy): Promise<EmailStrategy> {
@@ -86,7 +96,7 @@ export async function saveEmailStrategy(strategy: EmailStrategy): Promise<EmailS
   };
   const { data, error } = await supabase.from('dynamic_email_email_strategies').update(payload).eq('id', strategy.id).eq('version', strategy.version).select().single();
   if (error) throw new Error(error.code === 'PGRST116' ? 'A estratégia mudou em outra sessão. Recarregue antes de salvar.' : error.message);
-  return strategyFromRow(data);
+  return strategyFromRow(data, { name: strategy.rulerName, business_front: strategy.businessFront, journey_family: strategy.journeyFamily, journey_type: strategy.journeyType });
 }
 
 const contextFromRow = (row: Record<string, any>): ProductContext => ({

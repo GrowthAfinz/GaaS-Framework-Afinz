@@ -60,7 +60,7 @@ import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID
 import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
 import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveDraftEmailFactorySegment, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
-import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy, type ExternalReviewRun, type ExternalSuggestion, type ProductContext, type ProductGuardrail } from '../domain/management';
+import { countConfiguredStrategyFields, journeyContextForStrategy, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy, type ExternalReviewRun, type ExternalSuggestion, type JourneyContext, type ProductContext, type ProductGuardrail } from '../domain/management';
 import { createRulerManagementPlan, decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy, saveProductContext, saveProductGuardrail } from '../services/managementService';
 import { exportStrategyPlanXlsx } from '../export/strategyPlanXlsx';
 import { CreateRulerDialog, type CreateRulerConfig } from './CreateRulerDialog';
@@ -288,8 +288,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [signatureManagerOpen, setSignatureManagerOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [rulerOpen, setRulerOpen] = useState(false);
+  const [treeDimension, setTreeDimension] = useState<'partner' | 'journey'>(() => { try { return localStorage.getItem('gaas-email-tree-dimension-v1') === 'journey' ? 'journey' : 'partner'; } catch { return 'partner'; } });
   const [duplicateRulerOpen, setDuplicateRulerOpen] = useState(false);
-  const [newDefaults, setNewDefaults] = useState({ partner: 'Plurix', segment: 'CRM', weekKey: 'Semana 1' });
+  const [newDefaults, setNewDefaults] = useState<{ partner: string; segment: string; weekKey: string; journeyContext?: JourneyContext }>({ partner: 'Plurix', segment: 'CRM', weekKey: 'Semana 1' });
   const [selectedWeek, setSelectedWeek] = useState<WeekSelection | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<SegmentSelection | null>(null);
   const [weekArchiveTarget, setWeekArchiveTarget] = useState<{ partner: string; segment: string; weekKey: string } | null>(null);
@@ -584,7 +585,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     }));
     if (config.segmentMode === 'draft') await saveDraftEmailFactorySegment({ technicalName: config.segment, displayName: config.segmentAlias, businessFront: config.businessFront, partner: config.partner, bu: config.bu || undefined, lifecycleFamily: config.rulerFamily, audienceDescription: config.audienceDescription || undefined });
     const saved = await saveBriefings(created.map((row) => ({ row, warnings: ['Briefing criado pelo assistente de réguas; conteúdo, assets e Test Send ainda pendentes.'] })));
-    await createRulerManagementPlan({ name: config.rulerName, description: config.audienceDescription, businessFront: config.businessFront, rulerFamily: config.rulerFamily, partner: config.partner, adaptationPartners: config.adaptationPartners, product: config.partner, segment: config.segment, objective: config.objective, templateSlotId: config.templateSlotId, campaignGroups });
+    await createRulerManagementPlan({ name: config.rulerName, description: config.audienceDescription, businessFront: config.businessFront, rulerFamily: config.rulerFamily, journeyFamily: config.journeyFamily, journeyType: config.journeyType, partner: config.partner, adaptationPartners: config.adaptationPartners, product: config.partner, segment: config.segment, objective: config.objective, templateSlotId: config.templateSlotId, campaignGroups });
     setRows((current) => [...current, ...saved]);
     setSelectedId(saved[0]?.__id ?? ''); setSelectedWeek(null); setSelectedSegment({ partner: config.partner, segment: config.segment });
     setRulerOpen(false); setAnnouncement(`${config.rulerName} criada com ${config.emails.length} e-mails, ${partners.length} ${partners.length === 1 ? 'parceiro' : 'parceiros'} e ${saved.length} briefings em rascunho.`);
@@ -663,7 +664,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
     try { const saved = await saveTemplateSlot(slot); setTemplateSlots((current) => [...current, saved]); setSelectedTemplateId(saved.id); setTemplate(source); setAnnouncement(`${file.name} carregado no catálogo compartilhado. Revise e defina como principal quando estiver pronto.`); }
     catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao subir template.'); }
   };
-  const openNewBriefing = (partner = selected?.__meta.partner ?? 'Plurix', segment = selected?.__meta.segment ?? 'CRM', weekKey = selected?.__meta.weekKey ?? 'Semana 1') => { setNewDefaults({ partner, segment, weekKey }); setNewOpen(true); };
+  const openRuler = (partner = selected?.__meta.partner ?? 'Plurix', journeyContext?: JourneyContext) => { setNewDefaults((current) => ({ ...current, partner, journeyContext })); setRulerOpen(true); };
+  const openNewBriefing = (partner = selected?.__meta.partner ?? 'Plurix', segment = selected?.__meta.segment ?? 'CRM', weekKey = selected?.__meta.weekKey ?? 'Semana 1') => { setNewDefaults((current) => ({ ...current, partner, segment, weekKey })); setNewOpen(true); };
   const openNewWeek = (partner: string, segment: string) => {
     const usedNumbers = rows.filter((row) => row.__meta.partner === partner && row.__meta.segment === segment).map((row) => Number(row.__meta.weekKey.match(/\d+/)?.[0] ?? 0));
     setNewDefaults({ partner, segment, weekKey: `Semana ${Math.max(0, ...usedNumbers) + 1}` });
@@ -914,7 +916,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(event) => onFile(event.target.files?.[0])}/>
             <HeaderAction onClick={() => fileRef.current?.click()} icon={<Upload size={15}/>} label="Importar CSV"/>
             <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
-            <HeaderAction onClick={() => setRulerOpen(true)} icon={<ListChecks size={15}/>} label="Criar régua"/>
+            <HeaderAction onClick={() => openRuler()} icon={<ListChecks size={15}/>} label="Criar régua"/>
             <HeaderAction onClick={() => openNewBriefing()} icon={<Plus size={15}/>} label="Novo e-mail"/>
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
             <button disabled={!activeRows.length} onClick={openExport} title={activeRows.length ? 'Escolher réguas e baixar o CSV para o SFMC' : (exportBlockReason || 'Nada para exportar')} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
@@ -944,9 +946,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
             </div>
           </div>
           <div className="p-2.5">
-            <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">Parceiro › segmento › semana › e-mail › assinaturas</div>
+            <div className="mb-2 flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Dimensão da caixa de briefings">{([['partner', 'Por parceiro'], ['journey', 'Por jornada']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={treeDimension === value} onClick={() => { setTreeDimension(value); localStorage.setItem('gaas-email-tree-dimension-v1', value); }} className={`min-h-8 flex-1 rounded-md px-2 text-[11px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 ${treeDimension === value ? 'bg-white text-cyan-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{label}</button>)}</div>
+            <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">{treeDimension === 'partner' ? 'Parceiro › segmento › semana › e-mail › assinaturas' : 'Família › jornada › parceiro › segmento › semana › e-mail'}</div>
             {(filteredGroups.length || emptyPartnerSlots.length) ? <BriefingTree
-              groups={filteredGroups} emptyPartnerSlots={emptyPartnerSlots} selectedId={selected?.__id ?? ''} selectedWeek={selectedWeek} selectedSegment={selectedSegment} showArchived={showArchived}
+              groups={filteredGroups} emptyPartnerSlots={emptyPartnerSlots} strategies={emailStrategies} viewMode={treeDimension} selectedId={selected?.__id ?? ''} selectedWeek={selectedWeek} selectedSegment={selectedSegment} showArchived={showArchived}
               onSelect={selectEmail}
               onSelectSegment={(segment) => {
                 setSelectedWeek(null); setSelectedSegment(segment);
@@ -972,7 +975,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
               onArchiveSegment={(partner, segment) => setSegmentArchiveTarget({ partner, segment })}
               onRestoreSegment={(partner, segment) => void restoreSegment(partner, segment)}
               onMoveEmail={(groupId) => { const group = rows.find((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived'); if (group) setMoveTarget({ groupId, label: group.SEQUENCIA || 'E-mail', current: { partner: group.__meta.partner, segment: group.__meta.segment, weekKey: group.__meta.weekKey } }); }}
-              onCreatePartnerRuler={(partner) => { setNewDefaults((current) => ({ ...current, partner })); setRulerOpen(true); }}
+              onCreatePartnerRuler={(partner, journeyContext) => openRuler(partner, journeyContext)}
             /> : <div className="px-4 py-10 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={24}/><p className="font-semibold text-slate-700">Nenhum briefing encontrado</p><p className="mt-1 text-xs">Ajuste a busca ou o filtro de status.</p></div>}
           </div>
         </aside>
@@ -1088,7 +1091,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     </div>}
 
     {deleteOpen && selected && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-email-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeleteOpen(false); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-50 text-red-600"><Trash2 size={18}/></span><div><h2 id="delete-email-title" className="font-bold text-slate-900">Arquivar este e-mail editorial?</h2><p className="mt-1 text-sm leading-5 text-slate-600"><b>{selected.__meta.partner || 'Parceiro não informado'} · {selected.SEQUENCIA || 'Sequência pendente'}</b> e suas variantes deixarão os próximos CSVs. Registros salvos permanecem no histórico; somente rascunhos nunca salvos são removidos.</p></div></div><div className="mt-5 flex justify-end gap-2"><button autoFocus onClick={() => setDeleteOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button><button onClick={() => void deleteBriefing()} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">Arquivar e-mail</button></div></div></div>}
-    {rulerOpen && <CreateRulerDialog taxonomy={taxonomy} templates={templateSlots} defaultPartner={newDefaults.partner} onClose={() => setRulerOpen(false)} onCreate={createRuler}/>}
+    {rulerOpen && <CreateRulerDialog taxonomy={taxonomy} templates={templateSlots} defaultPartner={newDefaults.partner} defaultJourneyContext={newDefaults.journeyContext} onClose={() => setRulerOpen(false)} onCreate={createRuler}/>}
     {duplicateRulerOpen && selectedSegment && <DuplicateRulerDialog
       sourceLabel={`${selectedSegment.partner} · ${segmentDisplayLabel(selectedSegment.segment)}`}
       sourceSegment={selectedSegment.segment}
@@ -1349,7 +1352,30 @@ const PlanBit = ({ label, value }: { label: string; value?: string }) => <div cl
   <div className={`text-[11px] leading-4 ${value ? 'text-slate-700' : 'italic text-amber-600'}`}>{value || 'não definido no plano'}</div>
 </div>;
 
-const BriefingTree = ({ groups, emptyPartnerSlots, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment, onMoveEmail, onCreatePartnerRuler }: { groups: EditorialGroup[]; emptyPartnerSlots: readonly string[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void; onRenameWeek: (partner: string, segment: string, weekKey: string) => void; onRenameSegment: (partner: string, segment: string) => void; onDuplicateRulerFromTree: (partner: string, segment: string) => void; onArchiveSegment: (partner: string, segment: string) => void; onRestoreSegment: (partner: string, segment: string) => void; onMoveEmail: (groupId: string) => void; onCreatePartnerRuler: (partner: string) => void }) => {
+type BriefingTreeActions = { selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void; onRenameWeek: (partner: string, segment: string, weekKey: string) => void; onRenameSegment: (partner: string, segment: string) => void; onDuplicateRulerFromTree: (partner: string, segment: string) => void; onArchiveSegment: (partner: string, segment: string) => void; onRestoreSegment: (partner: string, segment: string) => void; onMoveEmail: (groupId: string) => void; onCreatePartnerRuler: (partner: string, journeyContext?: JourneyContext) => void };
+type PartnerBriefingTreeProps = BriefingTreeActions & { groups: EditorialGroup[]; emptyPartnerSlots: readonly string[] };
+type BriefingTreeProps = PartnerBriefingTreeProps & { strategies: EmailStrategy[]; viewMode: 'partner' | 'journey' };
+const CANONICAL_JOURNEYS: JourneyContext[] = [{ family: 'Aquisição', type: 'Topo de Funil' }, { family: 'Ciclo de Vida', type: 'Welcome' }, { family: 'Ciclo de Vida', type: 'Desbloqueio' }, { family: 'Ciclo de Vida', type: 'Ativação' }];
+
+const BriefingTree = ({ viewMode, strategies, ...props }: BriefingTreeProps) => viewMode === 'journey' ? <JourneyBriefingTree {...props} strategies={strategies}/> : <PartnerBriefingTree {...props}/>;
+
+const JourneyBriefingTree = ({ groups, strategies, emptyPartnerSlots, showArchived, onCreatePartnerRuler, ...actions }: Omit<BriefingTreeProps, 'viewMode'>) => {
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(['Aquisição', 'Aquisição::Topo de Funil']));
+  const strategyByGroup = useMemo(() => new Map(strategies.map((strategy) => [strategy.campaignGroupId, strategy])), [strategies]);
+  const partners = useMemo(() => [...new Set([...groups.map((group) => group.representative.__meta.partner || 'Sem parceiro'), ...emptyPartnerSlots])].sort(naturalLabelSort), [emptyPartnerSlots, groups]);
+  const entries = useMemo(() => {
+    const map = new Map<string, { context: JourneyContext; groups: EditorialGroup[] }>();
+    if (!showArchived) CANONICAL_JOURNEYS.forEach((context) => map.set(`${context.family}::${context.type}`, { context, groups: [] }));
+    groups.forEach((group) => { const context = journeyContextForStrategy(strategyByGroup.get(group.id), group.representative.TP_CAMPANHA, group.representative.__meta.segment); const key = `${context.family}::${context.type}`; const entry = map.get(key) ?? { context, groups: [] }; entry.groups.push(group); map.set(key, entry); });
+    return [...map.values()];
+  }, [groups, showArchived, strategyByGroup]);
+  const families = useMemo(() => { const map = new Map<string, typeof entries>(); entries.forEach((entry) => map.set(entry.context.family, [...(map.get(entry.context.family) ?? []), entry])); return map; }, [entries]);
+  const toggle = (key: string) => setExpanded((current) => { const next = new Set(current); next.has(key) ? next.delete(key) : next.add(key); return next; });
+  const node = (key: string, label: string, count: string, level = 0) => <button type="button" onClick={() => toggle(key)} aria-expanded={expanded.has(key)} className="flex min-h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500" style={{ paddingLeft: `${8 + level * 12}px` }}>{expanded.has(key) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="min-w-0 flex-1 truncate">{label}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{count}</span></button>;
+  return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{showArchived ? 'Lixeira por jornada' : 'Orquestração'}</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">Recolher</button><button type="button" onClick={() => setExpanded(new Set([...families.entries()].flatMap(([family, items]) => [family, ...items.map(({ context }) => `${family}::${context.type}`)])))} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">Ver jornadas</button></div></div>{[...families.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([family, items]) => <div key={family}>{node(family, family.toUpperCase(), `${items.reduce((total, item) => total + item.groups.length, 0)} e-mails`)}{expanded.has(family) && items.sort((a, b) => naturalLabelSort(a.context.type, b.context.type)).map(({ context, groups: typeGroups }) => { const key = `${family}::${context.type}`; const covered = new Set(typeGroups.map((group) => group.representative.__meta.partner || 'Sem parceiro')); return <div key={key} className="ml-3">{node(key, context.type, `${covered.size}/${partners.length} parceiros`, 1)}{expanded.has(key) && <div className="ml-3 border-l border-cyan-100 pl-1"><PartnerBriefingTree {...actions} showArchived={showArchived} groups={typeGroups} emptyPartnerSlots={showArchived ? [] : partners.filter((partner) => !covered.has(partner))} onCreatePartnerRuler={(partner) => onCreatePartnerRuler(partner, context)}/></div>}</div>; })}</div>)}</div>;
+};
+
+const PartnerBriefingTree = ({ groups, emptyPartnerSlots, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment, onMoveEmail, onCreatePartnerRuler }: PartnerBriefingTreeProps) => {
   const [expanded, setExpanded] = useState<Set<string>>(() => { try { const saved = localStorage.getItem('gaas-email-tree-expanded-v1'); return saved ? new Set(JSON.parse(saved)) : new Set(['p:Plurix', 'p:Plurix/s:CRM', 'p:Plurix/s:CRM/w:Semana 1']); } catch { return new Set(); } });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const toggle = (key: string) => setExpanded((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); return next; });

@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy } from './management';
+import { countConfiguredStrategyFields, journeyContextForStrategy, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy } from './management';
 
 const strategy = (overrides: Partial<EmailStrategy> = {}): EmailStrategy => ({
   id: 'strategy-1', campaignGroupId: 'group-1', partner: 'Plurix', segment: 'CRM', secondaryBenefits: [],
   technicalStatus: 'needs_review', editorialStatus: 'needs_enrichment', visualStatus: 'needs_review',
   certificationStatus: 'not_tested', fieldProvenance: {}, version: 1, updatedByType: 'system', updateSource: 'system', ...overrides,
+});
+
+describe('dynamic email journey context', () => {
+  it('keeps the journey explicitly stored in the management layer', () => {
+    expect(journeyContextForStrategy(strategy({ journeyFamily: 'Ciclo de Vida', journeyType: 'Welcome' }), 'Topo de Funil', 'CRM')).toEqual({ family: 'Ciclo de Vida', type: 'Welcome' });
+  });
+
+  it('maps legacy acquisition rulers to the canonical top-of-funnel journey', () => {
+    expect(journeyContextForStrategy(undefined, 'Topo de Funil', 'CRM')).toEqual({ family: 'Aquisição', type: 'Topo de Funil' });
+  });
+
+  it('recognizes lifecycle types without treating them as audience segments', () => {
+    expect(journeyContextForStrategy(undefined, 'Ativação', 'Clientes elegíveis')).toEqual({ family: 'Ciclo de Vida', type: 'Ativação' });
+  });
 });
 
 describe('dynamic email management readiness', () => {
