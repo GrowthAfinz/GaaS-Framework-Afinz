@@ -64,8 +64,10 @@ export function parseBriefingDate(value: string): Date | null {
   match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!match) return null;
   const a = +match[1]; const b = +match[2];
-  const month = a > 12 ? b : a; // SFMC uses MM/DD; unambiguous DD/MM is also accepted on import.
-  const day = a > 12 ? a : b;
+  // Exports downloaded from this SFMC BU use DD/MM/YYYY. Keep accepting legacy
+  // MM/DD values only when the second component makes that order unambiguous.
+  const month = b > 12 ? a : b;
+  const day = b > 12 ? b : a;
   return safeDate(+match[3], month, day, +(match[4] ?? 0), +(match[5] ?? 0), +(match[6] ?? 0));
 }
 
@@ -78,7 +80,7 @@ export function toDateInput(value: string): string {
 export function toSfmcDate(value: string): string {
   const date = parseBriefingDate(value); if (!date) return value;
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(date.getMonth() + 1)}/${p(date.getDate())}/${date.getFullYear()} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+  return `${p(date.getDate())}/${p(date.getMonth() + 1)}/${date.getFullYear()} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
 
 export function validateRows(rows: BriefingRow[], today = new Date()): Map<string, ValidationIssue[]> {
@@ -134,5 +136,5 @@ export function exportBriefingCsv(rows: BriefingRow[]): string {
   const data = rows.map((row) => Object.fromEntries(BRIEFING_COLUMNS.map((column) => [column,
     column === 'DT_INICIO' || column === 'DT_FIM' ? toSfmcDate(row[column]) : row[column].replace(/\r?\n/g, '<br>'),
   ])));
-  return Papa.unparse(data, { columns: [...BRIEFING_COLUMNS], delimiter: ';', newline: '\r\n', quotes: false, escapeFormulae: false });
+  return Papa.unparse(data, { columns: [...BRIEFING_COLUMNS], delimiter: ',', newline: '\r\n', quotes: false, escapeFormulae: false });
 }
