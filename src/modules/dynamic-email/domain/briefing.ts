@@ -80,7 +80,9 @@ export function toDateInput(value: string): string {
 export function toSfmcDate(value: string): string {
   const date = parseBriefingDate(value); if (!date) return value;
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(date.getDate())}/${p(date.getMonth() + 1)}/${date.getFullYear()} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+  // The SFMC import wizard used by this BU validates incoming dates as MM/DD/YYYY,
+  // even though CSVs downloaded from the DE are localized as DD/MM/YYYY.
+  return `${p(date.getMonth() + 1)}/${p(date.getDate())}/${date.getFullYear()} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
 
 export function validateRows(rows: BriefingRow[], today = new Date()): Map<string, ValidationIssue[]> {
