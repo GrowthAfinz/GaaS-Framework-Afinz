@@ -158,6 +158,15 @@ const STRUCTURE_BLOCKS: { id: string; num: number; label: string; textFields: Br
 ];
 const STRUCTURE_NUM: Record<string, number> = Object.fromEntries(STRUCTURE_BLOCKS.map((block) => [block.id, block.num]));
 const stripHtmlToText = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+// remove AMPscript/handlebars inline (%%=v(@X)=%%, %%[ ... ]%%, {{ x }}) — a prévia renderiza esses tokens
+// resolvidos, então a âncora precisa casar pelo texto literal que sobra.
+const stripDynamicTokens = (value: string) => value
+  .replace(/%%\[[\s\S]*?\]%%/g, ' ')
+  .replace(/%%=[\s\S]*?=%%/g, ' ')
+  .replace(/%%[\s\S]*?%%/g, ' ')
+  .replace(/\{\{[\s\S]*?\}\}/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
 
 function demoRows(): BriefingRow[] {
   const visa = emptyBriefingRow('00000000-0000-4000-8000-000000000001');
@@ -413,7 +422,12 @@ export const DynamicEmailWorkspace: React.FC = () => {
     if (!row) return [];
     const issueFields = new Set(selectedIssues.map((issue) => issue.field).filter(Boolean) as string[]);
     return STRUCTURE_BLOCKS.map((block) => {
-      const text = block.textFields.map((field) => stripHtmlToText(row[field] ?? '')).find((value) => value.length > 1) ?? '';
+      const rawTexts = block.textFields.map((field) => stripHtmlToText(row[field] ?? ''));
+      const literalTexts = rawTexts.map(stripDynamicTokens);
+      const text = literalTexts.find((value) => value.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '').length >= 4)
+        ?? literalTexts.find((value) => value.length > 1)
+        ?? rawTexts.find((value) => value.length > 1)
+        ?? '';
       const image = block.imageField ? (row[block.imageField] ?? '').trim() : '';
       const anchor = text
         ? { kind: 'text' as const, value: text }
@@ -1273,11 +1287,11 @@ const BriefingTree = ({ groups, emptyPartnerSlots, selectedId, selectedWeek, sel
     return partners;
   }, [emptyPartnerSlots, groups]);
   const disclosure = (key: string, label: React.ReactNode, count?: string, level = 0) => <button type="button" onClick={() => toggle(key)} aria-expanded={expanded.has(key)} className="flex min-h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500" style={{ paddingLeft: `${8 + level * 12}px` }}>{expanded.has(key) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="min-w-0 flex-1 truncate">{label}</span>{count && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{count}</span>}</button>;
-  return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{showArchived ? 'Lixeira' : 'Navegação'}</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Recolher tudo</button><button type="button" onClick={() => { const next = new Set<string>(); [...branches.entries()].forEach(([partner, segments]) => { next.add(`p:${partner}`); [...segments.keys()].forEach((segment) => next.add(`p:${partner}/s:${segment}`)); }); setExpanded(next); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); }} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Ver segmentos</button></div></div>{branches.size === 0 && <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center"><Trash2 className="mx-auto mb-2 text-slate-300" size={24}/><b className="text-sm text-slate-700">{showArchived ? 'A Lixeira está vazia' : 'Nenhum briefing neste filtro'}</b><p className="mt-1 text-xs leading-5 text-slate-500">{showArchived ? 'E-mails e semanas removidos aparecerão aqui e poderão ser restaurados.' : 'Ajuste a busca ou selecione outro status.'}</p></div>}<div className="space-y-1">{[...branches.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([partner, segments]) => {
+  return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{showArchived ? 'Lixeira' : 'Navegação'}</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Recolher tudo</button><button type="button" onClick={() => { const next = new Set<string>(); [...branches.entries()].forEach(([partner, segments]) => { next.add(`p:${partner}`); [...segments.keys()].forEach((segment) => next.add(`p:${partner}/s:${segment}`)); }); setExpanded(next); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); }} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Ver segmentos</button></div></div>{branches.size === 0 && <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center"><Trash2 className="mx-auto mb-2 text-slate-300" size={24}/><b className="text-sm text-slate-700">{showArchived ? 'A Lixeira está vazia' : 'Nenhum briefing neste filtro'}</b><p className="mt-1 text-xs leading-5 text-slate-500">{showArchived ? 'E-mails e semanas removidos aparecerão aqui e poderão ser restaurados.' : 'Ajuste a busca ou selecione outro status.'}</p></div>}<div className="space-y-1">{[...branches.entries()].map(([partner, segments]) => ({ partner, segments, volume: [...segments.values()].reduce((total, weeks) => total + [...weeks.values()].flat().length, 0) })).sort((a, b) => b.volume - a.volume || naturalLabelSort(a.partner, b.partner)).map(({ partner, segments, volume }) => {
     const partnerKey = `p:${partner}`;
-    const partnerCount = [...segments.values()].reduce((total, weeks) => total + [...weeks.values()].flat().length, 0);
+    const partnerCount = volume;
     const emptySlot = segments.size === 0;
-    return <div key={partnerKey}>{disclosure(partnerKey, <span className="uppercase tracking-wide text-cyan-800">{partner}</span>, emptySlot ? 'slot disponível' : `${partnerCount} e-mails`)}{expanded.has(partnerKey) && emptySlot && <div className="ml-7 mr-1 mt-1 rounded-xl border border-dashed border-cyan-200 bg-cyan-50/50 p-3"><div className="text-xs font-bold text-cyan-950">Campanha de aquisição</div><p className="mt-1 text-[11px] leading-4 text-slate-500">Espaço reservado. Nenhum briefing foi criado ainda.</p><button type="button" onClick={() => onCreatePartnerRuler(partner)} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-[#07595b] px-3 text-[11px] font-bold text-white outline-none hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500"><Plus size={13}/>Criar régua</button></div>}{expanded.has(partnerKey) && [...segments.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([segment, weeks]) => {
+    return <div key={partnerKey}>{disclosure(partnerKey, <span className="uppercase tracking-wide text-cyan-800">{partner}</span>, emptySlot ? undefined : `${partnerCount} e-mails`)}{expanded.has(partnerKey) && emptySlot && <div className="ml-7 mr-1 mt-1 rounded-xl border border-dashed border-cyan-200 bg-cyan-50/50 p-3"><div className="text-xs font-bold text-cyan-950">Campanha de aquisição</div><p className="mt-1 text-[11px] leading-4 text-slate-500">Espaço reservado. Nenhum briefing foi criado ainda.</p><button type="button" onClick={() => onCreatePartnerRuler(partner)} className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-[#07595b] px-3 text-[11px] font-bold text-white outline-none hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500"><Plus size={13}/>Criar régua</button></div>}{expanded.has(partnerKey) && [...segments.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([segment, weeks]) => {
       const segmentKey = `${partnerKey}/s:${segment}`;
       const segmentMenuKey = `menu:${segmentKey}`;
       const segmentSelected = selectedSegment?.partner === partner && selectedSegment.segment === segment;
