@@ -1,6 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
 import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
 import {
   AlertTriangle,
@@ -291,8 +290,6 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const templateFileRef = useRef<HTMLInputElement>(null);
-  const { defaultLayout: workspaceDefaultLayout, onLayoutChanged: onWorkspaceLayoutChanged } = useDefaultLayout({ id: 'gaas-email-briefing-workspace-v1', storage: localStorage });
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'gaas-email-editor-preview-v1', storage: localStorage });
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
   useEffect(() => {
@@ -349,7 +346,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const toggleSection = (id: string) => setOpenSections((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const focusStructureBlock = (id: string) => {
     setOpenSections((current) => (current.has(id) ? current : new Set(current).add(id)));
-    requestAnimationFrame(() => document.getElementById(`eb-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    setEditorHoverBlock(id);
+    requestAnimationFrame(() => setTimeout(() => document.getElementById(`eb-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30));
   };
   const activeStructureBlock = railHoverBlock ?? editorHoverBlock ?? [...openSections].find((id) => id in STRUCTURE_NUM) ?? null;
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
@@ -864,9 +862,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
-      <Group id="email-briefing-workspace" orientation="horizontal" defaultLayout={workspaceDefaultLayout ?? { briefings: 20, content: 80 }} onLayoutChanged={onWorkspaceLayoutChanged} className="min-w-0 overflow-hidden" style={{ height: 'min(820px, calc(var(--screen-h, 900px) - 188px))', minHeight: 540 }} resizeTargetMinimumSize={{ coarse: 20, fine: 10 }}>
-        <Panel id="briefings" defaultSize="20%" minSize="14%" maxSize="38%" className="min-w-0">
-        <aside className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
+      <div className="h-[calc(var(--screen-h,900px)_-_180px)] min-h-[480px] overflow-y-auto overflow-x-hidden overscroll-contain pr-1 [scrollbar-gutter:stable]">
+      <div className="grid items-stretch gap-3 grid-cols-[minmax(210px,264px)_minmax(0,1.3fr)_minmax(0,1fr)] pb-1">
+        <div className="min-w-0">
+        <aside className="sticky top-4 flex max-h-[calc(var(--screen-h,900px)_-_104px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
           <div className="shrink-0 border-b border-slate-200 p-3.5">
             <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredGroups.length} de {activeEditorialGroupCount} e-mails · {activeRows.length} variantes ativas</p></div><Inbox className="text-cyan-700" size={18}/></div>
             <label className="mt-3 flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-cyan-400 focus-within:bg-white">
@@ -910,21 +909,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
             /> : <div className="px-4 py-10 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={24}/><p className="font-semibold text-slate-700">Nenhum briefing encontrado</p><p className="mt-1 text-xs">Ajuste a busca ou o filtro de status.</p></div>}
           </div>
         </aside>
-        </Panel>
+        </div>
 
-        <Separator id="briefing-workspace-separator" aria-label="Ajustar largura da Caixa de briefings" className="group/sidebar-splitter relative mx-1.5 w-2 cursor-col-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-cyan-500" title="Arraste para ajustar a largura da Caixa de briefings. Use as setas do teclado ou dê dois cliques para restaurar.">
-          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-300 transition group-hover/sidebar-splitter:w-1 group-hover/sidebar-splitter:bg-cyan-500"/>
-          <span className="absolute left-1/2 top-1/2 h-10 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-300 bg-white shadow-sm transition group-hover/sidebar-splitter:border-cyan-500 group-hover/sidebar-splitter:bg-cyan-50"/>
-        </Separator>
-
-        <Panel id="content" defaultSize="80%" minSize="62%" className="min-w-0">
-        <Group id="email-editor-preview" orientation="horizontal" defaultLayout={defaultLayout ?? { editor: 58, preview: 42 }} onLayoutChanged={onLayoutChanged} className="h-full min-w-0 overflow-hidden rounded-2xl" resizeTargetMinimumSize={{ coarse: 20, fine: 10 }}>
-          <Panel id="editor" defaultSize="58%" minSize="32%" className="min-w-0">
-        {selectedSegment ? <WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)}/> : selectedWeek ? <WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)}/> : selected ? <section id="email-editor-panel" className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
-          <div className="shrink-0 border-b border-slate-200 bg-white/95 px-4 py-3.5 backdrop-blur">
+        {selectedSegment ? <div className="min-w-0"><WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)}/></div> : selectedWeek ? <div className="min-w-0"><WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)}/></div> : selected ? <section id="email-editor-panel" className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
+          <div className="sticky top-4 z-30 rounded-t-2xl border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
             <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Na Lixeira · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
           </div>
-          <div id="email-editor-scroll" className="min-h-0 flex-1 overflow-y-auto p-3.5">
+          <div id="email-editor-scroll" className="p-3.5">
             <label className="mb-2.5 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
             {selectedIssues.length > 0 && <div className="mb-2.5 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -963,19 +954,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
               })}
             </div>
           </div>
-          <div className="shrink-0 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">{selected.__meta.status === 'archived'
+          <div className="sticky bottom-3 z-30 mx-3 mb-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-2.5 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] backdrop-blur">{selected.__meta.status === 'archived'
             ? <button type="button" onClick={() => void restoreSelected()} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-2.5 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><ArchiveRestore size={16}/>Desarquivar e voltar a editar</button>
-            : <><button type="button" onClick={() => setSaveOpen(true)} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-2.5 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar briefing{selectedGroupErrorCount > 0 && <span className="rounded-full bg-white/20 px-1.5 text-[11px]">{selectedGroupErrorCount} pend.</span>}</button><p className="mt-1.5 text-center text-[11px] text-slate-500">Salve o rascunho ou marque como pronto depois de revisar os blocos.</p></>}</div>
+            : <button type="button" onClick={() => setSaveOpen(true)} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-2.5 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar briefing{selectedGroupErrorCount > 0 && <span className="rounded-full bg-white/20 px-1.5 text-[11px]">{selectedGroupErrorCount} pend.</span>}</button>}</div>
         </section> : <div/>}
-          </Panel>
 
-          <Separator id="email-editor-preview-separator" aria-label="Ajustar largura do editor e da prévia" className="group/splitter relative mx-1.5 w-2 cursor-col-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-cyan-500" title="Arraste para ajustar. Use as setas do teclado ou dê dois cliques para restaurar.">
-            <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-300 transition group-hover/splitter:w-1 group-hover/splitter:bg-cyan-500"/>
-            <span className="absolute left-1/2 top-1/2 h-10 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-300 bg-white shadow-sm transition group-hover/splitter:border-cyan-500 group-hover/splitter:bg-cyan-50"/>
-          </Separator>
-
-          <Panel id="preview" defaultSize="42%" minSize="25%" className="min-w-0">
-            <section id="email-preview-panel" className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
+        <div className="min-w-0">
+            <section id="email-preview-panel" className="sticky top-4 flex max-h-[calc(var(--screen-h,900px)_-_104px)] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
               <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5">
                 <div className="grid items-start gap-2 min-[1500px]:grid-cols-[minmax(220px,1fr)_auto]">
                   <div className="min-w-0">
@@ -1002,46 +987,24 @@ export const DynamicEmailWorkspace: React.FC = () => {
                   <MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
                 </div>
               </div>
-              {selected && <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3">
-                <div className="mb-2 flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.14em] text-slate-400"><Inbox size={11}/>Como chega na caixa de entrada</div>
-                <div className="flex items-start gap-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-slate-600 to-slate-900 text-sm font-black text-white">{(selected.CARTAO_NM_COMERCIAL || selected.__meta.partner || 'A').replace(/[^A-Za-zÀ-ÿ+]/g, '').slice(0, 1).toUpperCase() || 'A'}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-[13px] font-bold text-slate-900">{selected.CARTAO_NM_COMERCIAL || selected.__meta.partner || 'Afinz'}</span>
-                      <span className="shrink-0 text-[11px] text-slate-400">agora</span>
-                    </div>
-                    <div className="truncate text-[13px] font-semibold leading-5 text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">Assunto não preenchido</span>}</div>
-                    <div className="truncate text-xs leading-4 text-slate-500">{selected.PRE_CABECALHO || <span className="italic text-amber-600">Sem pré-cabeçalho — o cliente verá o início do corpo</span>}</div>
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 border-t border-slate-100 pt-2 text-[10px] text-slate-400">
-                  <span className="font-semibold text-slate-500">Para</span> {subscriber.PRI_NOME || 'cliente'}<span>·</span>Remetente e domínio definidos no SFMC<span>·</span>{selected.__meta.partner || 'Parceiro'} · {selected.SEQUENCIA || 'Sequência'}
-                </div>
+              {selected && <div className="shrink-0 space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
+                <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
+                <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{selected.PRE_CABECALHO || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo do e-mail</span>}</span></div>
               </div>}
-              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="min-h-[420px] flex-1 bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
+              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="min-h-[300px] flex-1 bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
             </section>
-          </Panel>
-        </Group>
-        </Panel>
-      </Group>
+        </div>
+      </div>
+      </div>
     </main>}
 
     {previewOpen && selected && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="email-preview-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }}>
       <section className="flex max-h-[94vh] w-full max-w-[1320px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" aria-label="Prévia ampliada do e-mail">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><div className="flex items-center gap-2"><h2 id="email-preview-title" className="text-lg font-bold text-slate-900">Visualização do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs text-slate-500">Revise conteúdo e personalização. A certificação final acontece no Test Send do SFMC.</p></div><button autoFocus onClick={() => setPreviewOpen(false)} className="rounded-lg p-2 text-slate-500 outline-none hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label="Fechar visualização"><X size={19}/></button></div>
         <div className="grid gap-3 border-b border-slate-200 bg-white px-5 py-3 md:grid-cols-[1fr_180px_180px]">
-          <div>
-            <div className="mb-2 flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.14em] text-slate-400"><Inbox size={11}/>Como chega na caixa de entrada</div>
-            <div className="flex items-start gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-slate-600 to-slate-900 text-sm font-black text-white">{(selected.CARTAO_NM_COMERCIAL || selected.NM_PRODUTO_INTERNO || 'A').replace(/[^A-Za-zÀ-ÿ+]/g, '').slice(0, 1).toUpperCase() || 'A'}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2"><span className="truncate text-[13px] font-bold text-slate-900">{selected.CARTAO_NM_COMERCIAL || selected.NM_PRODUTO_INTERNO || 'Afinz'}</span><span className="shrink-0 text-[11px] text-slate-400">agora</span></div>
-                <div className="truncate text-[13px] font-semibold leading-5 text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">Assunto não preenchido</span>}</div>
-                <div className="truncate text-xs leading-4 text-slate-500">{selected.PRE_CABECALHO || <span className="italic text-amber-600">Sem pré-cabeçalho — o cliente verá o início do corpo</span>}</div>
-                <div className="mt-1 text-[10px] text-slate-400"><span className="font-semibold text-slate-500">Para</span> {subscriber.PRI_NOME || 'cliente'} · Remetente definido no SFMC · {selected.TP_CAMPANHA || 'Campanha'} · {selected.SEQUENCIA || 'Sequência'}</div>
-              </div>
-            </div>
+          <div className="space-y-1.5 self-center">
+            <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
+            <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{selected.PRE_CABECALHO || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo</span>}</span></div>
           </div>
           <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
         </div>
@@ -1111,7 +1074,7 @@ const CollapsibleBlock = ({ id, label, description, open, onToggle, tone = 'defa
     id={id}
     onMouseEnter={onHoverChange ? () => onHoverChange(true) : undefined}
     onMouseLeave={onHoverChange ? () => onHoverChange(false) : undefined}
-    className={`overflow-hidden rounded-xl border transition ${focused ? 'border-cyan-400 ring-2 ring-cyan-200' : tone === 'audit' ? 'border-cyan-200 bg-cyan-50/40' : 'border-slate-200 bg-white'}`}
+    className={`scroll-mt-24 overflow-hidden rounded-xl border transition ${focused ? 'border-cyan-400 ring-2 ring-cyan-200' : tone === 'audit' ? 'border-cyan-200 bg-cyan-50/40' : 'border-slate-200 bg-white'}`}
   >
     <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left outline-none transition hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500">
       <div className="flex min-w-0 items-center gap-2.5">
