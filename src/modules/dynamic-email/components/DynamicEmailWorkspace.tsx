@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   CircleAlert,
   Code2,
   Copy,
@@ -273,6 +274,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const savingRef = useRef(false);
   const [syncState, setSyncState] = useState('Carregando dados compartilhados…');
   const [subscriber, setSubscriber] = useState<SubscriberSample>(SAMPLE);
+  const [previewToolsOpen, setPreviewToolsOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('gaas-email-preview-tools-v1') !== '0'; } catch { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem('gaas-email-preview-tools-v1', previewToolsOpen ? '1' : '0'); } catch { /* ignore */ } }, [previewToolsOpen]);
   const [importMessages, setImportMessages] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ready' | 'needs-review'>('all');
@@ -1011,6 +1016,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
                   {(lockedFields.length > 0 || imageLocked) && <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-600"><Lock size={12} className="mt-px shrink-0"/><span>Parte deste bloco é fixa no template <b>{templateSlots.find((slot) => slot.id === linkedTemplateId)?.name}</b> — vem direto do HTML/AMPscript e não pode ser ajustada aqui. Para mudar, troque o template ou edite o Template-fonte.</span></p>}
                   {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
                   {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)} locked={isContentBlock && !isColumnEditable(field)}/>)}</div>}
+                  {section.id === 'message' && <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                    <p className="mb-2 text-[11px] font-semibold text-slate-500">Amostra usada só na simulação da prévia — equivale aos dados do Test Send do SFMC, não vai no CSV.</p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/>
+                      <MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
+                    </div>
+                  </div>}
                   {section.imageSlot && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')} locked={imageLocked}/></div>}
                   {section.id === 'closing' && selected.__meta.partner === 'Plurix' && <div className={section.imageSlot ? 'mt-3' : ''}><SignatureMatrix rows={rows} selected={selected} onEnsure={() => setRows((current) => ensurePlurixVariants(current, selected.__id, signatureSettings.filter((item) => item.status === 'inactive').map((item) => item.signatureKey)))} onSelect={setSelectedId} onManage={() => setSignatureManagerOpen(true)}/></div>}
                 </CollapsibleBlock>
@@ -1028,30 +1040,27 @@ export const DynamicEmailWorkspace: React.FC = () => {
         <div className="min-w-0">
             <section id="email-preview-panel" className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
               <div className="border-b border-slate-200 bg-white px-3 py-2.5">
-                <div className="grid items-start gap-2 min-[1500px]:grid-cols-[minmax(220px,1fr)_auto]">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span><span className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${showMarketingNotes ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{showMarketingNotes ? 'Observações MKT' : 'E-mail projetado'}</span></div>
-                    <p className="mt-1 max-w-none whitespace-normal text-xs leading-[1.35rem] text-slate-500">Visualize a peça com conteúdo e ativos adaptados. Antes do envio, certifique pelo Test Send do SFMC.</p>
+                    {previewToolsOpen && <p className="mt-1 max-w-none whitespace-normal text-xs leading-[1.35rem] text-slate-500">Visualize a peça com conteúdo e ativos adaptados. Antes do envio, certifique pelo Test Send do SFMC.</p>}
                   </div>
-                  <div className="grid shrink-0 grid-cols-2 gap-1.5">
-                    <button onClick={() => openRenderedPreview()} disabled={!selected || render.diagnostics.length > 0} className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><ExternalLink size={14}/>Abrir em nova aba</button>
-                    <button onClick={() => openRenderedPreview(true)} disabled={!selected || render.diagnostics.length > 0} title="Abre a impressão do navegador para salvar a prévia completa em PDF" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Printer size={14}/>Salvar em PDF</button>
-                    <button type="button" aria-pressed={showMarketingNotes} onClick={() => setShowMarketingNotes((current) => !current)} disabled={!selected} title="Alternar entre a peça projetada e as instruções pendentes para Marketing" className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50 ${showMarketingNotes ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-800'}`}><MessageSquareText size={14}/>Observações MKT</button>
-                    <button onClick={() => setPreviewOpen(true)} disabled={!selected} className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={14}/>Ampliar</button>
-                  </div>
+                  <button type="button" onClick={() => setPreviewToolsOpen((current) => !current)} aria-expanded={previewToolsOpen} title={previewToolsOpen ? 'Minimizar controles e ampliar a prévia' : 'Mostrar os controles da prévia'} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500">{previewToolsOpen ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}{previewToolsOpen ? 'Minimizar' : 'Controles'}</button>
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.25fr)_minmax(120px,0.75fr)_minmax(120px,0.75fr)]">
-                  <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Template deste briefing
-                    <span className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 bg-white px-2 focus-within:border-cyan-400">
-                      <select value={linkedTemplateId} onChange={(event) => { const id = event.target.value; setSelectedTemplateId(id); updateGroupMeta({ templateSlotId: id }); }} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none" aria-label="Template vinculado ao briefing">
-                        {templateSlots.map((slot) => <option key={slot.id} value={slot.id}>{slot.name}</option>)}
-                      </select>
-                      <button type="button" onClick={() => { setSelectedTemplateId(linkedTemplateId); setMode('template'); }} className="ml-1 rounded-md p-1.5 text-cyan-700 hover:bg-cyan-50" aria-label="Editar HTML e AMPscript completo do template vinculado" title="Editar HTML e AMPscript completo"><Code2 size={14}/></button>
-                    </span>
-                  </label>
-                  <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/>
-                  <MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
+                <div className={`mt-2 grid gap-1.5 ${previewToolsOpen ? 'grid-cols-2 min-[1180px]:grid-cols-4' : 'grid-cols-4'}`}>
+                  <button onClick={() => openRenderedPreview()} disabled={!selected || render.diagnostics.length > 0} title="Abrir em nova aba" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><ExternalLink size={14}/>{previewToolsOpen && <span className="truncate">Abrir em nova aba</span>}</button>
+                  <button onClick={() => openRenderedPreview(true)} disabled={!selected || render.diagnostics.length > 0} title="Abre a impressão do navegador para salvar a prévia completa em PDF" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Printer size={14}/>{previewToolsOpen && <span className="truncate">Salvar em PDF</span>}</button>
+                  <button type="button" aria-pressed={showMarketingNotes} onClick={() => setShowMarketingNotes((current) => !current)} disabled={!selected} title="Alternar entre a peça projetada e as instruções pendentes para Marketing" className={`inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50 ${showMarketingNotes ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100' : 'border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-800'}`}><MessageSquareText size={14}/>{previewToolsOpen && <span className="truncate">Observações MKT</span>}</button>
+                  <button onClick={() => setPreviewOpen(true)} disabled={!selected} title="Ampliar" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 outline-none transition hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:opacity-50"><Maximize2 size={14}/>{previewToolsOpen && <span className="truncate">Ampliar</span>}</button>
                 </div>
+                {previewToolsOpen && <label className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Template deste briefing
+                  <span className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 bg-white px-2 focus-within:border-cyan-400">
+                    <select value={linkedTemplateId} onChange={(event) => { const id = event.target.value; setSelectedTemplateId(id); updateGroupMeta({ templateSlotId: id }); }} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none" aria-label="Template vinculado ao briefing">
+                      {templateSlots.map((slot) => <option key={slot.id} value={slot.id}>{slot.name}</option>)}
+                    </select>
+                    <button type="button" onClick={() => { setSelectedTemplateId(linkedTemplateId); setMode('template'); }} className="ml-1 rounded-md p-1.5 text-cyan-700 hover:bg-cyan-50" aria-label="Editar HTML e AMPscript completo do template vinculado" title="Editar HTML e AMPscript completo"><Code2 size={14}/></button>
+                  </span>
+                </label>}
               </div>
               {selected && <div className="space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
                 <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
