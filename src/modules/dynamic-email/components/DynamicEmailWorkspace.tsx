@@ -57,7 +57,7 @@ import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plu
 import { PLURIX_V8_TEMPLATE, PLURIX_V8_TEMPLATE_ID, PLURIX_V8_TEMPLATE_NAME } from '../fixtures/plurixV8Template';
 import { PLURIX_V9_TEMPLATE, PLURIX_V9_TEMPLATE_ID, PLURIX_V9_TEMPLATE_NAME } from '../fixtures/plurixV9Template';
 import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
-import { applyWorkspaceField, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
+import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailTemplateSlot, type LegalText, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
 import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveDraftEmailFactorySegment, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
 import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy, type ExternalReviewRun, type ExternalSuggestion, type ProductContext, type ProductGuardrail } from '../domain/management';
@@ -342,7 +342,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   }); void refreshTaxonomy(); }, []);
   const activeRows = useMemo(() => rows.filter((row) => row.__meta.status !== 'archived'), [rows]);
   const issuesByRow = useMemo(() => validateRows(activeRows), [activeRows]);
-  const selected = rows.find((row) => row.__id === selectedId) ?? rows[0];
+  const rowsInCurrentView = useMemo(() => briefingRowsForView(rows, showArchived), [rows, showArchived]);
+  const selected = rowsInCurrentView.find((row) => row.__id === selectedId) ?? rowsInCurrentView[0];
   useEffect(() => { setOpenSections(new Set()); setEditorHoverBlock(null); setRailHoverBlock(null); }, [selected?.__id]);
   const toggleSection = (id: string) => setOpenSections((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const focusStructureBlock = (id: string) => {
@@ -385,13 +386,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
     const issues = visibleRows.flatMap((row) => issuesByRow.get(row.__id) ?? []);
     return { id, rows: groupRows, visibleRows, representative, hasErrors: issues.some((issue) => issue.severity === 'error') };
   }), [issuesByRow, rows]);
-  const filteredGroups = useMemo(() => editorialGroups.filter((group) => {
-    const { representative: row, hasErrors } = group;
-    if (!showArchived && !group.visibleRows.length) return false;
-    if (statusFilter === 'ready' && hasErrors) return false;
-    if (statusFilter === 'needs-review' && !hasErrors) return false;
-    const haystack = [row.__meta.partner, row.__meta.segment, row.__meta.weekKey, row.TP_CAMPANHA, row.SEQUENCIA, row.UTM_CAMPANHA, row.ASSUNTO, ...group.rows.map((item) => item.__meta.subgroup)].join(' ').toLowerCase();
-    return haystack.includes(query.trim().toLowerCase());
+  const filteredGroups = useMemo(() => editorialGroups.flatMap((group) => {
+    const scopedRows = briefingRowsForView(group.rows, showArchived);
+    if (!scopedRows.length) return [];
+    const row = scopedRows.find((item) => item.NM_PRODUTO_INTERNO.toUpperCase() === 'AMIGAO') ?? scopedRows[0];
+    const hasErrors = showArchived ? false : group.hasErrors;
+    if (statusFilter === 'ready' && hasErrors) return [];
+    if (statusFilter === 'needs-review' && !hasErrors) return [];
+    const haystack = [row.__meta.partner, row.__meta.segment, row.__meta.weekKey, row.TP_CAMPANHA, row.SEQUENCIA, row.UTM_CAMPANHA, row.ASSUNTO, ...scopedRows.map((item) => item.__meta.subgroup)].join(' ').toLowerCase();
+    if (!haystack.includes(query.trim().toLowerCase())) return [];
+    return [{ ...group, rows: scopedRows, visibleRows: scopedRows, representative: row, hasErrors }];
   }), [editorialGroups, query, showArchived, statusFilter]);
   const selectedWeekGroups = useMemo(() => selectedWeek ? editorialGroups
     .filter((group) => group.visibleRows.length && group.representative.__meta.partner === selectedWeek.partner && group.representative.__meta.segment === selectedWeek.segment && group.representative.__meta.weekKey === selectedWeek.weekKey)
@@ -419,7 +423,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const exportBlockReason = !rows.length
     ? 'Crie ou importe pelo menos um briefing antes de exportar.'
     : !activeRows.length
-      ? 'Todos os briefings estão arquivados — não há nada para exportar.'
+      ? 'Todos os briefings estão na Lixeira — não há nada para exportar.'
       : technicalErrorCount
         ? `Corrija ${technicalErrorCount} ${technicalErrorCount === 1 ? 'erro bloqueante' : 'erros bloqueantes'} antes de exportar${(() => { const nomes = [...new Set(editorialGroups.filter((group) => group.visibleRows.length && group.hasErrors).map((group) => `${group.representative.__meta.partner || 'Parceiro'} · ${group.representative.SEQUENCIA || 'Sequência'}`))]; return nomes.length ? `: ${nomes.slice(0, 3).join('; ')}${nomes.length > 3 ? '…' : ''}` : ''; })()}.`
         : '';
@@ -531,7 +535,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const targetIds = new Set(targets.map((row) => row.__id));
       const nextRows = rows.filter((row) => !targetIds.has(row.__id) || Boolean(row.__meta.savedAt)).map((row) => archived.find((item) => item.__id === row.__id) ?? row);
       setRows(nextRows); setSelectedId(nextRows.find((row) => row.__meta.status !== 'archived')?.__id ?? nextRows[0]?.__id ?? '');
-      setAnnouncement(archived.length ? 'E-mail editorial arquivado; histórico e versões foram preservados.' : 'Rascunho ainda não salvo removido.');
+      setAnnouncement(archived.length ? 'E-mail movido para a Lixeira; histórico e versões foram preservados.' : 'Rascunho ainda não salvo removido.');
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao arquivar o e-mail.'); }
     finally { setDeleteOpen(false); }
   };
@@ -645,7 +649,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const archived = await Promise.all(targets.filter((row) => row.__meta.savedAt).map((row) => saveBriefing({ ...row, __meta: { ...row.__meta, status: 'archived', version: row.__meta.version + 1 } }, [`${target.weekKey} arquivada pela árvore editorial.`])));
       const ids = new Set(targets.map((row) => row.__id));
       const next = rows.filter((row) => !ids.has(row.__id) || Boolean(row.__meta.savedAt)).map((row) => archived.find((item) => item.__id === row.__id) ?? row);
-      setRows(next); setSelectedId(next.find((row) => row.__meta.status !== 'archived')?.__id ?? next[0]?.__id ?? ''); setAnnouncement(`${target.weekKey} arquivada; e-mails salvos permanecem no histórico.`);
+      setRows(next); setSelectedId(next.find((row) => row.__meta.status !== 'archived')?.__id ?? next[0]?.__id ?? ''); setAnnouncement(`${target.weekKey} movida para a Lixeira; e-mails salvos permanecem no histórico.`);
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao arquivar a semana.'); }
     finally { setWeekArchiveTarget(null); }
   };
@@ -656,20 +660,20 @@ export const DynamicEmailWorkspace: React.FC = () => {
   };
   const restoreGroup = async (groupId: string) => {
     const targets = rows.filter((row) => row.__meta.campaignGroupId === groupId && row.__meta.status === 'archived');
-    if (!targets.length) { setAnnouncement('Este e-mail não tem variações arquivadas para restaurar.'); return; }
+    if (!targets.length) { setAnnouncement('Este e-mail não tem variações na Lixeira para restaurar.'); return; }
     try {
       const restored = await restoreArchivedRows(targets, 'E-mail editorial restaurado do arquivo.');
       setSelectedWeek(null); setSelectedSegment(null); setSelectedId(restored[0].__id);
-      setAnnouncement(`E-mail restaurado do arquivo como rascunho (${restored.length} ${restored.length === 1 ? 'variação' : 'variações'}).`);
+      setAnnouncement(`E-mail restaurado da Lixeira como rascunho (${restored.length} ${restored.length === 1 ? 'variação' : 'variações'}).`);
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar o e-mail.'); }
   };
   const restoreWeek = async (target: { partner: string; segment: string; weekKey: string }) => {
     const targets = rows.filter((row) => row.__meta.partner === target.partner && row.__meta.segment === target.segment && row.__meta.weekKey === target.weekKey && row.__meta.status === 'archived');
-    if (!targets.length) { setAnnouncement('Esta semana não tem e-mails arquivados para restaurar.'); return; }
+    if (!targets.length) { setAnnouncement('Esta semana não tem e-mails na Lixeira para restaurar.'); return; }
     try {
       const restored = await restoreArchivedRows(targets, `${target.weekKey} restaurada do arquivo.`);
       setSelectedId(restored[0].__id);
-      setAnnouncement(`${target.weekKey} restaurada do arquivo; e-mails voltaram como rascunho.`);
+      setAnnouncement(`${target.weekKey} restaurada da Lixeira; e-mails voltaram como rascunho.`);
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar a semana.'); }
   };
   const restoreSelected = async () => {
@@ -677,7 +681,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     try {
       const [saved] = await restoreArchivedRows([selected], 'Variação restaurada do arquivo.');
       if (saved) setSelectedId(saved.__id);
-      setAnnouncement('Variação restaurada do arquivo; agora está como rascunho editável.');
+      setAnnouncement('Variação restaurada da Lixeira; agora está como rascunho editável.');
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar a variação.'); }
   };
   const openRename = (kind: 'week' | 'segment', partner: string, segment: string, weekKey?: string) => {
@@ -862,8 +866,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
               <Search size={15}/><span className="sr-only">Buscar briefings</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar parceiro, campanha..." className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"/>
             </label>
             <div className="mt-2 flex flex-wrap gap-1" aria-label="Filtrar briefings por status">
-              {([['all', 'Todos'], ['ready', 'Prontos'], ['needs-review', 'Com ajustes']] as const).map(([value, label]) => <button key={value} onClick={() => setStatusFilter(value)} className={`min-h-8 rounded-md px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${statusFilter === value ? 'bg-cyan-100 text-cyan-800' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}>{label}</button>)}
-              <button onClick={() => setShowArchived((value) => !value)} aria-pressed={showArchived} className={`min-h-8 rounded-md px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${showArchived ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}>Arquivadas</button>
+              {([['all', 'Todos'], ['ready', 'Prontos'], ['needs-review', 'Com ajustes']] as const).map(([value, label]) => <button key={value} onClick={() => { setStatusFilter(value); setShowArchived(false); setSelectedId(rows.find((row) => row.__meta.status !== 'archived')?.__id ?? ''); }} className={`min-h-8 rounded-md px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${!showArchived && statusFilter === value ? 'bg-cyan-100 text-cyan-800' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}>{label}</button>)}
+              <button onClick={() => { setShowArchived(true); setStatusFilter('all'); setSelectedWeek(null); setSelectedSegment(null); setSelectedId(rows.find((row) => row.__meta.status === 'archived')?.__id ?? ''); }} aria-pressed={showArchived} className={`min-h-8 rounded-md px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${showArchived ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}>Lixeira</button>
             </div>
           </div>
           <div className="max-h-[790px] overflow-y-auto p-2.5">
@@ -910,7 +914,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <Panel id="editor" defaultSize="58%" minSize="32%" className="min-w-0">
         {selectedSegment ? <WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)}/> : selectedWeek ? <WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)}/> : selected ? <section id="email-editor-panel" className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
           <div className="shrink-0 border-b border-slate-200 bg-white/95 px-4 py-3.5 backdrop-blur">
-            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Arquivada · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Na Lixeira · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
           </div>
           <div id="email-editor-scroll" className="min-h-0 flex-1 overflow-y-auto p-3.5">
             <label className="mb-2.5 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
@@ -1200,7 +1204,7 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
     return partners;
   }, [groups]);
   const disclosure = (key: string, label: React.ReactNode, count?: string, level = 0) => <button type="button" onClick={() => toggle(key)} aria-expanded={expanded.has(key)} className="flex min-h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500" style={{ paddingLeft: `${8 + level * 12}px` }}>{expanded.has(key) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="min-w-0 flex-1 truncate">{label}</span>{count && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{count}</span>}</button>;
-  return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Navegação</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Recolher tudo</button><button type="button" onClick={() => { const next = new Set<string>(); [...branches.entries()].forEach(([partner, segments]) => { next.add(`p:${partner}`); [...segments.keys()].forEach((segment) => next.add(`p:${partner}/s:${segment}`)); }); setExpanded(next); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); }} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Ver segmentos</button></div></div><div className="space-y-1">{[...branches.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([partner, segments]) => {
+  return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{showArchived ? 'Lixeira' : 'Navegação'}</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Recolher tudo</button><button type="button" onClick={() => { const next = new Set<string>(); [...branches.entries()].forEach(([partner, segments]) => { next.add(`p:${partner}`); [...segments.keys()].forEach((segment) => next.add(`p:${partner}/s:${segment}`)); }); setExpanded(next); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); }} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Ver segmentos</button></div></div>{branches.size === 0 && <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center"><Trash2 className="mx-auto mb-2 text-slate-300" size={24}/><b className="text-sm text-slate-700">{showArchived ? 'A Lixeira está vazia' : 'Nenhum briefing neste filtro'}</b><p className="mt-1 text-xs leading-5 text-slate-500">{showArchived ? 'E-mails e semanas removidos aparecerão aqui e poderão ser restaurados.' : 'Ajuste a busca ou selecione outro status.'}</p></div>}<div className="space-y-1">{[...branches.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([partner, segments]) => {
     const partnerKey = `p:${partner}`;
     const partnerCount = [...segments.values()].reduce((total, weeks) => total + [...weeks.values()].flat().length, 0);
     return <div key={partnerKey}>{disclosure(partnerKey, <span className="uppercase tracking-wide text-cyan-800">{partner}</span>, `${partnerCount} e-mails`)}{expanded.has(partnerKey) && [...segments.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([segment, weeks]) => {
@@ -1231,10 +1235,10 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
         ];
         if (hasActiveWeek) weekItems.push(
           { label: 'Duplicar semana e e-mails', icon: <Copy size={14}/>, onClick: () => { setMenuOpen(null); onDuplicateWeek(partner, segment, week); } },
-          { label: 'Arquivar semana', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveWeek(partner, segment, week); } },
+          { label: 'Mover semana para a Lixeira', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveWeek(partner, segment, week); } },
         );
         if (!hasActiveWeek && weekGroups.some((group) => group.rows.some((row) => row.__meta.status === 'archived'))) weekItems.push(
-          { label: 'Restaurar semana do arquivo', icon: <ArchiveRestore size={14}/>, onClick: () => { setMenuOpen(null); onRestoreWeek(partner, segment, week); } },
+          { label: 'Restaurar semana da Lixeira', icon: <ArchiveRestore size={14}/>, onClick: () => { setMenuOpen(null); onRestoreWeek(partner, segment, week); } },
         );
         const weekSelected = selectedWeek?.partner === partner && selectedWeek.segment === segment && selectedWeek.weekKey === week;
         return <div key={weekKey}><div className={`flex items-center rounded-lg ${weekSelected ? 'bg-cyan-50 ring-1 ring-cyan-300' : ''}`}><button type="button" onClick={() => toggle(weekKey)} aria-expanded={expanded.has(weekKey)} aria-label={`${expanded.has(weekKey) ? 'Recolher' : 'Expandir'} ${week}`} className="ml-6 rounded-md p-1.5 text-slate-500 outline-none hover:bg-white focus-visible:ring-2 focus-visible:ring-cyan-500">{expanded.has(weekKey) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}</button><button type="button" onClick={() => onSelectWeek({ partner, segment, weekKey: week })} className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-xs font-bold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><span className="min-w-0 flex-1 truncate">{week}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{weekGroups.length}</span></button><TreeActionMenu label={`Configurar ${week}`} open={menuOpen === weekMenuKey} onToggle={() => setMenuOpen((current) => current === weekMenuKey ? null : weekMenuKey)} items={weekItems}/></div>{expanded.has(weekKey) && weekGroups.sort((a, b) => naturalLabelSort(a.representative.SEQUENCIA, b.representative.SEQUENCIA)).map((group) => {
@@ -1246,10 +1250,10 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
           if (active.length) emailItems.push(
             { label: 'Duplicar e-mail', icon: <Copy size={14}/>, onClick: () => { setMenuOpen(null); onDuplicateEmail(group.id); } },
             { label: 'Mover para outra semana/segmento…', icon: <ArrowRightLeft size={14}/>, onClick: () => { setMenuOpen(null); onMoveEmail(group.id); } },
-            { label: 'Arquivar e-mail', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveEmail(group.id); } },
+            { label: 'Mover e-mail para a Lixeira', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveEmail(group.id); } },
           );
           else if (group.rows.some((row) => row.__meta.status === 'archived')) emailItems.push(
-            { label: 'Restaurar e-mail do arquivo', icon: <ArchiveRestore size={14}/>, onClick: () => { setMenuOpen(null); onRestoreEmail(group.id); } },
+            { label: 'Restaurar e-mail da Lixeira', icon: <ArchiveRestore size={14}/>, onClick: () => { setMenuOpen(null); onRestoreEmail(group.id); } },
           );
           const isPlurix = group.representative.__meta.partner === 'Plurix';
           return <div key={group.id} className={`ml-8 mt-1 rounded-xl border ${selectedGroup ? 'border-cyan-300 bg-cyan-50' : 'border-slate-200 bg-white'}`}><div className="flex items-center gap-1 p-1"><button type="button" onClick={() => { toggle(groupKey); const target = active.find((row) => row.NM_PRODUTO_INTERNO.toUpperCase() === 'AMIGAO') ?? active[0] ?? group.rows[0]; onSelect(target.__id); }} aria-expanded={expanded.has(groupKey)} className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left outline-none hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-cyan-500">{expanded.has(groupKey) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#07595b] text-[10px] font-extrabold text-white">{initials(group.representative.__meta.partner)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{group.representative.SEQUENCIA || 'E-mail'}</span><span className="block text-[10px] text-slate-500">{isPlurix ? `${active.length}/${PLURIX_SIGNATURES.length} assinaturas ativas` : `${group.representative.__meta.subgroup || 'Régua'} · ${active.length} versão ativa`}</span></span>{group.hasErrors ? <CircleAlert size={14} className="text-red-600"/> : <CheckCircle2 size={14} className="text-emerald-600"/>}</button><TreeActionMenu label={`Configurar ${group.representative.SEQUENCIA}`} open={menuOpen === emailMenuKey} onToggle={() => setMenuOpen((current) => current === emailMenuKey ? null : emailMenuKey)} items={emailItems}/></div>{expanded.has(groupKey) && <div className="border-t border-slate-100 bg-white/70 p-1.5">{group.rows.filter((row) => showArchived || row.__meta.status !== 'archived').map((row) => <button type="button" key={row.__id} onClick={() => onSelect(row.__id)} className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-xs outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500 ${row.__id === selectedId ? 'bg-cyan-100 font-bold text-cyan-950' : row.__meta.status === 'archived' ? 'text-slate-400 line-through' : 'text-slate-700'}`}><span className={`h-2 w-2 rounded-full ${row.__meta.status === 'archived' ? 'bg-slate-300' : 'bg-emerald-500'}`}/><span className="min-w-0 flex-1 truncate">{row.__meta.subgroup || row.NM_PRODUTO_INTERNO}</span><span className="text-[10px]">{row.__meta.status === 'archived' ? 'Arquivada' : 'Ativa'}</span></button>)}</div>}</div>;

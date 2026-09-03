@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyBriefingRow } from './briefing';
-import { applyWorkspaceField, ensurePlurixVariants, partnerLabel, withMeta } from './workspace';
+import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, partnerLabel, withMeta } from './workspace';
 
 describe('workspace da Fábrica de E-mails', () => {
   it('preserva N/A e deixa explícito que o parceiro não foi informado', () => {
@@ -30,5 +30,12 @@ describe('workspace da Fábrica de E-mails', () => {
     const variants = ensurePlurixVariants([row], row.__id, ['COMPRE MAIS']);
     expect(variants).toHaveLength(5);
     expect(variants.some((item) => item.NM_PRODUTO_INTERNO === 'COMPRE MAIS')).toBe(false);
+  });
+
+  it('separa a operação corrente da Lixeira sem misturar registros', () => {
+    const active = withMeta(emptyBriefingRow('00000000-0000-4000-8000-000000000060'), { status: 'ready' });
+    const discarded = withMeta(emptyBriefingRow('00000000-0000-4000-8000-000000000061'), { status: 'archived' });
+    expect(briefingRowsForView([active, discarded], false).map((row) => row.__id)).toEqual([active.__id]);
+    expect(briefingRowsForView([active, discarded], true).map((row) => row.__id)).toEqual([discarded.__id]);
   });
 });

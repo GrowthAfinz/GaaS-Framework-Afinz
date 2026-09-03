@@ -28,6 +28,10 @@ export type EditorialMeta = {
 
 export type WorkspaceBriefing = BriefingRow & { __meta: EditorialMeta };
 
+/** The normal inbox and the trash are mutually exclusive operational views. */
+export const briefingRowsForView = (rows: WorkspaceBriefing[], trashOnly: boolean): WorkspaceBriefing[] =>
+  rows.filter((row) => trashOnly ? row.__meta.status === 'archived' : row.__meta.status !== 'archived');
+
 export type EmailAsset = {
   id: string;
   name: string;
