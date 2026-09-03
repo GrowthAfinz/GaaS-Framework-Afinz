@@ -134,6 +134,25 @@ export function applyFix(row: BriefingRow, issue: ValidationIssue): BriefingRow 
   return row;
 }
 
+// Colunas do briefing que o template atual realmente consome no corpo do HTML.
+// Serve para "blindar" no editor os campos que ficam fixos dentro do AMPscript
+// (ex.: rodapé CAN-SPAM) e que o operador não consegue mudar por aqui.
+export function templateActiveColumns(templateSource: string): Set<BriefingColumn> {
+  const varToColumn = new Map<string, string>();
+  for (const match of templateSource.matchAll(/SET\s+@(\w+)\s*=\s*(?:Trim\s*\(\s*)?Field\s*\(\s*@Row\s*,\s*["']([^"']+)["']\s*\)/gi)) {
+    varToColumn.set(match[1].toLowerCase(), match[2]);
+  }
+  const setupEnd = templateSource.indexOf(']%%');
+  const body = setupEnd >= 0 ? templateSource.slice(setupEnd + 3) : templateSource;
+  const active = new Set<BriefingColumn>();
+  for (const [variable, column] of varToColumn) {
+    if (new RegExp(`@${variable}\\b`, 'i').test(body) && (BRIEFING_COLUMNS as readonly string[]).includes(column)) {
+      active.add(column as BriefingColumn);
+    }
+  }
+  return active;
+}
+
 export function exportBriefingCsv(rows: BriefingRow[]): string {
   const data = rows.map((row) => Object.fromEntries(BRIEFING_COLUMNS.map((column) => [column,
     column === 'DT_INICIO' || column === 'DT_FIM' ? toSfmcDate(row[column]) : row[column].replace(/\r?\n/g, '<br>'),
