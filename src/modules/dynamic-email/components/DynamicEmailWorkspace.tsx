@@ -259,6 +259,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [selectedWeek, setSelectedWeek] = useState<WeekSelection | null>(null);
   const [selectedSegment, setSelectedSegment] = useState<SegmentSelection | null>(null);
   const [weekArchiveTarget, setWeekArchiveTarget] = useState<{ partner: string; segment: string; weekKey: string } | null>(null);
+  const [segmentArchiveTarget, setSegmentArchiveTarget] = useState<{ partner: string; segment: string } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ kind: 'week' | 'segment'; partner: string; segment: string; weekKey?: string; current: string } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSelection, setExportSelection] = useState<Set<string>>(new Set());
@@ -630,6 +633,49 @@ export const DynamicEmailWorkspace: React.FC = () => {
       setAnnouncement('Variação restaurada do arquivo; agora está como rascunho editável.');
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar a variação.'); }
   };
+  const openRename = (kind: 'week' | 'segment', partner: string, segment: string, weekKey?: string) => {
+    const current = kind === 'week' ? (weekKey ?? '') : segment;
+    setRenameValue(current);
+    setRenameTarget({ kind, partner, segment, weekKey, current });
+  };
+  const confirmRename = async () => {
+    if (!renameTarget) return;
+    const next = renameValue.trim();
+    if (!next || next === renameTarget.current) { setRenameTarget(null); return; }
+    const { kind, partner, segment, weekKey } = renameTarget;
+    const field = kind === 'week' ? 'weekKey' : 'segment';
+    const matches = (row: WorkspaceBriefing) => row.__meta.partner === partner && row.__meta.segment === segment && (kind === 'segment' || row.__meta.weekKey === weekKey);
+    const targets = rows.filter(matches);
+    if (!targets.length) { setRenameTarget(null); return; }
+    try {
+      const saved = await Promise.all(targets.filter((row) => row.__meta.savedAt).map((row) => saveBriefing({ ...row, __meta: { ...row.__meta, [field]: next, version: row.__meta.version + 1 } }, [kind === 'week' ? `Semana renomeada para "${next}".` : `Régua renomeada para "${next}".`])));
+      setRows((current) => current.map((row) => (matches(row) ? saved.find((item) => item.__id === row.__id) ?? { ...row, __meta: { ...row.__meta, [field]: next } } : row)));
+      if (kind === 'week' && selectedWeek?.partner === partner && selectedWeek.segment === segment && selectedWeek.weekKey === weekKey) setSelectedWeek({ partner, segment, weekKey: next });
+      if (kind === 'segment' && selectedSegment?.partner === partner && selectedSegment.segment === segment) setSelectedSegment({ partner, segment: next });
+      setRenameTarget(null);
+      setAnnouncement(kind === 'week' ? `Semana renomeada para "${next}" em ${targets.length} ${targets.length === 1 ? 'e-mail' : 'e-mails'}.` : `Régua renomeada para "${next}" em ${targets.length} ${targets.length === 1 ? 'e-mail' : 'e-mails'}.`);
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao renomear.'); }
+  };
+  const archiveSegment = async (target: { partner: string; segment: string }) => {
+    const targets = rows.filter((row) => row.__meta.partner === target.partner && row.__meta.segment === target.segment && row.__meta.status !== 'archived');
+    try {
+      const archived = await Promise.all(targets.filter((row) => row.__meta.savedAt).map((row) => saveBriefing({ ...row, __meta: { ...row.__meta, status: 'archived', version: row.__meta.version + 1 } }, [`Régua ${target.segment} arquivada pela árvore editorial.`])));
+      const ids = new Set(targets.map((row) => row.__id));
+      const next = rows.filter((row) => !ids.has(row.__id) || Boolean(row.__meta.savedAt)).map((row) => archived.find((item) => item.__id === row.__id) ?? row);
+      setRows(next); setSelectedSegment(null); setSelectedWeek(null); setSelectedId(next.find((row) => row.__meta.status !== 'archived')?.__id ?? next[0]?.__id ?? '');
+      setAnnouncement(`Régua “${segmentDisplayLabel(target.segment)}” arquivada; e-mails salvos permanecem no histórico.`);
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao arquivar a régua.'); }
+    finally { setSegmentArchiveTarget(null); }
+  };
+  const restoreSegment = async (partner: string, segment: string) => {
+    const targets = rows.filter((row) => row.__meta.partner === partner && row.__meta.segment === segment && row.__meta.status === 'archived');
+    if (!targets.length) { setAnnouncement('Esta régua não tem e-mails arquivados para restaurar.'); return; }
+    try {
+      const restored = await restoreArchivedRows(targets, `Régua ${segment} restaurada do arquivo.`);
+      setSelectedWeek(null); setSelectedSegment({ partner, segment }); setSelectedId(restored[0].__id);
+      setAnnouncement(`Régua “${segmentDisplayLabel(segment)}” restaurada; e-mails voltaram como rascunho.`);
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar a régua.'); }
+  };
   const saveCurrent = async (ready: boolean) => {
     if (!selected || savingRef.current) return;
     savingRef.current = true;
@@ -780,6 +826,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
               onArchiveEmail={(groupId) => { const target = rows.find((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived'); if (target) { setSelectedId(target.__id); setDeleteOpen(true); } }}
               onRestoreWeek={(partner, segment, weekKey) => void restoreWeek({ partner, segment, weekKey })}
               onRestoreEmail={(groupId) => void restoreGroup(groupId)}
+              onRenameWeek={(partner, segment, weekKey) => openRename('week', partner, segment, weekKey)}
+              onRenameSegment={(partner, segment) => openRename('segment', partner, segment)}
+              onDuplicateRulerFromTree={(partner, segment) => { setSelectedWeek(null); setSelectedSegment({ partner, segment }); setDuplicateRulerOpen(true); }}
+              onArchiveSegment={(partner, segment) => setSegmentArchiveTarget({ partner, segment })}
+              onRestoreSegment={(partner, segment) => void restoreSegment(partner, segment)}
             /> : <div className="px-4 py-10 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={24}/><p className="font-semibold text-slate-700">Nenhum briefing encontrado</p><p className="mt-1 text-xs">Ajuste a busca ou o filtro de status.</p></div>}
           </div>
         </aside>
@@ -900,6 +951,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
     />}
     {newOpen && <NewBriefingDialog groups={editorialGroups.filter((group) => group.visibleRows.length)} settings={signatureSettings} taxonomy={taxonomy.filter((item) => item.businessFront === 'acquisition')} defaultPartner={newDefaults.partner} defaultSegment={newDefaults.segment} defaultWeekKey={newDefaults.weekKey} defaultSequence={`E-mail ${activeEditorialGroupCount + 1}`} onClose={() => setNewOpen(false)} onCreate={createBriefing}/>}
     {weekArchiveTarget && <div className="fixed inset-0 z-[75] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-week-title"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="archive-week-title" className="font-bold text-slate-900">Arquivar {weekArchiveTarget.weekKey}?</h2><p className="mt-2 text-sm leading-5 text-slate-600">Todos os e-mails e variações ativos da semana sairão dos próximos CSVs. Registros já salvos continuarão no histórico.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => setWeekArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Cancelar</button><button onClick={() => void archiveWeek(weekArchiveTarget)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">Arquivar semana</button></div></div></div>}
+    {segmentArchiveTarget && <div className="fixed inset-0 z-[75] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-segment-title"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="archive-segment-title" className="font-bold text-slate-900">Arquivar a régua “{segmentDisplayLabel(segmentArchiveTarget.segment)}”?</h2><p className="mt-2 text-sm leading-5 text-slate-600">Todas as semanas e e-mails ativos desta régua sairão dos próximos CSVs. Registros já salvos continuarão no histórico e podem ser restaurados.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => setSegmentArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Cancelar</button><button onClick={() => void archiveSegment(segmentArchiveTarget)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">Arquivar régua</button></div></div></div>}
+    {renameTarget && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="rename-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="rename-title" className="font-bold text-slate-900">{renameTarget.kind === 'week' ? 'Renomear semana' : 'Renomear régua'}</h2><p className="mt-1 text-sm leading-5 text-slate-600">{renameTarget.kind === 'week' ? 'O novo nome vale para todos os e-mails desta semana.' : 'O novo segmento vale para todos os e-mails da régua. Ele fica como rascunho de taxonomia até ser vinculado a um segmento observado em activities.'}</p><label className="mt-3 block text-xs font-semibold text-slate-700">{renameTarget.kind === 'week' ? 'Nome da semana' : 'Segmento técnico'}<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void confirmRename(); }} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"/></label><div className="mt-5 flex justify-end gap-2"><button onClick={() => setRenameTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancelar</button><button disabled={!renameValue.trim() || renameValue.trim() === renameTarget.current} onClick={() => void confirmRename()} className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white hover:bg-[#064c4e] disabled:cursor-not-allowed disabled:opacity-40"><Pencil size={15}/>Salvar</button></div></div></div>}
     {signatureManagerOpen && selected && <SignatureManagerModal rows={rows} selected={selected} settings={signatureSettings} onClose={() => setSignatureManagerOpen(false)} onVariantStatus={(row, status) => void changeVariantStatus(row, status)} onGlobalStatus={(setting, status) => void changeGlobalSignature(setting, status)} onAdd={addSignatureToSelectedGroup}/>}
     {saveOpen && selected && <SaveDialog selected={selected} errors={selectedGroupErrorCount} saving={isSaving} onClose={() => !isSaving && setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>}
     {exportOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="export-csv-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}>
@@ -1024,7 +1077,7 @@ const WeekReviewer = ({ selection, groups, strategies, issuesByRow, selectedId, 
 
 const ReviewMetric = ({ label, value, tone = 'default' }: { label: string; value: React.ReactNode; tone?: 'default' | 'success' | 'warning' | 'danger' }) => { const tones = { default: 'border-slate-200 bg-slate-50 text-slate-800', success: 'border-emerald-200 bg-emerald-50 text-emerald-800', warning: 'border-amber-200 bg-amber-50 text-amber-900', danger: 'border-red-200 bg-red-50 text-red-800' }; return <div className={`rounded-lg border px-3 py-2 ${tones[tone]}`}><div className="text-lg font-extrabold">{value}</div><div className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</div></div>; };
 
-const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail }: { groups: EditorialGroup[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void }) => {
+const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment }: { groups: EditorialGroup[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void; onRenameWeek: (partner: string, segment: string, weekKey: string) => void; onRenameSegment: (partner: string, segment: string) => void; onDuplicateRulerFromTree: (partner: string, segment: string) => void; onArchiveSegment: (partner: string, segment: string) => void; onRestoreSegment: (partner: string, segment: string) => void }) => {
   const [expanded, setExpanded] = useState<Set<string>>(() => { try { const saved = localStorage.getItem('gaas-email-tree-expanded-v1'); return saved ? new Set(JSON.parse(saved)) : new Set(['p:Plurix', 'p:Plurix/s:CRM', 'p:Plurix/s:CRM/w:Semana 1']); } catch { return new Set(); } });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const toggle = (key: string) => setExpanded((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); return next; });
@@ -1048,11 +1101,27 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
       const segmentMenuKey = `menu:${segmentKey}`;
       const segmentSelected = selectedSegment?.partner === partner && selectedSegment.segment === segment;
       const segmentEmailCount = [...weeks.values()].flat().filter((group) => group.visibleRows.length).length;
-      return <div key={segmentKey}><div className={`flex items-center rounded-lg ${segmentSelected ? 'bg-cyan-50 ring-1 ring-cyan-300' : ''}`}><button type="button" onClick={() => toggle(segmentKey)} aria-expanded={expanded.has(segmentKey)} aria-label={`${expanded.has(segmentKey) ? 'Recolher' : 'Expandir'} ${segmentDisplayLabel(segment)}`} className="ml-3 rounded-md p-1.5 text-slate-500 outline-none hover:bg-white focus-visible:ring-2 focus-visible:ring-cyan-500">{expanded.has(segmentKey) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}</button><button type="button" onClick={() => onSelectSegment({ partner, segment })} className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-xs font-bold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><span className="min-w-0 flex-1 truncate">{segmentDisplayLabel(segment)}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{segmentEmailCount} e-mails</span></button><TreeActionMenu label={`Configurar ${segmentDisplayLabel(segment)}`} open={menuOpen === segmentMenuKey} onToggle={() => setMenuOpen((current) => current === segmentMenuKey ? null : segmentMenuKey)} items={[{ label: 'Criar semana', icon: <Plus size={14}/>, onClick: () => { setMenuOpen(null); onNewWeek(partner, segment); } }]}/></div>{expanded.has(segmentKey) && [...weeks.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([week, weekGroups]) => {
+      const segmentGroups = [...weeks.values()].flat();
+      const segmentActive = segmentGroups.some((group) => group.rows.some((row) => row.__meta.status !== 'archived'));
+      const segmentItems: TreeMenuItem[] = [
+        { label: 'Criar semana', icon: <Plus size={14}/>, onClick: () => { setMenuOpen(null); onNewWeek(partner, segment); } },
+        { label: 'Renomear régua', icon: <Pencil size={14}/>, onClick: () => { setMenuOpen(null); onRenameSegment(partner, segment); } },
+      ];
+      if (segmentActive) segmentItems.push(
+        { label: 'Duplicar régua', icon: <Copy size={14}/>, onClick: () => { setMenuOpen(null); onDuplicateRulerFromTree(partner, segment); } },
+        { label: 'Arquivar régua', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveSegment(partner, segment); } },
+      );
+      else if (segmentGroups.some((group) => group.rows.some((row) => row.__meta.status === 'archived'))) segmentItems.push(
+        { label: 'Restaurar régua do arquivo', icon: <ArchiveRestore size={14}/>, onClick: () => { setMenuOpen(null); onRestoreSegment(partner, segment); } },
+      );
+      return <div key={segmentKey}><div className={`flex items-center rounded-lg ${segmentSelected ? 'bg-cyan-50 ring-1 ring-cyan-300' : ''}`}><button type="button" onClick={() => toggle(segmentKey)} aria-expanded={expanded.has(segmentKey)} aria-label={`${expanded.has(segmentKey) ? 'Recolher' : 'Expandir'} ${segmentDisplayLabel(segment)}`} className="ml-3 rounded-md p-1.5 text-slate-500 outline-none hover:bg-white focus-visible:ring-2 focus-visible:ring-cyan-500">{expanded.has(segmentKey) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}</button><button type="button" onClick={() => onSelectSegment({ partner, segment })} className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-xs font-bold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><span className="min-w-0 flex-1 truncate">{segmentDisplayLabel(segment)}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{segmentEmailCount} e-mails</span></button><TreeActionMenu label={`Configurar ${segmentDisplayLabel(segment)}`} open={menuOpen === segmentMenuKey} onToggle={() => setMenuOpen((current) => current === segmentMenuKey ? null : segmentMenuKey)} items={segmentItems}/></div>{expanded.has(segmentKey) && [...weeks.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([week, weekGroups]) => {
         const weekKey = `${segmentKey}/w:${week}`;
         const hasActiveWeek = weekGroups.some((group) => group.rows.some((row) => row.__meta.status !== 'archived'));
         const weekMenuKey = `menu:${weekKey}`;
-        const weekItems: TreeMenuItem[] = [{ label: 'Novo e-mail nesta semana', icon: <Plus size={14}/>, onClick: () => { setMenuOpen(null); onNewEmail(partner, segment, week); } }];
+        const weekItems: TreeMenuItem[] = [
+          { label: 'Novo e-mail nesta semana', icon: <Plus size={14}/>, onClick: () => { setMenuOpen(null); onNewEmail(partner, segment, week); } },
+          { label: 'Renomear semana', icon: <Pencil size={14}/>, onClick: () => { setMenuOpen(null); onRenameWeek(partner, segment, week); } },
+        ];
         if (hasActiveWeek) weekItems.push(
           { label: 'Duplicar semana e e-mails', icon: <Copy size={14}/>, onClick: () => { setMenuOpen(null); onDuplicateWeek(partner, segment, week); } },
           { label: 'Arquivar semana', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveWeek(partner, segment, week); } },
