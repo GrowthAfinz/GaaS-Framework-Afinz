@@ -9,7 +9,7 @@ export const EmailPreviewFrame = ({ html, contextKey, className }: { html: strin
     <iframe
       key={contextKey}
       title="Conteúdo renderizado do e-mail dinâmico"
-      sandbox=""
+      sandbox="allow-same-origin"
       srcDoc={html}
       className={className}
     />

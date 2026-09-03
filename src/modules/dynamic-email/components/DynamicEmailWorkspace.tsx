@@ -64,6 +64,7 @@ import { exportStrategyPlanXlsx } from '../export/strategyPlanXlsx';
 import { CreateRulerDialog, type CreateRulerConfig } from './CreateRulerDialog';
 import { DuplicateRulerDialog, type DuplicateRulerConfig } from './DuplicateRulerDialog';
 import { MoveEmailDialog, type MoveEmailTarget } from './MoveEmailDialog';
+import { PreviewWithStructure, type StructureBlock } from './PreviewWithStructure';
 import { EmailPreviewFrame, emailPreviewContextKey } from './EmailPreviewFrame';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
@@ -142,6 +143,17 @@ const EDITOR_SECTIONS: EditorSection[] = [
 
 const AUDIT_SECTION_ID = 'organizacao';
 const ALL_EDITOR_BLOCK_IDS = [AUDIT_SECTION_ID, ...EDITOR_SECTIONS.map((section) => section.id)];
+
+// Blocos que viram uma região visível na peça renderizada — recebem número no editor e um pino na prévia.
+const STRUCTURE_BLOCKS: { id: string; num: number; label: string; textFields: BriefingColumn[]; imageField?: BriefingColumn }[] = [
+  { id: 'header', num: 1, label: 'Cabeçalho', textFields: [], imageField: 'HEADER' },
+  { id: 'primary', num: 2, label: 'Bloco principal', textFields: ['TITULO_COPY_1_AZUL', 'COPY_1_PRETO', 'TITULO_CTA_1'], imageField: 'BANNER_1_CORPO' },
+  { id: 'secondary', num: 3, label: 'Segundo bloco', textFields: ['TITULO_COPY_2', 'COPY_2_PRETO', 'TITULO_CTA_2'], imageField: 'BANNER_2_CORPO' },
+  { id: 'closing', num: 4, label: 'Encerramento', textFields: [], imageField: 'BANNER_3_CORPO' },
+  { id: 'legal', num: 5, label: 'Info. legais', textFields: ['NOTA_LEGAL', 'RODAPE'] },
+];
+const STRUCTURE_NUM: Record<string, number> = Object.fromEntries(STRUCTURE_BLOCKS.map((block) => [block.id, block.num]));
+const stripHtmlToText = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
 
 function demoRows(): BriefingRow[] {
   const visa = emptyBriefingRow('00000000-0000-4000-8000-000000000001');
@@ -268,6 +280,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [renameValue, setRenameValue] = useState('');
   const [moveTarget, setMoveTarget] = useState<{ groupId: string; label: string; current: { partner: string; segment: string; weekKey: string } } | null>(null);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [editorHoverBlock, setEditorHoverBlock] = useState<string | null>(null);
+  const [railHoverBlock, setRailHoverBlock] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSelection, setExportSelection] = useState<Set<string>>(new Set());
@@ -327,8 +341,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const activeRows = useMemo(() => rows.filter((row) => row.__meta.status !== 'archived'), [rows]);
   const issuesByRow = useMemo(() => validateRows(activeRows), [activeRows]);
   const selected = rows.find((row) => row.__id === selectedId) ?? rows[0];
-  useEffect(() => { setOpenSections(new Set()); }, [selected?.__id]);
+  useEffect(() => { setOpenSections(new Set()); setEditorHoverBlock(null); setRailHoverBlock(null); }, [selected?.__id]);
   const toggleSection = (id: string) => setOpenSections((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const focusStructureBlock = (id: string) => {
+    setOpenSections((current) => (current.has(id) ? current : new Set(current).add(id)));
+    requestAnimationFrame(() => document.getElementById(`eb-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+  const activeStructureBlock = railHoverBlock ?? editorHoverBlock ?? [...openSections].find((id) => id in STRUCTURE_NUM) ?? null;
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
   const linkedTemplateId = selected?.__meta.templateSlotId && templateSlots.some((slot) => slot.id === selected.__meta.templateSlotId)
     ? selected.__meta.templateSlotId
@@ -337,6 +356,21 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
   const render = useMemo(() => previewRow ? renderDynamicEmail(previewTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden' }) : { html: '', diagnostics: [] }, [previewRow, previewTemplate, showMarketingNotes, subscriber]);
   const previewContextKey = emailPreviewContextKey(selected?.__id ?? '', linkedTemplateId);
+  const structureBlocks = useMemo<StructureBlock[]>(() => {
+    const row = previewRow;
+    if (!row) return [];
+    const issueFields = new Set(selectedIssues.map((issue) => issue.field).filter(Boolean) as string[]);
+    return STRUCTURE_BLOCKS.map((block) => {
+      const text = block.textFields.map((field) => stripHtmlToText(row[field] ?? '')).find((value) => value.length > 1) ?? '';
+      const image = block.imageField ? (row[block.imageField] ?? '').trim() : '';
+      const anchor = text
+        ? { kind: 'text' as const, value: text }
+        : /^https?:/i.test(image) ? { kind: 'image' as const, value: image } : null;
+      const ownedFields = [...block.textFields, ...(block.imageField ? [block.imageField] : [])];
+      const status: StructureBlock['status'] = !anchor ? 'empty' : ownedFields.some((field) => issueFields.has(field)) ? 'warning' : 'filled';
+      return { id: block.id, num: block.num, label: block.label, anchor, status };
+    });
+  }, [previewRow, selectedIssues]);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
@@ -873,7 +907,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-3.5 backdrop-blur">
             <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Arquivada · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
           </div>
-          <div className="max-h-[790px] overflow-y-auto p-3.5">
+          <div id="email-editor-scroll" className="max-h-[790px] overflow-y-auto p-3.5">
             <label className="mb-2.5 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
             {selectedIssues.length > 0 && <div className="mb-2.5 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -884,7 +918,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
               </div>
             </div>
             <div className="space-y-2.5">
-              <CollapsibleBlock label="Organização e auditoria" description="Parceiro, segmento, semana e Activity Name usados no CSV e na auditoria." tone="audit" open={openSections.has(AUDIT_SECTION_ID)} onToggle={() => toggleSection(AUDIT_SECTION_ID)}>
+              <CollapsibleBlock id={`eb-${AUDIT_SECTION_ID}`} marker={<BlockMarker/>} label="Organização e auditoria" description="Parceiro, segmento, semana e Activity Name usados no CSV e na auditoria." tone="audit" open={openSections.has(AUDIT_SECTION_ID)} onToggle={() => toggleSection(AUDIT_SECTION_ID)}>
                 <div className="grid gap-2 md:grid-cols-2">
                   <TaxonomySelect label="Parceiro" value={selected.__meta.partner} options={taxonomyOptions.partners} onChange={(value) => updateGroupMeta({ partner: value, segment: '', weekKey: '', activityNames: [], ...(value !== 'Plurix' ? { subgroup: '' } : {}) })}/>
                   <TaxonomySelect label="Segmento" value={selected.__meta.segment} options={taxonomyOptions.segments} onChange={(value) => updateGroupMeta({ segment: value, activityNames: [] })}/>
@@ -897,7 +931,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
               </CollapsibleBlock>
 
               {EDITOR_SECTIONS.map((section) => (
-                <CollapsibleBlock key={section.id} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
+                <CollapsibleBlock key={section.id} id={`eb-${section.id}`} marker={<BlockMarker num={STRUCTURE_NUM[section.id]}/>} focused={activeStructureBlock === section.id} onHoverChange={STRUCTURE_NUM[section.id] ? (hovering) => setEditorHoverBlock(hovering ? section.id : null) : undefined} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
                   {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
                   {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)}/>)}</div>}
                   {section.imageSlot && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')}/></div>}
@@ -946,7 +980,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 </div>
               </div>
               {selected && <div className="border-b border-slate-200 bg-slate-50 px-4 py-3"><div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white"><Mail size={16}/></span><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold leading-5 text-slate-900">{selected.ASSUNTO || 'Assunto não preenchido'}</div><div className="mt-0.5 line-clamp-1 text-xs text-slate-500">{selected.PRE_CABECALHO || 'Sem texto de pré-visualização'}</div><div className="mt-2 text-[11px] text-slate-500">{selected.__meta.partner || 'Parceiro'} · {selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO || 'Assinatura'} · {selected.__meta.segment || selected.TP_CAMPANHA || 'Segmento'} · {selected.SEQUENCIA || 'Sequência'} · Remetente definido no SFMC</div></div></div></div>}
-              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <EmailPreviewFrame html={render.html} contextKey={previewContextKey} className="h-[650px] w-full bg-slate-100"/>}
+              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="h-[650px] w-full bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
             </section>
           </Panel>
         </Group>
@@ -1019,12 +1053,20 @@ export const DynamicEmailWorkspace: React.FC = () => {
   </div>;
 };
 
-const CollapsibleBlock = ({ label, description, open, onToggle, tone = 'default', children }: { label: string; description?: string; open: boolean; onToggle: () => void; tone?: 'default' | 'audit'; children: React.ReactNode }) => (
-  <div className={`overflow-hidden rounded-xl border ${tone === 'audit' ? 'border-cyan-200 bg-cyan-50/40' : 'border-slate-200 bg-white'}`}>
+const CollapsibleBlock = ({ id, label, description, open, onToggle, tone = 'default', marker, focused, onHoverChange, children }: { id?: string; label: string; description?: string; open: boolean; onToggle: () => void; tone?: 'default' | 'audit'; marker?: React.ReactNode; focused?: boolean; onHoverChange?: (hovering: boolean) => void; children: React.ReactNode }) => (
+  <div
+    id={id}
+    onMouseEnter={onHoverChange ? () => onHoverChange(true) : undefined}
+    onMouseLeave={onHoverChange ? () => onHoverChange(false) : undefined}
+    className={`overflow-hidden rounded-xl border transition ${focused ? 'border-cyan-400 ring-2 ring-cyan-200' : tone === 'audit' ? 'border-cyan-200 bg-cyan-50/40' : 'border-slate-200 bg-white'}`}
+  >
     <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left outline-none transition hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500">
-      <div className="min-w-0">
-        <div className={`font-bold ${tone === 'audit' ? 'text-cyan-900' : 'text-slate-800'}`}>{label}</div>
-        {description && <div className="truncate text-xs text-slate-500">{description}</div>}
+      <div className="flex min-w-0 items-center gap-2.5">
+        {marker}
+        <div className="min-w-0">
+          <div className={`font-bold ${tone === 'audit' ? 'text-cyan-900' : 'text-slate-800'}`}>{label}</div>
+          {description && <div className="truncate text-xs text-slate-500">{description}</div>}
+        </div>
       </div>
       <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border text-xs font-bold transition ${open ? 'border-cyan-300 bg-cyan-50 text-cyan-700' : 'border-slate-300 bg-white text-slate-500'}`} aria-hidden="true">
         <ChevronDown size={17} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`}/>
@@ -1032,6 +1074,12 @@ const CollapsibleBlock = ({ label, description, open, onToggle, tone = 'default'
     </button>
     {open && <div className="border-t border-slate-100 px-3.5 py-3">{children}</div>}
   </div>
+);
+
+const BlockMarker = ({ num }: { num?: number }) => (
+  num
+    ? <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cyan-600 text-[11px] font-extrabold text-white">{num}</span>
+    : <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-slate-300 text-slate-400"><Settings2 size={12}/></span>
 );
 
 const HeaderMetric = ({ label, value, icon, tone = 'default' }: { label: string; value: number; icon: React.ReactNode; tone?: 'default' | 'success' | 'danger' | 'warning' }) => {
