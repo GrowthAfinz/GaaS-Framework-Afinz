@@ -13,11 +13,30 @@ export type StructureBlock = {
 const DESKTOP_W = 680; // viewport fixo da prévia — garante o layout desktop do e-mail
 const MAX_CONTENT_H = 9000; // trava defensiva contra template que estica <body> a 100%
 
-const findAnchorEl = (doc: Document, anchor: StructureAnchor): Element | null => {
+// o elemento renderiza de fato? (o pré-cabeçalho fica num <div display:none no
+// topo do <body> — sem esse filtro a busca por texto cai nele e inverte os pinos)
+const isRenderable = (el: Element | null): boolean => {
+  if (!el) return false;
+  const win = el.ownerDocument?.defaultView;
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    const cs = win?.getComputedStyle(node);
+    if (cs && (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse' || cs.opacity === '0')) return false;
+  }
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 || rect.height > 0;
+};
+
+const findAnchorEl = (doc: Document, block: StructureBlock): Element | null => {
+  // 1. marcador determinístico injetado no template antes do render (blockAnchors.ts)
+  const sentinel = doc.querySelector(`[data-eb-block="${block.id}"]`);
+  if (sentinel) return sentinel;
+  // 2. fallback: localizar pela âncora de conteúdo (só quando não há marcador)
+  const anchor = block.anchor;
+  if (!anchor) return null;
   if (anchor.kind === 'image') {
     const url = anchor.value;
     const seg = url.split('/').pop() || '';
-    const imgs = Array.from(doc.querySelectorAll('img'));
+    const imgs = Array.from(doc.querySelectorAll('img')).filter(isRenderable);
     return imgs.find((img) => img.getAttribute('src') === url)
       || imgs.find((img) => img.src === url)
       || (seg.length > 3 ? imgs.find((img) => img.src.includes(seg)) : undefined)
@@ -31,9 +50,9 @@ const findAnchorEl = (doc: Document, anchor: StructureAnchor): Element | null =>
   while ((node = walker.nextNode())) {
     const text = (node.textContent || '').trim().toLowerCase();
     if (text.length < 3) continue;
-    if (needle.startsWith(text.slice(0, 18)) || text.startsWith(key) || text.includes(key)) {
-      return node.parentElement;
-    }
+    if (!(needle.startsWith(text.slice(0, 18)) || text.startsWith(key) || text.includes(key))) continue;
+    if (!isRenderable(node.parentElement)) continue;
+    return node.parentElement;
   }
   return null;
 };
@@ -93,8 +112,7 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
     setContentH((current) => (Math.abs(current - fullH) < 3 ? current : fullH));
     const next: Record<string, number | 'missing'> = {};
     blocks.forEach((block) => {
-      if (!block.anchor) return;
-      const anchorEl = findAnchorEl(doc as Document, block.anchor);
+      const anchorEl = findAnchorEl(doc as Document, block);
       if (!anchorEl) { next[block.id] = 'missing'; return; }
       next[block.id] = anchorEl.getBoundingClientRect().top + (iframe.contentWindow?.scrollY ?? 0);
     });
@@ -149,20 +167,28 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
     };
   }, [measure, html, contextKey]);
 
-  const inView: StructureBlock[] = [];
-  const orphans: StructureBlock[] = [];
-  blocks.forEach((block) => {
-    const top = anchorTops[block.id];
-    if (typeof top !== 'number') { orphans.push(block); return; }
-    inView.push(block);
+  // tops medidos, mas forçados a ser não-decrescentes na ORDEM DECLARADA dos
+  // blocos: mesmo que uma âncora caia no lugar errado, a numeração nunca inverte.
+  const orderedBlocks = [...blocks].sort((a, b) => a.num - b.num);
+  const clampedTops: Record<string, number> = {};
+  let floor = 0;
+  orderedBlocks.forEach((block) => {
+    const raw = anchorTops[block.id];
+    if (typeof raw !== 'number') return;
+    const value = Math.max(raw, floor);
+    clampedTops[block.id] = value;
+    floor = value;
   });
 
+  const inView = orderedBlocks.filter((block) => block.id in clampedTops);
+  const orphans = orderedBlocks.filter((block) => !(block.id in clampedTops));
+
   let band: { top: number; height: number } | null = null;
-  const activeTop = activeBlockId ? anchorTops[activeBlockId] : undefined;
+  const activeTop = activeBlockId ? clampedTops[activeBlockId] : undefined;
   if (typeof activeTop === 'number') {
     const start = activeTop * scale;
     const nextStart = inView
-      .map((block) => (anchorTops[block.id] as number) * scale)
+      .map((block) => clampedTops[block.id] * scale)
       .filter((value) => value > start + 6)
       .sort((a, b) => a - b)[0];
     band = { top: start, height: Math.max(0, ((nextStart ?? visualH) || start + 120) - start) };
@@ -177,7 +203,7 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
         <span className="pointer-events-none absolute inset-y-0 left-[14px] w-px bg-slate-100"/>
         {inView.map((block) => {
           const on = activeBlockId === block.id || openBlockIds.has(block.id);
-          const y = Math.max((anchorTops[block.id] as number) * scale, 12);
+          const y = Math.max(clampedTops[block.id] * scale, 12);
           return (
             <button
               key={block.id}

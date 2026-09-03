@@ -39,6 +39,7 @@ import {
   X,
 } from 'lucide-react';
 import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer';
+import { injectBlockAnchors, type AnchorBlockSpec } from '../ampscript/blockAnchors';
 import {
   applyFix,
   emptyBriefingRow,
@@ -158,6 +159,12 @@ const STRUCTURE_BLOCKS: { id: string; num: number; label: string; textFields: Br
   { id: 'legal', num: 5, label: 'Info. legais', textFields: ['NOTA_LEGAL', 'RODAPE'] },
 ];
 const STRUCTURE_NUM: Record<string, number> = Object.fromEntries(STRUCTURE_BLOCKS.map((block) => [block.id, block.num]));
+// Colunas-assinatura de cada bloco (texto primeiro, imagem como fallback) — usadas
+// para injetar o marcador invisível que ancora o pino da prévia ao bloco certo.
+const STRUCTURE_ANCHOR_SPECS: AnchorBlockSpec[] = STRUCTURE_BLOCKS.map((block) => ({
+  id: block.id,
+  signatureColumns: [...block.textFields, ...(block.imageField ? [block.imageField] : [])],
+}));
 const stripHtmlToText = (value: string) => value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
 // remove AMPscript/handlebars inline (%%=v(@X)=%%, %%[ ... ]%%, {{ x }}) — a prévia renderiza esses tokens
 // resolvidos, então a âncora precisa casar pelo texto literal que sobra.
@@ -419,7 +426,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
     : effectivePrincipalId;
   const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
-  const render = useMemo(() => previewRow ? renderDynamicEmail(previewTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden' }) : { html: '', diagnostics: [] }, [previewRow, previewTemplate, showMarketingNotes, subscriber]);
+  const render = useMemo(() => {
+    if (!previewRow) return { html: '', diagnostics: [] };
+    const anchoredTemplate = injectBlockAnchors(previewTemplate, previewRow, STRUCTURE_ANCHOR_SPECS);
+    return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden' });
+  }, [previewRow, previewTemplate, showMarketingNotes, subscriber]);
   const previewContextKey = emailPreviewContextKey(selected?.__id ?? '', linkedTemplateId);
   const templateActiveCols = useMemo(() => templateActiveColumns(previewTemplate), [previewTemplate]);
   const isColumnEditable = (field: BriefingColumn) => templateActiveCols.size === 0 || templateActiveCols.has(field);
