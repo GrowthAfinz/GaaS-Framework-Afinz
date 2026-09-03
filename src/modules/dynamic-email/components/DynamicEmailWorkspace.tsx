@@ -4,6 +4,7 @@ import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panel
 import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
 import {
   AlertTriangle,
+  ArchiveRestore,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -12,6 +13,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  Eye,
   ImageIcon,
   Images,
   Inbox,
@@ -21,6 +23,7 @@ import {
   Mail,
   MessageSquareText,
   Maximize2,
+  Pencil,
   Plus,
   Printer,
   RefreshCw,
@@ -243,12 +246,22 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [selectedSegment, setSelectedSegment] = useState<SegmentSelection | null>(null);
   const [weekArchiveTarget, setWeekArchiveTarget] = useState<{ partner: string; segment: string; weekKey: string } | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportSelection, setExportSelection] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const templateFileRef = useRef<HTMLInputElement>(null);
   const { defaultLayout: workspaceDefaultLayout, onLayoutChanged: onWorkspaceLayoutChanged } = useDefaultLayout({ id: 'gaas-email-briefing-workspace-v1', storage: localStorage });
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: 'gaas-email-editor-preview-v1', storage: localStorage });
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
+  useEffect(() => {
+    if (!announcement) return;
+    const id = Date.now();
+    setToast({ id, text: announcement });
+    const timer = window.setTimeout(() => setToast((current) => (current?.id === id ? null : current)), 6000);
+    return () => window.clearTimeout(timer);
+  }, [announcement]);
   useEffect(() => {
     localStorage.setItem(TEMPLATE_SLOTS_KEY, JSON.stringify(templateSlots));
     localStorage.setItem(PRIMARY_TEMPLATE_KEY, effectivePrincipalId);
@@ -324,6 +337,21 @@ export const DynamicEmailWorkspace: React.FC = () => {
     .sort((a, b) => naturalLabelSort(a.representative.SEQUENCIA, b.representative.SEQUENCIA)) : [], [editorialGroups, selectedSegment]);
   const errorCount = editorialGroups.filter((group) => group.hasErrors).length;
   const activeEditorialGroupCount = editorialGroups.filter((group) => group.visibleRows.length > 0).length;
+  const rulerExportOptions = useMemo(() => {
+    const map = new Map<string, { key: string; partner: string; segment: string; label: string; total: number; errorGroups: number }>();
+    editorialGroups.forEach((group) => {
+      if (!group.visibleRows.length) return;
+      const partner = group.representative.__meta.partner;
+      const segment = group.representative.__meta.segment;
+      const key = `${partner}|||${segment}`;
+      const current = map.get(key) ?? { key, partner, segment, label: `${partner || 'Sem parceiro'} · ${segmentDisplayLabel(segment || 'Sem segmento')}`, total: 0, errorGroups: 0 };
+      current.total += 1;
+      if (group.hasErrors) current.errorGroups += 1;
+      map.set(key, current);
+    });
+    return [...map.values()].sort((a, b) => naturalLabelSort(a.label, b.label));
+  }, [editorialGroups]);
+  const exportableRulerCount = rulerExportOptions.filter((option) => option.errorGroups === 0).length;
   const exportBlockReason = !rows.length
     ? 'Crie ou importe pelo menos um briefing antes de exportar.'
     : !activeRows.length
@@ -352,12 +380,21 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const updateGroupMeta = (patch: Partial<WorkspaceBriefing['__meta']>) => selected && selected.__meta.status !== 'archived' && setRows((current) => current.map((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId && row.__meta.status !== 'archived' ? { ...row, __meta: { ...row.__meta, ...patch } } : row));
   const updateField = (field: BriefingColumn, value: string) => selected && selected.__meta.status !== 'archived' && setRows((current) => applyWorkspaceField(current, selected.__id, field, value));
   const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? { ...applyFix(row, issue), __meta: row.__meta } : row)); };
-  const exportCsv = () => {
-    if (exportBlockReason) { setAnnouncement(exportBlockReason); return; }
+  const openExport = () => {
+    if (!activeRows.length) { setAnnouncement(exportBlockReason || 'Nada para exportar.'); return; }
+    setExportSelection(new Set(rulerExportOptions.filter((option) => option.errorGroups === 0).map((option) => option.key)));
+    setExportOpen(true);
+  };
+  const confirmExport = () => {
+    const chosen = new Set([...exportSelection].filter((key) => rulerExportOptions.some((option) => option.key === key && option.errorGroups === 0)));
+    const exportRows = rows.filter((row) => row.__meta.status !== 'archived' && chosen.has(`${row.__meta.partner}|||${row.__meta.segment}`));
+    if (!exportRows.length) { setAnnouncement('Selecione ao menos uma régua sem pendências para exportar.'); return; }
     const filename = `TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`;
-    downloadText(filename, exportBriefingCsv(onlyCsvRows(rows)));
-    setAnnouncement(`${filename} gerado para download.`);
-    void recordExport(filename, activeRows, []);
+    downloadText(filename, exportBriefingCsv(onlyCsvRows(exportRows)));
+    const labels = rulerExportOptions.filter((option) => chosen.has(option.key)).map((option) => option.label);
+    setAnnouncement(`${filename} gerado com ${labels.length} ${labels.length === 1 ? 'régua' : 'réguas'}: ${labels.join('; ')}.`);
+    void recordExport(filename, exportRows, []);
+    setExportOpen(false);
   };
   const onFile = async (file?: File) => {
     if (!file) return;
@@ -429,9 +466,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const archived = await Promise.all(targets.filter((row) => row.__meta.savedAt).map((row) => saveBriefing({ ...row, __meta: { ...row.__meta, status: 'archived', version: row.__meta.version + 1 } }, ['E-mail editorial arquivado.'])));
       const targetIds = new Set(targets.map((row) => row.__id));
       const nextRows = rows.filter((row) => !targetIds.has(row.__id) || Boolean(row.__meta.savedAt)).map((row) => archived.find((item) => item.__id === row.__id) ?? row);
-      setRows(nextRows); setSelectedId(nextRows.find((row) => row.__meta.status !== 'archived')?.__id ?? nextRows[0]?.__id ?? ''); setDeleteOpen(false);
+      setRows(nextRows); setSelectedId(nextRows.find((row) => row.__meta.status !== 'archived')?.__id ?? nextRows[0]?.__id ?? '');
       setAnnouncement(archived.length ? 'E-mail editorial arquivado; histórico e versões foram preservados.' : 'Rascunho ainda não salvo removido.');
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao arquivar o e-mail.'); }
+    finally { setDeleteOpen(false); }
   };
   const saveTemplate = async () => {
     const current = templateSlots.find((slot) => slot.id === effectiveSelectedId); if (!current) return;
@@ -514,8 +552,40 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const archived = await Promise.all(targets.filter((row) => row.__meta.savedAt).map((row) => saveBriefing({ ...row, __meta: { ...row.__meta, status: 'archived', version: row.__meta.version + 1 } }, [`${target.weekKey} arquivada pela árvore editorial.`])));
       const ids = new Set(targets.map((row) => row.__id));
       const next = rows.filter((row) => !ids.has(row.__id) || Boolean(row.__meta.savedAt)).map((row) => archived.find((item) => item.__id === row.__id) ?? row);
-      setRows(next); setSelectedId(next.find((row) => row.__meta.status !== 'archived')?.__id ?? next[0]?.__id ?? ''); setWeekArchiveTarget(null); setAnnouncement(`${target.weekKey} arquivada; e-mails salvos permanecem no histórico.`);
+      setRows(next); setSelectedId(next.find((row) => row.__meta.status !== 'archived')?.__id ?? next[0]?.__id ?? ''); setAnnouncement(`${target.weekKey} arquivada; e-mails salvos permanecem no histórico.`);
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao arquivar a semana.'); }
+    finally { setWeekArchiveTarget(null); }
+  };
+  const restoreArchivedRows = async (targets: WorkspaceBriefing[], note: string) => {
+    const restored = await Promise.all(targets.map((row) => saveBriefing({ ...row, __meta: { ...row.__meta, status: 'draft', version: row.__meta.version + 1 } }, [note])));
+    setRows((current) => current.map((row) => restored.find((item) => item.__id === row.__id) ?? row));
+    return restored;
+  };
+  const restoreGroup = async (groupId: string) => {
+    const targets = rows.filter((row) => row.__meta.campaignGroupId === groupId && row.__meta.status === 'archived');
+    if (!targets.length) { setAnnouncement('Este e-mail não tem variações arquivadas para restaurar.'); return; }
+    try {
+      const restored = await restoreArchivedRows(targets, 'E-mail editorial restaurado do arquivo.');
+      setSelectedWeek(null); setSelectedSegment(null); setSelectedId(restored[0].__id);
+      setAnnouncement(`E-mail restaurado do arquivo como rascunho (${restored.length} ${restored.length === 1 ? 'variação' : 'variações'}).`);
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar o e-mail.'); }
+  };
+  const restoreWeek = async (target: { partner: string; segment: string; weekKey: string }) => {
+    const targets = rows.filter((row) => row.__meta.partner === target.partner && row.__meta.segment === target.segment && row.__meta.weekKey === target.weekKey && row.__meta.status === 'archived');
+    if (!targets.length) { setAnnouncement('Esta semana não tem e-mails arquivados para restaurar.'); return; }
+    try {
+      const restored = await restoreArchivedRows(targets, `${target.weekKey} restaurada do arquivo.`);
+      setSelectedId(restored[0].__id);
+      setAnnouncement(`${target.weekKey} restaurada do arquivo; e-mails voltaram como rascunho.`);
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar a semana.'); }
+  };
+  const restoreSelected = async () => {
+    if (!selected || selected.__meta.status !== 'archived') return;
+    try {
+      const [saved] = await restoreArchivedRows([selected], 'Variação restaurada do arquivo.');
+      if (saved) setSelectedId(saved.__id);
+      setAnnouncement('Variação restaurada do arquivo; agora está como rascunho editável.');
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar a variação.'); }
   };
   const saveCurrent = async (ready: boolean) => {
     if (!selected || savingRef.current) return;
@@ -584,6 +654,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
 
   return <div className="min-h-full bg-slate-50 p-4 lg:p-5">
     <div aria-live="polite" className="sr-only">{announcement}</div>
+    {toast && <div className="pointer-events-none fixed inset-x-0 top-4 z-[95] flex justify-center px-4">
+      <div className="pointer-events-auto flex max-w-xl items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-xl">
+        <Info size={16} className="mt-0.5 shrink-0 text-cyan-700"/>
+        <span className="min-w-0">{toast.text}</span>
+        <button type="button" onClick={() => setToast(null)} className="-my-1 ml-1 shrink-0 rounded-md p-1 text-slate-400 outline-none hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label="Fechar aviso"><X size={14}/></button>
+      </div>
+    </div>}
     <header className="rounded-2xl bg-[#07595b] px-5 py-4 text-white shadow-sm lg:px-6" aria-label="Fábrica de E-mails">
       <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
         <div className="min-w-[220px]">
@@ -612,8 +689,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <HeaderAction onClick={() => setRulerOpen(true)} icon={<ListChecks size={15}/>} label="Criar régua"/>
             <HeaderAction onClick={() => openNewBriefing()} icon={<Plus size={15}/>} label="Novo e-mail"/>
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
-            <button disabled={Boolean(exportBlockReason)} onClick={exportCsv} title={exportBlockReason || 'Baixar CSV pronto para importar no SFMC'} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
-            {exportBlockReason && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportBlockReason}</p>}
+            <button disabled={!activeRows.length} onClick={openExport} title={activeRows.length ? 'Escolher réguas e baixar o CSV para o SFMC' : (exportBlockReason || 'Nada para exportar')} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
+            {exportBlockReason && !activeRows.length && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportBlockReason}</p>}
+            {Boolean(activeRows.length) && technicalErrorCount > 0 && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportableRulerCount ? 'Réguas com pendências ficam fora do CSV — escolha as prontas ao exportar.' : `Corrija ${technicalErrorCount} ${technicalErrorCount === 1 ? 'erro bloqueante' : 'erros bloqueantes'} para liberar a exportação.`}</p>}
           </div>}
         </div>
       </div>
@@ -657,6 +735,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
               onArchiveWeek={(partner, segment, weekKey) => setWeekArchiveTarget({ partner, segment, weekKey })}
               onDuplicateEmail={duplicateGroup}
               onArchiveEmail={(groupId) => { const target = rows.find((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived'); if (target) { setSelectedId(target.__id); setDeleteOpen(true); } }}
+              onRestoreWeek={(partner, segment, weekKey) => void restoreWeek({ partner, segment, weekKey })}
+              onRestoreEmail={(groupId) => void restoreGroup(groupId)}
             /> : <div className="px-4 py-10 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={24}/><p className="font-semibold text-slate-700">Nenhum briefing encontrado</p><p className="mt-1 text-xs">Ajuste a busca ou o filtro de status.</p></div>}
           </div>
         </aside>
@@ -707,7 +787,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 </details>;
               })}
             </div>
-            <div className="mt-4 border-t border-slate-200 pt-4"><button type="button" disabled={selected.__meta.status === 'archived'} onClick={() => setSaveOpen(true)} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"><Save size={17}/>{selected.__meta.status === 'archived' ? 'Variante arquivada' : 'Salvar briefing'}</button><p className="mt-2 text-center text-xs text-slate-500">{selected.__meta.status === 'archived' ? 'Restaure esta assinatura no gerenciador para voltar a editá-la.' : 'Salve o rascunho ou marque como pronto depois de revisar todos os blocos.'}</p></div>
+            <div className="mt-4 border-t border-slate-200 pt-4">{selected.__meta.status === 'archived'
+              ? <><button type="button" onClick={() => void restoreSelected()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><ArchiveRestore size={17}/>Desarquivar e voltar a editar</button><p className="mt-2 text-center text-xs text-slate-500">A variação volta como rascunho, com todo o histórico de versões preservado.</p></>
+              : <><button type="button" onClick={() => setSaveOpen(true)} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={17}/>Salvar briefing</button><p className="mt-2 text-center text-xs text-slate-500">Salve o rascunho ou marque como pronto depois de revisar todos os blocos.</p></>}</div>
           </div>
         </section> : <div/>}
           </Panel>
@@ -767,7 +849,35 @@ export const DynamicEmailWorkspace: React.FC = () => {
     {newOpen && <NewBriefingDialog groups={editorialGroups.filter((group) => group.visibleRows.length)} settings={signatureSettings} taxonomy={taxonomy.filter((item) => item.businessFront === 'acquisition')} defaultPartner={newDefaults.partner} defaultSegment={newDefaults.segment} defaultWeekKey={newDefaults.weekKey} defaultSequence={`E-mail ${activeEditorialGroupCount + 1}`} onClose={() => setNewOpen(false)} onCreate={createBriefing}/>}
     {weekArchiveTarget && <div className="fixed inset-0 z-[75] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-week-title"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="archive-week-title" className="font-bold text-slate-900">Arquivar {weekArchiveTarget.weekKey}?</h2><p className="mt-2 text-sm leading-5 text-slate-600">Todos os e-mails e variações ativos da semana sairão dos próximos CSVs. Registros já salvos continuarão no histórico.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => setWeekArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Cancelar</button><button onClick={() => void archiveWeek(weekArchiveTarget)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">Arquivar semana</button></div></div></div>}
     {signatureManagerOpen && selected && <SignatureManagerModal rows={rows} selected={selected} settings={signatureSettings} onClose={() => setSignatureManagerOpen(false)} onVariantStatus={(row, status) => void changeVariantStatus(row, status)} onGlobalStatus={(setting, status) => void changeGlobalSignature(setting, status)} onAdd={addSignatureToSelectedGroup}/>}
-    {saveOpen && selected && <SaveDialog selected={selected} errors={selectedGroupErrorCount} saving={isSaving} onClose={() => !isSaving && setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>} 
+    {saveOpen && selected && <SaveDialog selected={selected} errors={selectedGroupErrorCount} saving={isSaving} onClose={() => !isSaving && setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>}
+    {exportOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="export-csv-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}>
+      <div className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-2xl">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-50 text-cyan-700"><Download size={18}/></span>
+          <div className="min-w-0"><h2 id="export-csv-title" className="font-bold text-slate-900">Exportar CSV para o SFMC</h2><p className="mt-1 text-sm leading-5 text-slate-600">Escolha quais réguas entram no arquivo <code className="rounded bg-slate-100 px-1 text-[11px]">TB_BRIEFING_CAMPANHA_AQUISICAO</code>. Réguas com pendências bloqueantes não podem ser exportadas.</p></div>
+        </div>
+        <div className="mt-4 min-h-0 flex-1 space-y-1.5 overflow-y-auto">
+          {rulerExportOptions.map((option) => {
+            const blocked = option.errorGroups > 0;
+            const checked = exportSelection.has(option.key) && !blocked;
+            return <label key={option.key} className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 text-sm ${blocked ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-70' : checked ? 'cursor-pointer border-cyan-300 bg-cyan-50/60' : 'cursor-pointer border-slate-200 hover:border-cyan-200'}`}>
+              <input type="checkbox" disabled={blocked} checked={checked} onChange={(event) => setExportSelection((current) => { const next = new Set(current); if (event.target.checked) next.add(option.key); else next.delete(option.key); return next; })} className="mt-0.5 h-4 w-4 accent-cyan-600"/>
+              <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900">{option.label}</span><span className="mt-0.5 block text-xs text-slate-500">{option.total} {option.total === 1 ? 'e-mail' : 'e-mails'}{blocked ? ` · ${option.errorGroups} com pendência bloqueante` : ''}</span></span>
+              {blocked ? <ShieldAlert size={15} className="mt-0.5 shrink-0 text-red-500"/> : <CheckCircle2 size={15} className={`mt-0.5 shrink-0 ${checked ? 'text-cyan-600' : 'text-slate-300'}`}/>}
+            </label>;
+          })}
+          {!rulerExportOptions.length && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Nenhuma régua ativa para exportar.</p>}
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <button type="button" onClick={() => setExportSelection(new Set(rulerExportOptions.filter((option) => option.errorGroups === 0).map((option) => option.key)))} className="text-xs font-bold text-cyan-700 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-cyan-500">Selecionar todas as prontas</button>
+          <span className="text-xs text-slate-500">{[...exportSelection].filter((key) => rulerExportOptions.some((option) => option.key === key && option.errorGroups === 0)).length} selecionada(s)</span>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" onClick={() => setExportOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button>
+          <button type="button" onClick={confirmExport} disabled={![...exportSelection].some((key) => rulerExportOptions.some((option) => option.key === key && option.errorGroups === 0))} className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-cyan-700 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Download size={15}/>Baixar CSV</button>
+        </div>
+      </div>
+    </div>}
   </div>;
 };
 
@@ -856,13 +966,13 @@ const WeekReviewer = ({ selection, groups, strategies, issuesByRow, selectedId, 
     <header className="border-b border-slate-200 bg-white px-4 py-3.5"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><ListChecks size={18} className="text-cyan-700"/><h2 className="font-bold text-slate-900">{fullRuler ? 'Revisor da régua completa' : 'Revisor de e-mails'}</h2></div><p className="mt-1 text-xs text-slate-500">{selection.partner} · {segmentDisplayLabel(selection.segment)}{selection.weekKey ? ` · ${selection.weekKey}` : ' · E-mails 1 a 8'}</p></div>{onDuplicate && onNewEmail && <div className="flex flex-wrap gap-2"><button type="button" onClick={onDuplicate} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:border-cyan-300"><Copy size={14}/>Duplicar semana</button><button type="button" onClick={onNewEmail} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-[#07595b] px-3 text-xs font-bold text-white"><Plus size={14}/>Criar e-mail</button></div>}</div>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5"><ReviewMetric label="E-mails" value={groups.length}/><ReviewMetric label="Prontos" value={`${readyCount}/${groups.length}`} tone={readyCount === groups.length ? 'success' : 'warning'}/><ReviewMetric label="Estratégia" value={`${enrichedCount}/${groups.length}`} tone={enrichedCount === groups.length ? 'success' : 'warning'}/><ReviewMetric label="Assets únicos" value={totalAssets}/><ReviewMetric label="Pendências únicas" value={summaries.reduce((total, item) => total + item.issues.filter((issue) => issue.severity === 'error').length, 0)} tone="danger"/></div>
     </header>
-    <div className="max-h-[790px] overflow-auto p-3.5"><div className="mb-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs text-cyan-950"><b>Revisão da régua:</b> selecione uma linha para atualizar a prévia à direita; use “Editar” para abrir o briefing completo.</div><div className="overflow-hidden rounded-xl border border-slate-200"><div className="hidden grid-cols-[56px_minmax(150px,0.75fr)_minmax(220px,1.4fr)_72px_88px_88px] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500 xl:grid"><span>Ordem</span><span>E-mail</span><span>Mensagem</span><span>Assets</span><span>Variações</span><span>Ação</span></div>{summaries.map(({ group, representative, issues, assetCount, ready }, index) => { const selected = group.visibleRows.some((row) => row.__id === selectedId); const errorCount = issues.filter((issue) => issue.severity === 'error').length; return <article key={group.id} className={`grid gap-3 border-b border-slate-100 p-3 last:border-b-0 xl:grid-cols-[56px_minmax(150px,0.75fr)_minmax(220px,1.4fr)_72px_88px_88px] ${selected ? 'bg-cyan-50' : 'bg-white hover:bg-slate-50'}`}><button type="button" onClick={() => onSelect(representative.__id)} className="contents text-left"><span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-xs font-extrabold text-slate-700">{index + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-900">{representative.SEQUENCIA || `E-mail ${index + 1}`}</span><span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-extrabold ${ready ? 'bg-emerald-100 text-emerald-800' : errorCount ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>{ready ? 'Pronto' : errorCount ? `${errorCount} ajustes` : 'Revisar'}</span></span><span className="min-w-0"><span className="block line-clamp-2 text-xs font-bold leading-4 text-slate-900">{representative.ASSUNTO || 'Assunto não preenchido'}</span><span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-slate-500">{representative.PRE_CABECALHO || 'Pré-cabeçalho não preenchido'}</span></span><span className="text-xs font-bold text-slate-700">{assetCount}</span><span className="text-xs font-bold text-slate-700">{group.visibleRows.length}</span></button><button type="button" onClick={() => onEdit(representative.__id)} className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 text-[10px] font-bold text-cyan-800 hover:border-cyan-300 hover:bg-white"><ExternalLink size={12}/>Editar</button></article>; })}</div>{!groups.length && <div className="py-16 text-center text-sm text-slate-500"><Mail className="mx-auto mb-2 text-slate-300"/><b>Nenhum e-mail ativo nesta semana.</b><p className="mt-1 text-xs">Crie o primeiro e-mail para iniciar a revisão.</p></div>}</div>
+    <div className="max-h-[790px] overflow-auto p-3.5"><div className="mb-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs text-cyan-950"><b>Revisão da régua:</b> clique numa linha para atualizar a prévia à direita; use <b>“Editar e-mail”</b> para abrir o editor completo desse e-mail.</div><div className="overflow-hidden rounded-xl border border-slate-200"><div className="hidden grid-cols-[52px_minmax(140px,0.7fr)_minmax(200px,1.3fr)_60px_74px] gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500 xl:grid"><span>Ordem</span><span>E-mail</span><span>Mensagem</span><span>Assets</span><span>Variações</span></div>{summaries.map(({ group, representative, issues, assetCount, ready }, index) => { const selected = group.visibleRows.some((row) => row.__id === selectedId); const errorCount = issues.filter((issue) => issue.severity === 'error').length; const editId = group.visibleRows.find((row) => row.__id === selectedId)?.__id ?? representative.__id; return <article key={group.id} className={`border-b border-slate-100 last:border-b-0 ${selected ? 'bg-cyan-50' : 'bg-white'}`}><button type="button" onClick={() => onSelect(representative.__id)} className={`grid w-full gap-3 p-3 text-left xl:grid-cols-[52px_minmax(140px,0.7fr)_minmax(200px,1.3fr)_60px_74px] ${selected ? '' : 'hover:bg-slate-50'}`}><span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-xs font-extrabold text-slate-700">{index + 1}</span><span className="min-w-0"><span className="block truncate text-sm font-bold text-slate-900">{representative.SEQUENCIA || `E-mail ${index + 1}`}</span><span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[9px] font-extrabold ${ready ? 'bg-emerald-100 text-emerald-800' : errorCount ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>{ready ? 'Pronto' : errorCount ? `${errorCount} ajustes` : 'Revisar'}</span></span><span className="min-w-0"><span className="block line-clamp-2 text-xs font-bold leading-4 text-slate-900">{representative.ASSUNTO || 'Assunto não preenchido'}</span><span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-slate-500">{representative.PRE_CABECALHO || 'Pré-cabeçalho não preenchido'}</span></span><span className="text-xs font-bold text-slate-700">{assetCount}<span className="ml-1 text-[10px] font-normal text-slate-400 xl:hidden">assets</span></span><span className="text-xs font-bold text-slate-700">{group.visibleRows.length}<span className="ml-1 text-[10px] font-normal text-slate-400 xl:hidden">variações</span></span></button><div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/70 px-3 py-2"><span className="min-w-0 truncate text-[11px] text-slate-500">{representative.__meta.subgroup || representative.NM_PRODUTO_INTERNO || 'Régua'}</span><div className="flex shrink-0 gap-2"><button type="button" onClick={() => onSelect(representative.__id)} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-600 outline-none hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500"><Eye size={13}/>Ver prévia</button><button type="button" onClick={() => onEdit(editId)} className="inline-flex h-8 items-center gap-1 rounded-lg bg-[#07595b] px-3 text-[11px] font-bold text-white outline-none hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500"><Pencil size={13}/>Editar e-mail</button></div></div></article>; })}</div>{!groups.length && <div className="py-16 text-center text-sm text-slate-500"><Mail className="mx-auto mb-2 text-slate-300"/><b>Nenhum e-mail ativo nesta semana.</b><p className="mt-1 text-xs">Crie o primeiro e-mail para iniciar a revisão.</p></div>}</div>
   </section>;
 };
 
 const ReviewMetric = ({ label, value, tone = 'default' }: { label: string; value: React.ReactNode; tone?: 'default' | 'success' | 'warning' | 'danger' }) => { const tones = { default: 'border-slate-200 bg-slate-50 text-slate-800', success: 'border-emerald-200 bg-emerald-50 text-emerald-800', warning: 'border-amber-200 bg-amber-50 text-amber-900', danger: 'border-red-200 bg-red-50 text-red-800' }; return <div className={`rounded-lg border px-3 py-2 ${tones[tone]}`}><div className="text-lg font-extrabold">{value}</div><div className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</div></div>; };
 
-const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail }: { groups: EditorialGroup[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void }) => {
+const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail }: { groups: EditorialGroup[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void }) => {
   const [expanded, setExpanded] = useState<Set<string>>(() => { try { const saved = localStorage.getItem('gaas-email-tree-expanded-v1'); return saved ? new Set(JSON.parse(saved)) : new Set(['p:Plurix', 'p:Plurix/s:CRM', 'p:Plurix/s:CRM/w:Semana 1']); } catch { return new Set(); } });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const toggle = (key: string) => setExpanded((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); return next; });
@@ -895,6 +1005,9 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
           { label: 'Duplicar semana e e-mails', icon: <Copy size={14}/>, onClick: () => { setMenuOpen(null); onDuplicateWeek(partner, segment, week); } },
           { label: 'Arquivar semana', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveWeek(partner, segment, week); } },
         );
+        if (!hasActiveWeek && weekGroups.some((group) => group.rows.some((row) => row.__meta.status === 'archived'))) weekItems.push(
+          { label: 'Restaurar semana do arquivo', icon: <ArchiveRestore size={14}/>, onClick: () => { setMenuOpen(null); onRestoreWeek(partner, segment, week); } },
+        );
         const weekSelected = selectedWeek?.partner === partner && selectedWeek.segment === segment && selectedWeek.weekKey === week;
         return <div key={weekKey}><div className={`flex items-center rounded-lg ${weekSelected ? 'bg-cyan-50 ring-1 ring-cyan-300' : ''}`}><button type="button" onClick={() => toggle(weekKey)} aria-expanded={expanded.has(weekKey)} aria-label={`${expanded.has(weekKey) ? 'Recolher' : 'Expandir'} ${week}`} className="ml-6 rounded-md p-1.5 text-slate-500 outline-none hover:bg-white focus-visible:ring-2 focus-visible:ring-cyan-500">{expanded.has(weekKey) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}</button><button type="button" onClick={() => onSelectWeek({ partner, segment, weekKey: week })} className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-xs font-bold text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><span className="min-w-0 flex-1 truncate">{week}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{weekGroups.length}</span></button><TreeActionMenu label={`Configurar ${week}`} open={menuOpen === weekMenuKey} onToggle={() => setMenuOpen((current) => current === weekMenuKey ? null : weekMenuKey)} items={weekItems}/></div>{expanded.has(weekKey) && weekGroups.sort((a, b) => naturalLabelSort(a.representative.SEQUENCIA, b.representative.SEQUENCIA)).map((group) => {
           const groupKey = `${weekKey}/e:${group.id}`;
@@ -905,6 +1018,9 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
           if (active.length) emailItems.push(
             { label: 'Duplicar e-mail', icon: <Copy size={14}/>, onClick: () => { setMenuOpen(null); onDuplicateEmail(group.id); } },
             { label: 'Arquivar e-mail', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveEmail(group.id); } },
+          );
+          else if (group.rows.some((row) => row.__meta.status === 'archived')) emailItems.push(
+            { label: 'Restaurar e-mail do arquivo', icon: <ArchiveRestore size={14}/>, onClick: () => { setMenuOpen(null); onRestoreEmail(group.id); } },
           );
           const isPlurix = group.representative.__meta.partner === 'Plurix';
           return <div key={group.id} className={`ml-8 mt-1 rounded-xl border ${selectedGroup ? 'border-cyan-300 bg-cyan-50' : 'border-slate-200 bg-white'}`}><div className="flex items-center gap-1 p-1"><button type="button" onClick={() => { toggle(groupKey); const target = active.find((row) => row.NM_PRODUTO_INTERNO.toUpperCase() === 'AMIGAO') ?? active[0] ?? group.rows[0]; onSelect(target.__id); }} aria-expanded={expanded.has(groupKey)} className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-left outline-none hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-cyan-500">{expanded.has(groupKey) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#07595b] text-[10px] font-extrabold text-white">{initials(group.representative.__meta.partner)}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{group.representative.SEQUENCIA || 'E-mail'}</span><span className="block text-[10px] text-slate-500">{isPlurix ? `${active.length}/${PLURIX_SIGNATURES.length} assinaturas ativas` : `${group.representative.__meta.subgroup || 'Régua'} · ${active.length} versão ativa`}</span></span>{group.hasErrors ? <CircleAlert size={14} className="text-red-600"/> : <CheckCircle2 size={14} className="text-emerald-600"/>}</button><TreeActionMenu label={`Configurar ${group.representative.SEQUENCIA}`} open={menuOpen === emailMenuKey} onToggle={() => setMenuOpen((current) => current === emailMenuKey ? null : emailMenuKey)} items={emailItems}/></div>{expanded.has(groupKey) && <div className="border-t border-slate-100 bg-white/70 p-1.5">{group.rows.filter((row) => showArchived || row.__meta.status !== 'archived').map((row) => <button type="button" key={row.__id} onClick={() => onSelect(row.__id)} className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-xs outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500 ${row.__id === selectedId ? 'bg-cyan-100 font-bold text-cyan-950' : row.__meta.status === 'archived' ? 'text-slate-400 line-through' : 'text-slate-700'}`}><span className={`h-2 w-2 rounded-full ${row.__meta.status === 'archived' ? 'bg-slate-300' : 'bg-emerald-500'}`}/><span className="min-w-0 flex-1 truncate">{row.__meta.subgroup || row.NM_PRODUTO_INTERNO}</span><span className="text-[10px]">{row.__meta.status === 'archived' ? 'Arquivada' : 'Ativa'}</span></button>)}</div>}</div>;
