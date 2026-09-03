@@ -74,6 +74,8 @@ const LEGACY_TEMPLATE_SLOTS_KEY = 'gaas-dynamic-email-template-slots-v4';
 const OLDER_TEMPLATE_SLOTS_KEYS = ['gaas-dynamic-email-template-slots-v3', 'gaas-dynamic-email-template-slots-v2'];
 const PRIMARY_TEMPLATE_KEY = 'gaas-dynamic-email-primary-template-v2';
 const ROWS_KEY = 'gaas-dynamic-email-briefings-v1';
+const COLS_KEY = 'gaas-email-factory-cols-v1';
+const DEFAULT_COLS: [number, number, number] = [1.15, 2.55, 2.1];
 const SAMPLE: SubscriberSample = { CPF: '00000000000', PRI_NOME: 'VANIA', LIMITE: 'R$ 3.500', PRODUTO: 'INSTITUCIONAL', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'Repescagem' };
 const LONG_FIELDS = new Set<BriefingColumn>(['COPY_1_PRETO', 'COPY_2_PRETO', 'NOTA_LEGAL', 'RODAPE', 'PRE_CABECALHO']);
 const COLOR_FIELDS = new Set<BriefingColumn>(['COR_COPY_1', 'COR_COPY_PRETO_1', 'COR_TITULO_COPY_2', 'COR_COPY_2', 'COR_NOTA_LEGAL']);
@@ -290,6 +292,52 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const templateFileRef = useRef<HTMLInputElement>(null);
+  const workspaceGridRef = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState<[number, number, number]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(COLS_KEY) || 'null');
+      if (Array.isArray(stored) && stored.length === 3 && stored.every((value) => typeof value === 'number' && value > 0)) {
+        return stored as [number, number, number];
+      }
+    } catch { /* ignore */ }
+    return [...DEFAULT_COLS] as [number, number, number];
+  });
+  useEffect(() => { localStorage.setItem(COLS_KEY, JSON.stringify(cols)); }, [cols]);
+  const startColDrag = (edge: 0 | 1) => (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const grid = workspaceGridRef.current;
+    if (!grid) return;
+    const width = grid.getBoundingClientRect().width;
+    if (width <= 0) return;
+    const startX = event.clientX;
+    const base = [...cols] as [number, number, number];
+    const total = base[0] + base[1] + base[2];
+    const minFr = total * 0.13;
+    const left = edge;
+    const right = edge + 1;
+    const onMove = (moveEvent: PointerEvent) => {
+      const deltaFr = ((moveEvent.clientX - startX) / width) * total;
+      let nextLeft = base[left] + deltaFr;
+      let nextRight = base[right] - deltaFr;
+      if (nextLeft < minFr) { nextRight -= minFr - nextLeft; nextLeft = minFr; }
+      if (nextRight < minFr) { nextLeft -= minFr - nextRight; nextRight = minFr; }
+      const next = [...base] as [number, number, number];
+      next[left] = nextLeft;
+      next[right] = nextRight;
+      setCols(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.removeProperty('cursor');
+      document.body.style.removeProperty('user-select');
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+  const resetCols = () => setCols([...DEFAULT_COLS] as [number, number, number]);
 
   useEffect(() => { localStorage.setItem(ROWS_KEY, JSON.stringify(rows)); }, [rows]);
   useEffect(() => {
@@ -862,11 +910,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
-      <div className="h-[calc(var(--screen-h,900px)_-_180px)] min-h-[480px] overflow-y-auto overflow-x-hidden overscroll-contain pr-1 [scrollbar-gutter:stable]">
-      <div className="grid items-stretch gap-3 grid-cols-[minmax(210px,264px)_minmax(0,1.3fr)_minmax(0,1fr)] pb-1">
+      <div className="h-[calc(var(--screen-h,900px)_-_172px)] min-h-[480px] overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]">
+      <div ref={workspaceGridRef} className="grid items-start pb-1" style={{ gridTemplateColumns: `minmax(0,${cols[0]}fr) auto minmax(0,${cols[1]}fr) auto minmax(0,${cols[2]}fr)` }}>
         <div className="min-w-0">
-        <aside className="sticky top-4 flex max-h-[calc(var(--screen-h,900px)_-_104px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
-          <div className="shrink-0 border-b border-slate-200 p-3.5">
+        <aside className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
+          <div className="border-b border-slate-200 p-3.5">
             <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredGroups.length} de {activeEditorialGroupCount} e-mails · {activeRows.length} variantes ativas</p></div><Inbox className="text-cyan-700" size={18}/></div>
             <label className="mt-3 flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-cyan-400 focus-within:bg-white">
               <Search size={15}/><span className="sr-only">Buscar briefings</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar parceiro, campanha..." className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"/>
@@ -876,7 +924,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
               <button onClick={() => { setShowArchived(true); setStatusFilter('all'); setSelectedWeek(null); setSelectedSegment(null); setSelectedId(rows.find((row) => row.__meta.status === 'archived')?.__id ?? ''); }} aria-pressed={showArchived} className={`min-h-8 rounded-md px-2.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${showArchived ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}>Lixeira</button>
             </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
+          <div className="p-2.5">
             <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">Parceiro › segmento › semana › e-mail › assinaturas</div>
             {(filteredGroups.length || emptyPartnerSlots.length) ? <BriefingTree
               groups={filteredGroups} emptyPartnerSlots={emptyPartnerSlots} selectedId={selected?.__id ?? ''} selectedWeek={selectedWeek} selectedSegment={selectedSegment} showArchived={showArchived}
@@ -911,8 +959,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
         </aside>
         </div>
 
-        {selectedSegment ? <div className="min-w-0"><WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)}/></div> : selectedWeek ? <div className="min-w-0"><WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)}/></div> : selected ? <section id="email-editor-panel" className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
-          <div className="sticky top-4 z-30 rounded-t-2xl border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+        <ResizeHandle label="Ajustar largura da Caixa de briefings" onPointerDown={startColDrag(0)} onReset={resetCols}/>
+
+        {selectedSegment ? <div className="min-w-0"><WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)}/></div> : selectedWeek ? <div className="min-w-0"><WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)}/></div> : selected ? <section id="email-editor-panel" className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
+          <div className="rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3">
             <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Na Lixeira · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
           </div>
           <div id="email-editor-scroll" className="p-3.5">
@@ -954,14 +1004,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
               })}
             </div>
           </div>
-          <div className="sticky bottom-3 z-30 mx-3 mb-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-2.5 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] backdrop-blur">{selected.__meta.status === 'archived'
-            ? <button type="button" onClick={() => void restoreSelected()} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-2.5 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><ArchiveRestore size={16}/>Desarquivar e voltar a editar</button>
-            : <button type="button" onClick={() => setSaveOpen(true)} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-2.5 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar briefing{selectedGroupErrorCount > 0 && <span className="rounded-full bg-white/20 px-1.5 text-[11px]">{selectedGroupErrorCount} pend.</span>}</button>}</div>
+          <div className="sticky bottom-0 z-30 rounded-b-2xl border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-6px_20px_-4px_rgba(15,23,42,0.15)]">{selected.__meta.status === 'archived'
+            ? <button type="button" onClick={() => void restoreSelected()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><ArchiveRestore size={16}/>Desarquivar e voltar a editar</button>
+            : <><button type="button" onClick={() => setSaveOpen(true)} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white shadow-sm outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar briefing{selectedGroupErrorCount > 0 && <span className="rounded-full bg-white/20 px-1.5 text-[11px]">{selectedGroupErrorCount} pend.</span>}</button><p className="mt-1.5 text-center text-[11px] text-slate-500">Salve o rascunho ou marque como pronto depois de revisar os blocos.</p></>}</div>
         </section> : <div/>}
 
+        <ResizeHandle label="Ajustar largura do editor e da prévia" onPointerDown={startColDrag(1)} onReset={resetCols}/>
+
         <div className="min-w-0">
-            <section id="email-preview-panel" className="sticky top-4 flex max-h-[calc(var(--screen-h,900px)_-_104px)] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
-              <div className="shrink-0 border-b border-slate-200 bg-white px-3 py-2.5">
+            <section id="email-preview-panel" className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
+              <div className="border-b border-slate-200 bg-white px-3 py-2.5">
                 <div className="grid items-start gap-2 min-[1500px]:grid-cols-[minmax(220px,1fr)_auto]">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900">Prévia do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span><span className={`rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide ${showMarketingNotes ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{showMarketingNotes ? 'Observações MKT' : 'E-mail projetado'}</span></div>
@@ -987,11 +1039,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
                   <MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
                 </div>
               </div>
-              {selected && <div className="shrink-0 space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
+              {selected && <div className="space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
                 <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
                 <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{selected.PRE_CABECALHO || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo do e-mail</span>}</span></div>
               </div>}
-              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="min-h-[300px] flex-1 bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
+              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="min-h-[300px] bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
             </section>
         </div>
       </div>
@@ -1089,6 +1141,21 @@ const CollapsibleBlock = ({ id, label, description, open, onToggle, tone = 'defa
       </span>
     </button>
     {open && <div className="border-t border-slate-100 px-3.5 py-3">{children}</div>}
+  </div>
+);
+
+const ResizeHandle = ({ label, onPointerDown, onReset }: { label: string; onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void; onReset: () => void }) => (
+  <div
+    role="separator"
+    aria-orientation="vertical"
+    aria-label={label}
+    title="Arraste para ajustar a largura. Dois cliques para restaurar."
+    onPointerDown={onPointerDown}
+    onDoubleClick={onReset}
+    className="group/handle relative z-20 flex w-3 shrink-0 cursor-col-resize touch-none select-none justify-center self-stretch outline-none"
+  >
+    <span className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-200 transition group-hover/handle:bg-cyan-400"/>
+    <span className="pointer-events-none sticky top-[calc(50%-1.25rem)] my-3 h-10 w-1.5 self-start rounded-full border border-slate-300 bg-white shadow-sm transition group-hover/handle:border-cyan-500 group-hover/handle:bg-cyan-50"/>
   </div>
 );
 

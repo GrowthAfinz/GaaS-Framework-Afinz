@@ -11,6 +11,7 @@ export type StructureBlock = {
 };
 
 const DESKTOP_W = 680; // viewport fixo da prévia — garante o layout desktop do e-mail
+const MAX_CONTENT_H = 9000; // trava defensiva contra template que estica <body> a 100%
 
 const findAnchorEl = (doc: Document, anchor: StructureAnchor): Element | null => {
   if (anchor.kind === 'image') {
@@ -37,6 +38,24 @@ const findAnchorEl = (doc: Document, anchor: StructureAnchor): Element | null =>
   return null;
 };
 
+// mede a extensão REAL do conteúdo do e-mail, ignorando <html>/<body> esticados a 100%
+// (senão a altura do iframe realimenta o scrollHeight e cresce sem parar)
+const measureContentHeight = (doc: Document): number => {
+  const body = doc.body;
+  if (!body) return 0;
+  const kids = Array.from(body.children) as HTMLElement[];
+  let extent = 0;
+  if (kids.length) {
+    const bodyTop = body.getBoundingClientRect().top;
+    for (const el of kids) {
+      const bottom = el.getBoundingClientRect().bottom - bodyTop;
+      if (Number.isFinite(bottom)) extent = Math.max(extent, bottom);
+    }
+  }
+  if (extent < 40) extent = Math.min(body.scrollHeight || 0, doc.documentElement?.scrollHeight || 0) || extent;
+  return Math.min(Math.max(Math.round(extent), 200), MAX_CONTENT_H);
+};
+
 export const PreviewWithStructure = ({ html, contextKey, className, blocks, activeBlockId, openBlockIds, onSelectBlock, onHoverBlock }: {
   html: string;
   contextKey: string;
@@ -50,26 +69,28 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
   const boxRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const rafRef = useRef<number>();
+  const lastWidthRef = useRef(0);
+  // âncora de cada bloco em px do documento do e-mail (sem escala)
   const [anchorTops, setAnchorTops] = useState<Record<string, number | 'missing'>>({});
-  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [boxW, setBoxW] = useState(0);
   const [contentH, setContentH] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
-  // escala que faz a peça inteira caber na área da prévia (poster) — sem scroll interno
-  const scale = box.w > 0
-    ? Math.min(1, box.w / DESKTOP_W, contentH > 0 ? Math.max(0.001, (box.h - 6) / contentH) : 1)
-    : 1;
+  // a escala só encaixa a largura — a altura fica 100% natural, sem scroll interno
+  const scale = boxW > 0 ? Math.min(1, boxW / DESKTOP_W) : 1;
+  const visualH = (contentH || 600) * scale;
 
   const measure = useCallback(() => {
     const iframe = iframeRef.current;
     const el = boxRef.current;
     if (!iframe || !el) return;
-    setBox((current) => (current.w === el.clientWidth && current.h === el.clientHeight ? current : { w: el.clientWidth, h: el.clientHeight }));
+    lastWidthRef.current = el.clientWidth;
+    setBoxW((current) => (current === el.clientWidth ? current : el.clientWidth));
     let doc: Document | null = null;
     try { doc = iframe.contentDocument; } catch { doc = null; }
     if (!doc || !doc.body) { setAnchorTops({}); return; }
-    const fullH = Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body.scrollHeight ?? 0);
-    setContentH((current) => (Math.abs(current - fullH) < 2 ? current : fullH));
+    const fullH = measureContentHeight(doc);
+    setContentH((current) => (Math.abs(current - fullH) < 3 ? current : fullH));
     const next: Record<string, number | 'missing'> = {};
     blocks.forEach((block) => {
       if (!block.anchor) return;
@@ -96,7 +117,15 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(measure);
     };
-    const boxObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+    // só re-mede quando a LARGURA muda — mudança de altura viria da própria medição
+    const boxObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver((entries) => {
+          const width = entries[0]?.contentRect.width ?? el.clientWidth;
+          if (Math.abs(width - lastWidthRef.current) < 1) return;
+          lastWidthRef.current = width;
+          schedule();
+        })
+      : null;
     boxObserver?.observe(el);
     let docObserver: ResizeObserver | null = null;
     const onLoad = () => {
@@ -104,10 +133,9 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
       docObserver?.disconnect();
       try {
         const doc = iframe.contentDocument;
-        if (doc?.documentElement && typeof ResizeObserver !== 'undefined') {
+        if (doc?.body && typeof ResizeObserver !== 'undefined') {
           docObserver = new ResizeObserver(schedule);
-          docObserver.observe(doc.documentElement);
-          if (doc.body) docObserver.observe(doc.body);
+          docObserver.observe(doc.body);
         }
         doc?.addEventListener('load', schedule, true);
       } catch { /* sandboxed */ }
@@ -121,7 +149,6 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
     };
   }, [measure, html, contextKey]);
 
-  const viewH = box.h;
   const inView: StructureBlock[] = [];
   const orphans: StructureBlock[] = [];
   blocks.forEach((block) => {
@@ -138,19 +165,19 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
       .map((block) => (anchorTops[block.id] as number) * scale)
       .filter((value) => value > start + 6)
       .sort((a, b) => a - b)[0];
-    band = { top: start, height: Math.max(0, ((nextStart ?? contentH * scale) || start + 120) - start) };
+    band = { top: start, height: Math.max(0, ((nextStart ?? visualH) || start + 120) - start) };
   }
 
   const pinClass = (block: StructureBlock, on: boolean) =>
     `relative grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-extrabold shadow-sm transition ${on ? 'border-cyan-600 bg-cyan-600 text-white' : block.status === 'warning' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-cyan-300 bg-white text-cyan-800 group-hover/pin:border-cyan-500'}`;
 
   return (
-    <div className={`flex ${className}`}>
+    <div className={`flex ${className}`} style={{ minHeight: Math.max(300, visualH) }}>
       <div className="relative w-[30px] shrink-0 border-r border-slate-200 bg-white">
         <span className="pointer-events-none absolute inset-y-0 left-[14px] w-px bg-slate-100"/>
         {inView.map((block) => {
           const on = activeBlockId === block.id || openBlockIds.has(block.id);
-          const y = Math.min(Math.max((anchorTops[block.id] as number) * scale, 12), Math.max(12, viewH - 12));
+          const y = Math.max((anchorTops[block.id] as number) * scale, 12);
           return (
             <button
               key={block.id}
@@ -181,7 +208,7 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
         </div>}
       </div>
 
-      <div ref={boxRef} className="relative min-w-0 flex-1 overflow-hidden bg-slate-100">
+      <div ref={boxRef} className="relative min-w-0 flex-1 overflow-hidden bg-slate-100" style={{ height: visualH }}>
         <iframe
           ref={iframeRef}
           key={contextKey}
@@ -189,7 +216,7 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
           sandbox="allow-same-origin"
           scrolling="no"
           srcDoc={html}
-          style={{ position: 'absolute', top: 0, left: 0, width: DESKTOP_W, height: (contentH || box.h || 600) + 4, transform: `scale(${scale})`, transformOrigin: 'top left' }}
+          style={{ position: 'absolute', top: 0, left: 0, width: DESKTOP_W, height: contentH || 600, transform: `scale(${scale})`, transformOrigin: 'top left' }}
           className={`border-0 bg-white transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         />
         {band && band.height > 6 && (
