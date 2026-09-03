@@ -10,9 +10,6 @@ export type StructureBlock = {
   templateLocked?: boolean;
 };
 
-type Placement = { visibleTop: number; docTop: number };
-
-const RAIL_W = 30;
 const DESKTOP_W = 680; // largura fixa do viewport da prévia — garante o layout desktop do e-mail
 
 const findAnchorEl = (doc: Document, anchor: StructureAnchor): Element | null => {
@@ -53,8 +50,11 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
   const boxRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const rafRef = useRef<number>();
-  const [placements, setPlacements] = useState<Record<string, Placement | 'missing'>>({});
+  // âncora de cada bloco em px do documento do e-mail (sem escala, sem scroll interno)
+  const [anchorTops, setAnchorTops] = useState<Record<string, number | 'missing'>>({});
   const [box, setBox] = useState({ w: 0, h: 0 });
+  const [contentH, setContentH] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
   const scale = box.w > 0 ? Math.min(1, box.w / DESKTOP_W) : 1;
@@ -63,28 +63,27 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
     const iframe = iframeRef.current;
     const el = boxRef.current;
     if (!iframe || !el) return;
-    const nextBox = { w: el.clientWidth, h: el.clientHeight };
-    setBox((current) => (current.w === nextBox.w && current.h === nextBox.h ? current : nextBox));
+    setBox((current) => (current.w === el.clientWidth && current.h === el.clientHeight ? current : { w: el.clientWidth, h: el.clientHeight }));
+    setScrollTop(el.scrollTop);
     let doc: Document | null = null;
     try { doc = iframe.contentDocument; } catch { doc = null; }
-    if (!doc || !doc.body) { setPlacements({}); return; }
-    let scrollY = 0;
-    try { scrollY = iframe.contentWindow?.scrollY ?? 0; } catch { scrollY = 0; }
-    const next: Record<string, Placement | 'missing'> = {};
+    if (!doc || !doc.body) { setAnchorTops({}); return; }
+    const fullH = Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body.scrollHeight ?? 0);
+    setContentH((current) => (Math.abs(current - fullH) < 2 ? current : fullH));
+    const next: Record<string, number | 'missing'> = {};
     blocks.forEach((block) => {
       if (!block.anchor) return;
       const anchorEl = findAnchorEl(doc as Document, block.anchor);
       if (!anchorEl) { next[block.id] = 'missing'; return; }
-      const rect = anchorEl.getBoundingClientRect();
-      next[block.id] = { visibleTop: rect.top, docTop: rect.top + scrollY };
+      next[block.id] = anchorEl.getBoundingClientRect().top + (iframe.contentWindow?.scrollY ?? 0);
     });
-    setPlacements(next);
+    setAnchorTops(next);
   }, [blocks]);
 
   useLayoutEffect(() => {
     setLoaded(false);
     const raf = requestAnimationFrame(measure);
-    const timers = [300, 900, 1800].map((delay) => window.setTimeout(measure, delay));
+    const timers = [250, 700, 1500, 2600].map((delay) => window.setTimeout(measure, delay));
     return () => { cancelAnimationFrame(raf); timers.forEach(window.clearTimeout); };
   }, [measure, html, contextKey]);
 
@@ -97,27 +96,40 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(measure);
     };
-    iframe.addEventListener('load', schedule);
-    const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
-    resizeObserver?.observe(el);
-    let win: Window | null = null;
-    let doc: Document | null = null;
-    try { win = iframe.contentWindow; doc = iframe.contentDocument; } catch { win = null; doc = null; }
-    win?.addEventListener('scroll', schedule, { passive: true });
-    doc?.addEventListener('load', schedule, true);
+    const onBoxScroll = () => setScrollTop(el.scrollTop);
+    el.addEventListener('scroll', onBoxScroll, { passive: true });
+    const boxObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+    boxObserver?.observe(el);
+
+    let docObserver: ResizeObserver | null = null;
+    const onLoad = () => {
+      schedule();
+      docObserver?.disconnect();
+      try {
+        const doc = iframe.contentDocument;
+        if (doc?.documentElement && typeof ResizeObserver !== 'undefined') {
+          docObserver = new ResizeObserver(schedule);
+          docObserver.observe(doc.documentElement);
+          if (doc.body) docObserver.observe(doc.body);
+        }
+        doc?.addEventListener('load', schedule, true);
+      } catch { /* sandboxed */ }
+    };
+    iframe.addEventListener('load', onLoad);
+    onLoad(); // caso o srcDoc já tenha carregado antes do listener
     return () => {
-      iframe.removeEventListener('load', schedule);
-      resizeObserver?.disconnect();
-      win?.removeEventListener('scroll', schedule);
-      doc?.removeEventListener('load', schedule, true);
+      iframe.removeEventListener('load', onLoad);
+      el.removeEventListener('scroll', onBoxScroll);
+      boxObserver?.disconnect();
+      docObserver?.disconnect();
     };
   }, [measure, html, contextKey]);
 
   useEffect(() => {
     if (!activeBlockId) return;
-    const placement = placements[activeBlockId];
-    if (!placement || placement === 'missing') return;
-    try { iframeRef.current?.contentWindow?.scrollTo({ top: Math.max(0, placement.docTop - 48), behavior: 'smooth' }); } catch { /* sandboxed */ }
+    const top = anchorTops[activeBlockId];
+    if (typeof top !== 'number') return;
+    boxRef.current?.scrollTo({ top: Math.max(0, top * scale - 48), behavior: 'smooth' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBlockId]);
 
@@ -127,23 +139,23 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
   const below: StructureBlock[] = [];
   const orphans: StructureBlock[] = [];
   blocks.forEach((block) => {
-    const placement = placements[block.id];
-    if (!block.anchor || placement === 'missing' || !placement) { orphans.push(block); return; }
-    const top = placement.visibleTop * scale;
-    if (top < -14) above.push(block);
-    else if (top > viewH + 14) below.push(block);
+    const top = anchorTops[block.id];
+    if (typeof top !== 'number') { orphans.push(block); return; }
+    const y = top * scale - scrollTop;
+    if (y < -14) above.push(block);
+    else if (y > viewH + 14) below.push(block);
     else inView.push(block);
   });
 
   let band: { top: number; height: number } | null = null;
-  const activePlacement = activeBlockId ? placements[activeBlockId] : null;
-  if (activePlacement && activePlacement !== 'missing') {
-    const top = Math.max(0, activePlacement.visibleTop * scale);
-    const nextTop = inView
-      .map((block) => (placements[block.id] as Placement).visibleTop * scale)
-      .filter((value) => value > activePlacement.visibleTop * scale + 6)
-      .sort((a, b) => a - b)[0] ?? viewH;
-    band = { top, height: Math.max(0, Math.min(viewH, nextTop) - top) };
+  const activeTop = activeBlockId ? anchorTops[activeBlockId] : undefined;
+  if (typeof activeTop === 'number') {
+    const start = activeTop * scale;
+    const nextStart = blocks
+      .map((block) => anchorTops[block.id])
+      .filter((value): value is number => typeof value === 'number' && value * scale > start + 6)
+      .sort((a, b) => a - b)[0];
+    band = { top: start, height: Math.max(0, ((nextStart ? nextStart * scale : contentH * scale) || start + 120) - start) };
   }
 
   const pinClass = (block: StructureBlock, on: boolean) =>
@@ -168,9 +180,8 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
         <span className="pointer-events-none absolute inset-y-0 left-[14px] w-px bg-slate-100"/>
         {above.length > 0 && <div className="absolute left-1 top-1 flex flex-col gap-1">{above.map((block) => offBtn(block, '↑'))}</div>}
         {inView.map((block) => {
-          const placement = placements[block.id] as Placement;
           const on = activeBlockId === block.id || openBlockIds.has(block.id);
-          const top = Math.min(Math.max(placement.visibleTop * scale, 12), Math.max(12, viewH - 12));
+          const y = Math.min(Math.max((anchorTops[block.id] as number) * scale - scrollTop, 12), Math.max(12, viewH - 12));
           return (
             <button
               key={block.id}
@@ -179,7 +190,7 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
               onMouseLeave={() => onHoverBlock(null)}
               onClick={() => onSelectBlock(block.id)}
               className="group/pin absolute left-1 outline-none"
-              style={{ top, transform: 'translateY(-50%)' }}
+              style={{ top: y, transform: 'translateY(-50%)' }}
               title={`Ir para o bloco “${block.label}”`}
             >
               <span className={pinClass(block, on)}>
@@ -202,19 +213,23 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
         </div>}
       </div>
 
-      <div ref={boxRef} className="relative min-w-0 flex-1 overflow-hidden bg-slate-100">
-        <iframe
-          ref={iframeRef}
-          key={contextKey}
-          title="Conteúdo renderizado do e-mail dinâmico"
-          sandbox="allow-same-origin"
-          srcDoc={html}
-          style={{ width: DESKTOP_W, height: box.h > 0 ? box.h / scale : '100%', transform: `scale(${scale})`, transformOrigin: 'top left' }}
-          className={`bg-white transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-        />
-        {band && band.height > 6 && (
-          <div className="pointer-events-none absolute inset-x-0 z-10 border-y-2 border-cyan-400/70 bg-cyan-300/[0.12]" style={{ top: band.top, height: band.height }}/>
-        )}
+      <div ref={boxRef} className="relative min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-slate-100 [scrollbar-width:thin]">
+        {/* wrapper com a altura VISUAL (escalada) do e-mail — é ele que o container rola */}
+        <div className="relative" style={{ height: (contentH || box.h || 600) * scale }}>
+          <iframe
+            ref={iframeRef}
+            key={contextKey}
+            title="Conteúdo renderizado do e-mail dinâmico"
+            sandbox="allow-same-origin"
+            scrolling="no"
+            srcDoc={html}
+            style={{ position: 'absolute', top: 0, left: 0, width: DESKTOP_W, height: (contentH || box.h || 600) + 4, transform: `scale(${scale})`, transformOrigin: 'top left' }}
+            className={`block border-0 bg-white transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          />
+          {band && band.height > 6 && (
+            <div className="pointer-events-none absolute inset-x-0 z-10 border-y-2 border-cyan-400/70 bg-cyan-300/[0.12]" style={{ top: band.top, height: band.height }}/>
+          )}
+        </div>
       </div>
     </div>
   );
