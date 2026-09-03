@@ -142,6 +142,28 @@ export async function saveProductContext(context: ProductContext): Promise<Produ
   return contextFromRow(data);
 }
 
+// Só grava colunas que já existem no banco antes da migration `20260904120000`.
+// category / value_exact / citation_status / source_type ficam para a fase do sync.
+export async function saveProductGuardrail(guardrail: ProductGuardrail): Promise<ProductGuardrail> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('Sessão autenticada necessária para salvar a regra.');
+  const payload = {
+    title: guardrail.title.trim(),
+    rule_text: guardrail.ruleText.trim(),
+    severity: guardrail.severity,
+    allowed_status: guardrail.allowedStatus,
+    evidence: guardrail.evidence?.trim() || null,
+    source_url: guardrail.sourceUrl?.trim() || null,
+    valid_from: guardrail.validFrom?.slice(0, 10) || null,
+    valid_to: guardrail.validTo?.slice(0, 10) || null,
+    updated_by: auth.user.id,
+  };
+  const { data, error } = await supabase.from('dynamic_email_product_guardrails')
+    .update(payload).eq('id', guardrail.id).eq('version', guardrail.version).select().single();
+  if (error) throw new Error(error.code === 'PGRST116' ? 'A regra mudou em outra sessão. Recarregue antes de salvar.' : error.message);
+  return guardrailFromRow(data);
+}
+
 export async function loadExternalReviews(): Promise<{ runs: ExternalReviewRun[]; suggestions: ExternalSuggestion[] }> {
   const [runsResult, suggestionsResult] = await Promise.all([
     supabase.from('dynamic_email_ai_analysis_runs').select('*').order('created_at', { ascending: false }).limit(100),

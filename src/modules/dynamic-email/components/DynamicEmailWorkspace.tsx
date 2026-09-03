@@ -61,7 +61,7 @@ import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normali
 import { projectMarketingPreview } from '../domain/previewProjection';
 import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadLegalTexts, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveDraftEmailFactorySegment, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
 import { countConfiguredStrategyFields, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy, type ExternalReviewRun, type ExternalSuggestion, type ProductContext, type ProductGuardrail } from '../domain/management';
-import { createRulerManagementPlan, decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy, saveProductContext } from '../services/managementService';
+import { createRulerManagementPlan, decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy, saveProductContext, saveProductGuardrail } from '../services/managementService';
 import { exportStrategyPlanXlsx } from '../export/strategyPlanXlsx';
 import { CreateRulerDialog, type CreateRulerConfig } from './CreateRulerDialog';
 import { DuplicateRulerDialog, type DuplicateRulerConfig } from './DuplicateRulerDialog';
@@ -925,7 +925,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       </div>
     </header>
 
-    {mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
+    {mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedGuardrail={(saved) => setProductGuardrails((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
@@ -1497,21 +1497,50 @@ const CITATION_LABEL: Record<string, { label: string; cls: string }> = {
 };
 const citationOf = (g: ProductGuardrail) => CITATION_LABEL[g.citationStatus ?? ({ allowed: 'pode', conditional: 'cuidado', blocked: 'nao' }[g.allowedStatus] ?? 'checar')] ?? CITATION_LABEL.checar;
 
-const RecapField = ({ label, value, editing, onChange, list, full }: { label: string; value?: string; editing: boolean; onChange: (v: string) => void; list?: boolean; full?: boolean }) => <div className={full ? 'sm:col-span-2' : ''}>
-  <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</div>
+const RecapField = ({ label, value, editing, onChange, onLabel, list, full, rows, hint }: { label: string; value?: string; editing: boolean; onChange: (v: string) => void; onLabel?: React.ReactNode; list?: boolean; full?: boolean; rows?: number; hint?: string }) => <div className={full ? 'sm:col-span-2' : ''}>
+  <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}{onLabel}</div>
   {editing
-    ? <textarea value={value ?? ''} onChange={(event) => onChange(event.target.value)} rows={list ? 3 : 2} className="mt-0.5 w-full resize-y rounded-lg border border-cyan-300 px-2 py-1 text-[11px] leading-4 text-slate-800 outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"/>
-    : (list && value ? <div className="flex flex-wrap gap-1">{value.split('\n').filter(Boolean).map((item, index) => <span key={index} className="rounded bg-cyan-100 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-800">{item}</span>)}</div> : <div className={`text-[11px] leading-4 ${value ? 'text-slate-700' : 'italic text-amber-600'}`}>{value || 'definir'}</div>)}
+    ? <><textarea value={value ?? ''} onChange={(event) => onChange(event.target.value)} rows={rows ?? (list ? 3 : 2)} className="mt-0.5 w-full resize-y rounded-lg border border-cyan-300 px-2 py-1 text-[11px] leading-4 text-slate-800 outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"/>{hint && <p className="mt-0.5 text-[9px] leading-3 text-slate-400">{hint}</p>}</>
+    : (list && value ? <div className="flex flex-wrap gap-1">{value.split('\n').filter(Boolean).map((item, index) => <span key={index} className="rounded bg-cyan-100 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-800">{item}</span>)}</div> : <div className={`whitespace-pre-wrap text-[11px] leading-4 ${value ? 'text-slate-700' : 'italic text-amber-600'}`}>{value || 'definir'}</div>)}
 </div>;
 
-const ProductRecap = ({ context, guardrails, productName, onSaved }: { context: ProductContext | null; guardrails: ProductGuardrail[]; productName: string; onSaved: (context: ProductContext) => void }) => {
+const GUARDRAIL_TYPE_LABEL: Record<string, string> = { benefit: 'Benefício', claim: 'Alegação', eligibility: 'Elegibilidade', legal: 'Legal', visual: 'Visual', tone: 'Tom', deeplink: 'Deeplink', prohibited: 'Proibição' };
+const SEVERITY_OPT: [ProductGuardrail['severity'], string][] = [['hard_block', 'Bloqueia publicação'], ['requires_review', 'Exige validação'], ['advisory', 'Orientação']];
+const ALLOWED_OPT: [ProductGuardrail['allowedStatus'], string][] = [['allowed', 'Liberado'], ['conditional', 'Condicional'], ['blocked', 'Bloqueado']];
+const severityBadge = (s: ProductGuardrail['severity']) => s === 'hard_block' ? { label: 'BLOQUEIA', cls: 'bg-red-100 text-red-700' } : s === 'requires_review' ? { label: 'VALIDAR', cls: 'bg-amber-100 text-amber-800' } : { label: 'ORIENTA', cls: 'bg-slate-100 text-slate-600' };
+
+const GuardrailEditor = ({ guardrail, onSaved, onClose }: { guardrail: ProductGuardrail; onSaved: (guardrail: ProductGuardrail) => void; onClose: () => void }) => {
+  const [draft, setDraft] = useState(guardrail);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  useEffect(() => { setDraft(guardrail); }, [guardrail.id, guardrail.version]);
+  const set = (patch: Partial<ProductGuardrail>) => setDraft((current) => ({ ...current, ...patch }));
+  const inp = 'mt-0.5 w-full rounded border border-cyan-300 px-2 py-1 text-[11px] text-slate-800 outline-none focus-visible:ring-2 focus-visible:ring-cyan-100';
+  const save = async () => { setSaving(true); setErr(''); try { onSaved(await saveProductGuardrail(draft)); onClose(); } catch (error) { setErr(error instanceof Error ? error.message : 'Falha ao salvar.'); } finally { setSaving(false); } };
+  return <div className="mt-1 rounded-lg border border-cyan-300 bg-cyan-50/40 p-2">
+    <div className="grid gap-1.5 sm:grid-cols-2">
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400 sm:col-span-2">Título<input value={draft.title} onChange={(event) => set({ title: event.target.value })} className={inp}/></label>
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400 sm:col-span-2">Regra — o que fazer / não fazer<textarea rows={2} value={draft.ruleText} onChange={(event) => set({ ruleText: event.target.value })} className={`${inp} resize-y leading-4`}/></label>
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Severidade<select value={draft.severity} onChange={(event) => set({ severity: event.target.value as ProductGuardrail['severity'] })} className={inp}>{SEVERITY_OPT.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Pode usar<select value={draft.allowedStatus} onChange={(event) => set({ allowedStatus: event.target.value as ProductGuardrail['allowedStatus'] })} className={inp}>{ALLOWED_OPT.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Vigente de<input type="date" value={(draft.validFrom ?? '').slice(0, 10)} onChange={(event) => set({ validFrom: event.target.value || undefined })} className={inp}/></label>
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Vigente até<input type="date" value={(draft.validTo ?? '').slice(0, 10)} onChange={(event) => set({ validTo: event.target.value || undefined })} className={inp}/></label>
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400 sm:col-span-2">Evidência — quem/o quê confirma<textarea rows={2} value={draft.evidence ?? ''} onChange={(event) => set({ evidence: event.target.value || undefined })} className={`${inp} resize-y leading-4`}/></label>
+      <label className="text-[9px] font-bold uppercase tracking-wide text-slate-400 sm:col-span-2">URL da fonte<input value={draft.sourceUrl ?? ''} onChange={(event) => set({ sourceUrl: event.target.value || undefined })} className={inp}/></label>
+    </div>
+    <div className="mt-1.5 flex items-center justify-end gap-2 text-[11px] font-bold">{err && <span className="font-normal text-red-600">{err}</span>}<button type="button" onClick={onClose} className="text-slate-500 hover:underline">descartar</button><button type="button" disabled={saving} onClick={() => void save()} className="text-cyan-700 hover:underline disabled:opacity-40">{saving ? 'salvando…' : 'salvar'}</button></div>
+  </div>;
+};
+
+const ProductRecap = ({ context, guardrails, productName, onSaved, onSavedGuardrail }: { context: ProductContext | null; guardrails: ProductGuardrail[]; productName: string; onSaved: (context: ProductContext) => void; onSavedGuardrail: (guardrail: ProductGuardrail) => void }) => {
   const [open, setOpen] = useState(() => { try { return localStorage.getItem('gaas-plano-recap-open-v1') !== '0'; } catch { return true; } });
   useEffect(() => { try { localStorage.setItem('gaas-plano-recap-open-v1', open ? '1' : '0'); } catch { /* ignore */ } }, [open]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProductContext | null>(context);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
-  useEffect(() => { setDraft(context); setEditing(false); setErr(''); }, [context?.id, context?.version]);
+  const [editingGuardrail, setEditingGuardrail] = useState<string | null>(null);
+  useEffect(() => { setDraft(context); setEditing(false); setErr(''); setEditingGuardrail(null); }, [context?.id, context?.version]);
 
   const benefits = guardrails.filter((item) => item.guardrailType === 'benefit');
   const rules = guardrails.filter((item) => item.guardrailType !== 'benefit');
@@ -1529,12 +1558,32 @@ const ProductRecap = ({ context, guardrails, productName, onSaved }: { context: 
     catch (error) { setErr(error instanceof Error ? error.message : 'Falha ao salvar.'); }
     finally { setSaving(false); }
   };
+  const guardrailRow = (guardrail: ProductGuardrail, extra?: React.ReactNode) => {
+    if (editingGuardrail === guardrail.id) return <GuardrailEditor key={guardrail.id} guardrail={guardrail} onSaved={onSavedGuardrail} onClose={() => setEditingGuardrail(null)}/>;
+    const vg = benefitVigencia(guardrail);
+    return <div key={guardrail.id} className={`group/gr grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-b border-slate-100 py-1 last:border-b-0 ${vg.tone === 'expired' ? 'opacity-70' : ''}`}>
+      <span className="min-w-0 text-[11px] leading-4">
+        <span className={`font-semibold ${vg.tone === 'expired' ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{guardrail.title}</span>
+        {guardrail.valueExact && <span className="text-slate-500"> — {guardrail.valueExact}</span>}
+        {guardrail.ruleText && guardrail.ruleText.trim() && guardrail.ruleText.trim() !== guardrail.title.trim() && <span className="block text-[10px] text-slate-400">{guardrail.ruleText}</span>}
+        {guardrail.evidence && <span className="block text-[10px] text-slate-400"><b>Evidência:</b> {guardrail.evidence}</span>}
+        {extra}
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-0.5 text-[9px] font-bold">
+        {guardrail.guardrailType === 'benefit'
+          ? <><span className={`rounded px-1.5 py-0.5 ${vg.tone === 'ok' ? 'bg-emerald-50 text-emerald-700' : vg.tone === 'expired' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-500'}`}>{vg.label}</span><span className={`rounded px-1.5 py-0.5 ${citationOf(guardrail).cls}`}>{citationOf(guardrail).label}</span></>
+          : <span className={`rounded px-1.5 py-0.5 ${severityBadge(guardrail.severity).cls}`}>{severityBadge(guardrail.severity).label}</span>}
+        {guardrail.sourceUrl && <a href={guardrail.sourceUrl} target="_blank" rel="noreferrer" className="text-cyan-700 hover:underline">fonte ↗</a>}
+        <button type="button" onClick={() => setEditingGuardrail(guardrail.id)} className="text-slate-400 opacity-0 transition group-hover/gr:opacity-100 hover:text-cyan-700 focus-visible:opacity-100"><Pencil size={11}/></button>
+      </span>
+    </div>;
+  };
 
   return <section className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-white">
     <button type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500">
       <span className="flex min-w-0 flex-wrap items-center gap-2">
         {open ? <ChevronDown size={14} className="shrink-0 text-cyan-700"/> : <ChevronRight size={14} className="shrink-0 text-cyan-700"/>}
-        <b className="text-sm text-slate-900">Recap do produto — {productName}</b>
+        <b className="text-sm text-slate-900">Ficha de Produto — {productName}</b>
         {context
           ? <span className="text-[11px] font-semibold text-slate-500">{vigentes} benefícios vigentes{expirados ? ` · ${expirados} expirado${expirados > 1 ? 's' : ''}` : ''}{blockRules ? ` · ${blockRules} regra${blockRules > 1 ? 's' : ''} que bloqueia${blockRules > 1 ? 'm' : ''}` : ''}</span>
           : <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">sem ficha cadastrada</span>}
@@ -1543,7 +1592,7 @@ const ProductRecap = ({ context, guardrails, productName, onSaved }: { context: 
     </button>
 
     {open && <div className="border-t border-cyan-100 p-3">
-      {!context && <p className="text-xs text-slate-500">Nenhuma ficha de produto cadastrada para <b>{productName}</b>. Cadastre uma ou peça a uma IA autorizada para preencher (via chat, nunca automático).</p>}
+      {!context && <p className="text-xs text-slate-500">Nenhuma Ficha de Produto cadastrada para <b>{productName}</b>. Cadastre uma ou peça a uma IA autorizada para preencher (via chat, nunca automático) — guia de redação em <code className="rounded bg-slate-100 px-1">Afinz-CRM-Midia-Vault/04-Operacao/Ficha-de-Produto-Guia.md</code>.</p>}
       {context && draft && <>
         <div className="flex items-start justify-between gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Identidade · o suco do produto <span className="ml-1 font-normal text-slate-400">v{context.version}</span></span>
@@ -1552,15 +1601,15 @@ const ProductRecap = ({ context, guardrails, productName, onSaved }: { context: 
             : <button type="button" onClick={() => setEditing(true)} className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800"><Pencil size={10} className="mr-1 inline"/>editar</button>}
         </div>
         <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
-          <RecapField label="Proposta de valor" value={draft.valueProposition} editing={editing} onChange={(value) => set({ valueProposition: value })} full/>
+          <RecapField label="Proposta de valor" value={draft.valueProposition} editing={editing} onChange={(value) => set({ valueProposition: value })} full rows={2} hint="Uma frase: o benefício central + a âncora mental do cliente."/>
           <RecapField label="Diferenciais (um por linha)" value={draft.differentiators.join('\n')} editing={editing} list onChange={(value) => set({ differentiators: value.split('\n').map((item) => item.trim()).filter(Boolean) })}/>
-          <RecapField label="Público elegível" value={draft.eligibleAudience} editing={editing} onChange={(value) => set({ eligibleAudience: value })}/>
-          <RecapField label="Tom de voz" value={draft.toneOfVoice} editing={editing} onChange={(value) => set({ toneOfVoice: value })}/>
-          <RecapField label="Contexto de marca" value={draft.brandContext} editing={editing} onChange={(value) => set({ brandContext: value })}/>
-          <RecapField label="Fonte" value={draft.provenance} editing={editing} onChange={(value) => set({ provenance: value })}/>
+          <RecapField label="Tom de voz" value={draft.toneOfVoice} editing={editing} onChange={(value) => set({ toneOfVoice: value })} rows={3} hint="Como falar e como não falar. Palavras a usar/evitar."/>
+          <RecapField label="Público elegível" value={draft.eligibleAudience} editing={editing} onChange={(value) => set({ eligibleAudience: value })} full rows={3} hint="Quem é, o que conhece, o que NÃO conhece, e o tamanho do público endereçável (ex.: 800K+ CPFs; não confundir com a base do Clube)."/>
+          <RecapField label="Contexto de marca" value={draft.brandContext} editing={editing} onChange={(value) => set({ brandContext: value })} full rows={5} hint="História, posicionamento, o que a marca representa, relação com o parceiro/emissor, o que a marca NÃO é. Vários parágrafos — não uma frase."/>
+          <RecapField label="Fonte / proveniência" value={draft.provenance} editing={editing} onChange={(value) => set({ provenance: value })}/>
         </div>
         {context.sourceUrl && !editing && <a href={context.sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[10px] font-bold text-cyan-700 hover:underline">fonte ↗</a>}
-        <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Ficha, benefícios e regras também podem ser preenchidos por uma IA autorizada a ler o Supabase — via chat, nunca automático. Toda alteração fica versionada.</p>
+        <p className="mt-1.5 text-[10px] leading-4 text-slate-400">Ficha, benefícios e regras também podem ser preenchidos por uma IA autorizada a ler o Supabase — via chat, nunca automático. A IA segue o guia de redação da Ficha de Produto no vault. Toda alteração fica versionada.</p>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Benefícios · {benefits.length}</span>
@@ -1569,29 +1618,25 @@ const ProductRecap = ({ context, guardrails, productName, onSaved }: { context: 
         {!benefits.length && <p className="mt-1 text-[11px] text-slate-500">Nenhum benefício estruturado ainda. Rode o sync do <code className="rounded bg-slate-100 px-1">Dicionario_Produtos_Afinz_v3.xlsx</code> ou peça à IA.</p>}
         {cats.map((cat) => <div key={cat} className="mt-1.5">
           <div className="text-[10px] font-bold text-cyan-800">{BENEFIT_CATEGORY_LABEL[cat] ?? cat}</div>
-          {byCat.get(cat)!.map((benefit) => { const vg = benefitVigencia(benefit); const cit = citationOf(benefit); const scope = benefit.appliesTo ? Object.entries(benefit.appliesTo).filter(([, value]) => value?.length).map(([key, value]) => `${key}: ${value.join(', ')}`).join(' · ') : '';
-            return <div key={benefit.id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-b border-slate-100 py-1 last:border-b-0 ${vg.tone === 'expired' ? 'opacity-70' : ''}`}>
-              <span className="min-w-0 text-[11px] leading-4">
-                <span className={`font-semibold ${vg.tone === 'expired' ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{benefit.title}</span>
-                {benefit.valueExact && <span className="text-slate-500"> — {benefit.valueExact}</span>}
-                {benefit.ruleText && benefit.ruleText.trim() && benefit.ruleText.trim() !== benefit.title.trim() && <span className="block text-[10px] text-slate-400">{benefit.ruleText}</span>}
-                {scope && <span className="block text-[10px] text-cyan-700">escopo — {scope}</span>}
-              </span>
-              <span className="flex shrink-0 flex-col items-end gap-0.5 text-[9px] font-bold">
-                <span className={`rounded px-1.5 py-0.5 ${vg.tone === 'ok' ? 'bg-emerald-50 text-emerald-700' : vg.tone === 'expired' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-500'}`}>{vg.label}</span>
-                <span className={`rounded px-1.5 py-0.5 ${cit.cls}`}>{cit.label}</span>
-                {benefit.sourceUrl && <a href={benefit.sourceUrl} target="_blank" rel="noreferrer" className="text-cyan-700 hover:underline">fonte ↗</a>}
-              </span>
-            </div>; })}
+          {byCat.get(cat)!.map((benefit) => guardrailRow(benefit, benefit.appliesTo && Object.values(benefit.appliesTo).some((value) => value?.length) ? <span className="block text-[10px] text-cyan-700">escopo — {Object.entries(benefit.appliesTo).filter(([, value]) => value?.length).map(([key, value]) => `${key}: ${value!.join(', ')}`).join(' · ')}</span> : null))}
         </div>)}
 
-        {!!rules.length && <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-slate-500"><ShieldAlert size={12} className="text-amber-700"/>{rules.length} regra{rules.length > 1 ? 's' : ''}: <span className="text-red-700">{rules.filter((rule) => rule.severity === 'hard_block').length} bloqueiam</span> · <span className="text-amber-700">{rules.filter((rule) => rule.severity === 'requires_review').length} validar</span> · {rules.filter((rule) => rule.severity === 'advisory').length} orientam <span className="font-normal text-slate-400">— detalhe na aba “Regras aplicáveis” do e-mail</span></div>}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400"><ShieldAlert size={11} className="text-amber-700"/>Regras do produto · {rules.length}</span>
+          {!!rules.length && <span className="text-[9px] font-semibold text-slate-500"><span className="text-red-700">{rules.filter((rule) => rule.severity === 'hard_block').length} bloqueiam</span> · <span className="text-amber-700">{rules.filter((rule) => rule.severity === 'requires_review').length} validar</span> · {rules.filter((rule) => rule.severity === 'advisory').length} orientam</span>}
+        </div>
+        {!rules.length && <p className="mt-1 text-[11px] text-slate-500">Nenhuma regra cadastrada para este produto.</p>}
+        {['prohibited', 'claim', 'eligibility', 'legal', 'deeplink', 'visual', 'tone'].filter((type) => rules.some((rule) => rule.guardrailType === type)).map((type) => <div key={type} className="mt-1.5">
+          <div className="text-[10px] font-bold text-slate-500">{GUARDRAIL_TYPE_LABEL[type] ?? type}</div>
+          {rules.filter((rule) => rule.guardrailType === type).map((rule) => guardrailRow(rule))}
+        </div>)}
+        <p className="mt-2 text-[10px] text-slate-400">Essas regras valem para todo o produto. A aba “Regras aplicáveis” de cada e-mail mostra o mesmo conjunto filtrado por severidade.</p>
       </>}
     </div>}
   </section>;
 };
 
-const StrategyWorkspace = ({ strategies, contexts, guardrails, rows, syncState, onRefresh, onSaved, onSavedContext }: { strategies: EmailStrategy[]; contexts: ProductContext[]; guardrails: ProductGuardrail[]; rows: WorkspaceBriefing[]; syncState: string; onRefresh: () => void; onSaved: (strategy: EmailStrategy) => void; onSavedContext: (context: ProductContext) => void }) => {
+const StrategyWorkspace = ({ strategies, contexts, guardrails, rows, syncState, onRefresh, onSaved, onSavedContext, onSavedGuardrail }: { strategies: EmailStrategy[]; contexts: ProductContext[]; guardrails: ProductGuardrail[]; rows: WorkspaceBriefing[]; syncState: string; onRefresh: () => void; onSaved: (strategy: EmailStrategy) => void; onSavedContext: (context: ProductContext) => void; onSavedGuardrail: (guardrail: ProductGuardrail) => void }) => {
   const partners = useMemo(() => [...new Set(strategies.map((item) => item.partner).filter(Boolean))].sort(naturalLabelSort), [strategies]);
   const [selectedId, setSelectedId] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -1687,7 +1732,7 @@ const StrategyWorkspace = ({ strategies, contexts, guardrails, rows, syncState, 
       {exportMessage && <div role="status" className="mt-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs text-cyan-900">{exportMessage}</div>}
     </section>
 
-    <ProductRecap context={productContext} guardrails={productRecapGuardrails} productName={productContext?.product || activeProduct || 'produto'} onSaved={onSavedContext}/>
+    <ProductRecap context={productContext} guardrails={productRecapGuardrails} productName={productContext?.product || activeProduct || 'produto'} onSaved={onSavedContext} onSavedGuardrail={onSavedGuardrail}/>
 
     {viewMode === 'overview' ? <StrategyOverview strategies={filtered} onOpen={openDetail}/> : <div className="grid gap-2 xl:grid-cols-[minmax(260px,32fr)_minmax(0,68fr)]">
       <StrategyEmailList strategies={filtered} selectedId={selected?.id ?? ''} density={density} scrollBox={scrollBox} adherenceOf={adherenceOf} onSelect={setSelectedId} onClear={clearFilters}/>
@@ -1712,7 +1757,7 @@ const StrategyWorkspace = ({ strategies, contexts, guardrails, rows, syncState, 
                   {PLAN_FIELDS.map((field) => <FichaRow key={field.key} field={field} draft={draft} density={density} editing={editingField === field.key} onEdit={() => setEditingField(field.key)} onDone={() => setEditingField(null)} update={update}/>)}
                 </div>)}
             {detailTab === 'comparison' && <PlannedExecutedComparison strategy={draft} briefing={briefingByGroup.get(draft.campaignGroupId)}/>}
-            {detailTab === 'rules' && <div className="space-y-2 p-3"><p className="text-[10px] text-slate-400">A ficha e os benefícios do produto ficam no <b>Recap do produto</b>, no topo. Aqui ficam as regras aplicáveis a este e-mail.</p><GuardrailList contexts={contexts} guardrails={guardrails} partner={draft.partner}/></div>}
+            {detailTab === 'rules' && <div className="space-y-2 p-3"><p className="text-[10px] text-slate-400">A <b>Ficha de Produto</b> (identidade, benefícios e regras editáveis) fica no topo. Aqui é a mesma lista de regras filtrada e em modo leitura.</p><GuardrailList contexts={contexts} guardrails={guardrails} partner={draft.partner}/></div>}
           </div>
         </> : <div className="p-6"><EmptyManagementState/></div>}
       </section>
