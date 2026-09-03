@@ -5,6 +5,7 @@ import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
 import {
   AlertTriangle,
   ArchiveRestore,
+  ArrowRightLeft,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -63,6 +64,7 @@ import { createRulerManagementPlan, decideExternalSuggestion, loadEmailStrategie
 import { exportStrategyPlanXlsx } from '../export/strategyPlanXlsx';
 import { CreateRulerDialog, type CreateRulerConfig } from './CreateRulerDialog';
 import { DuplicateRulerDialog, type DuplicateRulerConfig } from './DuplicateRulerDialog';
+import { MoveEmailDialog, type MoveEmailTarget } from './MoveEmailDialog';
 import { EmailPreviewFrame, emailPreviewContextKey } from './EmailPreviewFrame';
 
 const TEMPLATE_KEY = 'gaas-dynamic-email-template-v1';
@@ -138,6 +140,9 @@ const EDITOR_SECTIONS: EditorSection[] = [
   { id: 'closing', label: 'Encerramento visual', description: 'Último banner do conteúdo.', imageSlot: IMAGE_SLOTS.banner3 },
   { id: 'legal', label: 'Informações legais', description: 'Nota legal e rodapé exibidos no fim do e-mail.', fields: ['NOTA_LEGAL', 'COR_NOTA_LEGAL', 'TAMANHO_DA_FONTE_NOTA_LEGAL', 'RODAPE'] },
 ];
+
+const AUDIT_SECTION_ID = 'organizacao';
+const ALL_EDITOR_BLOCK_IDS = [AUDIT_SECTION_ID, ...EDITOR_SECTIONS.map((section) => section.id)];
 
 function demoRows(): BriefingRow[] {
   const visa = emptyBriefingRow('00000000-0000-4000-8000-000000000001');
@@ -262,6 +267,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [segmentArchiveTarget, setSegmentArchiveTarget] = useState<{ partner: string; segment: string } | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ kind: 'week' | 'segment'; partner: string; segment: string; weekKey?: string; current: string } | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [moveTarget, setMoveTarget] = useState<{ groupId: string; label: string; current: { partner: string; segment: string; weekKey: string } } | null>(null);
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSelection, setExportSelection] = useState<Set<string>>(new Set());
@@ -321,6 +328,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const activeRows = useMemo(() => rows.filter((row) => row.__meta.status !== 'archived'), [rows]);
   const issuesByRow = useMemo(() => validateRows(activeRows), [activeRows]);
   const selected = rows.find((row) => row.__id === selectedId) ?? rows[0];
+  useEffect(() => { setOpenSections(new Set()); }, [selected?.__id]);
+  const toggleSection = (id: string) => setOpenSections((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
   const linkedTemplateId = selected?.__meta.templateSlotId && templateSlots.some((slot) => slot.id === selected.__meta.templateSlotId)
     ? selected.__meta.templateSlotId
@@ -676,6 +685,22 @@ export const DynamicEmailWorkspace: React.FC = () => {
       setAnnouncement(`Régua “${segmentDisplayLabel(segment)}” restaurada; e-mails voltaram como rascunho.`);
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao restaurar a régua.'); }
   };
+  const movePartnerOptions = useMemo(() => [...new Set(['Institucional B2C', 'Plurix', ...taxonomy.map((item) => item.partner).filter((partner) => partner && partner !== 'N/A'), ...rows.map((row) => row.__meta.partner).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'pt-BR')), [taxonomy, rows]);
+  const moveSegmentsFor = (partner: string) => [...new Set([...taxonomy.filter((item) => item.partner === partner).map((item) => item.segment), ...rows.filter((row) => row.__meta.partner === partner).map((row) => row.__meta.segment)].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+  const moveWeeksFor = (partner: string, segment: string) => [...new Set([...EDITORIAL_WEEKS, ...rows.filter((row) => row.__meta.partner === partner && row.__meta.segment === segment).map((row) => row.__meta.weekKey)].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+  const moveEmail = async (groupId: string, target: MoveEmailTarget) => {
+    const targets = rows.filter((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived');
+    if (!targets.length) { setMoveTarget(null); setAnnouncement('Não há e-mail ativo para mover.'); return; }
+    const contextChanged = targets.some((row) => row.__meta.partner !== target.partner || row.__meta.segment !== target.segment);
+    const patchMeta = (meta: WorkspaceBriefing['__meta']) => ({ ...meta, partner: target.partner, segment: target.segment, weekKey: target.weekKey, activityNames: contextChanged ? [] : meta.activityNames });
+    try {
+      const saved = await Promise.all(targets.filter((row) => row.__meta.savedAt).map((row) => saveBriefing({ ...row, __journeyConfirmed: false, __meta: { ...patchMeta(row.__meta), version: row.__meta.version + 1 } }, [`E-mail movido para ${target.partner} · ${target.segment} · ${target.weekKey}.`])));
+      setRows((current) => current.map((row) => (row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived' ? saved.find((item) => item.__id === row.__id) ?? { ...row, __journeyConfirmed: false, __meta: patchMeta(row.__meta) } : row)));
+      setSelectedWeek(null); setSelectedSegment(null); setSelectedId(targets[0].__id);
+      setMoveTarget(null);
+      setAnnouncement(`E-mail movido para ${target.partner} · ${segmentDisplayLabel(target.segment)} · ${target.weekKey}. Reconfirme a jornada no SFMC.`);
+    } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao mover o e-mail.'); }
+  };
   const saveCurrent = async (ready: boolean) => {
     if (!selected || savingRef.current) return;
     savingRef.current = true;
@@ -831,6 +856,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
               onDuplicateRulerFromTree={(partner, segment) => { setSelectedWeek(null); setSelectedSegment({ partner, segment }); setDuplicateRulerOpen(true); }}
               onArchiveSegment={(partner, segment) => setSegmentArchiveTarget({ partner, segment })}
               onRestoreSegment={(partner, segment) => void restoreSegment(partner, segment)}
+              onMoveEmail={(groupId) => { const group = rows.find((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived'); if (group) setMoveTarget({ groupId, label: group.SEQUENCIA || 'E-mail', current: { partner: group.__meta.partner, segment: group.__meta.segment, weekKey: group.__meta.weekKey } }); }}
             /> : <div className="px-4 py-10 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={24}/><p className="font-semibold text-slate-700">Nenhum briefing encontrado</p><p className="mt-1 text-xs">Ajuste a busca ou o filtro de status.</p></div>}
           </div>
         </aside>
@@ -849,37 +875,38 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Arquivada · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
           </div>
           <div className="max-h-[790px] overflow-y-auto p-3.5">
-            <section className="mb-3 rounded-xl border border-cyan-100 bg-cyan-50/60 p-3" aria-label="Organização e auditoria">
-              <div className="mb-2 text-xs font-bold uppercase tracking-wide text-cyan-800">Organização e auditoria</div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <TaxonomySelect label="Parceiro" value={selected.__meta.partner} options={taxonomyOptions.partners} onChange={(value) => updateGroupMeta({ partner: value, segment: '', weekKey: '', activityNames: [], ...(value !== 'Plurix' ? { subgroup: '' } : {}) })}/>
-                <TaxonomySelect label="Segmento" value={selected.__meta.segment} options={taxonomyOptions.segments} onChange={(value) => updateGroupMeta({ segment: value, activityNames: [] })}/>
-                <TaxonomySelect label="Assinatura / subgrupo" value={selected.__meta.subgroup} options={taxonomyOptions.subgroups} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, subgroup: value } })}/>
-                <TaxonomySelect label="Semana editorial" value={selected.__meta.weekKey} options={taxonomyOptions.weeks} onChange={(value) => updateGroupMeta({ weekKey: value })}/>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Blocos do e-mail</span>
+              <div className="flex gap-1">
+                <button type="button" onClick={() => setOpenSections(new Set(ALL_EDITOR_BLOCK_IDS))} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 outline-none hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500">Expandir tudo</button>
+                <button type="button" onClick={() => setOpenSections(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 outline-none hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500">Recolher tudo</button>
               </div>
-              <div className="mt-2"><ActivityNameSelect value={selected.__meta.activityNames[0] ?? ''} options={taxonomyOptions.activityNames} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, activityNames: value ? [value] : [] } })}/></div>
-              {taxonomyState === 'loading' && <p className="mt-2 text-xs text-slate-500">Carregando opções da tabela activities…</p>}
-              {taxonomyState === 'error' && <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"><span>Não foi possível carregar a taxonomia de activities.</span><button type="button" onClick={() => void refreshTaxonomy()} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-bold"><RefreshCw size={12}/>Tentar novamente</button></div>}
-            </section>
-            {selectedIssues.length > 0 && <div className="mb-3 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
-
-            <label className="mb-3 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
-            {selected.__meta.partner === 'Plurix' && <SignatureMatrix rows={rows} selected={selected} onEnsure={() => setRows((current) => ensurePlurixVariants(current, selected.__id, signatureSettings.filter((item) => item.status === 'inactive').map((item) => item.signatureKey)))} onSelect={setSelectedId} onManage={() => setSignatureManagerOpen(true)}/>}
-
+            </div>
             <div className="space-y-2.5">
-              {EDITOR_SECTIONS.map((section) => {
-                return <details key={section.id} open className="group overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500 [&::-webkit-details-marker]:hidden">
-                    <div className="min-w-0"><div className="font-bold text-slate-800">{section.label}</div><div className="truncate text-xs text-slate-500">{section.description}</div></div>
-                    <ChevronDown className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" size={16}/>
-                  </summary>
-                  <div className="border-t border-slate-100 px-3.5 py-3">
-                    {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
-                    {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)}/>)}</div>}
-                    {section.imageSlot && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')}/></div>}
-                  </div>
-                </details>;
-              })}
+              <CollapsibleBlock label="Organização e auditoria" description="Parceiro, segmento, semana e Activity Name usados no CSV e na auditoria." tone="audit" open={openSections.has(AUDIT_SECTION_ID)} onToggle={() => toggleSection(AUDIT_SECTION_ID)}>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <TaxonomySelect label="Parceiro" value={selected.__meta.partner} options={taxonomyOptions.partners} onChange={(value) => updateGroupMeta({ partner: value, segment: '', weekKey: '', activityNames: [], ...(value !== 'Plurix' ? { subgroup: '' } : {}) })}/>
+                  <TaxonomySelect label="Segmento" value={selected.__meta.segment} options={taxonomyOptions.segments} onChange={(value) => updateGroupMeta({ segment: value, activityNames: [] })}/>
+                  <TaxonomySelect label="Assinatura / subgrupo" value={selected.__meta.subgroup} options={taxonomyOptions.subgroups} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, subgroup: value } })}/>
+                  <TaxonomySelect label="Semana editorial" value={selected.__meta.weekKey} options={taxonomyOptions.weeks} onChange={(value) => updateGroupMeta({ weekKey: value })}/>
+                </div>
+                <div className="mt-2"><ActivityNameSelect value={selected.__meta.activityNames[0] ?? ''} options={taxonomyOptions.activityNames} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, activityNames: value ? [value] : [] } })}/></div>
+                {taxonomyState === 'loading' && <p className="mt-2 text-xs text-slate-500">Carregando opções da tabela activities…</p>}
+                {taxonomyState === 'error' && <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"><span>Não foi possível carregar a taxonomia de activities.</span><button type="button" onClick={() => void refreshTaxonomy()} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-bold"><RefreshCw size={12}/>Tentar novamente</button></div>}
+              </CollapsibleBlock>
+
+              {selectedIssues.length > 0 && <div className="space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
+
+              <label className="flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
+              {selected.__meta.partner === 'Plurix' && <SignatureMatrix rows={rows} selected={selected} onEnsure={() => setRows((current) => ensurePlurixVariants(current, selected.__id, signatureSettings.filter((item) => item.status === 'inactive').map((item) => item.signatureKey)))} onSelect={setSelectedId} onManage={() => setSignatureManagerOpen(true)}/>}
+
+              {EDITOR_SECTIONS.map((section) => (
+                <CollapsibleBlock key={section.id} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
+                  {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
+                  {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)}/>)}</div>}
+                  {section.imageSlot && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')}/></div>}
+                </CollapsibleBlock>
+              ))}
             </div>
             <div className="mt-4 border-t border-slate-200 pt-4">{selected.__meta.status === 'archived'
               ? <><button type="button" onClick={() => void restoreSelected()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><ArchiveRestore size={17}/>Desarquivar e voltar a editar</button><p className="mt-2 text-center text-xs text-slate-500">A variação volta como rascunho, com todo o histórico de versões preservado.</p></>
@@ -949,6 +976,15 @@ export const DynamicEmailWorkspace: React.FC = () => {
       onClose={() => setDuplicateRulerOpen(false)}
       onConfirm={duplicateRuler}
     />}
+    {moveTarget && <MoveEmailDialog
+      emailLabel={moveTarget.label}
+      current={moveTarget.current}
+      partnerOptions={movePartnerOptions}
+      segmentsFor={moveSegmentsFor}
+      weeksFor={moveWeeksFor}
+      onClose={() => setMoveTarget(null)}
+      onConfirm={(target) => moveEmail(moveTarget.groupId, target)}
+    />}
     {newOpen && <NewBriefingDialog groups={editorialGroups.filter((group) => group.visibleRows.length)} settings={signatureSettings} taxonomy={taxonomy.filter((item) => item.businessFront === 'acquisition')} defaultPartner={newDefaults.partner} defaultSegment={newDefaults.segment} defaultWeekKey={newDefaults.weekKey} defaultSequence={`E-mail ${activeEditorialGroupCount + 1}`} onClose={() => setNewOpen(false)} onCreate={createBriefing}/>}
     {weekArchiveTarget && <div className="fixed inset-0 z-[75] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-week-title"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="archive-week-title" className="font-bold text-slate-900">Arquivar {weekArchiveTarget.weekKey}?</h2><p className="mt-2 text-sm leading-5 text-slate-600">Todos os e-mails e variações ativos da semana sairão dos próximos CSVs. Registros já salvos continuarão no histórico.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => setWeekArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Cancelar</button><button onClick={() => void archiveWeek(weekArchiveTarget)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">Arquivar semana</button></div></div></div>}
     {segmentArchiveTarget && <div className="fixed inset-0 z-[75] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-segment-title"><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="archive-segment-title" className="font-bold text-slate-900">Arquivar a régua “{segmentDisplayLabel(segmentArchiveTarget.segment)}”?</h2><p className="mt-2 text-sm leading-5 text-slate-600">Todas as semanas e e-mails ativos desta régua sairão dos próximos CSVs. Registros já salvos continuarão no histórico e podem ser restaurados.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => setSegmentArchiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700">Cancelar</button><button onClick={() => void archiveSegment(segmentArchiveTarget)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">Arquivar régua</button></div></div></div>}
@@ -985,6 +1021,21 @@ export const DynamicEmailWorkspace: React.FC = () => {
     </div>}
   </div>;
 };
+
+const CollapsibleBlock = ({ label, description, open, onToggle, tone = 'default', children }: { label: string; description?: string; open: boolean; onToggle: () => void; tone?: 'default' | 'audit'; children: React.ReactNode }) => (
+  <div className={`overflow-hidden rounded-xl border ${tone === 'audit' ? 'border-cyan-200 bg-cyan-50/40' : 'border-slate-200 bg-white'}`}>
+    <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left outline-none transition hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500">
+      <div className="min-w-0">
+        <div className={`font-bold ${tone === 'audit' ? 'text-cyan-900' : 'text-slate-800'}`}>{label}</div>
+        {description && <div className="truncate text-xs text-slate-500">{description}</div>}
+      </div>
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border text-xs font-bold transition ${open ? 'border-cyan-300 bg-cyan-50 text-cyan-700' : 'border-slate-300 bg-white text-slate-500'}`} aria-hidden="true">
+        <ChevronDown size={17} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`}/>
+      </span>
+    </button>
+    {open && <div className="border-t border-slate-100 px-3.5 py-3">{children}</div>}
+  </div>
+);
 
 const HeaderMetric = ({ label, value, icon, tone = 'default' }: { label: string; value: number; icon: React.ReactNode; tone?: 'default' | 'success' | 'danger' | 'warning' }) => {
   const colors = { default: 'text-cyan-50', success: 'text-emerald-200', danger: 'text-red-200', warning: 'text-amber-200' };
@@ -1077,7 +1128,7 @@ const WeekReviewer = ({ selection, groups, strategies, issuesByRow, selectedId, 
 
 const ReviewMetric = ({ label, value, tone = 'default' }: { label: string; value: React.ReactNode; tone?: 'default' | 'success' | 'warning' | 'danger' }) => { const tones = { default: 'border-slate-200 bg-slate-50 text-slate-800', success: 'border-emerald-200 bg-emerald-50 text-emerald-800', warning: 'border-amber-200 bg-amber-50 text-amber-900', danger: 'border-red-200 bg-red-50 text-red-800' }; return <div className={`rounded-lg border px-3 py-2 ${tones[tone]}`}><div className="text-lg font-extrabold">{value}</div><div className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</div></div>; };
 
-const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment }: { groups: EditorialGroup[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void; onRenameWeek: (partner: string, segment: string, weekKey: string) => void; onRenameSegment: (partner: string, segment: string) => void; onDuplicateRulerFromTree: (partner: string, segment: string) => void; onArchiveSegment: (partner: string, segment: string) => void; onRestoreSegment: (partner: string, segment: string) => void }) => {
+const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment, onMoveEmail }: { groups: EditorialGroup[]; selectedId: string; selectedWeek: WeekSelection | null; selectedSegment: SegmentSelection | null; showArchived: boolean; onSelect: (id: string) => void; onSelectSegment: (selection: SegmentSelection) => void; onSelectWeek: (selection: WeekSelection) => void; onManage: (groupId: string) => void; onNewWeek: (partner: string, segment: string) => void; onNewEmail: (partner: string, segment: string, weekKey: string) => void; onDuplicateWeek: (partner: string, segment: string, weekKey: string) => void; onArchiveWeek: (partner: string, segment: string, weekKey: string) => void; onDuplicateEmail: (groupId: string) => void; onArchiveEmail: (groupId: string) => void; onRestoreWeek: (partner: string, segment: string, weekKey: string) => void; onRestoreEmail: (groupId: string) => void; onRenameWeek: (partner: string, segment: string, weekKey: string) => void; onRenameSegment: (partner: string, segment: string) => void; onDuplicateRulerFromTree: (partner: string, segment: string) => void; onArchiveSegment: (partner: string, segment: string) => void; onRestoreSegment: (partner: string, segment: string) => void; onMoveEmail: (groupId: string) => void }) => {
   const [expanded, setExpanded] = useState<Set<string>>(() => { try { const saved = localStorage.getItem('gaas-email-tree-expanded-v1'); return saved ? new Set(JSON.parse(saved)) : new Set(['p:Plurix', 'p:Plurix/s:CRM', 'p:Plurix/s:CRM/w:Semana 1']); } catch { return new Set(); } });
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const toggle = (key: string) => setExpanded((current) => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); localStorage.setItem('gaas-email-tree-expanded-v1', JSON.stringify([...next])); return next; });
@@ -1138,6 +1189,7 @@ const BriefingTree = ({ groups, selectedId, selectedWeek, selectedSegment, showA
           const emailItems: TreeMenuItem[] = [{ label: 'Gerenciar assinaturas', icon: <Settings2 size={14}/>, onClick: () => { setMenuOpen(null); onManage(group.id); } }];
           if (active.length) emailItems.push(
             { label: 'Duplicar e-mail', icon: <Copy size={14}/>, onClick: () => { setMenuOpen(null); onDuplicateEmail(group.id); } },
+            { label: 'Mover para outra semana/segmento…', icon: <ArrowRightLeft size={14}/>, onClick: () => { setMenuOpen(null); onMoveEmail(group.id); } },
             { label: 'Arquivar e-mail', icon: <Trash2 size={14}/>, danger: true, onClick: () => { setMenuOpen(null); onArchiveEmail(group.id); } },
           );
           else if (group.rows.some((row) => row.__meta.status === 'archived')) emailItems.push(
