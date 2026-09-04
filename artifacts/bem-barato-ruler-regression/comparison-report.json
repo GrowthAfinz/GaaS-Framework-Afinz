@@ -1,0 +1,3152 @@
+[
+  {
+    "sequence": 1,
+    "subject": "Faça mais com seu cartão Bem Mais Afinz Visa!",
+    "preheader": "Ganhe até R$100 Créditos Vibe na sua primeira compra com o cartão Bem Mais.",
+    "delta": {
+      "images": 0,
+      "links": -1,
+      "heightPct": 1,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c1507c27-066c-4b04-9c5a-49385cb343e8.png",
+          "alt": "Está na hora de desbloquear",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 176,
+          "renderedHeight": 293,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "",
+          "naturalWidth": 460,
+          "renderedWidth": 176,
+          "renderedHeight": 292,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 176,
+          "renderedHeight": 293,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/e31039cf-fa85-41b7-bf16-9cbccacaaf10.gif",
+          "alt": "",
+          "naturalWidth": 720,
+          "renderedWidth": 600,
+          "renderedHeight": 230,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 16,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "http://onelink.to/jztxbk"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 12,
+      "blocks": [
+        "Olá, VANIA Quer fazer mais? Com o cartão Bem Mais Afinz Visa você economiza nas compras nos Supermercados Bem Barato e ainda ganha até R$100 Créditos Vibe! Todos os benefícios que você precisa em um cartão!Pedir meu cartão Sujeito à análise de crédito E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha créditos Vibe e ainda concorre a R$100 MIL todo mês!Pedir meu cartão Sujeito à análise de créditoPedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA Quer fazer mais? Com o cartão Bem Mais Afinz Visa você economiza nas compras nos Supermercados Bem Barato e ainda ganha até R$100 Créditos Vibe!",
+        "Quer fazer mais? Com o cartão Bem Mais Afinz Visa você economiza nas compras nos Supermercados Bem Barato e ainda ganha até R$100 Créditos Vibe!",
+        "Todos os benefícios que você precisa em um cartão!",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha créditos Vibe e ainda concorre a R$100 MIL todo mês!",
+        "E não para por aí!",
+        "Com o cartão Bem Mais Afinz Visa você ganha créditos Vibe e ainda concorre a R$100 MIL todo mês!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2541
+    },
+    "dynamicBemBaratoV1": {
+      "title": "Faça mais com seu cartão Bem Mais Afinz Visa!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c1507c27-066c-4b04-9c5a-49385cb343e8.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 180,
+          "renderedHeight": 300,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 460,
+          "renderedWidth": 180,
+          "renderedHeight": 299,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 180,
+          "renderedHeight": 300,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/e31039cf-fa85-41b7-bf16-9cbccacaaf10.gif",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 720,
+          "renderedWidth": 550,
+          "renderedHeight": 211,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 16,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 11,
+      "blocks": [
+        "Ganhe até R$100 Créditos Vibe na sua primeira compra com o cartão Bem Mais. ‌ ‌ ‌",
+        "Olá, VANIAQuer fazer mais? Com o cartão Bem Mais Afinz Visa você economiza nas compras nos Supermercados Bem Barato e ainda ganha até R$100 Créditos Vibe! Todos os benefícios que você precisa em um cartão! Pedir meu cartão Sujeito à análise de crédito E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha créditos Vibe e ainda concorre a R$100 MIL todo mês! Pedir meu cartão Sujeito à análise de crédito Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIAQuer fazer mais? Com o cartão Bem Mais Afinz Visa você economiza nas compras nos Supermercados Bem Barato e ainda ganha até R$100 Créditos Vibe!",
+        "Todos os benefícios que você precisa em um cartão!",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha créditos Vibe e ainda concorre a R$100 MIL todo mês!",
+        "E não para por aí!",
+        "Com o cartão Bem Mais Afinz Visa você ganha créditos Vibe e ainda concorre a R$100 MIL todo mês!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2561
+    }
+  },
+  {
+    "sequence": 2,
+    "subject": "Ganhe créditos Vibe para fazer mais no fim de semana!",
+    "preheader": "Peça seu cartão Bem Mais Afinz Visa e concorra a R$100 MIL todo mês.",
+    "delta": {
+      "images": 0,
+      "links": 0,
+      "heightPct": 4,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/d219d9c3-8a3b-43fb-bc4e-ccf2b77bb24c.png",
+          "alt": "Está na hora de desbloquear",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 180,
+          "renderedHeight": 299,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "",
+          "naturalWidth": 460,
+          "renderedWidth": 180,
+          "renderedHeight": 299,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/37f56012-cd80-455f-a6d0-248c321cc7e2.gif",
+          "alt": "",
+          "naturalWidth": 734,
+          "renderedWidth": 300,
+          "renderedHeight": 74,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/02901600-5c44-4f6e-a4a2-2bae56c2f8d2.png",
+          "alt": "",
+          "naturalWidth": 1920,
+          "renderedWidth": 600,
+          "renderedHeight": 258,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 16,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 11,
+      "blocks": [
+        "Olá, VANIA Com o cartão Bem Mais Afinz Visa, você faz suas compras no Supermercado Bem Barato, e ainda ganha créditos Vibe para fazer mais no fim de semana! São muitas vantagens:Pedir meu cartão Sujeito à análise de crédito E tem mais: com o cartão Bem Mais Afinz Visa você ganha créditos Vibe!Pedir meu cartão Sujeito à análise de crédito Seus créditos podem ser utilizados para garantir descontos em +250 marcas de diversas categorias!Pedir meu cartão Sujeito à análise de crédito Peça seu cartão e faça sua compra virar vantagem! *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Seg. a Sex. 10h às 16h Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA Com o cartão Bem Mais Afinz Visa, você faz suas compras no Supermercado Bem Barato, e ainda ganha créditos Vibe para fazer mais no fim de semana!",
+        "Com o cartão Bem Mais Afinz Visa, você faz suas compras no Supermercado Bem Barato, e ainda ganha créditos Vibe para fazer mais no fim de semana!",
+        "São muitas vantagens:",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "E tem mais: com o cartão Bem Mais Afinz Visa você ganha créditos Vibe!",
+        "com o cartão Bem Mais Afinz Visa você ganha créditos Vibe!",
+        "Seus créditos podem ser utilizados para garantir descontos em +250 marcas de diversas categorias!",
+        "Peça seu cartão e faça sua compra virar vantagem!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602 Seg. a Sex. 10h às 16h",
+        "Canal de atendimento:",
+        "Ouvidoria 0800 772 0602 Seg. a Sex. 10h às 16h",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2743
+    },
+    "dynamicBemBaratoV1": {
+      "title": "Ganhe créditos Vibe para fazer mais no fim de semana!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/d219d9c3-8a3b-43fb-bc4e-ccf2b77bb24c.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 272,
+          "renderedHeight": 452,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 460,
+          "renderedWidth": 272,
+          "renderedHeight": 451,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/37f56012-cd80-455f-a6d0-248c321cc7e2.gif",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 734,
+          "renderedWidth": 550,
+          "renderedHeight": 135,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/02901600-5c44-4f6e-a4a2-2bae56c2f8d2.png",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 1920,
+          "renderedWidth": 550,
+          "renderedHeight": 236,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 16,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 11,
+      "blocks": [
+        "Peça seu cartão Bem Mais Afinz Visa e concorra a R$100 MIL todo mês. ‌ ‌ ‌",
+        "Olá, VANIACom o cartão Bem Mais Afinz Visa, você faz suas compras no Supermercado Bem Barato, e ainda ganha créditos Vibe para fazer mais no fim de semana! São muitas vantagens: Pedir meu cartão Sujeito à análise de crédito E tem mais: com o cartão Bem Mais Afinz Visa você ganha créditos Vibe! Pedir meu cartão Sujeito à análise de crédito Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIACom o cartão Bem Mais Afinz Visa, você faz suas compras no Supermercado Bem Barato, e ainda ganha créditos Vibe para fazer mais no fim de semana!",
+        "São muitas vantagens:",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "E tem mais: com o cartão Bem Mais Afinz Visa você ganha créditos Vibe!",
+        "com o cartão Bem Mais Afinz Visa você ganha créditos Vibe!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2863
+    }
+  },
+  {
+    "sequence": 3,
+    "subject": "Pe",
+    "preheader": "Ganhe até R$100 Créditos Vibe na sua primeira compra com o cartão Bem Mais.",
+    "delta": {
+      "images": 0,
+      "links": -1,
+      "heightPct": 1,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/d305678a-9c9d-41a7-8438-75dd23dfeba3.png",
+          "alt": "",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b3063d8e-942f-497d-bd51-ad7754b5abe7.png",
+          "alt": "",
+          "naturalWidth": 426,
+          "renderedWidth": 176,
+          "renderedHeight": 289,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2f1fef6e-62d6-491a-8df1-fbea4eac2046.png",
+          "alt": "",
+          "naturalWidth": 426,
+          "renderedWidth": 176,
+          "renderedHeight": 289,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 168,
+          "renderedHeight": 279,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/e31039cf-fa85-41b7-bf16-9cbccacaaf10.gif",
+          "alt": "",
+          "naturalWidth": 720,
+          "renderedWidth": 600,
+          "renderedHeight": 230,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 16,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "http://onelink.to/jztxbk"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 11,
+      "blocks": [
+        "Olá, VANIA! Com o cartão Bem Mais Afinz Visa suas compras viram vantagens, peça agora e tenha descontos exclusivos! Mais benefícios para o seu dia a dia, em um cartão só.Pedir meu cartão Sujeito à análise de crédito E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha Créditos Vibe e ainda concorre a R$100 mil todo mês!Pedir meu cartão Sujeito à análise de créditoPedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA! Com o cartão Bem Mais Afinz Visa suas compras viram vantagens, peça agora e tenha descontos exclusivos!",
+        "Com o cartão Bem Mais Afinz Visa suas compras viram vantagens, peça agora e tenha descontos exclusivos!",
+        "Mais benefícios para o seu dia a dia, em um cartão só.",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha Créditos Vibe e ainda concorre a R$100 mil todo mês!",
+        "E não para por aí!",
+        "Com o cartão Bem Mais Afinz Visa você ganha Créditos Vibe e ainda concorre a R$100 mil todo mês!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2508
+    },
+    "dynamicBemBaratoV1": {
+      "title": "Peça seu cartão Bem Mais Afinz Visa e faça mais. Aproveite!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/d305678a-9c9d-41a7-8438-75dd23dfeba3.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b3063d8e-942f-497d-bd51-ad7754b5abe7.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 426,
+          "renderedWidth": 180,
+          "renderedHeight": 296,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2f1fef6e-62d6-491a-8df1-fbea4eac2046.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 426,
+          "renderedWidth": 180,
+          "renderedHeight": 296,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 180,
+          "renderedHeight": 300,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/e31039cf-fa85-41b7-bf16-9cbccacaaf10.gif",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 720,
+          "renderedWidth": 550,
+          "renderedHeight": 211,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 16,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 10,
+      "blocks": [
+        "Ganhe até R$100 Créditos Vibe na sua primeira compra com o cartão Bem Mais. ‌ ‌ ‌",
+        "Olá, VANIA!Com o cartão Bem Mais Afinz Visa suas compras viram vantagens, peça agora e tenha descontos exclusivos! Mais benefícios para o seu dia a dia, em um cartão só. Pedir meu cartão Sujeito à análise de crédito E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha Créditos Vibe e ainda concorre a R$100 mil todo mês! Pedir meu cartão Sujeito à análise de crédito Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA!Com o cartão Bem Mais Afinz Visa suas compras viram vantagens, peça agora e tenha descontos exclusivos!",
+        "Mais benefícios para o seu dia a dia, em um cartão só.",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "E não para por aí! Com o cartão Bem Mais Afinz Visa você ganha Créditos Vibe e ainda concorre a R$100 mil todo mês!",
+        "E não para por aí!",
+        "Com o cartão Bem Mais Afinz Visa você ganha Créditos Vibe e ainda concorre a R$100 mil todo mês!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2533
+    }
+  },
+  {
+    "sequence": 4,
+    "subject": "Transforme suas compras em vantagens com o cartão Bem Mais Afinz Visa!",
+    "preheader": "Benefícios e descontos exclusivos que facilitam o seu dia a dia.",
+    "delta": {
+      "images": 0,
+      "links": 0,
+      "heightPct": 5,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/5200206c-bd6a-42ff-bed3-be676bb49565.png",
+          "alt": "Está na hora de desbloquear",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 240,
+          "renderedHeight": 183,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b3063d8e-942f-497d-bd51-ad7754b5abe7.png",
+          "alt": "",
+          "naturalWidth": 426,
+          "renderedWidth": 180,
+          "renderedHeight": 296,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2f1fef6e-62d6-491a-8df1-fbea4eac2046.png",
+          "alt": "",
+          "naturalWidth": 426,
+          "renderedWidth": 180,
+          "renderedHeight": 296,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/02901600-5c44-4f6e-a4a2-2bae56c2f8d2.png",
+          "alt": "",
+          "naturalWidth": 1920,
+          "renderedWidth": 600,
+          "renderedHeight": 258,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 15,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D02"
+        },
+        {
+          "text": "",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 10,
+      "blocks": [
+        "Olá, VANIA! Com o cartão Bem Mais Afinz Visa, você faz suas compras, aproveita benefícios exclusivos e ganha Créditos Vibe para fazer mais! Confira:Pedir meu cartão Sujeito à análise de crédito Aproveite seus Creditos Vibe em +250 marcas! Peça seu cartão e aproveite todos os benefícios onde estiver!Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Seg. a Sex. 10h às 16h Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA! Com o cartão Bem Mais Afinz Visa, você faz suas compras, aproveita benefícios exclusivos e ganha Créditos Vibe para fazer mais!",
+        "Com o cartão Bem Mais Afinz Visa, você faz suas compras, aproveita benefícios exclusivos e ganha Créditos Vibe para fazer mais!",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "Aproveite seus Creditos Vibe em +250 marcas!",
+        "Peça seu cartão e aproveite todos os benefícios onde estiver!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602 Seg. a Sex. 10h às 16h",
+        "Canal de atendimento:",
+        "Ouvidoria 0800 772 0602 Seg. a Sex. 10h às 16h",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2472
+    },
+    "dynamicBemBaratoV1": {
+      "title": "Transforme suas compras em vantagens com o cartão Bem Mais Afinz Visa!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/5200206c-bd6a-42ff-bed3-be676bb49565.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b3063d8e-942f-497d-bd51-ad7754b5abe7.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 426,
+          "renderedWidth": 272,
+          "renderedHeight": 447,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2f1fef6e-62d6-491a-8df1-fbea4eac2046.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 426,
+          "renderedWidth": 272,
+          "renderedHeight": 447,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/02901600-5c44-4f6e-a4a2-2bae56c2f8d2.png",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 1920,
+          "renderedWidth": 550,
+          "renderedHeight": 236,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 15,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D02"
+        },
+        {
+          "text": "",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s2&af_sub3=bb_email_vibe_bsp_S2D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 10,
+      "blocks": [
+        "Benefícios e descontos exclusivos que facilitam o seu dia a dia. ‌ ‌ ‌",
+        "Olá, VANIA!Com o cartão Bem Mais Afinz Visa, você faz suas compras, aproveita benefícios exclusivos e ganha Créditos Vibe para fazer mais! Confira: Pedir meu cartão Sujeito à análise de crédito Aproveite seus Créditos Vibe em +250 marcas! Peça seu cartão e aproveite todos os benefícios onde estiver! Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA!Com o cartão Bem Mais Afinz Visa, você faz suas compras, aproveita benefícios exclusivos e ganha Créditos Vibe para fazer mais!",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "Aproveite seus Créditos Vibe em +250 marcas! Peça seu cartão e aproveite todos os benefícios onde estiver!",
+        "Aproveite seus Créditos Vibe em +250 marcas!",
+        "Peça seu cartão e aproveite todos os benefícios onde estiver!",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2587
+    }
+  },
+  {
+    "sequence": 5,
+    "subject": "Ganhe Créditos Vibe com o seu Cartão Bem Mais Afinz Visa!",
+    "preheader": "Garanta DESCONTOS exclusivos no App Vibe. Peça já o seu!",
+    "delta": {
+      "images": 0,
+      "links": -1,
+      "heightPct": -1,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/96f926ae-97d9-4f72-a570-faa9bf29ce67.png",
+          "alt": "",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 189,
+          "renderedHeight": 144,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 189,
+          "renderedHeight": 144,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 189,
+          "renderedHeight": 144,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 200,
+          "renderedHeight": 332,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "",
+          "naturalWidth": 460,
+          "renderedWidth": 200,
+          "renderedHeight": 332,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b68e83ed-3ce4-4337-a2cf-a0f72cf6529a.png",
+          "alt": "",
+          "naturalWidth": 3104,
+          "renderedWidth": 550,
+          "renderedHeight": 85,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ea13cca4-e778-41d9-b346-bfdc9d148bad.png",
+          "alt": "",
+          "naturalWidth": 6480,
+          "renderedWidth": 500,
+          "renderedHeight": 88,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 15,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "http://onelink.to/jztxbk"
+        },
+        {
+          "text": "PEÇA JÁ O SEU",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s1&af_sub3=bb_email_vibe_bsp_S1D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 11,
+      "blocks": [
+        "Olá, VANIA Com o cartão Bem Mais Afinz Visa, suas compras viram vantagens! Não perca os descontos exclusivos:PEÇA JÁ O SEU Sujeito à análise de crédito E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe. Não vai perder, né? Peça já o seu cartão Bem Mais e veja suas compras virarem vantagensPedir meu cartão Sujeito à análise de crédito Aproveite descontos incríveis nas suas marcas favoritas direto no app Vibe! Veja como é fácil pedir o seu em poucos passos: Garanta já o seu cartão Bem Mais Afinz Visa e faça seu dinheiro render:Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA Com o cartão Bem Mais Afinz Visa, suas compras viram vantagens! Não perca os descontos exclusivos:",
+        "Com o cartão Bem Mais Afinz Visa, suas compras viram vantagens! Não perca os descontos exclusivos:",
+        "cartão Bem Mais Afinz Visa",
+        "PEÇA JÁ O SEU",
+        "Sujeito à análise de crédito",
+        "E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe.",
+        "cartão Bem Mais Afinz",
+        "Não vai perder, né? Peça já o seu cartão Bem Mais e veja suas compras virarem vantagens",
+        "Não vai perder, né?",
+        "Peça já o seu cartão Bem Mais e veja suas compras virarem vantagens",
+        "cartão Bem Mais",
+        "Pedir meu cartão",
+        "Aproveite descontos incríveis nas suas marcas favoritas direto no app Vibe!",
+        "Veja como é fácil pedir o seu em poucos passos:",
+        "Garanta já o seu cartão Bem Mais Afinz Visa e faça seu dinheiro render:",
+        "Garanta já o seu",
+        "e faça seu dinheiro render:",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2484
+    },
+    "dynamicBemBaratoV1": {
+      "title": "Ganhe Créditos Vibe com o seu Cartão Bem Mais Afinz Visa!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/96f926ae-97d9-4f72-a570-faa9bf29ce67.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 180,
+          "renderedHeight": 137,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 180,
+          "renderedHeight": 137,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 180,
+          "renderedHeight": 137,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 272,
+          "renderedHeight": 452,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 460,
+          "renderedWidth": 272,
+          "renderedHeight": 451,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b68e83ed-3ce4-4337-a2cf-a0f72cf6529a.png",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 3104,
+          "renderedWidth": 550,
+          "renderedHeight": 85,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ea13cca4-e778-41d9-b346-bfdc9d148bad.png",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 6480,
+          "renderedWidth": 550,
+          "renderedHeight": 97,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 15,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "PEÇA JÁ O SEU",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D01"
+        },
+        {
+          "text": "PEÇA JÁ O SEU",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 10,
+      "blocks": [
+        "Garanta DESCONTOS exclusivos no App Vibe. Peça já o seu! ‌ ‌ ‌",
+        "Olá, VANIACom o cartão Bem Mais Afinz Visa, suas compras viram vantagens! Não perca os descontos exclusivos: PEÇA JÁ O SEU Sujeito à análise de crédito E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe.Não vai perder, né? Peça já o seu cartão Bem Mais e veja suas compras virarem vantagens. PEÇA JÁ O SEU Sujeito à análise de crédito Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIACom o cartão Bem Mais Afinz Visa, suas compras viram vantagens!",
+        "Não perca os descontos exclusivos:",
+        "PEÇA JÁ O SEU",
+        "Sujeito à análise de crédito",
+        "E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe.Não vai perder, né? Peça já o seu cartão Bem Mais e veja suas compras virarem vantagens.",
+        "E não para por aí:",
+        "com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe.Não vai perder, né? Peça já o seu cartão Bem Mais e veja suas compras virarem vantagens.",
+        "Pedir meu cartão",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2447
+    }
+  },
+  {
+    "sequence": 6,
+    "subject": "Faça mais no supermercado com o seu cartão Bem Mais Afinz Visa!",
+    "preheader": "Ganhe até",
+    "delta": {
+      "images": 0,
+      "links": 0,
+      "heightPct": 0,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/fabe966e-3e89-4789-8a66-5b5e98f4aa8f.png",
+          "alt": "",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 179,
+          "renderedHeight": 298,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "",
+          "naturalWidth": 460,
+          "renderedWidth": 179,
+          "renderedHeight": 297,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 179,
+          "renderedHeight": 298,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/710a8574-9b6e-4fb5-87dc-975f4b7f5293.png",
+          "alt": "",
+          "naturalWidth": 3099,
+          "renderedWidth": 570,
+          "renderedHeight": 88,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 14,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Quero meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 9,
+      "blocks": [
+        "Olá, VANIA Com seu cartão Bem Mais Afinz Visa, você conta com vantagens exclusivas para aproveitar suas compras, trocar benefícios e fazer mais no seu dia a dia.Quero meu cartão Sujeito à análise de crédito Confira todos os benefícios que o cartão Bem Mais Afinz Visa garante para você: E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe exclusivos: Aproveite descontos em diversas marcas direto no App Vibe. Peça o seu cartão Bem Mais Afinz Visa agora mesmo:Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA Com seu cartão Bem Mais Afinz Visa, você conta com vantagens exclusivas para aproveitar suas compras, trocar benefícios e fazer mais no seu dia a dia.",
+        "Com seu cartão Bem Mais Afinz Visa, você conta com vantagens exclusivas para aproveitar suas compras, trocar benefícios e fazer mais no seu dia a dia.",
+        "Quero meu cartão",
+        "Sujeito à análise de crédito",
+        "Confira todos os benefícios que o cartão Bem Mais Afinz Visa garante para você:",
+        "cartão Bem Mais Afinz Visa",
+        "E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe exclusivos:",
+        "cartão Bem Mais Afinz",
+        "Aproveite descontos em diversas marcas direto no App Vibe.",
+        "Peça o seu cartão Bem Mais Afinz Visa agora mesmo:",
+        "agora mesmo:",
+        "Pedir meu cartão",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2187
+    },
+    "dynamicBemBaratoV1": {
+      "title": "Faça mais no supermercado com o seu cartão Bem Mais Afinz Visa!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/fabe966e-3e89-4789-8a66-5b5e98f4aa8f.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 180,
+          "renderedHeight": 300,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 460,
+          "renderedWidth": 180,
+          "renderedHeight": 299,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 180,
+          "renderedHeight": 300,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/710a8574-9b6e-4fb5-87dc-975f4b7f5293.png",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 3099,
+          "renderedWidth": 550,
+          "renderedHeight": 85,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 14,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Quero meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D02"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s3&af_sub3=bb_email_vibe_bsp_S3D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 9,
+      "blocks": [
+        "Ganhe até R$100 em Créditos Vibe na 1ª compra. Aproveite! ‌ ‌ ‌",
+        "Olá, VANIACom seu cartão Bem Mais Afinz Visa, você conta com vantagens exclusivas para aproveitar suas compras, trocar benefícios e fazer mais no seu dia a dia. Quero meu cartão Sujeito à análise de crédito Confira todos os benefícios que o cartão Bem Mais Afinz Visa garante para você: E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe exclusivos.Aproveite descontos em diversas marcas direto no App Vibe. Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIACom seu cartão Bem Mais Afinz Visa, você conta com vantagens exclusivas para aproveitar suas compras, trocar benefícios e fazer mais no seu dia a dia.",
+        "Quero meu cartão",
+        "Sujeito à análise de crédito",
+        "Confira todos os benefícios que o cartão Bem Mais Afinz Visa garante para você:",
+        "E não para por aí: com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe exclusivos.Aproveite descontos em diversas marcas direto no App Vibe.",
+        "E não para por aí:",
+        "com o cartão Bem Mais Afinz Visa você ainda ganha Créditos Vibe exclusivos.Aproveite descontos em diversas marcas direto no App Vibe.",
+        "Pedir meu cartão",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2192
+    }
+  },
+  {
+    "sequence": 7,
+    "subject": "Ainda dá tempo de aproveitar os benefícios com o cartão Bem Mais Afinz Visa!",
+    "preheader": "Garanta já seu cartão Bem Mais e ganhe até R$100 em Créditos Vibe.",
+    "delta": {
+      "images": 0,
+      "links": -1,
+      "heightPct": 5,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/450aeaa3-29b1-4d64-824f-583c8bff6d3e.png",
+          "alt": "Está na hora de desbloquear",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 200,
+          "renderedHeight": 332,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "",
+          "naturalWidth": 460,
+          "renderedWidth": 200,
+          "renderedHeight": 332,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 14,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "http://onelink.to/jztxbk"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 10,
+      "blocks": [
+        "Olá, VANIA Ainda não pediu seu cartão Bem Mais Afinz Visa? Aproveite a chance de fazer mais nas compras! Confira os beneficios exclusivos:Pedir meu cartão Sujeito à análise de crédito Não perca a chance de aproveitar os CRÉDITOS exclusivos para comprar nas melhores marcas, direto no app da Vibe!: Garanta já o seu cartão Bem Mais Afinz Visa e aproveite as vantagens:Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA Ainda não pediu seu cartão Bem Mais Afinz Visa? Aproveite a chance de fazer mais nas compras!",
+        "Ainda não pediu seu cartão Bem Mais Afinz Visa? Aproveite a chance de fazer mais nas compras!",
+        "Ainda não pediu seu cartão Bem Mais Afinz Visa?",
+        "cartão Bem Mais Afinz Visa?",
+        "Aproveite a chance de fazer mais nas compras!",
+        "Confira os beneficios exclusivos:",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "Não perca a chance de aproveitar os CRÉDITOS exclusivos para comprar nas melhores marcas, direto no app da Vibe!:",
+        "melhores marcas",
+        "Garanta já o seu cartão Bem Mais Afinz Visa e aproveite as vantagens:",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2297
+    },
+    "dynamicBemBaratoV1": {
+      "title": "Ainda dá tempo de aproveitar os benefícios com o cartão Bem Mais Afinz Visa!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/450aeaa3-29b1-4d64-824f-583c8bff6d3e.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 272,
+          "renderedHeight": 452,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 460,
+          "renderedWidth": 272,
+          "renderedHeight": 451,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 14,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D01"
+        },
+        {
+          "text": "Pedir meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D01"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 9,
+      "blocks": [
+        "Garanta já seu cartão Bem Mais e ganhe até R$100 em Créditos Vibe. ‌ ‌ ‌",
+        "Olá, VANIAAinda não pediu seu cartão Bem Mais Afinz Visa? Aproveite a chance de fazer mais nas compras! Confira os benefícios exclusivos: Pedir meu cartão Sujeito à análise de crédito Não perca a chance de aproveitar os CRÉDITOS exclusivos para comprar nas melhores marcas, direto no app da Vibe!Garanta já o seu cartão Bem Mais Afinz Visa e aproveite as vantagens. Pedir meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIAAinda não pediu seu cartão Bem Mais Afinz Visa? Aproveite a chance de fazer mais nas compras!",
+        "Confira os benefícios exclusivos:",
+        "Pedir meu cartão",
+        "Sujeito à análise de crédito",
+        "Não perca a chance de aproveitar os CRÉDITOS exclusivos para comprar nas melhores marcas, direto no app da Vibe!Garanta já o seu cartão Bem Mais Afinz Visa e aproveite as vantagens.",
+        "Não perca a chance de aproveitar os CRÉDITOS exclusivos",
+        "para comprar nas melhores marcas, direto no app da Vibe!Garanta já o seu cartão Bem Mais Afinz Visa e aproveite as vantagens.",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2422
+    }
+  },
+  {
+    "sequence": 8,
+    "subject": "ÚLTIMA CHANCE: Peça o seu novo cartão Bem Mais Afinz Visa!",
+    "preheader": "Aproveite descontos em +250 marcas com seus Créditos Vibe.",
+    "delta": {
+      "images": 0,
+      "links": -1,
+      "heightPct": -1,
+      "brokenInDynamic": []
+    },
+    "reference": {
+      "title": "",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b81ea66d-b8f9-488b-92d3-7fd2ea770b9e.png",
+          "alt": "Está na hora de desbloquear",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "",
+          "naturalWidth": 852,
+          "renderedWidth": 257,
+          "renderedHeight": 196,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "",
+          "naturalWidth": 459,
+          "renderedWidth": 200,
+          "renderedHeight": 332,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "",
+          "naturalWidth": 460,
+          "renderedWidth": 200,
+          "renderedHeight": 332,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3e38098a-3f02-4a87-b4d0-6c62cdaa2e5e.png",
+          "alt": "",
+          "naturalWidth": 3115,
+          "renderedWidth": 570,
+          "renderedHeight": 88,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/4a36a1a8-9294-48f7-b68d-7ea90723f469.png",
+          "alt": "",
+          "naturalWidth": 919,
+          "renderedWidth": 530,
+          "renderedHeight": 122,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 14,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "http://onelink.to/jztxbk"
+        },
+        {
+          "text": "Pedir o meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D02"
+        },
+        {
+          "text": "Quero meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 10,
+      "blocks": [
+        "Olá, VANIA Última chance de garantir todos os benefícios do cartão Bem Mais Afinz Visa e fazer o seu dinheiro render mais!Pedir o meu cartão Sujeito à análise de crédito Aproveite todos os benefícios exclusivos do cartão Bem Mais Afinz Visa para você: Com o cartão Bem Mais Afinz Visa você tem benefícios exclusivos no App Vibe. Aproveite: Você também tem descontos incríveis nas melhores marcas no app Vibe! Peça o seu cartão Bem Mais Afinz Visa e não perca as vantagens!Quero meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento: Ouvidoria 0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIA Última chance de garantir todos os benefícios do cartão Bem Mais Afinz Visa e fazer o seu dinheiro render mais!",
+        "Última chance de garantir todos os benefícios do cartão Bem Mais Afinz Visa e fazer o seu dinheiro render mais!",
+        "cartão Bem Mais Afinz Visa",
+        "Pedir o meu cartão",
+        "Sujeito à análise de crédito",
+        "Aproveite todos os benefícios exclusivos do cartão Bem Mais Afinz Visa para você:",
+        "Com o cartão Bem Mais Afinz Visa você tem benefícios exclusivos no App Vibe. Aproveite:",
+        "Bem Mais Afinz Visa",
+        "Você também tem descontos incríveis nas melhores marcas no app Vibe!",
+        "descontos incríveis",
+        "Peça o seu cartão Bem Mais Afinz Visa e não perca as vantagens!",
+        "Quero meu cartão",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail. Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Por favor, não responda esse e-mail.",
+        "Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento: Ouvidoria 0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00 Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2459
+    },
+    "dynamicBemBaratoV1": {
+      "title": "ÚLTIMA CHANCE: Peça o seu novo cartão Bem Mais Afinz Visa!",
+      "images": [
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png",
+          "alt": "Afinz",
+          "naturalWidth": 600,
+          "renderedWidth": 600,
+          "renderedHeight": 80,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b81ea66d-b8f9-488b-92d3-7fd2ea770b9e.png",
+          "alt": "Cartão Bem Mais Afinz Visa",
+          "naturalWidth": 5000,
+          "renderedWidth": 600,
+          "renderedHeight": 250,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 852,
+          "renderedWidth": 272,
+          "renderedHeight": 207,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 459,
+          "renderedWidth": 272,
+          "renderedHeight": 452,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png",
+          "alt": "Benefício do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 460,
+          "renderedWidth": 272,
+          "renderedHeight": 451,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3e38098a-3f02-4a87-b4d0-6c62cdaa2e5e.png",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 3115,
+          "renderedWidth": 550,
+          "renderedHeight": 85,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/4a36a1a8-9294-48f7-b68d-7ea90723f469.png",
+          "alt": "Vantagens do cartão Bem Mais Afinz Visa",
+          "naturalWidth": 919,
+          "renderedWidth": 550,
+          "renderedHeight": 127,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png",
+          "alt": "Instagram da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png",
+          "alt": "Facebook da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png",
+          "alt": "TikTok da Afinz",
+          "naturalWidth": 300,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png",
+          "alt": "Blog da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 30,
+          "renderedHeight": 30,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png",
+          "alt": "Site da Afinz",
+          "naturalWidth": 501,
+          "renderedWidth": 31,
+          "renderedHeight": 31,
+          "loaded": true
+        },
+        {
+          "src": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png",
+          "alt": "Afinz",
+          "naturalWidth": 1815,
+          "renderedWidth": 90,
+          "renderedHeight": 48,
+          "loaded": true
+        }
+      ],
+      "totalImages": 14,
+      "brokenImages": [],
+      "links": [
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "Pedir o meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D02"
+        },
+        {
+          "text": "Quero meu cartão",
+          "href": "https://cartao-bem-mais.onelink.me/dJ0j/qcqop5rh?c=bb_topo_de_funil_vibe&af_sub1=crm&af_sub2=s4&af_sub3=bb_email_vibe_bsp_S4D02"
+        },
+        {
+          "text": "",
+          "href": "https://www.instagram.com/afinzoficial/"
+        },
+        {
+          "text": "",
+          "href": "https://web.facebook.com/Afinz"
+        },
+        {
+          "text": "",
+          "href": "https://www.tiktok.com/@afinzoficial"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/blog/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        },
+        {
+          "text": "",
+          "href": "https://afinz.com.br/"
+        }
+      ],
+      "totalLinks": 9,
+      "blocks": [
+        "Aproveite descontos em +250 marcas com seus Créditos Vibe. ‌ ‌ ‌",
+        "Olá, VANIAÚltima chance de garantir todos os benefícios do cartão Bem Mais Afinz Visa e fazer o seu dinheiro render mais! Pedir o meu cartão Sujeito à análise de crédito Aproveite todos os benefícios exclusivos do cartão Bem Mais Afinz Visa para você: Com o cartão Bem Mais Afinz Visa você tem benefícios exclusivos no App Vibe. Aproveite: Você também tem descontos incríveis nas melhores marcas no app Vibe! Quero meu cartão Sujeito à análise de crédito *Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade. Afinz, juntos fazemos mais! Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui. Canal de atendimento:Ouvidoria0800 772 0602 Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP",
+        "Olá, VANIAÚltima chance de garantir todos os benefícios do cartão Bem Mais Afinz Visa e fazer o seu dinheiro render mais!",
+        "Pedir o meu cartão",
+        "Sujeito à análise de crédito",
+        "Aproveite todos os benefícios exclusivos do cartão Bem Mais Afinz Visa para você:",
+        "Com o cartão Bem Mais Afinz Visa você tem benefícios exclusivos no App Vibe. Aproveite: Você também tem descontos incríveis nas melhores marcas no app Vibe!",
+        "Com o cartão Bem Mais Afinz Visa você tem benefícios exclusivos no App Vibe. Aproveite:",
+        "Você também tem descontos incríveis nas melhores marcas no app Vibe!",
+        "Quero meu cartão",
+        "*Sujeito à aprovação de crédito. Consulte termos e condições em: grupobemmais.com.br/cartao. Após realizar a primeira compra com o seu cartão com anuidade ativa, independentemente do valor, você receberá em até 5 dias úteis R$ 100 em créditos no App Vibe, com validade de até 6 meses. Para visualizar o seu saldo, baixe o App Vibe. A primeira compra deverá ser realizada em até 30 dias. / A cada fatura paga, com anuidade ativa, você receberá mais créditos no App Vibe, conforme condições da loja parceira, também com validade de até 6 meses. Os benefícios acumulados no app da Vibe podem ser trocados por descontos e vantagens das marcas parceiras. Eles são dinâmicos e podem ser alterados ou apresentados conforme as regras de elegibilidade de cada fornecedor parceiro. / Consulte o regulamento completo no app da Vibe. Promoção válida por tempo limitado, podendo ser alterada ou encerrada a qualquer momento, sem aviso prévio. / Sujeito a disponibilidade.",
+        "Afinz, juntos fazemos mais!",
+        "Curta a Afinz nas redes sociais e fique por dentro de tudo que acontece por aqui",
+        "Por favor, não responda esse e-mail.Essa é uma mensagem automática e não conseguimos te atender por aqui.",
+        "Canal de atendimento:Ouvidoria0800 772 0602",
+        "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00Rua XV de novembro, 45 - Sorocaba, SP"
+      ],
+      "bodyHeight": 2435
+    }
+  }
+]

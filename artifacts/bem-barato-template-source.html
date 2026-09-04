@@ -1,0 +1,169 @@
+%%[
+SET @FirstName = [PRI_NOME]
+SET @LimiteNovo = [LIMITE]
+SET @Produto = [PRODUTO]
+SET @Sequencia = [SEQUENCIA]
+SET @TpCampanha = [TP_CAMPANHA]
+SET @Today = NOW()
+SET @BriefingRows = LookupOrderedRows("TB_BRIEFING_CAMPANHA_AQUISICAO",1,"DT_INICIO DESC","NM_PRODUTO_INTERNO",@Produto,"SEQUENCIA",@Sequencia,"TP_CAMPANHA",@TpCampanha)
+SET @RowCount = RowCount(@BriefingRows)
+IF @RowCount > 0 THEN
+SET @Row = Row(@BriefingRows, 1)
+SET @Assunto = Field(@Row, "ASSUNTO")
+SET @PreCabecalho = Field(@Row, "PRE_CABECALHO")
+SET @Header = Field(@Row, "HEADER")
+SET @CartaoNmComercial = Field(@Row, "CARTAO_NM_COMERCIAL")
+SET @TituloCopy1 = Field(@Row, "TITULO_COPY_1_AZUL")
+SET @CorCopy1 = Field(@Row, "COR_COPY_1")
+SET @TamanhoFonteTituloCopy1 = Field(@Row, "TAMANHO_DA_FONTE_TITULO_COPY_1")
+SET @Copy1Preto = Field(@Row, "COPY_1_PRETO")
+SET @CorCopyPreto1 = Field(@Row, "COR_COPY_PRETO_1")
+SET @TamanhoFonteCopyPreto1 = Field(@Row, "TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1")
+SET @TituloCTA1 = Field(@Row, "TITULO_CTA_1")
+SET @LinkCTA1 = Field(@Row, "LINK_CTA_1")
+SET @TituloCopy2 = Field(@Row, "TITULO_COPY_2")
+SET @CorTituloCopy2 = Field(@Row, "COR_TITULO_COPY_2")
+SET @TamanhoFonteTituloCopy2 = Field(@Row, "TAMANHO_DA_FONTE_TITULO_COPY_2")
+SET @Copy2Preto = Field(@Row, "COPY_2_PRETO")
+SET @CorCopy2 = Field(@Row, "COR_COPY_2")
+SET @TamanhoFonteCopy2 = Field(@Row, "TAMANHO_DA_FONTE_COPY_2")
+SET @TituloCTA2 = Field(@Row, "TITULO_CTA_2")
+SET @LinkCTA2 = Field(@Row, "LINK_CTA_2")
+SET @Banner1Corpo = Field(@Row, "BANNER_1_CORPO")
+SET @LinkBanner1 = Field(@Row, "LINK_BANNER_1_CORPO")
+SET @Banner2Corpo = Field(@Row, "BANNER_2_CORPO")
+SET @LinkBanner2 = Field(@Row, "LINK_BANNER_2_CORPO")
+SET @Banner3Corpo = Field(@Row, "BANNER_3_CORPO")
+SET @LinkBanner3 = Field(@Row, "LINK_BANNER_3_CORPO")
+SET @NotaLegal = Field(@Row, "NOTA_LEGAL")
+SET @CorNotaLegal = Field(@Row, "COR_NOTA_LEGAL")
+SET @TamanhoFonteNotaLegal = Field(@Row, "TAMANHO_DA_FONTE_NOTA_LEGAL")
+SET @Rodape = Field(@Row, "RODAPE")
+ELSE RaiseError("Dados de briefing da campanha não encontrados.", true)
+ENDIF
+]%%
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%%=TreatAsContent(@Assunto)=%%</title>
+<style>
+@media only screen and (max-width:620px){
+.shell{width:100%!important}
+.pad{padding-left:18px!important;padding-right:18px!important}
+.buttonstyles{display:block!important}
+.body-copy{font-size:16px!important}
+.asset{width:100%!important;height:auto!important}
+.grid-row td{display:block!important;width:100%!important;padding:4px 0!important}
+}
+</style></head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:Tahoma,Geneva,sans-serif;color:#000000">
+%%[ IF NOT EMPTY(@PreCabecalho) THEN ]%%<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">%%=TreatAsContent(@PreCabecalho)=%%&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>%%[ ENDIF ]%%
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:0">
+<table role="presentation" class="shell" width="600" cellspacing="0" cellpadding="0" border="0" style="width:600px;max-width:600px;background:#ffffff">
+
+<tr><td align="center"><a href="https://afinz.com.br/" target="_blank"><img src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/160b947b-93b3-49f8-9537-84245584e143.png" width="600" alt="Afinz" style="display:block;width:100%;height:auto;border:0"></a></td></tr>
+
+%%[ IF NOT EMPTY(@Header) THEN ]%%<tr><td><img class="asset" src="%%=v(@Header)=%%" width="600" alt="Cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr>%%[ ENDIF ]%%
+
+%%[ IF NOT EMPTY(@Copy1Preto) THEN ]%%<tr><td class="pad" align="center" style="padding:30px 30px 10px;text-align:center"><div class="body-copy" style="color:%%=v(@CorCopyPreto1)=%%;font-size:%%=v(@TamanhoFonteCopyPreto1)=%%px;font-family:Tahoma,Geneva,sans-serif;line-height:1.5">%%=TreatAsContent(@Copy1Preto)=%%</div></td></tr>%%[ ENDIF ]%%
+
+%%[ IF @Sequencia == "E-mail 6" OR @Sequencia == "E-mail 8" THEN ]%%
+%%[ IF NOT EMPTY(@TituloCTA1) AND NOT EMPTY(@LinkCTA1) THEN ]%%
+<tr><td class="pad" align="center" style="padding:0 30px 6px">
+<table role="presentation" border="0" cellspacing="0" cellpadding="0"><tr><td class="innertd buttonblock" bgcolor="#00C6CC" style="border-radius:5px;background-color:#00C6CC">
+<a class="buttonstyles" href="%%=RedirectTo(TreatAsContent(@LinkCTA1))=%%" target="_blank" style="font-size:18px;font-family:Tahoma,Geneva,sans-serif;color:#000000;text-align:center;text-decoration:none;display:block;background-color:#00C6CC;border:0;padding:11px 20px;border-radius:5px">%%=TreatAsContent(@TituloCTA1)=%%</a>
+</td></tr></table></td></tr>
+<tr><td align="center" style="padding:0 30px 18px"><span style="font-size:11px;font-family:Tahoma,Geneva,sans-serif;color:#000000">Sujeito à análise de crédito</span></td></tr>
+%%[ ENDIF ]%%
+%%[ ENDIF ]%%
+
+%%[ IF NOT EMPTY(@TituloCopy1) THEN ]%%<tr><td class="pad" align="center" style="padding:15px 40px 20px;text-align:center"><div style="color:%%=v(@CorCopy1)=%%;font-size:%%=v(@TamanhoFonteTituloCopy1)=%%px;font-family:Tahoma,Geneva,sans-serif;font-weight:bold;line-height:1.3">%%=TreatAsContent(@TituloCopy1)=%%</div></td></tr>%%[ ENDIF ]%%
+
+%%[ IF @Sequencia == "E-mail 1" OR @Sequencia == "E-mail 2" OR @Sequencia == "E-mail 3" OR @Sequencia == "E-mail 4" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 7" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 5" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:33%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:33%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:33%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 6" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/dd5bd72f-fba0-4ed0-a6a4-e9fa78758810.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/87c5c98f-c6dd-47e1-8522-7e4f67172d1b.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 8" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/63c27266-d881-4e29-b256-fb6c3a2348ed.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/3f2ff739-5b6d-4484-ba6a-d552390794ba.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+
+%%[ IF @Sequencia == "E-mail 1" OR @Sequencia == "E-mail 2" OR @Sequencia == "E-mail 3" OR @Sequencia == "E-mail 4" OR @Sequencia == "E-mail 5" OR @Sequencia == "E-mail 7" THEN ]%%
+%%[ IF NOT EMPTY(@TituloCTA1) AND NOT EMPTY(@LinkCTA1) THEN ]%%
+<tr><td class="pad" align="center" style="padding:0 30px 6px">
+<table role="presentation" border="0" cellspacing="0" cellpadding="0"><tr><td class="innertd buttonblock" bgcolor="#00C6CC" style="border-radius:5px;background-color:#00C6CC">
+<a class="buttonstyles" href="%%=RedirectTo(TreatAsContent(@LinkCTA1))=%%" target="_blank" style="font-size:18px;font-family:Tahoma,Geneva,sans-serif;color:#000000;text-align:center;text-decoration:none;display:block;background-color:#00C6CC;border:0;padding:11px 20px;border-radius:5px">%%=TreatAsContent(@TituloCTA1)=%%</a>
+</td></tr></table></td></tr>
+<tr><td align="center" style="padding:0 30px 18px"><span style="font-size:11px;font-family:Tahoma,Geneva,sans-serif;color:#000000">Sujeito à análise de crédito</span></td></tr>
+%%[ ENDIF ]%%
+%%[ ENDIF ]%%
+
+%%[ IF NOT EMPTY(@TituloCopy2) OR NOT EMPTY(@Copy2Preto) THEN ]%%
+<tr><td class="pad" align="center" style="padding:10px 30px 12px;text-align:center">
+%%[ IF NOT EMPTY(@TituloCopy2) THEN ]%%<div style="color:%%=v(@CorTituloCopy2)=%%;font-size:%%=v(@TamanhoFonteTituloCopy2)=%%px;font-family:Tahoma,Geneva,sans-serif;font-weight:bold;line-height:1.3;padding-bottom:8px">%%=TreatAsContent(@TituloCopy2)=%%</div>%%[ ENDIF ]%%
+%%[ IF NOT EMPTY(@Copy2Preto) THEN ]%%<div class="body-copy" style="color:%%=v(@CorCopy2)=%%;font-size:%%=v(@TamanhoFonteCopy2)=%%px;font-family:Tahoma,Geneva,sans-serif;line-height:1.5">%%=TreatAsContent(@Copy2Preto)=%%</div>%%[ ENDIF ]%%
+</td></tr>
+%%[ ENDIF ]%%
+
+%%[ IF @Sequencia == "E-mail 1" OR @Sequencia == "E-mail 6" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:33%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:33%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:33%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 3" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:33%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b3063d8e-942f-497d-bd51-ad7754b5abe7.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:33%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2f1fef6e-62d6-491a-8df1-fbea4eac2046.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:33%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 2" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/82ec3fce-c040-4f7a-b450-e96b9f062489.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 4" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b3063d8e-942f-497d-bd51-ad7754b5abe7.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2f1fef6e-62d6-491a-8df1-fbea4eac2046.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ IF @Sequencia == "E-mail 5" OR @Sequencia == "E-mail 7" OR @Sequencia == "E-mail 8" THEN ]%%<tr><td class="pad" style="padding:0 25px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr class="grid-row"><td valign="top" align="center" style="width:50%;padding:3px 3px 3px 0"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ba613caa-444d-4954-acd0-1b151dada6ec.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td><td valign="top" align="center" style="width:50%;padding:3px 0 3px 3px"><img class="asset" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c392c8ff-b97f-4a86-8c56-df49ea5b2374.png" width="600" alt="Benefício do cartão Bem Mais Afinz Visa" style="display:block;width:100%;height:auto;border:0"></td></tr></table></td></tr>%%[ ENDIF ]%%
+
+%%[ IF @Sequencia == "E-mail 1" OR @Sequencia == "E-mail 2" OR @Sequencia == "E-mail 3" OR @Sequencia == "E-mail 5" THEN ]%%
+%%[ IF NOT EMPTY(@TituloCTA1) AND NOT EMPTY(@LinkCTA1) THEN ]%%
+<tr><td class="pad" align="center" style="padding:0 30px 6px">
+<table role="presentation" border="0" cellspacing="0" cellpadding="0"><tr><td class="innertd buttonblock" bgcolor="#00C6CC" style="border-radius:5px;background-color:#00C6CC">
+<a class="buttonstyles" href="%%=RedirectTo(TreatAsContent(@LinkCTA1))=%%" target="_blank" style="font-size:18px;font-family:Tahoma,Geneva,sans-serif;color:#000000;text-align:center;text-decoration:none;display:block;background-color:#00C6CC;border:0;padding:11px 20px;border-radius:5px">%%=TreatAsContent(@TituloCTA1)=%%</a>
+</td></tr></table></td></tr>
+<tr><td align="center" style="padding:0 30px 18px"><span style="font-size:11px;font-family:Tahoma,Geneva,sans-serif;color:#000000">Sujeito à análise de crédito</span></td></tr>
+%%[ ENDIF ]%%
+%%[ ENDIF ]%%
+%%[ IF NOT EMPTY(@Banner1Corpo) THEN ]%%
+<tr><td class="pad" align="center" style="padding:6px 25px 14px">
+%%[ IF NOT EMPTY(@LinkBanner1) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@LinkBanner1))=%%" target="_blank">%%[ ENDIF ]%%
+<img class="asset" src="%%=v(@Banner1Corpo)=%%" width="550" alt="Vantagens do cartão Bem Mais Afinz Visa" style="display:block;width:100%;max-width:550px;height:auto;border:0">
+%%[ IF NOT EMPTY(@LinkBanner1) THEN ]%%</a>%%[ ENDIF ]%%
+</td></tr>
+%%[ ENDIF ]%%
+%%[ IF NOT EMPTY(@Banner2Corpo) THEN ]%%
+<tr><td class="pad" align="center" style="padding:6px 25px 14px">
+%%[ IF NOT EMPTY(@LinkBanner2) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@LinkBanner2))=%%" target="_blank">%%[ ENDIF ]%%
+<img class="asset" src="%%=v(@Banner2Corpo)=%%" width="550" alt="Vantagens do cartão Bem Mais Afinz Visa" style="display:block;width:100%;max-width:550px;height:auto;border:0">
+%%[ IF NOT EMPTY(@LinkBanner2) THEN ]%%</a>%%[ ENDIF ]%%
+</td></tr>
+%%[ ENDIF ]%%
+%%[ IF NOT EMPTY(@Banner3Corpo) THEN ]%%
+<tr><td class="pad" align="center" style="padding:6px 25px 14px">
+%%[ IF NOT EMPTY(@LinkBanner3) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@LinkBanner3))=%%" target="_blank">%%[ ENDIF ]%%
+<img class="asset" src="%%=v(@Banner3Corpo)=%%" width="550" alt="Vantagens do cartão Bem Mais Afinz Visa" style="display:block;width:100%;max-width:550px;height:auto;border:0">
+%%[ IF NOT EMPTY(@LinkBanner3) THEN ]%%</a>%%[ ENDIF ]%%
+</td></tr>
+%%[ ENDIF ]%%
+%%[ IF NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2) THEN ]%%
+<tr><td class="pad" align="center" style="padding:0 30px 6px">
+<table role="presentation" border="0" cellspacing="0" cellpadding="0"><tr><td class="innertd buttonblock" bgcolor="#00C6CC" style="border-radius:5px;background-color:#00C6CC">
+<a class="buttonstyles" href="%%=RedirectTo(TreatAsContent(@LinkCTA2))=%%" target="_blank" style="font-size:18px;font-family:Tahoma,Geneva,sans-serif;color:#000000;text-align:center;text-decoration:none;display:block;background-color:#00C6CC;border:0;padding:11px 20px;border-radius:5px">%%=TreatAsContent(@TituloCTA2)=%%</a>
+</td></tr></table></td></tr>
+<tr><td align="center" style="padding:0 30px 18px"><span style="font-size:11px;font-family:Tahoma,Geneva,sans-serif;color:#000000">Sujeito à análise de crédito</span></td></tr>
+%%[ ENDIF ]%%
+
+%%[ IF NOT EMPTY(@NotaLegal) THEN ]%%<tr><td class="pad" style="padding:18px 30px;color:%%=v(@CorNotaLegal)=%%;font-size:%%=v(@TamanhoFonteNotaLegal)=%%px;font-family:Tahoma,Geneva,sans-serif;line-height:1.45;text-align:justify">%%=TreatAsContent(@NotaLegal)=%%</td></tr>%%[ ENDIF ]%%
+
+<tr><td align="center" style="padding:22px 20px 6px"><div style="color:#00c6cc;font-size:28px;font-family:Tahoma,Geneva,sans-serif;font-weight:bold">Afinz, juntos fazemos mais!</div></td></tr>
+<tr><td align="center" style="padding:6px 30px 12px"><div style="color:#000000;font-size:11px;font-family:Tahoma,Geneva,sans-serif"><b>Curta a Afinz</b> nas redes sociais e fique por dentro de tudo que acontece por aqui</div></td></tr>
+<tr><td align="center" style="padding:0 20px 16px"><table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:0 5px"><a href="https://www.instagram.com/afinzoficial/" target="_blank"><img src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png" width="31" alt="Instagram da Afinz" style="display:block;border:0"></a></td><td align="center" style="padding:0 5px"><a href="https://web.facebook.com/Afinz" target="_blank"><img src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png" width="30" alt="Facebook da Afinz" style="display:block;border:0"></a></td><td align="center" style="padding:0 5px"><a href="https://www.tiktok.com/@afinzoficial" target="_blank"><img src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png" width="30" alt="TikTok da Afinz" style="display:block;border:0"></a></td><td align="center" style="padding:0 5px"><a href="https://afinz.com.br/blog/" target="_blank"><img src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png" width="30" alt="Blog da Afinz" style="display:block;border:0"></a></td><td align="center" style="padding:0 5px"><a href="https://afinz.com.br/" target="_blank"><img src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png" width="31" alt="Site da Afinz" style="display:block;border:0"></a></td></tr></table></td></tr>
+<tr><td align="center" style="padding:0 20px 18px"><a href="https://afinz.com.br/" target="_blank"><img src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/787eb5c7-39ee-4b30-987a-0a81a38241a3.png" width="90" alt="Afinz" style="display:block;border:0"></a></td></tr>
+
+<tr><td align="center" style="padding:14px 30px;background:#000000"><div style="color:#ffffff;font-size:12px;font-family:Tahoma,Geneva,sans-serif;line-height:1.55">Por favor, não responda esse e-mail.<br>Essa é uma mensagem automática e não conseguimos te atender por aqui.</div></td></tr>
+<tr><td align="center" style="padding:10px 30px;background:#000000"><div style="color:#ffffff;font-size:12px;font-family:Tahoma,Geneva,sans-serif;line-height:1.55"><b>Canal de atendimento:</b><br><br><b>Ouvidoria</b><br>0800 772 0602</div></td></tr>
+%%[ IF NOT EMPTY(@Rodape) THEN ]%%<tr><td align="center" style="padding:0 30px 10px;background:#000000"><div style="color:#d1d5db;font-size:11px;font-family:Tahoma,Geneva,sans-serif;line-height:1.45">%%=TreatAsContent(@Rodape)=%%</div></td></tr>%%[ ENDIF ]%%
+<tr><td align="center" style="padding:15px 30px;background:#000000"><div style="color:#ffffff;font-size:12px;font-family:Tahoma,Geneva,sans-serif;line-height:1.55">Enviado por <b>Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74 | Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00</b><br>Rua XV de novembro, 45 - Sorocaba, SP</div></td></tr>
+
+</table></td></tr></table></body></html>
