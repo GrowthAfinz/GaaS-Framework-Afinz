@@ -95,6 +95,34 @@ export type EmailFactorySegment = {
   governanceStatus: SegmentGovernanceStatus;
 };
 
+/**
+ * Camada narrativa da régua. As estratégias de e-mail já trazem `rulerName`,
+ * `journeyFamily` e `journeyType` desnormalizados; isto aqui é o restante — o
+ * objetivo, a audiência e a transformação — que só existe no registro da régua.
+ */
+export type RulerStrategy = {
+  id: string;
+  name?: string;
+  description?: string;
+  partner: string;
+  product?: string;
+  segment: string;
+  businessFront?: string;
+  rulerFamily?: string;
+  journeyFamily?: string;
+  journeyType?: string;
+  objective?: string;
+  audience?: string;
+  journeyStage?: string;
+  narrativeTransformation?: string;
+  objections: string[];
+  commercialIntensity?: string;
+  successCriteria?: string;
+  editorialStatus: string;
+  templateSlotId?: string;
+  version: number;
+};
+
 export type SignatureSetting = {
   partner: string;
   signatureKey: string;

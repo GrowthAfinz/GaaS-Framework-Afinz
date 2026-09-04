@@ -1,6 +1,6 @@
 import { supabase } from '../../../services/supabaseClient';
 import { BRIEFING_COLUMNS, emptyBriefingRow, type BriefingRow } from '../domain/briefing';
-import type { ActivityTaxonomy, EmailAsset, EmailFactorySegment, EmailTemplateSlot, LegalText, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
+import type { ActivityTaxonomy, EmailAsset, EmailFactorySegment, EmailTemplateSlot, LegalText, RulerStrategy, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
 import { exportableRow, withMeta } from '../domain/workspace';
 
 const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
@@ -233,6 +233,24 @@ const segmentFromRow = (row: Record<string, any>): EmailFactorySegment => ({
   lifecycleFamily: row.lifecycle_family ?? undefined, audienceDescription: row.audience_description ?? undefined,
   origin: row.origin, governanceStatus: row.governance_status,
 });
+
+const rulerFromRow = (row: Record<string, any>): RulerStrategy => ({
+  id: row.id, name: row.name ?? undefined, description: row.description ?? undefined,
+  partner: row.partner ?? '', product: row.product ?? undefined, segment: row.segment ?? '',
+  businessFront: row.business_front ?? undefined, rulerFamily: row.ruler_family ?? undefined,
+  journeyFamily: row.journey_family ?? undefined, journeyType: row.journey_type ?? undefined,
+  objective: row.objective ?? undefined, audience: row.audience ?? undefined,
+  journeyStage: row.journey_stage ?? undefined, narrativeTransformation: row.narrative_transformation ?? undefined,
+  objections: row.objections ?? [], commercialIntensity: row.commercial_intensity ?? undefined,
+  successCriteria: row.success_criteria ?? undefined, editorialStatus: row.editorial_status ?? 'needs_enrichment',
+  templateSlotId: row.template_slot_id ?? undefined, version: row.version ?? 1,
+});
+
+export async function loadRulerStrategies(): Promise<RulerStrategy[]> {
+  const { data, error } = await supabase.from('dynamic_email_ruler_strategies').select('*').order('partner').order('segment');
+  if (error) throw error;
+  return (data ?? []).map(rulerFromRow);
+}
 
 export async function loadEmailFactorySegments(): Promise<EmailFactorySegment[]> {
   const { data, error } = await supabase.from('dynamic_email_segments').select('*').neq('governance_status', 'archived').order('display_name');
