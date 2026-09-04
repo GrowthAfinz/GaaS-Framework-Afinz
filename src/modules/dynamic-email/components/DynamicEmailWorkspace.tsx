@@ -61,6 +61,8 @@ import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID
 import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailFactorySegment, type EmailTemplateSlot, type LegalText, type RulerStrategy, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
 import { AiContextCard } from './AiContextCard';
+import { ExportCsvDialog } from './ExportCsvDialog';
+import { weekKeyFor, type ExportGroupInput } from '../domain/exportScope';
 import { deleteTemplateSlot as deleteSharedTemplateSlot, loadActivityTaxonomy, loadAssets, loadBriefings, loadEmailFactorySegments, loadLegalTexts, loadRulerStrategies, loadSignatureSettings, migrateLocalTemplateSlots, onlyCsvRows, recordExport, saveAsset, saveBriefing, saveBriefings, saveDraftEmailFactorySegment, saveSignatureSetting, saveTemplateSlot, setPrincipalTemplateSlot } from '../services/workspaceService';
 import { countConfiguredStrategyFields, journeyContextForStrategy, STRATEGY_FIELD_COUNT, strategyReadiness, type EmailStrategy, type ExternalReviewRun, type ExternalSuggestion, type JourneyContext, type ProductContext, type ProductGuardrail } from '../domain/management';
 import { createRulerManagementPlan, decideExternalSuggestion, loadEmailStrategies, loadExternalReviews, loadProductGovernance, saveEmailStrategy, saveProductContext, saveProductGuardrail } from '../services/managementService';
@@ -313,7 +315,6 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [railHoverBlock, setRailHoverBlock] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportSelection, setExportSelection] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const templateFileRef = useRef<HTMLInputElement>(null);
@@ -498,21 +499,19 @@ export const DynamicEmailWorkspace: React.FC = () => {
     .sort((a, b) => naturalLabelSort(a.representative.SEQUENCIA, b.representative.SEQUENCIA)) : [], [editorialGroups, selectedSegment]);
   const errorCount = editorialGroups.filter((group) => group.hasErrors).length;
   const activeEditorialGroupCount = editorialGroups.filter((group) => group.visibleRows.length > 0).length;
-  const rulerExportOptions = useMemo(() => {
-    const map = new Map<string, { key: string; partner: string; segment: string; label: string; total: number; errorGroups: number }>();
-    editorialGroups.forEach((group) => {
-      if (!group.visibleRows.length) return;
-      const partner = group.representative.__meta.partner;
-      const segment = group.representative.__meta.segment;
-      const key = `${partner}|||${segment}`;
-      const current = map.get(key) ?? { key, partner, segment, label: `${partner || 'Sem parceiro'} · ${segmentDisplayLabel(segment || 'Sem segmento')}`, total: 0, errorGroups: 0 };
-      current.total += 1;
-      if (group.hasErrors) current.errorGroups += 1;
-      map.set(key, current);
-    });
-    return [...map.values()].sort((a, b) => naturalLabelSort(a.label, b.label));
-  }, [editorialGroups]);
-  const exportableRulerCount = rulerExportOptions.filter((option) => option.errorGroups === 0).length;
+  // Entrada da árvore de export: um registro por e-mail editorial ativo.
+  const exportGroups = useMemo<ExportGroupInput[]>(() => editorialGroups
+    .filter((group) => group.visibleRows.length)
+    .map((group) => ({
+      id: group.id,
+      partner: group.representative.__meta.partner,
+      segment: group.representative.__meta.segment,
+      weekKey: group.representative.__meta.weekKey,
+      rowCount: group.visibleRows.length,
+      hasErrors: group.hasErrors,
+    })), [editorialGroups]);
+  const exportableWeekCount = useMemo(() => new Set(exportGroups.filter((group) => !group.hasErrors)
+    .map((group) => weekKeyFor(group.partner, group.segment, group.weekKey))).size, [exportGroups]);
   const exportBlockReason = !rows.length
     ? 'Crie ou importe pelo menos um briefing antes de exportar.'
     : !activeRows.length
@@ -543,17 +542,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? { ...applyFix(row, issue), __meta: row.__meta } : row)); };
   const openExport = () => {
     if (!activeRows.length) { setAnnouncement(exportBlockReason || 'Nada para exportar.'); return; }
-    setExportSelection(new Set(rulerExportOptions.filter((option) => option.errorGroups === 0).map((option) => option.key)));
     setExportOpen(true);
   };
-  const confirmExport = () => {
-    const chosen = new Set([...exportSelection].filter((key) => rulerExportOptions.some((option) => option.key === key && option.errorGroups === 0)));
-    const exportRows = rows.filter((row) => row.__meta.status !== 'archived' && chosen.has(`${row.__meta.partner}|||${row.__meta.segment}`));
-    if (!exportRows.length) { setAnnouncement('Selecione ao menos uma régua sem pendências para exportar.'); return; }
-    const filename = `TB_BRIEFING_CAMPANHA_AQUISICAO_${new Date().toISOString().slice(0, 10)}.csv`;
+  const confirmExport = (weekKeys: Set<string>, filename: string) => {
+    const exportRows = rows.filter((row) => row.__meta.status !== 'archived'
+      && weekKeys.has(weekKeyFor(row.__meta.partner, row.__meta.segment, row.__meta.weekKey)));
+    if (!exportRows.length) { setAnnouncement('Selecione ao menos uma semana sem pendências para exportar.'); return; }
     downloadText(filename, exportBriefingCsv(onlyCsvRows(exportRows)));
-    const labels = rulerExportOptions.filter((option) => chosen.has(option.key)).map((option) => option.label);
-    setAnnouncement(`${filename} gerado com ${labels.length} ${labels.length === 1 ? 'régua' : 'réguas'}: ${labels.join('; ')}.`);
+    setAnnouncement(`${filename} gerado com ${exportRows.length} ${exportRows.length === 1 ? 'linha' : 'linhas'} de ${weekKeys.size} ${weekKeys.size === 1 ? 'semana' : 'semanas'}.`);
     void recordExport(filename, exportRows, []);
     setExportOpen(false);
   };
@@ -941,7 +937,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
             <button disabled={!activeRows.length} onClick={openExport} title={activeRows.length ? 'Escolher réguas e baixar o CSV para o SFMC' : (exportBlockReason || 'Nada para exportar')} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
             {exportBlockReason && !activeRows.length && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportBlockReason}</p>}
-            {Boolean(activeRows.length) && technicalErrorCount > 0 && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportableRulerCount ? 'Réguas com pendências ficam fora do CSV — escolha as prontas ao exportar.' : `Corrija ${technicalErrorCount} ${technicalErrorCount === 1 ? 'erro bloqueante' : 'erros bloqueantes'} para liberar a exportação.`}</p>}
+            {Boolean(activeRows.length) && technicalErrorCount > 0 && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportableWeekCount ? 'Semanas com pendências ficam fora do CSV — escolha as prontas ao exportar.' : `Corrija ${technicalErrorCount} ${technicalErrorCount === 1 ? 'erro bloqueante' : 'erros bloqueantes'} para liberar a exportação.`}</p>}
           </div>}
         </div>
       </div>
@@ -1136,34 +1132,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
     {renameTarget && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="rename-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl"><h2 id="rename-title" className="font-bold text-slate-900">{renameTarget.kind === 'week' ? 'Renomear semana' : 'Renomear régua'}</h2><p className="mt-1 text-sm leading-5 text-slate-600">{renameTarget.kind === 'week' ? 'O novo nome vale para todos os e-mails desta semana.' : 'O novo segmento vale para todos os e-mails da régua. Ele fica como rascunho de taxonomia até ser vinculado a um segmento observado em activities.'}</p><label className="mt-3 block text-xs font-semibold text-slate-700">{renameTarget.kind === 'week' ? 'Nome da semana' : 'Segmento técnico'}<input autoFocus value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void confirmRename(); }} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"/></label><div className="mt-5 flex justify-end gap-2"><button onClick={() => setRenameTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Cancelar</button><button disabled={!renameValue.trim() || renameValue.trim() === renameTarget.current} onClick={() => void confirmRename()} className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white hover:bg-[#064c4e] disabled:cursor-not-allowed disabled:opacity-40"><Pencil size={15}/>Salvar</button></div></div></div>}
     {signatureManagerOpen && selected && <SignatureManagerModal rows={rows} selected={selected} settings={signatureSettings} onClose={() => setSignatureManagerOpen(false)} onVariantStatus={(row, status) => void changeVariantStatus(row, status)} onGlobalStatus={(setting, status) => void changeGlobalSignature(setting, status)} onAdd={addSignatureToSelectedGroup}/>}
     {saveOpen && selected && <SaveDialog selected={selected} errors={selectedGroupErrorCount} saving={isSaving} onClose={() => !isSaving && setSaveOpen(false)} onSave={saveCurrent} updateSelected={updateSelected}/>}
-    {exportOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="export-csv-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setExportOpen(false); }}>
-      <div className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl bg-white p-5 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-50 text-cyan-700"><Download size={18}/></span>
-          <div className="min-w-0"><h2 id="export-csv-title" className="font-bold text-slate-900">Exportar CSV para o SFMC</h2><p className="mt-1 text-sm leading-5 text-slate-600">Escolha quais réguas entram no arquivo <code className="rounded bg-slate-100 px-1 text-[11px]">TB_BRIEFING_CAMPANHA_AQUISICAO</code>. Réguas com pendências bloqueantes não podem ser exportadas.</p></div>
-        </div>
-        <div className="mt-4 min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-          {rulerExportOptions.map((option) => {
-            const blocked = option.errorGroups > 0;
-            const checked = exportSelection.has(option.key) && !blocked;
-            return <label key={option.key} className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 text-sm ${blocked ? 'cursor-not-allowed border-slate-200 bg-slate-50 opacity-70' : checked ? 'cursor-pointer border-cyan-300 bg-cyan-50/60' : 'cursor-pointer border-slate-200 hover:border-cyan-200'}`}>
-              <input type="checkbox" disabled={blocked} checked={checked} onChange={(event) => setExportSelection((current) => { const next = new Set(current); if (event.target.checked) next.add(option.key); else next.delete(option.key); return next; })} className="mt-0.5 h-4 w-4 accent-cyan-600"/>
-              <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900">{option.label}</span><span className="mt-0.5 block text-xs text-slate-500">{option.total} {option.total === 1 ? 'e-mail' : 'e-mails'}{blocked ? ` · ${option.errorGroups} com pendência bloqueante` : ''}</span></span>
-              {blocked ? <ShieldAlert size={15} className="mt-0.5 shrink-0 text-red-500"/> : <CheckCircle2 size={15} className={`mt-0.5 shrink-0 ${checked ? 'text-cyan-600' : 'text-slate-300'}`}/>}
-            </label>;
-          })}
-          {!rulerExportOptions.length && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Nenhuma régua ativa para exportar.</p>}
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <button type="button" onClick={() => setExportSelection(new Set(rulerExportOptions.filter((option) => option.errorGroups === 0).map((option) => option.key)))} className="text-xs font-bold text-cyan-700 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-cyan-500">Selecionar todas as prontas</button>
-          <span className="text-xs text-slate-500">{[...exportSelection].filter((key) => rulerExportOptions.some((option) => option.key === key && option.errorGroups === 0)).length} selecionada(s)</span>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => setExportOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button>
-          <button type="button" onClick={confirmExport} disabled={![...exportSelection].some((key) => rulerExportOptions.some((option) => option.key === key && option.errorGroups === 0))} className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-bold text-white outline-none hover:bg-cyan-700 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Download size={15}/>Baixar CSV</button>
-        </div>
-      </div>
-    </div>}
+    {exportOpen && <ExportCsvDialog
+      groups={exportGroups}
+      today={new Date().toISOString().slice(0, 10)}
+      segmentLabel={segmentDisplayLabel}
+      onClose={() => setExportOpen(false)}
+      onConfirm={confirmExport}
+    />}
   </div>;
 };
 

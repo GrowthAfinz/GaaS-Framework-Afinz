@@ -143,7 +143,7 @@ const sequenceOrder = (value: string | undefined): number => {
 const byText = (a: string, b: string) => a.localeCompare(b, 'pt-BR');
 
 const slugify = (value: string): string => value
-  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
 
 const inScope = (partner: string | undefined, scope: AiContextScope): boolean =>
