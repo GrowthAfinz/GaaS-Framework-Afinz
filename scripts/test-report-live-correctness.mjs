@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildReport, toIsoDay, normalizeSnapshotManifest } from '../supabase/functions/report-sync/report-live-engine.ts';
 import { buildArtifact, validateArtifactIntegrity, certificationPassed, canonicalJson, validateRegression } from '../supabase/functions/report-sync/report-live-versioning.ts';
-import { parseReportRequest, requiresReportOperator } from '../supabase/functions/report-sync/report-live-policy.ts';
+import { parseReportRequest, reportRoleAllows, requiresReportOperator, selectReportWorkerCredential, verifyReportWorkerCredential } from '../supabase/functions/report-sync/report-live-policy.ts';
 
 const contract = (code, view) => ({slide_code:code,section:'core',title:code,audience:'executivo',source_view:view,required_fields:[],optional_fields:[],fallback_view:null,implementation_readiness:'pronto_dado',conditional:false,display_order:1,active:true});
 const seed = () => ({runId:'11111111-1111-4111-8111-111111111111',profile:'monthly_report',periodStart:'2026-08-01',periodEnd:'2026-08-31',
@@ -71,6 +71,30 @@ test('invalid commands and dates never fall through to full',()=>{
 test('published PDF is readable by signed-in users while mutations require an operator',()=>{
  assert.equal(requiresReportOperator('export_pdf'),false);
  for(const mode of ['full','publish','rollback','resume_structure','worker']) assert.equal(requiresReportOperator(mode),true);
+});
+test('team roles separate candidate generation, live publication and access management',()=>{
+ assert.equal(reportRoleAllows('viewer','export_pdf'),true);
+ assert.equal(reportRoleAllows('viewer','build'),false);
+ assert.equal(reportRoleAllows('analyst','build'),true);
+ assert.equal(reportRoleAllows('analyst','publish'),false);
+ assert.equal(reportRoleAllows('publisher','full'),true);
+ assert.equal(reportRoleAllows('publisher','set_member'),false);
+ assert.equal(reportRoleAllows('admin','set_member'),true);
+ assert.equal(reportRoleAllows(null,'export_pdf'),false);
+});
+test('worker authentication survives a stripped custom header and transient verification errors',async()=>{
+ const token='a'.repeat(64);
+ assert.equal(selectReportWorkerCredential(token,''),token);
+ assert.equal(selectReportWorkerCredential(null,token),token);
+ assert.equal(selectReportWorkerCredential(null,'user.jwt.value'),null);
+ let calls=0, pauses=0;
+ const status=await verifyReportWorkerCredential(token,async()=>{
+  calls+=1;
+  return calls<3?{data:null,error:new Error('temporary')}:{data:true,error:null};
+ },3,async()=>{pauses+=1;});
+ assert.equal(status,'valid');assert.equal(calls,3);assert.equal(pauses,2);
+ assert.equal(await verifyReportWorkerCredential(token,async()=>({data:false,error:null})),'invalid');
+ assert.equal(await verifyReportWorkerCredential(token,async()=>({data:null,error:new Error('offline')}),2,async()=>{}),'unavailable');
 });
 test('business date retains date-only and uses Sao Paulo for timestamps',()=>{
  assert.equal(toIsoDay('2026-08-01'),'2026-08-01');
