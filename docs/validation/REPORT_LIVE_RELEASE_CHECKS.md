@@ -70,11 +70,21 @@ acesso pelo `service_role`.
 
 `report-sync` v43 está ativo e exige autenticação. Download do PDF publicado é
 permitido a usuários autenticados; geração, publicação, retomada e rollback exigem
-`report_live_role` de operador ou administrador. A manutenção permanece ativa até
-o frontend passar pelo workflow de `main` e ser confirmado na URL pública.
+`report_live_role` de operador ou administrador. A manutenção foi encerrada em
+13/09 depois da promoção do frontend e da confirmação do bundle na URL pública.
 
 O frontend do commit `96a9c74` foi confirmado no bundle servido pelo GitHub Pages.
 O worker durável foi ativado em seguida com frequência de um minuto; o primeiro
 ciclo retornou HTTP 200 e `{"idle":true}`, enquanto o watchdog continua ativo a
 cada cinco minutos. Leases impedem que invocações sobrepostas executem o mesmo
 efeito duas vezes.
+
+Na observação após a ativação, dois ciclos isolados responderam 401 e 500. O cron
+retomou sozinho no minuto seguinte e voltou a responder HTTP 200. Uma prova com
+cinco chamadas concorrentes também retornou `{"idle":true}` em todas elas, sem
+novo job, mudança do ponteiro ou alteração da publicação de agosto.
+
+O fechamento foi confirmado na `main` `18e1dd0`: manutenção desativada, cron ativo,
+job em `done`, publicação em `published`, estado Google `active`, QA aprovado e
+ponteiro ainda na versão 8. O run permaneceu certificado e válido; PDF e deck
+continuam com 57 páginas/slides.
