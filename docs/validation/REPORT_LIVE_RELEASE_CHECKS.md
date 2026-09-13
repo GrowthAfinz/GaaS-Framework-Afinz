@@ -72,3 +72,9 @@ acesso pelo `service_role`.
 permitido a usuários autenticados; geração, publicação, retomada e rollback exigem
 `report_live_role` de operador ou administrador. A manutenção permanece ativa até
 o frontend passar pelo workflow de `main` e ser confirmado na URL pública.
+
+O frontend do commit `96a9c74` foi confirmado no bundle servido pelo GitHub Pages.
+O worker durável foi ativado em seguida com frequência de um minuto; o primeiro
+ciclo retornou HTTP 200 e `{"idle":true}`, enquanto o watchdog continua ativo a
+cada cinco minutos. Leases impedem que invocações sobrepostas executem o mesmo
+efeito duas vezes.
