@@ -1,0 +1,30 @@
+name: Validate release
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - name: Frontend tests
+        run: npm test
+      - name: Report Live contract and recovery protocol tests
+        run: npm run test:report-live
+      - name: TypeScript regression gate (documented main debt)
+        run: npm run typecheck:release
+      - name: Edge Function type checks
+        run: npm run check:edge
+      - name: Production build
+        run: npm run build

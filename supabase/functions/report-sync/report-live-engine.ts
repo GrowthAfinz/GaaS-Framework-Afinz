@@ -5,6 +5,7 @@ export type DataState = "valor_observado" | "zero_observado" | "missing" | "nao_
 export type Row = Record<string, unknown>;
 
 export interface SourceManifest {
+  missing_sources?: string[];
   period_start: string;
   period_end: string;
   source_cutoffs: Record<string, string | null>;
@@ -16,6 +17,7 @@ export interface SourceManifest {
 }
 
 export interface SlideContract {
+  active?: boolean;
   slide_code: string;
   section: string;
   title: string;
@@ -38,6 +40,7 @@ export interface ReportInputs {
   crm: Row[];
   media: Row[];
   mediaActions: Row[];
+  eventMap?: Row[];
   b2c: Row[];
   goals: Row[];
   budgets: Row[];
@@ -85,8 +88,15 @@ export interface BuiltReport {
 
 const DAY = 86_400_000;
 
-export const toIsoDay = (value: unknown): string =>
-  value == null ? "" : String(value).slice(0, 10);
+export const toIsoDay = (value: unknown): string => {
+  if (value == null) return "";
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return "";
+  const shifted = new Date(parsed.getTime() - 3 * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+};
 
 export const toNumber = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -119,12 +129,14 @@ export function previousEquivalentPeriod(start: string, end: string) {
 
 export function classifyMediaFront(campaign: unknown): string {
   const value = String(campaign ?? "");
-  if (/COPA|RENTABILIZA|LP_Visa|DISPLAY_B2C_VISA|\[Demand\]|\[Youtube\]/i.test(value)) {
-    return "Marca B2C (Copa)";
-  }
   if (/\[SEGUROS\]/i.test(value)) return "Seguros";
   if (/\[PLURIX\]|mais_amigo/i.test(value)) return "Aquisição Plurix";
-  return "Aquisição B2C";
+  if (/AQUISICAO|APP_INSTALL|Download App/i.test(value)) return "Aquisição B2C";
+  if (/COPA|LP_Visa|DISPLAY_B2C_VISA/i.test(value)) return "Copa Visa";
+  if (/RENTABILIZA/i.test(value)) return "Rentabilização";
+  if (/\[B2B\]/i.test(value)) return "B2B";
+  if (/MARCA|BRANDING|\[Demand\]|\[Youtube\]/i.test(value)) return "Marca B2C";
+  return "Classificação pendente";
 }
 
 export function slug(value: unknown): string {
@@ -232,6 +244,9 @@ const ratio = (numerator: number | null, denominator: number | null): number | n
   return numerator / denominator;
 };
 
+const sumComplete = (rows: Row[], key: string): number | null =>
+  rows.some((row) => toNumber(row[key]) === null) ? null : sumNullable(rows, key);
+
 const delta = (current: number | null, previous: number | null): number | null => {
   if (current === null || previous === null || previous === 0) return null;
   return current / previous - 1;
@@ -276,16 +291,18 @@ const worstQuality = (...statuses: QualityStatus[]): QualityStatus =>
     qualityRank[current] > qualityRank[worst] ? current : worst, "confirmed");
 
 function crmMetrics(rows: Row[]) {
-  const baseTotal = sumNullable(rows, "Base Total");
-  const base = sumNullable(rows, "Base Acionável");
-  const proposals = sumNullable(rows, "Propostas");
-  const approved = sumNullable(rows, "Aprovados");
-  const cards = sumNullable(rows, "Cartões Gerados");
-  const cost = sumNullable(rows, "Custo Total Campanha");
-  const channelCost = sumNullable(rows, "Custo total canal");
-  const offerCost = sumNullable(rows, "Custo Total da Oferta");
-  const opens = sumNullable(rows, "Abertura");
-  const clicks = sumNullable(rows, "Cliques");
+  const baseTotal = sumComplete(rows, "Base Total");
+  const base = sumComplete(rows, "Base Acionável");
+  const proposals = sumComplete(rows, "Propostas");
+  const approved = sumComplete(rows, "Aprovados");
+  const cards = sumComplete(rows, "Cartões Gerados");
+  // A partial numerator must never be divided by all cards in the group.
+  const cost = rows.some((row) => toNumber(row["Custo Total Campanha"]) === null)
+    ? null : sumNullable(rows, "Custo Total Campanha");
+  const channelCost = sumComplete(rows, "Custo total canal");
+  const offerCost = sumComplete(rows, "Custo Total da Oferta");
+  const opens = sumComplete(rows, "Abertura");
+  const clicks = sumComplete(rows, "Cliques");
   return {
     dispatches: rows.length,
     base_total: baseTotal,
@@ -301,29 +318,21 @@ function crmMetrics(rows: Row[]) {
     proposal_rate: ratio(proposals, base),
     approval_rate: ratio(approved, proposals),
     card_rate_base: ratio(cards, base),
-    cac: ratio(cost, cards),
+    cac: rows.some((row) => toNumber(row["Cartões Gerados"]) === null) ? null : ratio(cost, cards),
     open_rate_proxy_base: ratio(opens, base),
     click_rate_open: ratio(clicks, opens),
   };
 }
 
 function mediaMetrics(rows: Row[]) {
-  const spend = sumNullable(rows, "spend");
-  const impressions = sumNullable(rows, "impressions");
-  const clicks = sumNullable(rows, "clicks");
-  const conversions = sumNullable(rows, "conversions");
-  const reach = sumNullable(rows, "reach");
-  const installs = sumNullable(rows, "installs");
-  const startTrials = sumNullable(rows, "start_trials");
-  let weightedFrequencyNumerator = 0;
-  let weightedFrequencyDenominator = 0;
-  for (const row of rows) {
-    const frequency = toNumber(row.frequency);
-    const rowImpressions = toNumber(row.impressions);
-    if (frequency === null || rowImpressions === null) continue;
-    weightedFrequencyNumerator += frequency * rowImpressions;
-    weightedFrequencyDenominator += rowImpressions;
-  }
+  const spend = sumComplete(rows, "spend");
+  const impressions = sumComplete(rows, "impressions");
+  const clicks = sumComplete(rows, "clicks");
+  // Generic conversions do not identify an event or attribution window.
+  const conversions: number | null = null;
+  const reach = rows.length === 1 ? toNumber(rows[0].reach) : null;
+  const installs: number | null = null;
+  const startTrials: number | null = null;
   return {
     rows: rows.length,
     spend,
@@ -335,13 +344,11 @@ function mediaMetrics(rows: Row[]) {
     start_trials: startTrials,
     ctr: ratio(clicks, impressions),
     cpc: ratio(spend, clicks),
-    cpm: impressions ? (spend ?? 0) / impressions * 1000 : null,
+    cpm: impressions && spend !== null ? spend / impressions * 1000 : null,
     cpa_platform: ratio(spend, conversions),
     cost_per_install: ratio(spend, installs),
     cost_per_start_trial: ratio(spend, startTrials),
-    frequency_weighted: weightedFrequencyDenominator
-      ? weightedFrequencyNumerator / weightedFrequencyDenominator
-      : null,
+    frequency_weighted: rows.length === 1 ? toNumber(rows[0].frequency) : null,
   };
 }
 
@@ -372,6 +379,27 @@ const sourceDate = (row: Row, source: "crm" | "media" | "b2c" | "action" | "insu
   if (source === "action") return row.business_date;
   return row.date;
 };
+
+export function normalizeSnapshotManifest(input: ReportInputs): ReportInputs {
+  const current = (rows: Row[], source: "crm" | "media" | "b2c" | "action" | "insurance") => rows.filter(row=>inWindow(sourceDate(row,source),input.periodStart,input.periodEnd));
+  const crm=current(input.crm,"crm"),media=current(input.media,"media"),b2c=current(input.b2c,"b2c");
+  const actions=current(input.mediaActions,"action").filter(row=>row.grain_level==='ad'&&row.grain_role==='fact');
+  const insurance=current(input.insurance,"insurance").filter(row=>String(row.BU).toLowerCase()==='seguros'||String(row.Segmento).toLowerCase()==='seguro');
+  const cutoff=(rows: Row[],source:"crm"|"media"|"b2c"|"action"|"insurance")=>rows.reduce<string|null>((latest,row)=>{const day=toIsoDay(sourceDate(row,source));return day&&(!latest||day>latest)?day:latest;},null);
+  const cutoffs={...input.manifest.source_cutoffs,crm:cutoff(crm,"crm"),media:cutoff(media,"media"),b2c:cutoff(b2c,"b2c"),insurance:cutoff(insurance,"insurance"),media_events:cutoff(actions,"action")};
+  const core=[cutoffs.crm,cutoffs.media,cutoffs.b2c];
+  const integrated=core.every(Boolean)?(core as string[]).sort()[0]:null;
+  const coverage=(rows:Row[],predicate:(row:Row)=>boolean)=>rows.length?rows.filter(predicate).length/rows.length:null;
+  const eventAdDays=new Set(actions.filter(row=>row.canonical_event&&toNumber(row.value)!==null).map(row=>`${String(row.channel).toLowerCase()}|${row.ad_id}|${toIsoDay(row.business_date)}`));
+  return {...input,manifest:{...input.manifest,source_cutoffs:cutoffs,data_reading_integrated:integrated,
+    gap_closure_days:integrated?Math.max(0,(dateValue(input.periodEnd)-dateValue(integrated))/DAY):null,
+    missing_sources:Object.entries({crm,media,b2c}).filter(([,rows])=>!rows.length).map(([key])=>key),
+    field_coverage:{...input.manifest.field_coverage,crm_rows:crm.length,media_rows:media.length,media_event_rows:actions.length,
+      media_named_event:coverage(actions,row=>Boolean(row.canonical_event)),
+      media_attribution_window:coverage(actions,row=>Boolean(row.effective_attribution_window)&&!/(mixed|default|unknown)/i.test(String(row.effective_attribution_window))),
+      media_ad_day_event_coverage:coverage(media,row=>eventAdDays.has(`${String(row.channel).toLowerCase()}|${row.ad_id}|${toIsoDay(row.date)}`))},
+    comparability:{...input.manifest.comparability,event_coverage_source:"frozen mv_paid_media_actions_latest; ad/fact",event_scope_rule:"Eventos não representam campanhas/anúncios ausentes da coleta governada."}}};
+}
 
 function buildPartnerModes(crmCurrent: Row[], config: Record<string, unknown>) {
   const materiality = (config.materiality ?? {}) as Record<string, unknown>;
@@ -427,13 +455,14 @@ function canonicalCampaignKey(row: Row, aliases: Row[]): string {
   const channel = String(row.channel ?? "").toLowerCase();
   const campaign = String(row.campaign ?? row.campaign_name ?? "");
   const sourceId = String(row.campaign_id ?? "");
-  const found = aliases.find((alias) => {
+  const matches = aliases.filter((alias) => {
     const samePlatform = String(alias.platform ?? "").toLowerCase() === channel;
-    if (!samePlatform) return false;
-    if (sourceId && String(alias.source_campaign_id ?? "") === sourceId) return true;
+    if (!samePlatform || alias.certification_status !== "certified") return false;
+    if (sourceId) return String(alias.source_campaign_id ?? "") === sourceId;
     return String(alias.source_campaign_name ?? "") === campaign;
   });
-  return String(found?.canonical_campaign_id ?? `${channel || "unknown"}:name:${slug(campaign)}`);
+  const found = matches.length === 1 ? matches[0] : undefined;
+  return String(found?.canonical_campaign_id ?? (sourceId ? `${channel}:campaign:${sourceId}` : `${channel || "unknown"}:name:${encodeURIComponent(campaign)}`));
 }
 
 function buildDeterministicCandidates(
@@ -619,9 +648,14 @@ function buildFieldCoverage(input: ReportInputs): Array<Record<string, unknown>>
   ];
   const output: Array<Record<string, unknown>> = [];
   for (const [source, rows] of sources) {
-    const fields = [...new Set(rows.flatMap((row) => Object.keys(row)))].sort();
-    for (const field of fields) {
-      const observed = rows.filter((row) => row[field] !== null && row[field] !== undefined && row[field] !== "").length;
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      for (const [field, value] of Object.entries(row)) {
+        counts.set(field, (counts.get(field) ?? 0) + (value !== null && value !== undefined && value !== "" ? 1 : 0));
+      }
+    }
+    for (const field of [...counts.keys()].sort()) {
+      const observed = counts.get(field)!;
       const privacyExcluded = field === "user_id" || field === "owner_id" || field === "created_by";
       output.push({
         source,
@@ -632,14 +666,60 @@ function buildFieldCoverage(input: ReportInputs): Array<Record<string, unknown>>
         consumer: privacyExcluded ? "" : consumers[field] ?? "",
         exclusion: privacyExcluded
           ? "Excluído do snapshot por privacidade; não é necessário para a decisão."
-          : consumers[field]
-          ? ""
-          : "Preservado na fonte; sem consumidor analítico na v1.0.",
-        status: privacyExcluded ? "excluded_privacy" : consumers[field] ? "consumed" : "excluded_justified",
+          : "",
+        status: privacyExcluded ? "excluded_privacy" : consumers[field] ? "consumed" : "unmapped",
       });
     }
   }
   return output;
+}
+
+function missingContractFields(contract: SlideContract, rows: unknown[][], input: ReportInputs, partner: string | null): string[] {
+  const header = (rows[0] ?? []).map(String);
+  const body = rows.slice(1).map((row) => Object.fromEntries(header.map((key,index) => [key,row[index]])));
+  const observed = (value: unknown) => value !== null && value !== undefined && value !== "";
+  const aliases: Record<string, string[]> = {
+    crm_cards: ["cards","cartoes_crm","Cartões"], crm_cost: ["cost","custo_crm"], crm_base: ["base","base_sum","Base acionável"],
+    media_spend: ["spend","investimento_midia"], proposals: ["proposals","Propostas"], approved: ["approved","Aprovados"],
+    b2c_type: ["source_type","tipo"], b2c_proposals: ["proposals","propostas_total"], b2c_emissions: ["emissions","emissoes_total"],
+    dispatch_count: ["dispatches"], frequency: ["frequency_weighted","frequency"], metric_definition: ["definition"],
+    aggregation_rule: ["rule"], campaign_alias: ["canonical_campaign_id"], field_consumer_or_exclusion: ["status"],
+  };
+  const contextual: Record<string, boolean> = {
+    partner: Boolean(partner) || body.length > 0 && body.every((row) => observed(row.partner)),
+    source_cutoffs: Object.values(input.manifest.source_cutoffs).some(observed),
+    field_coverage: Object.values(input.manifest.field_coverage).some(observed),
+    previous_equivalent_period: Boolean(input.periodStart && input.periodEnd),
+    daily_metrics: body.length > 0 && body.every((row) => observed(row.crm_cards) && observed(row.crm_cost) && observed(row.media_spend)),
+    partner_rollup: body.length > 0, materiality_config: Boolean(input.config.materiality),
+    approved_actions: input.actionOutcomes.length > 0, outcomes: input.actionOutcomes.length > 0,
+    action_candidates: body.length > 0, partner_action_candidate: body.length > 0, media_action_candidate: body.length > 0,
+    collection_runs: input.collectionRuns.length > 0 || input.collectionLogs.length > 0,
+    event_coverage: toNumber(input.manifest.field_coverage.media_named_event) === 1,
+    named_event: body.length > 0 && body.every((row) => row.result_state === "observed"),
+    visa_coverage: body.length > 0 && body.every((row) => observed(row.platform_result)),
+    insurance_source: input.insurance.some((row) => (String(row.BU).toLowerCase() === "seguros" || String(row.Segmento).toLowerCase() === "seguro") && inWindow(row["Data de Disparo"],input.periodStart,input.periodEnd)),
+    activities_template_coverage: body.some((row) => row.scope === "activities.template_id" && observed(row.coverage)),
+    slot_mapping_coverage: body.some((row) => row.scope === "communication_slots.current_template_id" && observed(row.coverage)),
+    valid_experiment: body.length > 0, collection_incident: body.length > 0, quality_config: Boolean(input.config.quality),
+  };
+  if (contract.source_view === "VIEW_B2C_PARALLEL_FUNNELS") {
+    const crm = body.filter(row => row.source_type === "CRM activities");
+    const b2c = body.filter(row => row.source_type !== "CRM activities");
+    contextual.crm_cards = crm.length > 0 && crm.every(row => observed(row.emissions));
+    contextual.b2c_proposals = b2c.length > 0 && b2c.every(row => observed(row.proposals));
+    contextual.b2c_emissions = b2c.length > 0 && b2c.every(row => observed(row.emissions));
+  }
+  return contract.required_fields.filter((field) => {
+    if (field in contextual) return !contextual[field];
+    const keys = [field, ...(aliases[field] ?? [])];
+    for (const key of keys) {
+      if (header.includes(key)) return !body.length || !body.every((row) => observed(row[key]));
+      const keyed = body.filter((row) => [row.metric,row.stage,row.campo].some((value) => slug(value) === slug(key)));
+      if (keyed.length) return !keyed.every((row) => observed(row.current ?? row.value ?? row.valor));
+    }
+    return true;
+  });
 }
 
 function buildSlides(
@@ -655,6 +735,9 @@ function buildSlides(
   const averageCoverage = coverageValues.length
     ? coverageValues.reduce((sum, value) => sum + value, 0) / coverageValues.length
     : null;
+  const qualityConfig = (input.config.quality ?? {}) as Record<string, unknown>;
+  const minimumCoverage = toNumber(qualityConfig.minimum_field_coverage) ?? 0.8;
+  const minimumRows = toNumber(qualityConfig.minimum_execution_rows) ?? 3;
   const add = (
     contract: SlideContract,
     instance: string,
@@ -662,21 +745,58 @@ function buildSlides(
     view: string | null,
     override?: Partial<SlideRun>,
   ) => {
+    const requestedView = view;
+    if ((!view || !tabs[view] || tabs[view].length < 2) && contract.fallback_view && tabs[contract.fallback_view]?.length > 1) {
+      view = contract.fallback_view;
+    }
     const hasView = Boolean(view && tabs[view] && tabs[view].length > 1);
+    // Partner views depend on CRM, not on the availability of B2C origination.
+    // Keep the global manifest for mixed-source views until their dependencies
+    // have an explicit contract; do not guess dependencies from slide titles.
+    const crmOnly = contract.section === "partner";
+    const relevantCutoff = crmOnly ? input.manifest.source_cutoffs.crm : input.manifest.data_reading_integrated;
+    const cutoffMaturity = relevantCutoff === input.periodEnd ? 1 : relevantCutoff ? 0.5 : 0;
+    const viewRows = view && tabs[view] ? tabs[view] : [];
+    const bodyRows = viewRows.slice(1);
+    const missingFields = missingContractFields(contract, viewRows, input, partner);
+    const observedCells = bodyRows.reduce(
+      (count, row) => count + row.filter((value) => value !== null && value !== undefined && value !== "").length,
+      0,
+    );
+    const possibleCells = bodyRows.length * (viewRows[0]?.length ?? 0);
+    const viewCoverage = possibleCells ? observedCells / possibleCells : null;
     let eligibility: Eligibility = hasView ? "render" : "omitir_bloqueado";
-    let quality = manifestQuality;
-    let fallback: string | null = null;
-    if (!hasView && contract.fallback_view && tabs[contract.fallback_view]?.length > 1) {
+    const executionVolume = contract.slide_code === "C1"
+      ? input.crm.length + input.media.length + input.b2c.length
+      : bodyRows.length;
+    const degradedDimensions = [
+      viewCoverage === null || viewCoverage < minimumCoverage,
+      cutoffMaturity < 1,
+      executionVolume < minimumRows,
+    ].filter(Boolean).length;
+    let quality: QualityStatus = degradedDimensions === 0
+      ? "confirmed"
+      : degradedDimensions === 1
+      ? "directional"
+      : "suspect";
+    if (!crmOnly) quality = worstQuality(quality, manifestQuality);
+    const fallback = view !== requestedView ? view : null;
+    if (fallback) {
       eligibility = "render_com_limites";
-      fallback = contract.fallback_view;
       quality = worstQuality(quality, "directional");
-    } else if (!hasView && !contract.conditional && contract.section === "core") {
+    } else if (!hasView && !contract.conditional) {
       eligibility = "render_com_limites";
       quality = "blocked";
     }
-    if (contract.implementation_readiness === "bloqueado_fonte") {
-      eligibility = contract.conditional ? "omitir_bloqueado" : "render_com_limites";
+    if (contract.implementation_readiness.startsWith("bloqueado_")) {
+      eligibility = !contract.conditional
+        ? "render_com_limites"
+        : "omitir_bloqueado";
       quality = worstQuality(quality, "blocked");
+    }
+    if (hasView && missingFields.length) {
+      eligibility = "render_com_limites";
+      quality = worstQuality(quality, "suspect");
     }
     output.push({
       run_id: input.runId,
@@ -688,12 +808,14 @@ function buildSlides(
       run_eligibility: eligibility,
       confidence_status: quality,
       confidence_label: labelForQuality(quality),
-      data_coverage: averageCoverage,
-      cutoff_maturity: input.manifest.data_reading_integrated === input.periodEnd ? 1 : 0.5,
-      execution_volume: null,
-      missing_required_fields: hasView ? [] : contract.required_fields,
+      data_coverage: viewCoverage ?? averageCoverage,
+      cutoff_maturity: cutoffMaturity,
+      execution_volume: executionVolume,
+      missing_required_fields: missingFields,
       fallback_applied: fallback,
       evidence: {
+        requested_view: requestedView,
+        quality_scope: crmOnly ? ["crm"] : ["integrated"],
         view_exists: hasView,
         native_cutoffs: input.manifest.source_cutoffs,
         gap_closure_days: input.manifest.gap_closure_days,
@@ -702,7 +824,7 @@ function buildSlides(
     });
   };
 
-  for (const contract of input.slideContracts.sort((a, b) => a.display_order - b.display_order)) {
+  for (const contract of [...input.slideContracts].filter((item) => item.active !== false).sort((a, b) => a.display_order - b.display_order)) {
     if (contract.section === "partner") continue;
     const view = contract.source_view;
     const conditionalAvailability: Record<string, boolean> = {
@@ -720,11 +842,13 @@ function buildSlides(
       });
       continue;
     }
-    add(contract, contract.slide_code.toLowerCase(), null, view);
+    const effectiveContract = contract.slide_code === "C3" && !input.manifest.data_reading_integrated
+      ? { ...contract, fallback_view: "VIEW_SCORECARD_NATIVE" } : contract;
+    add(effectiveContract, contract.slide_code.toLowerCase(), null, view);
   }
 
   const partnerContracts = input.slideContracts
-    .filter((contract) => contract.section === "partner")
+    .filter((contract) => contract.active !== false && contract.section === "partner")
     .sort((a, b) => a.display_order - b.display_order);
   for (const partner of partnerModes.filter((item) => item.mode !== "quality_flag")) {
     const partnerName = String(partner.partner);
@@ -752,6 +876,20 @@ function buildSlides(
 
 export function buildReport(input: ReportInputs): BuiltReport {
   const previous = previousEquivalentPeriod(input.periodStart, input.periodEnd);
+  const campaignIdsByAd = new Map<string, Set<string>>();
+  for (const action of input.mediaActions) {
+    if (action.grain_level !== "ad" || action.grain_role !== "fact" || !action.ad_id || !action.campaign_id) continue;
+    const key = `${String(action.channel).toLowerCase()}|${action.ad_id}`;
+    const ids = campaignIdsByAd.get(key) ?? new Set<string>();
+    ids.add(String(action.campaign_id)); campaignIdsByAd.set(key,ids);
+  }
+  const withMediaIdentity = (row: Row): Row => {
+    const ids = campaignIdsByAd.get(`${String(row.channel).toLowerCase()}|${row.ad_id}`);
+    const bridged = !row.campaign_id && ids?.size === 1 ? [...ids][0] : null;
+    const identified = { ...row, campaign_id: row.campaign_id ?? bridged };
+    return { ...identified, _report_campaign_id: canonicalCampaignKey(identified,input.aliases),
+      _identity_reason: bridged ? "ad_id_bridge" : row.campaign_id ? "source_id" : "alias_or_name" };
+  };
   // Parceiro canônico é derivado aqui, uma única vez, antes de qualquer agrupamento.
   // O bruto continua disponível em `partner_raw` para a trilha de auditoria.
   const crmCurrent = withCanonicalPartner(input.crm.filter((row) =>
@@ -759,16 +897,18 @@ export function buildReport(input: ReportInputs): BuiltReport {
   const crmPrevious = withCanonicalPartner(input.crm.filter((row) =>
     inWindow(sourceDate(row, "crm"), previous.start, previous.end)));
   const mediaCurrent = input.media.filter((row) =>
-    inWindow(sourceDate(row, "media"), input.periodStart, input.periodEnd));
+    inWindow(sourceDate(row, "media"), input.periodStart, input.periodEnd)).map(withMediaIdentity);
   const mediaPrevious = input.media.filter((row) =>
-    inWindow(sourceDate(row, "media"), previous.start, previous.end));
+    inWindow(sourceDate(row, "media"), previous.start, previous.end)).map(withMediaIdentity);
   const b2cCurrent = input.b2c.filter((row) =>
     inWindow(sourceDate(row, "b2c"), input.periodStart, input.periodEnd));
   const b2cPrevious = input.b2c.filter((row) =>
     inWindow(sourceDate(row, "b2c"), previous.start, previous.end));
   const actionsCurrent = input.mediaActions.filter((row) =>
+    row.grain_level === "ad" && row.grain_role === "fact" &&
     inWindow(sourceDate(row, "action"), input.periodStart, input.periodEnd));
   const insuranceCurrent = input.insurance.filter((row) =>
+    (String(row.BU).toLowerCase() === "seguros" || String(row.Segmento).toLowerCase() === "seguro") &&
     inWindow(sourceDate(row, "insurance"), input.periodStart, input.periodEnd));
 
   const crmNow = crmMetrics(crmCurrent);
@@ -827,6 +967,24 @@ export function buildReport(input: ReportInputs): BuiltReport {
     ],
   );
 
+  tabs.VIEW_SCORECARD_NATIVE = rowsToTable(
+    ["metric", "current", "previous_equivalent", "delta", "state", "definition"],
+    [
+      { metric: "investimento_midia", current: mediaNow.spend, previous_equivalent: mediaBefore.spend, delta: delta(mediaNow.spend, mediaBefore.spend), state: dataState(mediaNow.spend), definition: "SUM(spend); janela nativa de mídia" },
+      { metric: "cartoes_crm", current: crmNow.cards, previous_equivalent: crmBefore.cards, delta: delta(crmNow.cards, crmBefore.cards), state: dataState(crmNow.cards), definition: "SUM(Cartões Gerados); janela nativa CRM" },
+      { metric: "custo_crm", current: crmNow.cost, previous_equivalent: crmBefore.cost, delta: delta(crmNow.cost, crmBefore.cost), state: dataState(crmNow.cost), definition: "SUM(Custo Total Campanha); janela nativa CRM" },
+      { metric: "cac_crm", current: crmNow.cac, previous_equivalent: crmBefore.cac, delta: delta(crmNow.cac, crmBefore.cac), state: dataState(crmNow.cac), definition: "SUM(custo)/SUM(cartões); janela nativa CRM" },
+      { metric: "conversao_crm_base", current: crmNow.card_rate_base, previous_equivalent: crmBefore.card_rate_base, delta: delta(crmNow.card_rate_base, crmBefore.card_rate_base), state: dataState(crmNow.card_rate_base), definition: "SUM(cartões)/SUM(base acionável); janela nativa CRM" },
+    ],
+  );
+  {
+  const cutoff = input.manifest.data_reading_integrated;
+  const end = cutoff && cutoff < input.periodEnd ? cutoff : input.periodEnd;
+  const comparablePrevious = previousEquivalentPeriod(input.periodStart, end);
+  const crmNow = crmMetrics(cutoff ? crmCurrent.filter((row) => inWindow(sourceDate(row, "crm"), input.periodStart, end)) : []);
+  const crmBefore = crmMetrics(cutoff ? input.crm.filter((row) => inWindow(sourceDate(row, "crm"), comparablePrevious.start, comparablePrevious.end)) : []);
+  const mediaNow = mediaMetrics(cutoff ? mediaCurrent.filter((row) => inWindow(sourceDate(row, "media"), input.periodStart, end)) : []);
+  const mediaBefore = mediaMetrics(cutoff ? input.media.filter((row) => inWindow(sourceDate(row, "media"), comparablePrevious.start, comparablePrevious.end)) : []);
   tabs.VIEW_SCORECARD_INTEGRATED = rowsToTable(
     ["metric", "current", "previous_equivalent", "delta", "state", "definition"],
     [
@@ -837,36 +995,54 @@ export function buildReport(input: ReportInputs): BuiltReport {
       { metric: "conversao_crm_base", current: crmNow.card_rate_base, previous_equivalent: crmBefore.card_rate_base, delta: delta(crmNow.card_rate_base, crmBefore.card_rate_base), state: dataState(crmNow.card_rate_base), definition: "SUM(cartões)/SUM(base acionável)" },
     ],
   );
+  if (!cutoff) tabs.VIEW_SCORECARD_INTEGRATED = [tabs.VIEW_SCORECARD_INTEGRATED[0]];
+  }
+  tabs.VIEW_EXECUTIVE_READING = rowsToTable(
+    ["run_manifest", "core_kpis"],
+    [{
+      run_manifest: {
+        period_start: input.periodStart,
+        period_end: input.periodEnd,
+        source_cutoffs: input.manifest.source_cutoffs,
+        integrated_cutoff: input.manifest.data_reading_integrated,
+        quality_status: input.manifest.quality_status,
+      },
+      core_kpis: {
+        crm_cards: crmNow.cards,
+        crm_cost: crmNow.cost,
+        crm_cac: crmNow.cac,
+        crm_conversion: crmNow.card_rate_base,
+        media_spend: mediaNow.spend,
+      },
+    }],
+  );
 
-  const daily = new Map<string, Record<string, unknown>>();
-  for (const row of crmCurrent) {
-    const day = toIsoDay(sourceDate(row, "crm"));
-    const item = daily.get(day) ?? { date: day, crm_cards: 0, crm_cost: 0, media_spend: 0 };
-    item.crm_cards = (toNumber(item.crm_cards) ?? 0) + (toNumber(row["Cartões Gerados"]) ?? 0);
-    item.crm_cost = (toNumber(item.crm_cost) ?? 0) + (toNumber(row["Custo Total Campanha"]) ?? 0);
-    daily.set(day, item);
-  }
-  for (const row of mediaCurrent) {
-    const day = toIsoDay(sourceDate(row, "media"));
-    const item = daily.get(day) ?? { date: day, crm_cards: 0, crm_cost: 0, media_spend: 0 };
-    item.media_spend = (toNumber(item.media_spend) ?? 0) + (toNumber(row.spend) ?? 0);
-    daily.set(day, item);
-  }
-  let cumulativeCards = 0;
-  let cumulativeCrmCost = 0;
-  let cumulativeMediaSpend = 0;
-  const dailyRows = [...daily.values()].sort((a, b) => String(a.date).localeCompare(String(b.date))).map((row) => {
-    cumulativeCards += toNumber(row.crm_cards) ?? 0;
-    cumulativeCrmCost += toNumber(row.crm_cost) ?? 0;
-    cumulativeMediaSpend += toNumber(row.media_spend) ?? 0;
-    return {
-      ...row,
-      cumulative_cards: cumulativeCards,
-      cumulative_crm_cost: cumulativeCrmCost,
-      cumulative_media_spend: cumulativeMediaSpend,
-      cumulative_cac: cumulativeCards ? cumulativeCrmCost / cumulativeCards : null,
+  // A row with a missing metric is not a zero observation. Once incomplete,
+  // a cumulative total remains incomplete for the rest of this window.
+  const crmDays = groupRows(crmCurrent.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "crm")) })), ["day"]);
+  const mediaDays = groupRows(mediaCurrent.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "media")) })), ["day"]);
+  const byDay = (groups: Map<string, Row[]>) => new Map([...groups.values()].map((rows) => [String(rows[0].day), rows]));
+  const crmByDay = byDay(crmDays);
+  const mediaByDay = byDay(mediaDays);
+  const completeSum = (rows: Row[], field: string) => rows.length && rows.every((row) => toNumber(row[field]) !== null) ? sumNullable(rows, field) : null;
+  const cumulative: Record<string, number | null> = { crm_cards: 0, crm_cost: 0, media_spend: 0 };
+  const dailyRows: Row[] = [];
+  for (let timestamp = dateValue(input.periodStart); timestamp <= dateValue(input.periodEnd); timestamp += DAY) {
+    const day = isoFromMs(timestamp);
+    const row: Row = {
+      date: day,
+      crm_cards: completeSum(crmByDay.get(day) ?? [], "Cartões Gerados"),
+      crm_cost: completeSum(crmByDay.get(day) ?? [], "Custo Total Campanha"),
+      media_spend: completeSum(mediaByDay.get(day) ?? [], "spend"),
     };
-  });
+    for (const field of Object.keys(cumulative)) {
+      const value = toNumber(row[field]);
+      const previousValue = cumulative[field];
+      cumulative[field] = previousValue === null || value === null ? null : previousValue + value;
+    }
+    dailyRows.push({ ...row, cumulative_cards: cumulative.crm_cards, cumulative_crm_cost: cumulative.crm_cost,
+      cumulative_media_spend: cumulative.media_spend, cumulative_cac: ratio(cumulative.crm_cost, cumulative.crm_cards) });
+  }
   tabs.VIEW_PACING_ISODAYS = rowsToTable(
     ["date", "crm_cards", "crm_cost", "media_spend", "cumulative_cards", "cumulative_crm_cost", "cumulative_media_spend", "cumulative_cac"],
     dailyRows,
@@ -954,7 +1130,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
     );
     const channelRows = [...groupRows(rows, ["Segmento", "Canal"]).values()].map((group) => {
       const metrics = crmMetrics(group);
-      return { segment: group[0]?.Segmento, channel: group[0]?.Canal, cards: metrics.cards, base: metrics.base, cost: metrics.cost, channel_cost: metrics.channel_cost, cac: ratio(metrics.channel_cost ?? metrics.cost, metrics.cards), conversion: metrics.card_rate_base };
+      return { segment: group[0]?.Segmento, channel: group[0]?.Canal, cards: metrics.cards, base: metrics.base, cost: metrics.cost, channel_cost: metrics.channel_cost, cac: metrics.cac, conversion: metrics.card_rate_base };
     });
     tabs[tabName("VP", partnerName, "CHANNELS")] = rowsToTable(
       ["segment", "channel", "cards", "base", "cost", "channel_cost", "cac", "conversion"],
@@ -1069,37 +1245,51 @@ export function buildReport(input: ReportInputs): BuiltReport {
     mediaMixRows,
   );
 
-  const campaignRows = [...groupRows(mediaCurrent, ["channel", "campaign", "objective"]).values()].map((rows) => {
+  const campaignRows = [...groupRows(mediaCurrent, ["channel", "_report_campaign_id", "objective"]).values()].map((rows) => {
     const metrics = mediaMetrics(rows);
     const canonicalId = canonicalCampaignKey(rows[0], input.aliases);
     const events = actionsCurrent.filter((action) =>
       String(action.channel ?? "").toLowerCase() === String(rows[0]?.channel ?? "").toLowerCase() &&
       (String(action.campaign_name ?? "") === String(rows[0]?.campaign ?? "") ||
         String(action.campaign_id ?? "") === canonicalId.split(":").slice(-1)[0]));
-    const eventGroups = [...groupRows(events, ["canonical_event", "source_event_name", "effective_attribution_window"]).values()]
+    // Results explicitly reported by the platform are eligible only through
+    // the certified event map. Volume is never an event-selection policy.
+    const governed = events.filter((action) => action.source === "meta_results" && (input.eventMap ?? []).some((mapping) =>
+      mapping.source === action.source && mapping.source_event_name === action.source_event_name &&
+      mapping.canonical_event === action.canonical_event && mapping.is_primary_measure === true &&
+      mapping.confidence === "trusted" && Boolean(mapping.certified_at) &&
+      String(mapping.valid_from) <= toIsoDay(action.business_date) &&
+      (!mapping.valid_to || String(mapping.valid_to) >= toIsoDay(action.business_date))));
+    const eventGroups = [...groupRows(governed, ["source", "canonical_event", "source_event_name", "effective_attribution_window"]).values()]
       .map((group) => ({
         event: group[0]?.canonical_event ?? group[0]?.source_event_name,
         attribution_window: group[0]?.effective_attribution_window ?? group[0]?.reported_attribution_window,
-        value: sumNullable(group, "value"),
-      }))
-      .sort((a, b) => (toNumber(b.value) ?? 0) - (toNumber(a.value) ?? 0));
-    const primaryEvent = eventGroups[0];
+        value: sumNullable(group.filter((row) => ["available","explicit_zero"].includes(String(row.observation_status))), "value"),
+      })).filter((group) => group.value !== null);
+    const primaryEvent = eventGroups.length === 1 ? eventGroups[0] : undefined;
+    const observedKeys = new Set(governed.filter((action) => action.canonical_event === primaryEvent?.event &&
+      action.effective_attribution_window === primaryEvent?.attribution_window &&
+      ["available","explicit_zero"].includes(String(action.observation_status)) && toNumber(action.value) !== null)
+      .map((action) => `${toIsoDay(action.business_date)}|${action.ad_id}`));
+    const complete = Boolean(primaryEvent?.attribution_window) && !/(mixed|default|unknown)/i.test(String(primaryEvent?.attribution_window)) && rows.every((row) =>
+      Boolean(row.ad_id) && observedKeys.has(`${toIsoDay(row.date)}|${row.ad_id}`));
     return {
       canonical_campaign_id: canonicalId,
       display_name: rows[0]?.campaign,
       channel: rows[0]?.channel,
       objective: rows[0]?.objective,
       spend: metrics.spend,
-      result_event: primaryEvent?.event ?? rows[0]?.objective ?? "evento não certificado",
-      result_value: primaryEvent?.value ?? metrics.conversions,
+      result_event: primaryEvent?.event ?? "evento não certificado ou ambíguo",
+      result_value: primaryEvent?.value ?? null,
       attribution_window: primaryEvent?.attribution_window ?? "",
-      cpa_event: primaryEvent?.event ? `CPA ${primaryEvent.event}` : "CPA plataforma",
-      cpa_value: ratio(metrics.spend, primaryEvent?.value ?? metrics.conversions),
-      identity_status: canonicalId.includes(":name:") ? "alias_pending" : "source_id",
+      cpa_event: primaryEvent?.event ? `CPA ${primaryEvent.event}` : "CPA indisponível",
+      cpa_value: complete ? ratio(metrics.spend, primaryEvent?.value ?? null) : null,
+      result_state: !primaryEvent ? "missing_or_ambiguous" : complete ? "observed" : "partial",
+      identity_status: canonicalId.includes(":name:") ? "alias_pending" : rows[0]._identity_reason === "ad_id_bridge" ? "ad_id_bridge" : "source_id_or_certified_alias",
     };
   });
   tabs.VIEW_MEDIA_CAMPAIGNS = rowsToTable(
-    ["canonical_campaign_id", "display_name", "channel", "objective", "spend", "result_event", "result_value", "attribution_window", "cpa_event", "cpa_value", "identity_status"],
+    ["canonical_campaign_id", "display_name", "channel", "objective", "spend", "result_event", "result_value", "attribution_window", "cpa_event", "cpa_value", "identity_status", "result_state"],
     campaignRows.sort((a, b) => (toNumber(b.spend) ?? 0) - (toNumber(a.spend) ?? 0)),
   );
 
@@ -1163,11 +1353,27 @@ export function buildReport(input: ReportInputs): BuiltReport {
 
   const b2cGroups = [...groupRows(b2cCurrent, ["tipo"]).values()].map((rows) => ({
     source_type: rows[0]?.tipo,
-    proposals: sumNullable(rows, "propostas_total"),
-    emissions: sumNullable(rows, "emissoes_total"),
-    conversion: ratio(sumNullable(rows, "emissoes_total"), sumNullable(rows, "propostas_total")),
+    proposals: sumComplete(rows, "propostas_total"),
+    emissions: sumComplete(rows, "emissoes_total"),
+    conversion: ratio(sumComplete(rows, "emissoes_total"), sumComplete(rows, "propostas_total")),
     additive: false,
   }));
+
+  // Sem B2C, esta view ainda traria a linha do CRM — e o B1 ("Funis em
+  // paralelo") renderizaria um funil só, sem sinal de que o outro sumiu.
+  // Ausência silenciosa é pior que quadro vermelho: quem lê conclui que o
+  // paralelo foi feito. A linha explícita abaixo mantém o slide honesto e, por
+  // ter métricas nulas, derruba a cobertura da view — o que rebaixa a confiança
+  // do slide automaticamente, sem regra especial.
+  if (!b2cGroups.length) {
+    b2cGroups.push({
+      source_type: "B2C — indisponível no período",
+      proposals: null,
+      emissions: null,
+      conversion: null,
+      additive: false,
+    });
+  }
   tabs.VIEW_B2C_PARALLEL_FUNNELS = rowsToTable(
     ["source_type", "proposals", "emissions", "conversion", "additive", "comparison_note"],
     [
@@ -1224,26 +1430,27 @@ export function buildReport(input: ReportInputs): BuiltReport {
     [
       { metric: "crm_dispatches", value: insuranceCurrent.length, state: dataState(insuranceCurrent.length), cutoff: input.manifest.source_cutoffs.insurance },
       { metric: "crm_base", value: crmMetrics(insuranceCurrent).base, state: dataState(crmMetrics(insuranceCurrent).base), cutoff: input.manifest.source_cutoffs.insurance },
-      { metric: "crm_cards", value: crmMetrics(insuranceCurrent).cards, state: dataState(crmMetrics(insuranceCurrent).cards), cutoff: input.manifest.source_cutoffs.insurance },
+      { metric: "crm_opens", value: crmMetrics(insuranceCurrent).opens, state: dataState(crmMetrics(insuranceCurrent).opens), cutoff: input.manifest.source_cutoffs.insurance },
+      { metric: "crm_clicks", value: crmMetrics(insuranceCurrent).clicks, state: dataState(crmMetrics(insuranceCurrent).clicks), cutoff: input.manifest.source_cutoffs.insurance },
       { metric: "media_spend", value: mediaMetrics(mediaCurrent.filter((row) => classifyMediaFront(row.campaign) === "Seguros")).spend, state: dataState(mediaMetrics(mediaCurrent.filter((row) => classifyMediaFront(row.campaign) === "Seguros")).spend), cutoff: input.manifest.source_cutoffs.media },
     ],
   );
   tabs.VIEW_VISA_OPTIN = rowsToTable(
     ["channel", "campaign", "spend", "platform_result", "measurement_rule"],
     mediaCurrent
-      .filter((row) => classifyMediaFront(row.campaign) === "Marca B2C (Copa)")
+      .filter((row) => classifyMediaFront(row.campaign) === "Copa Visa")
       .map((row) => ({
         channel: row.channel,
         campaign: row.campaign,
         spend: row.spend,
-        platform_result: row.conversions,
+        platform_result: null,
         measurement_rule: "Medir por opt-in/evento nomeado; nunca CAC.",
       })),
   );
   tabs.VIEW_QUALITY_INCIDENTS = rowsToTable(
     ["source", "status", "started_at", "finished_at", "rows_received", "rows_rejected", "error_summary"],
     input.collectionRuns.filter((row) =>
-      !["success", "done", "completed"].includes(String(row.status ?? "").toLowerCase()) ||
+      !["success", "done", "complete", "completed"].includes(String(row.status ?? "").toLowerCase()) ||
       (toNumber(row.rows_rejected) ?? 0) > 0),
   );
 

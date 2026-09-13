@@ -1,0 +1,3 @@
+# SQL template literals are compared with JavaScript strings in contract tests.
+# Keep checkout bytes reproducible on Windows and Linux.
+*.sql text eol=lf
