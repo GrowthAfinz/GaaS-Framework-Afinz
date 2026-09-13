@@ -18,7 +18,7 @@ Eles não certificam efeitos reais no Google nem a capacidade de restauração.
 Homologação dos documentos vivos, PDF visual, backend e bundle público continuam
 obrigatórios antes de declarar agosto entregue.
 
-Resultado local em 13/09: 124 testes Vitest e 39 testes Node do Report Live
+Resultado local em 13/09: 124 testes Vitest e 41 testes Node do Report Live
 aprovados; checagem Deno e build Vite aprovados; regressão TypeScript sem novos
 diagnósticos. A padronização de checkout
 `*.sql text eol=lf` elimina diferenças CRLF/LF nas comparações de templates entre
@@ -38,11 +38,11 @@ O workflow de Pages depende agora do workflow reutilizável de validação. Ele 
 instalação limpa, testes, gate de tipos, checagem Deno e build. Isso ainda não
 representa promoção de backend nem execução dos testes SQL de recuperação no CI.
 
-A conta identificada pela interface autenticada foi configurada em 12/09 como
-operador do Report Live: `pablo.castro@afinz.com.br`, usuário
-`187810b7-9f30-4a0d-ba85-721aa000107b`. A alteração foi restrita à chave
-`app_metadata.report_live_role` e confirmada por nova consulta. Claims em JWT
-podem precisar de renovação; o backend usa `auth.getUser` para verificar a conta.
+A autorização humana passou a usar `report_live_memberships`, independente da
+credencial do worker. A conta `pablo.castro@afinz.com.br`, usuário
+`187810b7-9f30-4a0d-ba85-721aa000107b`, foi preservada como administradora inicial.
+Mudanças de papel são atômicas e deixam histórico em
+`report_live_membership_audit`; não dependem de renovar claims do JWT.
 
 ## Homologação de agosto
 
@@ -68,10 +68,15 @@ Em 13/09, RLS foi habilitada e o acesso anônimo removido de `activities`,
 preservado para compatibilidade com os módulos atuais; funções de serviço mantêm
 acesso pelo `service_role`.
 
-`report-sync` v43 está ativo e exige autenticação. Download do PDF publicado é
-permitido a usuários autenticados; geração, publicação, retomada e rollback exigem
-`report_live_role` de operador ou administrador. A manutenção foi encerrada em
-13/09 depois da promoção do frontend e da confirmação do bundle na URL pública.
+`report-sync` exige autenticação. Download do PDF publicado é permitido a usuários
+autenticados; geração, publicação, retomada e rollback passam pelo papel registrado
+na tabela de membros. A manutenção foi encerrada em 13/09 depois da promoção do
+frontend e da confirmação do bundle na URL pública.
+
+O acesso humano agora separa leitor, analista, publicador e administrador. Leitor
+baixa a saída publicada; analista gera uma candidata imutável e certificada;
+publicador também promove a candidata aos documentos vivos; administrador gerencia
+a equipe. O run registra `requested_by` e a publicação preserva `published_by`.
 
 O frontend do commit `96a9c74` foi confirmado no bundle servido pelo GitHub Pages.
 O worker durável foi ativado em seguida com frequência de um minuto; o primeiro
@@ -79,10 +84,13 @@ ciclo retornou HTTP 200 e `{"idle":true}`, enquanto o watchdog continua ativo a
 cada cinco minutos. Leases impedem que invocações sobrepostas executem o mesmo
 efeito duas vezes.
 
-Na observação após a ativação, dois ciclos isolados responderam 401 e 500. O cron
-retomou sozinho no minuto seguinte e voltou a responder HTTP 200. Uma prova com
-cinco chamadas concorrentes também retornou `{"idle":true}` em todas elas, sem
-novo job, mudança do ponteiro ou alteração da publicação de agosto.
+Na observação após a ativação, houve respostas intermitentes 401 e uma resposta
+500. O cron retomou sozinho no minuto seguinte. O transporte da credencial interna
+foi então duplicado nos headers `Authorization` e `x-report-worker-token`; o Edge
+Function aceita o bearer de 64 caracteres somente após validá-lo contra o Vault e
+repete falhas transitórias dessa validação. Uma prova com cinco chamadas
+concorrentes retornou `{"idle":true}` em todas elas, sem novo job, mudança do
+ponteiro ou alteração da publicação de agosto.
 
 O fechamento foi confirmado na `main` `18e1dd0`: manutenção desativada, cron ativo,
 job em `done`, publicação em `published`, estado Google `active`, QA aprovado e

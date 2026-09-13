@@ -61,6 +61,33 @@ interface RuntimeSetting {
   message: string | null;
 }
 
+type ReportLiveRole = 'viewer' | 'analyst' | 'publisher' | 'admin';
+
+interface ReportAccess {
+  role: ReportLiveRole | null;
+  active: boolean;
+  capabilities: {
+    download: boolean;
+    generate: boolean;
+    publish: boolean;
+    manage_members: boolean;
+  };
+}
+
+interface ReportMember {
+  user_id: string;
+  email: string;
+  role: ReportLiveRole;
+  active: boolean;
+}
+
+const ROLE_LABELS: Record<ReportLiveRole, string> = {
+  viewer: 'Leitor',
+  analyst: 'Analista',
+  publisher: 'Publicador',
+  admin: 'Administrador',
+};
+
 const STAGES: Array<{ key: RunRow['status']; label: string }> = [
   { key: 'queued', label: 'Na fila' },
   { key: 'building', label: 'Calculando e preservando as fontes' },
@@ -160,10 +187,16 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
   const [run, setRun] = useState<RunRow | null>(null);
   const [checking, setChecking] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<RuntimeSetting>({ maintenance: false, message: null });
+  const [access, setAccess] = useState<ReportAccess | null>(null);
+  const [members, setMembers] = useState<ReportMember[]>([]);
+  const [memberEmail, setMemberEmail] = useState('');
+  const [memberRole, setMemberRole] = useState<ReportLiveRole>('analyst');
+  const [savingMember, setSavingMember] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -173,12 +206,31 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
     }
   }, []);
 
+  const loadAccess = useCallback(async () => {
+    const { data, error } = await supabase.functions.invoke('report-sync', {
+      body: { mode: 'access' },
+    });
+    if (error) {
+      setAccess(null);
+      return;
+    }
+    setAccess(data as ReportAccess);
+  }, []);
+
+  const loadMembers = useCallback(async () => {
+    const { data, error } = await supabase.functions.invoke('report-sync', {
+      body: { mode: 'members' },
+    });
+    if (!error) setMembers((data?.members ?? []) as ReportMember[]);
+  }, []);
+
   useEffect(() => {
     setPreflight(null);
     setCheckError(null);
   }, [periodEnd, periodStart]);
 
   useEffect(() => {
+    void loadAccess();
     supabase.from('report_live_runtime_settings').select('maintenance,message').eq('id', 'live')
       .maybeSingle().then(({ data }) => {
         if (data) setRuntime(data as RuntimeSetting);
@@ -193,7 +245,11 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         if (data?.[0]) setRun(data[0] as RunRow);
       });
     return stopPolling;
-  }, [stopPolling]);
+  }, [loadAccess, stopPolling]);
+
+  useEffect(() => {
+    if (access?.capabilities.manage_members) void loadMembers();
+  }, [access?.capabilities.manage_members, loadMembers]);
 
   useEffect(() => {
     const active = isRunActive(run);
@@ -303,7 +359,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
   }, [periodEnd, periodStart]);
 
   const generateReport = useCallback(async () => {
-    if (!preflight || preflight.gate === 'blocked') return;
+    if (!preflight || preflight.gate === 'blocked' || !access?.capabilities.generate) return;
     setGenerating(true);
     setCheckError(null);
     try {
@@ -311,7 +367,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
       const period_end = preflight.expectedDate;
       const { data, error } = await supabase.functions.invoke('report-sync', {
         body: {
-          mode: 'full',
+          mode: access.capabilities.publish ? 'full' : 'build',
           period_start,
           period_end,
           report_profile: 'monthly_report',
@@ -337,10 +393,57 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
     } finally {
       setGenerating(false);
     }
-  }, [periodEnd, periodStart, preflight]);
+  }, [access, periodEnd, periodStart, preflight]);
+
+  const publishCandidate = useCallback(async () => {
+    if (!run || run.status !== 'certified' || !access?.capabilities.publish) return;
+    setPublishing(true);
+    setCheckError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('report-sync', {
+        body: { mode: 'publish', run_id: run.id },
+      });
+      if (error) throw error;
+      if (!data?.publication_id) throw new Error('A publicação foi aceita sem retornar seu identificador.');
+      setRun(current => current ? {
+        ...current,
+        status: 'publishing',
+        active_run: true,
+        publication_status: 'publishing',
+      } : current);
+    } catch (error) {
+      console.error('Erro ao publicar candidata do Report Live', error);
+      setCheckError(error instanceof Error ? error.message : 'Não foi possível publicar a versão candidata.');
+    } finally {
+      setPublishing(false);
+    }
+  }, [access?.capabilities.publish, run]);
+
+  const saveMember = useCallback(async (
+    email: string,
+    role: ReportLiveRole,
+    active: boolean,
+  ) => {
+    if (!access?.capabilities.manage_members) return;
+    setSavingMember(true);
+    setCheckError(null);
+    try {
+      const { error } = await supabase.functions.invoke('report-sync', {
+        body: { mode: 'set_member', member_email: email, role, active },
+      });
+      if (error) throw error;
+      setMemberEmail('');
+      await loadMembers();
+    } catch (error) {
+      console.error('Erro ao atualizar equipe do Report Live', error);
+      setCheckError(error instanceof Error ? error.message : 'Não foi possível atualizar o acesso da equipe.');
+    } finally {
+      setSavingMember(false);
+    }
+  }, [access?.capabilities.manage_members, loadMembers]);
 
   const downloadPdf = useCallback(async () => {
-    if (!run || run.status !== 'done' || run.publication_valid !== true || runtime.maintenance) return;
+    if (!run || run.status !== 'done' || run.publication_valid !== true || runtime.maintenance || !access?.capabilities.download) return;
     setDownloadingPdf(true);
     setCheckError(null);
     try {
@@ -369,7 +472,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
     } finally {
       setDownloadingPdf(false);
     }
-  }, [run, runtime.maintenance]);
+  }, [access?.capabilities.download, run, runtime.maintenance]);
 
   const inProgress = isRunActive(run);
   const published = run?.status === 'done' && run.publication_valid === true;
@@ -383,18 +486,31 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
         <ShieldCheck size={19} className="shrink-0 text-cyan-600" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-slate-800">Report Google Live</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-bold text-slate-800">Report Google Live</p>
+            {access?.role && (
+              <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-700">
+                {ROLE_LABELS[access.role]}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500">
-            Primeiro valida as fontes. Depois libera a criação do rascunho e a publicação.
+            {access?.capabilities.generate
+              ? 'Primeiro valida as fontes. Depois libera a criação da candidata e, conforme o papel, a publicação.'
+              : 'Consulte as saídas publicadas. A geração requer papel de analista ou superior.'}
           </p>
         </div>
         <button
           onClick={prepareReport}
-          disabled={checking || inProgress || runtime.maintenance}
+          disabled={checking || inProgress || runtime.maintenance || !access?.capabilities.generate}
           className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60"
         >
           {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-          {checking ? 'Validando...' : preflight ? 'Validar novamente' : 'Preparar relatório'}
+          {checking
+            ? 'Validando...'
+            : !access?.capabilities.generate
+              ? 'Somente leitura'
+              : preflight ? 'Validar novamente' : 'Preparar relatório'}
         </button>
       </div>
 
@@ -488,7 +604,9 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
                 {generating || inProgress
                   ? <Loader2 size={13} className="animate-spin" />
                   : <Presentation size={13} />}
-                {generating || inProgress ? 'Atualizando deck vivo...' : 'Atualizar planilha e deck vivos'}
+                {generating || inProgress
+                  ? access?.capabilities.publish ? 'Atualizando deck vivo...' : 'Gerando candidata...'
+                  : access?.capabilities.publish ? 'Atualizar planilha e deck vivos' : 'Gerar versão candidata'}
               </button>
             </div>
           )}
@@ -545,7 +663,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
             <button
               type="button"
               onClick={downloadPdf}
-              disabled={downloadingPdf || runtime.maintenance}
+              disabled={downloadingPdf || runtime.maintenance || !access?.capabilities.download}
               className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-white px-3 py-1.5 text-xs font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 disabled:cursor-wait disabled:opacity-60"
             >
               {downloadingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
@@ -557,11 +675,26 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
 
       {run && !inProgress && !published && !FAILED_STATUSES.has(run.status) && (
         <div className="border-t border-amber-100 bg-amber-50/60 px-4 py-3 text-xs text-amber-800">
-          {run.status === 'certified'
-            ? 'Relatório certificado tecnicamente. A publicação no Google ainda não foi confirmada.'
-            : run.status === 'superseded'
-              ? 'Esta execução foi substituída por outra versão.'
-              : `Execução encerrada com estado “${run.status}”. Publicação não confirmada.`}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {run.status === 'certified'
+                ? 'Versão candidata certificada. A planilha e o deck vivos ainda não foram atualizados.'
+                : run.status === 'superseded'
+                  ? 'Esta execução foi substituída por outra versão.'
+                  : `Execução encerrada com estado “${run.status}”. Publicação não confirmada.`}
+            </span>
+            {run.status === 'certified' && access?.capabilities.publish && (
+              <button
+                type="button"
+                onClick={publishCandidate}
+                disabled={publishing || runtime.maintenance}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 disabled:cursor-wait disabled:opacity-60"
+              >
+                {publishing ? <Loader2 size={13} className="animate-spin" /> : <Presentation size={13} />}
+                {publishing ? 'Publicando...' : 'Publicar candidata'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -572,6 +705,80 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
           </p>
           <p className="break-words text-xs text-red-500">{run.error_detail ?? 'Erro sem detalhe registrado.'}</p>
         </div>
+      )}
+
+      {access?.capabilities.manage_members && (
+        <details className="border-t border-cyan-100 bg-white/80 px-4 py-3">
+          <summary className="cursor-pointer text-xs font-bold text-slate-700">Equipe e permissões</summary>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Analistas geram candidatas; publicadores atualizam os documentos vivos; administradores gerenciam acessos.
+          </p>
+          <form
+            className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveMember(memberEmail, memberRole, true);
+            }}
+          >
+            <input
+              type="email"
+              required
+              value={memberEmail}
+              onChange={event => setMemberEmail(event.target.value)}
+              placeholder="pessoa@afinz.com.br"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-cyan-400"
+            />
+            <select
+              value={memberRole}
+              onChange={event => setMemberRole(event.target.value as ReportLiveRole)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-cyan-400"
+            >
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              disabled={savingMember}
+              className="rounded-lg bg-cyan-600 px-3 py-2 text-xs font-bold text-white hover:bg-cyan-700 disabled:opacity-60"
+            >
+              {savingMember ? 'Salvando...' : 'Adicionar acesso'}
+            </button>
+          </form>
+
+          <div className="mt-3 space-y-2">
+            {members.map(member => (
+              <div key={member.user_id} className="flex flex-col gap-2 rounded-lg border border-slate-200 px-3 py-2 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-slate-700">{member.email}</p>
+                  <p className={`text-[10px] font-semibold ${member.active ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {member.active ? 'Acesso ativo' : 'Acesso desativado'}
+                  </p>
+                </div>
+                <select
+                  value={member.role}
+                  disabled={savingMember}
+                  onChange={event => void saveMember(member.email, event.target.value as ReportLiveRole, member.active)}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
+                >
+                  {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={savingMember}
+                  onClick={() => void saveMember(member.email, member.role, !member.active)}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${member.active
+                    ? 'border-red-200 text-red-600 hover:bg-red-50'
+                    : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
+                >
+                  {member.active ? 'Desativar' : 'Reativar'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );

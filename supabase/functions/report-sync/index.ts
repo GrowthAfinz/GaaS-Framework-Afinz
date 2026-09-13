@@ -4,7 +4,13 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { PDFDocument } from "pdf-lib";
-import { parseReportRequest, requiresReportOperator } from "./report-live-policy.ts";
+import {
+  parseReportRequest,
+  reportRoleAllows,
+  selectReportWorkerCredential,
+  verifyReportWorkerCredential,
+  type ReportLiveRole,
+} from "./report-live-policy.ts";
 import { getOrCreateImmutableFile } from "./report-live-immutable-file.ts";
 import { compileRecoveryManifest, type RecoveryEvidence } from "./report-live-recovery.ts";
 import {
@@ -2199,7 +2205,11 @@ async function processBuildStep(requestedRunId?: string) {
           const certification = await certifyStoredArtifact(runId, stored);
           await setStatus(runId, certification.certified ? "certified" : "rejected", { active_run: false });
           if (certification.certified && options.auto_publish === true) {
-            await enqueuePublication(runId, stored, null);
+            await enqueuePublication(
+              runId,
+              stored,
+              options.requester_id ? String(options.requester_id) : null,
+            );
           }
           await finish("done");
         } else throw new Error(`Etapa desconhecida: ${job.phase}`);
@@ -2454,6 +2464,18 @@ async function processPublicationStep(publicationId: string) {
   }
 }
 
+async function findAuthUserByEmail(email: string) {
+  const perPage = 200;
+  for (let page = 1; page <= 50; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`Não foi possível consultar usuários: ${error.message}`);
+    const match = data.users.find((user) => user.email?.toLowerCase() === email);
+    if (match) return match;
+    if (data.users.length < perPage) break;
+  }
+  return null;
+}
+
 export async function handleReportRequest(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (request.method === "GET") {
@@ -2489,23 +2511,42 @@ export async function handleReportRequest(request: Request): Promise<Response> {
   }
 
   const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  const workerToken = request.headers.get("x-report-worker-token");
+  const workerToken = selectReportWorkerCredential(
+    request.headers.get("x-report-worker-token"),
+    bearer,
+  );
   let internal = Boolean(SERVICE_KEY && bearer === SERVICE_KEY);
   let requesterId: string | null = null;
+  let requesterRole: ReportLiveRole | null = null;
   if (!internal && workerToken) {
-    const verified = await admin.rpc("report_live_verify_worker", { p_token: workerToken });
-    internal = !verified.error && verified.data === true;
+    const verification = await verifyReportWorkerCredential(
+      workerToken,
+      async (credential) => {
+        const result = await admin.rpc("report_live_verify_worker", { p_token: credential });
+        return { data: result.data as boolean | null, error: result.error };
+      },
+    );
+    if (verification === "unavailable") {
+      console.error("Report Live worker credential verification unavailable after retries.");
+      return json({ error: "Autenticação interna temporariamente indisponível." }, 503);
+    }
+    internal = verification === "valid";
   }
   if (!internal && !bearer) return json({ error: "Autenticação obrigatória." }, 401);
   if (!internal) {
     const { data, error } = await admin.auth.getUser(bearer);
     if (error || !data.user) return json({ error: "Sessão inválida." }, 401);
     requesterId = data.user.id;
-    if (requiresReportOperator(body.mode)) {
-      const role = data.user.app_metadata?.report_live_role;
-      if (role !== "operator" && role !== "admin") {
-        return json({ error: "Operação restrita ao responsável pelo Report Live." }, 403);
-      }
+    const membership = await admin.from("report_live_memberships")
+      .select("role,active").eq("user_id", requesterId).maybeSingle();
+    if (membership.error) {
+      return json({ error: "Não foi possível verificar o acesso ao Report Live." }, 503);
+    }
+    requesterRole = membership.data
+      ? membership.data.active === true ? membership.data.role as ReportLiveRole : null
+      : "viewer";
+    if (body.mode !== "access" && !reportRoleAllows(requesterRole, body.mode)) {
+      return json({ error: "Seu papel não permite esta operação no Report Live." }, 403);
     }
   }
   if (!internal && ["full", "publish", "rollback", "resume_structure", "export_pdf",
@@ -2515,6 +2556,51 @@ export async function handleReportRequest(request: Request): Promise<Response> {
     if (setting.error) return json({ error: "Não foi possível verificar a janela operacional." }, 503);
     if (setting.data?.maintenance === true) {
       return json({ error: setting.data.message ?? "Report Live em manutenção controlada." }, 503);
+    }
+  }
+  if (body.mode === "access") {
+    if (internal) return json({ role: "admin", internal: true });
+    return json({
+      role: requesterRole,
+      active: requesterRole !== null,
+      capabilities: {
+        download: reportRoleAllows(requesterRole, "export_pdf"),
+        generate: reportRoleAllows(requesterRole, "build"),
+        publish: reportRoleAllows(requesterRole, "publish"),
+        manage_members: reportRoleAllows(requesterRole, "members"),
+      },
+    });
+  }
+  if (body.mode === "members") {
+    const members = await admin.from("report_live_memberships")
+      .select("user_id,email,role,active,created_at,updated_at")
+      .order("email", { ascending: true });
+    if (members.error) return json({ error: members.error.message }, 500);
+    return json({ members: members.data ?? [] });
+  }
+  if (body.mode === "set_member") {
+    const email = String(body.member_email ?? "").trim().toLowerCase();
+    const role = String(body.role ?? "") as ReportLiveRole;
+    const active = body.active !== false;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "E-mail inválido." }, 400);
+    if (!["viewer", "analyst", "publisher", "admin"].includes(role)) return json({ error: "Papel inválido." }, 400);
+    try {
+      const target = await findAuthUserByEmail(email);
+      if (!target) return json({ error: "Usuário ainda não possui conta no GaaS." }, 404);
+      const changed = await admin.rpc("report_live_set_member", {
+        p_actor_id: requesterId,
+        p_user_id: target.id,
+        p_email: target.email?.toLowerCase() ?? email,
+        p_role: role,
+        p_active: active,
+      });
+      if (changed.error) {
+        const status = /próprio acesso/i.test(changed.error.message) ? 409 : 500;
+        return json({ error: changed.error.message }, status);
+      }
+      return json({ ok: true, member: changed.data });
+    } catch (error) {
+      return json({ error: String((error as Error).message).slice(0, 500) }, 500);
     }
   }
   if (body.mode === "worker") {
@@ -2882,6 +2968,7 @@ export async function handleReportRequest(request: Request): Promise<Response> {
     period_start: periodStart,
     period_end: periodEnd,
     status: "queued",
+    requested_by: requesterId,
   }).select().single();
   if (error || !run) {
     if (error?.code === "23505") {
@@ -2903,7 +2990,13 @@ export async function handleReportRequest(request: Request): Promise<Response> {
   const requestedMode = body.mode === "build" ? "build" : "full";
   const queued = await admin.from("report_build_jobs").insert({
     run_id: run.id,
-    options: { texts, skipLlm, phase: requestedMode, auto_publish: requestedMode === "full" },
+    options: {
+      texts,
+      skipLlm,
+      phase: requestedMode,
+      auto_publish: requestedMode === "full",
+      requester_id: requesterId,
+    },
   });
   if (queued.error) {
     await setStatus(run.id, "error", { active_run: false, error_detail: queued.error.message });

@@ -15,4 +15,12 @@ begin
   ) then
     raise exception 'FAIL: Report Live worker cron is not active';
   end if;
+
+  if position('Authorization' in pg_get_functiondef(
+    'public.report_live_dispatch_scheduled_worker()'::regprocedure
+  )) = 0 or position('x-report-worker-token' in pg_get_functiondef(
+    'public.report_live_dispatch_scheduled_worker()'::regprocedure
+  )) = 0 then
+    raise exception 'FAIL: worker dispatcher must send both internal authentication headers';
+  end if;
 end $$;
