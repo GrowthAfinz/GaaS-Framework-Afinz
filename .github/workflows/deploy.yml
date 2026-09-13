@@ -15,7 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+
   build-and-deploy:
+    needs: validate
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -27,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
       - name: Install dependencies

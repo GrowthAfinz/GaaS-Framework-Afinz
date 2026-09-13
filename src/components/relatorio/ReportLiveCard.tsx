@@ -1,33 +1,155 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { format } from 'date-fns';
-import { CloudUpload, ExternalLink, FileSpreadsheet, Presentation, RefreshCw, AlertTriangle, Check, Loader2 } from 'lucide-react';
+import {
+  differenceInCalendarDays,
+  format,
+  isAfter,
+  parseISO,
+  startOfDay,
+  subDays,
+} from 'date-fns';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Clock3,
+  ExternalLink,
+  FileDown,
+  FileSpreadsheet,
+  Loader2,
+  Presentation,
+  RefreshCw,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react';
 import { supabase } from '../../services/supabaseClient';
-
-/**
- * Report Google Live — dispara a Edge Function `report-sync` e acompanha o
- * progresso real via polling na tabela `report_runs` (RLS: anon só lê).
- * Planilha e deck têm links FIXOS — o mesmo link é atualizado a cada geração.
- */
 
 interface RunRow {
   id: string;
-  status: 'queued' | 'writing_sheets' | 'generating_narrative' | 'refreshing_slides' | 'done' | 'error';
+  status: string;
+  active_run?: boolean | null;
+  publication_valid?: boolean | null;
+  publication_status?: string | null;
   sheet_url: string | null;
   slides_url: string | null;
   error_detail: string | null;
   rows_inserted: number | null;
+  period_start: string | null;
+  period_end: string | null;
+}
+
+type SourceStatus = 'ready' | 'stale' | 'blocked';
+type GateStatus = 'ready' | 'limited' | 'blocked';
+
+interface SourceCheck {
+  key: 'crm' | 'media' | 'b2c';
+  label: string;
+  description: string;
+  latestDate: string | null;
+  status: SourceStatus;
+  detail: string;
+}
+
+interface PreflightResult {
+  gate: GateStatus;
+  expectedDate: string;
+  checkedAt: Date;
+  sources: SourceCheck[];
+}
+
+interface RuntimeSetting {
+  maintenance: boolean;
+  message: string | null;
 }
 
 const STAGES: Array<{ key: RunRow['status']; label: string }> = [
   { key: 'queued', label: 'Na fila' },
-  { key: 'writing_sheets', label: 'Sincronizando dados novos na planilha' },
-  { key: 'generating_narrative', label: 'Gerando narrativa — Analista → Redator → Crítico' },
-  { key: 'refreshing_slides', label: 'Atualizando deck e gráficos linkados' },
-  { key: 'done', label: 'Concluído' },
+  { key: 'building', label: 'Calculando e preservando as fontes' },
+  { key: 'certifying', label: 'Validando o relatório' },
+  { key: 'writing_sheets', label: 'Sincronizando dados na planilha' },
+  { key: 'generating_narrative', label: 'Preparando narrativa do rascunho' },
+  { key: 'refreshing_slides', label: 'Atualizando deck e gráficos vinculados' },
+  { key: 'publishing', label: 'Verificando a publicação' },
 ];
 
+const ACTIVE_STATUSES = new Set(STAGES.map(stage => stage.key));
+const FAILED_STATUSES = new Set(['error', 'rejected', 'stale', 'publication_failed', 'rollback_failed']);
+const RUN_FIELDS = 'id,status,active_run,publication_valid,publication_status,sheet_url,slides_url,error_detail,rows_inserted,period_start,period_end';
+const isRunActive = (value: RunRow | null): boolean => Boolean(value &&
+  !FAILED_STATUSES.has(value.status) && !['done', 'superseded'].includes(value.status) &&
+  (value.active_run === true || ACTIVE_STATUSES.has(value.status) || value.publication_status === 'publishing'));
+
 const stageIndex = (status: RunRow['status']): number =>
-  Math.max(0, STAGES.findIndex(s => s.key === status));
+  Math.max(0, STAGES.findIndex(stage => stage.key === (['built', 'certified'].includes(status) ? 'certifying' : status)));
+
+const formatSourceDate = (date: string | null): string => {
+  if (!date) return 'Sem dado no período';
+  return format(parseISO(date.slice(0, 10)), 'dd/MM/yyyy');
+};
+
+const buildSourceCheck = (
+  key: SourceCheck['key'],
+  label: string,
+  description: string,
+  latestDate: string | null,
+  expectedDate: string,
+  error?: string,
+): SourceCheck => {
+  if (error) {
+    return {
+      key,
+      label,
+      description,
+      latestDate: null,
+      status: 'blocked',
+      detail: 'Não foi possível consultar esta fonte.',
+    };
+  }
+
+  if (!latestDate) {
+    return {
+      key,
+      label,
+      description,
+      latestDate: null,
+      status: 'blocked',
+      detail: 'Nenhum registro encontrado no período selecionado.',
+    };
+  }
+
+  const normalizedDate = latestDate.slice(0, 10);
+  const delay = differenceInCalendarDays(parseISO(expectedDate), parseISO(normalizedDate));
+
+  if (delay <= 0) {
+    return {
+      key,
+      label,
+      description,
+      latestDate: normalizedDate,
+      status: 'ready',
+      detail: 'Atualizada até o último dia fechado.',
+    };
+  }
+
+  if (delay > 2) {
+    return {
+      key,
+      label,
+      description,
+      latestDate: normalizedDate,
+      status: 'blocked',
+      detail: `${delay} dias de defasagem; excede o limite de 2 dias do Report Live.`,
+    };
+  }
+
+  return {
+    key,
+    label,
+    description,
+    latestDate: normalizedDate,
+    status: 'stale',
+    detail: `${delay} ${delay === 1 ? 'dia' : 'dias'} de defasagem.`,
+  };
+};
 
 interface ReportLiveCardProps {
   periodStart: Date;
@@ -36,8 +158,12 @@ interface ReportLiveCardProps {
 
 export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, periodEnd }) => {
   const [run, setRun] = useState<RunRow | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [startError, setStartError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
+  const [runtime, setRuntime] = useState<RuntimeSetting>({ maintenance: false, message: null });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -47,122 +173,353 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
     }
   }, []);
 
-  // Ao montar, recupera a última run (permite reabrir a aba e ver o resultado)
   useEffect(() => {
+    setPreflight(null);
+    setCheckError(null);
+  }, [periodEnd, periodStart]);
+
+  useEffect(() => {
+    supabase.from('report_live_runtime_settings').select('maintenance,message').eq('id', 'live')
+      .maybeSingle().then(({ data }) => {
+        if (data) setRuntime(data as RuntimeSetting);
+      });
     supabase
       .from('report_runs')
-      .select('id,status,sheet_url,slides_url,error_detail,rows_inserted')
+      .select(RUN_FIELDS)
       .eq('report_type', 'midia_paga_crm_mensal')
       .order('created_at', { ascending: false })
       .limit(1)
       .then(({ data }) => {
-        if (data && data[0]) setRun(data[0] as RunRow);
+        if (data?.[0]) setRun(data[0] as RunRow);
       });
     return stopPolling;
   }, [stopPolling]);
 
-  // Polling enquanto a run estiver em andamento
   useEffect(() => {
-    const active = run && run.status !== 'done' && run.status !== 'error';
-    if (!active) {
+    const active = isRunActive(run);
+    if (!active || !run) {
       stopPolling();
       return;
     }
     if (pollRef.current) return;
+
     pollRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('report_runs')
-        .select('id,status,sheet_url,slides_url,error_detail,rows_inserted')
-        .eq('id', run!.id)
+        .select(RUN_FIELDS)
+        .eq('id', run.id)
         .single();
       if (data) setRun(data as RunRow);
     }, 2500);
+
     return stopPolling;
   }, [run, stopPolling]);
 
-  const startSync = useCallback(async () => {
-    setStarting(true);
-    setStartError(null);
+  const prepareReport = useCallback(async () => {
+    setChecking(true);
+    setCheckError(null);
+
+    const yesterday = subDays(startOfDay(new Date()), 1);
+    const reportEnd = startOfDay(periodEnd);
+    const expectedDay = isAfter(reportEnd, yesterday) ? yesterday : reportEnd;
+    const expectedDate = format(expectedDay, 'yyyy-MM-dd');
+    const startDate = format(periodStart, 'yyyy-MM-dd');
+
+    if (isAfter(startOfDay(periodStart), expectedDay)) {
+      setPreflight(null);
+      setCheckError('O período selecionado ainda não possui um dia fechado para validação.');
+      setChecking(false);
+      return;
+    }
+
     try {
-      const { data, error } = await supabase.functions.invoke('report-sync', {
-        body: {
-          period_start: format(periodStart, 'yyyy-MM-dd'),
-          period_end: format(periodEnd, 'yyyy-MM-dd'),
-        },
-      });
-      if (error) throw error;
-      if (!data?.run_id) throw new Error(data?.error ?? 'Função não retornou run_id');
-      setRun({ id: data.run_id, status: 'queued', sheet_url: null, slides_url: null, error_detail: null, rows_inserted: null });
-    } catch (err) {
-      console.error('Erro ao iniciar report-sync', err);
-      setStartError(err instanceof Error ? err.message : 'Erro desconhecido ao iniciar a sincronização.');
+      const [crmResult, mediaResult, b2cResult] = await Promise.all([
+        supabase
+          .from('activities')
+          .select('"Data de Disparo"')
+          .gte('"Data de Disparo"', `${startDate}T00:00:00`)
+          .lte('"Data de Disparo"', `${expectedDate}T23:59:59`)
+          .order('"Data de Disparo"', { ascending: false })
+          .limit(1),
+        supabase
+          .from('paid_media_metrics')
+          .select('date')
+          .gte('date', startDate)
+          .lte('date', expectedDate)
+          .order('date', { ascending: false })
+          .limit(1),
+        supabase
+          .from('b2c_daily_metrics')
+          .select('data')
+          .gte('data', startDate)
+          .lte('data', expectedDate)
+          .order('data', { ascending: false })
+          .limit(1),
+      ]);
+
+      const crmRow = crmResult.data?.[0] as Record<string, string> | undefined;
+      const mediaRow = mediaResult.data?.[0] as Record<string, string> | undefined;
+      const b2cRow = b2cResult.data?.[0] as Record<string, string> | undefined;
+
+      const sources = [
+        buildSourceCheck(
+          'crm',
+          'CRM Aquisição',
+          'Disparos e funil do activities',
+          crmRow?.['Data de Disparo'] ?? null,
+          expectedDate,
+          crmResult.error?.message,
+        ),
+        buildSourceCheck(
+          'media',
+          'Mídia paga',
+          'Investimento e performance por campanha',
+          mediaRow?.date ?? null,
+          expectedDate,
+          mediaResult.error?.message,
+        ),
+        buildSourceCheck(
+          'b2c',
+          'B2C consolidado',
+          'Cartões e CAC do funil consolidado',
+          b2cRow?.data ?? null,
+          expectedDate,
+          b2cResult.error?.message,
+        ),
+      ];
+
+      const crmBlocked = sources.find(source => source.key === 'crm')?.status === 'blocked';
+      const hasLimitedSource = sources.some(source => source.status !== 'ready');
+      const gate: GateStatus = crmBlocked ? 'blocked' : hasLimitedSource ? 'limited' : 'ready';
+
+      setPreflight({ gate, expectedDate, checkedAt: new Date(), sources });
+    } catch (error) {
+      console.error('Erro ao preparar Report Live', error);
+      setPreflight(null);
+      setCheckError(error instanceof Error ? error.message : 'Não foi possível validar as fontes do relatório.');
     } finally {
-      setStarting(false);
+      setChecking(false);
     }
   }, [periodEnd, periodStart]);
 
-  const inProgress = run !== null && run.status !== 'done' && run.status !== 'error';
+  const generateReport = useCallback(async () => {
+    if (!preflight || preflight.gate === 'blocked') return;
+    setGenerating(true);
+    setCheckError(null);
+    try {
+      const period_start = format(periodStart, 'yyyy-MM-dd');
+      const period_end = preflight.expectedDate;
+      const { data, error } = await supabase.functions.invoke('report-sync', {
+        body: {
+          mode: 'full',
+          period_start,
+          period_end,
+          report_profile: 'monthly_report',
+          skip_llm: true,
+        },
+      });
+      if (error) throw error;
+      const runId = String(data?.run_id ?? '');
+      if (!runId) throw new Error('A atualização foi aceita, mas não retornou o identificador da execução.');
+      setRun({
+        id: runId,
+        status: 'queued',
+        sheet_url: null,
+        slides_url: null,
+        error_detail: null,
+        rows_inserted: null,
+        period_start,
+        period_end,
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar Report Live', error);
+      setCheckError(error instanceof Error ? error.message : 'Não foi possível iniciar a atualização do Report Live.');
+    } finally {
+      setGenerating(false);
+    }
+  }, [periodEnd, periodStart, preflight]);
+
+  const downloadPdf = useCallback(async () => {
+    if (!run || run.status !== 'done' || run.publication_valid !== true || runtime.maintenance) return;
+    setDownloadingPdf(true);
+    setCheckError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('report-sync', {
+        body: { mode: 'export_pdf', run_id: run.id },
+      });
+      if (error) throw error;
+      const signedUrl = String(data?.signed_url ?? '');
+      if (!signedUrl) throw new Error('O PDF publicado não retornou um link de download.');
+
+      const response = await fetch(signedUrl);
+      if (!response.ok) throw new Error(`O arquivo publicado respondeu com status ${response.status}.`);
+      const objectUrl = URL.createObjectURL(await response.blob());
+
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `report-live-${run.period_start ?? 'publicado'}-${run.period_end ?? ''}.pdf`;
+      anchor.rel = 'noreferrer';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error('Erro ao baixar PDF publicado', error);
+      setCheckError(error instanceof Error ? error.message : 'Não foi possível baixar o PDF publicado.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }, [run, runtime.maintenance]);
+
+  const inProgress = isRunActive(run);
+  const published = run?.status === 'done' && run.publication_valid === true;
   const currentStage = run ? stageIndex(run.status) : -1;
+  const previousRunLabel = run?.period_start && run?.period_end
+    ? `${format(parseISO(run.period_start), 'dd/MM/yyyy')} – ${format(parseISO(run.period_end), 'dd/MM/yyyy')}`
+    : null;
 
   return (
-    <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/60 to-white overflow-hidden">
-      {/* Header do card */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <CloudUpload size={18} className="shrink-0 text-cyan-600" />
+    <div className="overflow-hidden rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/60 to-white">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+        <ShieldCheck size={19} className="shrink-0 text-cyan-600" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-slate-800">Report Google Live</p>
           <p className="text-xs text-slate-500">
-            Planilha + deck com links fixos, dados sincronizados e narrativa gerada por IA (Analista → Redator → Crítico)
+            Primeiro valida as fontes. Depois libera a criação do rascunho e a publicação.
           </p>
         </div>
         <button
-          onClick={startSync}
-          disabled={starting || inProgress}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60"
+          onClick={prepareReport}
+          disabled={checking || inProgress || runtime.maintenance}
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60"
         >
-          {starting || inProgress ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-          {inProgress ? 'Gerando...' : 'Gerar / Atualizar'}
+          {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {checking ? 'Validando...' : preflight ? 'Validar novamente' : 'Preparar relatório'}
         </button>
       </div>
 
-      {startError && (
-        <div className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          <span>{startError}</span>
+      {runtime.maintenance && (
+        <div className="mx-4 mb-3 flex items-start gap-2 rounded-lg border-2 border-red-500 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-800">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+          <span>{runtime.message ?? 'Report Live em manutenção controlada. Novas atualizações e downloads estão temporariamente bloqueados.'}</span>
         </div>
       )}
 
-      {/* Tela de processamento — estágios reais lidos de report_runs */}
+      {checkError && (
+        <div className="mx-4 mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <span>{checkError}</span>
+        </div>
+      )}
+
+      {preflight && (
+        <div className="border-t border-cyan-100 bg-white/80 px-4 py-3">
+          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold text-slate-700">Validação do último dia fechado</p>
+              <p className="text-[11px] text-slate-400">
+                Esperado: {formatSourceDate(preflight.expectedDate)} · verificado às {format(preflight.checkedAt, 'HH:mm')}
+              </p>
+            </div>
+            <span className={`inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              preflight.gate === 'ready'
+                ? 'bg-emerald-100 text-emerald-700'
+                : preflight.gate === 'limited'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-700'
+            }`}>
+              {preflight.gate === 'ready' ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+              {preflight.gate === 'ready' ? 'Pronto' : preflight.gate === 'limited' ? 'Com limites' : 'Publicação bloqueada'}
+            </span>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-3">
+            {preflight.sources.map(source => (
+              <div key={source.key} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <div className="flex items-start gap-2">
+                  {source.status === 'ready' ? (
+                    <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-500" />
+                  ) : source.status === 'stale' ? (
+                    <Clock3 size={15} className="mt-0.5 shrink-0 text-amber-500" />
+                  ) : (
+                    <XCircle size={15} className="mt-0.5 shrink-0 text-red-500" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-700">{source.label}</p>
+                    <p className="text-[11px] text-slate-400">{source.description}</p>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-600">
+                      Último dado: {formatSourceDate(source.latestDate)}
+                    </p>
+                    <p className={`text-[11px] ${
+                      source.status === 'ready' ? 'text-emerald-600' : source.status === 'stale' ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      {source.detail}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${
+            preflight.gate === 'ready'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : preflight.gate === 'limited'
+                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+          }`}>
+            {preflight.gate === 'ready' ? <Check size={14} className="mt-0.5 shrink-0" /> : <AlertTriangle size={14} className="mt-0.5 shrink-0" />}
+            <span>
+              {preflight.gate === 'ready'
+                ? 'Dados prontos. A próxima etapa segura é gerar o rascunho para revisão antes de publicar.'
+                : preflight.gate === 'limited'
+                  ? 'CRM e mídia estão atuais, mas o consolidado B2C está defasado. O rascunho pode ser analisado apenas com essa limitação explícita.'
+                  : 'A fonte obrigatória de CRM não chegou ao último dia fechado. A atualização do relatório permanece bloqueada.'}
+            </span>
+          </div>
+
+          {preflight.gate !== 'blocked' && (
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={generateReport}
+                disabled={generating || inProgress || runtime.maintenance}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+              >
+                {generating || inProgress
+                  ? <Loader2 size={13} className="animate-spin" />
+                  : <Presentation size={13} />}
+                {generating || inProgress ? 'Atualizando deck vivo...' : 'Atualizar planilha e deck vivos'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {inProgress && (
-        <div className="border-t border-cyan-100 bg-white/70 px-4 py-3 space-y-1.5">
-          {STAGES.slice(0, 4).map((stage, i) => (
+        <div className="space-y-1.5 border-t border-cyan-100 bg-white/70 px-4 py-3">
+          <p className="mb-2 text-xs font-bold text-slate-700">Atualização anterior ainda em andamento</p>
+          {STAGES.map((stage, index) => (
             <div key={stage.key} className="flex items-center gap-2 text-xs">
-              {i < currentStage ? (
+              {index < currentStage ? (
                 <Check size={13} className="shrink-0 text-emerald-500" />
-              ) : i === currentStage ? (
+              ) : index === currentStage ? (
                 <Loader2 size={13} className="shrink-0 animate-spin text-cyan-600" />
               ) : (
                 <span className="inline-block h-3 w-3 shrink-0 rounded-full border border-slate-300" />
               )}
-              <span className={i <= currentStage ? 'font-semibold text-slate-700' : 'text-slate-400'}>
+              <span className={index <= currentStage ? 'font-semibold text-slate-700' : 'text-slate-400'}>
                 {stage.label}
               </span>
-              {stage.key === 'writing_sheets' && i === currentStage && run?.rows_inserted != null && run.rows_inserted > 0 && (
-                <span className="text-slate-400">({run.rows_inserted} linhas novas)</span>
-              )}
             </div>
           ))}
         </div>
       )}
 
-      {/* Resultado — links fixos */}
-      {run?.status === 'done' && (
-        <div className="border-t border-cyan-100 bg-white/70 px-4 py-3">
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
-            <Check size={14} /> Report atualizado
-            {run.rows_inserted != null && run.rows_inserted > 0 && (
-              <span className="font-normal text-slate-400">· {run.rows_inserted} linhas novas sincronizadas</span>
-            )}
+      {published && run && (
+        <div className="border-t border-cyan-100 bg-slate-50/70 px-4 py-3">
+          <p className="mb-2 text-xs font-semibold text-slate-600">
+            Última saída disponível{previousRunLabel ? ` · ${previousRunLabel}` : ''}
+            {run.rows_inserted != null && run.rows_inserted > 0 ? ` · ${run.rows_inserted} linhas sincronizadas` : ''}
           </p>
           <div className="flex flex-wrap gap-2">
             {run.sheet_url && (
@@ -170,9 +527,9 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
                 href={run.sheet_url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
               >
-                <FileSpreadsheet size={13} /> Planilha (dados) <ExternalLink size={11} />
+                <FileSpreadsheet size={13} /> Planilha <ExternalLink size={11} />
               </a>
             )}
             {run.slides_url && (
@@ -180,28 +537,40 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
                 href={run.slides_url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
               >
-                <Presentation size={13} /> Apresentação (deck) <ExternalLink size={11} />
+                <Presentation size={13} /> Apresentação <ExternalLink size={11} />
               </a>
             )}
+            <button
+              type="button"
+              onClick={downloadPdf}
+              disabled={downloadingPdf || runtime.maintenance}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-200 bg-white px-3 py-1.5 text-xs font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 disabled:cursor-wait disabled:opacity-60"
+            >
+              {downloadingPdf ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+              {downloadingPdf ? 'Preparando PDF...' : 'Baixar PDF'}
+            </button>
           </div>
         </div>
       )}
 
-      {run?.status === 'error' && (
+      {run && !inProgress && !published && !FAILED_STATUSES.has(run.status) && (
+        <div className="border-t border-amber-100 bg-amber-50/60 px-4 py-3 text-xs text-amber-800">
+          {run.status === 'certified'
+            ? 'Relatório certificado tecnicamente. A publicação no Google ainda não foi confirmada.'
+            : run.status === 'superseded'
+              ? 'Esta execução foi substituída por outra versão.'
+              : `Execução encerrada com estado “${run.status}”. Publicação não confirmada.`}
+        </div>
+      )}
+
+      {run && FAILED_STATUSES.has(run.status) && (
         <div className="border-t border-red-100 bg-red-50/60 px-4 py-3">
           <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-red-600">
-            <AlertTriangle size={14} /> A geração falhou
+            <AlertTriangle size={14} /> A última atualização falhou
           </p>
-          <p className="text-xs text-red-500 break-words">{run.error_detail ?? 'Erro sem detalhe registrado.'}</p>
-          <button
-            onClick={startSync}
-            disabled={starting}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
-          >
-            <RefreshCw size={12} /> Tentar novamente
-          </button>
+          <p className="break-words text-xs text-red-500">{run.error_detail ?? 'Erro sem detalhe registrado.'}</p>
         </div>
       )}
     </div>
