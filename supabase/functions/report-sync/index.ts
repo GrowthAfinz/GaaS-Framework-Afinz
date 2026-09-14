@@ -2080,7 +2080,9 @@ async function processRun(
     phase: "build" | "full";
   },
 ) {
-  const input = await loadInputs(runId, profile, periodStart, periodEnd);
+  const input = normalizeSnapshotManifest(
+    await loadInputs(runId, profile, periodStart, periodEnd),
+  ) as Awaited<ReturnType<typeof loadInputs>>;
   const built = buildReport(input);
   await setStatus(runId, "building", {
     build_status: "building",

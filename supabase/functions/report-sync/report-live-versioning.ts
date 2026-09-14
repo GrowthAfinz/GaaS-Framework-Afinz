@@ -512,6 +512,9 @@ export function validateArtifact(artifact: ReportBuildArtifact): ValidationResul
   );
   const missingSources = artifact.manifest.missing_sources ?? [];
   const manifestBlocked = artifact.manifest.quality_status === "blocked";
+  const partnerResolutionGate = artifact.manifest.comparability?.partner_resolution_equivalence as
+    | { status?: string; mismatch_count?: number }
+    | undefined;
   const nothingToPublish = renderableSlides.length === 0;
   const publicationBlocked = manifestBlocked || nothingToPublish;
   push(
@@ -522,7 +525,9 @@ export function validateArtifact(artifact: ReportBuildArtifact): ValidationResul
     nothingToPublish
       ? "Nenhum slide elegível: não há relatório a publicar."
       : manifestBlocked
-      ? "Manifesto bloqueado: sem CRM não há relatório, apenas status."
+      ? partnerResolutionGate?.status === "blocked"
+        ? `Manifesto bloqueado: ${partnerResolutionGate.mismatch_count ?? 0} divergência(s) entre parceiro canônico SQL e TypeScript.`
+        : "Manifesto bloqueado: sem CRM não há relatório, apenas status."
       : missingSources.length
       ? `Publicação permitida com limites; fonte(s) ausente(s): ${missingSources.join(", ")}.`
       : "Manifesto permite certificação.",
