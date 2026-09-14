@@ -160,4 +160,3 @@ Estender `ReconciliationAudit.tsx`/`ReconciliationQueue.tsx` (ou criar aba irmã
 - Nunca atribuir 1:1 quando há empate de score entre duas ou mais candidatas — persistir todas em `candidate_activity_names`, sem escolher.
 - Rodar o golden-set de `taxonomy.ts` antes de qualquer merge que toque nas funções compartilhadas — regressão ali quebra silenciosamente o fluxo de Cadastro e Templates que já está em produção.
 - Escopo travado em `media_source='crm'` nesta fase — não tentar reconciliar mídia paga contra `activities` (não são a mesma classe de evento; mídia paga vai para o bridge com `paid_media_metrics`, assunto separado).
-

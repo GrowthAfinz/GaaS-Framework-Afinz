@@ -16,4 +16,3 @@ Ponto de entrada rápido para o pacote de specs deste tema. Ordem de leitura rec
 ## Estado
 
 Proposto em 2026-08-06, aguardando revisão do Codex. Nenhum código de produção foi alterado ainda.
-

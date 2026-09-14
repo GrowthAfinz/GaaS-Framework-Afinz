@@ -443,4 +443,3 @@ Depois:
 - [presentations.batchUpdate](https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations/batchUpdate): operações agrupadas e controle de escrita devem ser usados dentro dos limites do serviço, sem inferir transação entre serviços.
 
 A IA implementadora deve consultar documentação atual antes de escolher APIs/flags. As referências acima sustentam capacidades técnicas; as escolhas de arquitetura são recomendações de engenharia desta spec.
-

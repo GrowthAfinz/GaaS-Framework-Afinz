@@ -59,4 +59,3 @@ Só `media_source='crm'` em `appsflyer_acquisition_daily`/`appsflyer_campaign_da
 ### Trade-offs
 - A camada inferida (sem `af_sub3`) não é 100% automática por design — precisa de uma fila de revisão (reaproveitando o padrão UX da Fila de Reconciliação existente), o que é trabalho de operação, não só de engenharia.
 - Cobertura real de instalação↔activity continua limitada pela cobertura de link governado, que é um problema de processo fora do controle deste pipeline.
-
