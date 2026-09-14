@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@supabase/functions-js@2.110.8": "2.110.8",
+    "npm:@supabase/supabase-js@2": "2.110.8",
     "npm:@supabase/supabase-js@2.110.8": "2.110.8",
     "npm:openai@^4.52.5": "4.104.0",
     "npm:pdf-lib@1.17.1": "1.17.1"
