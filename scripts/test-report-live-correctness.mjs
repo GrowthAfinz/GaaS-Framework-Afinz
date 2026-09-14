@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildReport, toIsoDay, normalizeSnapshotManifest } from '../supabase/functions/report-sync/report-live-engine.ts';
-import { buildArtifact, validateArtifactIntegrity, certificationPassed, canonicalJson, validateRegression } from '../supabase/functions/report-sync/report-live-versioning.ts';
+import { buildArtifact, validateArtifact, validateArtifactIntegrity, certificationPassed, canonicalJson, validateRegression } from '../supabase/functions/report-sync/report-live-versioning.ts';
 import { parseReportRequest, reportRoleAllows, requiresReportOperator, selectReportWorkerCredential, verifyReportWorkerCredential } from '../supabase/functions/report-sync/report-live-policy.ts';
 
 const contract = (code, view) => ({slide_code:code,section:'core',title:code,audience:'executivo',source_view:view,required_fields:[],optional_fields:[],fallback_view:null,implementation_readiness:'pronto_dado',conditional:false,display_order:1,active:true});
 const seed = () => ({runId:'11111111-1111-4111-8111-111111111111',profile:'monthly_report',periodStart:'2026-08-01',periodEnd:'2026-08-31',
  manifest:{period_start:'2026-08-01',period_end:'2026-08-31',source_cutoffs:{crm:'2026-08-31',media:'2026-08-31',b2c:'2026-08-20'},data_reading_integrated:'2026-08-20',gap_closure_days:11,quality_status:'suspect',field_coverage:{crm_template:1},comparability:{}},
- crm:[{'Data de Disparo':'2026-08-01',BU:'B2C',Parceiro:'Serasa','Base Acionável':100,'Cartões Gerados':10,'Custo Total Campanha':100}],
+ crm:[{'Data de Disparo':'2026-08-01',BU:'B2C',Parceiro:'Serasa',parceiro_canonico:'Serasa',parceiro_canonico_motivo:'EXPLICIT_PARTNER',parceiro_canonico_confianca:'alta','Base Acionável':100,'Cartões Gerados':10,'Custo Total Campanha':100}],
  media:[],mediaActions:[],b2c:[],goals:[],budgets:[],targets:[],collectionRuns:[],collectionLogs:[],experiments:[],insurance:[],communicationSlots:[],communicationTemplates:[],slideContracts:[contract('C0','VIEW_RUN_MANIFEST'),contract('C3','VIEW_SCORECARD_INTEGRATED')],aliases:[],actionCandidates:[],actionOutcomes:[],metricCertifications:[],config:{quality:{minimum_execution_rows:1,minimum_field_coverage:0.1}}});
 const records = (table) => table.slice(1).map(row=>Object.fromEntries(table[0].map((key,i)=>[key,row[i]])));
 const artifact = async input => { const built=buildReport(input); return buildArtifact(input,built,Object.fromEntries(built.slides.map(slide=>[slide.slide_instance_id,'Narrativa de teste.']))); };
@@ -35,6 +35,52 @@ test('regression uses the current equivalent window and falls back to native CRM
  assert.equal(result.evidence.current,10);
  assert.equal(result.evidence.previous,8);
  assert.equal(result.evidence.comparison_source,'native');
+});
+
+test('real-snapshot partner drift blocks the existing publication gate',async()=>{
+ const input=seed();
+ const confirmed=normalizeSnapshotManifest(input);
+ assert.equal(confirmed.manifest.quality_status,'suspect');
+ assert.deepEqual(confirmed.manifest.comparability.partner_resolution_equivalence,{checked_rows:1,mismatch_count:0,status:'confirmed',sample:[]});
+ input.crm[0].parceiro_canonico_motivo='B2C_CAMPAIGN_TWIN_MATCH';
+ const blocked=normalizeSnapshotManifest(input);
+ assert.equal(blocked.manifest.quality_status,'blocked');
+ assert.equal(blocked.manifest.comparability.partner_resolution_equivalence.mismatch_count,1);
+ const validations=validateArtifact(await artifact(blocked));
+ const publicationGate=validations.find(row=>row.validation_key==='manifest.publication_gate');
+ assert.equal(publicationGate.status,'failed');
+ assert.match(publicationGate.message,/parceiro canônico SQL e TypeScript/);
+ assert.equal(certificationPassed(validations),false);
+});
+
+test('partner channel view has one row per channel and pp variation',()=>{
+ const input=seed();
+ input.slideContracts=[{...contract('P3',null),section:'partner'}];
+ const row=(date,channel,segment,cards)=>({'Data de Disparo':date,BU:'B2C',Parceiro:'Proprietaria',Segmento:segment,Canal:channel,
+   'Base Acionável':100,'Cartões Gerados':cards,'Custo Total Campanha':100});
+ input.crm=[
+   row('2026-08-01','E-mail','A',10),row('2026-08-02','E-mail','B',20),
+   row('2026-08-03','SMS','A',30),row('2026-08-04','WhatsApp','A',20),row('2026-08-05','Push','A',20),
+   row('2026-07-01','E-mail','A',40),row('2026-07-02','SMS','A',20),
+   row('2026-07-03','WhatsApp','A',20),row('2026-07-04','Push','A',20),
+ ];
+ const table=buildReport(input).tabs.VP_PROPRIETARIA_CHANNELS;
+ assert.deepEqual(table[0],['channel','cards','base','cost','channel_cost','cac','conversion','share','share_previous_equivalent','share_delta_pp']);
+ const rows=records(table);
+ assert.equal(rows.length,4);
+ assert.equal(rows.find(item=>item.channel==='E-mail').share,0.3);
+ assert.ok(Math.abs(rows.find(item=>item.channel==='E-mail').share_delta_pp-(-10))<1e-9);
+ assert.ok(Math.abs(rows.reduce((total,item)=>total+item.share,0)-1)<1e-9);
+});
+
+test('unresolved partner warns only when it carries cards',()=>{
+ const input=seed();
+ input.crm=[{'Data de Disparo':'2026-08-01',BU:'Seguros',Parceiro:null,'Base Acionável':100,'Cartões Gerados':0,'Custo Total Campanha':0}];
+ let candidates=buildReport(input).actionCandidates;
+ assert.equal(candidates.some(row=>row.signal_code==='PARTNER_NA_CLASSIFICATION'),false);
+ input.crm[0]['Cartões Gerados']=1;
+ candidates=buildReport(input).actionCandidates;
+ assert.equal(candidates.some(row=>row.signal_code==='PARTNER_NA_CLASSIFICATION'),true);
 });
 
 test('required unavailable front remains visible with blocked confidence',()=>{

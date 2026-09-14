@@ -11,6 +11,24 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,6 +40,8 @@ jobs:
         run: npm test
       - name: Report Live contract and recovery protocol tests
         run: npm run test:report-live
+      - name: Canonical partner SQL and TypeScript equivalence
+        run: node --test scripts/test-report-live-partner-equivalence.mjs
       - name: TypeScript regression gate (documented main debt)
         run: npm run typecheck:release
       - name: Edge Function type checks

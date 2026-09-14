@@ -161,14 +161,26 @@ export type PartnerResolution = {
   confidence: PartnerConfidence;
 };
 
+export type PartnerResolutionMismatch = {
+  row_index: number;
+  expected: PartnerResolution;
+  observed: {
+    canonical_partner: unknown;
+    reason: unknown;
+    confidence: unknown;
+  };
+};
+
 const PLURIX_TOKEN = /(^|_)(plu|plx|plurix)/i;
 const INSTITUTIONAL_TOKEN = /institucional|inst(?![a-z])/i;
 
 /**
  * Resolve o parceiro canônico SEM sobrescrever o dado bruto.
  *
- * `Parceiro` (partner_raw) permanece intacto na base; esta derivação existe apenas
- * em tempo de leitura, é auditável por VIEW_PARTNER_RESOLUTION e reversível.
+ * `Parceiro` (partner_raw) permanece intacto na base. As colunas geradas
+ * `parceiro_canonico*` espelham esta função para consumo SQL; esta implementação
+ * continua sendo a autoridade do engine e sua equivalência é verificada no CI
+ * e no snapshot real de cada build.
  *
  * `N/A` é um valor bruto ambíguo, não uma classificação final: pode ser emissão
  * institucional da própria base B2C, autoatribuição da BU Plurix, ou falta real de
@@ -212,6 +224,31 @@ export function resolvePartner(row: Row): PartnerResolution {
   }
 
   return { canonical_partner: "N/A", reason: "UNRESOLVED", confidence: "baixa" };
+}
+
+/**
+ * Compara a regra TypeScript com as colunas geradas recebidas no snapshot.
+ * A funcao nao corrige nem sobrescreve o dado: qualquer drift precisa bloquear
+ * a certificacao do build e permanecer auditavel no manifesto.
+ */
+export function partnerResolutionMismatches(rows: Row[]): PartnerResolutionMismatch[] {
+  const mismatches: PartnerResolutionMismatch[] = [];
+  rows.forEach((row, rowIndex) => {
+    const expected = resolvePartner(row);
+    const observed = {
+      canonical_partner: row.parceiro_canonico,
+      reason: row.parceiro_canonico_motivo,
+      confidence: row.parceiro_canonico_confianca,
+    };
+    if (
+      observed.canonical_partner !== expected.canonical_partner ||
+      observed.reason !== expected.reason ||
+      observed.confidence !== expected.confidence
+    ) {
+      mismatches.push({ row_index: rowIndex, expected, observed });
+    }
+  });
+  return mismatches;
 }
 
 /** Anexa partner_raw/canonical_partner/reason/confidence sem mutar a origem. */
@@ -391,14 +428,22 @@ export function normalizeSnapshotManifest(input: ReportInputs): ReportInputs {
   const integrated=core.every(Boolean)?(core as string[]).sort()[0]:null;
   const coverage=(rows:Row[],predicate:(row:Row)=>boolean)=>rows.length?rows.filter(predicate).length/rows.length:null;
   const eventAdDays=new Set(actions.filter(row=>row.canonical_event&&toNumber(row.value)!==null).map(row=>`${String(row.channel).toLowerCase()}|${row.ad_id}|${toIsoDay(row.business_date)}`));
+  const partnerResolutionDrift = partnerResolutionMismatches(input.crm);
+  const partnerResolutionGate = {
+    checked_rows: input.crm.length,
+    mismatch_count: partnerResolutionDrift.length,
+    status: partnerResolutionDrift.length ? "blocked" : "confirmed",
+    sample: partnerResolutionDrift.slice(0, 10),
+  };
   return {...input,manifest:{...input.manifest,source_cutoffs:cutoffs,data_reading_integrated:integrated,
+    quality_status:partnerResolutionDrift.length ? "blocked" : input.manifest.quality_status,
     gap_closure_days:integrated?Math.max(0,(dateValue(input.periodEnd)-dateValue(integrated))/DAY):null,
     missing_sources:Object.entries({crm,media,b2c}).filter(([,rows])=>!rows.length).map(([key])=>key),
     field_coverage:{...input.manifest.field_coverage,crm_rows:crm.length,media_rows:media.length,media_event_rows:actions.length,
       media_named_event:coverage(actions,row=>Boolean(row.canonical_event)),
       media_attribution_window:coverage(actions,row=>Boolean(row.effective_attribution_window)&&!/(mixed|default|unknown)/i.test(String(row.effective_attribution_window))),
       media_ad_day_event_coverage:coverage(media,row=>eventAdDays.has(`${String(row.channel).toLowerCase()}|${row.ad_id}|${toIsoDay(row.date)}`))},
-    comparability:{...input.manifest.comparability,event_coverage_source:"frozen mv_paid_media_actions_latest; ad/fact",event_scope_rule:"Eventos não representam campanhas/anúncios ausentes da coleta governada."}}};
+    comparability:{...input.manifest.comparability,event_coverage_source:"frozen mv_paid_media_actions_latest; ad/fact",event_scope_rule:"Eventos não representam campanhas/anúncios ausentes da coleta governada.",partner_resolution_equivalence:partnerResolutionGate}}};
 }
 
 function buildPartnerModes(crmCurrent: Row[], config: Record<string, unknown>) {
@@ -445,7 +490,9 @@ function buildPartnerModes(crmCurrent: Row[], config: Record<string, unknown>) {
       variety,
       signal,
       mode: excludedPartner ? "quality_flag" : full ? "full" : "compact",
-      alert: excludedPartner ? "Parceiro N/A: corrigir taxonomia" : signal ? "Base executada sem cartão observado" : "",
+      alert: excludedPartner && (metrics.cards ?? 0) > 0
+        ? "Parceiro N/A com cartões: corrigir taxonomia"
+        : signal ? "Base executada sem cartão observado" : "",
     });
   }
   return output.sort((a, b) => (toNumber(b.cards) ?? 0) - (toNumber(a.cards) ?? 0));
@@ -522,7 +569,7 @@ function buildDeterministicCandidates(
   }
 
   for (const partner of partnerModes) {
-    if (partner.mode === "quality_flag") {
+    if (partner.mode === "quality_flag" && (toNumber(partner.cards) ?? 0) > 0) {
       add({
         source_view: "VIEW_PARTNER_ROUTER",
         entity_key: `partner:${slug(partner.partner)}`,
@@ -1128,12 +1175,27 @@ export function buildReport(input: ReportInputs): BuiltReport {
       ["segment", "cards", "base", "cost", "cac", "conversion"],
       segmentRows.sort((a, b) => (toNumber(b.cards) ?? 0) - (toNumber(a.cards) ?? 0)),
     );
-    const channelRows = [...groupRows(rows, ["Segmento", "Canal"]).values()].map((group) => {
+    const channelRows = [...groupRows(rows, ["Canal"]).values()].map((group) => {
       const metrics = crmMetrics(group);
-      return { segment: group[0]?.Segmento, channel: group[0]?.Canal, cards: metrics.cards, base: metrics.base, cost: metrics.cost, channel_cost: metrics.channel_cost, cac: metrics.cac, conversion: metrics.card_rate_base };
+      const channel = group[0]?.Canal;
+      const previousChannelMetrics = crmMetrics(previousRows.filter((row) => row.Canal === channel));
+      const share = ratio(metrics.cards, currentMetrics.cards);
+      const previousShare = ratio(previousChannelMetrics.cards, previousMetrics.cards);
+      return {
+        channel,
+        cards: metrics.cards,
+        base: metrics.base,
+        cost: metrics.cost,
+        channel_cost: metrics.channel_cost,
+        cac: ratio(metrics.channel_cost ?? metrics.cost, metrics.cards),
+        conversion: metrics.card_rate_base,
+        share,
+        share_previous_equivalent: previousShare,
+        share_delta_pp: share === null || previousShare === null ? null : (share - previousShare) * 100,
+      };
     });
     tabs[tabName("VP", partnerName, "CHANNELS")] = rowsToTable(
-      ["segment", "channel", "cards", "base", "cost", "channel_cost", "cac", "conversion"],
+      ["channel", "cards", "base", "cost", "channel_cost", "cac", "conversion", "share", "share_previous_equivalent", "share_delta_pp"],
       channelRows.sort((a, b) => (toNumber(b.cards) ?? 0) - (toNumber(a.cards) ?? 0)),
     );
     tabs[tabName("VP", partnerName, "FUNNEL")] = rowsToTable(
