@@ -567,6 +567,13 @@ function appendMonthlyChart(
   while (familyRows.length % 24 !== 0) familyRows.push([]);
 }
 
+function rectangularizeFamilyTable(rows: unknown[][]): unknown[][] {
+  const width = rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
+  return rows.map((row) => row.length === width
+    ? row
+    : [...row, ...Array(width - row.length).fill("")]);
+}
+
 function buildEditorialTabs(
   input: ReportInputs,
   tabs: Record<string, unknown[][]>,
@@ -719,8 +726,12 @@ function buildEditorialTabs(
       ["slide_instance_id", "slide_code", "chart_key", "family_view", "chart_type", "title", "start_row_index", "end_row_index", "domain_column_index", "series_json", "expected_chart_count"],
       chartRegistry,
     ),
-    VIEW_EDITORIAL_MONTHLY_CHARTS: monthlyFamilyRows.length ? monthlyFamilyRows : [["mes", "sem_serie"]],
-    VIEW_EDITORIAL_PACING_CHARTS: pacingFamilyRows.length ? pacingFamilyRows : [["dia", "sem_serie"]],
+    VIEW_EDITORIAL_MONTHLY_CHARTS: monthlyFamilyRows.length
+      ? rectangularizeFamilyTable(monthlyFamilyRows)
+      : [["mes", "sem_serie"]],
+    VIEW_EDITORIAL_PACING_CHARTS: pacingFamilyRows.length
+      ? rectangularizeFamilyTable(pacingFamilyRows)
+      : [["dia", "sem_serie"]],
   };
 }
 

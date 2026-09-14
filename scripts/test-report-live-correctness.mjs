@@ -179,6 +179,8 @@ test('phase 2a projects canonical monthly rulers without recalculating their val
  assert.equal(rulers.find(row=>row.slide_code==='P4'&&row.metric_key==='tx_finalizacao').value,0.03866);
  assert.equal(layouts.find(row=>row.slide_code==='P4').layout,'volume_conversao_final');
  assert.equal(records(built.tabs.VIEW_EDITORIAL_CHART_REGISTRY).length,2);
+ const monthlyChartTable=built.tabs.VIEW_EDITORIAL_MONTHLY_CHARTS;
+ assert.ok(monthlyChartTable.every(row=>row.length===monthlyChartTable[0].length));
 });
 test('pacing exposes the aligned prior period and never invents an uncertified target',()=>{
  const input=seed();input.slideContracts=[contract('C4','VIEW_PACING_ISODAYS')];
