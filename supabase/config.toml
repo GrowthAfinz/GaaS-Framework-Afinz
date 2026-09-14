@@ -56,3 +56,7 @@ verify_jwt = true
 [functions.collect-meta-events]
 enabled = true
 verify_jwt = true
+
+[functions.report-live-meta-preview]
+enabled = true
+verify_jwt = false
