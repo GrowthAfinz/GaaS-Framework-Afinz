@@ -1,3 +1,11 @@
+import {
+  buildMonthlyRuler,
+  formatRulerValue,
+  RULER_METRICS,
+  type RulerElements,
+  type RulerMetricKey,
+} from "../_shared/report-live-editorial.ts";
+
 export type QualityStatus = "confirmed" | "directional" | "suspect" | "blocked";
 export type Eligibility = "render" | "render_com_limites" | "omitir_bloqueado";
 export type DataState = "valor_observado" | "zero_observado" | "missing" | "nao_aplicavel";
@@ -56,6 +64,7 @@ export interface ReportInputs {
   actionCandidates: Row[];
   actionOutcomes: Row[];
   metricCertifications: Row[];
+  monthlyAcquisition?: Row[];
   config: Record<string, unknown>;
 }
 
@@ -407,6 +416,314 @@ const objectEntriesTable = (value: Record<string, unknown>): unknown[][] => [
   ]),
 ];
 
+const tableRecords = (table: unknown[][] | undefined): Row[] => {
+  if (!table?.length) return [];
+  const headers = table[0].map((value) => String(value));
+  return table.slice(1).map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index]])));
+};
+
+interface EditorialChartSeries {
+  column_index: number;
+  label: string;
+  color: string;
+  axis: "LEFT_AXIS" | "RIGHT_AXIS";
+  line_width: number;
+  point_size: number;
+}
+
+interface EditorialChartPlan {
+  slide_instance_id: string;
+  slide_code: string;
+  chart_key: string;
+  family_view: string;
+  chart_type: "LINE";
+  title: string;
+  start_row_index: number;
+  end_row_index: number;
+  domain_column_index: number;
+  series: EditorialChartSeries[];
+}
+
+const EDITORIAL_COLORS = {
+  gray: "#98A2B3",
+  grayDark: "#667085",
+  cyan: "#00C6CC",
+  blue: "#3B82F6",
+  green: "#10B981",
+  purple: "#A855F7",
+  amber: "#F59E0B",
+} as const;
+
+function editorialRulerRows(
+  slide: SlideRun,
+  rulers: RulerElements[],
+  layout: string,
+): Row[] {
+  return rulers.map((ruler, index) => ({
+    slide_instance_id: slide.slide_instance_id,
+    slide_code: slide.slide_code,
+    partner: slide.partner,
+    layout,
+    metric_order: index + 1,
+    metric_key: ruler.metric.key,
+    metric_label: ruler.metric.label,
+    metric_kind: ruler.metric.kind,
+    value: ruler.value,
+    value_text: ruler.valueText,
+    delta_text: ruler.deltaText,
+    range_text: ruler.rangeText,
+    verdict: ruler.verdict,
+    verdict_text: ruler.verdictText,
+    show_chart: ruler.showChart,
+    show_bounds: ruler.showBounds,
+    current_month_open: ruler.currentMonthOpen,
+    comparison_eligible: ruler.comparisonEligible,
+    limitation: ruler.limitation,
+  }));
+}
+
+function appendMonthlyChart(
+  familyRows: unknown[][],
+  plans: EditorialChartPlan[],
+  slide: SlideRun,
+  rulers: RulerElements[],
+  title: string,
+) {
+  const chartable = rulers.filter((ruler) => ruler.showChart);
+  if (!chartable.length) return;
+  const header = ["mes"];
+  const series: EditorialChartSeries[] = [];
+  const columns: Array<{ ruler: RulerElements; kind: "min" | "max" | "value" }> = [];
+  const valueColors = [EDITORIAL_COLORS.cyan, EDITORIAL_COLORS.blue, EDITORIAL_COLORS.green];
+  const mixedMetricKinds = new Set(chartable.map((ruler) => ruler.metric.kind)).size > 1;
+  chartable.forEach((ruler, metricIndex) => {
+    const axis: EditorialChartSeries["axis"] = mixedMetricKinds && metricIndex > 0
+      ? "RIGHT_AXIS"
+      : "LEFT_AXIS";
+    if (ruler.showBounds) {
+      header.push(`${ruler.metric.label} · mín.`);
+      columns.push({ ruler, kind: "min" });
+      series.push({
+        column_index: header.length - 1,
+        label: `${ruler.metric.label} · mín.`,
+        color: EDITORIAL_COLORS.gray,
+        axis,
+        line_width: 1,
+        point_size: 0,
+      });
+      header.push(`${ruler.metric.label} · máx.`);
+      columns.push({ ruler, kind: "max" });
+      series.push({
+        column_index: header.length - 1,
+        label: `${ruler.metric.label} · máx.`,
+        color: EDITORIAL_COLORS.grayDark,
+        axis,
+        line_width: 1,
+        point_size: 0,
+      });
+    }
+    header.push(ruler.metric.label);
+    columns.push({ ruler, kind: "value" });
+    series.push({
+      column_index: header.length - 1,
+      label: ruler.metric.label,
+      color: valueColors[metricIndex % valueColors.length],
+      axis,
+      line_width: 3,
+      point_size: 5,
+    });
+  });
+
+  const byMonth = new Map<string, Row>();
+  for (const ruler of chartable) {
+    for (const row of ruler.series) byMonth.set(String(row.mes ?? "").slice(0, 10), row);
+  }
+  const months = [...byMonth.keys()].sort();
+  const startRowIndex = familyRows.length;
+  familyRows.push(header);
+  for (const month of months) {
+    const row = byMonth.get(month) ?? {};
+    familyRows.push([
+      month.slice(0, 7),
+      ...columns.map(({ ruler, kind }) => {
+        if (kind === "value") return toNumber(row[ruler.metric.valueField]) ?? "";
+        const field = kind === "min" ? ruler.metric.minimumField : ruler.metric.maximumField;
+        return toNumber(row[field]) ?? "";
+      }),
+    ]);
+  }
+  plans.push({
+    slide_instance_id: slide.slide_instance_id,
+    slide_code: slide.slide_code,
+    chart_key: slide.slide_instance_id,
+    family_view: "VIEW_EDITORIAL_MONTHLY_CHARTS",
+    chart_type: "LINE",
+    title,
+    start_row_index: startRowIndex,
+    end_row_index: familyRows.length,
+    domain_column_index: 0,
+    series,
+  });
+  while (familyRows.length % 24 !== 0) familyRows.push([]);
+}
+
+function buildEditorialTabs(
+  input: ReportInputs,
+  tabs: Record<string, unknown[][]>,
+  slides: SlideRun[],
+): Record<string, unknown[][]> {
+  const monthlyRows = input.monthlyAcquisition ?? [];
+  const targetMonth = `${input.periodEnd.slice(0, 7)}-01`;
+  const rulerRows: Row[] = [];
+  const layoutRows: Row[] = [];
+  const plans: EditorialChartPlan[] = [];
+  const monthlyFamilyRows: unknown[][] = [];
+  const pacingFamilyRows: unknown[][] = [];
+
+  for (const slide of slides) {
+    if (!slide.partner || !["P1", "P4"].includes(slide.slide_code)) continue;
+    const currentRow = monthlyRows.find((row) =>
+      String(row.parceiro ?? "") === slide.partner && String(row.mes ?? "").slice(0, 10) === targetMonth
+    );
+    if (!currentRow) continue;
+    const leadPrequalified = String(currentRow.funil_semantica ?? "") === "lead_pre_qualificado";
+    const metricKeys: RulerMetricKey[] = slide.slide_code === "P1"
+      ? ["cartoes", "cac"]
+      : leadPrequalified
+      ? ["cartoes", "tx_finalizacao"]
+      : ["tx_proposta", "tx_aprovacao", "tx_finalizacao"];
+    const rulers = metricKeys.map((key) => buildMonthlyRuler(currentRow, monthlyRows, key));
+    const layout = slide.slide_code === "P1"
+      ? "scorecard"
+      : leadPrequalified
+      ? "volume_conversao_final"
+      : "funil_taxas";
+    rulerRows.push(...editorialRulerRows(slide, rulers, layout));
+    const support = leadPrequalified
+      ? "Base de lead pré-qualificado; etapas intermediárias não são comparáveis ao funil padrão."
+      : slide.slide_code === "P4"
+      ? `Base acionável: ${formatRulerValue(RULER_METRICS.base_acionavel, toNumber(currentRow.base_acionavel))} · Propostas: ${formatRulerValue(RULER_METRICS.propostas, toNumber(currentRow.propostas))} · Aprovados: ${formatRulerValue(RULER_METRICS.aprovados, toNumber(currentRow.aprovados))} · Cartões: ${formatRulerValue(RULER_METRICS.cartoes, toNumber(currentRow.cartoes))}`
+      : "Máximo de duas métricas materiais neste scorecard: volume e eficiência CRM.";
+    layoutRows.push({
+      slide_instance_id: slide.slide_instance_id,
+      slide_code: slide.slide_code,
+      layout,
+      support_text: support,
+      funil_semantica: currentRow.funil_semantica,
+      mes: currentRow.mes,
+      mes_fechado: currentRow.mes_fechado,
+      dias_cobertos: currentRow.dias_cobertos,
+      expected_chart: rulers.some((ruler) => ruler.showChart),
+    });
+    appendMonthlyChart(monthlyFamilyRows, plans, slide, rulers, `${slide.partner} · ${layout.replaceAll("_", " ")}`);
+  }
+
+  const pacingSlide = slides.find((slide) => slide.slide_code === "C4");
+  if (pacingSlide) {
+    const pacing = tableRecords(tabs.VIEW_PACING_ISODAYS);
+    const currentAvailable = pacing.some((row) => toNumber(row.cumulative_cards) !== null);
+    const previousAvailable = pacing.some((row) => toNumber(row.previous_equivalent_cumulative_cards) !== null);
+    if (pacing.length >= 2 && currentAvailable) {
+      const header = ["dia", "Realizado"];
+      const series: EditorialChartSeries[] = [{
+        column_index: 1,
+        label: "Realizado",
+        color: EDITORIAL_COLORS.cyan,
+        axis: "LEFT_AXIS",
+        line_width: 3,
+        point_size: 4,
+      }];
+      if (previousAvailable) {
+        header.push("Período equivalente");
+        series.push({
+          column_index: 2,
+          label: "Período equivalente",
+          color: EDITORIAL_COLORS.grayDark,
+          axis: "LEFT_AXIS",
+          line_width: 2,
+          point_size: 2,
+        });
+      }
+      const targetAvailable = pacing.some((row) => toNumber(row.certified_target_cumulative_cards) !== null);
+      if (targetAvailable) {
+        header.push("Meta certificada");
+        series.push({
+          column_index: header.length - 1,
+          label: "Meta certificada",
+          color: EDITORIAL_COLORS.green,
+          axis: "LEFT_AXIS",
+          line_width: 2,
+          point_size: 0,
+        });
+      }
+      const startRowIndex = pacingFamilyRows.length;
+      pacingFamilyRows.push(header);
+      for (const row of pacing) {
+        const values: unknown[] = [row.day_of_period, toNumber(row.cumulative_cards) ?? ""];
+        if (previousAvailable) values.push(toNumber(row.previous_equivalent_cumulative_cards) ?? "");
+        if (targetAvailable) values.push(toNumber(row.certified_target_cumulative_cards) ?? "");
+        pacingFamilyRows.push(values);
+      }
+      plans.push({
+        slide_instance_id: pacingSlide.slide_instance_id,
+        slide_code: pacingSlide.slide_code,
+        chart_key: pacingSlide.slide_instance_id,
+        family_view: "VIEW_EDITORIAL_PACING_CHARTS",
+        chart_type: "LINE",
+        title: "Cartões acumulados · dias equivalentes",
+        start_row_index: startRowIndex,
+        end_row_index: pacingFamilyRows.length,
+        domain_column_index: 0,
+        series,
+      });
+      layoutRows.push({
+        slide_instance_id: pacingSlide.slide_instance_id,
+        slide_code: pacingSlide.slide_code,
+        layout: "pacing_isodays",
+        support_text: targetAvailable
+          ? "Realizado, período equivalente e meta certificada."
+          : "Realizado e período equivalente; meta omitida por falta de certificação.",
+        funil_semantica: "",
+        mes: targetMonth,
+        mes_fechado: monthlyRows.find((row) => String(row.mes ?? "").slice(0, 10) === targetMonth)?.mes_fechado ?? "",
+        dias_cobertos: pacing.filter((row) => toNumber(row.cumulative_cards) !== null).length,
+        expected_chart: true,
+      });
+    }
+  }
+
+  const chartRegistry = plans.map((plan) => ({
+    slide_instance_id: plan.slide_instance_id,
+    slide_code: plan.slide_code,
+    chart_key: plan.chart_key,
+    family_view: plan.family_view,
+    chart_type: plan.chart_type,
+    title: plan.title,
+    start_row_index: plan.start_row_index,
+    end_row_index: plan.end_row_index,
+    domain_column_index: plan.domain_column_index,
+    series_json: JSON.stringify(plan.series),
+    expected_chart_count: 1,
+  }));
+
+  return {
+    VIEW_EDITORIAL_RULERS: rowsToTable(
+      ["slide_instance_id", "slide_code", "partner", "layout", "metric_order", "metric_key", "metric_label", "metric_kind", "value", "value_text", "delta_text", "range_text", "verdict", "verdict_text", "show_chart", "show_bounds", "current_month_open", "comparison_eligible", "limitation"],
+      rulerRows,
+    ),
+    VIEW_EDITORIAL_LAYOUTS: rowsToTable(
+      ["slide_instance_id", "slide_code", "layout", "support_text", "funil_semantica", "mes", "mes_fechado", "dias_cobertos", "expected_chart"],
+      layoutRows,
+    ),
+    VIEW_EDITORIAL_CHART_REGISTRY: rowsToTable(
+      ["slide_instance_id", "slide_code", "chart_key", "family_view", "chart_type", "title", "start_row_index", "end_row_index", "domain_column_index", "series_json", "expected_chart_count"],
+      chartRegistry,
+    ),
+    VIEW_EDITORIAL_MONTHLY_CHARTS: monthlyFamilyRows.length ? monthlyFamilyRows : [["mes", "sem_serie"]],
+    VIEW_EDITORIAL_PACING_CHARTS: pacingFamilyRows.length ? pacingFamilyRows : [["dia", "sem_serie"]],
+  };
+}
+
 const tabName = (prefix: string, value: unknown, suffix: string): string =>
   `${prefix}_${slug(value).toUpperCase().slice(0, 18)}_${suffix}`.slice(0, 99);
 
@@ -435,7 +752,7 @@ export function normalizeSnapshotManifest(input: ReportInputs): ReportInputs {
     status: partnerResolutionDrift.length ? "blocked" : "confirmed",
     sample: partnerResolutionDrift.slice(0, 10),
   };
-  return {...input,manifest:{...input.manifest,source_cutoffs:cutoffs,data_reading_integrated:integrated,
+  return {...input,monthlyAcquisition:input.monthlyAcquisition ?? [],manifest:{...input.manifest,source_cutoffs:cutoffs,data_reading_integrated:integrated,
     quality_status:partnerResolutionDrift.length ? "blocked" : input.manifest.quality_status,
     gap_closure_days:integrated?Math.max(0,(dateValue(input.periodEnd)-dateValue(integrated))/DAY):null,
     missing_sources:Object.entries({crm,media,b2c}).filter(([,rows])=>!rows.length).map(([key])=>key),
@@ -1067,31 +1384,59 @@ export function buildReport(input: ReportInputs): BuiltReport {
   // A row with a missing metric is not a zero observation. Once incomplete,
   // a cumulative total remains incomplete for the rest of this window.
   const crmDays = groupRows(crmCurrent.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "crm")) })), ["day"]);
+  const pacingStartDate = new Date(`${input.periodStart.slice(0, 7)}-01T00:00:00Z`);
+  pacingStartDate.setUTCMonth(pacingStartDate.getUTCMonth() - 1);
+  const pacingPreviousStart = pacingStartDate.toISOString().slice(0, 10);
+  const pacingPreviousEnd = isoFromMs(dateValue(pacingPreviousStart) + (inclusiveDays(input.periodStart, input.periodEnd) - 1) * DAY);
+  const crmPacingPrevious = withCanonicalPartner(input.crm.filter((row) =>
+    inWindow(sourceDate(row, "crm"), pacingPreviousStart, pacingPreviousEnd)));
+  const crmPreviousDays = groupRows(crmPacingPrevious.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "crm")) })), ["day"]);
   const mediaDays = groupRows(mediaCurrent.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "media")) })), ["day"]);
   const byDay = (groups: Map<string, Row[]>) => new Map([...groups.values()].map((rows) => [String(rows[0].day), rows]));
   const crmByDay = byDay(crmDays);
+  const crmPreviousByDay = byDay(crmPreviousDays);
   const mediaByDay = byDay(mediaDays);
   const completeSum = (rows: Row[], field: string) => rows.length && rows.every((row) => toNumber(row[field]) !== null) ? sumNullable(rows, field) : null;
   const cumulative: Record<string, number | null> = { crm_cards: 0, crm_cost: 0, media_spend: 0 };
+  let previousCumulativeCards: number | null = 0;
+  const periodKey = input.periodEnd.slice(0, 7);
+  const certifiedCardTarget = input.metricCertifications.find((row) =>
+    String(row.certification_status ?? "") === "certified" &&
+    ["crm_goal", "crm_target"].includes(String(row.metric_domain ?? "")) &&
+    [periodKey, `${periodKey.slice(5, 7)}/${periodKey.slice(0, 4)}`].includes(String(row.period_key ?? "")) &&
+    ["cards", "cartoes", "cartoes_crm", "crm_cards"].includes(String(row.metric_key ?? ""))
+  );
+  const monthlyCardTarget = toNumber(certifiedCardTarget?.target_value);
+  const periodDays = inclusiveDays(input.periodStart, input.periodEnd);
   const dailyRows: Row[] = [];
   for (let timestamp = dateValue(input.periodStart); timestamp <= dateValue(input.periodEnd); timestamp += DAY) {
     const day = isoFromMs(timestamp);
+    const dayOfPeriod = Math.floor((timestamp - dateValue(input.periodStart)) / DAY) + 1;
+    const previousDay = isoFromMs(dateValue(pacingPreviousStart) + (dayOfPeriod - 1) * DAY);
     const row: Row = {
       date: day,
+      day_of_period: dayOfPeriod,
+      previous_equivalent_date: previousDay,
       crm_cards: completeSum(crmByDay.get(day) ?? [], "Cartões Gerados"),
       crm_cost: completeSum(crmByDay.get(day) ?? [], "Custo Total Campanha"),
       media_spend: completeSum(mediaByDay.get(day) ?? [], "spend"),
     };
+    const previousCards = completeSum(crmPreviousByDay.get(previousDay) ?? [], "Cartões Gerados");
+    previousCumulativeCards = previousCumulativeCards === null || previousCards === null
+      ? null
+      : previousCumulativeCards + previousCards;
     for (const field of Object.keys(cumulative)) {
       const value = toNumber(row[field]);
       const previousValue = cumulative[field];
       cumulative[field] = previousValue === null || value === null ? null : previousValue + value;
     }
     dailyRows.push({ ...row, cumulative_cards: cumulative.crm_cards, cumulative_crm_cost: cumulative.crm_cost,
-      cumulative_media_spend: cumulative.media_spend, cumulative_cac: ratio(cumulative.crm_cost, cumulative.crm_cards) });
+      cumulative_media_spend: cumulative.media_spend, cumulative_cac: ratio(cumulative.crm_cost, cumulative.crm_cards),
+      previous_equivalent_cumulative_cards: previousCumulativeCards,
+      certified_target_cumulative_cards: monthlyCardTarget === null ? null : monthlyCardTarget * dayOfPeriod / periodDays });
   }
   tabs.VIEW_PACING_ISODAYS = rowsToTable(
-    ["date", "crm_cards", "crm_cost", "media_spend", "cumulative_cards", "cumulative_crm_cost", "cumulative_media_spend", "cumulative_cac"],
+    ["date", "day_of_period", "previous_equivalent_date", "crm_cards", "crm_cost", "media_spend", "cumulative_cards", "cumulative_crm_cost", "cumulative_media_spend", "cumulative_cac", "previous_equivalent_cumulative_cards", "certified_target_cumulative_cards"],
     dailyRows,
   );
 
@@ -1578,6 +1923,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
   );
 
   const slides = buildSlides(input, partnerModes, tabs);
+  Object.assign(tabs, buildEditorialTabs(input, tabs, slides));
   tabs.SLIDE_READINESS = rowsToTable(
     ["run_id", "slide_instance_id", "slide_code", "partner", "source_view", "implementation_readiness", "run_eligibility", "confidence_status", "confidence_label", "data_coverage", "cutoff_maturity", "execution_volume", "missing_required_fields", "fallback_applied", "evidence"],
     slides,

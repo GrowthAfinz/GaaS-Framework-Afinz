@@ -380,6 +380,9 @@ async function refreshMediaActionsView(): Promise<string | null> {
 async function loadInputs(runId: string, profile: string, periodStart: string, periodEnd: string) {
   const previous = previousEquivalentPeriod(periodStart, periodEnd);
   const queryStart = SNAPSHOT_START < previous.start ? SNAPSHOT_START : previous.start;
+  const monthlyStartDate = new Date(`${periodEnd.slice(0, 7)}-01T00:00:00Z`);
+  monthlyStartDate.setUTCMonth(monthlyStartDate.getUTCMonth() - 6);
+  const monthlyQueryStart = monthlyStartDate.toISOString().slice(0, 10);
   await refreshMediaActionsView();
   const [
     manifest,
@@ -402,6 +405,7 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     actionOutcomes,
     metricCertifications,
     eventMap,
+    monthlyAcquisition,
   ] = await Promise.all([
     loadManifest(periodStart, periodEnd),
     loadConfig(),
@@ -455,6 +459,12 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     pagedSelect("report_action_outcomes", "*", { orderColumn: "created_at" }),
     pagedSelect("report_metric_certifications", "*", { orderColumn: "period_key" }),
     pagedSelect("event_map", "*", { orderColumn: "id" }),
+    pagedSelect("v_aquisicao_mensal_canonico", "*", {
+      dateColumn: "mes",
+      from: monthlyQueryStart,
+      to: periodEnd,
+      orderColumn: "mes",
+    }),
   ]);
 
   return {
@@ -487,6 +497,7 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     actionOutcomes,
     metricCertifications,
     eventMap,
+    monthlyAcquisition,
   };
 }
 
@@ -1737,7 +1748,11 @@ async function readDeckGenerationState() {
   );
 }
 
-async function verifyStagedGeneration(runId: string, expectedSlideCount: number) {
+async function verifyStagedGeneration(
+  runId: string,
+  expectedSlideCount: number,
+  generationManifest: Row = {},
+) {
   const releaseKey = await reportLiveReleaseKey(runId);
   const presentation = await readDeckGenerationState();
   const target = publicationSlides(presentation.slides ?? [], releaseKey) as Row[];
@@ -1754,11 +1769,63 @@ async function verifyStagedGeneration(runId: string, expectedSlideCount: number)
     )
   );
   if (missingNarrative.length) throw new Error(`Narrativa ausente em ${missingNarrative.length} slide(s).`);
+  const chartManifest = Array.isArray(generationManifest.chart_manifest)
+    ? generationManifest.chart_manifest as Row[]
+    : [];
+  const expectedElements = Array.isArray(generationManifest.expected_element_ids)
+    ? generationManifest.expected_element_ids as Row[]
+    : [];
+  const targetById = new Map(target.map((slide) => [String(slide.objectId), slide]));
+  for (const expected of expectedElements) {
+    const slide = targetById.get(String(expected.page_id ?? ""));
+    const actualIds = new Set(((slide?.pageElements ?? []) as Row[]).map((element) => String(element.objectId ?? "")));
+    const missing = (Array.isArray(expected.element_ids) ? expected.element_ids : [])
+      .map(String).filter((elementId) => !actualIds.has(elementId));
+    if (missing.length) {
+      throw new Error(`Elementos editoriais ausentes em ${String(expected.slide_instance_id)}: ${missing.join(", ")}.`);
+    }
+  }
+  const chartBySlide = new Map(chartManifest.map((item) => [String(item.slide_instance_id), item]));
+  let linkedChartCount = 0;
+  for (const expected of expectedElements) {
+    const slide = targetById.get(String(expected.page_id ?? ""));
+    const linked = ((slide?.pageElements ?? []) as Row[]).filter((element) => Boolean(element.sheetsChart));
+    linkedChartCount += linked.length;
+    if (linked.length > 1) {
+      throw new Error(`Teto editorial violado: ${String(expected.slide_instance_id)} tem ${linked.length} gráficos vinculados.`);
+    }
+    const planned = chartBySlide.get(String(expected.slide_instance_id));
+    if (planned && linked.length !== Number(planned.expected_chart_count ?? 1)) {
+      throw new Error(`Gráfico obrigatório ausente em ${String(expected.slide_instance_id)}.`);
+    }
+    if (linked.length && !planned) {
+      throw new Error(`Gráfico sem manifesto de verificação em ${String(expected.slide_instance_id)}.`);
+    }
+    if (planned && linked.length === 1) {
+      const chart = linked[0].sheetsChart as Row;
+      if (Number(chart.chartId) !== Number(planned.chart_id) || String(chart.spreadsheetId) !== SHEET_ID) {
+        throw new Error(`Vínculo do gráfico diverge do manifesto em ${String(expected.slide_instance_id)}.`);
+      }
+    }
+  }
+  if (chartManifest.length) {
+    const sheetMetadata = await googleFetch(`${SHEETS}/${SHEET_ID}?fields=sheets(properties(title),charts(chartId))`);
+    const chartsBySheet = new Map<string, Set<number>>((sheetMetadata.sheets ?? []).map((sheet: Row) => [
+      String((sheet.properties as Row)?.title ?? ""),
+      new Set<number>(((sheet.charts ?? []) as Row[]).map((chart) => Number(chart.chartId))),
+    ]));
+    const orphaned = chartManifest.filter((item) =>
+      !chartsBySheet.get(String(item.physical_sheet_title ?? ""))?.has(Number(item.chart_id))
+    );
+    if (orphaned.length) throw new Error(`Fonte de ${orphaned.length} gráfico(s) não existe mais no Sheets.`);
+  }
   return {
     verified: true,
     release_key: releaseKey,
     staged_slide_ids: target.map((slide) => String(slide.objectId)),
     slide_count: target.length,
+    linked_chart_count: linkedChartCount,
+    verified_chart_count: chartManifest.length,
   };
 }
 
@@ -1920,6 +1987,8 @@ function deterministicNarrative(
   const mediaMix = tableRows(built.tabs.VIEW_MEDIA_MIX);
   const b2c = tableRows(built.tabs.VIEW_B2C_PARALLEL_FUNNELS);
   const fieldCoverage = tableRows(built.tabs.VIEW_FIELD_COVERAGE);
+  const editorialRulers = tableRows(built.tabs.VIEW_EDITORIAL_RULERS);
+  const editorialLayouts = tableRows(built.tabs.VIEW_EDITORIAL_LAYOUTS);
   const integratedCutoff = input.manifest.data_reading_integrated ?? "indisponível";
   const sourceCutoffs = input.manifest.source_cutoffs;
   const period = `${input.periodStart.split("-").reverse().join("/")}–${
@@ -1969,12 +2038,17 @@ function deterministicNarrative(
           `Conversão CRM/base: ${fmtPercent(metricValue(sourceRows, "conversao_crm_base"))}.`;
         break;
       }
-      case "C4":
-        body = `Comparação primária: ${built.previousPeriod.start.split("-").reverse().join("/")}–${
-          built.previousPeriod.end.split("-").reverse().join("/")
-        }, com a mesma quantidade de dias do recorte atual.\n` +
-          `Meta e projeção só aparecem quando a meta estiver certificada; sem certificação, o slide mantém apenas o realizado.`;
+      case "C4": {
+        const pacing = tableRows(built.tabs.VIEW_PACING_ISODAYS);
+        const pacingStart = String(pacing[0]?.previous_equivalent_date ?? "");
+        const pacingEnd = String(pacing.at(-1)?.previous_equivalent_date ?? "");
+        body = `Comparação primária: ${pacingStart.split("-").reverse().join("/")}–${
+          pacingEnd.split("-").reverse().join("/")
+        }, nos mesmos dias corridos do mês anterior.\n` +
+          `A linha sobrepõe realizado e período equivalente por dia corrido. ` +
+          `Meta só aparece quando certificada; sem certificação, não há terceira série.`;
         break;
+      }
       case "C5": {
         const full = router.filter((row) => row.mode === "full").map((row) => row.partner).join(", ") || "nenhum";
         const compact = router.filter((row) => row.mode === "compact").map((row) => row.partner).join(", ") || "nenhum";
@@ -1996,20 +2070,22 @@ function deterministicNarrative(
         break;
       }
       case "P1": {
-        const cards = metricValue(sourceRows, "cards");
-        const cac = metricValue(sourceRows, "cac");
-        const conversion = metricValue(sourceRows, "conversion");
-        body = `${slide.partner}: ${fmtNumber(cards)} cartões; CAC ${fmtCurrency(cac)}; ` +
-          `conversão ${fmtPercent(conversion)}.\n` +
-          `${cac === null ? "CAC indisponível porque o custo CRM está missing. " : ""}` +
-          `${commonLimit}`;
+        const rulers = editorialRulers.filter((row) => row.slide_instance_id === slide.slide_instance_id);
+        body = rulers.length
+          ? `${slide.partner}: ${rulers.map((row) =>
+            `${row.metric_label} ${row.value_text}${row.delta_text ? ` (${row.delta_text})` : ""} · ${row.verdict_text}`
+          ).join("; ")}.\n\nValores, faixas e vereditos vêm do snapshot mensal canônico.`
+          : `${slide.partner}: régua mensal indisponível neste snapshot. ${commonLimit}`;
         break;
       }
       case "P4": {
-        const stages = sourceRows.map((row) =>
-          `${row.stage}: ${fmtNumber(row.value)}`
-        ).join(" · ");
-        body = `${stages || "Funil indisponível"}.\n\nA etapa sem observação permanece como quebra visível; zero real e missing não são equivalentes.`;
+        const rulers = editorialRulers.filter((row) => row.slide_instance_id === slide.slide_instance_id);
+        const layout = editorialLayouts.find((row) => row.slide_instance_id === slide.slide_instance_id);
+        body = rulers.length
+          ? `${layout?.layout === "volume_conversao_final" ? "Leitura de volume e conversão final" : "Funil por taxas"}:\n` +
+            `${rulers.map((row) => `${row.metric_label} ${row.value_text} · ${row.verdict_text}`).join("\n")}\n\n` +
+            `${layout?.support_text ?? "Ausência permanece explícita; zero observado não é missing."}`
+          : "Régua mensal indisponível neste snapshot; o slide não inventa uma conversão substituta.";
         break;
       }
       case "P7":
@@ -2378,14 +2454,20 @@ async function processPublicationStep(publicationId: string) {
           );
           if (structure.staged_skipped !== true) throw new Error("Renderer não confirmou staging invisível.");
           await updateManifest({ staged_slide_ids: structure.staged_slide_ids ?? [],
-            previous_managed_slides: structure.previous_managed_slides ?? [] });
+            previous_managed_slides: structure.previous_managed_slides ?? [],
+            chart_manifest: structure.chart_manifest ?? [],
+            expected_element_ids: structure.expected_element_ids ?? [] });
           return { verified: true, ...structure };
         }
         if (phase === "narrative") {
           return { verified: true, ...(await updateSlides(artifact.narratives, runId)) };
         }
         if (phase === "verify_slides") {
-          return await verifyStagedGeneration(runId, expectedSlideCount);
+          return await verifyStagedGeneration(
+            runId,
+            expectedSlideCount,
+            (publication.generation_manifest ?? {}) as Row,
+          );
         }
         if (phase === "activate") {
           activationState.receipt = await activateGeneration(runId);

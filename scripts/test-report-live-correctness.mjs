@@ -162,6 +162,44 @@ test('missing and partial cost cannot produce zero or understated CAC',()=>{
  input.crm=input.crm.slice(0,1);input.crm[0]['Custo Total Campanha']=0;
  assert.equal(records(buildReport(input).tabs.VIEW_PACING_ISODAYS)[0].cumulative_cac,0);
 });
+test('phase 2a projects canonical monthly rulers without recalculating their values',()=>{
+ const input=seed();
+ input.slideContracts=[{...contract('P1',null),section:'partner'},{...contract('P4',null),section:'partner'}];
+ input.monthlyAcquisition=Array.from({length:6},(_,index)=>({
+   mes:`2026-${String(index+3).padStart(2,'0')}-01`,parceiro:'Serasa',cartoes:index===5?988:700+index*20,
+   cac:7.2,tx_finalizacao:index===5?0.03866:0.03,tx_aprovacao:0.998,tx_proposta:1.18,
+   cartoes_min_6m:600,cartoes_max_6m:1000,cac_min_6m:6,cac_max_6m:9,
+   tx_final_min_6m:0.0241,tx_final_max_6m:0.0528,tx_aprovacao_min_6m:0.99,tx_aprovacao_max_6m:1,
+   tx_proposta_min_6m:1,tx_proposta_max_6m:1.3,meses_observados:6,cac_meses_validos_6m:6,
+   tx_final_meses_validos_6m:6,tx_aprovacao_meses_validos_6m:6,tx_proposta_meses_validos_6m:6,
+   mes_fechado:true,regime_serie:'serasa_pos_2026_02',funil_semantica:'lead_pre_qualificado',
+ }));
+ const built=buildReport(input), rulers=records(built.tabs.VIEW_EDITORIAL_RULERS), layouts=records(built.tabs.VIEW_EDITORIAL_LAYOUTS);
+ assert.equal(rulers.find(row=>row.slide_code==='P1'&&row.metric_key==='cartoes').value,988);
+ assert.equal(rulers.find(row=>row.slide_code==='P4'&&row.metric_key==='tx_finalizacao').value,0.03866);
+ assert.equal(layouts.find(row=>row.slide_code==='P4').layout,'volume_conversao_final');
+ assert.equal(records(built.tabs.VIEW_EDITORIAL_CHART_REGISTRY).length,2);
+});
+test('pacing exposes the aligned prior period and never invents an uncertified target',()=>{
+ const input=seed();input.slideContracts=[contract('C4','VIEW_PACING_ISODAYS')];
+ input.crm.push({...input.crm[0],'Data de Disparo':'2026-07-01','Cartões Gerados':8});
+ const first=records(buildReport(input).tabs.VIEW_PACING_ISODAYS)[0];
+ assert.equal(first.day_of_period,1);
+ assert.equal(first.previous_equivalent_date,'2026-07-01');
+ assert.equal(first.previous_equivalent_cumulative_cards,8);
+ assert.equal(first.certified_target_cumulative_cards,'');
+});
+test('partial-month pacing compares the same calendar days of the prior month',()=>{
+ const input=seed();input.periodStart='2026-09-01';input.periodEnd='2026-09-11';input.slideContracts=[contract('C4','VIEW_PACING_ISODAYS')];
+ input.crm=[
+   {...input.crm[0],'Data de Disparo':'2026-09-01','Cartões Gerados':10},
+   {...input.crm[0],'Data de Disparo':'2026-08-01','Cartões Gerados':8},
+   {...input.crm[0],'Data de Disparo':'2026-08-21','Cartões Gerados':99},
+ ];
+ const first=records(buildReport(input).tabs.VIEW_PACING_ISODAYS)[0];
+ assert.equal(first.previous_equivalent_date,'2026-08-01');
+ assert.equal(first.previous_equivalent_cumulative_cards,8);
+});
 test('missing B2C falls back to native CRM instead of hiding valid numbers',()=>{
  const input=seed();input.manifest.data_reading_integrated=null;input.manifest.source_cutoffs.b2c=null;
  input.slideContracts[1].required_fields=['crm_cards','crm_cost'];

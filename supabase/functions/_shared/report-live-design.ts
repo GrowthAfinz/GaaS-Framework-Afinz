@@ -1,4 +1,4 @@
-export const REPORT_LIVE_DESIGN_VERSION = "2.0-light";
+export const REPORT_LIVE_DESIGN_VERSION = "2.1-editorial-2a";
 
 export const AFINZ_LIGHT = {
   canvas: "#F7F9FA",

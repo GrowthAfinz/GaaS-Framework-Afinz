@@ -10,7 +10,7 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "typecheck:release": "node scripts/check-types-release.mjs",
-    "test:report-live": "node --test scripts/test-report-live-correctness.mjs scripts/test-report-live-publication.mjs scripts/test-report-live-immutable-file.mjs scripts/test-report-live-recovery.mjs scripts/test-report-live-generation.mjs scripts/test-report-live-chart-policy.mjs",
+    "test:report-live": "node --test scripts/test-report-live-correctness.mjs scripts/test-report-live-publication.mjs scripts/test-report-live-immutable-file.mjs scripts/test-report-live-recovery.mjs scripts/test-report-live-generation.mjs scripts/test-report-live-chart-policy.mjs scripts/test-report-live-editorial.mjs",
     "check:edge": "npx --yes deno@2.9.6 check --config supabase/functions/deno.json supabase/functions/report-sync/index.ts supabase/functions/report-sync-v4-setup/index.ts supabase/functions/report-sync-build-candidate/index.ts supabase/functions/report-live-meta-preview/index.ts",
     "supabase:cli": "npx --yes supabase@2.117.0",
     "preview": "vite preview",

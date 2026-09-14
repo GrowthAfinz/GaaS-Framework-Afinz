@@ -6,9 +6,9 @@ import {
 } from "../_shared/report-live-design.ts";
 
 export const RELEASE_VERSIONS = {
-  source: "1.2",
-  semantic: "1.2.2",
-  spec: "1.0",
+  source: "1.3",
+  semantic: "1.3.0",
+  spec: "2a.0",
   narrative: "1",
   renderer: REPORT_LIVE_DESIGN_VERSION,
   validator: "2",
@@ -128,6 +128,7 @@ export function reportSourceRows(input: ReportInputs): Record<string, Row[]> {
     aliases: input.aliases,
     action_outcomes: input.actionOutcomes,
     metric_certifications: input.metricCertifications,
+    monthly_acquisition: input.monthlyAcquisition ?? [],
     slide_contracts: input.slideContracts as unknown as Row[],
     config: [input.config as Row],
   };
