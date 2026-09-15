@@ -394,6 +394,19 @@ export async function validateArtifactIntegrity(artifact: ReportBuildArtifact): 
 
 export function validateArtifact(artifact: ReportBuildArtifact): ValidationResult[] {
   const output: ValidationResult[] = [];
+  const manifestSpecVersion = artifact.tabs.VIEW_RUN_MANIFEST
+    ?.find((row) => row[0] === "spec_version")?.[1];
+  const manifestSpecMatches = manifestSpecVersion === artifact.versions.spec;
+  push(
+    output,
+    "versions.manifest_spec",
+    manifestSpecMatches ? "passed" : "failed",
+    "blocking",
+    manifestSpecMatches
+      ? "A versão da spec no manifesto coincide com a versão do artefato."
+      : "A versão da spec no manifesto diverge da versão do artefato; publicação proibida.",
+    { manifest_spec: manifestSpecVersion ?? null, artifact_spec: artifact.versions.spec },
+  );
   const sourceCounts = Object.keys(artifact.sources ?? {}).length
     ? Object.fromEntries(
       Object.entries(artifact.sources).map(([key, rows]) => [key, rows.length]),

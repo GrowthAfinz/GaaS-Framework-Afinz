@@ -53,6 +53,17 @@ test('real-snapshot partner drift blocks the existing publication gate',async()=
  assert.equal(certificationPassed(validations),false);
 });
 
+test('manifest spec version must match the immutable artifact version',async()=>{
+ const built=await artifact(seed());
+ let check=validateArtifact(built).find(row=>row.validation_key==='versions.manifest_spec');
+ assert.equal(check.status,'passed');
+ const row=built.tabs.VIEW_RUN_MANIFEST.find(item=>item[0]==='spec_version');
+ row[1]='1.0';
+ check=validateArtifact(built).find(item=>item.validation_key==='versions.manifest_spec');
+ assert.equal(check.status,'failed');
+ assert.deepEqual(check.evidence,{manifest_spec:'1.0',artifact_spec:'3.0'});
+});
+
 test('partner channel view has one row per channel and pp variation',()=>{
  const input=seed();
  input.slideContracts=[{...contract('P3',null),section:'partner'}];
