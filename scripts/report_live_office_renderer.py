@@ -68,6 +68,19 @@ def compact_number(value: float | int | None) -> str:
     return f"{value:,.0f}".replace(",", ".")
 
 
+def currency(value: float | int | None) -> str:
+    if value is None:
+        return "indisponível"
+    return f"R$ {float(value):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def percentage(value: float | int | None) -> str:
+    if value is None:
+        return "indisponível"
+    decimals = 3 if abs(float(value)) < 0.001 else 1
+    return f"{float(value):.{decimals}%}".replace(".", ",")
+
+
 def month_label(period_start: str) -> str:
     months = [
         "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -122,10 +135,20 @@ def build_render_plan(
             "source_view": slide.get("source_view"),
             "support_text": clean_text(layouts.get(slide_id, {}).get("support_text")),
         }
+        source_rows = records(tabs.get(str(slide.get("source_view"))))
         if slide_id == "c0":
             item["manifest"] = {
                 row["campo"]: row["valor"] for row in records(tabs.get("VIEW_RUN_MANIFEST"))
             }
+        elif slide_id == "c1":
+            row = source_rows[0] if source_rows else {}
+            core = json.loads(row.get("core_kpis") or "{}")
+            item["kpis"] = [
+                {"label": "Cartões CRM", "value": compact_number(parse_number(core.get("crm_cards")))},
+                {"label": "CAC CRM", "value": currency(parse_number(core.get("crm_cac")))},
+                {"label": "Mídia", "value": currency(parse_number(core.get("media_spend")))},
+            ]
+            item["support_text"] = f"Conversão CRM/base: {percentage(parse_number(core.get('crm_conversion')))}"
         elif slide_id == "c4":
             pacing = records(tabs.get("VIEW_PACING_ISODAYS"))
             item["chart"] = {
@@ -153,6 +176,51 @@ def build_render_plan(
                     "previous": previous,
                     "delta": None if current is None or not previous else current / previous - 1,
                 }
+        elif slide_id in {"c7", "c8"}:
+            item["empty_state"] = len(source_rows) == 0
+            item["rows"] = source_rows[:4]
+            if slide_id == "c8":
+                buckets = {"agir_hoje": 0, "acompanhar": 0, "investigar": 0}
+                for row in source_rows:
+                    key = str(row.get("bucket") or "").lower().replace(" ", "_")
+                    if key in buckets:
+                        buckets[key] += 1
+                item["bucket_counts"] = [
+                    {"label": "Agir hoje", "value": buckets["agir_hoje"]},
+                    {"label": "Acompanhar", "value": buckets["acompanhar"]},
+                    {"label": "Investigar", "value": buckets["investigar"]},
+                ]
+        elif slide_id in {"m1", "m2"}:
+            ranked = []
+            for row in source_rows:
+                spend = parse_number(row.get("spend"))
+                if spend is None:
+                    continue
+                ranked.append({
+                    "label": f"{clean_text(row.get('channel'))} / {clean_text(row.get('objective'))}",
+                    "value": spend,
+                    "value_text": currency(spend),
+                    "status": clean_text(row.get("budget_state")) if slide_id == "m1" else clean_text(row.get("cpa_event")),
+                })
+            item["ranking"] = sorted(ranked, key=lambda row: row["value"], reverse=True)[:5]
+            if slide_id == "m1":
+                missing_budget = sum(row.get("budget_state") == "missing" for row in source_rows)
+                if missing_budget:
+                    item["warning"] = (
+                        f"Orçamento indisponível em {missing_budget}/{len(source_rows)} linhas; "
+                        "pacing não calculável."
+                    )
+        elif slide_id == "b1":
+            item["funnels"] = [
+                {
+                    "label": clean_text(row.get("source_type")),
+                    "proposals": compact_number(parse_number(row.get("proposals"))),
+                    "emissions": compact_number(parse_number(row.get("emissions"))),
+                    "conversion": percentage(parse_number(row.get("conversion"))),
+                    "note": clean_text(row.get("comparison_note")),
+                }
+                for row in source_rows
+            ]
         elif slide_id.startswith("p1_"):
             metric_rows = sorted(
                 (row for row in rulers if row.get("slide_instance_id") == slide_id),
@@ -255,6 +323,34 @@ def render_pptx(plan: dict[str, Any], template: Path, logo: Path, output: Path) 
                  28, 374, 500, 16, 8, color)
         text_box(slide, str(page), 670, 374, 22, 16, 8, color, align=PP_ALIGN.RIGHT)
 
+    def native_bar_chart(slide: Any, item: dict[str, Any], accent: str) -> None:
+        ranking = item.get("ranking", [])
+        visual = item["geometry"]["visual"]
+        if not ranking:
+            text_box(slide, "dados indisponíveis", visual["x"] + 12, visual["y"] + 82,
+                     visual["width"] - 24, 42, 18, AFINZ["black"], True)
+            return
+        data = ChartData()
+        data.categories = [row["label"] for row in ranking]
+        data.add_series("Investimento", [row["value"] for row in ranking])
+        chart = slide.shapes.add_chart(
+            XL_CHART_TYPE.BAR_CLUSTERED,
+            int(visual["x"] * sx), int(visual["y"] * sy),
+            int(visual["width"] * sx), int(visual["height"] * sy), data,
+        ).chart
+        chart.has_title = False
+        chart.has_legend = False
+        chart.value_axis.minimum_scale = 0
+        chart.value_axis.has_major_gridlines = True
+        chart.value_axis.tick_labels.number_format = 'R$ #,##0'
+        chart.value_axis.tick_labels.font.name = "Calibri"
+        chart.value_axis.tick_labels.font.size = Pt(8)
+        chart.category_axis.tick_labels.font.name = "Calibri"
+        chart.category_axis.tick_labels.font.size = Pt(8)
+        chart.series[0].format.fill.solid()
+        chart.series[0].format.fill.fore_color.rgb = rgb(accent)
+        chart.series[0].format.line.color.rgb = rgb(accent)
+
     for page, item in enumerate(plan["slides"], start=1):
         if item["slide_instance_id"] == "c0":
             slide = base_slide(AFINZ["black"])
@@ -284,9 +380,11 @@ def render_pptx(plan: dict[str, Any], template: Path, logo: Path, output: Path) 
         narrative = geometry["narrative"]
         box(slide, narrative["x"], narrative["y"], narrative["width"], narrative["height"], AFINZ["black"])
         text_box(slide, item["narrative"], narrative["x"] + 12, narrative["y"] + 14,
-                 narrative["width"] - 24, narrative["height"] - 28, 11, AFINZ["white"])
+                 narrative["width"] - 24, narrative["height"] - 28,
+                 9.5 if narrative["width"] < 180 else 11, AFINZ["white"])
 
-        if item["slide_instance_id"] == "c4":
+        slide_id = item["slide_instance_id"]
+        if slide_id == "c4":
             summary = item["summary"]
             delta = summary["delta"]
             text_box(slide, "Realizado", 28, 105, 120, 16, 9, AFINZ["black"])
@@ -328,7 +426,76 @@ def render_pptx(plan: dict[str, Any], template: Path, logo: Path, output: Path) 
                 series.marker.format.fill.solid()
                 series.marker.format.fill.fore_color.rgb = rgb(contract["color"])
                 series.marker.format.line.color.rgb = rgb(contract["color"])
-        else:
+        elif slide_id == "c1":
+            visual = geometry["visual"]
+            kpis = item.get("kpis", [])
+            card_height = (visual["height"] - 16) / max(1, len(kpis))
+            for index, kpi in enumerate(kpis):
+                y = visual["y"] + index * card_height
+                box(slide, visual["x"], y, visual["width"], card_height - 6, AFINZ["black"])
+                text_box(slide, kpi["label"], visual["x"] + 12, y + 10,
+                         visual["width"] - 24, 18, 10, AFINZ["white"])
+                text_box(slide, kpi["value"], visual["x"] + 12, y + 30,
+                         visual["width"] - 24, 32, 20,
+                         AFINZ["cyan"] if index != 1 else AFINZ["lime"], True)
+            if item.get("support_text"):
+                text_box(slide, item["support_text"], visual["x"], 350,
+                         visual["width"], 18, 8, AFINZ["black"])
+        elif slide_id == "c7":
+            visual = geometry["visual"]
+            box(slide, visual["x"], visual["y"], visual["width"], visual["height"], AFINZ["black"])
+            text_box(slide, "0", visual["x"] + 18, visual["y"] + 40,
+                     visual["width"] - 36, 70, 48, AFINZ["lime"], True)
+            text_box(slide, "janelas de outcome encerradas", visual["x"] + 18, visual["y"] + 112,
+                     visual["width"] - 36, 30, 15, AFINZ["white"], True)
+            text_box(slide, "baseline preservada; efeito realizado indisponível",
+                     visual["x"] + 18, visual["y"] + 160,
+                     visual["width"] - 36, 34, 11, AFINZ["white"])
+        elif slide_id == "c8":
+            visual = geometry["visual"]
+            counts = item.get("bucket_counts", [])
+            width = visual["width"] / max(1, len(counts))
+            for index, bucket in enumerate(counts):
+                x = visual["x"] + index * width
+                if index:
+                    box(slide, x, visual["y"] + 12, 1.5, visual["height"] - 24, AFINZ["black"])
+                text_box(slide, bucket["label"], x + 12, visual["y"] + 28,
+                         width - 24, 24, 12, AFINZ["black"], True)
+                text_box(slide, str(bucket["value"]), x + 12, visual["y"] + 66,
+                         width - 24, 58, 36, AFINZ["lime"], True)
+            if item.get("empty_state"):
+                text_box(slide, "fila vazia no snapshot certificado", visual["x"] + 12,
+                         visual["y"] + 138, visual["width"] - 24, 20, 9, AFINZ["black"])
+        elif slide_id in {"m1", "m2"}:
+            native_bar_chart(slide, item, AFINZ["cyan"] if slide_id == "m1" else AFINZ["lime"])
+            if item.get("warning"):
+                text_box(slide, item["warning"], narrative["x"] + 12,
+                         narrative["y"] + 172, narrative["width"] - 24, 58,
+                         9, AFINZ["lime"], True)
+        elif slide_id == "b1":
+            visual = geometry["visual"]
+            funnels = item.get("funnels", [])
+            width = visual["width"] / max(1, len(funnels))
+            for index, funnel in enumerate(funnels):
+                x = visual["x"] + index * width
+                fill = AFINZ["black"] if "indisponível" in funnel["label"].lower() else AFINZ["cyan"]
+                box(slide, x + 4, visual["y"] + 8, width - 12, visual["height"] - 16, fill)
+                body_color = AFINZ["white"] if fill == AFINZ["black"] else AFINZ["black"]
+                text_box(slide, funnel["label"], x + 16, visual["y"] + 22,
+                         width - 36, 34, 12, body_color, True)
+                text_box(slide, "propostas", x + 16, visual["y"] + 74,
+                         width - 36, 18, 9, body_color)
+                text_box(slide, funnel["proposals"], x + 16, visual["y"] + 92,
+                         width - 36, 32, 18 if len(funnel["proposals"]) > 10 else 20,
+                         AFINZ["lime"] if fill == AFINZ["black"] else AFINZ["black"], True)
+                text_box(slide, "emissões", x + 16, visual["y"] + 132,
+                         width - 36, 18, 9, body_color)
+                text_box(slide, funnel["emissions"], x + 16, visual["y"] + 150,
+                         width - 36, 32, 18 if len(funnel["emissions"]) > 10 else 20,
+                         AFINZ["lime"] if fill == AFINZ["black"] else AFINZ["black"], True)
+                text_box(slide, f"conversão {funnel['conversion']}", x + 16,
+                         visual["y"] + 202, width - 36, 20, 10, body_color, True)
+        elif slide_id.startswith("p1_"):
             visual = geometry["visual"]
             metrics = item.get("metrics", [])
             column_width = visual["width"] / max(1, len(metrics))
@@ -348,6 +515,10 @@ def render_pptx(plan: dict[str, Any], template: Path, logo: Path, output: Path) 
                          column_width - 24, 18, 10, AFINZ["lime"], True)
             if item.get("support_text"):
                 text_box(slide, item["support_text"], 28, 350, 438, 18, 8, AFINZ["black"])
+        else:
+            visual = geometry["visual"]
+            text_box(slide, "arquétipo ainda não suportado", visual["x"] + 12,
+                     visual["y"] + 82, visual["width"] - 24, 42, 18, AFINZ["red"], True)
 
         slide.shapes.add_picture(str(logo), int(590 * sx), int(369 * sy), width=int(50 * sx))
         footer(slide, page)
@@ -466,6 +637,24 @@ def render_pdf(plan: dict[str, Any], logo: Path, output: Path) -> None:
             canvas.setFont("Helvetica", 8)
             canvas.drawString(lx + 24, legend_y, part["name"])
 
+    def ranking_chart(item: dict[str, Any], accent: str) -> None:
+        visual = item["geometry"]["visual"]
+        ranking = item.get("ranking", [])
+        if not ranking:
+            text("dados indisponíveis", visual["x"] + 12, visual["y"] + 82,
+                 visual["width"] - 24, 42, 18, "black", True)
+            return
+        maximum = max(row["value"] for row in ranking) or 1
+        label_width = min(150, visual["width"] * 0.36)
+        bar_x = visual["x"] + label_width
+        bar_width = visual["width"] - label_width - 52
+        row_height = visual["height"] / max(1, len(ranking))
+        for index, row in enumerate(ranking):
+            y = visual["y"] + index * row_height + 9
+            text(row["label"], visual["x"], y, label_width - 8, 22, 8.5, "black", True)
+            rect(bar_x, y + 2, bar_width * row["value"] / maximum, 12, accent)
+            text(row["value_text"], bar_x + bar_width + 6, y, 48, 20, 8, "black", True)
+
     for page, item in enumerate(plan["slides"], start=1):
         if item["slide_instance_id"] == "c0":
             rect(0, 0, CANVAS_WIDTH_PT, CANVAS_HEIGHT_PT, "black")
@@ -496,9 +685,11 @@ def render_pdf(plan: dict[str, Any], logo: Path, output: Path) -> None:
         narrative = item["geometry"]["narrative"]
         rect(narrative["x"], narrative["y"], narrative["width"], narrative["height"], "black")
         text(item["narrative"], narrative["x"] + 12, narrative["y"] + 14,
-             narrative["width"] - 24, narrative["height"] - 28, 11, "white")
+             narrative["width"] - 24, narrative["height"] - 28,
+             9.5 if narrative["width"] < 180 else 11, "white")
 
-        if item["slide_instance_id"] == "c4":
+        slide_id = item["slide_instance_id"]
+        if slide_id == "c4":
             summary = item["summary"]
             text("Realizado", 28, 105, 120, 16, 9, "black")
             text(compact_number(summary["current"]), 28, 120, 120, 34, 23, "cyan", True)
@@ -509,7 +700,71 @@ def render_pdf(plan: dict[str, Any], logo: Path, output: Path) -> None:
             text("Variação", 330, 105, 115, 16, 9, "black")
             text(delta_text, 330, 120, 115, 34, 23, "lime", True)
             line_chart(item)
-        else:
+        elif slide_id == "c1":
+            visual = item["geometry"]["visual"]
+            kpis = item.get("kpis", [])
+            card_height = (visual["height"] - 16) / max(1, len(kpis))
+            for index, kpi in enumerate(kpis):
+                y = visual["y"] + index * card_height
+                rect(visual["x"], y, visual["width"], card_height - 6, "black")
+                text(kpi["label"], visual["x"] + 12, y + 10,
+                     visual["width"] - 24, 18, 10, "white")
+                text(kpi["value"], visual["x"] + 12, y + 30,
+                     visual["width"] - 24, 32, 20, "cyan" if index != 1 else "lime", True)
+            if item.get("support_text"):
+                text(item["support_text"], visual["x"], 350, visual["width"], 18, 8, "black")
+        elif slide_id == "c7":
+            visual = item["geometry"]["visual"]
+            rect(visual["x"], visual["y"], visual["width"], visual["height"], "black")
+            text("0", visual["x"] + 18, visual["y"] + 40,
+                 visual["width"] - 36, 70, 48, "lime", True)
+            text("janelas de outcome encerradas", visual["x"] + 18, visual["y"] + 112,
+                 visual["width"] - 36, 30, 15, "white", True)
+            text("baseline preservada; efeito realizado indisponível",
+                 visual["x"] + 18, visual["y"] + 160,
+                 visual["width"] - 36, 34, 11, "white")
+        elif slide_id == "c8":
+            visual = item["geometry"]["visual"]
+            counts = item.get("bucket_counts", [])
+            width = visual["width"] / max(1, len(counts))
+            for index, bucket in enumerate(counts):
+                x = visual["x"] + index * width
+                if index:
+                    rect(x, visual["y"] + 12, 1.5, visual["height"] - 24, "black")
+                text(bucket["label"], x + 12, visual["y"] + 28,
+                     width - 24, 24, 12, "black", True)
+                text(str(bucket["value"]), x + 12, visual["y"] + 66,
+                     width - 24, 58, 36, "lime", True)
+            if item.get("empty_state"):
+                text("fila vazia no snapshot certificado", visual["x"] + 12,
+                     visual["y"] + 138, visual["width"] - 24, 20, 9, "black")
+        elif slide_id in {"m1", "m2"}:
+            ranking_chart(item, "cyan" if slide_id == "m1" else "lime")
+            if item.get("warning"):
+                text(item["warning"], narrative["x"] + 12, narrative["y"] + 172,
+                     narrative["width"] - 24, 58, 9, "lime", True)
+        elif slide_id == "b1":
+            visual = item["geometry"]["visual"]
+            funnels = item.get("funnels", [])
+            width = visual["width"] / max(1, len(funnels))
+            for index, funnel in enumerate(funnels):
+                x = visual["x"] + index * width
+                unavailable = "indisponível" in funnel["label"].lower()
+                fill = "black" if unavailable else "cyan"
+                body = "white" if unavailable else "black"
+                rect(x + 4, visual["y"] + 8, width - 12, visual["height"] - 16, fill)
+                text(funnel["label"], x + 16, visual["y"] + 22, width - 36, 34, 12, body, True)
+                text("propostas", x + 16, visual["y"] + 74, width - 36, 18, 9, body)
+                text(funnel["proposals"], x + 16, visual["y"] + 92, width - 36, 32,
+                     18 if len(funnel["proposals"]) > 10 else 20,
+                     "lime" if unavailable else "black", True)
+                text("emissões", x + 16, visual["y"] + 132, width - 36, 18, 9, body)
+                text(funnel["emissions"], x + 16, visual["y"] + 150, width - 36, 32,
+                     18 if len(funnel["emissions"]) > 10 else 20,
+                     "lime" if unavailable else "black", True)
+                text(f"conversão {funnel['conversion']}", x + 16, visual["y"] + 202,
+                     width - 36, 20, 10, body, True)
+        elif slide_id.startswith("p1_"):
             visual = item["geometry"]["visual"]
             metrics = item.get("metrics", [])
             width = visual["width"] / max(1, len(metrics))
@@ -524,6 +779,10 @@ def render_pdf(plan: dict[str, Any], logo: Path, output: Path) -> None:
                 text(metric["verdict"], x + 12, visual["y"] + 130, width - 24, 18, 10, "lime", True)
             if item.get("support_text"):
                 text(item["support_text"], 28, 350, 438, 18, 8, "black")
+        else:
+            visual = item["geometry"]["visual"]
+            text("arquétipo ainda não suportado", visual["x"] + 12,
+                 visual["y"] + 82, visual["width"] - 24, 42, 18, "red", True)
 
         canvas.drawImage(str(logo), 590 * sx, page_height - 392 * sy,
                          width=50 * sx, height=20 * sy,
@@ -544,7 +803,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pptx", type=Path, required=True)
     parser.add_argument("--pdf", type=Path, required=True)
     parser.add_argument("--plan", type=Path)
-    parser.add_argument("--slides", default=",".join(DEFAULT_SLIDES))
+    parser.add_argument("--slides", default=",".join(DEFAULT_SLIDES),
+                        help="IDs separados por vírgula ou 'all' para a projeção inteira")
     return parser.parse_args()
 
 
@@ -552,7 +812,11 @@ def main() -> None:
     args = parse_args()
     artifact = json.loads(args.artifact.read_text(encoding="utf-8"))
     validate_artifact_identity(artifact, args.expected_run_id, args.expected_content_hash)
-    slide_ids = tuple(value.strip() for value in args.slides.split(",") if value.strip())
+    slide_ids = (
+        tuple(item["slide_instance_id"] for item in artifact.get("slides", []))
+        if args.slides.strip().lower() == "all"
+        else tuple(value.strip() for value in args.slides.split(",") if value.strip())
+    )
     plan = build_render_plan(artifact, slide_ids)
     if args.plan:
         args.plan.parent.mkdir(parents=True, exist_ok=True)
