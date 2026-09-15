@@ -1,4 +1,4 @@
-export const REPORT_LIVE_DESIGN_VERSION = "2.1-editorial-2a";
+export const REPORT_LIVE_DESIGN_VERSION = "2.2-editorial-profiles-outcomes";
 
 export const AFINZ_LIGHT = {
   canvas: "#F7F9FA",
@@ -29,6 +29,64 @@ export type SlideArchetype =
   | "analytical_table"
   | "action_queue"
   | "technical_annex";
+
+export interface SlideGeometry {
+  visual: { x: number; y: number; width: number; height: number };
+  narrative: { x: number; y: number; width: number; height: number };
+}
+
+/** Canvas 720 x 405 pt, com 28 pt de margem e rodapé a partir de y=371. */
+export function layoutGeometryFor(
+  archetype: SlideArchetype,
+  hasRulers = false,
+): SlideGeometry {
+  if (hasRulers) {
+    return {
+      visual: { x: 28, y: 184, width: 438, height: 158 },
+      narrative: { x: 480, y: 100, width: 212, height: 255 },
+    };
+  }
+  if (archetype === "cover_contract") {
+    return {
+      visual: { x: 28, y: 100, width: 664, height: 145 },
+      narrative: { x: 28, y: 255, width: 664, height: 100 },
+    };
+  }
+  if (archetype === "executive_takeaway") {
+    return {
+      visual: { x: 28, y: 100, width: 250, height: 255 },
+      narrative: { x: 288, y: 100, width: 404, height: 255 },
+    };
+  }
+  if (archetype === "quality_gate") {
+    return {
+      visual: { x: 28, y: 100, width: 664, height: 190 },
+      narrative: { x: 28, y: 300, width: 664, height: 55 },
+    };
+  }
+  if (archetype === "time_series_pacing" || archetype === "heatmap" || archetype === "technical_annex") {
+    return {
+      visual: { x: 28, y: 100, width: 500, height: 255 },
+      narrative: { x: 540, y: 100, width: 152, height: 255 },
+    };
+  }
+  if (archetype === "funnel") {
+    return {
+      visual: { x: 28, y: 100, width: 470, height: 255 },
+      narrative: { x: 510, y: 100, width: 182, height: 255 },
+    };
+  }
+  if (archetype === "action_queue") {
+    return {
+      visual: { x: 28, y: 100, width: 664, height: 175 },
+      narrative: { x: 28, y: 285, width: 664, height: 70 },
+    };
+  }
+  return {
+    visual: { x: 28, y: 100, width: 438, height: 255 },
+    narrative: { x: 480, y: 100, width: 212, height: 255 },
+  };
+}
 
 export function archetypeFor(slideCode: string): SlideArchetype {
   if (slideCode === "C0") return "cover_contract";

@@ -18,6 +18,14 @@ export interface GeneratedSlide {
   slideProperties?: { isSkipped?: boolean };
 }
 
+export interface PublishedGeneration {
+  publication_id: string;
+  run_id: string;
+  release_key: string;
+  status: string;
+  publication_version: number;
+}
+
 const MANAGED_SLIDE_PREFIXES = ["rlv1s_", "rlv2s_", "v4sld_"] as const;
 
 async function digest(value: string, length = 10): Promise<string> {
@@ -95,6 +103,39 @@ export function releaseSlidePrefix(releaseKey: string): string {
     throw new Error("Identidade de geração inválida.");
   }
   return `rlv2s_${releaseKey}_`;
+}
+
+/**
+ * Retenção conservadora: mantém o ponteiro vivo e as N gerações publicadas mais
+ * recentes. Só gera plano de exclusão para releases conhecidas e já
+ * superseded/rolled_back; artefatos imutáveis no Storage e banco não entram no
+ * plano.
+ */
+export function buildGenerationRetentionPlan(
+  publications: PublishedGeneration[],
+  currentPublicationId: string,
+  keepGenerations = 2,
+) {
+  const keepCount = Math.max(2, Math.floor(keepGenerations));
+  const ordered = [...publications].sort((a, b) => b.publication_version - a.publication_version);
+  const retained = new Set<string>();
+  const current = ordered.find((item) => item.publication_id === currentPublicationId);
+  if (current?.release_key) retained.add(current.release_key);
+  for (const item of ordered) {
+    if (!item.release_key) continue;
+    if (retained.size >= keepCount) break;
+    retained.add(item.release_key);
+  }
+  const deletable = ordered.filter((item) =>
+    item.release_key &&
+    !retained.has(item.release_key) &&
+    ["superseded", "rolled_back"].includes(item.status)
+  );
+  return {
+    retained_release_keys: [...retained],
+    deletable,
+    immutable_artifacts_preserved: true,
+  };
 }
 
 /**

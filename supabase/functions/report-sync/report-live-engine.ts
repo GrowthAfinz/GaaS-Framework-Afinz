@@ -90,6 +90,7 @@ export interface BuiltReport {
   tabs: Record<string, unknown[][]>;
   slides: SlideRun[];
   actionCandidates: Row[];
+  evaluatedOutcomes: Row[];
   partnerModes: Array<Record<string, unknown>>;
   previousPeriod: { start: string; end: string };
   fieldCoverage: Array<Record<string, unknown>>;
@@ -429,6 +430,8 @@ interface EditorialChartSeries {
   axis: "LEFT_AXIS" | "RIGHT_AXIS";
   line_width: number;
   point_size: number;
+  number_format_type: "NUMBER" | "CURRENCY" | "PERCENT";
+  number_format_pattern: string;
 }
 
 interface EditorialChartPlan {
@@ -441,6 +444,9 @@ interface EditorialChartPlan {
   start_row_index: number;
   end_row_index: number;
   domain_column_index: number;
+  domain_title: string;
+  left_axis_title: string;
+  right_axis_title: string;
   series: EditorialChartSeries[];
 }
 
@@ -453,6 +459,22 @@ const EDITORIAL_COLORS = {
   purple: "#A855F7",
   amber: "#F59E0B",
 } as const;
+
+export function editorialNumberFormat(kind: RulerElements["metric"]["kind"]) {
+  if (kind === "rate") {
+    return { number_format_type: "PERCENT" as const, number_format_pattern: "0.0%" };
+  }
+  if (kind === "currency") {
+    return { number_format_type: "CURRENCY" as const, number_format_pattern: 'R$ #,##0.00' };
+  }
+  return { number_format_type: "NUMBER" as const, number_format_pattern: "#,##0" };
+}
+
+function editorialAxisTitle(kind: RulerElements["metric"]["kind"]): string {
+  if (kind === "rate") return "Taxa (%)";
+  if (kind === "currency") return "Valor (R$)";
+  return "Volume";
+}
 
 function editorialRulerRows(
   slide: SlideRun,
@@ -495,7 +517,8 @@ function appendMonthlyChart(
   const series: EditorialChartSeries[] = [];
   const columns: Array<{ ruler: RulerElements; kind: "min" | "max" | "value" }> = [];
   const valueColors = [EDITORIAL_COLORS.cyan, EDITORIAL_COLORS.blue, EDITORIAL_COLORS.green];
-  const mixedMetricKinds = new Set(chartable.map((ruler) => ruler.metric.kind)).size > 1;
+  const metricKinds = [...new Set(chartable.map((ruler) => ruler.metric.kind))];
+  const mixedMetricKinds = metricKinds.length > 1;
   chartable.forEach((ruler, metricIndex) => {
     const axis: EditorialChartSeries["axis"] = mixedMetricKinds && metricIndex > 0
       ? "RIGHT_AXIS"
@@ -510,6 +533,7 @@ function appendMonthlyChart(
         axis,
         line_width: 1,
         point_size: 0,
+        ...editorialNumberFormat(ruler.metric.kind),
       });
       header.push(`${ruler.metric.label} · máx.`);
       columns.push({ ruler, kind: "max" });
@@ -520,6 +544,7 @@ function appendMonthlyChart(
         axis,
         line_width: 1,
         point_size: 0,
+        ...editorialNumberFormat(ruler.metric.kind),
       });
     }
     header.push(ruler.metric.label);
@@ -531,6 +556,7 @@ function appendMonthlyChart(
       axis,
       line_width: 3,
       point_size: 5,
+      ...editorialNumberFormat(ruler.metric.kind),
     });
   });
 
@@ -562,6 +588,9 @@ function appendMonthlyChart(
     start_row_index: startRowIndex,
     end_row_index: familyRows.length,
     domain_column_index: 0,
+    domain_title: "Mês",
+    left_axis_title: editorialAxisTitle(metricKinds[0]),
+    right_axis_title: mixedMetricKinds ? editorialAxisTitle(metricKinds[1]) : "",
     series,
   });
   while (familyRows.length % 24 !== 0) familyRows.push([]);
@@ -639,6 +668,8 @@ function buildEditorialTabs(
         axis: "LEFT_AXIS",
         line_width: 3,
         point_size: 4,
+        number_format_type: "NUMBER",
+        number_format_pattern: "#,##0",
       }];
       if (previousAvailable) {
         header.push("Período equivalente");
@@ -649,6 +680,8 @@ function buildEditorialTabs(
           axis: "LEFT_AXIS",
           line_width: 2,
           point_size: 2,
+          number_format_type: "NUMBER",
+          number_format_pattern: "#,##0",
         });
       }
       const targetAvailable = pacing.some((row) => toNumber(row.certified_target_cumulative_cards) !== null);
@@ -661,6 +694,8 @@ function buildEditorialTabs(
           axis: "LEFT_AXIS",
           line_width: 2,
           point_size: 0,
+          number_format_type: "NUMBER",
+          number_format_pattern: "#,##0",
         });
       }
       const startRowIndex = pacingFamilyRows.length;
@@ -681,6 +716,9 @@ function buildEditorialTabs(
         start_row_index: startRowIndex,
         end_row_index: pacingFamilyRows.length,
         domain_column_index: 0,
+        domain_title: "Dia do mês",
+        left_axis_title: "Cartões acumulados",
+        right_axis_title: "",
         series,
       });
       layoutRows.push({
@@ -709,6 +747,9 @@ function buildEditorialTabs(
     start_row_index: plan.start_row_index,
     end_row_index: plan.end_row_index,
     domain_column_index: plan.domain_column_index,
+    domain_title: plan.domain_title,
+    left_axis_title: plan.left_axis_title,
+    right_axis_title: plan.right_axis_title,
     series_json: JSON.stringify(plan.series),
     expected_chart_count: 1,
   }));
@@ -723,7 +764,7 @@ function buildEditorialTabs(
       layoutRows,
     ),
     VIEW_EDITORIAL_CHART_REGISTRY: rowsToTable(
-      ["slide_instance_id", "slide_code", "chart_key", "family_view", "chart_type", "title", "start_row_index", "end_row_index", "domain_column_index", "series_json", "expected_chart_count"],
+      ["slide_instance_id", "slide_code", "chart_key", "family_view", "chart_type", "title", "start_row_index", "end_row_index", "domain_column_index", "domain_title", "left_axis_title", "right_axis_title", "series_json", "expected_chart_count"],
       chartRegistry,
     ),
     VIEW_EDITORIAL_MONTHLY_CHARTS: monthlyFamilyRows.length
@@ -861,6 +902,12 @@ function buildDeterministicCandidates(
     });
   };
 
+  const nextMonthEnd = (() => {
+    const date = new Date(`${input.periodEnd.slice(0, 7)}-01T00:00:00Z`);
+    date.setUTCMonth(date.getUTCMonth() + 2, 0);
+    return date.toISOString().slice(0, 10);
+  })();
+
   if ((input.manifest.gap_closure_days ?? 0) > 2) {
     add({
       source_view: "VIEW_COVERAGE_COMPARABILITY",
@@ -873,7 +920,12 @@ function buildDeterministicCandidates(
       evidence_refs: [{ view: "VIEW_RUN_MANIFEST", field: "source_cutoffs" }],
       reading_limit: "Usar o cutoff integrado e expor os cutoffs nativos.",
       action_text: "Regularizar a fonte atrasada antes de decisões cross-source.",
-      success_metric: "gap_fechamento <= 2 dias",
+      success_metric: "gap_closure_days",
+      expected_value: 2,
+      expected_unit: "dias",
+      expected_direction: "menor_melhor",
+      outcome_window_end: nextMonthEnd,
+      verification_view: "VIEW_RUN_MANIFEST",
     });
   }
 
@@ -892,6 +944,11 @@ function buildDeterministicCandidates(
       reading_limit: "Campanhas BAU podem ser analisadas por Activity Name enquanto o mapeamento avança.",
       action_text: "Priorizar o mapeamento das atividades BAU de maior volume.",
       success_metric: "activities_template_coverage >= 80%",
+      expected_value: 0.8,
+      expected_unit: "%",
+      expected_direction: "maior_melhor",
+      outcome_window_end: nextMonthEnd,
+      verification_view: "VIEW_TEMPLATE_COVERAGE",
       confidence_status: "confirmed",
     });
   }
@@ -910,6 +967,11 @@ function buildDeterministicCandidates(
         evidence_refs: [{ view: "VIEW_PARTNER_ROUTER", partner: partner.partner }],
         action_text: "Corrigir a taxonomia das atividades N/A de maior volume.",
         success_metric: "share_cartoes_parceiro_NA",
+        expected_value: 0.1,
+        expected_unit: "%",
+        expected_direction: "menor_melhor",
+        outcome_window_end: nextMonthEnd,
+        verification_view: "VIEW_PARTNER_ROUTER",
         confidence_status: "confirmed",
       });
     } else if (partner.signal) {
@@ -927,6 +989,11 @@ function buildDeterministicCandidates(
         reading_limit: "Zero observado não prova ineficiência causal.",
         action_text: "Validar proposta, aprovação, cartão e maturidade do parceiro.",
         success_metric: "cartoes_gerados",
+        expected_value: 1,
+        expected_unit: "cartões",
+        expected_direction: "maior_melhor",
+        outcome_window_end: nextMonthEnd,
+        verification_view: "VIEW_PARTNER_ROUTER",
       });
     }
   }
@@ -953,7 +1020,144 @@ function buildDeterministicCandidates(
     }
   }
 
-  return candidates;
+  const completedCandidateIds = new Set(
+    input.actionOutcomes.map((row) => String(row.action_candidate_id ?? "")),
+  );
+  const unclosedBySignal = new Map<string, Set<string>>();
+  for (const previous of input.actionCandidates) {
+    if (completedCandidateIds.has(String(previous.action_candidate_id ?? ""))) continue;
+    const signal = String(previous.signal_code ?? "");
+    if (!signal) continue;
+    const runs = unclosedBySignal.get(signal) ?? new Set<string>();
+    runs.add(String(previous.run_id ?? previous.action_candidate_id ?? ""));
+    unclosedBySignal.set(signal, runs);
+  }
+  return candidates.map((candidate) => {
+    const repeated = (unclosedBySignal.get(String(candidate.signal_code ?? ""))?.size ?? 0) >= 2;
+    return repeated
+      ? {
+        ...candidate,
+        status: "backlog",
+        owner: candidate.owner ?? "Growth Ops",
+        reading_limit: [
+          candidate.reading_limit,
+          "Sinal repetido por dois ciclos sem outcome; removido do deck até haver dono e fechamento.",
+        ].filter(Boolean).join(" "),
+      }
+      : candidate;
+  });
+}
+
+function outcomeMetric(
+  candidate: Row,
+  tabs: Record<string, unknown[][]>,
+): { value: number | null; reason: string } {
+  const view = String(candidate.verification_view ?? "");
+  const metric = String(candidate.success_metric ?? "");
+  const rows = tableRecords(tabs[view]);
+  if (!view || !tabs[view]) return { value: null, reason: "view_de_verificacao_inexistente" };
+  if (!rows.length) return { value: null, reason: "view_de_verificacao_sem_linhas" };
+
+  if (view === "VIEW_RUN_MANIFEST") {
+    const row = rows.find((item) => String(item.campo ?? "") === metric);
+    return { value: toNumber(row?.valor), reason: row ? "campo_do_manifesto" : "metrica_inexistente_na_view" };
+  }
+  if (view === "VIEW_TEMPLATE_COVERAGE") {
+    const row = rows.find((item) => String(item.scope ?? "") === "activities.template_id");
+    return { value: toNumber(row?.coverage), reason: row ? "cobertura_activities_template_id" : "metrica_inexistente_na_view" };
+  }
+  if (view === "VIEW_PARTNER_ROUTER") {
+    const partner = String(candidate.partner ?? "");
+    const row = rows.find((item) => String(item.partner ?? "") === partner);
+    const field = metric === "share_cartoes_parceiro_NA" ? "card_share"
+      : metric === "cartoes_gerados" ? "cards"
+      : metric;
+    return { value: toNumber(row?.[field]), reason: row ? `campo_${field}` : "entidade_inexistente_na_view" };
+  }
+
+  const direct = rows.find((item) => String(item.metric ?? item.metrica ?? "") === metric);
+  if (direct) {
+    return { value: toNumber(direct.current ?? direct.value ?? direct.valor), reason: "linha_de_metrica" };
+  }
+  if (rows.length === 1 && metric in rows[0]) {
+    return { value: toNumber(rows[0][metric]), reason: "coluna_de_metrica" };
+  }
+  return { value: null, reason: "metrica_inexistente_na_view" };
+}
+
+export function evaluateMaturedOutcomes(
+  input: ReportInputs,
+  tabs: Record<string, unknown[][]>,
+): Row[] {
+  const completed = new Set(input.actionOutcomes.map((row) => String(row.action_candidate_id ?? "")));
+  return input.actionCandidates.flatMap((candidate) => {
+    const candidateId = String(candidate.action_candidate_id ?? "");
+    const windowEnd = String(candidate.outcome_window_end ?? "");
+    const expected = toNumber(candidate.expected_value);
+    const direction = String(candidate.expected_direction ?? "");
+    if (!candidateId || completed.has(candidateId) || candidate.review_status !== "approved") return [];
+    if (!windowEnd || windowEnd > input.periodEnd || expected === null || !direction || !candidate.verification_view) return [];
+    const observed = outcomeMetric(candidate, tabs);
+    const comparable = observed.value !== null;
+    const confirmed = comparable && (
+      direction === "menor_melhor" ? observed.value! <= expected : observed.value! >= expected
+    );
+    const outcomeStatus = !comparable ? "premissa_invalida" : confirmed ? "confirmado" : "nao_confirmado";
+    return [{
+      action_candidate_id: candidateId,
+      metric_name: candidate.success_metric,
+      baseline_value: null,
+      expected_value: expected,
+      observed_value: observed.value,
+      unit: candidate.expected_unit ?? null,
+      window_start: toIsoDay(candidate.created_at) || input.periodStart,
+      window_end: windowEnd,
+      evaluated_at: `${input.periodEnd}T23:59:59.000Z`,
+      outcome_status: outcomeStatus,
+      conclusion: outcomeStatus === "premissa_invalida"
+        ? `Não foi possível verificar: ${observed.reason}.`
+        : `Realizado ${observed.value}; esperado ${expected}; direção ${direction}.`,
+      verification_view: candidate.verification_view,
+      verification_reason: observed.reason,
+    }];
+  });
+}
+
+function buildOutcomeViewRows(outcomes: Row[], candidates: Row[]): Row[] {
+  const candidateById = new Map(
+    candidates.map((row) => [String(row.action_candidate_id ?? ""), row]),
+  );
+  const detail = outcomes.map((outcome) => ({
+    ...outcome,
+    signal_code: candidateById.get(String(outcome.action_candidate_id ?? ""))?.signal_code ?? "",
+    scorecard_scope: "outcome",
+    success_rate: null,
+  }));
+  const bySignal = groupRows(detail.filter((row) => row.signal_code), ["signal_code"]);
+  const summaries = [...bySignal.values()].map((rows) => {
+    const concluded = rows.filter((row) => ["confirmado", "nao_confirmado"].includes(String(row.outcome_status)));
+    const confirmed = concluded.filter((row) => row.outcome_status === "confirmado").length;
+    return {
+      action_candidate_id: "",
+      signal_code: rows[0].signal_code,
+      metric_name: "taxa_acerto",
+      baseline_value: null,
+      expected_value: null,
+      observed_value: confirmed,
+      unit: `${confirmed}/${concluded.length}`,
+      window_start: "",
+      window_end: "",
+      outcome_status: concluded.length ? "placar" : "sem_base_comparavel",
+      conclusion: concluded.length
+        ? `${confirmed} de ${concluded.length} recomendações confirmadas.`
+        : "Ainda não há outcome comparável.",
+      verification_view: "",
+      verification_reason: "agregado_por_signal_code",
+      scorecard_scope: "signal_code",
+      success_rate: concluded.length ? confirmed / concluded.length : null,
+    };
+  });
+  return [...detail, ...summaries];
 }
 
 function buildFieldCoverage(input: ReportInputs): Array<Record<string, unknown>> {
@@ -1203,7 +1407,6 @@ function buildSlides(
     if (contract.section === "partner") continue;
     const view = contract.source_view;
     const conditionalAvailability: Record<string, boolean> = {
-      "K-VISA": Boolean(tabs.VIEW_VISA_OPTIN?.length > 1),
       "K-SEG": Boolean(tabs.VIEW_INSURANCE_SUMMARY?.length > 1),
       "K-TPL": true,
       "K-EXP": Boolean(tabs.VIEW_EXPERIMENTS?.length > 1),
@@ -1247,6 +1450,65 @@ function buildSlides(
     }
   }
   return output;
+}
+
+const PROFILE_LIMITS = {
+  executivo_mensal: 12,
+  deep_dive: 31,
+} as const;
+
+const DEEP_DIVE_PRIORITY = [
+  "C0", "C1", "C4", "C7", "C8",
+  "P1", "P4", "P2", "P3", "P5", "P7", "P6",
+  "M1", "M2", "M3", "M4", "M6",
+  "B1", "K-SEG", "K-TPL",
+  "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+];
+
+const EXECUTIVE_PRIORITY = [
+  "C0", "C1", "C4", "C7", "C8",
+  "P1", "M1", "M2", "B1",
+];
+
+/**
+ * Dois perfis são projeções determinísticas do mesmo artefato. A seleção nunca
+ * promove slide bloqueado e mantém a ordem original do contrato. Quando uma
+ * condicional não existe, a vaga é preenchida pelo próximo slide elegível.
+ */
+export function projectSlidesForProfile(slides: SlideRun[], rawProfile: string): SlideRun[] {
+  const profile = rawProfile === "monthly_report" ? "executivo_mensal" : rawProfile;
+  if (!(profile in PROFILE_LIMITS)) return slides;
+  const eligible = slides.filter((slide) => slide.run_eligibility !== "omitir_bloqueado");
+  const priorities = profile === "executivo_mensal" ? EXECUTIVE_PRIORITY : DEEP_DIVE_PRIORITY;
+  const rank = (slide: SlideRun) => {
+    const codeRank = priorities.indexOf(slide.slide_code);
+    const partnerPenalty = slide.partner ? Math.max(0, slides.findIndex((candidate) => candidate.partner === slide.partner)) / 10_000 : 0;
+    return (codeRank < 0 ? priorities.length + 100 : codeRank) + partnerPenalty;
+  };
+  const section = (slide: SlideRun) => slide.slide_code.startsWith("C") ? "core"
+    : slide.slide_code.startsWith("P") ? "partner"
+    : slide.slide_code.startsWith("M") ? "media"
+    : slide.slide_code.startsWith("B") ? "b2c"
+    : slide.slide_code.startsWith("K-") ? "conditional"
+    : slide.slide_code.startsWith("A") ? "annex"
+    : "other";
+  const quotas = profile === "executivo_mensal"
+    ? { core: 5, partner: 4, media: 2, b2c: 1, conditional: 0, annex: 0, other: 0 }
+    : { core: 5, partner: 11, media: 5, b2c: 1, conditional: 2, annex: 7, other: 0 };
+  const selected: SlideRun[] = [];
+  for (const [name, quota] of Object.entries(quotas)) {
+    selected.push(...eligible
+      .filter((slide) => section(slide) === name)
+      .sort((a, b) => rank(a) - rank(b) || slides.indexOf(a) - slides.indexOf(b))
+      .slice(0, quota));
+  }
+  const selectedIds = new Set(selected.map((slide) => slide.slide_instance_id));
+  const limit = PROFILE_LIMITS[profile as keyof typeof PROFILE_LIMITS];
+  selected.push(...eligible
+    .filter((slide) => !selectedIds.has(slide.slide_instance_id))
+    .sort((a, b) => rank(a) - rank(b) || slides.indexOf(a) - slides.indexOf(b))
+    .slice(0, Math.max(0, limit - selected.length)));
+  return selected.slice(0, limit).sort((a, b) => slides.indexOf(a) - slides.indexOf(b));
 }
 
 export function buildReport(input: ReportInputs): BuiltReport {
@@ -1501,7 +1763,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
 
   tabs.VIEW_ACTION_QUEUE = rowsToTable(
     ["bucket", "domain", "partner", "signal", "impact", "probable_cause", "evidence_refs", "reading_limit", "action_text", "owner", "due_date", "success_metric", "confidence_status", "review_status"],
-    actionCandidates,
+    actionCandidates.filter((candidate) => candidate.status !== "backlog"),
   );
   tabs.VIEW_ACTION_OUTCOMES = rowsToTable(
     ["action_candidate_id", "metric_name", "baseline_value", "expected_value", "observed_value", "unit", "window_start", "window_end", "outcome_status", "conclusion"],
@@ -1606,7 +1868,9 @@ export function buildReport(input: ReportInputs): BuiltReport {
     );
     tabs[tabName("VP", partnerName, "ACTION")] = rowsToTable(
       ["bucket", "signal", "action_text", "success_metric", "confidence_status", "review_status"],
-      actionCandidates.filter((candidate) => String(candidate.partner ?? "") === partnerName).slice(0, 1),
+      actionCandidates.filter((candidate) =>
+        candidate.status !== "backlog" && String(candidate.partner ?? "") === partnerName
+      ).slice(0, 1),
     );
   }
 
@@ -1853,18 +2117,6 @@ export function buildReport(input: ReportInputs): BuiltReport {
       { metric: "media_spend", value: mediaMetrics(mediaCurrent.filter((row) => classifyMediaFront(row.campaign) === "Seguros")).spend, state: dataState(mediaMetrics(mediaCurrent.filter((row) => classifyMediaFront(row.campaign) === "Seguros")).spend), cutoff: input.manifest.source_cutoffs.media },
     ],
   );
-  tabs.VIEW_VISA_OPTIN = rowsToTable(
-    ["channel", "campaign", "spend", "platform_result", "measurement_rule"],
-    mediaCurrent
-      .filter((row) => classifyMediaFront(row.campaign) === "Copa Visa")
-      .map((row) => ({
-        channel: row.channel,
-        campaign: row.campaign,
-        spend: row.spend,
-        platform_result: null,
-        measurement_rule: "Medir por opt-in/evento nomeado; nunca CAC.",
-      })),
-  );
   tabs.VIEW_QUALITY_INCIDENTS = rowsToTable(
     ["source", "status", "started_at", "finished_at", "rows_received", "rows_rejected", "error_summary"],
     input.collectionRuns.filter((row) =>
@@ -1933,7 +2185,14 @@ export function buildReport(input: ReportInputs): BuiltReport {
     ],
   );
 
-  const slides = buildSlides(input, partnerModes, tabs);
+  const evaluatedOutcomes = evaluateMaturedOutcomes(input, tabs);
+  const allOutcomes = [...input.actionOutcomes, ...evaluatedOutcomes];
+  tabs.VIEW_ACTION_OUTCOMES = rowsToTable(
+    ["action_candidate_id", "signal_code", "metric_name", "baseline_value", "expected_value", "observed_value", "unit", "window_start", "window_end", "outcome_status", "conclusion", "verification_view", "verification_reason", "scorecard_scope", "success_rate"],
+    buildOutcomeViewRows(allOutcomes, input.actionCandidates),
+  );
+
+  const slides = projectSlidesForProfile(buildSlides(input, partnerModes, tabs), input.profile);
   Object.assign(tabs, buildEditorialTabs(input, tabs, slides));
   tabs.SLIDE_READINESS = rowsToTable(
     ["run_id", "slide_instance_id", "slide_code", "partner", "source_view", "implementation_readiness", "run_eligibility", "confidence_status", "confidence_label", "data_coverage", "cutoff_maturity", "execution_volume", "missing_required_fields", "fallback_applied", "evidence"],
@@ -1962,6 +2221,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
     tabs,
     slides,
     actionCandidates,
+    evaluatedOutcomes,
     partnerModes,
     previousPeriod: previous,
     fieldCoverage,

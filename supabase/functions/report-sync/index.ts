@@ -23,11 +23,13 @@ import {
   type PublicationReceipt,
 } from "./report-live-publication.ts";
 import {
+  buildGenerationRetentionPlan,
   buildSheetGeneration,
   buildIsolatedExportPlan,
   buildSlideActivationRequests,
   buildSlideVisibilityRestoreRequests,
   isManagedGeneratedSlide,
+  releaseSlidePrefix,
   verifySlideActivation,
 } from "./report-live-generation.ts";
 import { reportLiveReleaseKey } from "../_shared/report-live-design.ts";
@@ -402,6 +404,7 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     communicationTemplates,
     slideContracts,
     aliases,
+    actionCandidates,
     actionOutcomes,
     metricCertifications,
     eventMap,
@@ -456,6 +459,7 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     pagedSelect("communication_templates", "*", { orderColumn: "created_at" }),
     pagedSelect("report_slide_contracts", "*", { orderColumn: "display_order" }),
     pagedSelect("paid_media_campaign_aliases", "*", { orderColumn: "platform" }),
+    pagedSelect("report_action_candidates", "*", { orderColumn: "created_at" }),
     pagedSelect("report_action_outcomes", "*", { orderColumn: "created_at" }),
     pagedSelect("report_metric_certifications", "*", { orderColumn: "period_key" }),
     pagedSelect("event_map", "*", { orderColumn: "id" }),
@@ -493,7 +497,7 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
       optional_fields: Array.isArray(contract.optional_fields) ? contract.optional_fields : [],
     })),
     aliases,
-    actionCandidates: [],
+    actionCandidates,
     actionOutcomes,
     metricCertifications,
     eventMap,
@@ -679,6 +683,11 @@ async function saveGeneratedState(
       owner: candidate.owner ?? null,
       due_date: candidate.due_date ?? null,
       success_metric: candidate.success_metric ?? null,
+      expected_value: candidate.expected_value ?? null,
+      expected_unit: candidate.expected_unit ?? null,
+      expected_direction: candidate.expected_direction ?? null,
+      outcome_window_end: candidate.outcome_window_end ?? null,
+      verification_view: candidate.verification_view ?? null,
       confidence_status: candidate.confidence_status,
       generated_by: candidate.generated_by,
       review_status: candidate.review_status,
@@ -688,6 +697,13 @@ async function saveGeneratedState(
       .from("report_action_candidates")
       .upsert(rows, { onConflict: "run_id,entity_key,signal_code" });
     if (error) throw new Error(`report_action_candidates: ${error.message}`);
+  }
+
+  if (built.evaluatedOutcomes.length) {
+    const { error } = await admin
+      .from("report_action_outcomes")
+      .upsert(built.evaluatedOutcomes, { onConflict: "action_candidate_id" });
+    if (error) throw new Error(`report_action_outcomes: ${error.message}`);
   }
 
   const { error: deleteError } = await admin.from("report_slide_runs").delete().eq("run_id", runId);
@@ -2272,7 +2288,8 @@ async function processBuildStep(requestedRunId?: string) {
             await finish("done");
           } else {
             const built = { tabs: artifact.tabs, slides: artifact.slides, actionCandidates: artifact.action_candidates,
-              partnerModes: artifact.partner_modes, previousPeriod: artifact.previous_period, fieldCoverage: artifact.field_coverage };
+              evaluatedOutcomes: [], partnerModes: artifact.partner_modes,
+              previousPeriod: artifact.previous_period, fieldCoverage: artifact.field_coverage };
             await saveGeneratedState(runId, input.profile, input.manifest, built);
             await persistBuild(input, artifact, validateArtifact(artifact));
             await finish("certify");
@@ -2809,12 +2826,88 @@ export async function handleReportRequest(request: Request): Promise<Response> {
     return json({ error: "Secrets obrigatórios ausentes." }, 500);
   }
 
-  // Cleanup is a separate, read-only inventory route. Never fall through to full.
-  // Destructive cleanup is deliberately unavailable until recovery is verified.
+  // Retenção remove apenas objetos Google de gerações publicadas conhecidas.
+  // Artefatos/PDFs imutáveis e registros do banco permanecem preservados.
   if (body.mode === "cleanup_sheet_tabs") {
-    if (body.confirm === true) return json({ error: "Limpeza desabilitada até recuperação verificada." }, 409);
-    const metadata = await googleFetch(`${SHEETS}/${SHEET_ID}?fields=sheets(properties(sheetId,title))`);
-    return json({ ok: true, dry_run: true, sheets: metadata.sheets ?? [], deleted: [] });
+    if (!internal) return json({ error: "Retenção restrita ao serviço." }, 403);
+    const keepGenerations = Math.max(2, Math.min(12, Number(body.keep_generations ?? 2)));
+    const [{ data: pointer, error: pointerError }, { data: publications, error: publicationsError }] = await Promise.all([
+      admin.from("report_live_pointer").select("current_publication_id").eq("id", "live").maybeSingle(),
+      admin.from("report_publications")
+        .select("id,run_id,slide_generation,status,publication_version")
+        .in("status", ["published", "superseded", "rolled_back"])
+        .order("publication_version", { ascending: false }),
+    ]);
+    if (pointerError) return json({ error: pointerError.message }, 500);
+    if (publicationsError) return json({ error: publicationsError.message }, 500);
+    if (!pointer?.current_publication_id) return json({ error: "Ponteiro vivo ausente; retenção recusada." }, 409);
+    const plan = buildGenerationRetentionPlan(
+      (publications ?? []).map((item) => ({
+        publication_id: String(item.id),
+        run_id: String(item.run_id),
+        release_key: String(item.slide_generation ?? ""),
+        status: String(item.status),
+        publication_version: Number(item.publication_version),
+      })),
+      String(pointer.current_publication_id),
+      keepGenerations,
+    );
+    const generations: Array<{ publication_id: string; run_id: string; release_key: string; sheet_titles: string[] }> = [];
+    for (const publication of plan.deletable) {
+      try {
+        const artifact = await downloadBuildArtifact(buildArtifactPath(publication.run_id));
+        const generation = await artifactGeneration(artifact);
+        if (generation.releaseKey !== publication.release_key) {
+          return json({ error: `Release divergente no run ${publication.run_id}; retenção recusada.` }, 409);
+        }
+        generations.push({
+          publication_id: publication.publication_id,
+          run_id: publication.run_id,
+          release_key: publication.release_key,
+          sheet_titles: generation.entries.map((entry) => entry.physical_title),
+        });
+      } catch (error) {
+        return json({ error: `Artefato de retenção indisponível para ${publication.run_id}: ${String((error as Error).message)}` }, 409);
+      }
+    }
+    const [sheetMetadata, deck] = await Promise.all([
+      googleFetch(`${SHEETS}/${SHEET_ID}?fields=sheets(properties(sheetId,title))`),
+      googleFetch(`${SLIDES}/${SLIDES_ID}?fields=slides(objectId,slideProperties(isSkipped))`),
+    ]);
+    const deletableSheetTitles = new Set(generations.flatMap((item) => item.sheet_titles));
+    const deletableSheets: Array<{ sheet_id: number; title: string }> =
+      (sheetMetadata.sheets ?? []).flatMap((sheet: Row) => {
+      const properties = sheet.properties as Row;
+      return deletableSheetTitles.has(String(properties.title ?? ""))
+        ? [{ sheet_id: Number(properties.sheetId), title: String(properties.title) }]
+        : [];
+      });
+    const prefixes = generations.map((item) => releaseSlidePrefix(item.release_key));
+    const deletableSlides: string[] = (deck.slides ?? []).flatMap((slide: Row) => {
+      const objectId = String(slide.objectId ?? "");
+      const skipped = (slide.slideProperties as Row)?.isSkipped === true;
+      return skipped && prefixes.some((prefix) => objectId.startsWith(prefix)) ? [objectId] : [];
+    });
+    const dryRun = body.confirm !== "DELETE_SUPERSEDED_GENERATIONS";
+    if (!dryRun) {
+      if (deletableSheets.length) {
+        await googleFetch(`${SHEETS}/${SHEET_ID}:batchUpdate`, {
+          method: "POST",
+          body: JSON.stringify({ requests: deletableSheets.map((sheet) => ({ deleteSheet: { sheetId: sheet.sheet_id } })) }),
+        });
+      }
+      if (deletableSlides.length) {
+        await googleFetch(`${SLIDES}/${SLIDES_ID}:batchUpdate`, {
+          method: "POST",
+          body: JSON.stringify({ requests: deletableSlides.map((objectId) => ({ deleteObject: { objectId } })) }),
+        });
+      }
+    }
+    return json({ ok: true, dry_run: dryRun, keep_generations: keepGenerations,
+      retained_release_keys: plan.retained_release_keys, generations,
+      sheets: deletableSheets, slides: deletableSlides,
+      deleted: dryRun ? { sheets: 0, slides: 0 } : { sheets: deletableSheets.length, slides: deletableSlides.length },
+      immutable_artifacts_preserved: true });
   }
 
   // Download the immutable PDF of a confirmed publication. Never relabel the

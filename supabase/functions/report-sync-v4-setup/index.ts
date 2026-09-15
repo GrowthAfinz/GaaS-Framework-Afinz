@@ -6,6 +6,7 @@ import {
   accentFor,
   AFINZ_LIGHT,
   archetypeFor,
+  layoutGeometryFor,
   minimumBodySize,
   reportLiveReleaseKey,
   REPORT_LIVE_DESIGN_VERSION,
@@ -874,6 +875,8 @@ type EditorialChartSeries = {
   axis: "LEFT_AXIS" | "RIGHT_AXIS";
   line_width: number;
   point_size: number;
+  number_format_type: "NUMBER" | "CURRENCY" | "PERCENT";
+  number_format_pattern: string;
 };
 
 type EditorialChartPlan = {
@@ -886,6 +889,9 @@ type EditorialChartPlan = {
   start_row_index: number;
   end_row_index: number;
   domain_column_index: number;
+  domain_title: string;
+  left_axis_title: string;
+  right_axis_title: string;
   series: EditorialChartSeries[];
   expected_chart_count: number;
 };
@@ -977,6 +983,9 @@ async function readEditorialData(sheetTitleMap: Record<string, string>) {
       start_row_index: Number(row.start_row_index ?? 0),
       end_row_index: Number(row.end_row_index ?? 0),
       domain_column_index: Number(row.domain_column_index ?? 0),
+      domain_title: String(row.domain_title ?? "Período"),
+      left_axis_title: String(row.left_axis_title ?? ""),
+      right_axis_title: String(row.right_axis_title ?? ""),
       series,
       expected_chart_count: Number(row.expected_chart_count ?? 1),
     };
@@ -1047,7 +1056,6 @@ function chartConfigFor(code: string): V1ChartConfig | null {
     M5: { type: "BAR", domain: "ad_name", series: ["clicks"] },
     B1: { type: "BAR", domain: "source_type", series: ["emissions"] },
     B2: { type: "LINE", domain: "date", series: ["emissions"] },
-    "K-VISA": { type: "BAR", domain: "campaign", series: ["platform_result"] },
     "K-TPL": { type: "BAR", domain: "scope", series: ["coverage"] },
     A1: { type: "BAR", domain: "partner", series: ["cards"] },
   };
@@ -1129,6 +1137,28 @@ async function ensureV1Charts(
           endColumnIndex: columnIndex + 1,
         }],
       });
+      for (const series of editorial.series) {
+        requests.push({
+          repeatCell: {
+            range: {
+              sheetId: info.sheetId,
+              startRowIndex: editorial.start_row_index + 1,
+              endRowIndex: editorial.end_row_index,
+              startColumnIndex: series.column_index,
+              endColumnIndex: series.column_index + 1,
+            },
+            cell: {
+              userEnteredFormat: {
+                numberFormat: {
+                  type: series.number_format_type,
+                  pattern: series.number_format_pattern,
+                },
+              },
+            },
+            fields: "userEnteredFormat.numberFormat",
+          },
+        });
+      }
       const existing = info.charts.find((chart) => chart.anchorRow === editorial.start_row_index);
       const chartSpec = {
         title: editorial.title,
@@ -1148,10 +1178,10 @@ async function ensureV1Charts(
             pointStyle: { size: series.point_size, shape: "CIRCLE" },
           })),
           axis: [
-            { position: "BOTTOM_AXIS", title: "Período" },
-            { position: "LEFT_AXIS" },
+            { position: "BOTTOM_AXIS", title: editorial.domain_title },
+            { position: "LEFT_AXIS", title: editorial.left_axis_title, viewWindowOptions: { viewWindowMode: "PRETTY" } },
             ...(editorial.series.some((series) => series.axis === "RIGHT_AXIS")
-              ? [{ position: "RIGHT_AXIS" }]
+              ? [{ position: "RIGHT_AXIS", title: editorial.right_axis_title, viewWindowOptions: { viewWindowMode: "PRETTY" } }]
               : []),
           ],
         },
@@ -1558,6 +1588,7 @@ async function ensureV1Slides(
     const accentColor = accentFor(item.section);
     const archetype = archetypeFor(item.slide_code);
     const bodySize = minimumBodySize(item.section);
+    const geometry = layoutGeometryFor(archetype, rulerRows.length > 0);
     const confidenceColor = item.confidence === "Alta"
       ? V1_COLORS.green
       : item.confidence === "Média"
@@ -1655,8 +1686,6 @@ async function ensureV1Slides(
     }
 
     if (hasChart) {
-      const chartY = rulerRows.length ? 184 : 100;
-      const chartHeight = rulerRows.length ? 158 : 238;
       requests.push({
         createSheetsChart: {
           objectId: chartId,
@@ -1666,14 +1695,14 @@ async function ensureV1Slides(
           elementProperties: {
             pageObjectId: pageId,
             size: {
-              width: { magnitude: 438, unit: "PT" },
-              height: { magnitude: chartHeight, unit: "PT" },
+              width: { magnitude: geometry.visual.width, unit: "PT" },
+              height: { magnitude: geometry.visual.height, unit: "PT" },
             },
             transform: {
               scaleX: 1,
               scaleY: 1,
-              translateX: 28,
-              translateY: chartY,
+              translateX: geometry.visual.x,
+              translateY: geometry.visual.y,
               unit: "PT",
             },
           },
@@ -1685,10 +1714,10 @@ async function ensureV1Slides(
         pageId,
         previewId,
         renderPreviewText(preview, missingExpectedChart),
-        28,
-        100,
-        438,
-        255,
+        geometry.visual.x,
+        geometry.visual.y,
+        geometry.visual.width,
+        geometry.visual.height,
         missingExpectedChart
           ? { fontSize: Math.max(bodySize, 12), color: "#991B1B", fontFamily: "Arial", fill: "#FDECEC", bold: true }
           : { fontSize: bodySize, color: AFINZ_LIGHT.text, fontFamily: "Arial", fill: V1_COLORS.panel },
@@ -1712,10 +1741,10 @@ async function ensureV1Slides(
       pageId,
       narrativeId,
       `LEITURA DA DECISÃO\n\n{{${item.slide_instance_id}}}`,
-      480,
-      100,
-      212,
-      255,
+      geometry.narrative.x,
+      geometry.narrative.y,
+      geometry.narrative.width,
+      geometry.narrative.height,
       { fontSize: 11, color: AFINZ_LIGHT.text, fill: V1_COLORS.panelLight, radius: true },
     );
     requests.push({
