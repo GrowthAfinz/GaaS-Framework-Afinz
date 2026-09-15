@@ -91,6 +91,66 @@ class OfficeRendererPlanTests(unittest.TestCase):
                 artifact, "11111111-1111-4111-8111-111111111111", "outro-hash",
             )
 
+    def test_monthly_archetypes_preserve_missing_and_rankings(self):
+        artifact = self.artifact()
+        ids = ["c1", "c7", "c8", "m1", "m2", "b1"]
+        archetypes = {
+            "c1": "executive_takeaway", "c7": "analytical_table", "c8": "action_queue",
+            "m1": "time_series_pacing", "m2": "router_ranking", "b1": "funnel",
+        }
+        sources = {
+            "c1": "VIEW_EXECUTIVE_READING", "c7": "VIEW_ACTION_OUTCOMES",
+            "c8": "VIEW_ACTION_QUEUE", "m1": "VIEW_MEDIA_PACING",
+            "m2": "VIEW_MEDIA_MIX", "b1": "VIEW_B2C_PARALLEL_FUNNELS",
+        }
+        geometry = {"visual": {"x": 28, "y": 100, "width": 438, "height": 255},
+                    "narrative": {"x": 480, "y": 100, "width": 212, "height": 255}}
+        artifact["slides"] = [
+            {"slide_instance_id": value, "slide_code": value.upper(),
+             "source_view": sources[value], "partner": None,
+             "confidence_label": "Baixa", "confidence_status": "suspect"}
+            for value in ids
+        ]
+        artifact["slide_blueprints"] = [
+            {"slide_instance_id": value, "blueprint": {"narrative": "Texto.",
+              "visual": {"archetype": archetypes[value], "geometry": geometry}}}
+            for value in ids
+        ]
+        artifact["tabs"]["VIEW_REGISTRY"] = table(
+            ["slide_instance_id", "title"], [[value, value.upper()] for value in ids],
+        )
+        artifact["tabs"].update({
+            "VIEW_EXECUTIVE_READING": table(
+                ["run_manifest", "core_kpis"],
+                [["{}", '{"crm_cards":100,"crm_cac":12.5,"media_spend":900,"crm_conversion":0.02}']],
+            ),
+            "VIEW_ACTION_OUTCOMES": table(["outcome_status"], []),
+            "VIEW_ACTION_QUEUE": table(["bucket"], []),
+            "VIEW_MEDIA_PACING": table(
+                ["channel", "objective", "spend", "budget_state"],
+                [["meta", "conversion", 900, "missing"]],
+            ),
+            "VIEW_MEDIA_MIX": table(
+                ["channel", "objective", "spend", "cpa_event"],
+                [["meta", "conversion", 900, "CPA conversion"]],
+            ),
+            "VIEW_B2C_PARALLEL_FUNNELS": table(
+                ["source_type", "proposals", "emissions", "conversion", "comparison_note"],
+                [["B2C — indisponível", "", "", "", "não somar"],
+                 ["CRM activities", 1000, 100, 0.1, "não somar"]],
+            ),
+        })
+        plan = renderer.build_render_plan(artifact, ids)
+        by_id = {item["slide_instance_id"]: item for item in plan["slides"]}
+        self.assertEqual(by_id["c1"]["kpis"][1]["value"], "R$ 12,50")
+        self.assertTrue(by_id["c7"]["empty_state"])
+        self.assertTrue(by_id["c8"]["empty_state"])
+        self.assertEqual(by_id["m1"]["ranking"][0]["status"], "missing")
+        self.assertIn("1/1", by_id["m1"]["warning"])
+        self.assertEqual(by_id["m2"]["ranking"][0]["value"], 900.0)
+        self.assertEqual(by_id["b1"]["funnels"][0]["emissions"], "indisponível")
+        self.assertEqual(by_id["c1"]["support_text"], "Conversão CRM/base: 2,0%")
+
 
 if __name__ == "__main__":
     unittest.main()
