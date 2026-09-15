@@ -10,6 +10,7 @@ import {
   minimumBodySize,
   reportLiveReleaseKey,
   REPORT_LIVE_DESIGN_VERSION,
+  REPORT_LIVE_SPEC_VERSION,
   stableReportLiveObjectId,
 } from "../_shared/report-live-design.ts";
 
@@ -2015,7 +2016,7 @@ Deno.serve(async (req: Request) => {
         sheetTitleMap,
         artifactPreviews,
       );
-      return json({ ok: true, spec_version: "1.0", ...result });
+      return json({ ok: true, spec_version: REPORT_LIVE_SPEC_VERSION, ...result });
     } catch (error) {
       return json({ ok: false, error: String((error as Error).message).slice(0, 900) }, 500);
     }

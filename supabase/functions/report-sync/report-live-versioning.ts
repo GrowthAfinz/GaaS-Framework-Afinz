@@ -4,12 +4,13 @@ import {
   layoutGeometryFor,
   minimumBodySize,
   REPORT_LIVE_DESIGN_VERSION,
+  REPORT_LIVE_SPEC_VERSION,
 } from "../_shared/report-live-design.ts";
 
 export const RELEASE_VERSIONS = {
   source: "1.4",
   semantic: "1.4.0",
-  spec: "3.0",
+  spec: REPORT_LIVE_SPEC_VERSION,
   narrative: "1",
   renderer: REPORT_LIVE_DESIGN_VERSION,
   validator: "3",

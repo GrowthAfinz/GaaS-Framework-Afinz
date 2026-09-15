@@ -5,6 +5,7 @@ import {
   type RulerElements,
   type RulerMetricKey,
 } from "../_shared/report-live-editorial.ts";
+import { REPORT_LIVE_SPEC_VERSION } from "../_shared/report-live-design.ts";
 
 export type QualityStatus = "confirmed" | "directional" | "suspect" | "blocked";
 export type Eligibility = "render" | "render_com_limites" | "omitir_bloqueado";
@@ -1559,7 +1560,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
 
   tabs.VIEW_RUN_MANIFEST = objectEntriesTable({
     run_id: input.runId,
-    spec_version: "1.0",
+    spec_version: REPORT_LIVE_SPEC_VERSION,
     report_profile: input.profile,
     period_start: input.periodStart,
     period_end: input.periodEnd,

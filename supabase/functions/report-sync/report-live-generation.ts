@@ -129,7 +129,7 @@ export function buildGenerationRetentionPlan(
   const deletable = ordered.filter((item) =>
     item.release_key &&
     !retained.has(item.release_key) &&
-    ["superseded", "rolled_back"].includes(item.status)
+    ["superseded", "rolled_back", "failed"].includes(item.status)
   );
   return {
     retained_release_keys: [...retained],

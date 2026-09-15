@@ -95,11 +95,11 @@ test('retention preserves the live and previous generation and only selects know
     { publication_id: 'p4', run_id: 'r4', release_key: 'live', status: 'published', publication_version: 4 },
     { publication_id: 'p3', run_id: 'r3', release_key: 'previous', status: 'superseded', publication_version: 3 },
     { publication_id: 'p2', run_id: 'r2', release_key: 'old', status: 'superseded', publication_version: 2 },
-    { publication_id: 'p1', run_id: 'r1', release_key: 'rolled', status: 'rolled_back', publication_version: 1 },
+    { publication_id: 'p1', run_id: 'r1', release_key: 'failed', status: 'failed', publication_version: 1 },
   ];
   const plan = buildGenerationRetentionPlan(publications, 'p4', 2);
   assert.deepEqual(plan.retained_release_keys, ['live', 'previous']);
-  assert.deepEqual(plan.deletable.map((item) => item.release_key), ['old', 'rolled']);
+  assert.deepEqual(plan.deletable.map((item) => item.release_key), ['old', 'failed']);
   assert.equal(plan.immutable_artifacts_preserved, true);
 });
 

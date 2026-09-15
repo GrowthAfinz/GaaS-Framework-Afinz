@@ -1,4 +1,5 @@
 export const REPORT_LIVE_DESIGN_VERSION = "2.2-editorial-profiles-outcomes";
+export const REPORT_LIVE_SPEC_VERSION = "3.0";
 
 export const AFINZ_LIGHT = {
   canvas: "#F7F9FA",

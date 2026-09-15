@@ -719,7 +719,7 @@ async function saveGeneratedState(
   }, {});
   await setStatus(runId, "building", {
     report_profile: profile,
-    spec_version: "1.0",
+    spec_version: RELEASE_VERSIONS.spec,
     data_reading_integrated: manifest.data_reading_integrated,
     source_cutoffs: manifest.source_cutoffs,
     gap_closure_days: manifest.gap_closure_days,
@@ -2581,7 +2581,7 @@ export async function handleReportRequest(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (request.method === "GET") {
     const checks: Record<string, unknown> = {
-      spec_version: "1.0",
+      spec_version: RELEASE_VERSIONS.spec,
       sheet_id: Boolean(SHEET_ID),
       slides_id: Boolean(SLIDES_ID),
       service_key: Boolean(SERVICE_KEY),
@@ -2953,7 +2953,7 @@ export async function handleReportRequest(request: Request): Promise<Response> {
       const narrative = deterministicNarrative(input, built);
       return json({
         ok: true,
-        spec_version: "1.0",
+        spec_version: RELEASE_VERSIONS.spec,
         manifest: input.manifest,
         rows: {
           crm: input.crm.length,
