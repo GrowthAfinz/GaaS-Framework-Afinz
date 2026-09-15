@@ -2910,6 +2910,32 @@ export async function handleReportRequest(request: Request): Promise<Response> {
       immutable_artifacts_preserved: true });
   }
 
+  // A renderer externo consome o mesmo artefato imutável certificado usado
+  // pela publicação Google. O link curto evita expor a service role e mantém
+  // a fonte de dados, narrativa e geometria em um contrato único.
+  if (body.mode === "export_artifact") {
+    if (!internal) return json({ error: "Exportação do artefato restrita ao serviço." }, 403);
+    const runId = String(body.run_id ?? "");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(runId)) {
+      return json({ error: "run_id inválido." }, 400);
+    }
+    const { data: run, error } = await admin.from("report_runs")
+      .select("id,artifact_path,certification_status,content_hash,spec_version,renderer_version")
+      .eq("id", runId).maybeSingle();
+    if (error) return json({ error: error.message }, 500);
+    if (!run?.artifact_path) return json({ error: "Artefato imutável ausente." }, 404);
+    if (run.certification_status !== "certified") {
+      return json({ error: "Somente artefato certificado pode alimentar renderer externo." }, 409);
+    }
+    const { data: signed, error: signedError } = await admin.storage.from(PDF_BUCKET)
+      .createSignedUrl(String(run.artifact_path), PDF_SIGNED_URL_TTL);
+    if (signedError || !signed) return json({ error: "Não foi possível assinar o artefato." }, 500);
+    return json({ ok: true, run_id: run.id, path: run.artifact_path,
+      content_hash: run.content_hash, spec_version: run.spec_version,
+      renderer_version: run.renderer_version, signed_url: signed.signedUrl,
+      expires_in_seconds: PDF_SIGNED_URL_TTL });
+  }
+
   // Download the immutable PDF of a confirmed publication. Never relabel the
   // current live deck as a historical run by exporting it again.
   if (body.mode === "export_pdf") {

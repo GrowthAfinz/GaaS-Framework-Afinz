@@ -123,3 +123,7 @@ dist
 .vite/
 .deploy-worktrees/
 
+# Python renderer caches
+__pycache__/
+*.py[cod]
+
