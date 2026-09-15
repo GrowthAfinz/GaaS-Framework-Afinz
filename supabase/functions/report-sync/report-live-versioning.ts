@@ -1,17 +1,19 @@
 import type { BuiltReport, ReportInputs, Row, SlideRun } from "./report-live-engine.ts";
 import {
   archetypeFor,
+  layoutGeometryFor,
   minimumBodySize,
   REPORT_LIVE_DESIGN_VERSION,
+  REPORT_LIVE_SPEC_VERSION,
 } from "../_shared/report-live-design.ts";
 
 export const RELEASE_VERSIONS = {
-  source: "1.2",
-  semantic: "1.2.2",
-  spec: "1.0",
+  source: "1.4",
+  semantic: "1.4.0",
+  spec: REPORT_LIVE_SPEC_VERSION,
   narrative: "1",
   renderer: REPORT_LIVE_DESIGN_VERSION,
-  validator: "2",
+  validator: "3",
 } as const;
 
 export type ValidationSeverity = "info" | "warning" | "error" | "blocking";
@@ -126,8 +128,10 @@ export function reportSourceRows(input: ReportInputs): Record<string, Row[]> {
     communication_slots: input.communicationSlots,
     communication_templates: input.communicationTemplates,
     aliases: input.aliases,
+    action_candidates: input.actionCandidates,
     action_outcomes: input.actionOutcomes,
     metric_certifications: input.metricCertifications,
+    monthly_acquisition: input.monthlyAcquisition ?? [],
     slide_contracts: input.slideContracts as unknown as Row[],
     config: [input.config as Row],
   };
@@ -196,6 +200,7 @@ export async function buildSlideBlueprints(
       renderer_version: RELEASE_VERSIONS.renderer,
       theme: "afinz_light",
       minimum_body_pt: minimumBodySize(slide.slide_code.startsWith("A") ? "annex" : "body"),
+      geometry: layoutGeometryFor(archetype, ["P1", "P4", "C4"].includes(slide.slide_code)),
     };
     const visualHash = await sha256(visualContract);
     const blueprint = {
@@ -389,6 +394,19 @@ export async function validateArtifactIntegrity(artifact: ReportBuildArtifact): 
 
 export function validateArtifact(artifact: ReportBuildArtifact): ValidationResult[] {
   const output: ValidationResult[] = [];
+  const manifestSpecVersion = artifact.tabs.VIEW_RUN_MANIFEST
+    ?.find((row) => row[0] === "spec_version")?.[1];
+  const manifestSpecMatches = manifestSpecVersion === artifact.versions.spec;
+  push(
+    output,
+    "versions.manifest_spec",
+    manifestSpecMatches ? "passed" : "failed",
+    "blocking",
+    manifestSpecMatches
+      ? "A versão da spec no manifesto coincide com a versão do artefato."
+      : "A versão da spec no manifesto diverge da versão do artefato; publicação proibida.",
+    { manifest_spec: manifestSpecVersion ?? null, artifact_spec: artifact.versions.spec },
+  );
   const sourceCounts = Object.keys(artifact.sources ?? {}).length
     ? Object.fromEntries(
       Object.entries(artifact.sources).map(([key, rows]) => [key, rows.length]),
@@ -434,6 +452,79 @@ export function validateArtifact(artifact: ReportBuildArtifact): ValidationResul
       ? "O artefato possui slides elegíveis para publicação."
       : "Nenhum slide está elegível; publicação vazia proibida.",
     { rendered_slides: renderedSlides.length },
+  );
+
+  const expectedProfileSlides = artifact.report_profile === "deep_dive"
+    ? 31
+    : ["monthly_report", "executivo_mensal"].includes(artifact.report_profile)
+    ? 12
+    : null;
+  if (expectedProfileSlides !== null) {
+    push(
+      output,
+      "slides.profile_cardinality",
+      renderedSlides.length === expectedProfileSlides ? "passed" : "failed",
+      "blocking",
+      renderedSlides.length === expectedProfileSlides
+        ? `Perfil ${artifact.report_profile} contém ${expectedProfileSlides} slides.`
+        : `Perfil ${artifact.report_profile} exige ${expectedProfileSlides} slides; foram gerados ${renderedSlides.length}.`,
+      { profile: artifact.report_profile, expected: expectedProfileSlides, actual: renderedSlides.length },
+    );
+  }
+
+  const chartTable = artifact.tabs.VIEW_EDITORIAL_CHART_REGISTRY ?? [];
+  const chartHeaders = (chartTable[0] ?? []).map(String);
+  const chartRows = chartTable.slice(1).map((row) =>
+    Object.fromEntries(chartHeaders.map((header, index) => [header, row[index]])) as Row
+  );
+  const layoutTable = artifact.tabs.VIEW_EDITORIAL_LAYOUTS ?? [];
+  const layoutHeaders = (layoutTable[0] ?? []).map(String);
+  const expectedChartSlides = layoutTable.slice(1).flatMap((row) => {
+    const item = Object.fromEntries(layoutHeaders.map((header, index) => [header, row[index]])) as Row;
+    return String(item.expected_chart).toLowerCase() === "true" ? [String(item.slide_instance_id)] : [];
+  });
+  const plannedChartSlides = new Set(chartRows.map((row) => String(row.slide_instance_id ?? "")));
+  const chartContractFailures: Array<{ slide_instance_id: unknown; reasons: string[] }> =
+    expectedChartSlides
+      .filter((slideId) => !plannedChartSlides.has(slideId))
+      .map((slideId) => ({ slide_instance_id: slideId, reasons: ["grafico_esperado_sem_plano"] }));
+  chartContractFailures.push(...chartRows.flatMap((row) => {
+    const reasons: string[] = [];
+    let series: Row[] = [];
+    try {
+      const parsed = JSON.parse(String(row.series_json ?? "[]"));
+      if (Array.isArray(parsed)) series = parsed as Row[];
+    } catch (_) {
+      reasons.push("series_json_invalido");
+    }
+    if (!String(row.title ?? "").trim()) reasons.push("titulo_ausente");
+    if (!String(row.domain_title ?? "").trim()) reasons.push("eixo_dominio_ausente");
+    if (!String(row.left_axis_title ?? "").trim()) reasons.push("eixo_esquerdo_ausente");
+    if (Number(row.expected_chart_count) !== 1) reasons.push("quantidade_grafico_invalida");
+    if (!artifact.tabs[String(row.family_view ?? "")]) reasons.push("familia_ausente");
+    if (!(Number(row.end_row_index) > Number(row.start_row_index) + 1)) reasons.push("range_sem_dados");
+    if (!series.length) reasons.push("serie_ausente");
+    for (const item of series) {
+      if (!["LEFT_AXIS", "RIGHT_AXIS"].includes(String(item.axis))) reasons.push("eixo_serie_invalido");
+      if (!String(item.color ?? "").match(/^#[0-9a-f]{6}$/i)) reasons.push("cor_serie_invalida");
+      if (!["NUMBER", "CURRENCY", "PERCENT"].includes(String(item.number_format_type))) reasons.push("formato_serie_invalido");
+      if (!String(item.number_format_pattern ?? "").trim()) reasons.push("padrao_numerico_ausente");
+    }
+    const hasRight = series.some((item) => item.axis === "RIGHT_AXIS");
+    if (hasRight && !String(row.right_axis_title ?? "").trim()) reasons.push("eixo_direito_ausente");
+    return reasons.length
+      ? [{ slide_instance_id: row.slide_instance_id, reasons: [...new Set(reasons)] }]
+      : [];
+  }));
+  push(
+    output,
+    "charts.editorial_contract_complete",
+    chartContractFailures.length ? "failed" : "passed",
+    "blocking",
+    chartContractFailures.length
+      ? "Há gráfico editorial sem range, série, eixo, cor ou formato numérico completo."
+      : "Todos os gráficos editoriais declaram range, séries, eixos, cores e formatos.",
+    { charts: chartRows.length, failures: chartContractFailures },
   );
 
   const rectangularFailures = Object.entries(artifact.tabs)

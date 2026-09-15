@@ -6,9 +6,11 @@ import {
   accentFor,
   AFINZ_LIGHT,
   archetypeFor,
+  layoutGeometryFor,
   minimumBodySize,
   reportLiveReleaseKey,
   REPORT_LIVE_DESIGN_VERSION,
+  REPORT_LIVE_SPEC_VERSION,
   stableReportLiveObjectId,
 } from "../_shared/report-live-design.ts";
 
@@ -867,6 +869,60 @@ type V1ChartConfig = {
   series: string[];
 };
 
+type EditorialChartSeries = {
+  column_index: number;
+  label: string;
+  color: string;
+  axis: "LEFT_AXIS" | "RIGHT_AXIS";
+  line_width: number;
+  point_size: number;
+  number_format_type: "NUMBER" | "CURRENCY" | "PERCENT";
+  number_format_pattern: string;
+};
+
+type EditorialChartPlan = {
+  slide_instance_id: string;
+  slide_code: string;
+  chart_key: string;
+  family_view: string;
+  chart_type: "LINE";
+  title: string;
+  start_row_index: number;
+  end_row_index: number;
+  domain_column_index: number;
+  domain_title: string;
+  left_axis_title: string;
+  right_axis_title: string;
+  series: EditorialChartSeries[];
+  expected_chart_count: number;
+};
+
+type EditorialRulerRow = {
+  slide_instance_id: string;
+  metric_order: number;
+  metric_label: string;
+  value_text: string;
+  delta_text: string;
+  range_text: string;
+  verdict_text: string;
+  limitation: string;
+};
+
+type EditorialLayoutRow = {
+  slide_instance_id: string;
+  layout: string;
+  support_text: string;
+  expected_chart: boolean;
+};
+
+type ChartManifestItem = {
+  slide_instance_id: string;
+  chart_id: number;
+  family_view: string;
+  physical_sheet_title: string;
+  expected_chart_count: number;
+};
+
 const V1_COLORS = {
   background: AFINZ_LIGHT.canvas,
   panel: AFINZ_LIGHT.surface,
@@ -898,6 +954,63 @@ async function readV1Table(range: string): Promise<Record<string, string>[]> {
   return values.slice(1).map((row) =>
     Object.fromEntries(headers.map((header, index) => [header, String(row[index] ?? "")]))
   );
+}
+
+async function readEditorialData(sheetTitleMap: Record<string, string>) {
+  const read = async (logicalView: string) => {
+    const physical = sheetTitleMap[logicalView];
+    return physical ? await readV1Table(`${physical}!A:AZ`) : [];
+  };
+  const [rawPlans, rawRulers, rawLayouts] = await Promise.all([
+    read("VIEW_EDITORIAL_CHART_REGISTRY"),
+    read("VIEW_EDITORIAL_RULERS"),
+    read("VIEW_EDITORIAL_LAYOUTS"),
+  ]);
+  const plans: EditorialChartPlan[] = rawPlans.map((row) => {
+    let series: EditorialChartSeries[] = [];
+    try {
+      const parsed = JSON.parse(String(row.series_json ?? "[]"));
+      if (Array.isArray(parsed)) series = parsed as EditorialChartSeries[];
+    } catch (_) {
+      series = [];
+    }
+    return {
+      slide_instance_id: String(row.slide_instance_id ?? ""),
+      slide_code: String(row.slide_code ?? ""),
+      chart_key: String(row.chart_key ?? ""),
+      family_view: String(row.family_view ?? ""),
+      chart_type: "LINE" as const,
+      title: String(row.title ?? ""),
+      start_row_index: Number(row.start_row_index ?? 0),
+      end_row_index: Number(row.end_row_index ?? 0),
+      domain_column_index: Number(row.domain_column_index ?? 0),
+      domain_title: String(row.domain_title ?? "Período"),
+      left_axis_title: String(row.left_axis_title ?? ""),
+      right_axis_title: String(row.right_axis_title ?? ""),
+      series,
+      expected_chart_count: Number(row.expected_chart_count ?? 1),
+    };
+  }).filter((plan) =>
+    plan.slide_instance_id && plan.family_view && plan.series.length &&
+    plan.end_row_index > plan.start_row_index + 1
+  );
+  const rulers: EditorialRulerRow[] = rawRulers.map((row) => ({
+    slide_instance_id: String(row.slide_instance_id ?? ""),
+    metric_order: Number(row.metric_order ?? 0),
+    metric_label: String(row.metric_label ?? ""),
+    value_text: String(row.value_text ?? ""),
+    delta_text: String(row.delta_text ?? ""),
+    range_text: String(row.range_text ?? ""),
+    verdict_text: String(row.verdict_text ?? ""),
+    limitation: String(row.limitation ?? ""),
+  })).filter((row) => row.slide_instance_id && row.metric_label);
+  const layouts: EditorialLayoutRow[] = rawLayouts.map((row) => ({
+    slide_instance_id: String(row.slide_instance_id ?? ""),
+    layout: String(row.layout ?? ""),
+    support_text: String(row.support_text ?? ""),
+    expected_chart: String(row.expected_chart ?? "").toLowerCase() === "true",
+  })).filter((row) => row.slide_instance_id);
+  return { plans, rulers, layouts };
 }
 
 function normalizeV1Registry(rows: Record<string, unknown>[]): V1RegistryRow[] {
@@ -944,7 +1057,6 @@ function chartConfigFor(code: string): V1ChartConfig | null {
     M5: { type: "BAR", domain: "ad_name", series: ["clicks"] },
     B1: { type: "BAR", domain: "source_type", series: ["emissions"] },
     B2: { type: "LINE", domain: "date", series: ["emissions"] },
-    "K-VISA": { type: "BAR", domain: "campaign", series: ["platform_result"] },
     "K-TPL": { type: "BAR", domain: "scope", series: ["coverage"] },
     A1: { type: "BAR", domain: "partner", series: ["cards"] },
   };
@@ -954,55 +1066,159 @@ function chartConfigFor(code: string): V1ChartConfig | null {
 async function ensureV1Charts(
   registry: V1RegistryRow[],
   sheetTitleMap: Record<string, string> = {},
+  editorialPlans: EditorialChartPlan[] = [],
 ) {
   const metadata = await gFetch(
-    `${SHEETS}/${SHEET_ID}?fields=sheets(properties(sheetId,title,gridProperties(rowCount)),charts(chartId))`,
+    `${SHEETS}/${SHEET_ID}?fields=sheets(properties(sheetId,title,gridProperties(rowCount)),charts(chartId,position(overlayPosition(anchorCell(sheetId,rowIndex,columnIndex)))))`,
   );
-  const sheetByTitle = new Map<string, { sheetId: number; rowCount: number; chartIds: number[] }>();
+  const sheetByTitle = new Map<string, {
+    sheetId: number;
+    rowCount: number;
+    charts: Array<{ chartId: number; anchorRow: number }>;
+  }>();
   for (const sheet of metadata.sheets ?? []) {
     sheetByTitle.set(sheet.properties.title, {
       sheetId: sheet.properties.sheetId,
       rowCount: Number(sheet.properties.gridProperties?.rowCount ?? 0),
-      chartIds: (sheet.charts ?? []).map((chart: any) => chart.chartId),
+      charts: (sheet.charts ?? []).map((chart: any) => ({
+        chartId: Number(chart.chartId),
+        anchorRow: Number(chart.position?.overlayPosition?.anchorCell?.rowIndex ?? -1),
+      })),
     });
   }
-  const chartByView: Record<string, number> = {};
+  const chartBySlide: Record<string, number> = {};
+  const chartManifest: ChartManifestItem[] = [];
   const requests: any[] = [];
-  const requestViews: string[] = [];
+  const pendingAdds: Array<{ slide: V1RegistryRow; familyView: string; physicalTitle: string }> = [];
   const styledSheets = new Set<number>();
+  const editorialBySlide = new Map(editorialPlans.map((plan) => [plan.slide_instance_id, plan]));
+  const expectedEditorialAnchors = new Map<number, Set<number>>();
+
+  const styleSheet = (info: { sheetId: number; rowCount: number }) => {
+    if (styledSheets.has(info.sheetId)) return;
+    requests.push({
+      repeatCell: {
+        range: { sheetId: info.sheetId, startRowIndex: 0, endRowIndex: 1 },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: rgb(AFINZ_LIGHT.surfaceMuted),
+            textFormat: { foregroundColor: rgb(AFINZ_LIGHT.text), bold: true },
+            horizontalAlignment: "CENTER",
+          },
+        },
+        fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
+      },
+    });
+    if (info.rowCount > 1) requests.push({
+      updateSheetProperties: {
+        properties: { sheetId: info.sheetId, gridProperties: { frozenRowCount: 1 } },
+        fields: "gridProperties.frozenRowCount",
+      },
+    });
+    styledSheets.add(info.sheetId);
+  };
 
   for (const item of registry) {
     if (item.eligibility === "omitir_bloqueado" || !item.source_view) continue;
-    const physicalTitle = sheetTitleMap[item.source_view] ?? item.source_view;
-    const info = sheetByTitle.get(physicalTitle);
-    if (!info) continue;
-    if (!styledSheets.has(info.sheetId)) {
-      requests.push({
-        repeatCell: {
-          range: { sheetId: info.sheetId, startRowIndex: 0, endRowIndex: 1 },
-          cell: {
-            userEnteredFormat: {
-              backgroundColor: rgb(AFINZ_LIGHT.surfaceMuted),
-              textFormat: { foregroundColor: rgb(AFINZ_LIGHT.text), bold: true },
-              horizontalAlignment: "CENTER",
-            },
-          },
-          fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
-        },
+    const editorial = editorialBySlide.get(item.slide_instance_id);
+    if (editorial) {
+      const physicalTitle = sheetTitleMap[editorial.family_view] ?? editorial.family_view;
+      const info = sheetByTitle.get(physicalTitle);
+      if (!info) throw new Error(`Família editorial ausente no Sheets: ${physicalTitle}.`);
+      styleSheet(info);
+      const anchors = expectedEditorialAnchors.get(info.sheetId) ?? new Set<number>();
+      anchors.add(editorial.start_row_index);
+      expectedEditorialAnchors.set(info.sheetId, anchors);
+      const sourceRange = (columnIndex: number) => ({
+        sources: [{
+          sheetId: info.sheetId,
+          startRowIndex: editorial.start_row_index,
+          endRowIndex: editorial.end_row_index,
+          startColumnIndex: columnIndex,
+          endColumnIndex: columnIndex + 1,
+        }],
       });
-      if (info.rowCount > 1) {
+      for (const series of editorial.series) {
         requests.push({
-          updateSheetProperties: {
-            properties: {
+          repeatCell: {
+            range: {
               sheetId: info.sheetId,
-              gridProperties: { frozenRowCount: 1 },
+              startRowIndex: editorial.start_row_index + 1,
+              endRowIndex: editorial.end_row_index,
+              startColumnIndex: series.column_index,
+              endColumnIndex: series.column_index + 1,
             },
-            fields: "gridProperties.frozenRowCount",
+            cell: {
+              userEnteredFormat: {
+                numberFormat: {
+                  type: series.number_format_type,
+                  pattern: series.number_format_pattern,
+                },
+              },
+            },
+            fields: "userEnteredFormat.numberFormat",
           },
         });
       }
-      styledSheets.add(info.sheetId);
+      const existing = info.charts.find((chart) => chart.anchorRow === editorial.start_row_index);
+      const chartSpec = {
+        title: editorial.title,
+        backgroundColor: rgb(AFINZ_LIGHT.surface),
+        titleTextFormat: { foregroundColor: rgb(AFINZ_LIGHT.text), fontSize: 13, bold: true },
+        basicChart: {
+          chartType: "LINE",
+          legendPosition: "BOTTOM_LEGEND",
+          headerCount: 1,
+          interpolateNulls: false,
+          domains: [{ domain: { sourceRange: sourceRange(editorial.domain_column_index) } }],
+          series: editorial.series.map((series) => ({
+            series: { sourceRange: sourceRange(series.column_index) },
+            targetAxis: series.axis,
+            colorStyle: { rgbColor: rgb(series.color) },
+            lineStyle: { width: series.line_width },
+            pointStyle: { size: series.point_size, shape: "CIRCLE" },
+          })),
+          axis: [
+            { position: "BOTTOM_AXIS", title: editorial.domain_title },
+            { position: "LEFT_AXIS", title: editorial.left_axis_title, viewWindowOptions: { viewWindowMode: "PRETTY" } },
+            ...(editorial.series.some((series) => series.axis === "RIGHT_AXIS")
+              ? [{ position: "RIGHT_AXIS", title: editorial.right_axis_title, viewWindowOptions: { viewWindowMode: "PRETTY" } }]
+              : []),
+          ],
+        },
+      };
+      if (existing) {
+        chartBySlide[item.slide_instance_id] = existing.chartId;
+        chartManifest.push({
+          slide_instance_id: item.slide_instance_id,
+          chart_id: existing.chartId,
+          family_view: editorial.family_view,
+          physical_sheet_title: physicalTitle,
+          expected_chart_count: editorial.expected_chart_count,
+        });
+        requests.push({ updateChartSpec: { chartId: existing.chartId, spec: chartSpec } });
+      } else {
+        requests.push({
+          addChart: {
+            chart: {
+              spec: chartSpec,
+              position: { overlayPosition: {
+                anchorCell: { sheetId: info.sheetId, rowIndex: editorial.start_row_index, columnIndex: 0 },
+                widthPixels: 720,
+                heightPixels: 360,
+              } },
+            },
+          },
+        });
+        pendingAdds.push({ slide: item, familyView: editorial.family_view, physicalTitle });
+      }
+      continue;
     }
+
+    const physicalTitle = sheetTitleMap[item.source_view] ?? item.source_view;
+    const info = sheetByTitle.get(physicalTitle);
+    if (!info) continue;
+    styleSheet(info);
     const config = chartConfigFor(item.slide_code);
     if (!config) continue;
     const valuesResponse = await sheetsGet(`${physicalTitle}!A1:AZ500`);
@@ -1049,11 +1265,18 @@ async function ensureV1Charts(
         })),
       },
     };
-    if (info.chartIds.length) {
-      chartByView[item.source_view] = info.chartIds[0];
+    if (info.charts.length) {
+      chartBySlide[item.slide_instance_id] = info.charts[0].chartId;
+      chartManifest.push({
+        slide_instance_id: item.slide_instance_id,
+        chart_id: info.charts[0].chartId,
+        family_view: item.source_view,
+        physical_sheet_title: physicalTitle,
+        expected_chart_count: 1,
+      });
       requests.push({
         updateChartSpec: {
-          chartId: info.chartIds[0],
+          chartId: info.charts[0].chartId,
           spec: chartSpec,
         },
       });
@@ -1075,7 +1298,14 @@ async function ensureV1Charts(
         },
         },
       });
-      requestViews.push(item.source_view);
+      pendingAdds.push({ slide: item, familyView: item.source_view, physicalTitle });
+    }
+  }
+
+  for (const [sheetId, anchors] of expectedEditorialAnchors) {
+    const sheet = [...sheetByTitle.values()].find((candidate) => candidate.sheetId === sheetId);
+    for (const chart of sheet?.charts ?? []) {
+      if (!anchors.has(chart.anchorRow)) requests.push({ deleteEmbeddedObject: { objectId: chart.chartId } });
     }
   }
 
@@ -1087,12 +1317,28 @@ async function ensureV1Charts(
     let chartReply = 0;
     for (const reply of response.replies ?? []) {
       if (reply.addChart?.chart?.chartId != null) {
-        chartByView[requestViews[chartReply]] = reply.addChart.chart.chartId;
+        const pending = pendingAdds[chartReply];
+        const chartId = Number(reply.addChart.chart.chartId);
+        chartBySlide[pending.slide.slide_instance_id] = chartId;
+        chartManifest.push({
+          slide_instance_id: pending.slide.slide_instance_id,
+          chart_id: chartId,
+          family_view: pending.familyView,
+          physical_sheet_title: pending.physicalTitle,
+          expected_chart_count: 1,
+        });
         chartReply += 1;
       }
     }
   }
-  return chartByView;
+  const missingEditorialCharts = editorialPlans.filter((plan) =>
+    registry.some((item) => item.slide_instance_id === plan.slide_instance_id && item.eligibility !== "omitir_bloqueado") &&
+    chartBySlide[plan.slide_instance_id] == null
+  );
+  if (missingEditorialCharts.length) {
+    throw new Error(`Gráficos editoriais não materializados: ${missingEditorialCharts.map((plan) => plan.slide_instance_id).join(", ")}.`);
+  }
+  return { chartBySlide, chartManifest };
 }
 
 function addTextBox(
@@ -1199,27 +1445,57 @@ function renderPreviewText(preview: string, missingExpectedChart: boolean): stri
 
 async function ensureV1Slides(
   registry: V1RegistryRow[],
-  chartByView: Record<string, number>,
+  chartBySlide: Record<string, number>,
   runId: string,
   sheetTitleMap: Record<string, string> = {},
   artifactPreviews: Record<string, string> = {},
+  editorialRulers: EditorialRulerRow[] = [],
+  editorialLayouts: EditorialLayoutRow[] = [],
 ) {
   const releaseKey = await reportLiveReleaseKey(runId);
   const generationPrefix = `rlv2s_${releaseKey}_`;
   const rendered = registry.filter((item) => item.eligibility !== "omitir_bloqueado");
-  const identities = await Promise.all(rendered.map(async (item) => ({
-    item,
-    pageId: await stableReportLiveObjectId("rlv2s", releaseKey, item.slide_instance_id),
-    titleId: await stableReportLiveObjectId("rlv2t", releaseKey, item.slide_instance_id),
-    eyebrowId: await stableReportLiveObjectId("rlv2e", releaseKey, item.slide_instance_id),
-    accentId: await stableReportLiveObjectId("rlv2a", releaseKey, item.slide_instance_id),
-    confidenceId: await stableReportLiveObjectId("rlv2q", releaseKey, item.slide_instance_id),
-    narrativeId: await stableReportLiveObjectId("rlv2n", releaseKey, item.slide_instance_id),
-    previewId: await stableReportLiveObjectId("rlv2p", releaseKey, item.slide_instance_id),
-    footerId: await stableReportLiveObjectId("rlv2f", releaseKey, item.slide_instance_id),
-    chartId: await stableReportLiveObjectId("rlv2c", releaseKey, item.slide_instance_id),
-  })));
+  const identities = await Promise.all(rendered.map(async (item) => {
+    const rulerRows = editorialRulers.filter((row) => row.slide_instance_id === item.slide_instance_id)
+      .sort((a, b) => a.metric_order - b.metric_order);
+    const layout = editorialLayouts.find((row) => row.slide_instance_id === item.slide_instance_id) ?? null;
+    return {
+      item,
+      rulerRows,
+      layout,
+      rulerIds: await Promise.all(rulerRows.map((row) =>
+        stableReportLiveObjectId("rlv2r", releaseKey, `${item.slide_instance_id}:${row.metric_order}`)
+      )),
+      supportId: layout
+        ? await stableReportLiveObjectId("rlv2u", releaseKey, item.slide_instance_id)
+        : "",
+      pageId: await stableReportLiveObjectId("rlv2s", releaseKey, item.slide_instance_id),
+      titleId: await stableReportLiveObjectId("rlv2t", releaseKey, item.slide_instance_id),
+      eyebrowId: await stableReportLiveObjectId("rlv2e", releaseKey, item.slide_instance_id),
+      accentId: await stableReportLiveObjectId("rlv2a", releaseKey, item.slide_instance_id),
+      confidenceId: await stableReportLiveObjectId("rlv2q", releaseKey, item.slide_instance_id),
+      narrativeId: await stableReportLiveObjectId("rlv2n", releaseKey, item.slide_instance_id),
+      previewId: await stableReportLiveObjectId("rlv2p", releaseKey, item.slide_instance_id),
+      footerId: await stableReportLiveObjectId("rlv2f", releaseKey, item.slide_instance_id),
+      chartId: await stableReportLiveObjectId("rlv2c", releaseKey, item.slide_instance_id),
+    };
+  }));
   const expectedPageIds = new Set(identities.map(({ pageId }) => pageId));
+  const expectedElementIds = identities.map((identity) => ({
+    slide_instance_id: identity.item.slide_instance_id,
+    page_id: identity.pageId,
+    element_ids: [
+      identity.titleId,
+      identity.eyebrowId,
+      identity.accentId,
+      identity.confidenceId,
+      identity.narrativeId,
+      identity.footerId,
+      chartBySlide[identity.item.slide_instance_id] != null ? identity.chartId : identity.previewId,
+      ...identity.rulerIds,
+      ...(identity.supportId ? [identity.supportId] : []),
+    ],
+  }));
   const presentation = await gFetch(
     `${SLIDES}/${SLIDES_ID}?fields=slides(objectId,slideProperties(isSkipped),pageElements(objectId,title,shape(text(textElements(textRun(content))))))`,
   );
@@ -1254,8 +1530,10 @@ async function ensureV1Slides(
     identities.every(identity => {
       const page = (presentation.slides ?? []).find((slide: any) => slide.objectId === identity.pageId);
       const elements = new Set<string>((page?.pageElements ?? []).map((element: any) => String(element.objectId)));
-      const hasChart = identity.item.source_view && chartByView[identity.item.source_view] != null;
-      const missingExpectedChart = Boolean(chartConfigFor(identity.item.slide_code)) && !hasChart;
+      const hasChart = chartBySlide[identity.item.slide_instance_id] != null;
+      const missingExpectedChart = (identity.layout
+        ? identity.layout.expected_chart
+        : Boolean(chartConfigFor(identity.item.slide_code))) && !hasChart;
       const expectedPreview = artifactPreviews[identity.item.source_view];
       const previewElement = (page?.pageElements ?? []).find((element: any) => element.objectId === identity.previewId);
       const currentPreview = (previewElement?.shape?.text?.textElements ?? [])
@@ -1263,7 +1541,8 @@ async function ensureV1Slides(
       const plannedPreview = expectedPreview === undefined ? null : renderPreviewText(expectedPreview, missingExpectedChart);
       return page?.slideProperties?.isSkipped === true &&
         [identity.titleId, identity.eyebrowId, identity.accentId, identity.confidenceId,
-        identity.narrativeId, identity.footerId, hasChart ? identity.chartId : identity.previewId]
+        identity.narrativeId, identity.footerId, hasChart ? identity.chartId : identity.previewId,
+        ...identity.rulerIds, ...(identity.supportId ? [identity.supportId] : [])]
         .every(id => elements.has(id)) && (hasChart || (plannedPreview !== null && currentPreview === plannedPreview));
     });
   if (completeCurrentGeneration) {
@@ -1276,6 +1555,7 @@ async function ensureV1Slides(
       slides_reused: rendered.length,
       slides_omitted: registry.length - rendered.length,
       staged_skipped: true,
+      expected_element_ids: expectedElementIds,
     };
   }
 
@@ -1296,15 +1576,20 @@ async function ensureV1Slides(
       previewId,
       footerId,
       chartId,
+      rulerRows,
+      rulerIds,
+      supportId,
+      layout,
     } = identity;
-    const hasChart = item.source_view && chartByView[item.source_view] != null;
-    const missingExpectedChart = Boolean(chartConfigFor(item.slide_code)) && !hasChart;
+    const hasChart = chartBySlide[item.slide_instance_id] != null;
+    const missingExpectedChart = (layout ? layout.expected_chart : Boolean(chartConfigFor(item.slide_code))) && !hasChart;
     const preview = hasChart
       ? ""
       : artifactPreviews[item.source_view] ?? await v1PreviewText(item.source_view, sheetTitleMap);
     const accentColor = accentFor(item.section);
     const archetype = archetypeFor(item.slide_code);
     const bodySize = minimumBodySize(item.section);
+    const geometry = layoutGeometryFor(archetype, rulerRows.length > 0);
     const confidenceColor = item.confidence === "Alta"
       ? V1_COLORS.green
       : item.confidence === "Média"
@@ -1382,24 +1667,43 @@ async function ensureV1Slides(
       { fontSize: 9, color: AFINZ_LIGHT.text, bold: true, fill: confidenceColor, radius: true, alignment: "CENTER" },
     );
 
+    if (rulerRows.length) {
+      const cardGap = 8;
+      const cardWidth = (438 - cardGap * (rulerRows.length - 1)) / rulerRows.length;
+      rulerRows.forEach((ruler, index) => {
+        const limitation = ruler.limitation ? `\n${ruler.limitation}` : "";
+        addTextBox(
+          requests,
+          pageId,
+          rulerIds[index],
+          `${ruler.metric_label.toUpperCase()}\n${ruler.value_text}${ruler.delta_text ? `  ${ruler.delta_text}` : ""}\n${ruler.range_text} · ${ruler.verdict_text}${limitation}`,
+          28 + index * (cardWidth + cardGap),
+          98,
+          cardWidth,
+          78,
+          { fontSize: rulerRows.length > 2 ? 8 : 9, color: AFINZ_LIGHT.text, fill: V1_COLORS.panel, radius: true },
+        );
+      });
+    }
+
     if (hasChart) {
       requests.push({
         createSheetsChart: {
           objectId: chartId,
           spreadsheetId: SHEET_ID,
-          chartId: chartByView[item.source_view],
+          chartId: chartBySlide[item.slide_instance_id],
           linkingMode: "LINKED",
           elementProperties: {
             pageObjectId: pageId,
             size: {
-              width: { magnitude: 438, unit: "PT" },
-              height: { magnitude: 255, unit: "PT" },
+              width: { magnitude: geometry.visual.width, unit: "PT" },
+              height: { magnitude: geometry.visual.height, unit: "PT" },
             },
             transform: {
               scaleX: 1,
               scaleY: 1,
-              translateX: 28,
-              translateY: 100,
+              translateX: geometry.visual.x,
+              translateY: geometry.visual.y,
               unit: "PT",
             },
           },
@@ -1411,13 +1715,26 @@ async function ensureV1Slides(
         pageId,
         previewId,
         renderPreviewText(preview, missingExpectedChart),
-        28,
-        100,
-        438,
-        255,
+        geometry.visual.x,
+        geometry.visual.y,
+        geometry.visual.width,
+        geometry.visual.height,
         missingExpectedChart
           ? { fontSize: Math.max(bodySize, 12), color: "#991B1B", fontFamily: "Arial", fill: "#FDECEC", bold: true }
           : { fontSize: bodySize, color: AFINZ_LIGHT.text, fontFamily: "Arial", fill: V1_COLORS.panel },
+      );
+    }
+    if (layout && supportId) {
+      addTextBox(
+        requests,
+        pageId,
+        supportId,
+        layout.support_text,
+        28,
+        346,
+        438,
+        18,
+        { fontSize: 8, color: V1_COLORS.muted },
       );
     }
     addTextBox(
@@ -1425,10 +1742,10 @@ async function ensureV1Slides(
       pageId,
       narrativeId,
       `LEITURA DA DECISÃO\n\n{{${item.slide_instance_id}}}`,
-      480,
-      100,
-      212,
-      255,
+      geometry.narrative.x,
+      geometry.narrative.y,
+      geometry.narrative.width,
+      geometry.narrative.height,
       { fontSize: 11, color: AFINZ_LIGHT.text, fill: V1_COLORS.panelLight, radius: true },
     );
     requests.push({
@@ -1494,6 +1811,7 @@ async function ensureV1Slides(
     slides_reused: 0,
     slides_omitted: registry.length - rendered.length,
     staged_skipped: true,
+    expected_element_ids: expectedElementIds,
   };
 }
 
@@ -1512,11 +1830,21 @@ async function setupV1(
   if (!registry.length) {
     throw new Error("VIEW_REGISTRY está vazia. Execute report-sync antes de setup_v1.");
   }
-  const chartByView = await ensureV1Charts(registry, sheetTitleMap);
-  const slides = await ensureV1Slides(registry, chartByView, runId, sheetTitleMap, artifactPreviews);
+  const editorial = await readEditorialData(sheetTitleMap);
+  const { chartBySlide, chartManifest } = await ensureV1Charts(registry, sheetTitleMap, editorial.plans);
+  const slides = await ensureV1Slides(
+    registry,
+    chartBySlide,
+    runId,
+    sheetTitleMap,
+    artifactPreviews,
+    editorial.rulers,
+    editorial.layouts,
+  );
   return {
     registry_rows: registry.length,
-    charts_available: Object.keys(chartByView).length,
+    charts_available: Object.keys(chartBySlide).length,
+    chart_manifest: chartManifest,
     ...slides,
   };
 }
@@ -1688,7 +2016,7 @@ Deno.serve(async (req: Request) => {
         sheetTitleMap,
         artifactPreviews,
       );
-      return json({ ok: true, spec_version: "1.0", ...result });
+      return json({ ok: true, spec_version: REPORT_LIVE_SPEC_VERSION, ...result });
     } catch (error) {
       return json({ ok: false, error: String((error as Error).message).slice(0, 900) }, 500);
     }

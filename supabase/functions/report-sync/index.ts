@@ -23,11 +23,13 @@ import {
   type PublicationReceipt,
 } from "./report-live-publication.ts";
 import {
+  buildGenerationRetentionPlan,
   buildSheetGeneration,
   buildIsolatedExportPlan,
   buildSlideActivationRequests,
   buildSlideVisibilityRestoreRequests,
   isManagedGeneratedSlide,
+  releaseSlidePrefix,
   verifySlideActivation,
 } from "./report-live-generation.ts";
 import { reportLiveReleaseKey } from "../_shared/report-live-design.ts";
@@ -380,6 +382,9 @@ async function refreshMediaActionsView(): Promise<string | null> {
 async function loadInputs(runId: string, profile: string, periodStart: string, periodEnd: string) {
   const previous = previousEquivalentPeriod(periodStart, periodEnd);
   const queryStart = SNAPSHOT_START < previous.start ? SNAPSHOT_START : previous.start;
+  const monthlyStartDate = new Date(`${periodEnd.slice(0, 7)}-01T00:00:00Z`);
+  monthlyStartDate.setUTCMonth(monthlyStartDate.getUTCMonth() - 6);
+  const monthlyQueryStart = monthlyStartDate.toISOString().slice(0, 10);
   await refreshMediaActionsView();
   const [
     manifest,
@@ -399,9 +404,11 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     communicationTemplates,
     slideContracts,
     aliases,
+    actionCandidates,
     actionOutcomes,
     metricCertifications,
     eventMap,
+    monthlyAcquisition,
   ] = await Promise.all([
     loadManifest(periodStart, periodEnd),
     loadConfig(),
@@ -452,9 +459,16 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     pagedSelect("communication_templates", "*", { orderColumn: "created_at" }),
     pagedSelect("report_slide_contracts", "*", { orderColumn: "display_order" }),
     pagedSelect("paid_media_campaign_aliases", "*", { orderColumn: "platform" }),
+    pagedSelect("report_action_candidates", "*", { orderColumn: "created_at" }),
     pagedSelect("report_action_outcomes", "*", { orderColumn: "created_at" }),
     pagedSelect("report_metric_certifications", "*", { orderColumn: "period_key" }),
     pagedSelect("event_map", "*", { orderColumn: "id" }),
+    pagedSelect("v_aquisicao_mensal_canonico", "*", {
+      dateColumn: "mes",
+      from: monthlyQueryStart,
+      to: periodEnd,
+      orderColumn: "mes",
+    }),
   ]);
 
   return {
@@ -483,10 +497,11 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
       optional_fields: Array.isArray(contract.optional_fields) ? contract.optional_fields : [],
     })),
     aliases,
-    actionCandidates: [],
+    actionCandidates,
     actionOutcomes,
     metricCertifications,
     eventMap,
+    monthlyAcquisition,
   };
 }
 
@@ -668,6 +683,11 @@ async function saveGeneratedState(
       owner: candidate.owner ?? null,
       due_date: candidate.due_date ?? null,
       success_metric: candidate.success_metric ?? null,
+      expected_value: candidate.expected_value ?? null,
+      expected_unit: candidate.expected_unit ?? null,
+      expected_direction: candidate.expected_direction ?? null,
+      outcome_window_end: candidate.outcome_window_end ?? null,
+      verification_view: candidate.verification_view ?? null,
       confidence_status: candidate.confidence_status,
       generated_by: candidate.generated_by,
       review_status: candidate.review_status,
@@ -677,6 +697,13 @@ async function saveGeneratedState(
       .from("report_action_candidates")
       .upsert(rows, { onConflict: "run_id,entity_key,signal_code" });
     if (error) throw new Error(`report_action_candidates: ${error.message}`);
+  }
+
+  if (built.evaluatedOutcomes.length) {
+    const { error } = await admin
+      .from("report_action_outcomes")
+      .upsert(built.evaluatedOutcomes, { onConflict: "action_candidate_id" });
+    if (error) throw new Error(`report_action_outcomes: ${error.message}`);
   }
 
   const { error: deleteError } = await admin.from("report_slide_runs").delete().eq("run_id", runId);
@@ -692,7 +719,7 @@ async function saveGeneratedState(
   }, {});
   await setStatus(runId, "building", {
     report_profile: profile,
-    spec_version: "1.0",
+    spec_version: RELEASE_VERSIONS.spec,
     data_reading_integrated: manifest.data_reading_integrated,
     source_cutoffs: manifest.source_cutoffs,
     gap_closure_days: manifest.gap_closure_days,
@@ -1737,7 +1764,11 @@ async function readDeckGenerationState() {
   );
 }
 
-async function verifyStagedGeneration(runId: string, expectedSlideCount: number) {
+async function verifyStagedGeneration(
+  runId: string,
+  expectedSlideCount: number,
+  generationManifest: Row = {},
+) {
   const releaseKey = await reportLiveReleaseKey(runId);
   const presentation = await readDeckGenerationState();
   const target = publicationSlides(presentation.slides ?? [], releaseKey) as Row[];
@@ -1754,11 +1785,63 @@ async function verifyStagedGeneration(runId: string, expectedSlideCount: number)
     )
   );
   if (missingNarrative.length) throw new Error(`Narrativa ausente em ${missingNarrative.length} slide(s).`);
+  const chartManifest = Array.isArray(generationManifest.chart_manifest)
+    ? generationManifest.chart_manifest as Row[]
+    : [];
+  const expectedElements = Array.isArray(generationManifest.expected_element_ids)
+    ? generationManifest.expected_element_ids as Row[]
+    : [];
+  const targetById = new Map(target.map((slide) => [String(slide.objectId), slide]));
+  for (const expected of expectedElements) {
+    const slide = targetById.get(String(expected.page_id ?? ""));
+    const actualIds = new Set(((slide?.pageElements ?? []) as Row[]).map((element) => String(element.objectId ?? "")));
+    const missing = (Array.isArray(expected.element_ids) ? expected.element_ids : [])
+      .map(String).filter((elementId) => !actualIds.has(elementId));
+    if (missing.length) {
+      throw new Error(`Elementos editoriais ausentes em ${String(expected.slide_instance_id)}: ${missing.join(", ")}.`);
+    }
+  }
+  const chartBySlide = new Map(chartManifest.map((item) => [String(item.slide_instance_id), item]));
+  let linkedChartCount = 0;
+  for (const expected of expectedElements) {
+    const slide = targetById.get(String(expected.page_id ?? ""));
+    const linked = ((slide?.pageElements ?? []) as Row[]).filter((element) => Boolean(element.sheetsChart));
+    linkedChartCount += linked.length;
+    if (linked.length > 1) {
+      throw new Error(`Teto editorial violado: ${String(expected.slide_instance_id)} tem ${linked.length} gráficos vinculados.`);
+    }
+    const planned = chartBySlide.get(String(expected.slide_instance_id));
+    if (planned && linked.length !== Number(planned.expected_chart_count ?? 1)) {
+      throw new Error(`Gráfico obrigatório ausente em ${String(expected.slide_instance_id)}.`);
+    }
+    if (linked.length && !planned) {
+      throw new Error(`Gráfico sem manifesto de verificação em ${String(expected.slide_instance_id)}.`);
+    }
+    if (planned && linked.length === 1) {
+      const chart = linked[0].sheetsChart as Row;
+      if (Number(chart.chartId) !== Number(planned.chart_id) || String(chart.spreadsheetId) !== SHEET_ID) {
+        throw new Error(`Vínculo do gráfico diverge do manifesto em ${String(expected.slide_instance_id)}.`);
+      }
+    }
+  }
+  if (chartManifest.length) {
+    const sheetMetadata = await googleFetch(`${SHEETS}/${SHEET_ID}?fields=sheets(properties(title),charts(chartId))`);
+    const chartsBySheet = new Map<string, Set<number>>((sheetMetadata.sheets ?? []).map((sheet: Row) => [
+      String((sheet.properties as Row)?.title ?? ""),
+      new Set<number>(((sheet.charts ?? []) as Row[]).map((chart) => Number(chart.chartId))),
+    ]));
+    const orphaned = chartManifest.filter((item) =>
+      !chartsBySheet.get(String(item.physical_sheet_title ?? ""))?.has(Number(item.chart_id))
+    );
+    if (orphaned.length) throw new Error(`Fonte de ${orphaned.length} gráfico(s) não existe mais no Sheets.`);
+  }
   return {
     verified: true,
     release_key: releaseKey,
     staged_slide_ids: target.map((slide) => String(slide.objectId)),
     slide_count: target.length,
+    linked_chart_count: linkedChartCount,
+    verified_chart_count: chartManifest.length,
   };
 }
 
@@ -1920,6 +2003,8 @@ function deterministicNarrative(
   const mediaMix = tableRows(built.tabs.VIEW_MEDIA_MIX);
   const b2c = tableRows(built.tabs.VIEW_B2C_PARALLEL_FUNNELS);
   const fieldCoverage = tableRows(built.tabs.VIEW_FIELD_COVERAGE);
+  const editorialRulers = tableRows(built.tabs.VIEW_EDITORIAL_RULERS);
+  const editorialLayouts = tableRows(built.tabs.VIEW_EDITORIAL_LAYOUTS);
   const integratedCutoff = input.manifest.data_reading_integrated ?? "indisponível";
   const sourceCutoffs = input.manifest.source_cutoffs;
   const period = `${input.periodStart.split("-").reverse().join("/")}–${
@@ -1969,12 +2054,17 @@ function deterministicNarrative(
           `Conversão CRM/base: ${fmtPercent(metricValue(sourceRows, "conversao_crm_base"))}.`;
         break;
       }
-      case "C4":
-        body = `Comparação primária: ${built.previousPeriod.start.split("-").reverse().join("/")}–${
-          built.previousPeriod.end.split("-").reverse().join("/")
-        }, com a mesma quantidade de dias do recorte atual.\n` +
-          `Meta e projeção só aparecem quando a meta estiver certificada; sem certificação, o slide mantém apenas o realizado.`;
+      case "C4": {
+        const pacing = tableRows(built.tabs.VIEW_PACING_ISODAYS);
+        const pacingStart = String(pacing[0]?.previous_equivalent_date ?? "");
+        const pacingEnd = String(pacing.at(-1)?.previous_equivalent_date ?? "");
+        body = `Comparação primária: ${pacingStart.split("-").reverse().join("/")}–${
+          pacingEnd.split("-").reverse().join("/")
+        }, nos mesmos dias corridos do mês anterior.\n` +
+          `A linha sobrepõe realizado e período equivalente por dia corrido. ` +
+          `Meta só aparece quando certificada; sem certificação, não há terceira série.`;
         break;
+      }
       case "C5": {
         const full = router.filter((row) => row.mode === "full").map((row) => row.partner).join(", ") || "nenhum";
         const compact = router.filter((row) => row.mode === "compact").map((row) => row.partner).join(", ") || "nenhum";
@@ -1996,20 +2086,22 @@ function deterministicNarrative(
         break;
       }
       case "P1": {
-        const cards = metricValue(sourceRows, "cards");
-        const cac = metricValue(sourceRows, "cac");
-        const conversion = metricValue(sourceRows, "conversion");
-        body = `${slide.partner}: ${fmtNumber(cards)} cartões; CAC ${fmtCurrency(cac)}; ` +
-          `conversão ${fmtPercent(conversion)}.\n` +
-          `${cac === null ? "CAC indisponível porque o custo CRM está missing. " : ""}` +
-          `${commonLimit}`;
+        const rulers = editorialRulers.filter((row) => row.slide_instance_id === slide.slide_instance_id);
+        body = rulers.length
+          ? `${slide.partner}: ${rulers.map((row) =>
+            `${row.metric_label} ${row.value_text}${row.delta_text ? ` (${row.delta_text})` : ""} · ${row.verdict_text}`
+          ).join("; ")}.\n\nValores, faixas e vereditos vêm do snapshot mensal canônico.`
+          : `${slide.partner}: régua mensal indisponível neste snapshot. ${commonLimit}`;
         break;
       }
       case "P4": {
-        const stages = sourceRows.map((row) =>
-          `${row.stage}: ${fmtNumber(row.value)}`
-        ).join(" · ");
-        body = `${stages || "Funil indisponível"}.\n\nA etapa sem observação permanece como quebra visível; zero real e missing não são equivalentes.`;
+        const rulers = editorialRulers.filter((row) => row.slide_instance_id === slide.slide_instance_id);
+        const layout = editorialLayouts.find((row) => row.slide_instance_id === slide.slide_instance_id);
+        body = rulers.length
+          ? `${layout?.layout === "volume_conversao_final" ? "Leitura de volume e conversão final" : "Funil por taxas"}:\n` +
+            `${rulers.map((row) => `${row.metric_label} ${row.value_text} · ${row.verdict_text}`).join("\n")}\n\n` +
+            `${layout?.support_text ?? "Ausência permanece explícita; zero observado não é missing."}`
+          : "Régua mensal indisponível neste snapshot; o slide não inventa uma conversão substituta.";
         break;
       }
       case "P7":
@@ -2196,7 +2288,8 @@ async function processBuildStep(requestedRunId?: string) {
             await finish("done");
           } else {
             const built = { tabs: artifact.tabs, slides: artifact.slides, actionCandidates: artifact.action_candidates,
-              partnerModes: artifact.partner_modes, previousPeriod: artifact.previous_period, fieldCoverage: artifact.field_coverage };
+              evaluatedOutcomes: [], partnerModes: artifact.partner_modes,
+              previousPeriod: artifact.previous_period, fieldCoverage: artifact.field_coverage };
             await saveGeneratedState(runId, input.profile, input.manifest, built);
             await persistBuild(input, artifact, validateArtifact(artifact));
             await finish("certify");
@@ -2378,14 +2471,20 @@ async function processPublicationStep(publicationId: string) {
           );
           if (structure.staged_skipped !== true) throw new Error("Renderer não confirmou staging invisível.");
           await updateManifest({ staged_slide_ids: structure.staged_slide_ids ?? [],
-            previous_managed_slides: structure.previous_managed_slides ?? [] });
+            previous_managed_slides: structure.previous_managed_slides ?? [],
+            chart_manifest: structure.chart_manifest ?? [],
+            expected_element_ids: structure.expected_element_ids ?? [] });
           return { verified: true, ...structure };
         }
         if (phase === "narrative") {
           return { verified: true, ...(await updateSlides(artifact.narratives, runId)) };
         }
         if (phase === "verify_slides") {
-          return await verifyStagedGeneration(runId, expectedSlideCount);
+          return await verifyStagedGeneration(
+            runId,
+            expectedSlideCount,
+            (publication.generation_manifest ?? {}) as Row,
+          );
         }
         if (phase === "activate") {
           activationState.receipt = await activateGeneration(runId);
@@ -2482,7 +2581,7 @@ export async function handleReportRequest(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (request.method === "GET") {
     const checks: Record<string, unknown> = {
-      spec_version: "1.0",
+      spec_version: RELEASE_VERSIONS.spec,
       sheet_id: Boolean(SHEET_ID),
       slides_id: Boolean(SLIDES_ID),
       service_key: Boolean(SERVICE_KEY),
@@ -2727,12 +2826,88 @@ export async function handleReportRequest(request: Request): Promise<Response> {
     return json({ error: "Secrets obrigatórios ausentes." }, 500);
   }
 
-  // Cleanup is a separate, read-only inventory route. Never fall through to full.
-  // Destructive cleanup is deliberately unavailable until recovery is verified.
+  // Retenção remove apenas objetos Google de gerações publicadas conhecidas.
+  // Artefatos/PDFs imutáveis e registros do banco permanecem preservados.
   if (body.mode === "cleanup_sheet_tabs") {
-    if (body.confirm === true) return json({ error: "Limpeza desabilitada até recuperação verificada." }, 409);
-    const metadata = await googleFetch(`${SHEETS}/${SHEET_ID}?fields=sheets(properties(sheetId,title))`);
-    return json({ ok: true, dry_run: true, sheets: metadata.sheets ?? [], deleted: [] });
+    if (!internal) return json({ error: "Retenção restrita ao serviço." }, 403);
+    const keepGenerations = Math.max(2, Math.min(12, Number(body.keep_generations ?? 2)));
+    const [{ data: pointer, error: pointerError }, { data: publications, error: publicationsError }] = await Promise.all([
+      admin.from("report_live_pointer").select("current_publication_id").eq("id", "live").maybeSingle(),
+      admin.from("report_publications")
+        .select("id,run_id,slide_generation,status,publication_version")
+        .in("status", ["published", "superseded", "rolled_back"])
+        .order("publication_version", { ascending: false }),
+    ]);
+    if (pointerError) return json({ error: pointerError.message }, 500);
+    if (publicationsError) return json({ error: publicationsError.message }, 500);
+    if (!pointer?.current_publication_id) return json({ error: "Ponteiro vivo ausente; retenção recusada." }, 409);
+    const plan = buildGenerationRetentionPlan(
+      (publications ?? []).map((item) => ({
+        publication_id: String(item.id),
+        run_id: String(item.run_id),
+        release_key: String(item.slide_generation ?? ""),
+        status: String(item.status),
+        publication_version: Number(item.publication_version),
+      })),
+      String(pointer.current_publication_id),
+      keepGenerations,
+    );
+    const generations: Array<{ publication_id: string; run_id: string; release_key: string; sheet_titles: string[] }> = [];
+    for (const publication of plan.deletable) {
+      try {
+        const artifact = await downloadBuildArtifact(buildArtifactPath(publication.run_id));
+        const generation = await artifactGeneration(artifact);
+        if (generation.releaseKey !== publication.release_key) {
+          return json({ error: `Release divergente no run ${publication.run_id}; retenção recusada.` }, 409);
+        }
+        generations.push({
+          publication_id: publication.publication_id,
+          run_id: publication.run_id,
+          release_key: publication.release_key,
+          sheet_titles: generation.entries.map((entry) => entry.physical_title),
+        });
+      } catch (error) {
+        return json({ error: `Artefato de retenção indisponível para ${publication.run_id}: ${String((error as Error).message)}` }, 409);
+      }
+    }
+    const [sheetMetadata, deck] = await Promise.all([
+      googleFetch(`${SHEETS}/${SHEET_ID}?fields=sheets(properties(sheetId,title))`),
+      googleFetch(`${SLIDES}/${SLIDES_ID}?fields=slides(objectId,slideProperties(isSkipped))`),
+    ]);
+    const deletableSheetTitles = new Set(generations.flatMap((item) => item.sheet_titles));
+    const deletableSheets: Array<{ sheet_id: number; title: string }> =
+      (sheetMetadata.sheets ?? []).flatMap((sheet: Row) => {
+      const properties = sheet.properties as Row;
+      return deletableSheetTitles.has(String(properties.title ?? ""))
+        ? [{ sheet_id: Number(properties.sheetId), title: String(properties.title) }]
+        : [];
+      });
+    const prefixes = generations.map((item) => releaseSlidePrefix(item.release_key));
+    const deletableSlides: string[] = (deck.slides ?? []).flatMap((slide: Row) => {
+      const objectId = String(slide.objectId ?? "");
+      const skipped = (slide.slideProperties as Row)?.isSkipped === true;
+      return skipped && prefixes.some((prefix) => objectId.startsWith(prefix)) ? [objectId] : [];
+    });
+    const dryRun = body.confirm !== "DELETE_SUPERSEDED_GENERATIONS";
+    if (!dryRun) {
+      if (deletableSheets.length) {
+        await googleFetch(`${SHEETS}/${SHEET_ID}:batchUpdate`, {
+          method: "POST",
+          body: JSON.stringify({ requests: deletableSheets.map((sheet) => ({ deleteSheet: { sheetId: sheet.sheet_id } })) }),
+        });
+      }
+      if (deletableSlides.length) {
+        await googleFetch(`${SLIDES}/${SLIDES_ID}:batchUpdate`, {
+          method: "POST",
+          body: JSON.stringify({ requests: deletableSlides.map((objectId) => ({ deleteObject: { objectId } })) }),
+        });
+      }
+    }
+    return json({ ok: true, dry_run: dryRun, keep_generations: keepGenerations,
+      retained_release_keys: plan.retained_release_keys, generations,
+      sheets: deletableSheets, slides: deletableSlides,
+      deleted: dryRun ? { sheets: 0, slides: 0 } : { sheets: deletableSheets.length, slides: deletableSlides.length },
+      immutable_artifacts_preserved: true });
   }
 
   // Download the immutable PDF of a confirmed publication. Never relabel the
@@ -2778,7 +2953,7 @@ export async function handleReportRequest(request: Request): Promise<Response> {
       const narrative = deterministicNarrative(input, built);
       return json({
         ok: true,
-        spec_version: "1.0",
+        spec_version: RELEASE_VERSIONS.spec,
         manifest: input.manifest,
         rows: {
           crm: input.crm.length,

@@ -1,3 +1,12 @@
+import {
+  buildMonthlyRuler,
+  formatRulerValue,
+  RULER_METRICS,
+  type RulerElements,
+  type RulerMetricKey,
+} from "../_shared/report-live-editorial.ts";
+import { REPORT_LIVE_SPEC_VERSION } from "../_shared/report-live-design.ts";
+
 export type QualityStatus = "confirmed" | "directional" | "suspect" | "blocked";
 export type Eligibility = "render" | "render_com_limites" | "omitir_bloqueado";
 export type DataState = "valor_observado" | "zero_observado" | "missing" | "nao_aplicavel";
@@ -56,6 +65,7 @@ export interface ReportInputs {
   actionCandidates: Row[];
   actionOutcomes: Row[];
   metricCertifications: Row[];
+  monthlyAcquisition?: Row[];
   config: Record<string, unknown>;
 }
 
@@ -81,6 +91,7 @@ export interface BuiltReport {
   tabs: Record<string, unknown[][]>;
   slides: SlideRun[];
   actionCandidates: Row[];
+  evaluatedOutcomes: Row[];
   partnerModes: Array<Record<string, unknown>>;
   previousPeriod: { start: string; end: string };
   fieldCoverage: Array<Record<string, unknown>>;
@@ -407,6 +418,365 @@ const objectEntriesTable = (value: Record<string, unknown>): unknown[][] => [
   ]),
 ];
 
+const tableRecords = (table: unknown[][] | undefined): Row[] => {
+  if (!table?.length) return [];
+  const headers = table[0].map((value) => String(value));
+  return table.slice(1).map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index]])));
+};
+
+interface EditorialChartSeries {
+  column_index: number;
+  label: string;
+  color: string;
+  axis: "LEFT_AXIS" | "RIGHT_AXIS";
+  line_width: number;
+  point_size: number;
+  number_format_type: "NUMBER" | "CURRENCY" | "PERCENT";
+  number_format_pattern: string;
+}
+
+interface EditorialChartPlan {
+  slide_instance_id: string;
+  slide_code: string;
+  chart_key: string;
+  family_view: string;
+  chart_type: "LINE";
+  title: string;
+  start_row_index: number;
+  end_row_index: number;
+  domain_column_index: number;
+  domain_title: string;
+  left_axis_title: string;
+  right_axis_title: string;
+  series: EditorialChartSeries[];
+}
+
+const EDITORIAL_COLORS = {
+  gray: "#98A2B3",
+  grayDark: "#667085",
+  cyan: "#00C6CC",
+  blue: "#3B82F6",
+  green: "#10B981",
+  purple: "#A855F7",
+  amber: "#F59E0B",
+} as const;
+
+export function editorialNumberFormat(kind: RulerElements["metric"]["kind"]) {
+  if (kind === "rate") {
+    return { number_format_type: "PERCENT" as const, number_format_pattern: "0.0%" };
+  }
+  if (kind === "currency") {
+    return { number_format_type: "CURRENCY" as const, number_format_pattern: 'R$ #,##0.00' };
+  }
+  return { number_format_type: "NUMBER" as const, number_format_pattern: "#,##0" };
+}
+
+function editorialAxisTitle(kind: RulerElements["metric"]["kind"]): string {
+  if (kind === "rate") return "Taxa (%)";
+  if (kind === "currency") return "Valor (R$)";
+  return "Volume";
+}
+
+function editorialRulerRows(
+  slide: SlideRun,
+  rulers: RulerElements[],
+  layout: string,
+): Row[] {
+  return rulers.map((ruler, index) => ({
+    slide_instance_id: slide.slide_instance_id,
+    slide_code: slide.slide_code,
+    partner: slide.partner,
+    layout,
+    metric_order: index + 1,
+    metric_key: ruler.metric.key,
+    metric_label: ruler.metric.label,
+    metric_kind: ruler.metric.kind,
+    value: ruler.value,
+    value_text: ruler.valueText,
+    delta_text: ruler.deltaText,
+    range_text: ruler.rangeText,
+    verdict: ruler.verdict,
+    verdict_text: ruler.verdictText,
+    show_chart: ruler.showChart,
+    show_bounds: ruler.showBounds,
+    current_month_open: ruler.currentMonthOpen,
+    comparison_eligible: ruler.comparisonEligible,
+    limitation: ruler.limitation,
+  }));
+}
+
+function appendMonthlyChart(
+  familyRows: unknown[][],
+  plans: EditorialChartPlan[],
+  slide: SlideRun,
+  rulers: RulerElements[],
+  title: string,
+) {
+  const chartable = rulers.filter((ruler) => ruler.showChart);
+  if (!chartable.length) return;
+  const header = ["mes"];
+  const series: EditorialChartSeries[] = [];
+  const columns: Array<{ ruler: RulerElements; kind: "min" | "max" | "value" }> = [];
+  const valueColors = [EDITORIAL_COLORS.cyan, EDITORIAL_COLORS.blue, EDITORIAL_COLORS.green];
+  const metricKinds = [...new Set(chartable.map((ruler) => ruler.metric.kind))];
+  const mixedMetricKinds = metricKinds.length > 1;
+  chartable.forEach((ruler, metricIndex) => {
+    const axis: EditorialChartSeries["axis"] = mixedMetricKinds && metricIndex > 0
+      ? "RIGHT_AXIS"
+      : "LEFT_AXIS";
+    if (ruler.showBounds) {
+      header.push(`${ruler.metric.label} · mín.`);
+      columns.push({ ruler, kind: "min" });
+      series.push({
+        column_index: header.length - 1,
+        label: `${ruler.metric.label} · mín.`,
+        color: EDITORIAL_COLORS.gray,
+        axis,
+        line_width: 1,
+        point_size: 0,
+        ...editorialNumberFormat(ruler.metric.kind),
+      });
+      header.push(`${ruler.metric.label} · máx.`);
+      columns.push({ ruler, kind: "max" });
+      series.push({
+        column_index: header.length - 1,
+        label: `${ruler.metric.label} · máx.`,
+        color: EDITORIAL_COLORS.grayDark,
+        axis,
+        line_width: 1,
+        point_size: 0,
+        ...editorialNumberFormat(ruler.metric.kind),
+      });
+    }
+    header.push(ruler.metric.label);
+    columns.push({ ruler, kind: "value" });
+    series.push({
+      column_index: header.length - 1,
+      label: ruler.metric.label,
+      color: valueColors[metricIndex % valueColors.length],
+      axis,
+      line_width: 3,
+      point_size: 5,
+      ...editorialNumberFormat(ruler.metric.kind),
+    });
+  });
+
+  const byMonth = new Map<string, Row>();
+  for (const ruler of chartable) {
+    for (const row of ruler.series) byMonth.set(String(row.mes ?? "").slice(0, 10), row);
+  }
+  const months = [...byMonth.keys()].sort();
+  const startRowIndex = familyRows.length;
+  familyRows.push(header);
+  for (const month of months) {
+    const row = byMonth.get(month) ?? {};
+    familyRows.push([
+      month.slice(0, 7),
+      ...columns.map(({ ruler, kind }) => {
+        if (kind === "value") return toNumber(row[ruler.metric.valueField]) ?? "";
+        const field = kind === "min" ? ruler.metric.minimumField : ruler.metric.maximumField;
+        return toNumber(row[field]) ?? "";
+      }),
+    ]);
+  }
+  plans.push({
+    slide_instance_id: slide.slide_instance_id,
+    slide_code: slide.slide_code,
+    chart_key: slide.slide_instance_id,
+    family_view: "VIEW_EDITORIAL_MONTHLY_CHARTS",
+    chart_type: "LINE",
+    title,
+    start_row_index: startRowIndex,
+    end_row_index: familyRows.length,
+    domain_column_index: 0,
+    domain_title: "Mês",
+    left_axis_title: editorialAxisTitle(metricKinds[0]),
+    right_axis_title: mixedMetricKinds ? editorialAxisTitle(metricKinds[1]) : "",
+    series,
+  });
+  while (familyRows.length % 24 !== 0) familyRows.push([]);
+}
+
+function rectangularizeFamilyTable(rows: unknown[][]): unknown[][] {
+  const width = rows.reduce((maximum, row) => Math.max(maximum, row.length), 0);
+  return rows.map((row) => row.length === width
+    ? row
+    : [...row, ...Array(width - row.length).fill("")]);
+}
+
+function buildEditorialTabs(
+  input: ReportInputs,
+  tabs: Record<string, unknown[][]>,
+  slides: SlideRun[],
+): Record<string, unknown[][]> {
+  const monthlyRows = input.monthlyAcquisition ?? [];
+  const targetMonth = `${input.periodEnd.slice(0, 7)}-01`;
+  const rulerRows: Row[] = [];
+  const layoutRows: Row[] = [];
+  const plans: EditorialChartPlan[] = [];
+  const monthlyFamilyRows: unknown[][] = [];
+  const pacingFamilyRows: unknown[][] = [];
+
+  for (const slide of slides) {
+    if (!slide.partner || !["P1", "P4"].includes(slide.slide_code)) continue;
+    const currentRow = monthlyRows.find((row) =>
+      String(row.parceiro ?? "") === slide.partner && String(row.mes ?? "").slice(0, 10) === targetMonth
+    );
+    if (!currentRow) continue;
+    const leadPrequalified = String(currentRow.funil_semantica ?? "") === "lead_pre_qualificado";
+    const metricKeys: RulerMetricKey[] = slide.slide_code === "P1"
+      ? ["cartoes", "cac"]
+      : leadPrequalified
+      ? ["cartoes", "tx_finalizacao"]
+      : ["tx_proposta", "tx_aprovacao", "tx_finalizacao"];
+    const rulers = metricKeys.map((key) => buildMonthlyRuler(currentRow, monthlyRows, key));
+    const layout = slide.slide_code === "P1"
+      ? "scorecard"
+      : leadPrequalified
+      ? "volume_conversao_final"
+      : "funil_taxas";
+    rulerRows.push(...editorialRulerRows(slide, rulers, layout));
+    const support = leadPrequalified
+      ? "Base de lead pré-qualificado; etapas intermediárias não são comparáveis ao funil padrão."
+      : slide.slide_code === "P4"
+      ? `Base acionável: ${formatRulerValue(RULER_METRICS.base_acionavel, toNumber(currentRow.base_acionavel))} · Propostas: ${formatRulerValue(RULER_METRICS.propostas, toNumber(currentRow.propostas))} · Aprovados: ${formatRulerValue(RULER_METRICS.aprovados, toNumber(currentRow.aprovados))} · Cartões: ${formatRulerValue(RULER_METRICS.cartoes, toNumber(currentRow.cartoes))}`
+      : "Máximo de duas métricas materiais neste scorecard: volume e eficiência CRM.";
+    layoutRows.push({
+      slide_instance_id: slide.slide_instance_id,
+      slide_code: slide.slide_code,
+      layout,
+      support_text: support,
+      funil_semantica: currentRow.funil_semantica,
+      mes: currentRow.mes,
+      mes_fechado: currentRow.mes_fechado,
+      dias_cobertos: currentRow.dias_cobertos,
+      expected_chart: rulers.some((ruler) => ruler.showChart),
+    });
+    appendMonthlyChart(monthlyFamilyRows, plans, slide, rulers, `${slide.partner} · ${layout.replaceAll("_", " ")}`);
+  }
+
+  const pacingSlide = slides.find((slide) => slide.slide_code === "C4");
+  if (pacingSlide) {
+    const pacing = tableRecords(tabs.VIEW_PACING_ISODAYS);
+    const currentAvailable = pacing.some((row) => toNumber(row.cumulative_cards) !== null);
+    const previousAvailable = pacing.some((row) => toNumber(row.previous_equivalent_cumulative_cards) !== null);
+    if (pacing.length >= 2 && currentAvailable) {
+      const header = ["dia", "Realizado"];
+      const series: EditorialChartSeries[] = [{
+        column_index: 1,
+        label: "Realizado",
+        color: EDITORIAL_COLORS.cyan,
+        axis: "LEFT_AXIS",
+        line_width: 3,
+        point_size: 4,
+        number_format_type: "NUMBER",
+        number_format_pattern: "#,##0",
+      }];
+      if (previousAvailable) {
+        header.push("Período equivalente");
+        series.push({
+          column_index: 2,
+          label: "Período equivalente",
+          color: EDITORIAL_COLORS.grayDark,
+          axis: "LEFT_AXIS",
+          line_width: 2,
+          point_size: 2,
+          number_format_type: "NUMBER",
+          number_format_pattern: "#,##0",
+        });
+      }
+      const targetAvailable = pacing.some((row) => toNumber(row.certified_target_cumulative_cards) !== null);
+      if (targetAvailable) {
+        header.push("Meta certificada");
+        series.push({
+          column_index: header.length - 1,
+          label: "Meta certificada",
+          color: EDITORIAL_COLORS.green,
+          axis: "LEFT_AXIS",
+          line_width: 2,
+          point_size: 0,
+          number_format_type: "NUMBER",
+          number_format_pattern: "#,##0",
+        });
+      }
+      const startRowIndex = pacingFamilyRows.length;
+      pacingFamilyRows.push(header);
+      for (const row of pacing) {
+        const values: unknown[] = [row.day_of_period, toNumber(row.cumulative_cards) ?? ""];
+        if (previousAvailable) values.push(toNumber(row.previous_equivalent_cumulative_cards) ?? "");
+        if (targetAvailable) values.push(toNumber(row.certified_target_cumulative_cards) ?? "");
+        pacingFamilyRows.push(values);
+      }
+      plans.push({
+        slide_instance_id: pacingSlide.slide_instance_id,
+        slide_code: pacingSlide.slide_code,
+        chart_key: pacingSlide.slide_instance_id,
+        family_view: "VIEW_EDITORIAL_PACING_CHARTS",
+        chart_type: "LINE",
+        title: "Cartões acumulados · dias equivalentes",
+        start_row_index: startRowIndex,
+        end_row_index: pacingFamilyRows.length,
+        domain_column_index: 0,
+        domain_title: "Dia do mês",
+        left_axis_title: "Cartões acumulados",
+        right_axis_title: "",
+        series,
+      });
+      layoutRows.push({
+        slide_instance_id: pacingSlide.slide_instance_id,
+        slide_code: pacingSlide.slide_code,
+        layout: "pacing_isodays",
+        support_text: targetAvailable
+          ? "Realizado, período equivalente e meta certificada."
+          : "Realizado e período equivalente; meta omitida por falta de certificação.",
+        funil_semantica: "",
+        mes: targetMonth,
+        mes_fechado: monthlyRows.find((row) => String(row.mes ?? "").slice(0, 10) === targetMonth)?.mes_fechado ?? "",
+        dias_cobertos: pacing.filter((row) => toNumber(row.cumulative_cards) !== null).length,
+        expected_chart: true,
+      });
+    }
+  }
+
+  const chartRegistry = plans.map((plan) => ({
+    slide_instance_id: plan.slide_instance_id,
+    slide_code: plan.slide_code,
+    chart_key: plan.chart_key,
+    family_view: plan.family_view,
+    chart_type: plan.chart_type,
+    title: plan.title,
+    start_row_index: plan.start_row_index,
+    end_row_index: plan.end_row_index,
+    domain_column_index: plan.domain_column_index,
+    domain_title: plan.domain_title,
+    left_axis_title: plan.left_axis_title,
+    right_axis_title: plan.right_axis_title,
+    series_json: JSON.stringify(plan.series),
+    expected_chart_count: 1,
+  }));
+
+  return {
+    VIEW_EDITORIAL_RULERS: rowsToTable(
+      ["slide_instance_id", "slide_code", "partner", "layout", "metric_order", "metric_key", "metric_label", "metric_kind", "value", "value_text", "delta_text", "range_text", "verdict", "verdict_text", "show_chart", "show_bounds", "current_month_open", "comparison_eligible", "limitation"],
+      rulerRows,
+    ),
+    VIEW_EDITORIAL_LAYOUTS: rowsToTable(
+      ["slide_instance_id", "slide_code", "layout", "support_text", "funil_semantica", "mes", "mes_fechado", "dias_cobertos", "expected_chart"],
+      layoutRows,
+    ),
+    VIEW_EDITORIAL_CHART_REGISTRY: rowsToTable(
+      ["slide_instance_id", "slide_code", "chart_key", "family_view", "chart_type", "title", "start_row_index", "end_row_index", "domain_column_index", "domain_title", "left_axis_title", "right_axis_title", "series_json", "expected_chart_count"],
+      chartRegistry,
+    ),
+    VIEW_EDITORIAL_MONTHLY_CHARTS: monthlyFamilyRows.length
+      ? rectangularizeFamilyTable(monthlyFamilyRows)
+      : [["mes", "sem_serie"]],
+    VIEW_EDITORIAL_PACING_CHARTS: pacingFamilyRows.length
+      ? rectangularizeFamilyTable(pacingFamilyRows)
+      : [["dia", "sem_serie"]],
+  };
+}
+
 const tabName = (prefix: string, value: unknown, suffix: string): string =>
   `${prefix}_${slug(value).toUpperCase().slice(0, 18)}_${suffix}`.slice(0, 99);
 
@@ -435,7 +805,7 @@ export function normalizeSnapshotManifest(input: ReportInputs): ReportInputs {
     status: partnerResolutionDrift.length ? "blocked" : "confirmed",
     sample: partnerResolutionDrift.slice(0, 10),
   };
-  return {...input,manifest:{...input.manifest,source_cutoffs:cutoffs,data_reading_integrated:integrated,
+  return {...input,monthlyAcquisition:input.monthlyAcquisition ?? [],manifest:{...input.manifest,source_cutoffs:cutoffs,data_reading_integrated:integrated,
     quality_status:partnerResolutionDrift.length ? "blocked" : input.manifest.quality_status,
     gap_closure_days:integrated?Math.max(0,(dateValue(input.periodEnd)-dateValue(integrated))/DAY):null,
     missing_sources:Object.entries({crm,media,b2c}).filter(([,rows])=>!rows.length).map(([key])=>key),
@@ -533,6 +903,12 @@ function buildDeterministicCandidates(
     });
   };
 
+  const nextMonthEnd = (() => {
+    const date = new Date(`${input.periodEnd.slice(0, 7)}-01T00:00:00Z`);
+    date.setUTCMonth(date.getUTCMonth() + 2, 0);
+    return date.toISOString().slice(0, 10);
+  })();
+
   if ((input.manifest.gap_closure_days ?? 0) > 2) {
     add({
       source_view: "VIEW_COVERAGE_COMPARABILITY",
@@ -545,7 +921,12 @@ function buildDeterministicCandidates(
       evidence_refs: [{ view: "VIEW_RUN_MANIFEST", field: "source_cutoffs" }],
       reading_limit: "Usar o cutoff integrado e expor os cutoffs nativos.",
       action_text: "Regularizar a fonte atrasada antes de decisões cross-source.",
-      success_metric: "gap_fechamento <= 2 dias",
+      success_metric: "gap_closure_days",
+      expected_value: 2,
+      expected_unit: "dias",
+      expected_direction: "menor_melhor",
+      outcome_window_end: nextMonthEnd,
+      verification_view: "VIEW_RUN_MANIFEST",
     });
   }
 
@@ -564,6 +945,11 @@ function buildDeterministicCandidates(
       reading_limit: "Campanhas BAU podem ser analisadas por Activity Name enquanto o mapeamento avança.",
       action_text: "Priorizar o mapeamento das atividades BAU de maior volume.",
       success_metric: "activities_template_coverage >= 80%",
+      expected_value: 0.8,
+      expected_unit: "%",
+      expected_direction: "maior_melhor",
+      outcome_window_end: nextMonthEnd,
+      verification_view: "VIEW_TEMPLATE_COVERAGE",
       confidence_status: "confirmed",
     });
   }
@@ -582,6 +968,11 @@ function buildDeterministicCandidates(
         evidence_refs: [{ view: "VIEW_PARTNER_ROUTER", partner: partner.partner }],
         action_text: "Corrigir a taxonomia das atividades N/A de maior volume.",
         success_metric: "share_cartoes_parceiro_NA",
+        expected_value: 0.1,
+        expected_unit: "%",
+        expected_direction: "menor_melhor",
+        outcome_window_end: nextMonthEnd,
+        verification_view: "VIEW_PARTNER_ROUTER",
         confidence_status: "confirmed",
       });
     } else if (partner.signal) {
@@ -599,6 +990,11 @@ function buildDeterministicCandidates(
         reading_limit: "Zero observado não prova ineficiência causal.",
         action_text: "Validar proposta, aprovação, cartão e maturidade do parceiro.",
         success_metric: "cartoes_gerados",
+        expected_value: 1,
+        expected_unit: "cartões",
+        expected_direction: "maior_melhor",
+        outcome_window_end: nextMonthEnd,
+        verification_view: "VIEW_PARTNER_ROUTER",
       });
     }
   }
@@ -625,7 +1021,144 @@ function buildDeterministicCandidates(
     }
   }
 
-  return candidates;
+  const completedCandidateIds = new Set(
+    input.actionOutcomes.map((row) => String(row.action_candidate_id ?? "")),
+  );
+  const unclosedBySignal = new Map<string, Set<string>>();
+  for (const previous of input.actionCandidates) {
+    if (completedCandidateIds.has(String(previous.action_candidate_id ?? ""))) continue;
+    const signal = String(previous.signal_code ?? "");
+    if (!signal) continue;
+    const runs = unclosedBySignal.get(signal) ?? new Set<string>();
+    runs.add(String(previous.run_id ?? previous.action_candidate_id ?? ""));
+    unclosedBySignal.set(signal, runs);
+  }
+  return candidates.map((candidate) => {
+    const repeated = (unclosedBySignal.get(String(candidate.signal_code ?? ""))?.size ?? 0) >= 2;
+    return repeated
+      ? {
+        ...candidate,
+        status: "backlog",
+        owner: candidate.owner ?? "Growth Ops",
+        reading_limit: [
+          candidate.reading_limit,
+          "Sinal repetido por dois ciclos sem outcome; removido do deck até haver dono e fechamento.",
+        ].filter(Boolean).join(" "),
+      }
+      : candidate;
+  });
+}
+
+function outcomeMetric(
+  candidate: Row,
+  tabs: Record<string, unknown[][]>,
+): { value: number | null; reason: string } {
+  const view = String(candidate.verification_view ?? "");
+  const metric = String(candidate.success_metric ?? "");
+  const rows = tableRecords(tabs[view]);
+  if (!view || !tabs[view]) return { value: null, reason: "view_de_verificacao_inexistente" };
+  if (!rows.length) return { value: null, reason: "view_de_verificacao_sem_linhas" };
+
+  if (view === "VIEW_RUN_MANIFEST") {
+    const row = rows.find((item) => String(item.campo ?? "") === metric);
+    return { value: toNumber(row?.valor), reason: row ? "campo_do_manifesto" : "metrica_inexistente_na_view" };
+  }
+  if (view === "VIEW_TEMPLATE_COVERAGE") {
+    const row = rows.find((item) => String(item.scope ?? "") === "activities.template_id");
+    return { value: toNumber(row?.coverage), reason: row ? "cobertura_activities_template_id" : "metrica_inexistente_na_view" };
+  }
+  if (view === "VIEW_PARTNER_ROUTER") {
+    const partner = String(candidate.partner ?? "");
+    const row = rows.find((item) => String(item.partner ?? "") === partner);
+    const field = metric === "share_cartoes_parceiro_NA" ? "card_share"
+      : metric === "cartoes_gerados" ? "cards"
+      : metric;
+    return { value: toNumber(row?.[field]), reason: row ? `campo_${field}` : "entidade_inexistente_na_view" };
+  }
+
+  const direct = rows.find((item) => String(item.metric ?? item.metrica ?? "") === metric);
+  if (direct) {
+    return { value: toNumber(direct.current ?? direct.value ?? direct.valor), reason: "linha_de_metrica" };
+  }
+  if (rows.length === 1 && metric in rows[0]) {
+    return { value: toNumber(rows[0][metric]), reason: "coluna_de_metrica" };
+  }
+  return { value: null, reason: "metrica_inexistente_na_view" };
+}
+
+export function evaluateMaturedOutcomes(
+  input: ReportInputs,
+  tabs: Record<string, unknown[][]>,
+): Row[] {
+  const completed = new Set(input.actionOutcomes.map((row) => String(row.action_candidate_id ?? "")));
+  return input.actionCandidates.flatMap((candidate) => {
+    const candidateId = String(candidate.action_candidate_id ?? "");
+    const windowEnd = String(candidate.outcome_window_end ?? "");
+    const expected = toNumber(candidate.expected_value);
+    const direction = String(candidate.expected_direction ?? "");
+    if (!candidateId || completed.has(candidateId) || candidate.review_status !== "approved") return [];
+    if (!windowEnd || windowEnd > input.periodEnd || expected === null || !direction || !candidate.verification_view) return [];
+    const observed = outcomeMetric(candidate, tabs);
+    const comparable = observed.value !== null;
+    const confirmed = comparable && (
+      direction === "menor_melhor" ? observed.value! <= expected : observed.value! >= expected
+    );
+    const outcomeStatus = !comparable ? "premissa_invalida" : confirmed ? "confirmado" : "nao_confirmado";
+    return [{
+      action_candidate_id: candidateId,
+      metric_name: candidate.success_metric,
+      baseline_value: null,
+      expected_value: expected,
+      observed_value: observed.value,
+      unit: candidate.expected_unit ?? null,
+      window_start: toIsoDay(candidate.created_at) || input.periodStart,
+      window_end: windowEnd,
+      evaluated_at: `${input.periodEnd}T23:59:59.000Z`,
+      outcome_status: outcomeStatus,
+      conclusion: outcomeStatus === "premissa_invalida"
+        ? `Não foi possível verificar: ${observed.reason}.`
+        : `Realizado ${observed.value}; esperado ${expected}; direção ${direction}.`,
+      verification_view: candidate.verification_view,
+      verification_reason: observed.reason,
+    }];
+  });
+}
+
+function buildOutcomeViewRows(outcomes: Row[], candidates: Row[]): Row[] {
+  const candidateById = new Map(
+    candidates.map((row) => [String(row.action_candidate_id ?? ""), row]),
+  );
+  const detail = outcomes.map((outcome) => ({
+    ...outcome,
+    signal_code: candidateById.get(String(outcome.action_candidate_id ?? ""))?.signal_code ?? "",
+    scorecard_scope: "outcome",
+    success_rate: null,
+  }));
+  const bySignal = groupRows(detail.filter((row) => row.signal_code), ["signal_code"]);
+  const summaries = [...bySignal.values()].map((rows) => {
+    const concluded = rows.filter((row) => ["confirmado", "nao_confirmado"].includes(String(row.outcome_status)));
+    const confirmed = concluded.filter((row) => row.outcome_status === "confirmado").length;
+    return {
+      action_candidate_id: "",
+      signal_code: rows[0].signal_code,
+      metric_name: "taxa_acerto",
+      baseline_value: null,
+      expected_value: null,
+      observed_value: confirmed,
+      unit: `${confirmed}/${concluded.length}`,
+      window_start: "",
+      window_end: "",
+      outcome_status: concluded.length ? "placar" : "sem_base_comparavel",
+      conclusion: concluded.length
+        ? `${confirmed} de ${concluded.length} recomendações confirmadas.`
+        : "Ainda não há outcome comparável.",
+      verification_view: "",
+      verification_reason: "agregado_por_signal_code",
+      scorecard_scope: "signal_code",
+      success_rate: concluded.length ? confirmed / concluded.length : null,
+    };
+  });
+  return [...detail, ...summaries];
 }
 
 function buildFieldCoverage(input: ReportInputs): Array<Record<string, unknown>> {
@@ -875,7 +1408,6 @@ function buildSlides(
     if (contract.section === "partner") continue;
     const view = contract.source_view;
     const conditionalAvailability: Record<string, boolean> = {
-      "K-VISA": Boolean(tabs.VIEW_VISA_OPTIN?.length > 1),
       "K-SEG": Boolean(tabs.VIEW_INSURANCE_SUMMARY?.length > 1),
       "K-TPL": true,
       "K-EXP": Boolean(tabs.VIEW_EXPERIMENTS?.length > 1),
@@ -919,6 +1451,65 @@ function buildSlides(
     }
   }
   return output;
+}
+
+const PROFILE_LIMITS = {
+  executivo_mensal: 12,
+  deep_dive: 31,
+} as const;
+
+const DEEP_DIVE_PRIORITY = [
+  "C0", "C1", "C4", "C7", "C8",
+  "P1", "P4", "P2", "P3", "P5", "P7", "P6",
+  "M1", "M2", "M3", "M4", "M6",
+  "B1", "K-SEG", "K-TPL",
+  "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+];
+
+const EXECUTIVE_PRIORITY = [
+  "C0", "C1", "C4", "C7", "C8",
+  "P1", "M1", "M2", "B1",
+];
+
+/**
+ * Dois perfis são projeções determinísticas do mesmo artefato. A seleção nunca
+ * promove slide bloqueado e mantém a ordem original do contrato. Quando uma
+ * condicional não existe, a vaga é preenchida pelo próximo slide elegível.
+ */
+export function projectSlidesForProfile(slides: SlideRun[], rawProfile: string): SlideRun[] {
+  const profile = rawProfile === "monthly_report" ? "executivo_mensal" : rawProfile;
+  if (!(profile in PROFILE_LIMITS)) return slides;
+  const eligible = slides.filter((slide) => slide.run_eligibility !== "omitir_bloqueado");
+  const priorities = profile === "executivo_mensal" ? EXECUTIVE_PRIORITY : DEEP_DIVE_PRIORITY;
+  const rank = (slide: SlideRun) => {
+    const codeRank = priorities.indexOf(slide.slide_code);
+    const partnerPenalty = slide.partner ? Math.max(0, slides.findIndex((candidate) => candidate.partner === slide.partner)) / 10_000 : 0;
+    return (codeRank < 0 ? priorities.length + 100 : codeRank) + partnerPenalty;
+  };
+  const section = (slide: SlideRun) => slide.slide_code.startsWith("C") ? "core"
+    : slide.slide_code.startsWith("P") ? "partner"
+    : slide.slide_code.startsWith("M") ? "media"
+    : slide.slide_code.startsWith("B") ? "b2c"
+    : slide.slide_code.startsWith("K-") ? "conditional"
+    : slide.slide_code.startsWith("A") ? "annex"
+    : "other";
+  const quotas = profile === "executivo_mensal"
+    ? { core: 5, partner: 4, media: 2, b2c: 1, conditional: 0, annex: 0, other: 0 }
+    : { core: 5, partner: 11, media: 5, b2c: 1, conditional: 2, annex: 7, other: 0 };
+  const selected: SlideRun[] = [];
+  for (const [name, quota] of Object.entries(quotas)) {
+    selected.push(...eligible
+      .filter((slide) => section(slide) === name)
+      .sort((a, b) => rank(a) - rank(b) || slides.indexOf(a) - slides.indexOf(b))
+      .slice(0, quota));
+  }
+  const selectedIds = new Set(selected.map((slide) => slide.slide_instance_id));
+  const limit = PROFILE_LIMITS[profile as keyof typeof PROFILE_LIMITS];
+  selected.push(...eligible
+    .filter((slide) => !selectedIds.has(slide.slide_instance_id))
+    .sort((a, b) => rank(a) - rank(b) || slides.indexOf(a) - slides.indexOf(b))
+    .slice(0, Math.max(0, limit - selected.length)));
+  return selected.slice(0, limit).sort((a, b) => slides.indexOf(a) - slides.indexOf(b));
 }
 
 export function buildReport(input: ReportInputs): BuiltReport {
@@ -969,7 +1560,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
 
   tabs.VIEW_RUN_MANIFEST = objectEntriesTable({
     run_id: input.runId,
-    spec_version: "1.0",
+    spec_version: REPORT_LIVE_SPEC_VERSION,
     report_profile: input.profile,
     period_start: input.periodStart,
     period_end: input.periodEnd,
@@ -1067,31 +1658,59 @@ export function buildReport(input: ReportInputs): BuiltReport {
   // A row with a missing metric is not a zero observation. Once incomplete,
   // a cumulative total remains incomplete for the rest of this window.
   const crmDays = groupRows(crmCurrent.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "crm")) })), ["day"]);
+  const pacingStartDate = new Date(`${input.periodStart.slice(0, 7)}-01T00:00:00Z`);
+  pacingStartDate.setUTCMonth(pacingStartDate.getUTCMonth() - 1);
+  const pacingPreviousStart = pacingStartDate.toISOString().slice(0, 10);
+  const pacingPreviousEnd = isoFromMs(dateValue(pacingPreviousStart) + (inclusiveDays(input.periodStart, input.periodEnd) - 1) * DAY);
+  const crmPacingPrevious = withCanonicalPartner(input.crm.filter((row) =>
+    inWindow(sourceDate(row, "crm"), pacingPreviousStart, pacingPreviousEnd)));
+  const crmPreviousDays = groupRows(crmPacingPrevious.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "crm")) })), ["day"]);
   const mediaDays = groupRows(mediaCurrent.map((row) => ({ ...row, day: toIsoDay(sourceDate(row, "media")) })), ["day"]);
   const byDay = (groups: Map<string, Row[]>) => new Map([...groups.values()].map((rows) => [String(rows[0].day), rows]));
   const crmByDay = byDay(crmDays);
+  const crmPreviousByDay = byDay(crmPreviousDays);
   const mediaByDay = byDay(mediaDays);
   const completeSum = (rows: Row[], field: string) => rows.length && rows.every((row) => toNumber(row[field]) !== null) ? sumNullable(rows, field) : null;
   const cumulative: Record<string, number | null> = { crm_cards: 0, crm_cost: 0, media_spend: 0 };
+  let previousCumulativeCards: number | null = 0;
+  const periodKey = input.periodEnd.slice(0, 7);
+  const certifiedCardTarget = input.metricCertifications.find((row) =>
+    String(row.certification_status ?? "") === "certified" &&
+    ["crm_goal", "crm_target"].includes(String(row.metric_domain ?? "")) &&
+    [periodKey, `${periodKey.slice(5, 7)}/${periodKey.slice(0, 4)}`].includes(String(row.period_key ?? "")) &&
+    ["cards", "cartoes", "cartoes_crm", "crm_cards"].includes(String(row.metric_key ?? ""))
+  );
+  const monthlyCardTarget = toNumber(certifiedCardTarget?.target_value);
+  const periodDays = inclusiveDays(input.periodStart, input.periodEnd);
   const dailyRows: Row[] = [];
   for (let timestamp = dateValue(input.periodStart); timestamp <= dateValue(input.periodEnd); timestamp += DAY) {
     const day = isoFromMs(timestamp);
+    const dayOfPeriod = Math.floor((timestamp - dateValue(input.periodStart)) / DAY) + 1;
+    const previousDay = isoFromMs(dateValue(pacingPreviousStart) + (dayOfPeriod - 1) * DAY);
     const row: Row = {
       date: day,
+      day_of_period: dayOfPeriod,
+      previous_equivalent_date: previousDay,
       crm_cards: completeSum(crmByDay.get(day) ?? [], "Cartões Gerados"),
       crm_cost: completeSum(crmByDay.get(day) ?? [], "Custo Total Campanha"),
       media_spend: completeSum(mediaByDay.get(day) ?? [], "spend"),
     };
+    const previousCards = completeSum(crmPreviousByDay.get(previousDay) ?? [], "Cartões Gerados");
+    previousCumulativeCards = previousCumulativeCards === null || previousCards === null
+      ? null
+      : previousCumulativeCards + previousCards;
     for (const field of Object.keys(cumulative)) {
       const value = toNumber(row[field]);
       const previousValue = cumulative[field];
       cumulative[field] = previousValue === null || value === null ? null : previousValue + value;
     }
     dailyRows.push({ ...row, cumulative_cards: cumulative.crm_cards, cumulative_crm_cost: cumulative.crm_cost,
-      cumulative_media_spend: cumulative.media_spend, cumulative_cac: ratio(cumulative.crm_cost, cumulative.crm_cards) });
+      cumulative_media_spend: cumulative.media_spend, cumulative_cac: ratio(cumulative.crm_cost, cumulative.crm_cards),
+      previous_equivalent_cumulative_cards: previousCumulativeCards,
+      certified_target_cumulative_cards: monthlyCardTarget === null ? null : monthlyCardTarget * dayOfPeriod / periodDays });
   }
   tabs.VIEW_PACING_ISODAYS = rowsToTable(
-    ["date", "crm_cards", "crm_cost", "media_spend", "cumulative_cards", "cumulative_crm_cost", "cumulative_media_spend", "cumulative_cac"],
+    ["date", "day_of_period", "previous_equivalent_date", "crm_cards", "crm_cost", "media_spend", "cumulative_cards", "cumulative_crm_cost", "cumulative_media_spend", "cumulative_cac", "previous_equivalent_cumulative_cards", "certified_target_cumulative_cards"],
     dailyRows,
   );
 
@@ -1145,7 +1764,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
 
   tabs.VIEW_ACTION_QUEUE = rowsToTable(
     ["bucket", "domain", "partner", "signal", "impact", "probable_cause", "evidence_refs", "reading_limit", "action_text", "owner", "due_date", "success_metric", "confidence_status", "review_status"],
-    actionCandidates,
+    actionCandidates.filter((candidate) => candidate.status !== "backlog"),
   );
   tabs.VIEW_ACTION_OUTCOMES = rowsToTable(
     ["action_candidate_id", "metric_name", "baseline_value", "expected_value", "observed_value", "unit", "window_start", "window_end", "outcome_status", "conclusion"],
@@ -1250,7 +1869,9 @@ export function buildReport(input: ReportInputs): BuiltReport {
     );
     tabs[tabName("VP", partnerName, "ACTION")] = rowsToTable(
       ["bucket", "signal", "action_text", "success_metric", "confidence_status", "review_status"],
-      actionCandidates.filter((candidate) => String(candidate.partner ?? "") === partnerName).slice(0, 1),
+      actionCandidates.filter((candidate) =>
+        candidate.status !== "backlog" && String(candidate.partner ?? "") === partnerName
+      ).slice(0, 1),
     );
   }
 
@@ -1497,18 +2118,6 @@ export function buildReport(input: ReportInputs): BuiltReport {
       { metric: "media_spend", value: mediaMetrics(mediaCurrent.filter((row) => classifyMediaFront(row.campaign) === "Seguros")).spend, state: dataState(mediaMetrics(mediaCurrent.filter((row) => classifyMediaFront(row.campaign) === "Seguros")).spend), cutoff: input.manifest.source_cutoffs.media },
     ],
   );
-  tabs.VIEW_VISA_OPTIN = rowsToTable(
-    ["channel", "campaign", "spend", "platform_result", "measurement_rule"],
-    mediaCurrent
-      .filter((row) => classifyMediaFront(row.campaign) === "Copa Visa")
-      .map((row) => ({
-        channel: row.channel,
-        campaign: row.campaign,
-        spend: row.spend,
-        platform_result: null,
-        measurement_rule: "Medir por opt-in/evento nomeado; nunca CAC.",
-      })),
-  );
   tabs.VIEW_QUALITY_INCIDENTS = rowsToTable(
     ["source", "status", "started_at", "finished_at", "rows_received", "rows_rejected", "error_summary"],
     input.collectionRuns.filter((row) =>
@@ -1577,7 +2186,15 @@ export function buildReport(input: ReportInputs): BuiltReport {
     ],
   );
 
-  const slides = buildSlides(input, partnerModes, tabs);
+  const evaluatedOutcomes = evaluateMaturedOutcomes(input, tabs);
+  const allOutcomes = [...input.actionOutcomes, ...evaluatedOutcomes];
+  tabs.VIEW_ACTION_OUTCOMES = rowsToTable(
+    ["action_candidate_id", "signal_code", "metric_name", "baseline_value", "expected_value", "observed_value", "unit", "window_start", "window_end", "outcome_status", "conclusion", "verification_view", "verification_reason", "scorecard_scope", "success_rate"],
+    buildOutcomeViewRows(allOutcomes, input.actionCandidates),
+  );
+
+  const slides = projectSlidesForProfile(buildSlides(input, partnerModes, tabs), input.profile);
+  Object.assign(tabs, buildEditorialTabs(input, tabs, slides));
   tabs.SLIDE_READINESS = rowsToTable(
     ["run_id", "slide_instance_id", "slide_code", "partner", "source_view", "implementation_readiness", "run_eligibility", "confidence_status", "confidence_label", "data_coverage", "cutoff_maturity", "execution_volume", "missing_required_fields", "fallback_applied", "evidence"],
     slides,
@@ -1605,6 +2222,7 @@ export function buildReport(input: ReportInputs): BuiltReport {
     tabs,
     slides,
     actionCandidates,
+    evaluatedOutcomes,
     partnerModes,
     previousPeriod: previous,
     fieldCoverage,
