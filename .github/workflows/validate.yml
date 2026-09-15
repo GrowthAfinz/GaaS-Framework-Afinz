@@ -40,6 +40,8 @@ jobs:
         run: npm test
       - name: Report Live contract and recovery protocol tests
         run: npm run test:report-live
+      - name: Report Live Office render-plan tests
+        run: npm run test:report-live-office
       - name: Canonical partner SQL and TypeScript equivalence
         run: node --test scripts/test-report-live-partner-equivalence.mjs
       - name: TypeScript regression gate (documented main debt)

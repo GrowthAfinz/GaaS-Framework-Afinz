@@ -1,6 +1,6 @@
 /** Pure, testable policies shared by the HTTP entrypoint and the durable worker. */
 export const REPORT_MODES = new Set([
-  "build", "full", "certify", "publish", "diff", "inspect_contract", "watchdog",
+  "build", "full", "certify", "publish", "diff", "inspect_contract", "watchdog", "export_artifact",
   "cleanup_sheet_tabs", "stage_sheets", "stage_sheet_core", "stage_sheet_source",
   "stage_sheets_commit", "rollback", "resume_structure", "export_pdf", "worker", "publication_worker", "inspect_publication", "inspect_recovery", "inspect_generation",
   "access", "members", "set_member",
@@ -22,7 +22,7 @@ const PUBLISHER_MODES = new Set([
 ]);
 const ADMIN_MODES = new Set([
   "members", "set_member", "watchdog", "worker", "publication_worker",
-  "inspect_publication", "inspect_recovery", "inspect_generation",
+  "inspect_publication", "inspect_recovery", "inspect_generation", "export_artifact",
 ]);
 
 export function requiredReportRole(mode: unknown): ReportLiveRole {

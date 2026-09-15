@@ -124,6 +124,7 @@ test('missing B2C does not downgrade the same CRM partner evidence',()=>{
 test('invalid commands and dates never fall through to full',()=>{
  for(const body of [{mode:'unknown'}, {mode:'status'}, {period_start:'2026-02-30'}, {period_start:'2026-09-02',period_end:'2026-09-01'}, [], null]) assert.throws(()=>parseReportRequest(body));
  assert.equal(parseReportRequest({mode:'cleanup_sheet_tabs'}).mode,'cleanup_sheet_tabs');
+ assert.equal(parseReportRequest({mode:'export_artifact'}).mode,'export_artifact');
 });
 test('published PDF is readable by signed-in users while mutations require an operator',()=>{
  assert.equal(requiresReportOperator('export_pdf'),false);
@@ -136,6 +137,8 @@ test('team roles separate candidate generation, live publication and access mana
  assert.equal(reportRoleAllows('analyst','publish'),false);
  assert.equal(reportRoleAllows('publisher','full'),true);
  assert.equal(reportRoleAllows('publisher','set_member'),false);
+ assert.equal(reportRoleAllows('publisher','export_artifact'),false);
+ assert.equal(reportRoleAllows('admin','export_artifact'),true);
  assert.equal(reportRoleAllows('admin','set_member'),true);
  assert.equal(reportRoleAllows(null,'export_pdf'),false);
 });
