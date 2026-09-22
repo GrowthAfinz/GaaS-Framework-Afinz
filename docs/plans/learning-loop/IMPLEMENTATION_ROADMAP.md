@@ -38,6 +38,8 @@ Paridade funcional do Report Live e nenhum efeito externo acionado pela navegaç
 
 ## Release 2 — feed sistêmico read-only
 
+**Estado em 22/09/2026:** implementada; schema publicado; integração na `main` depende do PR e do pipeline.
+
 ### Escopo
 
 - `growth_feed_events`;
@@ -48,6 +50,8 @@ Paridade funcional do Report Live e nenhum efeito externo acionado pela navegaç
 - agrupamento;
 - drawers de evidência;
 - badges internos.
+
+Originação B2C permanece como frente visível sem eventos até existir um produtor governado; nenhum card é simulado para preencher a fila.
 
 ### Gate
 

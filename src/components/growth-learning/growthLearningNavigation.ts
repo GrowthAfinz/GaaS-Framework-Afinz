@@ -47,6 +47,40 @@ function updateBrowserSearch(search: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
+export function readGrowthLearningItem(search: string): string | null {
+  return new URLSearchParams(search).get('item');
+}
+
+export function buildGrowthLearningItemSearch(itemId: string | null, currentSearch: string): string {
+  const params = new URLSearchParams(currentSearch);
+  params.set('view', 'learning');
+  params.set('section', 'feed');
+  if (itemId) params.set('item', itemId);
+  else params.delete('item');
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : '';
+}
+
+export function openGrowthLearningItem(itemId: string): void {
+  if (typeof window === 'undefined') return;
+  const search = buildGrowthLearningItemSearch(itemId, window.location.search);
+  const nextUrl = `${window.location.pathname}${search}${window.location.hash}`;
+  window.history.pushState({ growthLearningItem: true }, '', nextUrl);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+export function closeGrowthLearningItem(): void {
+  if (typeof window === 'undefined') return;
+  if (window.history.state?.growthLearningItem) {
+    window.history.back();
+    return;
+  }
+  const search = buildGrowthLearningItemSearch(null, window.location.search);
+  const nextUrl = `${window.location.pathname}${search}${window.location.hash}`;
+  window.history.replaceState({}, '', nextUrl);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 export function openGrowthLearningSection(section: GrowthLearningSection): void {
   if (typeof window === 'undefined') return;
   updateBrowserSearch(buildGrowthLearningSearch(section, window.location.search));

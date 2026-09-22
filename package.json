@@ -12,6 +12,7 @@
     "typecheck:release": "node scripts/check-types-release.mjs",
     "test:report-live": "node --test scripts/test-report-live-correctness.mjs scripts/test-report-live-publication.mjs scripts/test-report-live-immutable-file.mjs scripts/test-report-live-recovery.mjs scripts/test-report-live-generation.mjs scripts/test-report-live-chart-policy.mjs scripts/test-report-live-editorial.mjs scripts/test-report-live-profiles-outcomes.mjs",
     "test:report-live-office": "python scripts/test_report_live_office_renderer.py",
+    "test:growth-feed-sql": "node --test scripts/test-growth-feed-release-2.mjs",
     "validate:report-live-office": "python scripts/validate_report_live_office_output.py --plan tmp/report-live-pptx-poc/render-plan.json --pptx output/pptx/report-live-office-poc-aug-2026.pptx --pdf output/pdf/report-live-office-poc-aug-2026.pdf",
     "check:edge": "npx --yes deno@2.9.6 check --config supabase/functions/deno.json supabase/functions/report-sync/index.ts supabase/functions/report-sync-v4-setup/index.ts supabase/functions/report-sync-build-candidate/index.ts supabase/functions/report-live-meta-preview/index.ts",
     "supabase:cli": "npx --yes supabase@2.117.0",
