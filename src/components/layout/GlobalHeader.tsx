@@ -17,6 +17,7 @@ import {
     Mail,
     LayoutGrid,
     ShieldCheck,
+    BrainCircuit,
     X,
 } from 'lucide-react';
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
@@ -28,6 +29,7 @@ import { useUserRole } from '../../context/UserRoleContext';
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { useGlobalSearch, GlobalSearchResult, GlobalSearchResultType } from '../../hooks/useGlobalSearch';
 import { useExplorerStore, PendingNavigation } from '../../store/explorerStore';
+import { openGrowthLearningSection, openReportsOutput } from '../growth-learning/growthLearningNavigation';
 
 interface GlobalHeaderProps {
     onMouseEnter?: () => void;
@@ -60,6 +62,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
     const { canSeeTab } = useUserRole();
     const setPendingNavigation = useExplorerStore((s) => s.setPendingNavigation);
 
+    const navigateToTab = useCallback((tab: Parameters<typeof setTab>[0]) => {
+        if (tab !== 'aprendizado-growth') openReportsOutput();
+        setTab(tab);
+    }, [setTab]);
+
     const [searchInput, setSearchInput] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -80,10 +87,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             bu: result.bu,
         };
         setPendingNavigation(nav);
-        setTab('explorador');
+        navigateToTab('explorador');
         setSearchInput('');
         setIsSearchOpen(false);
-    }, [setPendingNavigation, setTab]);
+    }, [navigateToTab, setPendingNavigation]);
 
     const handleClear = useCallback(() => {
         setSearchInput('');
@@ -107,43 +114,44 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             title: 'Planejamento',
             direct: false,
             items: [
-                { id: 'launch', label: 'Launch Planner', icon: Calendar, onClick: () => setTab('launch') },
-                { id: 'diario', label: 'Diario de Bordo', icon: BookOpen, onClick: () => setTab('diario') },
+                { id: 'launch', label: 'Launch Planner', icon: Calendar, onClick: () => navigateToTab('launch') },
+                { id: 'diario', label: 'Diario de Bordo', icon: BookOpen, onClick: () => navigateToTab('diario') },
             ]
         },
         {
             title: 'Framework',
             direct: true,
             items: [
-                { id: 'explorador', label: 'Explorador Avançado', icon: LayoutDashboard, onClick: () => setTab('explorador') },
+                { id: 'explorador', label: 'Explorador Avançado', icon: LayoutDashboard, onClick: () => navigateToTab('explorador') },
             ]
         },
         {
             title: 'Análise',
             direct: false,
             items: [
-                { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => setTab('originacao-b2c') },
-                { id: 'funil-aquisicao', label: 'Funil de Aquisição', icon: Funnel, onClick: () => setTab('funil-aquisicao') },
-                { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => setTab('relatorio') },
-                { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => setTab('jornada') },
-                { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => setTab('orientador') },
+                { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => navigateToTab('originacao-b2c') },
+                { id: 'funil-aquisicao', label: 'Funil de Aquisição', icon: Funnel, onClick: () => navigateToTab('funil-aquisicao') },
+                { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => navigateToTab('relatorio') },
+                { id: 'aprendizado-growth', label: 'Aprendizado Growth', icon: BrainCircuit, onClick: () => { openGrowthLearningSection('feed'); navigateToTab('aprendizado-growth'); } },
+                { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') },
+                { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => navigateToTab('orientador') },
             ]
         },
         {
             title: 'Comunicações',
             direct: false,
             items: [
-                { id: 'comunicacoes-cadastro', label: 'Cadastro e Templates', icon: LayoutGrid, onClick: () => setTab('comunicacoes-cadastro') },
-                { id: 'comunicacoes-performance', label: 'Performance do Conteúdo', icon: BarChart3, onClick: () => setTab('comunicacoes-performance') },
-                { id: 'comunicacoes-email-dinamico', label: 'Fábrica de E-mails', icon: Mail, onClick: () => setTab('comunicacoes-email-dinamico') },
-                { id: 'comunicacoes-appsflyer-auditoria', label: 'Auditoria AppsFlyer', icon: ShieldCheck, onClick: () => setTab('comunicacoes-appsflyer-auditoria') },
+                { id: 'comunicacoes-cadastro', label: 'Cadastro e Templates', icon: LayoutGrid, onClick: () => navigateToTab('comunicacoes-cadastro') },
+                { id: 'comunicacoes-performance', label: 'Performance do Conteúdo', icon: BarChart3, onClick: () => navigateToTab('comunicacoes-performance') },
+                { id: 'comunicacoes-email-dinamico', label: 'Fábrica de E-mails', icon: Mail, onClick: () => navigateToTab('comunicacoes-email-dinamico') },
+                { id: 'comunicacoes-appsflyer-auditoria', label: 'Auditoria AppsFlyer', icon: ShieldCheck, onClick: () => navigateToTab('comunicacoes-appsflyer-auditoria') },
             ]
         },
         {
             title: 'Mídia Paga',
             direct: true,
             items: [
-                { id: 'midia-paga', label: 'Media Analytics', icon: undefined, onClick: () => setTab('midia-paga') },
+                { id: 'midia-paga', label: 'Media Analytics', icon: undefined, onClick: () => navigateToTab('midia-paga') },
             ]
         }
     ];
@@ -168,7 +176,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
         >
             {/* ── LEFT: Brand ────────────────────────────────────────── */}
             <button
-                onClick={() => setTab('launch')}
+                onClick={() => navigateToTab('launch')}
                 className="shrink-0 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                 style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}
                 title="Voltar para Launch Planner"
@@ -339,7 +347,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
 
                 {/* Settings */}
                 <button
-                    onClick={() => setTab('configuracoes')}
+                    onClick={() => navigateToTab('configuracoes')}
                     className={`p-2 rounded-lg transition-all ${activeTab === 'configuracoes' ? 'text-slate-800 bg-slate-100' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
                     title="Configurações"
                 >

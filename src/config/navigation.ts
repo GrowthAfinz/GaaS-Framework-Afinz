@@ -20,7 +20,8 @@ import {
     Wallet,
     FolderTree,
     Settings2,
-    ClipboardList
+    ClipboardList,
+    BrainCircuit
 } from 'lucide-react';
 
 export const NAV_CONFIG: NavGroup[] = [
@@ -37,6 +38,7 @@ export const NAV_CONFIG: NavGroup[] = [
             { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp },
             { id: 'resultados', label: 'Resultados', icon: BarChart3 },
             { id: 'relatorio', label: 'Relatório', icon: ClipboardList },
+            { id: 'aprendizado-growth', label: 'Aprendizado Growth', icon: BrainCircuit },
             { id: 'orientador', label: 'Orientador', icon: Lightbulb },
         ]
     },

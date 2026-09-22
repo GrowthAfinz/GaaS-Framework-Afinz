@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** planejamento aprovado para detalhamento; nenhuma migration ou implementação iniciada
+**Status:** Release 1 implementada em branch; sem migration, feed, apostas, outcomes novos ou memória
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live
@@ -28,6 +28,7 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 8. [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) — releases verticais e dependências.
 9. [ACCEPTANCE_AND_TEST_PLAN.md](ACCEPTANCE_AND_TEST_PLAN.md) — critérios verificáveis de aceite.
 10. ADRs — decisões estruturais que não devem ser reabertas incidentalmente.
+11. [RELEASE_1_IMPLEMENTATION.md](RELEASE_1_IMPLEMENTATION.md) — implementação e evidências da fundação de navegação.
 
 ## Decisões confirmadas com o product owner
 

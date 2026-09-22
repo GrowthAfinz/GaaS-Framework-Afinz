@@ -35,6 +35,9 @@ interface RunRow {
   rows_inserted: number | null;
   period_start: string | null;
   period_end: string | null;
+  published_at?: string | null;
+  publication_version?: number | null;
+  report_profile?: string | null;
 }
 
 type SourceStatus = 'ready' | 'stale' | 'blocked';
@@ -100,7 +103,7 @@ const STAGES: Array<{ key: RunRow['status']; label: string }> = [
 
 const ACTIVE_STATUSES = new Set(STAGES.map(stage => stage.key));
 const FAILED_STATUSES = new Set(['error', 'rejected', 'stale', 'publication_failed', 'rollback_failed']);
-const RUN_FIELDS = 'id,status,active_run,publication_valid,publication_status,sheet_url,slides_url,error_detail,rows_inserted,period_start,period_end';
+const RUN_FIELDS = 'id,status,active_run,publication_valid,publication_status,sheet_url,slides_url,error_detail,rows_inserted,period_start,period_end,published_at,publication_version,report_profile';
 const isRunActive = (value: RunRow | null): boolean => Boolean(value &&
   !FAILED_STATUSES.has(value.status) && !['done', 'superseded'].includes(value.status) &&
   (value.active_run === true || ACTIVE_STATUSES.has(value.status) || value.publication_status === 'publishing'));
@@ -181,10 +184,19 @@ const buildSourceCheck = (
 interface ReportLiveCardProps {
   periodStart: Date;
   periodEnd: Date;
+  variant?: 'operations' | 'output';
+  onOpenOperations?: () => void;
 }
 
-export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, periodEnd }) => {
+export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({
+  periodStart,
+  periodEnd,
+  variant = 'operations',
+  onOpenOperations,
+}) => {
+  const operational = variant === 'operations';
   const [run, setRun] = useState<RunRow | null>(null);
+  const [activePublication, setActivePublication] = useState<RunRow | null>(null);
   const [checking, setChecking] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -235,24 +247,37 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
       .maybeSingle().then(({ data }) => {
         if (data) setRuntime(data as RuntimeSetting);
       });
-    supabase
-      .from('report_runs')
-      .select(RUN_FIELDS)
-      .eq('report_type', 'midia_paga_crm_mensal')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (data?.[0]) setRun(data[0] as RunRow);
-      });
+    const loadRuns = async () => {
+      const activeQuery = await supabase
+        .from('report_runs')
+        .select(RUN_FIELDS)
+        .eq('report_type', 'midia_paga_crm_mensal')
+        .eq('status', 'done')
+        .eq('publication_valid', true)
+        .eq('publication_status', 'published')
+        .order('published_at', { ascending: false })
+        .limit(1);
+      setActivePublication(activeQuery.data?.[0] as RunRow ?? null);
+
+      if (!operational) return;
+      const latestQuery = await supabase
+        .from('report_runs')
+        .select(RUN_FIELDS)
+        .eq('report_type', 'midia_paga_crm_mensal')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      setRun(latestQuery.data?.[0] as RunRow ?? null);
+    };
+    void loadRuns();
     return stopPolling;
-  }, [loadAccess, stopPolling]);
+  }, [loadAccess, operational, stopPolling]);
 
   useEffect(() => {
-    if (access?.capabilities.manage_members) void loadMembers();
-  }, [access?.capabilities.manage_members, loadMembers]);
+    if (operational && access?.capabilities.manage_members) void loadMembers();
+  }, [access?.capabilities.manage_members, loadMembers, operational]);
 
   useEffect(() => {
-    const active = isRunActive(run);
+    const active = operational && isRunActive(run);
     if (!active || !run) {
       stopPolling();
       return;
@@ -269,7 +294,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
     }, 2500);
 
     return stopPolling;
-  }, [run, stopPolling]);
+  }, [operational, run, stopPolling]);
 
   const prepareReport = useCallback(async () => {
     setChecking(true);
@@ -442,13 +467,15 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
     }
   }, [access?.capabilities.manage_members, loadMembers]);
 
+  const publishedRun = run?.status === 'done' && run.publication_valid === true ? run : activePublication;
+
   const downloadPdf = useCallback(async () => {
-    if (!run || run.status !== 'done' || run.publication_valid !== true || runtime.maintenance || !access?.capabilities.download) return;
+    if (!publishedRun || runtime.maintenance || !access?.capabilities.download) return;
     setDownloadingPdf(true);
     setCheckError(null);
     try {
       const { data, error } = await supabase.functions.invoke('report-sync', {
-        body: { mode: 'export_pdf', run_id: run.id },
+        body: { mode: 'export_pdf', run_id: publishedRun.id },
       });
       if (error) throw error;
       const signedUrl = String(data?.signed_url ?? '');
@@ -460,7 +487,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
 
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = `report-live-${run.period_start ?? 'publicado'}-${run.period_end ?? ''}.pdf`;
+      anchor.download = `report-live-${publishedRun.period_start ?? 'publicado'}-${publishedRun.period_end ?? ''}.pdf`;
       anchor.rel = 'noreferrer';
       document.body.appendChild(anchor);
       anchor.click();
@@ -472,13 +499,13 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
     } finally {
       setDownloadingPdf(false);
     }
-  }, [access?.capabilities.download, run, runtime.maintenance]);
+  }, [access?.capabilities.download, publishedRun, runtime.maintenance]);
 
   const inProgress = isRunActive(run);
-  const published = run?.status === 'done' && run.publication_valid === true;
+  const published = Boolean(publishedRun);
   const currentStage = run ? stageIndex(run.status) : -1;
-  const previousRunLabel = run?.period_start && run?.period_end
-    ? `${format(parseISO(run.period_start), 'dd/MM/yyyy')} – ${format(parseISO(run.period_end), 'dd/MM/yyyy')}`
+  const previousRunLabel = publishedRun?.period_start && publishedRun?.period_end
+    ? `${format(parseISO(publishedRun.period_start), 'dd/MM/yyyy')} – ${format(parseISO(publishedRun.period_end), 'dd/MM/yyyy')}`
     : null;
 
   return (
@@ -487,31 +514,43 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         <ShieldCheck size={19} className="shrink-0 text-cyan-600" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-bold text-slate-800">Report Google Live</p>
-            {access?.role && (
+            <p className="text-sm font-bold text-slate-800">{operational ? 'Operação do Report Live' : 'Report Live publicado'}</p>
+            {operational && access?.role && (
               <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold text-cyan-700">
                 {ROLE_LABELS[access.role]}
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500">
-            {access?.capabilities.generate
-              ? 'Primeiro valida as fontes. Depois libera a criação da candidata e, conforme o papel, a publicação.'
-              : 'Consulte as saídas publicadas. A geração requer papel de analista ou superior.'}
+            {operational
+              ? access?.capabilities.generate
+                ? 'Primeiro valida as fontes. Depois libera a criação da candidata e, conforme o papel, a publicação.'
+                : 'Consulte as saídas publicadas. A geração requer papel de analista ou superior.'
+              : 'Consulte a publicação ativa. Geração, certificação e publicação ficam em Aprendizado Growth.'}
           </p>
         </div>
-        <button
-          onClick={prepareReport}
-          disabled={checking || inProgress || runtime.maintenance || !access?.capabilities.generate}
-          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60"
-        >
-          {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-          {checking
-            ? 'Validando...'
-            : !access?.capabilities.generate
-              ? 'Somente leitura'
-              : preflight ? 'Validar novamente' : 'Preparar relatório'}
-        </button>
+        {operational ? (
+          <button
+            onClick={prepareReport}
+            disabled={checking || inProgress || runtime.maintenance || !access?.capabilities.generate}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-cyan-600 px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-cyan-700 disabled:cursor-wait disabled:opacity-60"
+          >
+            {checking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {checking
+              ? 'Validando...'
+              : !access?.capabilities.generate
+                ? 'Somente leitura'
+                : preflight ? 'Validar novamente' : 'Preparar relatório'}
+          </button>
+        ) : onOpenOperations ? (
+          <button
+            type="button"
+            onClick={onOpenOperations}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-cyan-200 bg-white px-3.5 py-1.5 text-xs font-bold text-cyan-700 transition-colors hover:bg-cyan-50"
+          >
+            <Presentation size={13} /> Abrir operação
+          </button>
+        ) : null}
       </div>
 
       {runtime.maintenance && (
@@ -528,7 +567,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         </div>
       )}
 
-      {preflight && (
+      {operational && preflight && (
         <div className="border-t border-cyan-100 bg-white/80 px-4 py-3">
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -613,7 +652,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         </div>
       )}
 
-      {inProgress && (
+      {operational && inProgress && (
         <div className="space-y-1.5 border-t border-cyan-100 bg-white/70 px-4 py-3">
           <p className="mb-2 text-xs font-bold text-slate-700">Atualização anterior ainda em andamento</p>
           {STAGES.map((stage, index) => (
@@ -633,16 +672,19 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         </div>
       )}
 
-      {published && run && (
+      {published && publishedRun && (
         <div className="border-t border-cyan-100 bg-slate-50/70 px-4 py-3">
           <p className="mb-2 text-xs font-semibold text-slate-600">
-            Última saída disponível{previousRunLabel ? ` · ${previousRunLabel}` : ''}
-            {run.rows_inserted != null && run.rows_inserted > 0 ? ` · ${run.rows_inserted} linhas sincronizadas` : ''}
+            {operational ? 'Publicação ativa' : 'Versão publicada'}{previousRunLabel ? ` · ${previousRunLabel}` : ''}
+            {publishedRun.publication_version != null ? ` · v${publishedRun.publication_version}` : ''}
+            {publishedRun.report_profile ? ` · perfil ${publishedRun.report_profile}` : ''}
+            {publishedRun.published_at ? ` · publicada em ${format(parseISO(publishedRun.published_at), 'dd/MM/yyyy HH:mm')}` : ''}
+            {publishedRun.rows_inserted != null && publishedRun.rows_inserted > 0 ? ` · ${publishedRun.rows_inserted} linhas sincronizadas` : ''}
           </p>
           <div className="flex flex-wrap gap-2">
-            {run.sheet_url && (
+            {publishedRun.sheet_url && (
               <a
-                href={run.sheet_url}
+                href={publishedRun.sheet_url}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
@@ -650,9 +692,9 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
                 <FileSpreadsheet size={13} /> Planilha <ExternalLink size={11} />
               </a>
             )}
-            {run.slides_url && (
+            {publishedRun.slides_url && (
               <a
-                href={run.slides_url}
+                href={publishedRun.slides_url}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
@@ -673,7 +715,16 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         </div>
       )}
 
-      {run && !inProgress && !published && !FAILED_STATUSES.has(run.status) && (
+      {!operational && !published && (
+        <div className="border-t border-cyan-100 bg-white/80 px-4 py-5">
+          <p className="text-sm font-bold text-slate-700">Nenhuma publicação válida disponível</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">
+            O consumo permanece vazio até que uma candidata certificada seja publicada. Esta área nunca exibe rascunho ou execução incompleta como saída oficial.
+          </p>
+        </div>
+      )}
+
+      {operational && run && !inProgress && run.id !== publishedRun?.id && !FAILED_STATUSES.has(run.status) && (
         <div className="border-t border-amber-100 bg-amber-50/60 px-4 py-3 text-xs text-amber-800">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>
@@ -698,7 +749,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         </div>
       )}
 
-      {run && FAILED_STATUSES.has(run.status) && (
+      {operational && run && FAILED_STATUSES.has(run.status) && (
         <div className="border-t border-red-100 bg-red-50/60 px-4 py-3">
           <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-red-600">
             <AlertTriangle size={14} /> A última atualização falhou
@@ -707,7 +758,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({ periodStart, per
         </div>
       )}
 
-      {access?.capabilities.manage_members && (
+      {operational && access?.capabilities.manage_members && (
         <details className="border-t border-cyan-100 bg-white/80 px-4 py-3">
           <summary className="cursor-pointer text-xs font-bold text-slate-700">Equipe e permissões</summary>
           <p className="mt-1 text-[11px] text-slate-500">
