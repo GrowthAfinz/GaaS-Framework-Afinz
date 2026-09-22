@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildGrowthLearningSearch,
+  buildGrowthLearningItemSearch,
   buildReportsOutputSearch,
   hasGrowthLearningRouteContext,
   isGrowthLearningView,
   readGrowthLearningSection,
+  readGrowthLearningItem,
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
@@ -47,5 +49,15 @@ describe('growth learning navigation contract', () => {
     expect(hasGrowthLearningRouteContext('?item=campaign-42')).toBe(false);
     expect(hasGrowthLearningRouteContext('?section=settings')).toBe(false);
     expect(hasGrowthLearningRouteContext('?section=memory')).toBe(true);
+  });
+
+  it('opens and closes a feed item without losing filters', () => {
+    const opened = buildGrowthLearningItemSearch('event-42', '?view=learning&section=feed&front=paid_media&sort=recent');
+    expect(readGrowthLearningItem(opened)).toBe('event-42');
+    const closed = buildGrowthLearningItemSearch(null, opened);
+    const params = new URLSearchParams(closed);
+    expect(params.has('item')).toBe(false);
+    expect(params.get('front')).toBe('paid_media');
+    expect(params.get('sort')).toBe('recent');
   });
 });

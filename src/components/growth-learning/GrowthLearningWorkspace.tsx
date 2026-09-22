@@ -15,6 +15,7 @@ import {
   openGrowthLearningSection,
   readGrowthLearningSection,
 } from './growthLearningNavigation';
+import { GrowthFeedView } from './feed/GrowthFeedView';
 
 interface GrowthLearningWorkspaceProps {
   periodStart: Date;
@@ -33,16 +34,11 @@ const SECTIONS: Array<{
   { id: 'report-live', label: 'Report Live', icon: Presentation },
 ];
 
-const FOUNDATION_COPY: Record<Exclude<GrowthLearningSection, 'report-live'>, {
+const FOUNDATION_COPY: Record<Exclude<GrowthLearningSection, 'feed' | 'report-live'>, {
   title: string;
   description: string;
   next: string;
 }> = {
-  feed: {
-    title: 'Fila sistêmica',
-    description: 'Será o feed de sinais, bloqueios e mudanças materiais produzidos pelo sistema — sem posts sociais ou números inventados.',
-    next: 'Próximo corte: eventos read-only com procedência, confiança e ação principal.',
-  },
   bets: {
     title: 'Apostas',
     description: 'Transformará sinais aceitos em compromissos verificáveis, com hipótese, baseline, expectativa, janela e critério de sucesso.',
@@ -60,7 +56,7 @@ const FOUNDATION_COPY: Record<Exclude<GrowthLearningSection, 'report-live'>, {
   },
 };
 
-const FoundationState: React.FC<{ section: Exclude<GrowthLearningSection, 'report-live'> }> = ({ section }) => {
+const FoundationState: React.FC<{ section: Exclude<GrowthLearningSection, 'feed' | 'report-live'> }> = ({ section }) => {
   const copy = FOUNDATION_COPY[section];
   return (
     <section className="mx-auto grid min-h-[420px] max-w-4xl place-items-center px-6 py-12">
@@ -98,6 +94,7 @@ const FoundationState: React.FC<{ section: Exclude<GrowthLearningSection, 'repor
 
 export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = ({ periodStart, periodEnd }) => {
   const [section, setSection] = useState<GrowthLearningSection>(() => readGrowthLearningSection(window.location.search));
+  const [feedCount, setFeedCount] = useState(0);
 
   useEffect(() => {
     const syncSection = () => setSection(readGrowthLearningSection(window.location.search));
@@ -125,8 +122,8 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300 backdrop-blur">
-              <span className="block font-bold text-white">Release 1 · fundação</span>
-              Navegação e operação editorial, sem schema novo.
+              <span className="block font-bold text-white">Release 2 · feed sistêmico</span>
+              Eventos read-only com procedência e ação explícita.
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-4 pt-2 sm:px-6" aria-label="Áreas de Aprendizado Growth">
@@ -143,12 +140,15 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
                 }`}
               >
                 <Icon size={15} /> {label}
+                {id === 'feed' && feedCount > 0 && <span className="rounded-full bg-cyan-400/20 px-2 py-0.5 text-[10px] text-cyan-100">{feedCount}</span>}
               </button>
             ))}
           </nav>
         </header>
 
-        {section === 'report-live' ? (
+        {section === 'feed' ? (
+          <GrowthFeedView periodStart={periodStart} periodEnd={periodEnd} onCountChange={setFeedCount} />
+        ) : section === 'report-live' ? (
           <section className="space-y-4">
             <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
               <div>

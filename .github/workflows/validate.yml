@@ -44,6 +44,8 @@ jobs:
         run: npm run test:report-live-office
       - name: Canonical partner SQL and TypeScript equivalence
         run: node --test scripts/test-report-live-partner-equivalence.mjs
+      - name: Growth feed SQL contract
+        run: node --test scripts/test-growth-feed-release-2.mjs
       - name: TypeScript regression gate (documented main debt)
         run: npm run typecheck:release
       - name: Edge Function type checks
