@@ -7,6 +7,9 @@ import { SetPasswordView } from './components/SetPasswordView';
 
 import { ResultadosView } from './components/ResultadosView';
 import { RelatorioView } from './components/RelatorioView';
+import { GrowthLearningWorkspace } from './components/growth-learning/GrowthLearningWorkspace';
+import { isGrowthLearningView } from './components/growth-learning/growthLearningNavigation';
+import { ReportLiveOutputCard } from './components/relatorio/ReportLiveOutputCard';
 import { JornadaDisparosView } from './components/JornadaDisparosView';
 import { DiarioBordo } from './components/DiarioBordo';
 import { FrameworkView } from './components/FrameworkView';
@@ -163,6 +166,21 @@ function App() {
   const storeFilters = viewSettings.filtrosGlobais;
   const activeTab = viewSettings.abaAtual;
 
+  useEffect(() => {
+    const syncLearningRoute = () => {
+      const learningRoute = isGrowthLearningView(window.location.search);
+      const currentTab = useAppStore.getState().viewSettings.abaAtual;
+      if (learningRoute && currentTab !== 'aprendizado-growth') {
+        setTab('aprendizado-growth');
+      } else if (!learningRoute && currentTab === 'aprendizado-growth') {
+        setTab('relatorio');
+      }
+    };
+    syncLearningRoute();
+    window.addEventListener('popstate', syncLearningRoute);
+    return () => window.removeEventListener('popstate', syncLearningRoute);
+  }, [setTab]);
+
   const { startDate, endDate, compareEnabled, compareMode } = usePeriod();
   const { selectedBUs } = useBU();
 
@@ -293,6 +311,28 @@ function App() {
     return (
       <MainLayout>
         <DynamicEmailWorkspace />
+      </MainLayout>
+    );
+  }
+
+  if (import.meta.env.DEV && urlHash === '#growth-learning-preview') {
+    return (
+      <MainLayout>
+        <GrowthLearningWorkspace periodStart={startDate} periodEnd={endDate} />
+      </MainLayout>
+    );
+  }
+
+  if (import.meta.env.DEV && urlHash === '#report-live-output-preview') {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-4xl px-6 py-10">
+          <ReportLiveOutputCard
+            periodStart={startDate}
+            periodEnd={endDate}
+            onOpenOperations={() => undefined}
+          />
+        </div>
       </MainLayout>
     );
   }
@@ -485,6 +525,11 @@ function App() {
                   />
                 </PageTransition>
               )}
+              {activeTab === 'aprendizado-growth' && (
+                <PageTransition>
+                  <GrowthLearningWorkspace periodStart={startDate} periodEnd={endDate} />
+                </PageTransition>
+              )}
               {activeTab === 'orientador' && (
                 <PageTransition>
                   <OrientadorView activities={Object.values(advancedFilteredData).flat()} />
@@ -543,7 +588,7 @@ function App() {
                   <DynamicEmailWorkspace />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'aprendizado-growth', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>
