@@ -82,7 +82,7 @@ Gates locais:
 - quatro entrypoints de Edge Functions aprovados;
 - build Vite aprovado.
 
-O workflow `validate.yml` também passa a executar o contrato SQL em PostgreSQL 17 com fixtures adversariais. O resultado do Actions será registrado no PR antes do merge.
+O PR #14 executou `validate.yml` no run `35752793973` e concluiu verde em 1m19s. A etapa `Growth feed SQL contract` passou em PostgreSQL 17 limpo com fixtures adversariais, junto dos testes, TypeScript, Edge Functions e build.
 
 ## Fora desta release
 
