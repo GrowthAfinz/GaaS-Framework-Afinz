@@ -33,14 +33,15 @@ Isso evita:
 ```sql
 id uuid primary key
 source_action_candidate_id uuid null
+evidence_snapshot_id uuid not null
 front text not null
 team_scope text not null
 owner text null
 hypothesis text not null
 action_text text not null
 metric_name text not null
-baseline_value numeric null
-expected_value numeric null
+baseline_value numeric not null
+expected_value numeric not null
 expected_direction text not null
 expected_unit text null
 success_criterion text not null
@@ -48,11 +49,17 @@ execution_due_at timestamptz null
 outcome_window_start date not null
 outcome_window_end date not null
 verification_view text not null
+stop_condition text null
+known_alternatives jsonb not null
 status text not null
 belief_snapshot jsonb not null
+contract_version text not null
+created_by uuid not null
 created_at timestamptz not null
 updated_at timestamptz not null
 ```
+
+No estado `approved`, baseline, expectativa e contrato de verificação são obrigatórios. A Release 3A não converte sinal incompleto em aposta parcial: o comando exige o preenchimento do contrato antes da escrita.
 
 ### 3.2 `growth_bet_updates`
 
@@ -65,7 +72,7 @@ update_type text not null
 body text null
 execution_status text null
 metadata jsonb not null
-created_by text null
+created_by uuid not null
 created_at timestamptz not null
 ```
 
@@ -99,6 +106,8 @@ created_at timestamptz not null
 ```
 
 `growth_bets` referencia um snapshot. Quando o sinal nasce de run certificado, o snapshot pode apontar para o artefato existente em vez de duplicar seus bytes.
+
+O snapshot e o `belief_snapshot` são imutáveis. Alterações posteriores na aposta poderão atualizar seu estado operacional, mas não reescrevem a crença aprovada nem a evidência usada na decisão.
 
 ### 3.5 `growth_feed_events`
 
