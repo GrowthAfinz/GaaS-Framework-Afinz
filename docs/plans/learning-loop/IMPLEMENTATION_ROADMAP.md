@@ -59,6 +59,8 @@ Todos os cards mostram procedência e ação. Nenhum número nasce na prosa do f
 
 ## Release 3 — sinal para aposta
 
+**Estado em 22/09/2026:** Release 3A implementada em branch; migration e teste PostgreSQL 17 aguardam PR. A interface de aceite e o workspace operacional permanecem na 3B.
+
 ### Escopo
 
 - `growth_bets`;
@@ -72,6 +74,22 @@ Todos os cards mostram procedência e ação. Nenhum número nasce na prosa do f
 ### Gate
 
 Uma recomendação vira aposta contratada em menos de um minuto, sem copiar manualmente filtros ou números.
+
+### Corte 3A — contrato e persistência
+
+- `growth_bets`, `growth_evidence_snapshots` e timeline append-only;
+- RPC transacional `growth_accept_signal_as_bet`;
+- snapshot imutável da crença, evidência, qualidade e regime;
+- evento `bet_created` na mesma transação;
+- leitura por `growth_bets_operational_v`;
+- sem botão, drawer, checklist ou tela de Apostas.
+
+### Corte 3B — interação e operação
+
+- ação `Assumir aposta` no drawer da Fila;
+- formulário pré-preenchido e validação do contrato;
+- workspace Apostas, checklist, updates, comentários e histórico;
+- rejeitar/mesclar sinal e mudanças materiais no feed.
 
 ## Release 4 — outcome
 
