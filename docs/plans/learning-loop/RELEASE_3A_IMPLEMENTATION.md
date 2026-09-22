@@ -4,6 +4,8 @@
 **Branch:** `codex/growth-learning-release-3a`  
 **Base:** `1584d17` — merge do PR #14, Release 2
 
+**Estado:** publicada na `main` e no Supabase em 22/09/2026
+
 ## Objetivo
 
 Criar a fundação transacional para transformar uma recomendação governada em aposta verificável. Este corte não adiciona botão, formulário, checklist ou workspace operacional; ele fecha o contrato de dados que a Release 3B consumirá.
@@ -66,6 +68,15 @@ Por isso a 3A não cria aposta automaticamente a partir dos campos existentes. A
 - deep-link do evento para a própria aposta.
 
 A migration e o cenário adversarial completo também foram executados dentro de uma transação no schema real e encerrados com `ROLLBACK`. O ensaio retornou 1 aposta, 1 snapshot, 1 update e 1 evento, com todas as verificações booleanas verdadeiras e nenhuma persistência.
+
+## Promoção
+
+- PR #15 mergeado na `main` como `3fde5bc`;
+- workflow pós-merge `35794413827` verde, incluindo o contrato SQL em PostgreSQL 17;
+- GitHub Pages publicado pelo mesmo workflow;
+- migration registrada pelo Supabase como `20260922225227_growth_bets_release_3a`;
+- reconciliação confirmou RLS, RPC autenticada, view `security_invoker`, triggers de imutabilidade e ausência de escrita direta;
+- estado inicial: 0 apostas, 0 snapshots, 0 updates e 0 eventos `bet_created` — nenhum dado de demonstração foi criado em produção.
 
 ## Fora desta release
 
