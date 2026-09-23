@@ -93,6 +93,8 @@ Uma recomendação vira aposta contratada em menos de um minuto, sem copiar manu
 
 ## Release 4 — outcome
 
+**Estado em 23/09/2026:** implementada na branch `codex/growth-learning-release-4-outcomes`; promoção depende de migration rastreada, PR verde e merge na `main`.
+
 ### Escopo
 
 - extensão de `report_action_outcomes`;

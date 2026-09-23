@@ -49,6 +49,7 @@ function normalizedState(event: GrowthFeedEvent): string {
   return [
     'candidate', 'backlog', 'new', 'pending',
     'approved', 'in_progress', 'waiting_window', 'ready_for_review',
+    'system_evaluated', 'contested',
   ].includes(state) ? 'open' : state;
 }
 

@@ -1,22 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Brain,
-  CheckCircle2,
-  CircleGauge,
-  Inbox,
-  ListChecks,
-  Presentation,
-  Sparkles,
-  type LucideIcon,
-} from 'lucide-react';
+import { Brain, CheckCircle2, CircleGauge, Inbox, ListChecks, Presentation, Sparkles, type LucideIcon } from 'lucide-react';
 import { ReportLiveCard } from '../relatorio/ReportLiveCard';
-import {
-  GrowthLearningSection,
-  openGrowthLearningSection,
-  readGrowthLearningSection,
-} from './growthLearningNavigation';
+import { GrowthLearningSection, openGrowthLearningSection, readGrowthLearningSection } from './growthLearningNavigation';
 import { GrowthFeedView } from './feed/GrowthFeedView';
 import { GrowthBetsView } from './bets/GrowthBetsView';
+import { GrowthOutcomesView } from './outcomes/GrowthOutcomesView';
 
 interface GrowthLearningWorkspaceProps {
   periodStart: Date;
@@ -35,16 +23,14 @@ const SECTIONS: Array<{
   { id: 'report-live', label: 'Report Live', icon: Presentation },
 ];
 
-const FOUNDATION_COPY: Record<Exclude<GrowthLearningSection, 'feed' | 'bets' | 'report-live'>, {
-  title: string;
-  description: string;
-  next: string;
-}> = {
-  outcomes: {
-    title: 'Outcomes',
-    description: 'Confrontará o que foi contratado com o que realmente ocorreu, preservando missing, execução divergente e mudança de regime.',
-    next: 'Próximo corte: agenda de verificação e veredito determinístico confirmável ou contestável.',
-  },
+const FOUNDATION_COPY: Record<
+  Exclude<GrowthLearningSection, 'feed' | 'bets' | 'outcomes' | 'report-live'>,
+  {
+    title: string;
+    description: string;
+    next: string;
+  }
+> = {
   memory: {
     title: 'Memória',
     description: 'Consolidará outcomes resolvidos em aprendizados versionados, contextualizados e com validade obrigatória.',
@@ -52,7 +38,9 @@ const FOUNDATION_COPY: Record<Exclude<GrowthLearningSection, 'feed' | 'bets' | '
   },
 };
 
-const FoundationState: React.FC<{ section: Exclude<GrowthLearningSection, 'feed' | 'bets' | 'report-live'> }> = ({ section }) => {
+const FoundationState: React.FC<{
+  section: Exclude<GrowthLearningSection, 'feed' | 'bets' | 'outcomes' | 'report-live'>;
+}> = ({ section }) => {
   const copy = FOUNDATION_COPY[section];
   return (
     <section className="mx-auto grid min-h-[420px] max-w-4xl place-items-center px-6 py-12">
@@ -92,6 +80,7 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
   const [section, setSection] = useState<GrowthLearningSection>(() => readGrowthLearningSection(window.location.search));
   const [feedCount, setFeedCount] = useState(0);
   const [betCount, setBetCount] = useState(0);
+  const [outcomeCount, setOutcomeCount] = useState(0);
 
   useEffect(() => {
     const syncSection = () => setSection(readGrowthLearningSection(window.location.search));
@@ -114,31 +103,20 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
                 <Sparkles size={14} /> Loop de aprendizado Growth
               </div>
               <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Aprendizado Growth</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                O espaço operacional para transformar sinais em apostas, verificar outcomes e preservar memória. O Report Live continua sendo a visualização editorial do ciclo.
-              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">O espaço operacional para transformar sinais em apostas, verificar outcomes e preservar memória. O Report Live continua sendo a visualização editorial do ciclo.</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300 backdrop-blur">
-              <span className="block font-bold text-white">Release 3B · decisão operacional</span>
-              Sinais viram apostas verificáveis, com checklist e timeline.
+              <span className="block font-bold text-white">Release 4 · verificação de outcomes</span>
+              Apostas vencidas entram na agenda sem transformar ausência de execução em fracasso.
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-4 pt-2 sm:px-6" aria-label="Áreas de Aprendizado Growth">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => selectSection(id)}
-                aria-current={section === id ? 'page' : undefined}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-t-xl border-b-2 px-4 py-3 text-sm font-bold transition-colors ${
-                  section === id
-                    ? 'border-cyan-400 bg-white/10 text-white'
-                    : 'border-transparent text-slate-400 hover:bg-white/5 hover:text-white'
-                }`}
-              >
+              <button key={id} type="button" onClick={() => selectSection(id)} aria-current={section === id ? 'page' : undefined} className={`inline-flex shrink-0 items-center gap-2 rounded-t-xl border-b-2 px-4 py-3 text-sm font-bold transition-colors ${section === id ? 'border-cyan-400 bg-white/10 text-white' : 'border-transparent text-slate-400 hover:bg-white/5 hover:text-white'}`}>
                 <Icon size={15} /> {label}
                 {id === 'feed' && feedCount > 0 && <span className="rounded-full bg-cyan-400/20 px-2 py-0.5 text-[10px] text-cyan-100">{feedCount}</span>}
                 {id === 'bets' && betCount > 0 && <span className="rounded-full bg-cyan-400/20 px-2 py-0.5 text-[10px] text-cyan-100">{betCount}</span>}
+                {id === 'outcomes' && outcomeCount > 0 && <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] text-amber-100">{outcomeCount}</span>}
               </button>
             ))}
           </nav>
@@ -148,6 +126,8 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
           <GrowthFeedView periodStart={periodStart} periodEnd={periodEnd} onCountChange={setFeedCount} />
         ) : section === 'bets' ? (
           <GrowthBetsView onCountChange={setBetCount} />
+        ) : section === 'outcomes' ? (
+          <GrowthOutcomesView onCountChange={setOutcomeCount} />
         ) : section === 'report-live' ? (
           <section className="space-y-4">
             <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
