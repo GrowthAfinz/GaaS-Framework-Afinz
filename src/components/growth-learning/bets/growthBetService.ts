@@ -1,6 +1,7 @@
 import { supabase } from '../../../services/supabaseClient';
 import {
   AcceptGrowthBetInput,
+  CreateContextualGrowthBetInput,
   GrowthBet,
   GrowthBetChecklistItem,
   GrowthBetStatus,
@@ -10,6 +11,7 @@ import {
   GrowthLearningSuggestion,
   GrowthSignalDecision,
 } from './growthBet.types';
+import { GrowthBetSourceContext } from '../growthLearningNavigation';
 
 function oneRow<T>(data: T | T[] | null): T {
   const row = Array.isArray(data) ? data[0] : data;
@@ -85,6 +87,89 @@ export async function fetchApplicableGrowthLearnings(actionCandidateId: string):
   });
   if (error) throw error;
   return (data || []) as GrowthLearningSuggestion[];
+}
+
+function scalarFilter(filters: Record<string, unknown>, key: string): string | undefined {
+  const value = filters[key];
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (Array.isArray(value) && value.length === 1 && typeof value[0] === 'string' && value[0].trim()) {
+    return value[0].trim();
+  }
+  return undefined;
+}
+
+function contextualMatchSnapshot(context: GrowthBetSourceContext, metricName: string): Record<string, unknown> {
+  return {
+    metric: metricName.trim() || undefined,
+    entity: context.entityKey,
+    entity_key: context.entityKey,
+    source_view: context.sourceSurface,
+    partner: scalarFilter(context.filters, 'partner') || scalarFilter(context.filters, 'parceiros'),
+    channel: scalarFilter(context.filters, 'channel') || scalarFilter(context.filters, 'canais'),
+    platform: scalarFilter(context.filters, 'platform'),
+    system: scalarFilter(context.filters, 'system'),
+    artifact: scalarFilter(context.filters, 'artifact'),
+    rule: scalarFilter(context.filters, 'rule'),
+    campaign_family: scalarFilter(context.filters, 'campaign_family'),
+    regime: scalarFilter(context.filters, 'regime'),
+    signal_code: scalarFilter(context.filters, 'signal_code'),
+  };
+}
+
+export async function fetchApplicableGrowthLearningsForContext(
+  context: GrowthBetSourceContext,
+  metricName: string,
+): Promise<GrowthLearningSuggestion[]> {
+  const { data, error } = await supabase.rpc('growth_find_applicable_learnings_for_context', {
+    p_front: context.front,
+    p_context_snapshot: contextualMatchSnapshot(context, metricName),
+  });
+  if (error) throw error;
+  return (data || []) as GrowthLearningSuggestion[];
+}
+
+export async function createContextualGrowthBet(input: CreateContextualGrowthBetInput): Promise<GrowthBet> {
+  const alternatives = input.knownAlternatives
+    .split('\n')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const { data, error } = await supabase.rpc('growth_create_contextual_bet_with_memory', {
+    p_front: input.sourceContext.front,
+    p_source_context: {
+      source_surface: input.sourceContext.sourceSurface,
+      source_route: input.sourceContext.sourceRoute,
+      period_start: input.sourceContext.periodStart,
+      period_end: input.sourceContext.periodEnd,
+      filters: input.sourceContext.filters,
+      entity_key: input.sourceContext.entityKey || null,
+      visual_ref: input.sourceContext.visualRef || null,
+      title: input.sourceContext.title,
+      verification_view: input.sourceContext.verificationView,
+    },
+    p_team_scope: input.teamScope.trim(),
+    p_hypothesis: input.hypothesis.trim(),
+    p_action_text: input.actionText.trim(),
+    p_metric_name: input.metricName.trim(),
+    p_baseline_value: Number(input.baselineValue),
+    p_expected_value: Number(input.expectedValue),
+    p_expected_direction: input.expectedDirection,
+    p_success_criterion: input.successCriterion.trim(),
+    p_outcome_window_start: input.outcomeWindowStart,
+    p_outcome_window_end: input.outcomeWindowEnd,
+    p_verification_view: input.verificationView.trim(),
+    p_learning_decisions: input.learningDecisions.map((item) => ({
+      learning_id: item.learningId,
+      decision: item.decision,
+      reason: item.reason?.trim() || null,
+    })),
+    p_expected_unit: input.expectedUnit.trim() || null,
+    p_execution_due_at: input.executionDueAt ? new Date(`${input.executionDueAt}T12:00:00`).toISOString() : null,
+    p_stop_condition: input.stopCondition.trim() || null,
+    p_known_alternatives: alternatives,
+    p_owner: input.owner.trim() || null,
+  });
+  if (error) throw error;
+  return oneRow(data as GrowthBet | GrowthBet[] | null);
 }
 
 export async function fetchGrowthBetLearningApplications(betId: string): Promise<GrowthLearningApplication[]> {

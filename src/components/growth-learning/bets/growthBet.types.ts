@@ -156,7 +156,7 @@ export interface GrowthLearningDecisionInput {
 export interface GrowthLearningApplication {
   id: string;
   bet_id: string;
-  action_candidate_id: string;
+  action_candidate_id: string | null;
   learning_id: string;
   learning_revision: number;
   decision: GrowthLearningDecisionKind;
@@ -181,3 +181,9 @@ export interface AcceptGrowthBetInput extends GrowthBetDraft {
   actionCandidateId: string;
   learningDecisions: GrowthLearningDecisionInput[];
 }
+
+export interface CreateContextualGrowthBetInput extends GrowthBetDraft {
+  sourceContext: GrowthBetSourceContext;
+  learningDecisions: GrowthLearningDecisionInput[];
+}
+import type { GrowthBetSourceContext } from '../growthLearningNavigation';

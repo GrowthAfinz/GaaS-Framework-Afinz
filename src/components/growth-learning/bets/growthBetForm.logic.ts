@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { GrowthFeedEvent } from '../feed/growthFeed.types';
+import { GrowthBetSourceContext } from '../growthLearningNavigation';
 import { GrowthBetDraft, GrowthBetDirection } from './growthBet.types';
 
 const DIRECTIONS = new Set<GrowthBetDirection>(['maior_melhor', 'menor_melhor', 'atingir_meta']);
@@ -30,6 +31,35 @@ export function buildGrowthBetDraft(event: GrowthFeedEvent, today = new Date()):
     outcomeWindowStart: format(today, 'yyyy-MM-dd'),
     outcomeWindowEnd: snapshot.outcome_window_end || '',
     verificationView: snapshot.verification_view || snapshot.source_view || '',
+    stopCondition: '',
+    knownAlternatives: '',
+  };
+}
+
+export function buildContextualGrowthBetDraft(
+  context: GrowthBetSourceContext,
+  today = new Date(),
+): GrowthBetDraft {
+  const teamByFront = {
+    crm_acquisition: 'CRM Aquisição',
+    paid_media: 'Mídia Paga',
+    b2c_origin: 'Originação B2C',
+  } as const;
+  return {
+    teamScope: teamByFront[context.front],
+    owner: '',
+    hypothesis: '',
+    actionText: '',
+    metricName: context.metricName || '',
+    baselineValue: '',
+    expectedValue: '',
+    expectedDirection: 'atingir_meta',
+    expectedUnit: '',
+    successCriterion: '',
+    executionDueAt: '',
+    outcomeWindowStart: format(today, 'yyyy-MM-dd'),
+    outcomeWindowEnd: '',
+    verificationView: context.verificationView,
     stopCondition: '',
     knownAlternatives: '',
   };

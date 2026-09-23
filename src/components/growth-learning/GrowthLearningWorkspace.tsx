@@ -55,8 +55,8 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
               <p className="mt-2 text-sm leading-6 text-slate-300">O espaço operacional para transformar sinais em apostas, verificar outcomes e preservar memória. O Report Live continua sendo a visualização editorial do ciclo.</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-300 backdrop-blur">
-              <span className="block font-bold text-white">Release 5 · memória versionada</span>
-              Outcomes resolvidos e conhecimento histórico permanecem separados por procedência.
+              <span className="block font-bold text-white">Release 7A · contexto analítico</span>
+              Leituras de relatórios e funis podem virar apostas com origem, memória e verificação preservadas.
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-4 pt-2 sm:px-6" aria-label="Áreas de Aprendizado Growth">
