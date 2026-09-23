@@ -131,7 +131,12 @@ Append-only. Correção de objeto não reescreve posts antigos; mudança materia
 
 ```sql
 id uuid primary key
-source_outcome_id uuid not null unique
+source_kind text not null -- outcome | vault_curated
+source_outcome_id uuid null
+source_key text not null unique
+source_title text not null
+source_ref text not null
+front text not null
 classification text not null
 lifecycle_status text not null
 statement text not null
@@ -145,9 +150,12 @@ review_at date not null
 valid_until date null
 supersedes_learning_id uuid null
 current_revision integer not null default 1
+created_by text not null
 created_at timestamptz not null
 updated_at timestamptz not null
 ```
+
+`source_outcome_id` é obrigatório e único quando `source_kind = 'outcome'`; deve ser nulo em `vault_curated`. A origem nunca é inferida pela redação da afirmação.
 
 ### 3.7 `growth_learning_revisions`
 
@@ -184,7 +192,28 @@ created_at timestamptz not null
 unique (learning_id, target_type, target_id, relation_type)
 ```
 
-### 3.9 `growth_signal_decisions`
+### 3.9 `growth_curated_proposals`
+
+Registra propostas históricas que merecem aparecer na Fila, mas ainda não possuem contrato suficiente para se tornarem apostas.
+
+```sql
+id uuid primary key
+source_key text not null unique
+source_ref text not null
+front text not null
+bucket text not null
+title text not null
+problem text not null
+evidence text not null
+action_text text not null
+metric_name text null
+confidence_status text not null
+reading_limit text not null
+lifecycle_status text not null
+created_at timestamptz not null
+```
+
+### 3.10 `growth_signal_decisions`
 
 Materializada na Release 3B para impedir dupla decisão sobre uma recomendação e preservar rejeições/mesclagens que não criam uma nova aposta:
 
@@ -282,7 +311,12 @@ O serviço pode sugerir; o valor fica persistido.
 
 ## 9. Histórico
 
-Não retropreencher aprendizados antigos automaticamente na primeira migration. A importação histórica deve ser uma etapa separada e idempotente, iniciando por outcomes existentes e revisados.
+O histórico possui duas rotas independentes e idempotentes:
+
+- outcomes existentes e revisados são retropreenchidos como `source_kind = 'outcome'`;
+- decisões vivas do vault podem ser curadas como `source_kind = 'vault_curated'`, sempre com `source_ref`, limitações, vigência e revisão.
+
+Curadoria histórica não equivale a validação pelo loop. Propostas ainda sem métrica verificável entram como `growth_curated_proposals`, e não como apostas prontas.
 
 ## 10. Fora deste desenho
 

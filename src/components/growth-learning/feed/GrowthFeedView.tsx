@@ -131,6 +131,11 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
       openGrowthLearningSectionItem('outcomes', event.subject_id);
       return;
     }
+    if (event.summary_snapshot.primary_action?.kind === 'open_learning' || event.subject_type === 'growth_learning') {
+      setSelected(null);
+      openGrowthLearningSectionItem('memory', event.subject_id);
+      return;
+    }
     if (event.event_type === 'recommendation_created') {
       const decision = decisions.get(event.subject_id);
       if (decision?.bet_id) {

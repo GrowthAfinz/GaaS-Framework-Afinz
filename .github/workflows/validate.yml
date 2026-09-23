@@ -50,6 +50,8 @@ jobs:
         run: node --test scripts/test-growth-bets-release-3b.mjs
       - name: Growth outcomes SQL contract
         run: node --test scripts/test-growth-outcomes-release-4.mjs
+      - name: Growth memory SQL contract
+        run: node --test scripts/test-growth-memory-release-5.mjs
       - name: TypeScript regression gate (documented main debt)
         run: npm run typecheck:release
       - name: Edge Function type checks
