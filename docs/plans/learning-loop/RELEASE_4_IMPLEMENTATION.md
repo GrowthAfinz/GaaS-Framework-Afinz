@@ -4,6 +4,8 @@
 **Branch:** `codex/growth-learning-release-4-outcomes`  
 **Base:** `4a195e4` — correção determinística da timeline da Release 3B integrada à `main`
 
+**Estado:** publicada na `main`, no Supabase e no GitHub Pages em 23/09/2026
+
 ## Objetivo
 
 Confrontar o contrato da aposta com resultado verificável sem criar um segundo motor de métricas e sem classificar ação não executada como hipótese refutada.
@@ -70,3 +72,14 @@ A migration `20260923034804_growth_outcomes_release_4.sql`:
 - novo motor de métricas ou consulta dinâmica a views arbitrárias pelo navegador;
 - execução autônoma de campanha;
 - alteração do renderer ou publicação do Report Live.
+
+## Promoção
+
+- PR [#19](https://github.com/GrowthAfinz/GaaS-Framework-Afinz/pull/19) mergeado como `a473a27d1fe034ff23e9e6d906a3e43e79fcc6c3`;
+- gate do PR `35815839611` verde após o alinhamento do timestamp da migration;
+- migration registrada no Supabase como `20260923034804_growth_outcomes_release_4` antes do merge;
+- reconciliação confirmou oito colunas novas, view `security_invoker`, RPC autenticada, ausência de escrita direta e contagens iniciais zeradas;
+- workflow pós-merge `35815961161` verde, incluindo o contrato SQL da Release 4 em PostgreSQL 17;
+- GitHub Pages publicou o bundle `index-Bc9k64xX.js`, HTTP 200, contendo as superfícies e o contrato `growth_outcomes_due_v`;
+- nenhum build, certificação ou publicação de Google Slides/Sheets/PDF foi executado;
+- advisors não apontaram novo erro específico da estrutura criada; o alerta da RPC autenticada é intencional para o comando governado, e o índice novo permanece sem uso porque a base começa vazia.
