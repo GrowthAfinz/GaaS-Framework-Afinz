@@ -111,7 +111,7 @@ Aposta vencida aparece automaticamente e nenhum resultado é classificado como f
 
 ## Release 5 — memória versionada
 
-**Estado em 23/09/2026:** schema publicado no Supabase; UI e proteção do contrato dependem do PR e dos gates de CI/Pages.
+**Estado em 23/09/2026:** publicada na `main`, no Supabase e no GitHub Pages pelo PR #21. A memória versionada está operacional; recuperação e reuso permanecem no corte seguinte.
 
 ### Escopo
 
