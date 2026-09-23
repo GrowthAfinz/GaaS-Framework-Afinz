@@ -1,24 +1,16 @@
 export const GROWTH_FEED_FRONTS = ['all', 'crm_acquisition', 'paid_media', 'b2c_origin', 'report_live'] as const;
-export type GrowthFeedFrontFilter = typeof GROWTH_FEED_FRONTS[number];
+export type GrowthFeedFrontFilter = (typeof GROWTH_FEED_FRONTS)[number];
 
 export const GROWTH_FEED_SORTS = ['priority', 'recent', 'relevance'] as const;
-export type GrowthFeedSort = typeof GROWTH_FEED_SORTS[number];
+export type GrowthFeedSort = (typeof GROWTH_FEED_SORTS)[number];
 
 export const GROWTH_FEED_CONFIDENCES = ['all', 'confirmed', 'directional', 'suspect', 'blocked'] as const;
-export type GrowthFeedConfidenceFilter = typeof GROWTH_FEED_CONFIDENCES[number];
+export type GrowthFeedConfidenceFilter = (typeof GROWTH_FEED_CONFIDENCES)[number];
 
 export const GROWTH_FEED_STATES = ['all', 'open', 'blocked', 'certified', 'published'] as const;
-export type GrowthFeedStateFilter = typeof GROWTH_FEED_STATES[number];
+export type GrowthFeedStateFilter = (typeof GROWTH_FEED_STATES)[number];
 
-export type GrowthFeedEventType =
-  | 'recommendation_created'
-  | 'data_quality_blocked'
-  | 'report_candidate_generated'
-  | 'report_published'
-  | 'report_blocked'
-  | 'bet_created'
-  | 'bet_updated'
-  | 'signal_rejected';
+export type GrowthFeedEventType = 'recommendation_created' | 'data_quality_blocked' | 'report_candidate_generated' | 'report_published' | 'report_blocked' | 'bet_created' | 'bet_updated' | 'signal_rejected' | 'execution_recorded' | 'outcome_due' | 'outcome_evaluated';
 
 export interface GrowthFeedEvidenceRef {
   view?: string;
@@ -27,7 +19,7 @@ export interface GrowthFeedEvidenceRef {
 }
 
 export interface GrowthFeedPrimaryAction {
-  kind?: 'open_evidence' | 'open_report_live' | 'open_bet';
+  kind?: 'open_evidence' | 'open_report_live' | 'open_bet' | 'open_outcome';
   label?: string;
 }
 
@@ -57,6 +49,9 @@ export interface GrowthFeedSnapshot {
   success_criterion?: string;
   outcome_window_start?: string;
   execution_status?: string;
+  observed_value?: number;
+  system_verdict?: string;
+  resolved_verdict?: string;
   outcome_window_end?: string;
   verification_view?: string;
   run_id?: string;
@@ -93,7 +88,7 @@ export interface GrowthFeedDimensions {
 export interface GrowthFeedEvent {
   id: string;
   event_type: GrowthFeedEventType;
-  subject_type: 'action_candidate' | 'report_run' | 'report_publication' | 'growth_bet';
+  subject_type: 'action_candidate' | 'report_run' | 'report_publication' | 'growth_bet' | 'growth_outcome';
   subject_id: string;
   front: Exclude<GrowthFeedFrontFilter, 'all'>;
   occurred_at: string;

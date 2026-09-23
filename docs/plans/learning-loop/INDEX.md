@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Release 3B publicada; outcomes e memória continuam fora do corte
+**Status:** Release 3B publicada; Release 4 de outcomes em promoção; memória continua fora do corte
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live
@@ -32,6 +32,7 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 12. [RELEASE_2_IMPLEMENTATION.md](RELEASE_2_IMPLEMENTATION.md) — feed sistêmico read-only, produtores, segurança e evidências de publicação.
 13. [RELEASE_3A_IMPLEMENTATION.md](RELEASE_3A_IMPLEMENTATION.md) — contrato transacional e evidência imutável da aposta.
 14. [RELEASE_3B_IMPLEMENTATION.md](RELEASE_3B_IMPLEMENTATION.md) — decisão na Fila, workspace Apostas e operação auditável.
+15. [RELEASE_4_IMPLEMENTATION.md](RELEASE_4_IMPLEMENTATION.md) — agenda, avaliação determinística e revisão de outcomes.
 
 ## Decisões confirmadas com o product owner
 
