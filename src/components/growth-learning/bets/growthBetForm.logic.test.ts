@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GrowthFeedEvent } from '../feed/growthFeed.types';
-import { buildGrowthBetDraft, validateGrowthBetDraft } from './growthBetForm.logic';
+import { buildContextualGrowthBetDraft, buildGrowthBetDraft, validateGrowthBetDraft } from './growthBetForm.logic';
 
 const event = {
   id: 'event-1',
@@ -49,5 +49,27 @@ describe('growth bet form contract', () => {
     expect(errors.teamScope).toBeTruthy();
     expect(errors.baselineValue).toBeTruthy();
     expect(errors.outcomeWindowEnd).toContain('antes');
+  });
+
+  it('prefills contextual provenance but never invents a hypothesis, action or target', () => {
+    const draft = buildContextualGrowthBetDraft({
+      front: 'paid_media',
+      sourceSurface: 'acquisition_funnel',
+      sourceRoute: 'funnels:paid-media',
+      periodStart: '2026-08-01',
+      periodEnd: '2026-08-31',
+      filters: { platform: 'Meta' },
+      entityKey: 'funnel:paid-media',
+      metricName: 'installs',
+      title: 'Funil App Install',
+      verificationView: 'funnels:paid-media',
+    }, new Date('2026-09-23T12:00:00Z'));
+    expect(draft.teamScope).toBe('Mídia Paga');
+    expect(draft.metricName).toBe('installs');
+    expect(draft.verificationView).toBe('funnels:paid-media');
+    expect(draft.hypothesis).toBe('');
+    expect(draft.actionText).toBe('');
+    expect(draft.baselineValue).toBe('');
+    expect(draft.expectedValue).toBe('');
   });
 });

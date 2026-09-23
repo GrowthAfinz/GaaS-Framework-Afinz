@@ -54,6 +54,8 @@ jobs:
         run: node --test scripts/test-growth-memory-release-5.mjs
       - name: Growth learning reuse SQL contract
         run: node --test scripts/test-growth-learning-reuse-release-6.mjs
+      - name: Growth contextual entry SQL contract
+        run: node --test scripts/test-growth-context-entry-release-7a.mjs
       - name: TypeScript regression gate (documented main debt)
         run: npm run typecheck:release
       - name: Edge Function type checks

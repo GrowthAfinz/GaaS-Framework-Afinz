@@ -3,11 +3,14 @@ import {
   buildGrowthLearningSearch,
   buildGrowthLearningItemSearch,
   buildGrowthLearningSectionItemSearch,
+  buildGrowthBetSourceContextSearch,
+  buildCloseGrowthBetSourceContextSearch,
   buildReportsOutputSearch,
   hasGrowthLearningRouteContext,
   isGrowthLearningView,
   readGrowthLearningSection,
   readGrowthLearningItem,
+  readGrowthBetSourceContext,
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
@@ -68,5 +71,46 @@ describe('growth learning navigation contract', () => {
     expect(params.get('section')).toBe('bets');
     expect(params.get('item')).toBe('bet-42');
     expect(params.get('bu')).toBe('B2C');
+  });
+
+  it('transports a validated analytic context without losing unrelated query state', () => {
+    const context = {
+      front: 'crm_acquisition' as const,
+      sourceSurface: 'reports_monthly' as const,
+      sourceRoute: 'reports:monthly',
+      periodStart: '2026-08-01',
+      periodEnd: '2026-08-31',
+      filters: { bu: ['B2C'], canais: ['WhatsApp'] },
+      entityKey: 'crm:bu:B2C',
+      visualRef: 'reports:monthly:workspace',
+      title: 'Relatório mensal de Aquisição',
+      verificationView: 'reports:monthly',
+    };
+    const search = buildGrowthBetSourceContextSearch(context, '?compare=previous');
+    const params = new URLSearchParams(search);
+    expect(params.get('compare')).toBe('previous');
+    expect(params.get('section')).toBe('bets');
+    expect(params.get('create')).toBe('contextual-bet');
+    expect(readGrowthBetSourceContext(search)).toEqual(context);
+
+    const closed = new URLSearchParams(buildCloseGrowthBetSourceContextSearch(search));
+    expect(closed.get('compare')).toBe('previous');
+    expect(closed.has('create')).toBe(false);
+    expect(closed.has('growth_context')).toBe(false);
+  });
+
+  it('rejects malformed, unsupported and inverted contextual deep-links', () => {
+    expect(readGrowthBetSourceContext('?create=contextual-bet&growth_context=%7Bbroken')).toBeNull();
+    const invalid = buildGrowthBetSourceContextSearch({
+      front: 'crm_acquisition',
+      sourceSurface: 'reports_overview',
+      sourceRoute: 'reports:overview',
+      periodStart: '2026-09-30',
+      periodEnd: '2026-09-01',
+      filters: {},
+      title: 'Overview',
+      verificationView: 'reports:overview',
+    }, '');
+    expect(readGrowthBetSourceContext(invalid)).toBeNull();
   });
 });

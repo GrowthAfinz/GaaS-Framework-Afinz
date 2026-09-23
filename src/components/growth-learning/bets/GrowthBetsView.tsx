@@ -2,10 +2,19 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Filter, ListChecks, Loader2, RefreshCw, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { closeGrowthLearningItem, openGrowthLearningSectionItem, readGrowthLearningItem } from '../growthLearningNavigation';
+import {
+  closeGrowthBetSourceContext,
+  closeGrowthLearningItem,
+  completeGrowthBetSourceContext,
+  GrowthBetSourceContext,
+  openGrowthLearningSectionItem,
+  readGrowthBetSourceContext,
+  readGrowthLearningItem,
+} from '../growthLearningNavigation';
 import { fetchGrowthBet, fetchGrowthBets } from './growthBetService';
 import { GrowthBet, GrowthBetStatus } from './growthBet.types';
 import { GrowthBetDrawer } from './GrowthBetDrawer';
+import { GrowthContextBetDialog } from './GrowthContextBetDialog';
 
 interface GrowthBetsViewProps { onCountChange?: (count: number) => void }
 
@@ -20,6 +29,7 @@ function formatDate(value: string) { try { return format(parseISO(value), 'dd MM
 export const GrowthBetsView: React.FC<GrowthBetsViewProps> = ({ onCountChange }) => {
   const [bets, setBets] = useState<GrowthBet[]>([]);
   const [selected, setSelected] = useState<GrowthBet | null>(null);
+  const [sourceContext, setSourceContext] = useState<GrowthBetSourceContext | null>(() => readGrowthBetSourceContext(window.location.search));
   const [front, setFront] = useState('all');
   const [status, setStatus] = useState('active');
   const [query, setQuery] = useState('');
@@ -34,6 +44,11 @@ export const GrowthBetsView: React.FC<GrowthBetsViewProps> = ({ onCountChange })
   }, [onCountChange]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const syncContext = () => setSourceContext(readGrowthBetSourceContext(window.location.search));
+    window.addEventListener('popstate', syncContext);
+    return () => window.removeEventListener('popstate', syncContext);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const syncItem = async () => {
@@ -67,6 +82,7 @@ export const GrowthBetsView: React.FC<GrowthBetsViewProps> = ({ onCountChange })
       {loading ? <div className="grid min-h-[340px] place-items-center rounded-2xl border border-slate-200 bg-white"><span className="flex items-center gap-2 text-sm font-semibold text-slate-500"><Loader2 size={18} className="animate-spin" /> Lendo apostas…</span></div> : error ? <div className="grid min-h-[340px] place-items-center rounded-2xl border border-rose-200 bg-rose-50 px-6 text-center"><div><AlertCircle size={30} className="mx-auto text-rose-600" /><h3 className="mt-3 font-black text-rose-900">As apostas não puderam ser carregadas</h3><p className="mt-2 text-sm text-rose-800">{error}</p><button type="button" onClick={() => void load()} className="mx-auto mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-900 px-4 py-2 text-xs font-bold text-white"><RefreshCw size={14} /> Tentar novamente</button></div></div> : filtered.length === 0 ? <div className="grid min-h-[340px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center"><div><ListChecks size={32} className="mx-auto text-slate-300" /><h3 className="mt-3 font-black text-slate-800">Nenhuma aposta nesta leitura</h3><p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Aceite uma recomendação elegível na Fila ou ajuste os filtros. Nenhuma aposta é criada automaticamente.</p></div></div> : <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-left"><thead className="bg-slate-50 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500"><tr><th className="px-4 py-3">Aposta</th><th className="px-4 py-3">Frente</th><th className="px-4 py-3">Métrica</th><th className="px-4 py-3">Expectativa</th><th className="px-4 py-3">Janela</th><th className="px-4 py-3">Time / owner</th><th className="px-4 py-3">Checklist</th><th className="px-4 py-3">Estado</th></tr></thead><tbody className="divide-y divide-slate-100">{filtered.map((bet) => <tr key={bet.id} onClick={() => openBet(bet)} className="cursor-pointer text-sm hover:bg-cyan-50/40"><td className="max-w-sm px-4 py-4"><div className="font-bold text-slate-900">{bet.hypothesis}</div><div className="mt-1 truncate text-xs text-slate-500">{bet.action_text}</div></td><td className="px-4 py-4 text-xs font-semibold text-slate-600">{FRONT_LABELS[bet.front]}</td><td className="px-4 py-4"><div className="font-semibold text-slate-800">{bet.metric_name}</div><div className="text-xs text-slate-400">baseline {bet.baseline_value}{bet.expected_unit ? ` ${bet.expected_unit}` : ''}</div></td><td className="px-4 py-4 font-bold text-slate-800">{bet.expected_value}{bet.expected_unit ? ` ${bet.expected_unit}` : ''}</td><td className="px-4 py-4 text-xs text-slate-600">{formatDate(bet.outcome_window_start)}<br />{formatDate(bet.outcome_window_end)}</td><td className="px-4 py-4"><div className="font-semibold text-slate-800">{bet.team_scope}</div><div className="text-xs text-slate-400">{bet.owner || 'Sem owner individual'}</div></td><td className="px-4 py-4"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{bet.checklist_completed}/{bet.checklist_total}</span></td><td className="px-4 py-4"><span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-cyan-800">{STATUS_LABELS[bet.status]}</span></td></tr>)}</tbody></table></div></div>}
 
       {selected && <GrowthBetDrawer bet={selected} onClose={closeGrowthLearningItem} onChanged={() => void load()} />}
+      {sourceContext && <GrowthContextBetDialog context={sourceContext} onClose={closeGrowthBetSourceContext} onCompleted={(betId) => { setSourceContext(null); completeGrowthBetSourceContext(betId); void load(); }} />}
     </section>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download, CalendarDays, Files, ArrowDownToLine, Sparkles } from 'lucide-react';
+import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download, CalendarDays, Files, ArrowDownToLine, Sparkles, Target } from 'lucide-react';
 import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
@@ -17,7 +17,7 @@ import { exportFechamentoCopaXlsx } from '../utils/fechamentoCopaExcelExport';
 import { exportHighFrequencyPartnerXlsx, HighFrequencyPartner } from '../utils/highFrequencyPartnersExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import { ReportLiveOutputCard } from './relatorio/ReportLiveOutputCard';
-import { openGrowthLearningSection } from './growth-learning/growthLearningNavigation';
+import { openGrowthBetSourceContext, openGrowthLearningSection } from './growth-learning/growthLearningNavigation';
 import {
   ColumnKey,
   DimensionKey,
@@ -198,6 +198,36 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     openGrowthLearningSection(section);
     setTab('aprendizado-growth');
   }, [setTab]);
+
+  const createContextualBet = useCallback(() => {
+    if (rentab || reportMode === 'xlsx') return;
+    const modeContract = {
+      performance: { surface: 'reports_overview' as const, label: 'Overview', route: 'reports:overview' },
+      daily: { surface: 'reports_daily' as const, label: 'Diário', route: 'reports:daily' },
+      monthly: { surface: 'reports_monthly' as const, label: 'Mensal', route: 'reports:monthly' },
+    }[reportMode];
+    openGrowthBetSourceContext({
+      front: 'crm_acquisition',
+      sourceSurface: modeContract.surface,
+      sourceRoute: modeContract.route,
+      periodStart: format(periodStart, 'yyyy-MM-dd'),
+      periodEnd: format(periodEnd, 'yyyy-MM-dd'),
+      filters: {
+        bu: selectedBUs,
+        canais: globalFilters.canais,
+        jornadas: globalFilters.jornadas,
+        segmentos: globalFilters.segmentos,
+        parceiros: globalFilters.parceiros,
+        subgrupos: globalFilters.subgrupos,
+        ofertas: globalFilters.ofertas,
+      },
+      entityKey: selectedBU ? `crm:bu:${selectedBU}` : 'crm:acquisition',
+      visualRef: `${modeContract.route}:workspace`,
+      title: `Relatório ${modeContract.label} de Aquisição`,
+      verificationView: modeContract.route,
+    });
+    setTab('aprendizado-growth');
+  }, [globalFilters, periodEnd, periodStart, rentab, reportMode, selectedBU, selectedBUs, setTab]);
 
   useEffect(() => {
     if (!reportDeepLink) return;
@@ -849,6 +879,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 <span className="ml-2 opacity-70">· {format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</span>
               </p>
             </div>
+            {!rentab && reportMode !== 'xlsx' && (
+              <button type="button" onClick={createContextualBet} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/30 bg-white px-4 py-2.5 text-xs font-black text-cyan-800 shadow-sm transition hover:bg-cyan-50">
+                <Target size={15} /> Criar aposta
+              </button>
+            )}
           </div>
         </div>
 
