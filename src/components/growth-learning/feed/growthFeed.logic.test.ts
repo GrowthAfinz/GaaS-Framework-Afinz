@@ -52,4 +52,10 @@ describe('Growth feed deterministic list contract', () => {
     const filters = readGrowthFeedFilters('?front=b2c_origin');
     expect(filterAndGroupGrowthFeed([event({})], filters)).toEqual([]);
   });
+
+  it('treats active bet lifecycle states as open work', () => {
+    const filters = readGrowthFeedFilters('?state=open');
+    const activeBet = event({ event_type: 'bet_updated', subject_type: 'growth_bet', event_state: 'in_progress' });
+    expect(filterAndGroupGrowthFeed([activeBet], filters)).toHaveLength(1);
+  });
 });

@@ -184,6 +184,22 @@ created_at timestamptz not null
 unique (learning_id, target_type, target_id, relation_type)
 ```
 
+### 3.9 `growth_signal_decisions`
+
+Materializada na Release 3B para impedir dupla decisão sobre uma recomendação e preservar rejeições/mesclagens que não criam uma nova aposta:
+
+```sql
+id uuid primary key
+action_candidate_id uuid not null unique
+decision_type text not null -- accepted | rejected | merged
+bet_id uuid null
+reason text null
+decided_by uuid not null
+decided_at timestamptz not null
+```
+
+O registro é imutável. `accepted` e `merged` exigem `bet_id`; `rejected` exige motivo e não aponta para aposta.
+
 ## 4. Extensões propostas em `report_action_outcomes`
 
 Adicionar sem remover o contrato atual:

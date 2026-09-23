@@ -122,13 +122,15 @@ const fixtureSql = `
   );
 `;
 
-test('Release 3A contracts an eligible signal atomically and preserves its original belief', () => {
+test('Release 3B operates governed bets while preserving the Release 3A belief contract', () => {
   const feedMigrationSql = latestMigration(/^\d+_growth_feed_release_2\.sql$/);
   const betMigrationSql = latestMigration(/^\d+_growth_bets_release_3a\.sql$/);
+  const operationsMigrationSql = latestMigration(/^\d+_growth_bets_release_3b\.sql$/);
 
   psql([], fixtureSql);
   psql([], feedMigrationSql);
   psql([], betMigrationSql);
+  psql([], operationsMigrationSql);
 
   const result = psql(['-q', '-t', '-A'], `
     do $$
@@ -138,7 +140,10 @@ test('Release 3A contracts an eligible signal atomically and preserves its origi
       eligible_id constant uuid := '33333333-3333-4333-8333-333333333333';
       suspect_id constant uuid := '44444444-4444-4444-8444-444444444444';
       quality_id constant uuid := '55555555-5555-4555-8555-555555555555';
+      reject_id constant uuid := '66666666-6666-4666-8666-666666666666';
+      merge_id constant uuid := '77777777-7777-4777-8777-777777777777';
       created_bet public.growth_bets%rowtype;
+      checklist_item public.growth_bet_checklist_items%rowtype;
       before_counts jsonb;
       after_counts jsonb;
       failure_seen boolean;
@@ -182,6 +187,20 @@ test('Release 3A contracts an eligible signal atomically and preserves its origi
           '[{"view":"VIEW_MEDIA_QUALITY","field":"coverage"}]', 'Não decidir.',
           'Auditar tracking.', 'coverage', 'confirmed', 'test', 0.9, 'ratio',
           'maior_melhor', date '2026-10-31', 'VIEW_MEDIA_QUALITY'
+        ),
+        (
+          reject_id, run_id, 'VIEW_TEMPLATE_COVERAGE', 'crm:template:reject',
+          'REJECT_SIGNAL', 'crm', null, 'Acompanhar', 'Sinal sem prioridade.', null, null,
+          '[{"view":"VIEW_TEMPLATE_COVERAGE","field":"coverage"}]', null,
+          'Avaliar prioridade.', 'coverage', 'directional', 'test', 0.7, 'ratio',
+          'maior_melhor', date '2026-10-31', 'VIEW_TEMPLATE_COVERAGE'
+        ),
+        (
+          merge_id, run_id, 'VIEW_TEMPLATE_COVERAGE', 'crm:template:merge',
+          'MERGE_SIGNAL', 'crm', null, 'Acompanhar', 'Sinal reforça a mesma hipótese.', null, null,
+          '[{"view":"VIEW_TEMPLATE_COVERAGE","field":"coverage"}]', null,
+          'Completar o mapeamento.', 'coverage', 'confirmed', 'test', 0.8, 'ratio',
+          'maior_melhor', date '2026-10-31', 'VIEW_TEMPLATE_COVERAGE'
         );
 
       created_bet := public.growth_accept_signal_as_bet(
@@ -297,6 +316,37 @@ test('Release 3A contracts an eligible signal atomically and preserves its origi
         failure_seen := true;
       end;
       if not failure_seen then raise exception 'bet timeline deletion was accepted'; end if;
+
+      perform public.growth_reject_signal(reject_id, 'Sinal sem impacto material neste ciclo.');
+      perform public.growth_merge_signal_into_bet(
+        merge_id,
+        created_bet.id,
+        'Mesma frente, métrica e hipótese operacional.'
+      );
+
+      checklist_item := public.growth_add_bet_checklist_item(created_bet.id, 'Mapear atividades prioritárias');
+      checklist_item := public.growth_set_bet_checklist_item(checklist_item.id, 'completed');
+      if checklist_item.status <> 'completed' or checklist_item.completed_at is null then
+        raise exception 'checklist completion was not persisted';
+      end if;
+
+      perform public.growth_append_bet_update(
+        created_bet.id, 'comment', 'Dependência alinhada com CRM.', null, null
+      );
+      perform public.growth_append_bet_update(
+        created_bet.id, 'execution', 'Metade das atividades foi mapeada.', 'partial', null
+      );
+      perform public.growth_append_bet_update(
+        created_bet.id, 'status_changed', 'Execução iniciada.', null, 'in_progress'
+      );
+
+      failure_seen := false;
+      begin
+        update public.growth_signal_decisions set reason = 'rewritten';
+      exception when raise_exception then
+        failure_seen := true;
+      end;
+      if not failure_seen then raise exception 'signal decision mutation was accepted'; end if;
     end $$;
 
     select json_build_object(
@@ -304,6 +354,19 @@ test('Release 3A contracts an eligible signal atomically and preserves its origi
       'snapshots', (select count(*) from public.growth_evidence_snapshots),
       'updates', (select count(*) from public.growth_bet_updates),
       'bet_events', (select count(*) from public.growth_feed_events where event_type = 'bet_created'),
+      'bet_update_events', (select count(*) from public.growth_feed_events where event_type = 'bet_updated'),
+      'rejected_events', (select count(*) from public.growth_feed_events where event_type = 'signal_rejected'),
+      'decisions', (select count(*) from public.growth_signal_decisions),
+      'operational_projection', (
+        select json_build_object(
+          'checklist_total', checklist_total,
+          'checklist_completed', checklist_completed,
+          'update_count', update_count,
+          'last_execution_status', last_execution_status
+        )
+        from public.growth_bets_operational_v
+      ),
+      'bet_in_progress', (select status = 'in_progress' from public.growth_bets),
       'candidate_accepted', (
         select review_status = 'approved' and status = 'accepted'
         from public.report_action_candidates
@@ -337,6 +400,13 @@ test('Release 3A contracts an eligible signal atomically and preserves its origi
       ),
       'authenticated_direct_insert', has_table_privilege('authenticated', 'public.growth_bets', 'INSERT'),
       'authenticated_view', has_table_privilege('authenticated', 'public.growth_bets_operational_v', 'SELECT'),
+      'authenticated_checklist_insert', has_table_privilege('authenticated', 'public.growth_bet_checklist_items', 'INSERT'),
+      'authenticated_operations_rpc', has_function_privilege(
+        'authenticated', 'public.growth_append_bet_update(uuid,text,text,text,text)', 'EXECUTE'
+      ),
+      'anon_operations_rpc', has_function_privilege(
+        'anon', 'public.growth_append_bet_update(uuid,text,text,text,text)', 'EXECUTE'
+      ),
       'anon_view', has_table_privilege('anon', 'public.growth_bets_operational_v', 'SELECT'),
       'security_invoker', (
         select coalesce(reloptions @> array['security_invoker=true'], false)
@@ -349,8 +419,18 @@ test('Release 3A contracts an eligible signal atomically and preserves its origi
   assert.deepEqual(actual, {
     bets: 1,
     snapshots: 1,
-    updates: 1,
+    updates: 6,
     bet_events: 1,
+    bet_update_events: 4,
+    rejected_events: 1,
+    decisions: 3,
+    operational_projection: {
+      checklist_total: 1,
+      checklist_completed: 1,
+      update_count: 6,
+      last_execution_status: 'partial',
+    },
+    bet_in_progress: true,
     candidate_accepted: true,
     belief_preserved: true,
     snapshot_provenance: true,
@@ -359,6 +439,9 @@ test('Release 3A contracts an eligible signal atomically and preserves its origi
     anon_rpc: false,
     authenticated_direct_insert: false,
     authenticated_view: true,
+    authenticated_checklist_insert: false,
+    authenticated_operations_rpc: true,
+    anon_operations_rpc: false,
     anon_view: false,
     security_invoker: true,
   });

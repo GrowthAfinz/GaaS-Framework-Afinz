@@ -4,11 +4,13 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GrowthFeedEvent } from './growthFeed.types';
 import { FeedEventIcon, FRONT_LABELS, GROWTH_FEED_CARD_REGISTRY } from './growthFeedRegistry';
+import { GrowthSignalDecision } from '../bets/growthBet.types';
 
 interface GrowthFeedDrawerProps {
   event: GrowthFeedEvent;
   onClose: () => void;
   onPrimaryAction: (event: GrowthFeedEvent) => void;
+  decision?: GrowthSignalDecision;
 }
 
 function formatDate(value?: string) {
@@ -23,7 +25,7 @@ const Fact: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, val
   </div>
 );
 
-export const GrowthFeedDrawer: React.FC<GrowthFeedDrawerProps> = ({ event, onClose, onPrimaryAction }) => {
+export const GrowthFeedDrawer: React.FC<GrowthFeedDrawerProps> = ({ event, onClose, onPrimaryAction, decision }) => {
   const snapshot = event.summary_snapshot;
   const variant = GROWTH_FEED_CARD_REGISTRY[event.event_type];
   const evidence = Array.isArray(snapshot.evidence_refs) ? snapshot.evidence_refs : [];
@@ -97,6 +99,7 @@ export const GrowthFeedDrawer: React.FC<GrowthFeedDrawerProps> = ({ event, onClo
               <Fact label="Código do sinal" value={snapshot.signal_code} />
               <Fact label="Período de evidência" value={snapshot.period_start && snapshot.period_end ? `${snapshot.period_start} a ${snapshot.period_end}` : undefined} />
               <Fact label="Métrica de sucesso" value={snapshot.success_metric} />
+              <Fact label="Decisão do sinal" value={decision ? `${decision.decision_type}${decision.reason ? ` · ${decision.reason}` : ''}` : undefined} />
               <Fact label="Run ID" value={snapshot.run_id || event.relevance_dimensions.run_id} />
               <Fact label="Evento ID" value={event.id} />
             </dl>
@@ -110,9 +113,11 @@ export const GrowthFeedDrawer: React.FC<GrowthFeedDrawerProps> = ({ event, onClo
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-6 py-4">
           <span className="inline-flex items-center gap-2 text-xs text-slate-500"><CalendarDays size={14} /> Snapshot imutável do momento do evento</span>
-          <button type="button" onClick={() => snapshot.primary_action?.kind === 'open_report_live' ? onPrimaryAction(event) : onClose()} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
-            {snapshot.primary_action?.kind === 'open_report_live' ? (snapshot.primary_action.label || 'Abrir Report Live') : 'Concluir leitura'}
-            {snapshot.primary_action?.kind === 'open_report_live' && <ExternalLink size={14} />}
+          <button type="button" onClick={() => decision?.decision_type === 'rejected' ? onClose() : onPrimaryAction(event)} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
+            {event.event_type === 'recommendation_created'
+              ? decision?.decision_type === 'rejected' ? 'Concluir leitura' : decision?.bet_id ? 'Abrir aposta' : 'Assumir aposta'
+              : snapshot.primary_action?.label || 'Concluir leitura'}
+            {(snapshot.primary_action?.kind === 'open_report_live' || snapshot.primary_action?.kind === 'open_bet' || Boolean(decision?.bet_id)) && <ExternalLink size={14} />}
           </button>
         </footer>
       </aside>
