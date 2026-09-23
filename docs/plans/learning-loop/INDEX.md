@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Release 5 de memória implementada; publicação depende dos gates remotos
+**Status:** Release 5 de memória publicada; reutilização continua fora do corte
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live

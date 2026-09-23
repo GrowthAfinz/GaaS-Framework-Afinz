@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-23
 **Branch:** `codex/growth-learning-release-5-memory`
-**Estado:** schema publicado no Supabase; UI e proteção de CI dependem do PR
+**Estado:** publicada na `main`, no Supabase e no GitHub Pages
 
 ## 1. Objetivo do corte
 
@@ -100,7 +100,13 @@ O Supabase registrou `20260923144041_growth_memory_release_5` e `20260923144342_
 
 Os quatro índices novos apareceram apenas como `unused_index` informativo logo após a criação, o que é esperado antes de tráfego de leitura.
 
-## 8. Fora deste corte
+## 8. Publicação da aplicação
+
+O PR [#21](https://github.com/GrowthAfinz/GaaS-Framework-Afinz/pull/21) foi mergeado na `main` como `df6827e`. O pipeline do PR (`35877220960`) e o workflow pós-merge (`35877449664`) aprovaram o contrato SQL da Release 5 em PostgreSQL 17, os testes, TypeScript, Edge Functions e o build.
+
+O GitHub Pages publicou `index-UYQZnnK7.js`, servido com HTTP 200 e contendo `Release 5`, `Validadas pelo loop`, `Curadas do vault` e `growth_memory_active_v`. A interface pública carregou até o login; a inspeção interna autenticada da aba Memória permanece como UAT do operador.
+
+## 9. Fora deste corte
 
 - recuperação automática de memória aplicável em um novo sinal ou aposta;
 - embeddings ou busca vetorial;
