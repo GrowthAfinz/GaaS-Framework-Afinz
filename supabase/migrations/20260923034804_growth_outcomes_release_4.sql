@@ -1,3 +1,4 @@
+-- Timestamp aligned to the migration version recorded by the Supabase MCP.
 alter table public.report_action_outcomes
   add column if not exists bet_id uuid references public.growth_bets(id) on delete restrict,
   add column if not exists execution_status text,

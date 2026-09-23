@@ -24,7 +24,7 @@ O veredito do sistema nunca é sobrescrito pela revisão humana. Confirmação e
 
 ## Persistência e agenda
 
-A migration `20260923032332_growth_outcomes_release_4.sql`:
+A migration `20260923034804_growth_outcomes_release_4.sql`:
 
 - estende `report_action_outcomes` com `bet_id`, execução, veredito sistêmico, revisão, contestação, resolução e snapshot de evidência;
 - cria triggers para ligar o outcome à aposta e aplicar a regra de execução;
@@ -70,4 +70,3 @@ A migration `20260923032332_growth_outcomes_release_4.sql`:
 - novo motor de métricas ou consulta dinâmica a views arbitrárias pelo navegador;
 - execução autônoma de campanha;
 - alteração do renderer ou publicação do Report Live.
-
