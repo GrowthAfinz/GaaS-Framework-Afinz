@@ -229,6 +229,29 @@ decided_at timestamptz not null
 
 O registro é imutável. `accepted` e `merged` exigem `bet_id`; `rejected` exige motivo e não aponta para aposta.
 
+### 3.11 `growth_learning_applications`
+
+Snapshot append-only criado junto com uma nova aposta para registrar a memória consultada sem alterar o `belief_snapshot` imutável da Release 3:
+
+```sql
+id uuid primary key
+bet_id uuid not null
+action_candidate_id uuid not null
+learning_id uuid not null
+learning_revision integer not null
+decision text not null -- reused | discarded
+decision_reason text null
+match_score integer not null
+match_reasons jsonb not null
+eligibility_snapshot text not null
+context_snapshot jsonb not null
+decided_by uuid not null
+created_at timestamptz not null
+unique (bet_id, learning_id)
+```
+
+`discarded` exige justificativa. Score, revisão, elegibilidade e contexto são recalculados pelo servidor no instante da aposta e nunca aceitos do cliente como fonte de verdade.
+
 ## 4. Extensões propostas em `report_action_outcomes`
 
 Adicionar sem remover o contrato atual:

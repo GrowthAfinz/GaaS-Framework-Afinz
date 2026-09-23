@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CalendarDays, Check, Circle, Database, History, Loader2, MessageSquarePlus, Plus, ShieldCheck, Target, X } from 'lucide-react';
+import { AlertCircle, BookMarked, CalendarDays, Check, Circle, Database, History, Loader2, MessageSquarePlus, Plus, ShieldCheck, Target, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   addGrowthBetChecklistItem,
   appendGrowthBetUpdate,
   fetchGrowthBetChecklist,
+  fetchGrowthBetLearningApplications,
   fetchGrowthBetUpdates,
   setGrowthBetChecklistItem,
 } from './growthBetService';
-import { GrowthBet, GrowthBetChecklistItem, GrowthBetStatus, GrowthBetUpdate, GrowthExecutionStatus } from './growthBet.types';
+import { GrowthBet, GrowthBetChecklistItem, GrowthBetStatus, GrowthBetUpdate, GrowthExecutionStatus, GrowthLearningApplication } from './growthBet.types';
 
 interface GrowthBetDrawerProps {
   bet: GrowthBet;
@@ -38,6 +39,7 @@ const Fact: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, val
 export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, onChanged }) => {
   const [checklist, setChecklist] = useState<GrowthBetChecklistItem[]>([]);
   const [updates, setUpdates] = useState<GrowthBetUpdate[]>([]);
+  const [learningApplications, setLearningApplications] = useState<GrowthLearningApplication[]>([]);
   const [newItem, setNewItem] = useState('');
   const [updateBody, setUpdateBody] = useState('');
   const [updateKind, setUpdateKind] = useState<'comment' | 'execution' | 'status_changed'>('comment');
@@ -51,12 +53,14 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
     setLoading(true);
     setError(null);
     try {
-      const [nextChecklist, nextUpdates] = await Promise.all([
+      const [nextChecklist, nextUpdates, nextLearningApplications] = await Promise.all([
         fetchGrowthBetChecklist(bet.id),
         fetchGrowthBetUpdates(bet.id),
+        fetchGrowthBetLearningApplications(bet.id),
       ]);
       setChecklist(nextChecklist);
       setUpdates(nextUpdates);
+      setLearningApplications(nextLearningApplications);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a operação da aposta.');
     } finally {
@@ -133,6 +137,20 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
             <div className="mt-3 space-y-2 rounded-2xl border border-slate-200 p-4 text-sm leading-6 text-slate-700">
               {bet.source_signal && <p><strong>Sinal:</strong> {bet.source_signal}</p>}{bet.source_impact && <p><strong>Impacto:</strong> {bet.source_impact}</p>}{bet.source_probable_cause && <p><strong>Causa provável:</strong> {bet.source_probable_cause}</p>}{bet.source_reading_limit && <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900"><strong>Limite:</strong> {bet.source_reading_limit}</p>}
               <div className="grid gap-3 pt-2 sm:grid-cols-2"><Fact label="Período" value={`${formatDate(bet.evidence_period_start)} a ${formatDate(bet.evidence_period_end)}`} /><Fact label="Fonte" value={bet.source_view} /><Fact label="Hash" value={<span className="break-all font-mono text-[11px]">{bet.source_hash}</span>} /><Fact label="Sinais mesclados" value={bet.merged_signal_count} /></div>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500"><BookMarked size={15} /> Memória consultada</h3>
+            <div className="mt-3 space-y-3">
+              {learningApplications.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Nenhuma memória específica foi aplicável no momento desta aposta.</p> : learningApplications.map((application) => (
+                <article key={application.id} className={`rounded-2xl border p-4 ${application.decision === 'reused' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-black text-slate-900">{application.source_title}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${application.decision === 'reused' ? 'bg-emerald-700 text-white' : 'bg-slate-700 text-white'}`}>{application.decision === 'reused' ? 'Reutilizada' : 'Descartada'}</span></div>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">{application.statement}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">Revisão {application.learning_revision} · score {application.match_score} · {application.match_reasons.map((item) => item.dimension).join(', ')}</p>
+                  {application.decision_reason && <p className="mt-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600"><strong>Motivo:</strong> {application.decision_reason}</p>}
+                </article>
+              ))}
             </div>
           </section>
 
