@@ -46,7 +46,10 @@ export function buildGrowthFeedFilterSearch(filters: GrowthFeedFilters, currentS
 
 function normalizedState(event: GrowthFeedEvent): string {
   const state = event.event_state || event.summary_snapshot.event_state || 'open';
-  return ['candidate', 'backlog', 'new', 'pending'].includes(state) ? 'open' : state;
+  return [
+    'candidate', 'backlog', 'new', 'pending',
+    'approved', 'in_progress', 'waiting_window', 'ready_for_review',
+  ].includes(state) ? 'open' : state;
 }
 
 function relevanceScore(event: GrowthFeedEvent, filters: GrowthFeedFilters, now: Date): number {

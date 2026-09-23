@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildGrowthLearningSearch,
   buildGrowthLearningItemSearch,
+  buildGrowthLearningSectionItemSearch,
   buildReportsOutputSearch,
   hasGrowthLearningRouteContext,
   isGrowthLearningView,
@@ -59,5 +60,13 @@ describe('growth learning navigation contract', () => {
     expect(params.has('item')).toBe(false);
     expect(params.get('front')).toBe('paid_media');
     expect(params.get('sort')).toBe('recent');
+  });
+
+  it('deep-links an operational item in its own section', () => {
+    const opened = buildGrowthLearningSectionItemSearch('bets', 'bet-42', '?view=learning&section=feed&bu=B2C');
+    const params = new URLSearchParams(opened);
+    expect(params.get('section')).toBe('bets');
+    expect(params.get('item')).toBe('bet-42');
+    expect(params.get('bu')).toBe('B2C');
   });
 });

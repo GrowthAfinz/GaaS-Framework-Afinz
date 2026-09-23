@@ -15,7 +15,10 @@ export type GrowthFeedEventType =
   | 'data_quality_blocked'
   | 'report_candidate_generated'
   | 'report_published'
-  | 'report_blocked';
+  | 'report_blocked'
+  | 'bet_created'
+  | 'bet_updated'
+  | 'signal_rejected';
 
 export interface GrowthFeedEvidenceRef {
   view?: string;
@@ -24,7 +27,7 @@ export interface GrowthFeedEvidenceRef {
 }
 
 export interface GrowthFeedPrimaryAction {
-  kind?: 'open_evidence' | 'open_report_live';
+  kind?: 'open_evidence' | 'open_report_live' | 'open_bet';
   label?: string;
 }
 
@@ -49,6 +52,11 @@ export interface GrowthFeedSnapshot {
   expected_value?: number;
   expected_unit?: string;
   expected_direction?: string;
+  baseline_value?: number;
+  metric_name?: string;
+  success_criterion?: string;
+  outcome_window_start?: string;
+  execution_status?: string;
   outcome_window_end?: string;
   verification_view?: string;
   run_id?: string;
@@ -85,7 +93,7 @@ export interface GrowthFeedDimensions {
 export interface GrowthFeedEvent {
   id: string;
   event_type: GrowthFeedEventType;
-  subject_type: 'action_candidate' | 'report_run' | 'report_publication';
+  subject_type: 'action_candidate' | 'report_run' | 'report_publication' | 'growth_bet';
   subject_id: string;
   front: Exclude<GrowthFeedFrontFilter, 'all'>;
   occurred_at: string;

@@ -56,7 +56,7 @@ Por isso a 3A não cria aposta automaticamente a partir dos campos existentes. A
 
 ## Teste
 
-`scripts/test-growth-bets-release-3a.mjs` sobe o schema mínimo sobre PostgreSQL 17 e valida:
+`scripts/test-growth-bets-release-3b.mjs` sobe o schema mínimo sobre PostgreSQL 17 e preserva estes testes junto dos contratos operacionais adicionados na Release 3B:
 
 - criação 1:1 de aposta, snapshot, timeline e evento;
 - procedência do artefato e do estado de qualidade;

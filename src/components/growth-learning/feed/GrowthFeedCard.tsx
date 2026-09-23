@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, ExternalLink, History, ShieldCheck } from 'luci
 import { formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GrowthFeedEvent, GrowthFeedGroup } from './growthFeed.types';
+import { GrowthSignalDecision } from '../bets/growthBet.types';
 import { FeedEventIcon, FRONT_LABELS, GROWTH_FEED_CARD_REGISTRY } from './growthFeedRegistry';
 
 interface GrowthFeedCardProps {
@@ -11,6 +12,7 @@ interface GrowthFeedCardProps {
   onToggleGroup: () => void;
   onOpen: (event: GrowthFeedEvent) => void;
   onPrimaryAction: (event: GrowthFeedEvent) => void;
+  decision?: GrowthSignalDecision;
 }
 
 function confidenceLabel(value: string | null) {
@@ -35,11 +37,18 @@ const MiniEvent: React.FC<{ event: GrowthFeedEvent; onOpen: () => void }> = ({ e
   </button>
 );
 
-export const GrowthFeedCard: React.FC<GrowthFeedCardProps> = ({ group, expanded, onToggleGroup, onOpen, onPrimaryAction }) => {
+export const GrowthFeedCard: React.FC<GrowthFeedCardProps> = ({ group, expanded, onToggleGroup, onOpen, onPrimaryAction, decision }) => {
   const event = group.representative;
   const snapshot = event.summary_snapshot;
   const variant = GROWTH_FEED_CARD_REGISTRY[event.event_type];
   const total = group.events.length;
+  const actionLabel = event.event_type === 'recommendation_created'
+    ? decision?.decision_type === 'rejected'
+      ? 'Ver decisão registrada'
+      : decision?.bet_id
+        ? 'Abrir aposta'
+        : 'Assumir aposta'
+    : snapshot.primary_action?.label || 'Abrir evidências';
   return (
     <article className={`overflow-hidden rounded-2xl border border-slate-200 border-l-4 bg-white shadow-sm transition hover:shadow-md ${variant.accent}`}>
       <div className="p-5 sm:p-6">
@@ -78,7 +87,7 @@ export const GrowthFeedCard: React.FC<GrowthFeedCardProps> = ({ group, expanded,
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => onPrimaryAction(event)} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800">
-              {snapshot.primary_action?.label || 'Abrir evidências'}
+              {actionLabel}
             </button>
             {snapshot.primary_action?.kind === 'open_report_live' && (
               <button type="button" onClick={() => onOpen(event)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Ver procedência</button>

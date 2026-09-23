@@ -59,7 +59,7 @@ Todos os cards mostram procedência e ação. Nenhum número nasce na prosa do f
 
 ## Release 3 — sinal para aposta
 
-**Estado em 22/09/2026:** Release 3A publicada na `main` e no Supabase. O contrato SQL passou em PostgreSQL 17; a interface de aceite e o workspace operacional permanecem na 3B.
+**Estado em 22/09/2026:** Release 3A publicada na `main` e no Supabase. A Release 3B está implementada em branch e aguarda pipeline, revisão, migration e promoção.
 
 ### Escopo
 

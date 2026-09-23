@@ -6,6 +6,7 @@ import {
   closeGrowthLearningItem,
   openGrowthLearningItem,
   openGrowthLearningSection,
+  openGrowthLearningSectionItem,
   readGrowthLearningItem,
 } from '../growthLearningNavigation';
 import { buildGrowthFeedFilterSearch, filterAndGroupGrowthFeed, readGrowthFeedFilters } from './growthFeed.logic';
@@ -13,6 +14,9 @@ import { fetchGrowthFeed, fetchGrowthFeedItem } from './growthFeedService';
 import { GrowthFeedEvent, GrowthFeedFilters } from './growthFeed.types';
 import { GrowthFeedCard } from './GrowthFeedCard';
 import { GrowthFeedDrawer } from './GrowthFeedDrawer';
+import { GrowthSignalDecisionDialog } from '../bets/GrowthSignalDecisionDialog';
+import { fetchGrowthSignalDecisions } from '../bets/growthBetService';
+import { GrowthSignalDecision } from '../bets/growthBet.types';
 
 interface GrowthFeedViewProps {
   periodStart: Date;
@@ -32,6 +36,8 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
   const [events, setEvents] = useState<GrowthFeedEvent[]>([]);
   const [filters, setFilters] = useState<GrowthFeedFilters>(() => readGrowthFeedFilters(window.location.search));
   const [selected, setSelected] = useState<GrowthFeedEvent | null>(null);
+  const [decisionEvent, setDecisionEvent] = useState<GrowthFeedEvent | null>(null);
+  const [decisions, setDecisions] = useState<Map<string, GrowthSignalDecision>>(() => new Map());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +47,10 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
     setError(null);
     try {
       const nextEvents = await fetchGrowthFeed(periodStart, periodEnd);
+      const candidateIds = Array.from(new Set(nextEvents.filter((event) => event.subject_type === 'action_candidate').map((event) => event.subject_id)));
+      const nextDecisions = await fetchGrowthSignalDecisions(candidateIds);
       setEvents(nextEvents);
+      setDecisions(new Map(nextDecisions.map((decision) => [decision.action_candidate_id, decision])));
       onCountChange?.(nextEvents.length);
     } catch (loadError) {
       console.error('Growth feed could not be loaded', loadError);
@@ -106,6 +115,23 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
       setSelected(null);
       openGrowthLearningSection('report-live');
       return;
+    }
+    if (event.summary_snapshot.primary_action?.kind === 'open_bet' || event.subject_type === 'growth_bet') {
+      setSelected(null);
+      openGrowthLearningSectionItem('bets', event.subject_id);
+      return;
+    }
+    if (event.event_type === 'recommendation_created') {
+      const decision = decisions.get(event.subject_id);
+      if (decision?.bet_id) {
+        setSelected(null);
+        openGrowthLearningSectionItem('bets', decision.bet_id);
+        return;
+      }
+      if (!decision) {
+        setDecisionEvent(event);
+        return;
+      }
     }
     openEvent(event);
   };
@@ -176,12 +202,20 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
               })}
               onOpen={openEvent}
               onPrimaryAction={primaryAction}
+              decision={decisions.get(group.representative.subject_id)}
             />
           ))}
         </div>
       )}
 
-      {selected && <GrowthFeedDrawer event={selected} onClose={closeGrowthLearningItem} onPrimaryAction={primaryAction} />}
+      {selected && <GrowthFeedDrawer event={selected} decision={decisions.get(selected.subject_id)} onClose={closeGrowthLearningItem} onPrimaryAction={primaryAction} />}
+      {decisionEvent && <GrowthSignalDecisionDialog event={decisionEvent} onClose={() => setDecisionEvent(null)} onCompleted={({ betId }) => {
+        setDecisionEvent(null);
+        setSelected(null);
+        void load();
+        if (betId) openGrowthLearningSectionItem('bets', betId);
+        else openGrowthLearningSection('feed');
+      }} />}
     </section>
   );
 };
