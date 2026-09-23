@@ -134,6 +134,8 @@ Sucesso, fracasso e inconclusão produzem memória distinta, rastreável e vigen
 
 **Contrato executável:** [RELEASE_6_REUSE_SPEC.md](RELEASE_6_REUSE_SPEC.md).
 
+**Estado em 23/09/2026:** publicada na `main`, no Supabase e no GitHub Pages pelo PR #23. O matching determinístico e o snapshot explícito `reused`/`discarded` estão operacionais; integração transversal continua na Release 7.
+
 ### Escopo
 
 - recuperar memórias aplicáveis;
