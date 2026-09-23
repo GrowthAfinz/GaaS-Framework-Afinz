@@ -93,7 +93,7 @@ Uma recomendação vira aposta contratada em menos de um minuto, sem copiar manu
 
 ## Release 4 — outcome
 
-**Estado em 23/09/2026:** implementada na branch `codex/growth-learning-release-4-outcomes`; promoção depende de migration rastreada, PR verde e merge na `main`.
+**Estado em 23/09/2026:** publicada na `main`, no Supabase e no GitHub Pages pelo PR #19. A agenda e a revisão de outcomes estão operacionais; memória permanece no corte seguinte.
 
 ### Escopo
 
