@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Release 3A publicada; Release 3B em implementação; outcomes e memória continuam fora do corte
+**Status:** Release 3B publicada; outcomes e memória continuam fora do corte
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live

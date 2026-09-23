@@ -4,7 +4,7 @@
 **Branch:** `codex/growth-learning-release-3b`  
 **Base:** `9ba2d23` — documentação da Release 3A integrada à `main`
 
-**Estado:** implementada em branch; ainda não publicada
+**Estado:** publicada na `main`, no Supabase e no GitHub Pages em 22/09/2026
 
 ## Objetivo
 
@@ -84,3 +84,14 @@ Essa divisão mantém a Fila sistêmica: mudança material aparece; conversa cot
 - editor de contrato aprovado;
 - automação de campanhas;
 - mudança no engine do Report Live.
+
+## Promoção
+
+- PR #17 mergeado na `main` como `e9db756`;
+- migration registrada no Supabase como `growth_bets_release_3b` antes do deploy da interface;
+- reconciliação confirmou tabelas e views presentes, `security_invoker`, RPCs fechadas para `anon`, ausência de escrita direta para `authenticated` e contagens iniciais zeradas;
+- workflow de `main` `35803398333` verde, incluindo o contrato SQL em PostgreSQL 17;
+- GitHub Pages publicado pelo mesmo workflow;
+- página e bundle público `index-DglFengp.js` responderam HTTP 200;
+- o bundle contém `Release 3B`, `Assumir aposta`, `Apostas contratadas` e `Mesclar à existente`;
+- nenhum dado sintético foi persistido durante ensaio ou promoção.
