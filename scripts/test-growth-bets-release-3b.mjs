@@ -126,11 +126,13 @@ test('Release 3B operates governed bets while preserving the Release 3A belief c
   const feedMigrationSql = latestMigration(/^\d+_growth_feed_release_2\.sql$/);
   const betMigrationSql = latestMigration(/^\d+_growth_bets_release_3a\.sql$/);
   const operationsMigrationSql = latestMigration(/^\d+_growth_bets_release_3b\.sql$/);
+  const timelineMigrationSql = latestMigration(/^\d+_growth_bet_timeline_sequence\.sql$/);
 
   psql([], fixtureSql);
   psql([], feedMigrationSql);
   psql([], betMigrationSql);
   psql([], operationsMigrationSql);
+  psql([], timelineMigrationSql);
 
   const result = psql(['-q', '-t', '-A'], `
     do $$
