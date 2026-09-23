@@ -30,6 +30,7 @@ test('Release 6 retrieves deterministic memory and freezes explicit reuse decisi
   assert.equal(baseline.status, 0, baseline.stderr || baseline.stdout);
 
   psql([], latestMigration(/^\d+_growth_learning_reuse_release_6\.sql$/));
+  psql([], latestMigration(/^\d+_growth_learning_reuse_candidate_index\.sql$/));
 
   const result = psql(['-q', '-t', '-A'], `
     do $$
@@ -183,7 +184,8 @@ test('Release 6 retrieves deterministic memory and freezes explicit reuse decisi
       'anon_matcher', has_function_privilege('anon', 'public.growth_find_applicable_learnings(uuid)', 'EXECUTE'),
       'auth_app_view', has_table_privilege('authenticated', 'public.growth_learning_applications_v', 'SELECT'),
       'anon_app_view', has_table_privilege('anon', 'public.growth_learning_applications_v', 'SELECT'),
-      'security_invoker', (select coalesce(reloptions @> array['security_invoker=true'], false) from pg_class where oid = 'public.growth_learning_applications_v'::regclass)
+      'security_invoker', (select coalesce(reloptions @> array['security_invoker=true'], false) from pg_class where oid = 'public.growth_learning_applications_v'::regclass),
+      'candidate_index', to_regclass('public.growth_learning_applications_candidate_idx') is not null
     );
   `);
 
@@ -201,4 +203,5 @@ test('Release 6 retrieves deterministic memory and freezes explicit reuse decisi
   assert.equal(summary.auth_app_view, true);
   assert.equal(summary.anon_app_view, false);
   assert.equal(summary.security_invoker, true);
+  assert.equal(summary.candidate_index, true);
 });
