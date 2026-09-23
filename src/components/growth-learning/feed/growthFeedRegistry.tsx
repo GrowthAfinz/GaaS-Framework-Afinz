@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, CircleGauge, FileCheck2, GitBranch, PlayCircle, ShieldAlert, Sparkles, Target, Timer, XCircle, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, BookMarked, CheckCircle2, CircleGauge, FileCheck2, GitBranch, History, PlayCircle, SearchCheck, ShieldAlert, Sparkles, Target, Timer, XCircle, type LucideIcon } from 'lucide-react';
 import { GrowthFeedEventType } from './growthFeed.types';
 
 export interface GrowthFeedCardVariant {
@@ -87,6 +87,27 @@ export const GROWTH_FEED_CARD_REGISTRY: Record<GrowthFeedEventType, GrowthFeedCa
     accent: 'border-l-violet-500',
     badge: 'bg-violet-50 text-violet-700 border-violet-200',
     iconBackground: 'bg-violet-100 text-violet-700',
+  },
+  curated_proposal_created: {
+    label: 'Proposta curada',
+    icon: SearchCheck,
+    accent: 'border-l-amber-500',
+    badge: 'bg-amber-50 text-amber-800 border-amber-200',
+    iconBackground: 'bg-amber-100 text-amber-800',
+  },
+  learning_created: {
+    label: 'Aprendizado criado',
+    icon: BookMarked,
+    accent: 'border-l-violet-500',
+    badge: 'bg-violet-50 text-violet-700 border-violet-200',
+    iconBackground: 'bg-violet-100 text-violet-700',
+  },
+  learning_revised: {
+    label: 'Memória revisada',
+    icon: History,
+    accent: 'border-l-blue-500',
+    badge: 'bg-blue-50 text-blue-700 border-blue-200',
+    iconBackground: 'bg-blue-100 text-blue-700',
   },
 };
 

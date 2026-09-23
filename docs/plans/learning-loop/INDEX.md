@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Release 4 de outcomes publicada; memória continua fora do corte
+**Status:** Release 5 de memória implementada; publicação depende dos gates remotos
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live
@@ -33,6 +33,7 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 13. [RELEASE_3A_IMPLEMENTATION.md](RELEASE_3A_IMPLEMENTATION.md) — contrato transacional e evidência imutável da aposta.
 14. [RELEASE_3B_IMPLEMENTATION.md](RELEASE_3B_IMPLEMENTATION.md) — decisão na Fila, workspace Apostas e operação auditável.
 15. [RELEASE_4_IMPLEMENTATION.md](RELEASE_4_IMPLEMENTATION.md) — agenda, avaliação determinística e revisão de outcomes.
+16. [RELEASE_5_IMPLEMENTATION.md](RELEASE_5_IMPLEMENTATION.md) — memória versionada, procedência explícita e curadoria inicial do vault.
 
 ## Decisões confirmadas com o product owner
 
@@ -48,6 +49,7 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 - Apostas possuem checklist, comentários internos, atualizações e histórico.
 - O sistema calcula o outcome; o usuário pode confirmar ou contestar o veredito.
 - Todo outcome materializa memória, inclusive fracasso, inconclusão ou premissa inválida.
+- Memória derivada de outcome e conhecimento curado do vault são origens distintas e visíveis.
 - Toda memória possui vigência ou data obrigatória de revisão.
 - Alterações de memória poderão ser feitas via LLM/Supabase e precisam manter revisões.
 - Notificações ficam somente dentro do GaaS.

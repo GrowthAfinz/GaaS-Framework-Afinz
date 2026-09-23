@@ -111,6 +111,8 @@ Aposta vencida aparece automaticamente e nenhum resultado é classificado como f
 
 ## Release 5 — memória versionada
 
+**Estado em 23/09/2026:** schema publicado no Supabase; UI e proteção do contrato dependem do PR e dos gates de CI/Pages.
+
 ### Escopo
 
 - `growth_learnings`;
@@ -121,6 +123,8 @@ Aposta vencida aparece automaticamente e nenhum resultado é classificado como f
 - estados confirmado/direcional/contraditório/inconclusivo/invalidado;
 - busca/filtros;
 - alteração via Supabase/LLM com histórico.
+- origem explícita `outcome` versus `vault_curated`, sem converter conhecimento histórico em falsa validação experimental;
+- propostas curadas no feed quando ainda falta um contrato quantitativo verificável.
 
 ### Gate
 

@@ -94,6 +94,9 @@ export const GrowthFeedDrawer: React.FC<GrowthFeedDrawerProps> = ({ event, onClo
               <Fact label="Confiança" value={event.confidence_status || 'não classificada'} />
               <Fact label="Estado" value={event.event_state || 'não classificado'} />
               <Fact label="Fonte" value={snapshot.source_view || event.relevance_dimensions.source_view || event.subject_type} />
+              <Fact label="Referência de origem" value={snapshot.source_ref || event.relevance_dimensions.source_ref as string | undefined} />
+              <Fact label="Tipo de origem" value={snapshot.source_kind} />
+              <Fact label="Classificação" value={snapshot.classification} />
               <Fact label="Produtor" value={snapshot.generated_by || 'pipeline Report Live'} />
               <Fact label="Entidade" value={snapshot.entity_key || event.subject_id} />
               <Fact label="Código do sinal" value={snapshot.signal_code} />
@@ -113,11 +116,12 @@ export const GrowthFeedDrawer: React.FC<GrowthFeedDrawerProps> = ({ event, onClo
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-6 py-4">
           <span className="inline-flex items-center gap-2 text-xs text-slate-500"><CalendarDays size={14} /> Snapshot imutável do momento do evento</span>
-          <button type="button" onClick={() => decision?.decision_type === 'rejected' ? onClose() : onPrimaryAction(event)} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
+          <button type="button" onClick={() => decision?.decision_type === 'rejected' || event.event_type === 'curated_proposal_created' ? onClose() : onPrimaryAction(event)} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
             {event.event_type === 'recommendation_created'
               ? decision?.decision_type === 'rejected' ? 'Concluir leitura' : decision?.bet_id ? 'Abrir aposta' : 'Assumir aposta'
+              : event.event_type === 'curated_proposal_created' ? 'Concluir leitura'
               : snapshot.primary_action?.label || 'Concluir leitura'}
-            {(snapshot.primary_action?.kind === 'open_report_live' || snapshot.primary_action?.kind === 'open_bet' || Boolean(decision?.bet_id)) && <ExternalLink size={14} />}
+            {(snapshot.primary_action?.kind === 'open_report_live' || snapshot.primary_action?.kind === 'open_bet' || snapshot.primary_action?.kind === 'open_learning' || Boolean(decision?.bet_id)) && <ExternalLink size={14} />}
           </button>
         </footer>
       </aside>

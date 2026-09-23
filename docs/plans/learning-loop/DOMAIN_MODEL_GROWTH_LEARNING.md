@@ -115,7 +115,12 @@ Invariantes:
 
 ### 1.5 Aprendizado
 
-Memória derivada de um outcome, inclusive quando inconclusivo ou inválido.
+Memória reutilizável com origem explícita. Pode ser derivada de um outcome revisado ou curada de uma decisão histórica do vault, sem confundir as duas procedências.
+
+Origens:
+
+- `outcome`: validada pelo ciclo `aposta → execução → outcome → revisão`;
+- `vault_curated`: conhecimento histórico governado, rastreado até uma nota-fonte, mas não validado pelo loop atual.
 
 Classificações:
 
@@ -142,6 +147,7 @@ Todo aprendizado possui:
 - confiança;
 - evidências;
 - outcomes de origem;
+- origem e referência documental;
 - regime;
 - `valid_from`;
 - `review_at` obrigatório;
@@ -236,6 +242,8 @@ Após o outcome chegar a `confirmed_by_user` ou `resolved`, o sistema:
 6. disponibiliza o aprendizado para recuperação futura.
 
 Não existe botão humano “promover para memória” no primeiro corte.
+
+Conhecimento histórico pode ser importado separadamente como `vault_curated`. Ele deve carregar fonte, escopo, limitações, vigência e revisão, e a interface deve distingui-lo visualmente de uma memória originada por outcome.
 
 ## 6. Correção via LLM/Supabase
 

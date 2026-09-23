@@ -10,7 +10,7 @@ export type GrowthFeedConfidenceFilter = (typeof GROWTH_FEED_CONFIDENCES)[number
 export const GROWTH_FEED_STATES = ['all', 'open', 'blocked', 'certified', 'published'] as const;
 export type GrowthFeedStateFilter = (typeof GROWTH_FEED_STATES)[number];
 
-export type GrowthFeedEventType = 'recommendation_created' | 'data_quality_blocked' | 'report_candidate_generated' | 'report_published' | 'report_blocked' | 'bet_created' | 'bet_updated' | 'signal_rejected' | 'execution_recorded' | 'outcome_due' | 'outcome_evaluated';
+export type GrowthFeedEventType = 'recommendation_created' | 'data_quality_blocked' | 'report_candidate_generated' | 'report_published' | 'report_blocked' | 'bet_created' | 'bet_updated' | 'signal_rejected' | 'execution_recorded' | 'outcome_due' | 'outcome_evaluated' | 'curated_proposal_created' | 'learning_created' | 'learning_revised';
 
 export interface GrowthFeedEvidenceRef {
   view?: string;
@@ -19,7 +19,7 @@ export interface GrowthFeedEvidenceRef {
 }
 
 export interface GrowthFeedPrimaryAction {
-  kind?: 'open_evidence' | 'open_report_live' | 'open_bet' | 'open_outcome';
+  kind?: 'open_evidence' | 'open_report_live' | 'open_bet' | 'open_outcome' | 'open_learning';
   label?: string;
 }
 
@@ -64,6 +64,10 @@ export interface GrowthFeedSnapshot {
   source_hash?: string;
   content_hash?: string;
   priority_reason?: string;
+  source_kind?: string;
+  source_ref?: string;
+  classification?: string;
+  change_reason?: string;
   primary_action?: GrowthFeedPrimaryAction;
   [key: string]: unknown;
 }
@@ -88,7 +92,7 @@ export interface GrowthFeedDimensions {
 export interface GrowthFeedEvent {
   id: string;
   event_type: GrowthFeedEventType;
-  subject_type: 'action_candidate' | 'report_run' | 'report_publication' | 'growth_bet' | 'growth_outcome';
+  subject_type: 'action_candidate' | 'report_run' | 'report_publication' | 'growth_bet' | 'growth_outcome' | 'growth_proposal' | 'growth_learning';
   subject_id: string;
   front: Exclude<GrowthFeedFrontFilter, 'all'>;
   occurred_at: string;
