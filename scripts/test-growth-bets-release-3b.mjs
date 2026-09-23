@@ -357,9 +357,13 @@ test('Release 3B operates governed bets while preserving the Release 3A belief c
       'bet_update_events', (select count(*) from public.growth_feed_events where event_type = 'bet_updated'),
       'rejected_events', (select count(*) from public.growth_feed_events where event_type = 'signal_rejected'),
       'decisions', (select count(*) from public.growth_signal_decisions),
-      'checklist_complete', (
-        select checklist_total = 1 and checklist_completed = 1
-          and update_count = 6 and last_execution_status = 'partial'
+      'operational_projection', (
+        select json_build_object(
+          'checklist_total', checklist_total,
+          'checklist_completed', checklist_completed,
+          'update_count', update_count,
+          'last_execution_status', last_execution_status
+        )
         from public.growth_bets_operational_v
       ),
       'bet_in_progress', (select status = 'in_progress' from public.growth_bets),
@@ -420,7 +424,12 @@ test('Release 3B operates governed bets while preserving the Release 3A belief c
     bet_update_events: 4,
     rejected_events: 1,
     decisions: 3,
-    checklist_complete: true,
+    operational_projection: {
+      checklist_total: 1,
+      checklist_completed: 1,
+      update_count: 6,
+      last_execution_status: 'partial',
+    },
     bet_in_progress: true,
     candidate_accepted: true,
     belief_preserved: true,
