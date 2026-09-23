@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Release 6 de reutilização determinística publicada; integração transversal permanece no próximo corte
+**Status:** Release 7A de entrada contextual publicada; links reversos e projeção editorial permanecem nos cortes 7B e 7C
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live
@@ -36,6 +36,8 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 16. [RELEASE_5_IMPLEMENTATION.md](RELEASE_5_IMPLEMENTATION.md) — memória versionada, procedência explícita e curadoria inicial do vault.
 17. [RELEASE_6_REUSE_SPEC.md](RELEASE_6_REUSE_SPEC.md) — matching determinístico, snapshot de decisão e estados bloqueados da reutilização.
 18. [RELEASE_6_IMPLEMENTATION.md](RELEASE_6_IMPLEMENTATION.md) — implementação publicada, reconciliação remota e evidências dos gates.
+19. [RELEASE_7A_CONTEXT_ENTRY_SPEC.md](RELEASE_7A_CONTEXT_ENTRY_SPEC.md) — contrato da entrada contextual, deep-link, evidência e memória compartilhada.
+20. [RELEASE_7A_IMPLEMENTATION.md](RELEASE_7A_IMPLEMENTATION.md) — superfícies entregues, contratos remotos e gates de publicação.
 
 ## Decisões confirmadas com o product owner
 
