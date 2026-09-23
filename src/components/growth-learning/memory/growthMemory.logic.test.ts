@@ -11,6 +11,7 @@ const base: GrowthLearning = {
   valid_until: null, supersedes_learning_id: null, current_revision: 1, created_by: 'test',
   created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z', validated_by_loop: false,
   review_due: false, revision_count: 1, last_revision_at: '2026-09-01T00:00:00Z', link_count: 1,
+  reused_count: 0, discarded_count: 0, reuse_rate: null,
 };
 
 describe('growth memory logic', () => {

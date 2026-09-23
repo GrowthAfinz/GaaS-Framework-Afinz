@@ -118,6 +118,66 @@ export interface GrowthBetDraft {
   knownAlternatives: string;
 }
 
+export type GrowthLearningEligibility = 'reusable' | 'needs_review' | 'expired' | 'contested' | 'superseded' | 'blocked';
+export type GrowthLearningDecisionKind = 'reused' | 'discarded';
+
+export interface GrowthLearningMatchReason {
+  dimension: string;
+  value: string;
+  weight: number;
+}
+
+export interface GrowthLearningSuggestion {
+  learning_id: string;
+  learning_revision: number;
+  source_kind: 'outcome' | 'vault_curated';
+  source_title: string;
+  source_ref: string;
+  statement: string;
+  classification: string;
+  lifecycle_status: string;
+  confidence_status: string;
+  eligibility: GrowthLearningEligibility;
+  review_due: boolean;
+  match_score: number;
+  match_reasons: GrowthLearningMatchReason[];
+  limitations: Record<string, unknown>;
+  scope: Record<string, unknown>;
+  applicability: Record<string, unknown>;
+  context_snapshot: Record<string, unknown>;
+}
+
+export interface GrowthLearningDecisionInput {
+  learningId: string;
+  decision: GrowthLearningDecisionKind;
+  reason?: string;
+}
+
+export interface GrowthLearningApplication {
+  id: string;
+  bet_id: string;
+  action_candidate_id: string;
+  learning_id: string;
+  learning_revision: number;
+  decision: GrowthLearningDecisionKind;
+  decision_reason: string | null;
+  match_score: number;
+  match_reasons: GrowthLearningMatchReason[];
+  eligibility_snapshot: 'reusable' | 'needs_review';
+  context_snapshot: Record<string, unknown>;
+  decided_by: string;
+  created_at: string;
+  source_kind: 'outcome' | 'vault_curated';
+  source_title: string;
+  source_ref: string;
+  statement: string;
+  classification: string;
+  confidence_status: string;
+  limitations: Record<string, unknown>;
+  bet_hypothesis: string;
+}
+
 export interface AcceptGrowthBetInput extends GrowthBetDraft {
   actionCandidateId: string;
+  learningDecisions: GrowthLearningDecisionInput[];
 }

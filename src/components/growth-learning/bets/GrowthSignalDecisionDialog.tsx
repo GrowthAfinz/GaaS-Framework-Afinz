@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, GitMerge, Loader2, Target, X, XCircle } from 'lucide-react';
+import { AlertCircle, BookMarked, CheckCircle2, GitMerge, Loader2, Target, X, XCircle } from 'lucide-react';
 import { GrowthFeedEvent } from '../feed/growthFeed.types';
-import { acceptGrowthSignal, fetchGrowthBets, mergeGrowthSignal, rejectGrowthSignal } from './growthBetService';
+import { acceptGrowthSignal, fetchApplicableGrowthLearnings, fetchGrowthBets, mergeGrowthSignal, rejectGrowthSignal } from './growthBetService';
 import { buildGrowthBetDraft, validateGrowthBetDraft } from './growthBetForm.logic';
-import { GrowthBet, GrowthBetDraft } from './growthBet.types';
+import { GrowthBet, GrowthBetDraft, GrowthLearningDecisionInput, GrowthLearningSuggestion } from './growthBet.types';
 
 type DecisionMode = 'accept' | 'merge' | 'reject';
 
@@ -26,6 +26,10 @@ export const GrowthSignalDecisionDialog: React.FC<GrowthSignalDecisionDialogProp
   const [mergeBetId, setMergeBetId] = useState('');
   const [reason, setReason] = useState('');
   const [loadingBets, setLoadingBets] = useState(false);
+  const [learningSuggestions, setLearningSuggestions] = useState<GrowthLearningSuggestion[]>([]);
+  const [learningDecisions, setLearningDecisions] = useState<Record<string, GrowthLearningDecisionInput>>({});
+  const [loadingMemory, setLoadingMemory] = useState(true);
+  const [memoryError, setMemoryError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [commandError, setCommandError] = useState<string | null>(null);
 
@@ -50,6 +54,17 @@ export const GrowthSignalDecisionDialog: React.FC<GrowthSignalDecisionDialogProp
       .finally(() => setLoadingBets(false));
   }, [bets.length, event.front, loadingBets, mode]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingMemory(true);
+    setMemoryError(false);
+    fetchApplicableGrowthLearnings(event.subject_id)
+      .then((rows) => { if (!cancelled) setLearningSuggestions(rows); })
+      .catch((error) => { if (!cancelled) { setMemoryError(true); setCommandError(error instanceof Error ? error.message : 'Não foi possível consultar a memória.'); } })
+      .finally(() => { if (!cancelled) setLoadingMemory(false); });
+    return () => { cancelled = true; };
+  }, [event.subject_id]);
+
   const field = <K extends keyof GrowthBetDraft>(key: K, value: GrowthBetDraft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: '' }));
@@ -58,8 +73,22 @@ export const GrowthSignalDecisionDialog: React.FC<GrowthSignalDecisionDialogProp
   const canSubmit = useMemo(() => {
     if (mode === 'reject') return reason.trim().length >= 3;
     if (mode === 'merge') return Boolean(mergeBetId);
-    return true;
-  }, [mergeBetId, mode, reason]);
+    if (loadingMemory || memoryError) return false;
+    return learningSuggestions
+      .filter((learning) => ['reusable', 'needs_review'].includes(learning.eligibility))
+      .every((learning) => {
+        const decision = learningDecisions[learning.learning_id];
+        return decision?.decision === 'reused'
+          || (decision?.decision === 'discarded' && (decision.reason?.trim().length || 0) >= 3);
+      });
+  }, [learningDecisions, learningSuggestions, loadingMemory, memoryError, mergeBetId, mode, reason]);
+
+  const decideLearning = (learningId: string, decision: GrowthLearningDecisionInput['decision']) => {
+    setLearningDecisions((current) => ({
+      ...current,
+      [learningId]: { learningId, decision, reason: decision === 'discarded' ? current[learningId]?.reason || '' : undefined },
+    }));
+  };
 
   const submit = async () => {
     setCommandError(null);
@@ -71,7 +100,11 @@ export const GrowthSignalDecisionDialog: React.FC<GrowthSignalDecisionDialogProp
     setSaving(true);
     try {
       if (mode === 'accept') {
-        const bet = await acceptGrowthSignal({ ...draft, actionCandidateId: event.subject_id });
+        const bet = await acceptGrowthSignal({
+          ...draft,
+          actionCandidateId: event.subject_id,
+          learningDecisions: Object.values(learningDecisions),
+        });
         onCompleted({ kind: mode, betId: bet.id });
       } else if (mode === 'merge') {
         await mergeGrowthSignal(event.subject_id, mergeBetId, reason);
@@ -142,6 +175,32 @@ export const GrowthSignalDecisionDialog: React.FC<GrowthSignalDecisionDialogProp
                 </div>
                 <label className={labelClass}>Prazo de execução (opcional)<input type="date" value={draft.executionDueAt} onChange={(e) => field('executionDueAt', e.target.value)} className={inputClass} /></label>
                 <label className={labelClass}>View de verificação *<input value={draft.verificationView} onChange={(e) => field('verificationView', e.target.value)} className={`${inputClass} font-mono text-xs`} /><FieldError text={errors.verificationView} /></label>
+              </section>
+
+              <section className="space-y-3 lg:col-span-2">
+                <div><h3 className="flex items-center gap-2 text-sm font-black text-slate-900"><BookMarked size={16} className="text-violet-700" /> Memória aplicável</h3><p className="mt-1 text-xs text-slate-500">O match é determinístico. Toda memória elegível precisa ser reutilizada ou descartada antes da aprovação.</p></div>
+                {loadingMemory ? (
+                  <p className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Comparando escopo, métrica e contexto…</p>
+                ) : learningSuggestions.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">Nenhuma memória possui coincidência específica suficiente para este sinal. Mesma frente, sozinha, não é tratada como similaridade.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {learningSuggestions.map((learning) => {
+                      const eligible = ['reusable', 'needs_review'].includes(learning.eligibility);
+                      const decision = learningDecisions[learning.learning_id];
+                      return (
+                        <article key={learning.learning_id} className={`rounded-2xl border p-4 ${eligible ? 'border-violet-200 bg-violet-50/50' : 'border-amber-200 bg-amber-50'}`}>
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-black text-slate-900">{learning.source_title}</span><span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-600">v{learning.learning_revision} · score {learning.match_score}</span><span className={`rounded-full px-2 py-1 text-[10px] font-black ${eligible ? 'bg-violet-100 text-violet-800' : 'bg-amber-100 text-amber-800'}`}>{learning.eligibility.split('_').join(' ')}</span></div><p className="mt-2 text-sm leading-6 text-slate-700">{learning.statement}</p><p className="mt-2 text-[11px] text-slate-500">Match: {learning.match_reasons.map((item) => `${item.dimension}=${item.value}`).join(' · ')} · origem {learning.source_kind === 'outcome' ? 'outcome' : 'vault curado'}</p></div>
+                            {eligible && <div className="flex shrink-0 gap-2"><button type="button" onClick={() => decideLearning(learning.learning_id, 'reused')} className={`rounded-xl px-3 py-2 text-xs font-bold ${decision?.decision === 'reused' ? 'bg-emerald-700 text-white' : 'border border-emerald-200 bg-white text-emerald-700'}`}>Reutilizar</button><button type="button" onClick={() => decideLearning(learning.learning_id, 'discarded')} className={`rounded-xl px-3 py-2 text-xs font-bold ${decision?.decision === 'discarded' ? 'bg-slate-800 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>Descartar</button></div>}
+                          </div>
+                          {decision?.decision === 'discarded' && <label className="mt-3 block text-xs font-bold text-slate-700">Por que não se aplica neste caso? *<input value={decision.reason || ''} onChange={(e) => setLearningDecisions((current) => ({ ...current, [learning.learning_id]: { learningId: learning.learning_id, decision: 'discarded', reason: e.target.value } }))} className={inputClass} placeholder="Regime, escopo ou contexto diferente" /></label>}
+                          {!eligible && <p className="mt-3 text-xs font-semibold text-amber-800">Esta memória aparece como alerta, mas o estado atual impede sua reutilização.</p>}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
             </div>
           ) : mode === 'merge' ? (

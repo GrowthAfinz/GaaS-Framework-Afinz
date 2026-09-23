@@ -132,6 +132,8 @@ Sucesso, fracasso e inconclusão produzem memória distinta, rastreável e vigen
 
 ## Release 6 — reutilização
 
+**Contrato executável:** [RELEASE_6_REUSE_SPEC.md](RELEASE_6_REUSE_SPEC.md).
+
 ### Escopo
 
 - recuperar memórias aplicáveis;

@@ -6,6 +6,8 @@ import {
   GrowthBetStatus,
   GrowthBetUpdate,
   GrowthExecutionStatus,
+  GrowthLearningApplication,
+  GrowthLearningSuggestion,
   GrowthSignalDecision,
 } from './growthBet.types';
 
@@ -49,7 +51,7 @@ export async function acceptGrowthSignal(input: AcceptGrowthBetInput): Promise<G
     .split('\n')
     .map((value) => value.trim())
     .filter(Boolean);
-  const { data, error } = await supabase.rpc('growth_accept_signal_as_bet', {
+  const { data, error } = await supabase.rpc('growth_accept_signal_as_bet_with_memory', {
     p_action_candidate_id: input.actionCandidateId,
     p_team_scope: input.teamScope.trim(),
     p_hypothesis: input.hypothesis.trim(),
@@ -62,6 +64,11 @@ export async function acceptGrowthSignal(input: AcceptGrowthBetInput): Promise<G
     p_outcome_window_start: input.outcomeWindowStart,
     p_outcome_window_end: input.outcomeWindowEnd,
     p_verification_view: input.verificationView.trim(),
+    p_learning_decisions: input.learningDecisions.map((item) => ({
+      learning_id: item.learningId,
+      decision: item.decision,
+      reason: item.reason?.trim() || null,
+    })),
     p_expected_unit: input.expectedUnit.trim() || null,
     p_execution_due_at: input.executionDueAt ? new Date(`${input.executionDueAt}T12:00:00`).toISOString() : null,
     p_stop_condition: input.stopCondition.trim() || null,
@@ -70,6 +77,24 @@ export async function acceptGrowthSignal(input: AcceptGrowthBetInput): Promise<G
   });
   if (error) throw error;
   return oneRow(data as GrowthBet | GrowthBet[] | null);
+}
+
+export async function fetchApplicableGrowthLearnings(actionCandidateId: string): Promise<GrowthLearningSuggestion[]> {
+  const { data, error } = await supabase.rpc('growth_find_applicable_learnings', {
+    p_action_candidate_id: actionCandidateId,
+  });
+  if (error) throw error;
+  return (data || []) as GrowthLearningSuggestion[];
+}
+
+export async function fetchGrowthBetLearningApplications(betId: string): Promise<GrowthLearningApplication[]> {
+  const { data, error } = await supabase
+    .from('growth_learning_applications_v')
+    .select('*')
+    .eq('bet_id', betId)
+    .order('match_score', { ascending: false });
+  if (error) throw error;
+  return (data || []) as GrowthLearningApplication[];
 }
 
 export async function rejectGrowthSignal(candidateId: string, reason: string): Promise<string> {

@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Release 5 de memória publicada; reutilização continua fora do corte
+**Status:** Release 5 publicada; Release 6 de reutilização determinística em implementação
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live
@@ -34,6 +34,7 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 14. [RELEASE_3B_IMPLEMENTATION.md](RELEASE_3B_IMPLEMENTATION.md) — decisão na Fila, workspace Apostas e operação auditável.
 15. [RELEASE_4_IMPLEMENTATION.md](RELEASE_4_IMPLEMENTATION.md) — agenda, avaliação determinística e revisão de outcomes.
 16. [RELEASE_5_IMPLEMENTATION.md](RELEASE_5_IMPLEMENTATION.md) — memória versionada, procedência explícita e curadoria inicial do vault.
+17. [RELEASE_6_REUSE_SPEC.md](RELEASE_6_REUSE_SPEC.md) — matching determinístico, snapshot de decisão e estados bloqueados da reutilização.
 
 ## Decisões confirmadas com o product owner
 

@@ -34,6 +34,9 @@ export interface GrowthLearning {
   revision_count: number;
   last_revision_at: string | null;
   link_count: number;
+  reused_count: number;
+  discarded_count: number;
+  reuse_rate: number | null;
 }
 
 export interface GrowthLearningRevision {

@@ -93,6 +93,8 @@ export const GrowthMemoryDrawer: React.FC<GrowthMemoryDrawerProps> = ({ learning
               <div><dt className="text-[10px] font-black uppercase text-slate-400">Revisar em</dt><dd className={`mt-1 text-sm font-bold ${learning.review_due ? 'text-amber-700' : 'text-slate-700'}`}>{formatDate(learning.review_at)}{learning.review_due ? ' · revisão vencida' : ''}</dd></div>
               <div><dt className="text-[10px] font-black uppercase text-slate-400">Regime</dt><dd className="mt-1 text-sm text-slate-700">{learning.regime || 'Não especificado'}</dd></div>
               <div><dt className="text-[10px] font-black uppercase text-slate-400">Revisão atual</dt><dd className="mt-1 text-sm text-slate-700">v{learning.current_revision}</dd></div>
+              <div><dt className="text-[10px] font-black uppercase text-slate-400">Decisões de reuso</dt><dd className="mt-1 text-sm text-slate-700">{learning.reused_count} reutilizada(s) · {learning.discarded_count} descartada(s)</dd></div>
+              <div><dt className="text-[10px] font-black uppercase text-slate-400">Taxa de reuso</dt><dd className="mt-1 text-sm text-slate-700">{learning.reuse_rate === null ? 'Ainda sem decisões' : `${Math.round(learning.reuse_rate * 100)}%`}</dd></div>
             </dl>
           </section>
 
