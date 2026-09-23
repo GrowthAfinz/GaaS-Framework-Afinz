@@ -95,3 +95,7 @@ Essa divisão mantém a Fila sistêmica: mudança material aparece; conversa cot
 - página e bundle público `index-DglFengp.js` responderam HTTP 200;
 - o bundle contém `Release 3B`, `Assumir aposta`, `Apostas contratadas` e `Mesclar à existente`;
 - nenhum dado sintético foi persistido durante ensaio ou promoção.
+
+### Correção pós-promoção
+
+O pipeline documental posterior encontrou um caso não determinístico no teste SQL: vários updates gravados na mesma transação compartilham `created_at`, e o desempate anterior por UUID podia projetar `not_started` como execução mais recente. A migration `growth_bet_timeline_sequence` adiciona uma sequência monotônica à timeline e passa a usá-la na projeção operacional. O gate manteve a expectativa `partial`; não foi relaxado.

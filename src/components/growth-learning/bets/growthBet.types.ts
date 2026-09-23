@@ -79,6 +79,7 @@ export interface GrowthBetChecklistItem {
 
 export interface GrowthBetUpdate {
   id: string;
+  timeline_sequence: number;
   bet_id: string;
   update_type: 'created' | 'status_changed' | 'execution' | 'comment' | 'contract_revised';
   body: string | null;
