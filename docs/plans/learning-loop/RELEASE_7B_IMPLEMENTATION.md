@@ -1,6 +1,6 @@
 # Release 7B — implementação de apostas relacionadas
 
-**Estado:** validada no CI e publicada no Supabase; merge e publicação web pendentes.
+**Estado:** publicada na `main`, no Supabase e no GitHub Pages.
 
 ## Entrega
 
@@ -51,11 +51,13 @@ O primeiro run do PR expôs uma flutuação anterior no teste da Release 4: o fi
 - zero apostas originadas da Fila vazaram para a view;
 - Advisors não atribuíram alerta novo à view ou ao índice; os achados retornados são dívida anterior e fora deste corte.
 
-## Pendências para fechar
+## Fechamento
 
-1. merge na `main`;
-2. GitHub Pages verde e bundle público reconciliado;
-3. vault e ontologia compilada atualizados.
+- PR [#27](https://github.com/GrowthAfinz/GaaS-Framework-Afinz/pull/27) mergeado como `998c9fe`;
+- workflow pós-merge [35945457751](https://github.com/GrowthAfinz/GaaS-Framework-Afinz/actions/runs/35945457751) verde;
+- GitHub Pages publicou `assets/index-DzP4WOf1.js`, HTTP 200;
+- bundle público reconciliado com `Apostas desta origem`, `Voltar à origem`, `mesma leitura` e `growth_bet_source_links_v`;
+- vault consolidado atualizado e ontologia recompilada com 184 notas.
 
 ## Limite
 
