@@ -9,7 +9,8 @@ import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCel
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 import { SerasaBiFunnelView, SerasaMarketplaceFunnelView } from './SerasaSourceFunnelView';
 import { useAppStore } from '../store/useAppStore';
-import { openGrowthBetSourceContext } from './growth-learning/growthLearningNavigation';
+import { GrowthBetSourceContext, openGrowthBetSourceContext } from './growth-learning/growthLearningNavigation';
+import { RelatedGrowthBets } from './growth-learning/bets/RelatedGrowthBets';
 
 type Granularity = 'daily' | 'weekly' | 'monthly';
 type StageKey = 'consultas' | 'aprovados' | 'pedidos' | 'bio' | 'docs' | 'assinatura' | 'emitidos';
@@ -315,6 +316,8 @@ export const FunilAquisicaoView: React.FC = () => {
   const [funnel, setFunnel] = useState<'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz' | 'appsflyer'>('app-afinz');
   const { startDate, endDate } = usePeriod();
   const setTab = useAppStore((state) => state.setTab);
+  const funnelDeepLink = useAppStore((state) => state.funnelDeepLink);
+  const setFunnelDeepLink = useAppStore((state) => state.setFunnelDeepLink);
   const options = [
     { key: 'app-afinz' as const, label: 'Funil Onboarding — Apps', detail: 'B2C + B2B2C + Plurix' },
     { key: 'appsflyer' as const, label: 'Funil App Install — AppsFlyer', detail: 'Installs · sessões · origem (orgânico/pago/CRM)' },
@@ -349,21 +352,29 @@ export const FunilAquisicaoView: React.FC = () => {
       description: 'Topo de funil por origem — orgânico, pago e CRM na mesma régua. Meio/fundo por template aguardam raw data.',
     },
   }[funnel];
+  const growthSourceContext = useMemo<GrowthBetSourceContext>(() => ({
+    front: funnel === 'paid-media' ? 'paid_media' : 'b2c_origin',
+    sourceSurface: 'acquisition_funnel',
+    sourceRoute: `funnels:${funnel}`,
+    periodStart: iso(startDate),
+    periodEnd: iso(endDate),
+    filters: { funnel },
+    entityKey: `funnel:${funnel}`,
+    visualRef: `funnels:${funnel}:workspace`,
+    title: activeContext.title,
+    verificationView: `funnels:${funnel}`,
+  }), [activeContext.title, endDate, funnel, startDate]);
+
+  useEffect(() => {
+    if (!funnelDeepLink) return;
+    setFunnel(funnelDeepLink.funnel);
+    setFunnelDeepLink(null);
+  }, [funnelDeepLink, setFunnelDeepLink]);
+
   const createContextualBet = useCallback(() => {
-    openGrowthBetSourceContext({
-      front: funnel === 'paid-media' ? 'paid_media' : 'b2c_origin',
-      sourceSurface: 'acquisition_funnel',
-      sourceRoute: `funnels:${funnel}`,
-      periodStart: iso(startDate),
-      periodEnd: iso(endDate),
-      filters: { funnel },
-      entityKey: `funnel:${funnel}`,
-      visualRef: `funnels:${funnel}:workspace`,
-      title: activeContext.title,
-      verificationView: `funnels:${funnel}`,
-    });
+    openGrowthBetSourceContext(growthSourceContext);
     setTab('aprendizado-growth');
-  }, [activeContext.title, endDate, funnel, setTab, startDate]);
+  }, [growthSourceContext, setTab]);
   const navigation = <>
     <div>
       <p className="text-[10.5px] font-bold uppercase tracking-[0.16em] text-cyan-100">{activeContext.eyebrow}</p>
@@ -388,6 +399,7 @@ export const FunilAquisicaoView: React.FC = () => {
         <button type="button" onClick={createContextualBet} className="inline-flex w-fit items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-slate-800"><Target size={15} /> Criar aposta deste funil</button>
       </div>
     </div>
+    <RelatedGrowthBets context={growthSourceContext} />
     <div className="pt-4">
       {funnel === 'serasa-marketplace'
         ? <SerasaMarketplaceFunnelView navigation={navigation} />

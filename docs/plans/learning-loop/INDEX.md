@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Release 7A de entrada contextual publicada; links reversos e projeção editorial permanecem nos cortes 7B e 7C
+**Status:** Release 7A publicada; Release 7B validada no CI e no Supabase, aguardando merge; projeção editorial permanece no corte 7C
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live
@@ -38,6 +38,8 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 18. [RELEASE_6_IMPLEMENTATION.md](RELEASE_6_IMPLEMENTATION.md) — implementação publicada, reconciliação remota e evidências dos gates.
 19. [RELEASE_7A_CONTEXT_ENTRY_SPEC.md](RELEASE_7A_CONTEXT_ENTRY_SPEC.md) — contrato da entrada contextual, deep-link, evidência e memória compartilhada.
 20. [RELEASE_7A_IMPLEMENTATION.md](RELEASE_7A_IMPLEMENTATION.md) — superfícies entregues, contratos remotos e gates de publicação.
+21. [RELEASE_7B_RELATED_BETS_SPEC.md](RELEASE_7B_RELATED_BETS_SPEC.md) — contrato de relação, retorno à origem e próxima verificação.
+22. [RELEASE_7B_IMPLEMENTATION.md](RELEASE_7B_IMPLEMENTATION.md) — implementação, view read-only e evidências de validação/publicação.
 
 ## Decisões confirmadas com o product owner
 

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, BookMarked, CalendarDays, Check, Circle, Database, History, Loader2, MessageSquarePlus, Plus, ShieldCheck, Target, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, ArrowLeft, BookMarked, CalendarDays, Check, Circle, Database, History, Loader2, MessageSquarePlus, Plus, ShieldCheck, Target, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -11,6 +11,11 @@ import {
   setGrowthBetChecklistItem,
 } from './growthBetService';
 import { GrowthBet, GrowthBetChecklistItem, GrowthBetStatus, GrowthBetUpdate, GrowthExecutionStatus, GrowthLearningApplication } from './growthBet.types';
+import { readGrowthBetSourceContextFromBeliefSnapshot, openReportsOutput } from '../growthLearningNavigation';
+import { growthSourceDestination } from './relatedGrowthBets.logic';
+import { useAppStore } from '../../../store/useAppStore';
+import { BU, useBU } from '../../../contexts/BUContext';
+import { usePeriod } from '../../../contexts/PeriodContext';
 
 interface GrowthBetDrawerProps {
   bet: GrowthBet;
@@ -37,6 +42,9 @@ const Fact: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, val
 );
 
 export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, onChanged }) => {
+  const { setPeriod } = usePeriod();
+  const { setSelectedBUs, isBULocked } = useBU();
+  const { setGlobalFilters, setReportDeepLink, setFunnelDeepLink, setTab } = useAppStore();
   const [checklist, setChecklist] = useState<GrowthBetChecklistItem[]>([]);
   const [updates, setUpdates] = useState<GrowthBetUpdate[]>([]);
   const [learningApplications, setLearningApplications] = useState<GrowthLearningApplication[]>([]);
@@ -48,6 +56,34 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sourceContext = useMemo(() => readGrowthBetSourceContextFromBeliefSnapshot(bet.belief_snapshot), [bet.belief_snapshot]);
+  const sourceDestination = useMemo(() => sourceContext ? growthSourceDestination(sourceContext) : null, [sourceContext]);
+
+  const returnToSource = () => {
+    if (!sourceContext || !sourceDestination) return;
+    setPeriod(parseISO(sourceContext.periodStart), parseISO(sourceContext.periodEnd), 'custom');
+
+    const filterKeys = ['canais', 'jornadas', 'segmentos', 'parceiros', 'subgrupos', 'ofertas'] as const;
+    const filterPatch = Object.fromEntries(filterKeys.flatMap((key) => {
+      const value = sourceContext.filters[key];
+      return Array.isArray(value) && value.every((item) => typeof item === 'string') ? [[key, value]] : [];
+    }));
+    setGlobalFilters(filterPatch);
+
+    const validBUs = new Set<BU>(['B2C', 'B2B2C', 'Plurix', 'Seguros']);
+    const sourceBUs = sourceContext.filters.bu;
+    if (!isBULocked && Array.isArray(sourceBUs)) {
+      setSelectedBUs(sourceBUs.filter((value): value is BU => typeof value === 'string' && validBUs.has(value as BU)));
+    }
+
+    if (sourceDestination.tab === 'relatorio') {
+      setReportDeepLink({ mode: sourceDestination.reportMode });
+    } else {
+      setFunnelDeepLink({ funnel: sourceDestination.funnel });
+    }
+    openReportsOutput();
+    setTab(sourceDestination.tab);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,7 +153,10 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
         <header className="border-b border-slate-200 px-5 py-5 sm:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-cyan-100 text-cyan-700"><Target size={20} /></span><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] text-white">{BET_STATUS_LABELS[bet.status]}</span><span className="text-xs font-bold text-slate-500">{bet.team_scope}{bet.owner ? ` · ${bet.owner}` : ''}</span></div><h2 className="mt-2 text-xl font-black leading-snug text-slate-900">{bet.hypothesis}</h2></div></div>
-            <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+            <div className="flex shrink-0 items-center gap-2">
+              {sourceDestination && <button type="button" onClick={returnToSource} className="inline-flex items-center gap-2 rounded-xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-black text-cyan-800 hover:bg-cyan-100"><ArrowLeft size={14} /> Voltar à origem</button>}
+              <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+            </div>
           </div>
         </header>
 
