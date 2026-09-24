@@ -1,7 +1,7 @@
 # Release 7C — implementação da projeção editorial
 
 **Data:** 2026-09-24
-**Estado:** candidata local; não aplicada nem publicada
+**Estado:** PR #29 verde; não aplicada nem publicada
 
 ## Entrega
 
@@ -38,4 +38,6 @@ Consequência esperada para um build de setembro: C8 pode mostrar a aposta de re
 - `npm run check:edge`: verde;
 - `npm run build`: verde; avisos históricos de chunk/dynamic import permanecem.
 
-O teste SQL PostgreSQL 17 foi adicionado ao `validate.yml`; o Docker local estava indisponível e, portanto, esse gate precisa ser confirmado pelo Actions do PR. A migration não foi aplicada e a Edge Function não foi publicada neste estado.
+O Docker local estava indisponível. O PR [#29](https://github.com/GrowthAfinz/GaaS-Framework-Afinz/pull/29) executou o contrato no PostgreSQL 17 limpo do Actions; o job `validate` (`35956153582`) passou em 1m27s. O preview Vercel também passou.
+
+A migration não foi aplicada, a Edge Function não foi publicada, o PR não foi mergeado e o deck Google não foi tocado. Essas são ações de produção separadas.
