@@ -1,6 +1,6 @@
 # Release 7B — implementação de apostas relacionadas
 
-**Estado:** candidata; gates locais concluídos, validação SQL no CI e publicação remota pendentes.
+**Estado:** validada no CI e publicada no Supabase; merge e publicação web pendentes.
 
 ## Entrega
 
@@ -17,9 +17,14 @@
 
 A relação continua armazenada somente em `growth_bets.belief_snapshot.source_context`, congelado pela Release 7A. A view da 7B é uma projeção `security_invoker`; ela não introduz escrita, tabela de associação nem atualização retroativa.
 
-Migração candidata:
+Migração versionada:
 
 - `20260924013705_growth_related_bets_release_7b.sql`.
+
+Aplicação remota pelo MCP Supabase:
+
+- `20260924015813_growth_related_bets_release_7b`;
+- projeto `mipiwxadnpwtcgfcedym`.
 
 ## Evidência local
 
@@ -29,19 +34,28 @@ Migração candidata:
 - `npm run check:edge`: verde;
 - `npm run build`: verde;
 - inspeção visual em `#funil-preview`: faixa própria entre o cabeçalho e o workspace, sem sobrepor o gráfico.
+- PR [#27](https://github.com/GrowthAfinz/GaaS-Framework-Afinz/pull/27), run [35945082567](https://github.com/GrowthAfinz/GaaS-Framework-Afinz/actions/runs/35945082567): todos os gates verdes, inclusive `Growth related bets SQL contract` no Postgres 17;
+- Vercel preview do PR: verde.
 
 O teste SQL `test-growth-related-bets-release-7b.mjs` foi incorporado ao `validate.yml`. Como o Docker local continua indisponível, o Postgres 17 do pull request é o gate de banco antes da aplicação remota.
 
 O primeiro run do PR expôs uma flutuação anterior no teste da Release 4: o fixture usava `current_date` do runner em UTC, enquanto `growth_outcomes_due_v` classifica a data de negócio em `America/Sao_Paulo`. O fixture passou a usar a mesma data de negócio; nenhuma função, view ou regra de outcome foi alterada.
 
+## Reconciliação remota
+
+- `growth_bet_source_links_v` presente;
+- `security_invoker=true`;
+- `authenticated` possui `SELECT`; `anon` não possui;
+- `growth_bets_context_source_idx` presente;
+- zero apostas contextuais reais no momento da verificação, portanto o estado vazio é o resultado correto;
+- zero apostas originadas da Fila vazaram para a view;
+- Advisors não atribuíram alerta novo à view ou ao índice; os achados retornados são dívida anterior e fora deste corte.
+
 ## Pendências para fechar
 
-1. pipeline do pull request verde, inclusive o novo contrato SQL;
-2. migration aplicada no projeto `mipiwxadnpwtcgfcedym`;
-3. verificação remota de `security_invoker`, grants e índice;
-4. merge na `main`;
-5. GitHub Pages verde e bundle público reconciliado;
-6. vault e ontologia compilada atualizados.
+1. merge na `main`;
+2. GitHub Pages verde e bundle público reconciliado;
+3. vault e ontologia compilada atualizados.
 
 ## Limite
 

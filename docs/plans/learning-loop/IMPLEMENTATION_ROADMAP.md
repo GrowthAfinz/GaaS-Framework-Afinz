@@ -151,7 +151,7 @@ Uma nova aposta cita aprendizado anterior e registra se o reutilizou ou descarto
 
 ## Release 7 — integração transversal e editorial
 
-**Estado em 23/09/2026:** corte 7A publicado na `main` e no Supabase pelo PR #25. O corte 7B está implementado como candidato: Overview, Diário, Mensal e Funis listam apostas da mesma origem e o drawer restaura a leitura; publicação depende do pipeline, migration remota e merge. Projeção editorial continua separada na 7C.
+**Estado em 23/09/2026:** corte 7A publicado na `main` e no Supabase pelo PR #25. O corte 7B passou no pipeline do PR #27 e sua view read-only está publicada no Supabase; Overview, Diário, Mensal e Funis listam apostas da mesma origem e o drawer restaura a leitura. Merge e publicação web ainda fecham o corte. Projeção editorial continua separada na 7C.
 
 ### Escopo
 
