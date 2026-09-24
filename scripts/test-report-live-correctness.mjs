@@ -61,7 +61,7 @@ test('manifest spec version must match the immutable artifact version',async()=>
  row[1]='1.0';
  check=validateArtifact(built).find(item=>item.validation_key==='versions.manifest_spec');
  assert.equal(check.status,'failed');
- assert.deepEqual(check.evidence,{manifest_spec:'1.0',artifact_spec:'3.0'});
+ assert.deepEqual(check.evidence,{manifest_spec:'1.0',artifact_spec:'3.1'});
 });
 
 test('partner channel view has one row per channel and pp variation',()=>{

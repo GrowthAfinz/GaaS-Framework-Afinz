@@ -151,7 +151,7 @@ Uma nova aposta cita aprendizado anterior e registra se o reutilizou ou descarto
 
 ## Release 7 — integração transversal e editorial
 
-**Estado em 23/09/2026:** cortes 7A e 7B publicados na `main`, no Supabase e no GitHub Pages pelos PRs #25 e #27. Overview, Diário, Mensal e Funis criam e listam apostas da mesma origem; o drawer restaura a leitura. Projeção editorial continua separada na 7C.
+**Estado em 24/09/2026:** cortes 7A e 7B publicados na `main`, no Supabase e no GitHub Pages pelos PRs #25 e #27. A 7C possui contrato e implementação candidata local para C7/C8; ainda não foi aplicada, deployada nem publicada.
 
 ### Escopo
 
@@ -185,6 +185,8 @@ O ciclo começa em uma tela analítica e termina em aprendizado reapresentado se
 - selecionar apostas, outcomes e aprendizados materiais;
 - projetar o ciclo no Report Live sem transformar recomendação em causalidade;
 - retrospectiva semanal/mensal e calibração por tipo de sinal.
+- contrato executável: [RELEASE_7C_EDITORIAL_SPEC.md](RELEASE_7C_EDITORIAL_SPEC.md);
+- implementação candidata: [RELEASE_7C_IMPLEMENTATION.md](RELEASE_7C_IMPLEMENTATION.md).
 
 ## Ordem de grandeza
 
