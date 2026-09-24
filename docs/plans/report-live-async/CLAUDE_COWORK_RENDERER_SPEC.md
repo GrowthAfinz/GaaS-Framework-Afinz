@@ -106,7 +106,13 @@ O renderer recebe um pacote normalizado. Ele não consulta Supabase e não inter
 type ReportRenderPackage = {
   schema_version: "1.0";
   run_id: string;
-  profile: "executivo_mensal" | "deep_dive";
+  profile: string;
+  expected_slide_count: number;
+  coverage_baseline: {
+    run_id: string;
+    slide_count: 57;
+    coverage_map_path: string;
+  };
   period: { start: string; end: string; data_through: string };
   publication: {
     generated_at: string;
@@ -150,12 +156,11 @@ type RenderSlide = {
 
 O array `slides[]` já chega projetado e ordenado. O renderer deve produzir exatamente uma página para cada item, sem reordenar, promover, omitir ou criar slides.
 
-Cardinalidade esperada:
+A publicação de agosto com 57 páginas é a baseline de cobertura. Os perfis de 12 e 31 slides existem como implementação candidata, mas ainda não foram homologados e não constituem cardinalidade obrigatória do novo renderer. Até a auditoria de equivalência terminar, qualquer cardinalidade declarada no pacote é aceita se:
 
-- `executivo_mensal`: 12 slides;
-- `deep_dive`: 31 slides.
-
-Qualquer outra quantidade é erro bloqueante de contrato.
+- `slides.length` corresponder ao `expected_slide_count` do manifesto;
+- cada `slide_instance_id` tiver procedência;
+- toda omissão em relação à baseline de 57 estiver registrada no mapa de cobertura.
 
 ## 5. Inventário completo
 
@@ -424,8 +429,8 @@ O `qa-report.json` deve listar cada slide, erros, warnings e evidência dos chec
 
 Implementar pelo menos:
 
-- perfil executivo com 12 slides;
-- deep dive com 31 slides;
+- golden run com os 57 slides da publicação de agosto, preservando sua cobertura;
+- fixture candidata somente depois da auditoria de equivalência, com cardinalidade derivada dos slides realmente úteis;
 - mês corrente parcial;
 - Serasa em `lead_pre_qualificado` e regime incomparável;
 - parceiro com amostra insuficiente;
@@ -438,7 +443,8 @@ Implementar pelo menos:
 
 ## 15. Critérios de aceite
 
-- os perfis completos de 12 e 31 slides são gerados a partir do mesmo pacote-base;
+- o golden run de 57 slides pode ser reconstruído sem perda de cobertura funcional;
+- toda redução de cardinalidade possui mapa baseline→destino e motivo verificável;
 - todas as páginas têm estrutura completa, procedência e limite de leitura;
 - o renderer não consulta Google nem Supabase;
 - o renderer não recalcula métricas nem seleciona slides;
@@ -456,8 +462,7 @@ Pare antes de continuar se:
 - a template institucional não puder ser usada sem perda do slide master;
 - a conversão para PDF trocar fontes ou quebrar gráficos;
 - uma regra exigir recalcular números;
-- a cardinalidade divergir de 12/31;
+- a cardinalidade divergir do `expected_slide_count` declarado no pacote;
 - a solução depender de Google ou de edição manual pós-render.
 
 Reporte a lacuna com `slide_code`, campo ausente, impacto e menor alteração contratual necessária.
-

@@ -15,7 +15,7 @@ Substituir Google Sheets/Slides como destino de publicação por artefatos PPTX/
 - inputs congelados;
 - hashes e blueprints;
 - build, certificação e publicação como etapas distintas;
-- profiles `executivo_mensal` e `deep_dive`;
+- perfis de output governados, sem assumir que a hipótese 12/31 já substitui a baseline publicada de 57 slides;
 - ponteiro de publicação vigente;
 - histórico e rollback;
 - contratos de missing, cutoff, comparação e confiança;
@@ -168,9 +168,9 @@ Política proposta:
 
 - segunda, quarta e sexta às 09:00;
 - dados até o último dia fechado;
-- os dois profiles compartilham o mesmo snapshot e são gerados em todo ciclo;
-- `executivo_mensal` é a visualização padrão de 12 slides;
-- `deep_dive` acompanha a mesma publicação com 31 slides, sem reduzir a estrutura para economizar render;
+- os outputs aprovados compartilham o mesmo snapshot;
+- a primeira implementação reconstrói a cobertura do output publicado de 57 slides;
+- um perfil compacto só entra na cadência depois que a auditoria baseline→destino provar que nenhuma decisão, evidência ou limite útil desapareceu;
 - falha de freshness gera run bloqueado e evento no feed, sem substituir o output vigente.
 
 ## 9. Certificação
@@ -180,7 +180,7 @@ Política proposta:
 - snapshot congelado;
 - fontes e cutoffs presentes;
 - slides projetados;
-- cardinalidade 12/31;
+- cardinalidade coerente com o manifesto e com o mapa de cobertura da baseline;
 - nenhum `omitir_bloqueado` no pacote;
 - hashes e versões definidos.
 
@@ -234,12 +234,14 @@ Política proposta:
 2. Claude entrega renderer e fixtures locais;
 3. Codex implementa pacote normalizado e contratos de banco;
 4. integrar worker sem ativar publicação automática;
-5. reconstruir um golden run real;
-6. comparar PPTX/PDF com a publicação vigente;
-7. executar três ciclos em shadow mode;
-8. habilitar canal `supabase_storage` no GaaS;
-9. manter a última publicação Google como histórico;
-10. aposentar Google somente após aceite registrado.
+5. reconstruir o golden run real de 57 páginas;
+6. classificar cada slide como preservar, fundir, omitir sem dado ou aposentar;
+7. comparar PPTX/PDF e cobertura funcional com a publicação vigente;
+8. homologar a cardinalidade resultante, sem meta prévia de 12 ou 31;
+9. executar três ciclos em shadow mode;
+10. habilitar canal `supabase_storage` no GaaS;
+11. manter a última publicação Google como histórico;
+12. aposentar Google somente após aceite registrado.
 
 ## 12. Entregas do Codex
 
@@ -261,7 +263,7 @@ Política proposta:
 
 - spec do renderer aceita;
 - horário da cadência confirmado;
-- golden package de 12 e 31 slides disponível;
+- golden package de 57 slides e mapa de cobertura baseline→destino disponíveis;
 - renderer gera PPTX e PDF sem intervenção manual;
 - estratégia de execução do worker definida para o modo desassistido.
 
