@@ -32,6 +32,8 @@ Migração candidata:
 
 O teste SQL `test-growth-related-bets-release-7b.mjs` foi incorporado ao `validate.yml`. Como o Docker local continua indisponível, o Postgres 17 do pull request é o gate de banco antes da aplicação remota.
 
+O primeiro run do PR expôs uma flutuação anterior no teste da Release 4: o fixture usava `current_date` do runner em UTC, enquanto `growth_outcomes_due_v` classifica a data de negócio em `America/Sao_Paulo`. O fixture passou a usar a mesma data de negócio; nenhuma função, view ou regra de outcome foi alterada.
+
 ## Pendências para fechar
 
 1. pipeline do pull request verde, inclusive o novo contrato SQL;
