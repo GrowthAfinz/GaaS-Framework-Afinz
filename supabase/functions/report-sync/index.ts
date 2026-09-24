@@ -42,6 +42,7 @@ import {
   type SlideContract,
   type SourceManifest,
 } from "./report-live-engine.ts";
+import { freezeEditorialGrowthSources } from "./report-live-growth-loop.ts";
 import {
   buildArtifact,
   certificationPassed,
@@ -406,6 +407,9 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     aliases,
     actionCandidates,
     actionOutcomes,
+    growthBets,
+    growthOutcomes,
+    growthLearnings,
     metricCertifications,
     eventMap,
     monthlyAcquisition,
@@ -461,6 +465,9 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     pagedSelect("paid_media_campaign_aliases", "*", { orderColumn: "platform" }),
     pagedSelect("report_action_candidates", "*", { orderColumn: "created_at" }),
     pagedSelect("report_action_outcomes", "*", { orderColumn: "created_at" }),
+    pagedSelect("growth_bets_operational_v", "*", { orderColumn: "created_at" }),
+    pagedSelect("growth_outcomes_due_v", "*", { orderColumn: "outcome_window_end" }),
+    pagedSelect("growth_memory_active_v", "*", { orderColumn: "updated_at" }),
     pagedSelect("report_metric_certifications", "*", { orderColumn: "period_key" }),
     pagedSelect("event_map", "*", { orderColumn: "id" }),
     pagedSelect("v_aquisicao_mensal_canonico", "*", {
@@ -470,6 +477,12 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
       orderColumn: "mes",
     }),
   ]);
+
+  const frozenGrowth = freezeEditorialGrowthSources({
+    bets: growthBets,
+    outcomes: growthOutcomes,
+    learnings: growthLearnings,
+  });
 
   return {
     runId,
@@ -499,6 +512,9 @@ async function loadInputs(runId: string, profile: string, periodStart: string, p
     aliases,
     actionCandidates,
     actionOutcomes,
+    growthBets: frozenGrowth.bets,
+    growthOutcomes: frozenGrowth.outcomes,
+    growthLearnings: frozenGrowth.learnings,
     metricCertifications,
     eventMap,
     monthlyAcquisition,
@@ -1700,6 +1716,7 @@ async function generateNarrative(
     scorecard: built.tabs.VIEW_SCORECARD_INTEGRATED?.slice(0, 12),
     partner_router: built.tabs.VIEW_PARTNER_ROUTER?.slice(0, 15),
     action_queue: built.tabs.VIEW_ACTION_QUEUE?.slice(0, 12),
+    growth_retrospective: built.tabs.VIEW_GROWTH_LEARNING_RETROSPECTIVE?.slice(0, 10),
   };
   const response = await gemini(
     `Você redige o Report Live Afinz/GaaS. Números são imutáveis e vêm apenas da evidência.
@@ -1999,7 +2016,7 @@ function deterministicNarrative(
   const templates = tableRows(built.tabs.VIEW_TEMPLATE_COVERAGE);
   const router = tableRows(built.tabs.VIEW_PARTNER_ROUTER);
   const actionQueue = tableRows(built.tabs.VIEW_ACTION_QUEUE);
-  const outcomes = tableRows(built.tabs.VIEW_ACTION_OUTCOMES);
+  const growthRetrospective = tableRows(built.tabs.VIEW_GROWTH_LEARNING_RETROSPECTIVE);
   const mediaMix = tableRows(built.tabs.VIEW_MEDIA_MIX);
   const b2c = tableRows(built.tabs.VIEW_B2C_PARALLEL_FUNNELS);
   const fieldCoverage = tableRows(built.tabs.VIEW_FIELD_COVERAGE);
@@ -2074,15 +2091,27 @@ function deterministicNarrative(
         break;
       }
       case "C7":
-        body = outcomes.length
-          ? `${outcomes.length} outcome(s) registrado(s). Comparar resultado observado com a métrica e janela definidas na ação original.`
-          : "Ainda não há janela de outcome encerrada nesta primeira execução. O slide permanece como baseline, sem inventar efeito realizado.";
+        {
+          const verifiedOutcomes = growthRetrospective.filter((row) => row.record_type === "outcome");
+          const loopLearnings = growthRetrospective.filter((row) => row.record_type === "aprendizado_do_loop");
+          const curatedMemory = growthRetrospective.filter((row) => row.record_type === "memoria_curada");
+          body = `${verifiedOutcomes.length} outcome(s) material(is) · ${loopLearnings.length} aprendizado(s) do loop · ${curatedMemory.length} memória(s) curada(s).\n` +
+            (verifiedOutcomes.length
+              ? "Outcomes preservam expectativa, execução, janela e veredito revisado.\n"
+              : "Nenhum outcome verificado neste recorte; não há efeito realizado a inferir.\n") +
+            (curatedMemory.length
+              ? "Memória curada orienta contexto, mas não equivale a validação causal pelo loop."
+              : "Todo aprendizado exibido mantém procedência e validade explícitas.");
+        }
         break;
       case "C8": {
+        const growthBets = actionQueue.filter((row) => row.editorial_origin === "growth_bet");
+        const candidates = actionQueue.filter((row) => row.editorial_origin === "report_action_candidate");
         const buckets = ["Agir hoje", "Acompanhar", "Investigar"].map((bucket) =>
           `${bucket}: ${actionQueue.filter((row) => row.bucket === bucket).length}`
         ).join(" · ");
-        body = `${buckets}.\n\nCada item foi emitido por regra determinística, deduplicado por domínio × parceiro × sinal e aguarda owner/prazo humanos.`;
+        body = `${buckets}.\n${growthBets.length} aposta(s) assumida(s) · ${candidates.length} candidata(s) do engine.\n\n` +
+          "Aposta é compromisso humano; candidata continua aguardando decisão. Nenhum item é apresentado como causalidade comprovada.";
         break;
       }
       case "P1": {

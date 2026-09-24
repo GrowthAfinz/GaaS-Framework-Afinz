@@ -6,6 +6,14 @@ import {
   type RulerMetricKey,
 } from "../_shared/report-live-editorial.ts";
 import { REPORT_LIVE_SPEC_VERSION } from "../_shared/report-live-design.ts";
+import {
+  growthBetQueueRow,
+  growthLearningRetrospectiveRow,
+  growthOutcomeRetrospectiveRow,
+  selectEditorialGrowthBets,
+  selectEditorialGrowthLearnings,
+  selectEditorialGrowthOutcomes,
+} from "./report-live-growth-loop.ts";
 
 export type QualityStatus = "confirmed" | "directional" | "suspect" | "blocked";
 export type Eligibility = "render" | "render_com_limites" | "omitir_bloqueado";
@@ -64,6 +72,9 @@ export interface ReportInputs {
   aliases: Row[];
   actionCandidates: Row[];
   actionOutcomes: Row[];
+  growthBets?: Row[];
+  growthOutcomes?: Row[];
+  growthLearnings?: Row[];
   metricCertifications: Row[];
   monthlyAcquisition?: Row[];
   config: Record<string, unknown>;
@@ -1272,7 +1283,9 @@ function missingContractFields(contract: SlideContract, rows: unknown[][], input
     previous_equivalent_period: Boolean(input.periodStart && input.periodEnd),
     daily_metrics: body.length > 0 && body.every((row) => observed(row.crm_cards) && observed(row.crm_cost) && observed(row.media_spend)),
     partner_rollup: body.length > 0, materiality_config: Boolean(input.config.materiality),
-    approved_actions: input.actionOutcomes.length > 0, outcomes: input.actionOutcomes.length > 0,
+    approved_actions: input.actionOutcomes.length > 0 || (input.growthOutcomes ?? []).some((row) => Boolean(row.outcome_id)),
+    outcomes: input.actionOutcomes.length > 0 || (input.growthOutcomes ?? []).some((row) => Boolean(row.outcome_id)),
+    cycle_records: body.length > 0,
     action_candidates: body.length > 0, partner_action_candidate: body.length > 0, media_action_candidate: body.length > 0,
     collection_runs: input.collectionRuns.length > 0 || input.collectionLogs.length > 0,
     event_coverage: toNumber(input.manifest.field_coverage.media_named_event) === 1,
@@ -1556,6 +1569,21 @@ export function buildReport(input: ReportInputs): BuiltReport {
   const partnerModes = buildPartnerModes(crmCurrent, input.config);
   const fieldCoverage = buildFieldCoverage(input);
   const actionCandidates = buildDeterministicCandidates(input, partnerModes, crmCurrent, mediaCurrent);
+  const editorialGrowthBets = selectEditorialGrowthBets(
+    input.growthBets ?? [],
+    input.periodStart,
+    input.periodEnd,
+  );
+  const editorialGrowthOutcomes = selectEditorialGrowthOutcomes(
+    input.growthOutcomes ?? [],
+    input.periodStart,
+    input.periodEnd,
+  );
+  const editorialGrowthLearnings = selectEditorialGrowthLearnings(
+    input.growthLearnings ?? [],
+    input.periodStart,
+    input.periodEnd,
+  );
   const tabs: Record<string, unknown[][]> = {};
 
   tabs.VIEW_RUN_MANIFEST = objectEntriesTable({
@@ -1763,12 +1791,39 @@ export function buildReport(input: ReportInputs): BuiltReport {
   );
 
   tabs.VIEW_ACTION_QUEUE = rowsToTable(
-    ["bucket", "domain", "partner", "signal", "impact", "probable_cause", "evidence_refs", "reading_limit", "action_text", "owner", "due_date", "success_metric", "confidence_status", "review_status"],
-    actionCandidates.filter((candidate) => candidate.status !== "backlog"),
+    ["bucket", "domain", "partner", "signal", "impact", "probable_cause", "evidence_refs", "reading_limit", "action_text", "owner", "due_date", "success_metric", "confidence_status", "review_status", "editorial_origin", "bet_id", "contract_status", "outcome_window_end"],
+    [
+      ...editorialGrowthBets.map((row) => growthBetQueueRow(row, input.periodEnd)),
+      ...actionCandidates.filter((candidate) => candidate.status !== "backlog").map((candidate) => ({
+        ...candidate,
+        editorial_origin: "report_action_candidate",
+        bet_id: null,
+        contract_status: "awaiting_human_decision",
+      })),
+    ],
   );
   tabs.VIEW_ACTION_OUTCOMES = rowsToTable(
     ["action_candidate_id", "metric_name", "baseline_value", "expected_value", "observed_value", "unit", "window_start", "window_end", "outcome_status", "conclusion"],
     input.actionOutcomes,
+  );
+  tabs.VIEW_GROWTH_BETS_MATERIAL = rowsToTable(
+    ["id", "front", "team_scope", "owner", "status", "hypothesis", "action_text", "metric_name", "baseline_value", "expected_value", "expected_direction", "expected_unit", "success_criterion", "execution_due_at", "outcome_window_start", "outcome_window_end", "verification_view", "source_confidence_status", "evidence_period_start", "evidence_period_end", "last_execution_status"],
+    editorialGrowthBets,
+  );
+  tabs.VIEW_GROWTH_OUTCOMES_MATERIAL = rowsToTable(
+    ["outcome_id", "bet_id", "front", "hypothesis", "metric_name", "baseline_value", "expected_value", "observed_value", "observed_unit", "system_verdict", "review_status", "resolved_verdict", "due_bucket", "conclusion", "verification_reason", "outcome_window_start", "outcome_window_end"],
+    editorialGrowthOutcomes,
+  );
+  tabs.VIEW_GROWTH_MEMORY_MATERIAL = rowsToTable(
+    ["id", "source_kind", "source_title", "source_ref", "front", "classification", "lifecycle_status", "statement", "confidence_status", "regime", "valid_from", "review_at", "valid_until", "validated_by_loop", "review_due", "reused_count"],
+    editorialGrowthLearnings,
+  );
+  tabs.VIEW_GROWTH_LEARNING_RETROSPECTIVE = rowsToTable(
+    ["record_type", "status", "front", "title", "evidence", "decision", "origin", "period_or_validity", "confidence_status", "reference_id"],
+    [
+      ...editorialGrowthOutcomes.map(growthOutcomeRetrospectiveRow),
+      ...editorialGrowthLearnings.map(growthLearningRetrospectiveRow),
+    ],
   );
 
   for (const partner of partnerModes.filter((item) => item.mode !== "quality_flag")) {

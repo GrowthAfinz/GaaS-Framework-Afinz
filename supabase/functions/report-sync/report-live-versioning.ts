@@ -8,8 +8,8 @@ import {
 } from "../_shared/report-live-design.ts";
 
 export const RELEASE_VERSIONS = {
-  source: "1.4",
-  semantic: "1.4.0",
+  source: "1.5",
+  semantic: "1.5.0",
   spec: REPORT_LIVE_SPEC_VERSION,
   narrative: "1",
   renderer: REPORT_LIVE_DESIGN_VERSION,
@@ -130,6 +130,9 @@ export function reportSourceRows(input: ReportInputs): Record<string, Row[]> {
     aliases: input.aliases,
     action_candidates: input.actionCandidates,
     action_outcomes: input.actionOutcomes,
+    growth_bets: input.growthBets ?? [],
+    growth_outcomes: input.growthOutcomes ?? [],
+    growth_learnings: input.growthLearnings ?? [],
     metric_certifications: input.metricCertifications,
     monthly_acquisition: input.monthlyAcquisition ?? [],
     slide_contracts: input.slideContracts as unknown as Row[],
