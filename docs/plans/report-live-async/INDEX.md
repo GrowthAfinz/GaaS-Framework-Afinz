@@ -8,7 +8,16 @@
 
 1. [`CLAUDE_COWORK_HANDOFF.md`](CLAUDE_COWORK_HANDOFF.md) — ponto de entrada autossuficiente e passo 0 de cobertura dos 57 slides.
 2. [`CLAUDE_COWORK_RENDERER_SPEC.md`](CLAUDE_COWORK_RENDERER_SPEC.md) — contrato completo para o Claude implementar o renderer PPTX/PDF.
-3. [`SUPABASE_ASYNC_PUBLISHING_PLAN.md`](SUPABASE_ASYNC_PUBLISHING_PLAN.md) — fila, artefatos, certificação, Storage e integração com o GaaS.
+3. [`report-render-package.schema.json`](report-render-package.schema.json) — contrato normativo engine → renderer.
+4. [`fixtures/august-2026-baseline-57.coverage.json`](fixtures/august-2026-baseline-57.coverage.json) — golden estrutural, não renderizável, das 57 páginas.
+5. `fixtures/archetypes-*.fixture.json` — pacotes sintéticos que cobrem os 12 arquétipos.
+6. [`SUPABASE_ASYNC_PUBLISHING_PLAN.md`](SUPABASE_ASYNC_PUBLISHING_PLAN.md) — fila, artefatos, certificação, Storage e integração com o GaaS.
+
+## Implementação de apoio
+
+- `supabase/functions/report-sync/report-live-render-package.ts`: adaptador puro e validações sem I/O;
+- `scripts/build-report-live-render-fixtures.mjs`: geração determinística do golden e das fixtures;
+- `scripts/test-report-live-render-package.mjs`: gates de cobertura, cardinalidade, procedência e estados de dado.
 
 ## Fontes preexistentes consolidadas
 

@@ -102,9 +102,12 @@ dist/report-live/
 
 O renderer recebe um pacote normalizado. Ele não consulta Supabase e não interpreta o artefato bruto.
 
+O contrato normativo validável por máquina está em `docs/plans/report-live-async/report-render-package.schema.json`. O adaptador puro que transforma o resultado do engine está em `supabase/functions/report-sync/report-live-render-package.ts`.
+
 ```ts
 type ReportRenderPackage = {
   schema_version: "1.0";
+  package_kind: "production" | "archetype_fixture";
   run_id: string;
   profile: string;
   expected_slide_count: number;
@@ -113,7 +116,14 @@ type ReportRenderPackage = {
     slide_count: 57;
     coverage_map_path: string;
   };
-  period: { start: string; end: string; data_through: string };
+  coverage_accounting: Array<{
+    baseline_page: number;
+    baseline_slide_code: string;
+    disposition: "preserve" | "merge" | "omit_no_data" | "retire_closed_scope" | "retain_as_quality_status";
+    target_slide_instance_ids: string[];
+    rationale: string;
+  }>;
+  period: { start: string; end: string; data_through: string | null };
   publication: {
     generated_at: string;
     spec_version: string;
@@ -154,6 +164,10 @@ type RenderSlide = {
 };
 ```
 
+`visual.dataset` preserva as linhas da view como `columns`, `rows` e `row_count`. Cada célula traz `value` e `state`, com os estados `valor_observado`, `zero_observado`, `missing` e `nao_aplicavel`. O renderer não pode converter `missing` em `0` nem inferir `nao_aplicavel` pelo texto `N/A`, porque `N/A` também é um valor canônico legítimo de parceiro não resolvido.
+
+O bloco `visual` também transporta `editorial_layout`, `editorial_rulers` e `chart_contract`. Esses campos vêm das tabelas já materializadas `VIEW_EDITORIAL_LAYOUTS`, `VIEW_EDITORIAL_RULERS`, `VIEW_EDITORIAL_CHART_REGISTRY` e das famílias de dados apontadas pelo registry. Assim, o renderer recebe tipo, séries, eixo, cor, formato, range e dados do gráfico; não os reconstrói por convenção própria. Se `editorial_layout.expected_chart=true` e `chart_contract` estiver ausente, o pacote é inválido.
+
 O array `slides[]` já chega projetado e ordenado. O renderer deve produzir exatamente uma página para cada item, sem reordenar, promover, omitir ou criar slides.
 
 A publicação de agosto com 57 páginas é a baseline de cobertura. Os perfis de 12 e 31 slides existem como implementação candidata, mas ainda não foram homologados e não constituem cardinalidade obrigatória do novo renderer. Até a auditoria de equivalência terminar, qualquer cardinalidade declarada no pacote é aceita se:
@@ -161,6 +175,29 @@ A publicação de agosto com 57 páginas é a baseline de cobertura. Os perfis d
 - `slides.length` corresponder ao `expected_slide_count` do manifesto;
 - cada `slide_instance_id` tiver procedência;
 - toda omissão em relação à baseline de 57 estiver registrada no mapa de cobertura.
+
+Para pacotes `production`, `coverage_accounting` contém exatamente as 57 páginas históricas, sem repetição. `preserve`, `merge` e `retain_as_quality_status` apontam para ao menos um `slide_instance_id` presente no pacote. `retire_closed_scope` e `omit_no_data` exigem justificativa, mas não inventam um slide de destino.
+
+Pacotes `archetype_fixture` existem somente para teste do renderer e podem omitir a contabilidade das 57 páginas. Eles se identificam como sintéticos no título, narrativa e procedência.
+
+### 4.1 Fixtures disponíveis
+
+```text
+docs/plans/report-live-async/fixtures/august-2026-baseline-57.coverage.json
+docs/plans/report-live-async/fixtures/archetypes-core.fixture.json
+docs/plans/report-live-async/fixtures/archetypes-charts.fixture.json
+docs/plans/report-live-async/fixtures/archetypes-operations.fixture.json
+```
+
+O arquivo de agosto é uma baseline **estrutural, não renderizável**. Ele preserva ordem, código, título, arquétipo, view e procedência das 57 páginas publicadas, mas não contém as linhas do artefato imutável. Não o use para fabricar um relatório com números vazios ou inferidos.
+
+Os três arquivos de arquétipo são renderizáveis, explicitamente sintéticos e cobrem os doze contratos visuais. Servem para desenvolver e testar o renderer antes de receber um pacote operacional completo.
+
+```bash
+npm run build:report-live-render-fixtures
+npm run check:report-live-render-fixtures
+node --test scripts/test-report-live-render-package.mjs
+```
 
 ## 5. Inventário completo
 

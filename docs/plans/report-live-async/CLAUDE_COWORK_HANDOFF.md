@@ -62,18 +62,21 @@ Portanto:
 Leia os arquivos completos, nesta ordem:
 
 1. `docs/plans/report-live-async/CLAUDE_COWORK_RENDERER_SPEC.md`
-2. `docs/plans/report-live-async/SUPABASE_ASYNC_PUBLISHING_PLAN.md` — apenas para entender a fronteira; não implemente esta parte.
-3. `MASTER_DECK_SPEC.md` na raiz de `ACALENDARIO APP`.
-4. `docs/plans/ESTUDO_RECONHECIMENTO_REPORT_LIVE.md`
-5. `docs/plans/inventario_slides.csv`
-6. `Afinz-CRM-Midia-Vault/05-Estrategia/Report-Live-Arquitetura-Editorial.md` na raiz compartilhada.
-7. `Afinz-CRM-Midia-Vault/08-Engenharia/Report-Live-Versionamento-e-Publicacao.md` na raiz compartilhada.
-8. `.claude/skills/afinz-pptx/SKILL.md` na raiz compartilhada.
-9. `.claude/skills/afinz-pptx/brand_spec.md` na raiz compartilhada.
-10. `supabase/functions/_shared/report-live-design.ts`
-11. `supabase/functions/report-sync/report-live-engine.ts`, com foco em `SlideRun`, construção de views, elegibilidade e projeção de perfis.
-12. `supabase/functions/report-sync/report-live-versioning.ts`, com foco em blueprints, hashes e certificação.
-13. `docs/plans/learning-loop/RELEASE_7C_EDITORIAL_SPEC.md`
+2. `docs/plans/report-live-async/report-render-package.schema.json`
+3. `docs/plans/report-live-async/fixtures/august-2026-baseline-57.coverage.json`
+4. `docs/plans/report-live-async/SUPABASE_ASYNC_PUBLISHING_PLAN.md` — apenas para entender a fronteira; não implemente esta parte.
+5. `MASTER_DECK_SPEC.md` na raiz de `ACALENDARIO APP`.
+6. `docs/plans/ESTUDO_RECONHECIMENTO_REPORT_LIVE.md`
+7. `docs/plans/inventario_slides.csv`
+8. `Afinz-CRM-Midia-Vault/05-Estrategia/Report-Live-Arquitetura-Editorial.md` na raiz compartilhada.
+9. `Afinz-CRM-Midia-Vault/08-Engenharia/Report-Live-Versionamento-e-Publicacao.md` na raiz compartilhada.
+10. `.claude/skills/afinz-pptx/SKILL.md` na raiz compartilhada.
+11. `.claude/skills/afinz-pptx/brand_spec.md` na raiz compartilhada.
+12. `supabase/functions/_shared/report-live-design.ts`
+13. `supabase/functions/report-sync/report-live-engine.ts`, com foco em `SlideRun`, construção de views, elegibilidade e projeção de perfis.
+14. `supabase/functions/report-sync/report-live-versioning.ts`, com foco em blueprints, hashes e certificação.
+15. `supabase/functions/report-sync/report-live-render-package.ts`
+16. `docs/plans/learning-loop/RELEASE_7C_EDITORIAL_SPEC.md`
 
 Referências visuais locais:
 
@@ -84,6 +87,18 @@ archives\report-live-evidence-2026-09-13\outputs\report-live-production-blueprin
 ```
 
 O PDF de 57 páginas acima é uma candidata preservada para reconhecimento visual. Use o inventário, o estudo e o artefato como fonte da estrutura; não trate o PDF candidato como prova de publicação ou como layout a copiar cegamente.
+
+### Evidência já reconciliada pelo Codex
+
+- run publicado: `9bb55892-4b17-4f76-825a-0ac97c92b525`;
+- publicação: `54649269-7cce-460a-a87d-b4cc5f310a62`;
+- 62 `slide_runs` e 62 blueprints foram construídos;
+- 57 páginas foram publicadas e certificadas;
+- as cinco exclusões no build eram `K-EXP` e quatro instâncias `P6`, todas com `run_eligibility=omitir_bloqueado`;
+- `K-VISA` existia e foi publicado na página 47 em agosto, mas foi aposentado depois do período;
+- o golden JSON local é estrutural e não contém as linhas do artefato imutável.
+
+Essa diferença 62 → 57 é intencional no run histórico. Não conte blueprint bloqueado como página perdida. Para o novo renderer, o universo é sempre o array `slides[]` do pacote e a sua contabilidade explícita contra as 57 páginas históricas.
 
 ## Passo 0 bloqueante — mapa dos 57 slides
 
@@ -133,6 +148,8 @@ Regras:
 - `K-VISA` deve ser `retire_closed_scope`;
 - nenhuma outra aposentadoria pode ser presumida;
 - não tente chegar a 12, 31 ou qualquer total previamente escolhido.
+- use `august-2026-baseline-57.coverage.json` como inventário estrutural auxiliar, mas confirme decisões editoriais no PDF, vault e código;
+- não preencha conteúdo numérico a partir do golden estrutural: ele deliberadamente não contém as linhas do artefato.
 
 Em `SLIDE_COVERAGE_REVIEW.md`, responda:
 
@@ -159,6 +176,16 @@ Implemente o renderer conforme `CLAUDE_COWORK_RENDERER_SPEC.md`:
 - inspecione visualmente todas as páginas;
 - não publique nem envie arquivos ao Storage.
 
+Para desenvolver os doze arquétipos sem inventar business data, use apenas:
+
+```text
+docs/plans/report-live-async/fixtures/archetypes-core.fixture.json
+docs/plans/report-live-async/fixtures/archetypes-charts.fixture.json
+docs/plans/report-live-async/fixtures/archetypes-operations.fixture.json
+```
+
+Os valores desses arquivos são sintéticos e identificados como tal. Eles testam geometria, tipografia, hierarquia, estados de dado e procedência; não servem como exemplo de performance Afinz.
+
 ## Guardrails
 
 - Ausência não é zero.
@@ -183,4 +210,3 @@ Entregue:
 - lacunas do pacote de dados que impediriam slides completos;
 - divergências encontradas entre vault, código e PDF;
 - nenhuma implementação de renderer ainda.
-

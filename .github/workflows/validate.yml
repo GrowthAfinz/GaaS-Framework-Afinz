@@ -40,6 +40,8 @@ jobs:
         run: npm test
       - name: Report Live contract and recovery protocol tests
         run: npm run test:report-live
+      - name: Report Live renderer fixtures are reproducible
+        run: npm run check:report-live-render-fixtures
       - name: Report Live Office render-plan tests
         run: npm run test:report-live-office
       - name: Canonical partner SQL and TypeScript equivalence
