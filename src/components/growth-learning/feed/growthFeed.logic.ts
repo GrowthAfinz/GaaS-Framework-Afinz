@@ -12,6 +12,17 @@ import {
   GrowthFeedStateFilter,
 } from './growthFeed.types';
 
+export type GrowthFeedAttentionBucket = 'act' | 'watch' | 'investigate';
+
+export function classifyGrowthFeedAttentionBucket(event: GrowthFeedEvent): GrowthFeedAttentionBucket {
+  const blocked = event.confidence_status === 'blocked'
+    || event.event_state === 'blocked'
+    || ['report_blocked', 'data_quality_blocked'].includes(event.event_type);
+  if (blocked || Number(event.priority_score) >= 80) return 'act';
+  if (event.confidence_status === 'suspect' || Number(event.priority_score) < 55) return 'investigate';
+  return 'watch';
+}
+
 function isOneOf<T extends readonly string[]>(value: string | null, values: T): value is T[number] {
   return Boolean(value && values.includes(value));
 }

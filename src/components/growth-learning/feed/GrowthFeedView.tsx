@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Filter, Inbox, Loader2, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { closeGrowthLearningItem, openGrowthLearningItem, openGrowthLearningSection, openGrowthLearningSectionItem, readGrowthLearningItem } from '../growthLearningNavigation';
-import { buildGrowthFeedFilterSearch, filterAndGroupGrowthFeed, readGrowthFeedFilters } from './growthFeed.logic';
+import { openGrowthLearningItem, openGrowthLearningSection, openGrowthLearningSectionItem, readGrowthLearningItem } from '../growthLearningNavigation';
+import { buildGrowthFeedFilterSearch, classifyGrowthFeedAttentionBucket, filterAndGroupGrowthFeed, readGrowthFeedFilters } from './growthFeed.logic';
 import { fetchGrowthFeed, fetchGrowthFeedItem } from './growthFeedService';
 import { GrowthFeedEvent, GrowthFeedFilters } from './growthFeed.types';
 import { GrowthFeedCard } from './GrowthFeedCard';
 import { GrowthFeedDrawer } from './GrowthFeedDrawer';
+import { GrowthFeedInspector } from './GrowthFeedInspector';
 import { GrowthSignalDecisionDialog } from '../bets/GrowthSignalDecisionDialog';
 import { fetchGrowthSignalDecisions } from '../bets/growthBetService';
 import { GrowthSignalDecision } from '../bets/growthBet.types';
@@ -30,6 +31,8 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
   const [events, setEvents] = useState<GrowthFeedEvent[]>([]);
   const [filters, setFilters] = useState<GrowthFeedFilters>(() => readGrowthFeedFilters(window.location.search));
   const [selected, setSelected] = useState<GrowthFeedEvent | null>(null);
+  const [provenanceEvent, setProvenanceEvent] = useState<GrowthFeedEvent | null>(null);
+  const [attentionBucket, setAttentionBucket] = useState<'all' | 'act' | 'watch' | 'investigate'>('all');
   const [decisionEvent, setDecisionEvent] = useState<GrowthFeedEvent | null>(null);
   const [decisions, setDecisions] = useState<Map<string, GrowthSignalDecision>>(() => new Map());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
@@ -89,6 +92,11 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
   }, [events]);
 
   const groups = useMemo(() => filterAndGroupGrowthFeed(events, filters), [events, filters]);
+  const bucketCounts = useMemo(() => groups.reduce((counts, group) => {
+    counts[classifyGrowthFeedAttentionBucket(group.representative)] += 1;
+    return counts;
+  }, { act: 0, watch: 0, investigate: 0 }), [groups]);
+  const visibleGroups = useMemo(() => attentionBucket === 'all' ? groups : groups.filter((group) => classifyGrowthFeedAttentionBucket(group.representative) === attentionBucket), [attentionBucket, groups]);
   const activeFilterLabels = [
     filters.front !== 'all'
       ? (
@@ -114,6 +122,16 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
     setSelected(event);
     openGrowthLearningItem(event.id);
   };
+
+  useEffect(() => {
+    if (visibleGroups.length === 0) {
+      setSelected(null);
+      return;
+    }
+    if (!selected || !visibleGroups.some((group) => group.events.some((event) => event.id === selected.id))) {
+      setSelected(visibleGroups[0].representative);
+    }
+  }, [selected, visibleGroups]);
 
   const primaryAction = (event: GrowthFeedEvent) => {
     if (event.summary_snapshot.primary_action?.kind === 'open_report_live') {
@@ -154,14 +172,14 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
   const emptyMessage = filters.front === 'b2c_origin' ? 'Originação B2C ainda não possui um produtor governado de eventos. A frente permanece visível, sem conteúdo simulado.' : events.length === 0 ? 'Nenhum produtor sistêmico registrou evento neste período.' : 'Há eventos no período, mas nenhum corresponde aos filtros ativos.';
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <section className="space-y-3">
+      <div className="flex flex-col gap-4 border border-slate-200 bg-white px-4 py-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-700">
             <Inbox size={15} /> Fila sistêmica
           </div>
-          <p className="mt-1 text-sm text-slate-600">
-            {format(periodStart, 'dd MMM', { locale: ptBR })} — {format(periodEnd, 'dd MMM yyyy', { locale: ptBR })} · {groups.length} {groups.length === 1 ? 'sinal agrupado' : 'sinais agrupados'}
+          <p className="mt-1 text-xs text-slate-500">
+            {format(periodStart, 'dd MMM', { locale: ptBR })} — {format(periodEnd, 'dd MMM yyyy', { locale: ptBR })} · {visibleGroups.length} de {groups.length} sinais agrupados
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -237,6 +255,18 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+        <span className="mr-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Decisão</span>
+        {([
+          ['all', 'Toda a fila', groups.length, 'border-slate-200 bg-white text-slate-700'],
+          ['act', 'Agir hoje', bucketCounts.act, 'border-rose-200 bg-rose-50 text-rose-700'],
+          ['watch', 'Acompanhar', bucketCounts.watch, 'border-amber-200 bg-amber-50 text-amber-700'],
+          ['investigate', 'Investigar', bucketCounts.investigate, 'border-cyan-200 bg-cyan-50 text-cyan-700'],
+        ] as const).map(([value, label, count, tone]) => (
+          <button key={value} type="button" onClick={() => setAttentionBucket(value)} className={`rounded-lg border px-3 py-2 text-xs font-bold transition ${attentionBucket === value ? `${tone} ring-2 ring-cyan-100` : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}>{label} <span className="ml-1 rounded-full bg-white/70 px-1.5 py-0.5 text-[10px]">{count}</span></button>
+        ))}
+      </div>
+
       {activeFilterLabels.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-1">
           <span className="text-xs text-slate-500">Filtros ativos:</span>
@@ -268,7 +298,7 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
             </button>
           </div>
         </div>
-      ) : groups.length === 0 ? (
+      ) : visibleGroups.length === 0 ? (
         <div className="grid min-h-[340px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center">
           <div>
             <Inbox size={32} className="mx-auto text-slate-300" />
@@ -277,29 +307,43 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {groups.map((group) => (
-            <GrowthFeedCard
-              key={group.groupKey}
-              group={group}
-              expanded={expandedGroups.has(group.groupKey)}
-              onToggleGroup={() =>
-                setExpandedGroups((current) => {
-                  const next = new Set(current);
-                  if (next.has(group.groupKey)) next.delete(group.groupKey);
-                  else next.add(group.groupKey);
-                  return next;
-                })
-              }
-              onOpen={openEvent}
-              onPrimaryAction={primaryAction}
-              decision={decisions.get(group.representative.subject_id)}
-            />
-          ))}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(390px,.75fr)] lg:items-start">
+          <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+            <div className="hidden grid-cols-[minmax(0,1.7fr)_minmax(150px,.9fr)_110px_92px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-slate-400 md:grid"><span>Sinal</span><span>Impacto</span><span>Confiança</span><span className="text-right">Tempo</span></div>
+            <div>
+              {visibleGroups.map((group) => (
+                <GrowthFeedCard
+                  key={group.groupKey}
+                  group={group}
+                  expanded={expandedGroups.has(group.groupKey)}
+                  selected={selected?.id === group.representative.id}
+                  onSelect={() => openEvent(group.representative)}
+                  onToggleGroup={() =>
+                    setExpandedGroups((current) => {
+                      const next = new Set(current);
+                      if (next.has(group.groupKey)) next.delete(group.groupKey);
+                      else next.add(group.groupKey);
+                      return next;
+                    })
+                  }
+                  onOpen={setProvenanceEvent}
+                  onPrimaryAction={primaryAction}
+                  decision={decisions.get(group.representative.subject_id)}
+                />
+              ))}
+            </div>
+          </div>
+          <GrowthFeedInspector
+            event={selected}
+            decision={selected ? decisions.get(selected.subject_id) : undefined}
+            occurrences={selected ? groups.find((group) => group.events.some((event) => event.id === selected.id))?.events.length : 0}
+            onPrimaryAction={primaryAction}
+            onOpenProvenance={setProvenanceEvent}
+          />
         </div>
       )}
 
-      {selected && <GrowthFeedDrawer event={selected} decision={decisions.get(selected.subject_id)} onClose={closeGrowthLearningItem} onPrimaryAction={primaryAction} />}
+      {provenanceEvent && <GrowthFeedDrawer event={provenanceEvent} decision={decisions.get(provenanceEvent.subject_id)} onClose={() => setProvenanceEvent(null)} onPrimaryAction={primaryAction} />}
       {decisionEvent && (
         <GrowthSignalDecisionDialog
           event={decisionEvent}

@@ -509,8 +509,8 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({
     : null;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/60 to-white">
-      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+    <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center">
         <ShieldCheck size={19} className="shrink-0 text-cyan-600" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -568,7 +568,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({
       )}
 
       {operational && preflight && (
-        <div className="border-t border-cyan-100 bg-white/80 px-4 py-3">
+        <div className="bg-white px-4 py-3">
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold text-slate-700">Validação do último dia fechado</p>
@@ -653,7 +653,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({
       )}
 
       {operational && inProgress && (
-        <div className="space-y-1.5 border-t border-cyan-100 bg-white/70 px-4 py-3">
+        <div className="space-y-1.5 border-t border-slate-200 bg-white px-4 py-3">
           <p className="mb-2 text-xs font-bold text-slate-700">Atualização anterior ainda em andamento</p>
           {STAGES.map((stage, index) => (
             <div key={stage.key} className="flex items-center gap-2 text-xs">
@@ -673,7 +673,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({
       )}
 
       {published && publishedRun && (
-        <div className="border-t border-cyan-100 bg-slate-50/70 px-4 py-3">
+        <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-3">
           <p className="mb-2 text-xs font-semibold text-slate-600">
             {operational ? 'Publicação ativa' : 'Versão publicada'}{previousRunLabel ? ` · ${previousRunLabel}` : ''}
             {publishedRun.publication_version != null ? ` · v${publishedRun.publication_version}` : ''}

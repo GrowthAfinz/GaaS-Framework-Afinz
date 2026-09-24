@@ -46,6 +46,56 @@ final result: passed
 
 ---
 
+# Design QA — Aprendizado Growth operator-owner
+
+- Source visual truth: `C:\Users\Pablo Prado\.codex\generated_images\01a09c44-7292-7421-b308-c7917e44fa4f\exec-d027d8db-3c09-40fc-a1be-87c2d283bf58.png`
+- Implementation URL: `http://127.0.0.1:4173/?view=learning`
+- Implementation screenshot: unavailable because the authenticated workspace is not reachable in the local browser session.
+- Target pixels: 1659 × 948. Intended comparison viewport: desktop 1659 × 948 CSS px, device scale 1.
+- State: Fila selected, operator queue populated, first signal selected in the contextual inspector.
+
+## Full-view comparison evidence
+
+The selected target establishes a compact white workspace header, horizontal tabs in the order `Fila | Report Live | Apostas | Outcomes | Memória`, decision buckets, dense operational rows and a persistent contextual inspector. The implementation contains those structures and passed build/tests, but the browser rendered the authentication screen before the workspace. A visual fidelity judgment from code is not accepted as evidence.
+
+## Focused-region comparison
+
+Blocked. The local browser cannot capture the workspace header, tab rail, Fila table, inspector, Apostas ledger, Outcomes agenda, Memória ledger or Report Live operation without an authenticated session.
+
+## Required fidelity surfaces
+
+- Fonts and typography: not visually verified.
+- Spacing and layout rhythm: not visually verified.
+- Colors and visual tokens: not visually verified.
+- Image quality and assets: no new raster assets are required; the app keeps its existing logo and icon library. Rendering remains unverified.
+- Copy and content: source code preserves operator language and the five governed tab jobs; browser rendering remains unverified.
+
+## Interaction evidence
+
+- Browser reached the local application at `http://127.0.0.1:4173/?view=learning`.
+- The authentication gate rendered normally.
+- Workspace navigation, filters, decision buckets, row selection, contextual inspector and cross-tab actions could not be exercised before authentication.
+
+## Findings
+
+- [P0] Authenticated workspace unavailable for visual QA
+  Location: local browser session, before `GrowthLearningWorkspace`.
+  Evidence: the rendered page is the GaaS login view rather than the selected Fila state.
+  Impact: there is no browser-rendered evidence for fidelity or interaction quality across the five tabs.
+  Fix: authenticate the already-open local preview, then capture the Fila at the target viewport, exercise all five tabs and rerun the comparison.
+
+## Implementation checklist
+
+- Authenticate the local preview.
+- Capture Fila at 1659 × 948 with the first signal selected.
+- Verify `Report Live` is second and exercise all five tabs.
+- Inspect filters, buckets, row selection, drawer/actions, responsive overflow and browser console.
+- Compare target and implementation together; fix all P0/P1/P2 findings.
+
+final result: blocked
+
+---
+
 # Design QA — E-mail Dinâmico
 
 - Referência: tela anterior fornecida pelo usuário, em 1907 × 759 px.
@@ -90,3 +140,11 @@ final result: passed
 - Não houve overflow horizontal nem erros de console nas interações verificadas.
 
 final result: passed
+
+---
+
+# Latest Design QA Status — Aprendizado Growth
+
+The Aprendizado Growth review is the latest active design QA. Browser rendering is blocked at the local authentication gate, so the P0 finding recorded above remains unresolved until an authenticated workspace capture and interaction pass are completed.
+
+final result: blocked
