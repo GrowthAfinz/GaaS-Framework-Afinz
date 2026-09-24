@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGrowthFeedFilterSearch, filterAndGroupGrowthFeed, readGrowthFeedFilters } from './growthFeed.logic';
+import { buildGrowthFeedFilterSearch, classifyGrowthFeedAttentionBucket, filterAndGroupGrowthFeed, readGrowthFeedFilters } from './growthFeed.logic';
 import { GrowthFeedEvent } from './growthFeed.types';
 
 const event = (overrides: Partial<GrowthFeedEvent>): GrowthFeedEvent => ({
@@ -24,6 +24,13 @@ const event = (overrides: Partial<GrowthFeedEvent>): GrowthFeedEvent => ({
 });
 
 describe('Growth feed deterministic list contract', () => {
+  it('classifies work into operator decision buckets', () => {
+    expect(classifyGrowthFeedAttentionBucket(event({ priority_score: 95 }))).toBe('act');
+    expect(classifyGrowthFeedAttentionBucket(event({ priority_score: 60, event_state: 'blocked' }))).toBe('act');
+    expect(classifyGrowthFeedAttentionBucket(event({ priority_score: 68, confidence_status: 'confirmed' }))).toBe('watch');
+    expect(classifyGrowthFeedAttentionBucket(event({ priority_score: 42, confidence_status: 'confirmed' }))).toBe('investigate');
+    expect(classifyGrowthFeedAttentionBucket(event({ priority_score: 68, confidence_status: 'suspect' }))).toBe('investigate');
+  });
   it('reads only governed filters and preserves them in the URL', () => {
     const filters = readGrowthFeedFilters('?front=paid_media&confidence=suspect&state=blocked&sort=recent');
     expect(filters).toEqual({ front: 'paid_media', confidence: 'suspect', state: 'blocked', sort: 'recent' });

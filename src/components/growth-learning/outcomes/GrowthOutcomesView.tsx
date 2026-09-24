@@ -114,6 +114,13 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
     () => filterGrowthOutcomes(outcomes, { bucket, front, query }),
     [bucket, front, outcomes, query],
   );
+  const summary = useMemo(() => ({
+    overdue: outcomes.filter((item) => item.due_bucket === 'overdue').length,
+    dueToday: outcomes.filter((item) => item.due_bucket === 'due_today').length,
+    ready: outcomes.filter((item) => item.due_bucket === 'ready_review').length,
+    waiting: outcomes.filter((item) => item.due_bucket === 'waiting_data').length,
+    contested: outcomes.filter((item) => item.due_bucket === 'contested').length,
+  }), [outcomes]);
   const open = (outcome: GrowthOutcome) => {
     setSelected(outcome);
     openGrowthLearningSectionItem(
@@ -123,16 +130,14 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
   };
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <section className="space-y-3">
+      <div className="flex flex-col gap-4 border border-slate-200 bg-white px-4 py-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-700">
             <CircleGauge size={15} /> Agenda de outcomes
           </div>
-          <p className="mt-1 text-sm text-slate-600">
-            {filtered.length}{" "}
-            {filtered.length === 1 ? "verificação" : "verificações"} nesta
-            leitura
+          <p className="mt-1 text-xs text-slate-500">
+            {filtered.length} de {outcomes.length} verificações nesta leitura
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -174,6 +179,15 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+        <span className="mr-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Agenda de verificação</span>
+        <button type="button" onClick={() => setBucket('overdue')} className={`rounded-lg border px-3 py-2 text-xs font-bold ${summary.overdue ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-white text-slate-500'}`}>{summary.overdue} vencidos</button>
+        <button type="button" onClick={() => setBucket('due_today')} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">{summary.dueToday} para hoje</button>
+        <button type="button" onClick={() => setBucket('ready_review')} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">{summary.ready} prontos para revisão</button>
+        <button type="button" onClick={() => setBucket('waiting_data')} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">{summary.waiting} aguardando dados</button>
+        <button type="button" onClick={() => setBucket('contested')} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700">{summary.contested} contestados</button>
+      </div>
+
       {loading ? (
         <div className="grid min-h-[340px] place-items-center rounded-2xl border border-slate-200 bg-white">
           <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
@@ -211,7 +225,7 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1050px] text-left">
               <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
@@ -231,7 +245,7 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
                   <tr
                     key={outcome.bet_id}
                     onClick={() => open(outcome)}
-                    className="cursor-pointer text-sm hover:bg-cyan-50/40"
+                    className={`cursor-pointer text-sm transition hover:bg-cyan-50/50 ${selected?.bet_id === outcome.bet_id ? 'bg-cyan-50/70' : ''}`}
                   >
                     <td className="max-w-sm px-4 py-4">
                       <div className="font-bold text-slate-900">

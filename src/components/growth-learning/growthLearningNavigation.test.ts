@@ -6,6 +6,7 @@ import {
   buildGrowthBetSourceContextSearch,
   buildCloseGrowthBetSourceContextSearch,
   buildReportsOutputSearch,
+  GROWTH_LEARNING_SECTIONS,
   hasGrowthLearningRouteContext,
   isGrowthLearningView,
   readGrowthLearningSection,
@@ -15,6 +16,9 @@ import {
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
+  it('keeps Report Live as the second operational tab', () => {
+    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'report-live', 'bets', 'outcomes', 'memory']);
+  });
   it('defaults an absent or invalid section to the system feed', () => {
     expect(readGrowthLearningSection('')).toBe('feed');
     expect(readGrowthLearningSection('?view=learning&section=unknown')).toBe('feed');
