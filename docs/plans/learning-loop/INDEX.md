@@ -1,7 +1,7 @@
 # Loop de aprendizado Growth — índice do planejamento
 
 **Data:** 2026-09-22
-**Status:** Releases 7A e 7B publicadas; Release 7C em implementação candidata
+**Status:** Releases 7A e 7B publicadas; Release 7C em implementação candidata; publicação assíncrona em especificação
 **Produto:** GaaS Afinz
 **Workspace:** `Relatórios > Aprendizado Growth`
 **Output editorial:** Report Live
@@ -42,6 +42,7 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 22. [RELEASE_7B_IMPLEMENTATION.md](RELEASE_7B_IMPLEMENTATION.md) — implementação, view read-only e evidências de validação/publicação.
 23. [RELEASE_7C_EDITORIAL_SPEC.md](RELEASE_7C_EDITORIAL_SPEC.md) — materialidade, projeções C7/C8 e limites causais.
 24. [RELEASE_7C_IMPLEMENTATION.md](RELEASE_7C_IMPLEMENTATION.md) — código candidato, versões e gates.
+25. [Report Live assíncrono](../report-live-async/INDEX.md) — renderer PPTX/PDF pelo Claude Cowork e publicação imutável no Supabase Storage.
 
 ## Decisões confirmadas com o product owner
 

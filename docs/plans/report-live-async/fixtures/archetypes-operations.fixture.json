@@ -1,0 +1,352 @@
+{
+  "schema_version": "1.0",
+  "package_kind": "archetype_fixture",
+  "run_id": "fixture-archetypes-operations",
+  "profile": "fixture_only_non_operational",
+  "expected_slide_count": 3,
+  "coverage_baseline": {
+    "run_id": "9bb55892-4b17-4f76-825a-0ac97c92b525",
+    "publication_id": "54649269-7cce-460a-a87d-b4cc5f310a62",
+    "slide_count": 57,
+    "coverage_map_path": "docs/plans/report-live-async/SLIDE_COVERAGE_MAP.csv"
+  },
+  "coverage_accounting": [],
+  "period": {
+    "start": "2026-08-01",
+    "end": "2026-08-31",
+    "data_through": "2026-08-31"
+  },
+  "publication": {
+    "generated_at": "2026-09-24T12:00:00.000Z",
+    "spec_version": "fixture-1",
+    "semantic_version": "fixture-1",
+    "renderer_version": "python-pptx-candidate"
+  },
+  "source_cutoffs": {
+    "fixture": "2026-08-31"
+  },
+  "quality_status": "suspect",
+  "slides": [
+    {
+      "slide_instance_id": "fixture_c7",
+      "slide_code": "C7",
+      "display_order": 1,
+      "section": "core",
+      "archetype": "analytical_table",
+      "title": "[FIXTURE] Tabela analítica",
+      "subtitle": "Dados exclusivamente sintéticos para teste visual",
+      "partner": null,
+      "audience": "teste_de_renderer",
+      "eligibility": "render_com_limites",
+      "confidence": "suspect",
+      "narrative": {
+        "takeaway": "Fixture visual: não representa resultado de negócio.",
+        "evidence": [
+          "100 = valor sintético",
+          "0 = zero observado",
+          "null = missing"
+        ],
+        "action": null,
+        "limitation": "Uso exclusivo em testes automatizados e QA de layout."
+      },
+      "visual": {
+        "archetype": "analytical_table",
+        "geometry": {
+          "visual": {
+            "x": 28,
+            "y": 100,
+            "width": 438,
+            "height": 255
+          },
+          "narrative": {
+            "x": 480,
+            "y": 100,
+            "width": 212,
+            "height": 255
+          }
+        },
+        "minimum_body_pt": 11,
+        "dataset": {
+          "columns": [
+            "label",
+            "value",
+            "note"
+          ],
+          "rows": [
+            [
+              {
+                "value": "Amostra A",
+                "state": "valor_observado"
+              },
+              {
+                "value": 100,
+                "state": "valor_observado"
+              },
+              {
+                "value": "valor sintético",
+                "state": "valor_observado"
+              }
+            ],
+            [
+              {
+                "value": "Amostra B",
+                "state": "valor_observado"
+              },
+              {
+                "value": 0,
+                "state": "zero_observado"
+              },
+              {
+                "value": "zero observado sintético",
+                "state": "valor_observado"
+              }
+            ],
+            [
+              {
+                "value": "Amostra sem leitura",
+                "state": "valor_observado"
+              },
+              {
+                "value": null,
+                "state": "missing"
+              },
+              {
+                "value": "missing sintético",
+                "state": "valor_observado"
+              }
+            ]
+          ],
+          "row_count": 3
+        },
+        "editorial_layout": null,
+        "editorial_rulers": [],
+        "chart_contract": null
+      },
+      "provenance": {
+        "source_view": "FIXTURE_C7",
+        "evidence_refs": [
+          "fixture:archetypes-operations.fixture.json:C7"
+        ],
+        "window_label": "fixture 2026-08-01 a 2026-08-31",
+        "source_cutoffs": {
+          "fixture": "2026-08-31"
+        },
+        "data_hash": "48b880d9cdfd656e6349948b2d992728a42cc49c8788270869674a3964344e80"
+      }
+    },
+    {
+      "slide_instance_id": "fixture_c8",
+      "slide_code": "C8",
+      "display_order": 2,
+      "section": "core",
+      "archetype": "action_queue",
+      "title": "[FIXTURE] Fila de ação",
+      "subtitle": "Dados exclusivamente sintéticos para teste visual",
+      "partner": null,
+      "audience": "teste_de_renderer",
+      "eligibility": "render_com_limites",
+      "confidence": "suspect",
+      "narrative": {
+        "takeaway": "Fixture visual: não representa resultado de negócio.",
+        "evidence": [
+          "100 = valor sintético",
+          "0 = zero observado",
+          "null = missing"
+        ],
+        "action": null,
+        "limitation": "Uso exclusivo em testes automatizados e QA de layout."
+      },
+      "visual": {
+        "archetype": "action_queue",
+        "geometry": {
+          "visual": {
+            "x": 28,
+            "y": 100,
+            "width": 664,
+            "height": 175
+          },
+          "narrative": {
+            "x": 28,
+            "y": 285,
+            "width": 664,
+            "height": 70
+          }
+        },
+        "minimum_body_pt": 11,
+        "dataset": {
+          "columns": [
+            "label",
+            "value",
+            "note"
+          ],
+          "rows": [
+            [
+              {
+                "value": "Amostra A",
+                "state": "valor_observado"
+              },
+              {
+                "value": 100,
+                "state": "valor_observado"
+              },
+              {
+                "value": "valor sintético",
+                "state": "valor_observado"
+              }
+            ],
+            [
+              {
+                "value": "Amostra B",
+                "state": "valor_observado"
+              },
+              {
+                "value": 0,
+                "state": "zero_observado"
+              },
+              {
+                "value": "zero observado sintético",
+                "state": "valor_observado"
+              }
+            ],
+            [
+              {
+                "value": "Amostra sem leitura",
+                "state": "valor_observado"
+              },
+              {
+                "value": null,
+                "state": "missing"
+              },
+              {
+                "value": "missing sintético",
+                "state": "valor_observado"
+              }
+            ]
+          ],
+          "row_count": 3
+        },
+        "editorial_layout": null,
+        "editorial_rulers": [],
+        "chart_contract": null
+      },
+      "provenance": {
+        "source_view": "FIXTURE_C8",
+        "evidence_refs": [
+          "fixture:archetypes-operations.fixture.json:C8"
+        ],
+        "window_label": "fixture 2026-08-01 a 2026-08-31",
+        "source_cutoffs": {
+          "fixture": "2026-08-31"
+        },
+        "data_hash": "48b880d9cdfd656e6349948b2d992728a42cc49c8788270869674a3964344e80"
+      }
+    },
+    {
+      "slide_instance_id": "fixture_a2",
+      "slide_code": "A2",
+      "display_order": 3,
+      "section": "annex",
+      "archetype": "technical_annex",
+      "title": "[FIXTURE] Anexo técnico",
+      "subtitle": "Dados exclusivamente sintéticos para teste visual",
+      "partner": null,
+      "audience": "teste_de_renderer",
+      "eligibility": "render_com_limites",
+      "confidence": "suspect",
+      "narrative": {
+        "takeaway": "Fixture visual: não representa resultado de negócio.",
+        "evidence": [
+          "100 = valor sintético",
+          "0 = zero observado",
+          "null = missing"
+        ],
+        "action": null,
+        "limitation": "Uso exclusivo em testes automatizados e QA de layout."
+      },
+      "visual": {
+        "archetype": "technical_annex",
+        "geometry": {
+          "visual": {
+            "x": 28,
+            "y": 100,
+            "width": 500,
+            "height": 255
+          },
+          "narrative": {
+            "x": 540,
+            "y": 100,
+            "width": 152,
+            "height": 255
+          }
+        },
+        "minimum_body_pt": 9,
+        "dataset": {
+          "columns": [
+            "label",
+            "value",
+            "note"
+          ],
+          "rows": [
+            [
+              {
+                "value": "Amostra A",
+                "state": "valor_observado"
+              },
+              {
+                "value": 100,
+                "state": "valor_observado"
+              },
+              {
+                "value": "valor sintético",
+                "state": "valor_observado"
+              }
+            ],
+            [
+              {
+                "value": "Amostra B",
+                "state": "valor_observado"
+              },
+              {
+                "value": 0,
+                "state": "zero_observado"
+              },
+              {
+                "value": "zero observado sintético",
+                "state": "valor_observado"
+              }
+            ],
+            [
+              {
+                "value": "Amostra sem leitura",
+                "state": "valor_observado"
+              },
+              {
+                "value": null,
+                "state": "missing"
+              },
+              {
+                "value": "missing sintético",
+                "state": "valor_observado"
+              }
+            ]
+          ],
+          "row_count": 3
+        },
+        "editorial_layout": null,
+        "editorial_rulers": [],
+        "chart_contract": null
+      },
+      "provenance": {
+        "source_view": "FIXTURE_A2",
+        "evidence_refs": [
+          "fixture:archetypes-operations.fixture.json:A2"
+        ],
+        "window_label": "fixture 2026-08-01 a 2026-08-31",
+        "source_cutoffs": {
+          "fixture": "2026-08-31"
+        },
+        "data_hash": "48b880d9cdfd656e6349948b2d992728a42cc49c8788270869674a3964344e80"
+      }
+    }
+  ]
+}
