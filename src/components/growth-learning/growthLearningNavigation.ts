@@ -153,27 +153,51 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+export function parseGrowthBetSourceContext(value: unknown): GrowthBetSourceContext | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const candidate: Partial<GrowthBetSourceContext> = {
+    front: raw.front as GrowthContextFront | undefined,
+    sourceSurface: (raw.sourceSurface ?? raw.source_surface) as GrowthContextSurface | undefined,
+    sourceRoute: (raw.sourceRoute ?? raw.source_route) as string | undefined,
+    periodStart: (raw.periodStart ?? raw.period_start) as string | undefined,
+    periodEnd: (raw.periodEnd ?? raw.period_end) as string | undefined,
+    filters: raw.filters as Record<string, unknown> | undefined,
+    entityKey: (raw.entityKey ?? raw.entity_key) as string | undefined,
+    metricName: (raw.metricName ?? raw.metric_name) as string | undefined,
+    visualRef: (raw.visualRef ?? raw.visual_ref) as string | undefined,
+    title: raw.title as string | undefined,
+    verificationView: (raw.verificationView ?? raw.verification_view) as string | undefined,
+  };
+  const filtersAreObject = Boolean(candidate.filters)
+    && typeof candidate.filters === 'object'
+    && !Array.isArray(candidate.filters);
+  if (!candidate.front || !CONTEXT_FRONT_SET.has(candidate.front)
+    || !candidate.sourceSurface || !CONTEXT_SURFACE_SET.has(candidate.sourceSurface)
+    || typeof candidate.sourceRoute !== 'string' || !candidate.sourceRoute.trim()
+    || !isIsoDate(candidate.periodStart) || !isIsoDate(candidate.periodEnd)
+    || candidate.periodStart > candidate.periodEnd
+    || !filtersAreObject
+    || typeof candidate.title !== 'string' || !candidate.title.trim()
+    || typeof candidate.verificationView !== 'string' || !candidate.verificationView.trim()) {
+    return null;
+  }
+  return candidate as GrowthBetSourceContext;
+}
+
+export function readGrowthBetSourceContextFromBeliefSnapshot(
+  beliefSnapshot: Record<string, unknown>,
+): GrowthBetSourceContext | null {
+  return parseGrowthBetSourceContext(beliefSnapshot.source_context);
+}
+
 export function readGrowthBetSourceContext(search: string): GrowthBetSourceContext | null {
   const params = new URLSearchParams(search);
   if (params.get('create') !== CONTEXT_ACTION) return null;
   const serialized = params.get(CONTEXT_PARAM);
   if (!serialized) return null;
   try {
-    const value = JSON.parse(serialized) as Partial<GrowthBetSourceContext>;
-    const filtersAreObject = Boolean(value.filters)
-      && typeof value.filters === 'object'
-      && !Array.isArray(value.filters);
-    if (!value.front || !CONTEXT_FRONT_SET.has(value.front)
-      || !value.sourceSurface || !CONTEXT_SURFACE_SET.has(value.sourceSurface)
-      || typeof value.sourceRoute !== 'string' || !value.sourceRoute.trim()
-      || !isIsoDate(value.periodStart) || !isIsoDate(value.periodEnd)
-      || value.periodStart > value.periodEnd
-      || !filtersAreObject
-      || typeof value.title !== 'string' || !value.title.trim()
-      || typeof value.verificationView !== 'string' || !value.verificationView.trim()) {
-      return null;
-    }
-    return value as GrowthBetSourceContext;
+    return parseGrowthBetSourceContext(JSON.parse(serialized));
   } catch {
     return null;
   }

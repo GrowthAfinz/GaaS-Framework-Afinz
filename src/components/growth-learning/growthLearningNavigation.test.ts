@@ -11,6 +11,7 @@ import {
   readGrowthLearningSection,
   readGrowthLearningItem,
   readGrowthBetSourceContext,
+  readGrowthBetSourceContextFromBeliefSnapshot,
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
@@ -112,5 +113,35 @@ describe('growth learning navigation contract', () => {
       verificationView: 'reports:overview',
     }, '');
     expect(readGrowthBetSourceContext(invalid)).toBeNull();
+  });
+
+  it('reconstructs the camel-case navigation contract from the immutable SQL snapshot', () => {
+    expect(readGrowthBetSourceContextFromBeliefSnapshot({
+      source_context: {
+        front: 'paid_media',
+        source_surface: 'acquisition_funnel',
+        source_route: 'funnels:paid-media',
+        period_start: '2026-08-01',
+        period_end: '2026-08-31',
+        filters: { funnel: 'paid-media' },
+        entity_key: 'funnel:paid-media',
+        visual_ref: 'funnels:paid-media:workspace',
+        title: 'Funil de Aquisição',
+        verification_view: 'funnels:paid-media',
+      },
+    })).toEqual({
+      front: 'paid_media',
+      sourceSurface: 'acquisition_funnel',
+      sourceRoute: 'funnels:paid-media',
+      periodStart: '2026-08-01',
+      periodEnd: '2026-08-31',
+      filters: { funnel: 'paid-media' },
+      entityKey: 'funnel:paid-media',
+      metricName: undefined,
+      visualRef: 'funnels:paid-media:workspace',
+      title: 'Funil de Aquisição',
+      verificationView: 'funnels:paid-media',
+    });
+    expect(readGrowthBetSourceContextFromBeliefSnapshot({ source_context: { source_route: 'unknown' } })).toBeNull();
   });
 });

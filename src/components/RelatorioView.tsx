@@ -17,7 +17,8 @@ import { exportFechamentoCopaXlsx } from '../utils/fechamentoCopaExcelExport';
 import { exportHighFrequencyPartnerXlsx, HighFrequencyPartner } from '../utils/highFrequencyPartnersExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import { ReportLiveOutputCard } from './relatorio/ReportLiveOutputCard';
-import { openGrowthBetSourceContext, openGrowthLearningSection } from './growth-learning/growthLearningNavigation';
+import { GrowthBetSourceContext, openGrowthBetSourceContext, openGrowthLearningSection } from './growth-learning/growthLearningNavigation';
+import { RelatedGrowthBets } from './growth-learning/bets/RelatedGrowthBets';
 import {
   ColumnKey,
   DimensionKey,
@@ -194,19 +195,14 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const { selectedBUs } = useBU();
   const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly' | 'xlsx'>('performance');
 
-  const openGrowthLearning = useCallback((section: 'feed' | 'report-live' = 'feed') => {
-    openGrowthLearningSection(section);
-    setTab('aprendizado-growth');
-  }, [setTab]);
-
-  const createContextualBet = useCallback(() => {
-    if (rentab || reportMode === 'xlsx') return;
+  const growthSourceContext = useMemo<GrowthBetSourceContext | null>(() => {
+    if (rentab || reportMode === 'xlsx') return null;
     const modeContract = {
       performance: { surface: 'reports_overview' as const, label: 'Overview', route: 'reports:overview' },
       daily: { surface: 'reports_daily' as const, label: 'Diário', route: 'reports:daily' },
       monthly: { surface: 'reports_monthly' as const, label: 'Mensal', route: 'reports:monthly' },
     }[reportMode];
-    openGrowthBetSourceContext({
+    return {
       front: 'crm_acquisition',
       sourceSurface: modeContract.surface,
       sourceRoute: modeContract.route,
@@ -225,9 +221,19 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       visualRef: `${modeContract.route}:workspace`,
       title: `Relatório ${modeContract.label} de Aquisição`,
       verificationView: modeContract.route,
-    });
+    };
+  }, [globalFilters, periodEnd, periodStart, rentab, reportMode, selectedBU, selectedBUs]);
+
+  const openGrowthLearning = useCallback((section: 'feed' | 'report-live' = 'feed') => {
+    openGrowthLearningSection(section);
     setTab('aprendizado-growth');
-  }, [globalFilters, periodEnd, periodStart, rentab, reportMode, selectedBU, selectedBUs, setTab]);
+  }, [setTab]);
+
+  const createContextualBet = useCallback(() => {
+    if (!growthSourceContext) return;
+    openGrowthBetSourceContext(growthSourceContext);
+    setTab('aprendizado-growth');
+  }, [growthSourceContext, setTab]);
 
   useEffect(() => {
     if (!reportDeepLink) return;
@@ -920,6 +926,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           ))}
         </div>}
       </div>
+
+      {growthSourceContext && <RelatedGrowthBets context={growthSourceContext} />}
 
       {reportMode === 'monthly' ? (
         <MonthlyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />

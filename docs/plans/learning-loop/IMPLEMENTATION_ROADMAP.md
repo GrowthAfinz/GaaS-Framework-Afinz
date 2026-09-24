@@ -151,7 +151,7 @@ Uma nova aposta cita aprendizado anterior e registra se o reutilizou ou descarto
 
 ## Release 7 — integração transversal e editorial
 
-**Estado em 23/09/2026:** corte 7A publicado na `main` e no Supabase pelo PR #25. Overview, Diário, Mensal e Funis já criam aposta com contexto congelado; retorno da aposta à tela de origem e projeção editorial continuam separados.
+**Estado em 23/09/2026:** corte 7A publicado na `main` e no Supabase pelo PR #25. O corte 7B está implementado como candidato: Overview, Diário, Mensal e Funis listam apostas da mesma origem e o drawer restaura a leitura; publicação depende do pipeline, migration remota e merge. Projeção editorial continua separada na 7C.
 
 ### Escopo
 
@@ -177,6 +177,8 @@ O ciclo começa em uma tela analítica e termina em aprendizado reapresentado se
 - exibir apostas relacionadas nas superfícies analíticas;
 - navegar da aposta para a leitura que a originou;
 - explicitar estado, janela e próxima verificação sem sobrepor o gráfico.
+- contrato executável: [RELEASE_7B_RELATED_BETS_SPEC.md](RELEASE_7B_RELATED_BETS_SPEC.md);
+- implementação candidata: [RELEASE_7B_IMPLEMENTATION.md](RELEASE_7B_IMPLEMENTATION.md).
 
 ### Corte 7C — projeção editorial
 

@@ -38,6 +38,8 @@ Sinal → Interpretação → Aposta → Execução → Outcome → Aprendizado 
 18. [RELEASE_6_IMPLEMENTATION.md](RELEASE_6_IMPLEMENTATION.md) — implementação publicada, reconciliação remota e evidências dos gates.
 19. [RELEASE_7A_CONTEXT_ENTRY_SPEC.md](RELEASE_7A_CONTEXT_ENTRY_SPEC.md) — contrato da entrada contextual, deep-link, evidência e memória compartilhada.
 20. [RELEASE_7A_IMPLEMENTATION.md](RELEASE_7A_IMPLEMENTATION.md) — superfícies entregues, contratos remotos e gates de publicação.
+21. [RELEASE_7B_RELATED_BETS_SPEC.md](RELEASE_7B_RELATED_BETS_SPEC.md) — contrato de relação, retorno à origem e próxima verificação.
+22. [RELEASE_7B_IMPLEMENTATION.md](RELEASE_7B_IMPLEMENTATION.md) — implementação, view read-only e evidências de validação/publicação.
 
 ## Decisões confirmadas com o product owner
 

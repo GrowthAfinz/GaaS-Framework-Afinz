@@ -72,6 +72,10 @@ interface AppState {
     // Deep-link transitório do Launch Planner para um modo específico de Relatórios.
     reportDeepLink: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' } | null;
     setReportDeepLink: (dl: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' } | null) => void;
+
+    // Deep-link transitório de uma aposta para o funil analítico que a originou.
+    funnelDeepLink: { funnel: 'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz' | 'appsflyer' } | null;
+    setFunnelDeepLink: (dl: { funnel: 'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz' | 'appsflyer' } | null) => void;
 }
 
 const INITIAL_FILTERS: FilterState = {
@@ -167,6 +171,8 @@ export const useAppStore = create<AppState>()(
             setPerfDeepLink: (dl) => set({ perfDeepLink: dl }),
             reportDeepLink: null,
             setReportDeepLink: (dl) => set({ reportDeepLink: dl }),
+            funnelDeepLink: null,
+            setFunnelDeepLink: (dl) => set({ funnelDeepLink: dl }),
 
             // B2C State
             b2cData: [],

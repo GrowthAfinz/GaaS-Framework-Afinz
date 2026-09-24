@@ -12,6 +12,7 @@ import {
   GrowthSignalDecision,
 } from './growthBet.types';
 import { GrowthBetSourceContext } from '../growthLearningNavigation';
+import { GrowthBetSourceLink } from './relatedGrowthBets.logic';
 
 function oneRow<T>(data: T | T[] | null): T {
   const row = Array.isArray(data) ? data[0] : data;
@@ -26,6 +27,22 @@ export async function fetchGrowthBets(): Promise<GrowthBet[]> {
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return (data || []) as GrowthBet[];
+}
+
+export async function fetchRelatedGrowthBets(context: GrowthBetSourceContext): Promise<GrowthBetSourceLink[]> {
+  let query = supabase
+    .from('growth_bet_source_links_v')
+    .select('*')
+    .eq('front', context.front)
+    .eq('source_route', context.sourceRoute)
+    .order('updated_at', { ascending: false })
+    .limit(12);
+  query = context.entityKey
+    ? query.eq('entity_key', context.entityKey)
+    : query.is('entity_key', null);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as GrowthBetSourceLink[];
 }
 
 export async function fetchGrowthBet(id: string): Promise<GrowthBet | null> {
