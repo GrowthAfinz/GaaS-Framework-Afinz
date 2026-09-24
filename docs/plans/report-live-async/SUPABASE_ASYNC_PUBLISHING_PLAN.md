@@ -168,9 +168,9 @@ Política proposta:
 
 - segunda, quarta e sexta às 09:00;
 - dados até o último dia fechado;
-- dois profiles podem compartilhar o mesmo snapshot;
-- `executivo_mensal` é a publicação padrão;
-- `deep_dive` é gerado no mesmo ciclo ou sob demanda conforme custo medido no piloto;
+- os dois profiles compartilham o mesmo snapshot e são gerados em todo ciclo;
+- `executivo_mensal` é a visualização padrão de 12 slides;
+- `deep_dive` acompanha a mesma publicação com 31 slides, sem reduzir a estrutura para economizar render;
 - falha de freshness gera run bloqueado e evento no feed, sem substituir o output vigente.
 
 ## 9. Certificação
@@ -260,7 +260,6 @@ Política proposta:
 ## 13. Gates para iniciar código de produção
 
 - spec do renderer aceita;
-- escolha confirmada entre deep dive sempre ou sob demanda;
 - horário da cadência confirmado;
 - golden package de 12 e 31 slides disponível;
 - renderer gera PPTX e PDF sem intervenção manual;
