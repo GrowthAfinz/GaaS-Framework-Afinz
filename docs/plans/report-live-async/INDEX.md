@@ -6,8 +6,9 @@
 
 ## Ordem de leitura
 
-1. [`CLAUDE_COWORK_RENDERER_SPEC.md`](CLAUDE_COWORK_RENDERER_SPEC.md) — contrato completo para o Claude implementar o renderer PPTX/PDF.
-2. [`SUPABASE_ASYNC_PUBLISHING_PLAN.md`](SUPABASE_ASYNC_PUBLISHING_PLAN.md) — fila, artefatos, certificação, Storage e integração com o GaaS.
+1. [`CLAUDE_COWORK_HANDOFF.md`](CLAUDE_COWORK_HANDOFF.md) — ponto de entrada autossuficiente e passo 0 de cobertura dos 57 slides.
+2. [`CLAUDE_COWORK_RENDERER_SPEC.md`](CLAUDE_COWORK_RENDERER_SPEC.md) — contrato completo para o Claude implementar o renderer PPTX/PDF.
+3. [`SUPABASE_ASYNC_PUBLISHING_PLAN.md`](SUPABASE_ASYNC_PUBLISHING_PLAN.md) — fila, artefatos, certificação, Storage e integração com o GaaS.
 
 ## Fontes preexistentes consolidadas
 
