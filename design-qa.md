@@ -49,50 +49,48 @@ final result: passed
 # Design QA — Aprendizado Growth operator-owner
 
 - Source visual truth: `C:\Users\Pablo Prado\.codex\generated_images\01a09c44-7292-7421-b308-c7917e44fa4f\exec-d027d8db-3c09-40fc-a1be-87c2d283bf58.png`
-- Implementation URL: `http://127.0.0.1:4173/?view=learning`
-- Implementation screenshot: unavailable because the authenticated workspace is not reachable in the local browser session.
-- Target pixels: 1659 × 948. Intended comparison viewport: desktop 1659 × 948 CSS px, device scale 1.
+- Implementation URL: `https://growthafinz.github.io/GaaS-Framework-Afinz/?view=learning&section=feed&release=629b7cb`
+- Implementation screenshot: authenticated production capture observed after GitHub Pages run `36041264509` completed successfully.
+- Target pixels: 1659 × 948. Production verification used the connected desktop Chrome viewport at 1238 × 528 CSS px.
 - State: Fila selected, operator queue populated, first signal selected in the contextual inspector.
 
 ## Full-view comparison evidence
 
-The selected target establishes a compact white workspace header, horizontal tabs in the order `Fila | Report Live | Apostas | Outcomes | Memória`, decision buckets, dense operational rows and a persistent contextual inspector. The implementation contains those structures and passed build/tests, but the browser rendered the authentication screen before the workspace. A visual fidelity judgment from code is not accepted as evidence.
+The selected target establishes a compact white workspace header, horizontal tabs in the order `Fila | Report Live | Apostas | Outcomes | Memória`, decision buckets, dense operational rows and a persistent contextual inspector. The authenticated production capture shows the same information architecture with real data: 29 feed events, 14 grouped signals, 1 bet and 5 memory entries.
 
 ## Focused-region comparison
 
-Blocked. The local browser cannot capture the workspace header, tab rail, Fila table, inspector, Apostas ledger, Outcomes agenda, Memória ledger or Report Live operation without an authenticated session.
+The production session exercised the workspace header, tab rail, Fila table, contextual inspector, Report Live operation, Apostas ledger, Outcomes agenda and Memória ledger. The five sections loaded without horizontal overflow in the inspected desktop viewport.
 
 ## Required fidelity surfaces
 
-- Fonts and typography: not visually verified.
-- Spacing and layout rhythm: not visually verified.
-- Colors and visual tokens: not visually verified.
-- Image quality and assets: no new raster assets are required; the app keeps its existing logo and icon library. Rendering remains unverified.
-- Copy and content: source code preserves operator language and the five governed tab jobs; browser rendering remains unverified.
+- Fonts and typography: visually verified in production; hierarchy remains legible in the compact header, tab rail and dense ledgers.
+- Spacing and layout rhythm: visually verified in production; the Fila preserves a readable split between queue and inspector.
+- Colors and visual tokens: visually verified against the selected direction; white operational surfaces, cyan emphasis and semantic status colors remain consistent.
+- Image quality and assets: no new raster assets are required; the app keeps its existing logo and icon library.
+- Copy and content: real production rows preserve operator language and the five governed tab jobs.
 
 ## Interaction evidence
 
-- Browser reached the local application at `http://127.0.0.1:4173/?view=learning`.
-- The authentication gate rendered normally.
-- Workspace navigation, filters, decision buckets, row selection, contextual inspector and cross-tab actions could not be exercised before authentication.
+- Browser reached the authenticated GitHub Pages application after deployment of merge commit `629b7cb`.
+- Fila loaded 14 grouped signals and exposed the decision buckets `Toda a fila`, `Agir hoje`, `Acompanhar` and `Investigar`.
+- Report Live appeared in second position; Report Live, Apostas, Outcomes and Memória were each opened successfully.
+- The contextual inspector rendered the selected signal as `Sinal → Impacto → Causa provável → Evidência → Ação → Confiança`.
+- Browser console inspection returned no errors during the five-section pass.
 
 ## Findings
 
-- [P0] Authenticated workspace unavailable for visual QA
-  Location: local browser session, before `GrowthLearningWorkspace`.
-  Evidence: the rendered page is the GaaS login view rather than the selected Fila state.
-  Impact: there is no browser-rendered evidence for fidelity or interaction quality across the five tabs.
-  Fix: authenticate the already-open local preview, then capture the Fila at the target viewport, exercise all five tabs and rerun the comparison.
+- No P0, P1 or P2 visual or interaction defects were observed in the authenticated production pass.
 
 ## Implementation checklist
 
-- Authenticate the local preview.
-- Capture Fila at 1659 × 948 with the first signal selected.
-- Verify `Report Live` is second and exercise all five tabs.
-- Inspect filters, buckets, row selection, drawer/actions, responsive overflow and browser console.
-- Compare target and implementation together; fix all P0/P1/P2 findings.
+- [x] Verify the authenticated production workspace.
+- [x] Verify `Report Live` is second and exercise all five tabs.
+- [x] Inspect filters, decision buckets, selected row, inspector and dense ledgers.
+- [x] Inspect the browser console for runtime errors.
+- [x] Confirm there are no open P0/P1/P2 findings in the inspected viewport.
 
-final result: blocked
+final result: passed
 
 ---
 
@@ -145,6 +143,6 @@ final result: passed
 
 # Latest Design QA Status — Aprendizado Growth
 
-The Aprendizado Growth review is the latest active design QA. Browser rendering is blocked at the local authentication gate, so the P0 finding recorded above remains unresolved until an authenticated workspace capture and interaction pass are completed.
+The Aprendizado Growth review is the latest active design QA. The authenticated GitHub Pages release for merge commit `629b7cb` was exercised across Fila, Report Live, Apostas, Outcomes and Memória, with real data and no browser console errors.
 
-final result: blocked
+final result: passed
