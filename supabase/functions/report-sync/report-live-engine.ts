@@ -1472,7 +1472,7 @@ const PROFILE_LIMITS = {
 } as const;
 
 const DEEP_DIVE_PRIORITY = [
-  "C0", "C1", "C4", "C7", "C8",
+  "C0", "C1", "C2", "C4", "C7", "C8",
   "P1", "P4", "P2", "P3", "P5", "P7", "P6",
   "M1", "M2", "M3", "M4", "M6",
   "B1", "K-SEG", "K-TPL",
@@ -1480,9 +1480,24 @@ const DEEP_DIVE_PRIORITY = [
 ];
 
 const EXECUTIVE_PRIORITY = [
-  "C0", "C1", "C4", "C7", "C8",
+  "C0", "C1", "C2", "C4", "C7", "C8",
   "P1", "M1", "M2", "B1",
 ];
+
+const MONTHLY_FULL_MERGED_CODES = new Set(["P7", "M7", "K-TPL"]);
+
+function projectMonthlyFull(slides: SlideRun[]): SlideRun[] {
+  return slides.filter((slide) => {
+    if (slide.run_eligibility === "omitir_bloqueado") return false;
+    if (MONTHLY_FULL_MERGED_CODES.has(slide.slide_code)) return false;
+    if (slide.slide_code === "B2" && (slide.execution_volume ?? 0) < 1) return false;
+    if (slide.slide_code === "B3" && slide.source_view === "VIEW_COVERAGE_COMPARABILITY") return false;
+    // Um único segmento não cria uma decisão de priorização: o contexto volta
+    // para P1. Com dois ou mais, P2 reaparece automaticamente.
+    if (slide.slide_code === "P2" && (slide.execution_volume ?? 0) < 2) return false;
+    return true;
+  });
+}
 
 /**
  * Dois perfis são projeções determinísticas do mesmo artefato. A seleção nunca
@@ -1490,7 +1505,8 @@ const EXECUTIVE_PRIORITY = [
  * condicional não existe, a vaga é preenchida pelo próximo slide elegível.
  */
 export function projectSlidesForProfile(slides: SlideRun[], rawProfile: string): SlideRun[] {
-  const profile = rawProfile === "monthly_report" ? "executivo_mensal" : rawProfile;
+  const profile = rawProfile === "monthly_report" ? "monthly_full" : rawProfile;
+  if (profile === "monthly_full") return projectMonthlyFull(slides);
   if (!(profile in PROFILE_LIMITS)) return slides;
   const eligible = slides.filter((slide) => slide.run_eligibility !== "omitir_bloqueado");
   const priorities = profile === "executivo_mensal" ? EXECUTIVE_PRIORITY : DEEP_DIVE_PRIORITY;
@@ -1507,8 +1523,8 @@ export function projectSlidesForProfile(slides: SlideRun[], rawProfile: string):
     : slide.slide_code.startsWith("A") ? "annex"
     : "other";
   const quotas = profile === "executivo_mensal"
-    ? { core: 5, partner: 4, media: 2, b2c: 1, conditional: 0, annex: 0, other: 0 }
-    : { core: 5, partner: 11, media: 5, b2c: 1, conditional: 2, annex: 7, other: 0 };
+    ? { core: 6, partner: 3, media: 2, b2c: 1, conditional: 0, annex: 0, other: 0 }
+    : { core: 6, partner: 10, media: 5, b2c: 1, conditional: 2, annex: 7, other: 0 };
   const selected: SlideRun[] = [];
   for (const [name, quota] of Object.entries(quotas)) {
     selected.push(...eligible
@@ -2175,9 +2191,16 @@ export function buildReport(input: ReportInputs): BuiltReport {
   );
   tabs.VIEW_QUALITY_INCIDENTS = rowsToTable(
     ["source", "status", "started_at", "finished_at", "rows_received", "rows_rejected", "error_summary"],
-    input.collectionRuns.filter((row) =>
-      !["success", "done", "complete", "completed"].includes(String(row.status ?? "").toLowerCase()) ||
-      (toNumber(row.rows_rejected) ?? 0) > 0),
+    input.collectionRuns.filter((row) => {
+      const incidentDay = toIsoDay(
+        row.data_as_of ?? row.until_date ?? row.since_date ?? row.finished_at ?? row.started_at,
+      );
+      const inReportWindow = incidentDay !== "" && inWindow(incidentDay, input.periodStart, input.periodEnd);
+      const failed = !["success", "done", "complete", "completed"].includes(
+        String(row.status ?? "").toLowerCase(),
+      ) || (toNumber(row.rows_rejected) ?? 0) > 0;
+      return inReportWindow && failed;
+    }),
   );
 
   const matrixRows = [...groupRows(crmCurrent, ["BU", "canonical_partner", "Segmento"]).values()].map((rows) => {

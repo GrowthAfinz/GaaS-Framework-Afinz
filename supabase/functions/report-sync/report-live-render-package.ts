@@ -357,6 +357,13 @@ export function buildReportRenderPackage(input: ReportRenderPackageAdapterInput)
 export function validateReportRenderPackage(pkg: ReportRenderPackage): RenderPackageValidationIssue[] {
   const issues: RenderPackageValidationIssue[] = [];
   const add = (path: string, code: string, message: string) => issues.push({ path, code, message });
+  const chartRequiredArchetypes = new Set<SlideArchetype>([
+    "time_series_pacing",
+    "router_ranking",
+    "driver_scatter",
+    "funnel",
+    "heatmap",
+  ]);
 
   if (pkg.schema_version !== REPORT_RENDER_PACKAGE_SCHEMA_VERSION) {
     add("schema_version", "schema_version", `Esperado ${REPORT_RENDER_PACKAGE_SCHEMA_VERSION}.`);
@@ -373,6 +380,12 @@ export function validateReportRenderPackage(pkg: ReportRenderPackage): RenderPac
     if (slide.slide_code === "K-VISA") add(`${path}.slide_code`, "retired_scope", "K-VISA é histórico e não pode entrar em novo render.");
     if (!slide.title.trim()) add(`${path}.title`, "required", "Título vazio.");
     if (!slide.narrative.takeaway.trim()) add(`${path}.narrative.takeaway`, "required", "Takeaway vazio.");
+    if (pkg.package_kind === "production" && slide.narrative.evidence.length === 0) {
+      add(`${path}.narrative.evidence`, "narrative_contract", "Slide de produção precisa declarar evidência estruturada.");
+    }
+    if (pkg.package_kind === "production" && !slide.narrative.limitation.trim()) {
+      add(`${path}.narrative.limitation`, "narrative_contract", "Slide de produção precisa declarar limite de leitura.");
+    }
     if (!slide.provenance.data_hash.trim()) add(`${path}.provenance.data_hash`, "required", "Hash de dados ausente.");
     if (!/^[a-f0-9]{64}$/.test(slide.provenance.data_hash)) add(`${path}.provenance.data_hash`, "hash", "Hash de dados deve ser SHA-256 hexadecimal.");
     if (!slide.provenance.source_view && slide.provenance.evidence_refs.length === 0) {
@@ -405,9 +418,24 @@ export function validateReportRenderPackage(pkg: ReportRenderPackage): RenderPac
     if (expectedChart && !slide.visual.chart_contract) {
       add(`${path}.visual.chart_contract`, "chart_contract", "Layout exige gráfico, mas o contrato está ausente.");
     }
+    if (pkg.package_kind === "production" && chartRequiredArchetypes.has(slide.archetype) && !slide.visual.chart_contract) {
+      add(`${path}.visual.chart_contract`, "chart_contract", `Arquétipo ${slide.archetype} exige contrato de gráfico em produção.`);
+    }
     if (slide.visual.chart_contract) {
       if (!slide.visual.chart_contract.series.length) add(`${path}.visual.chart_contract.series`, "chart_contract", "Gráfico sem séries.");
       if (slide.visual.chart_contract.dataset.row_count < 1) add(`${path}.visual.chart_contract.dataset`, "chart_contract", "Range de gráfico sem dados.");
+      if (!slide.visual.chart_contract.title.trim()) add(`${path}.visual.chart_contract.title`, "chart_contract", "Gráfico sem título.");
+      if (!slide.visual.chart_contract.domain_title.trim()) add(`${path}.visual.chart_contract.domain_title`, "chart_contract", "Gráfico sem eixo de domínio.");
+      if (!slide.visual.chart_contract.left_axis_title.trim()) add(`${path}.visual.chart_contract.left_axis_title`, "chart_contract", "Gráfico sem eixo esquerdo.");
+      slide.visual.chart_contract.series.forEach((series, seriesIndex) => {
+        const seriesPath = `${path}.visual.chart_contract.series[${seriesIndex}]`;
+        if (!["LEFT_AXIS", "RIGHT_AXIS"].includes(String(series.axis))) add(`${seriesPath}.axis`, "chart_contract", "Eixo da série inválido.");
+        if (!/^#[0-9a-f]{6}$/i.test(String(series.color ?? ""))) add(`${seriesPath}.color`, "chart_contract", "Cor da série inválida.");
+        if (!["NUMBER", "CURRENCY", "PERCENT"].includes(String(series.number_format_type))) {
+          add(`${seriesPath}.number_format_type`, "chart_contract", "Formato numérico da série inválido.");
+        }
+        if (!String(series.number_format_pattern ?? "").trim()) add(`${seriesPath}.number_format_pattern`, "chart_contract", "Padrão numérico da série ausente.");
+      });
     }
   });
 

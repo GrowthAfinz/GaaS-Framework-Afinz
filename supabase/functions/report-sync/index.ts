@@ -2053,10 +2053,15 @@ function deterministicNarrative(
       case "C2": {
         const crmCoverage = coverage.find((row) => row.source === "CRM")?.coverage;
         const mediaCoverage = coverage.find((row) => row.source === "Mídia")?.coverage;
+        const activityTemplate = templates.find((row) => row.scope === "activities.template_id");
+        const slotTemplate = templates.find((row) => row.scope === "communication_slots.current_template_id");
         body = `Cutoff integrado: ${integratedCutoff}; gap máximo: ${
           fmtNumber(input.manifest.gap_closure_days)
         } dia(s).\n` +
           `Template CRM: ${fmtPercent(crmCoverage)} · evento nomeado de mídia: ${fmtPercent(mediaCoverage)}.\n` +
+          `Cobertura de template: ${fmtPercent(activityTemplate?.coverage)} em activities · ${
+            fmtPercent(slotTemplate?.coverage)
+          } em slots; backlog permanece explícito enquanto estiver abaixo do contrato.\n` +
           `CRM e B2C/Serasa permanecem em funis paralelos; nenhuma origem é somada sem certificação.`;
         break;
       }
@@ -2116,11 +2121,22 @@ function deterministicNarrative(
       }
       case "P1": {
         const rulers = editorialRulers.filter((row) => row.slide_instance_id === slide.slide_instance_id);
+        const segmentView = String(slide.source_view ?? "").replace(/_RESULT$/, "_SEGMENTS");
+        const segments = tableRows(built.tabs[segmentView]);
+        const partnerActions = actionQueue.filter((row) => row.partner === slide.partner);
+        const segmentContext = segments.length === 1
+          ? ` Segmento único no período: ${segments[0].segment ?? "não identificado"}; P2 foi incorporado aqui.`
+          : segments.length > 1
+          ? ` ${segments.length} segmentos observados; o detalhamento permanece em P2.`
+          : " Segmentação indisponível neste snapshot.";
+        const actionContext = partnerActions.length
+          ? ` ${partnerActions.length} ação(ões) do parceiro estão consolidadas em C8.`
+          : " Sem ação candidata do parceiro; manter curso e monitorar o próximo cutoff.";
         body = rulers.length
           ? `${slide.partner}: ${rulers.map((row) =>
             `${row.metric_label} ${row.value_text}${row.delta_text ? ` (${row.delta_text})` : ""} · ${row.verdict_text}`
-          ).join("; ")}.\n\nValores, faixas e vereditos vêm do snapshot mensal canônico.`
-          : `${slide.partner}: régua mensal indisponível neste snapshot. ${commonLimit}`;
+          ).join("; ")}.\n\nValores, faixas e vereditos vêm do snapshot mensal canônico.${segmentContext}${actionContext}`
+          : `${slide.partner}: régua mensal indisponível neste snapshot.${segmentContext}${actionContext} ${commonLimit}`;
         break;
       }
       case "P4": {
@@ -2157,10 +2173,21 @@ function deterministicNarrative(
           `Aliases pendentes permanecem sinalizados e nunca são fundidos por similaridade textual.`;
         break;
       }
+      case "M6": {
+        const mediaActions = actionQueue.filter((row) => row.domain === "media");
+        body = `${sourceRows.length} linha(s) de qualidade de mídia observada(s).\n` +
+          (mediaActions.length
+            ? `${mediaActions.length} ação(ões) de mídia estão consolidadas em C8.`
+            : "Nenhuma ação de mídia certificada; manter o gate de tracking e monitorar o próximo cutoff.") +
+          `\n\n${commonLimit}`;
+        break;
+      }
       case "B1":
         body = `${b2c.map((row) =>
           `${row.source_type}: ${fmtNumber(row.emissions)} emissões`
-        ).join("\n") || "Sem funis observados."}\n\nCRM, total e Serasa são exibidos em paralelo; não são somados.`;
+        ).join("\n") || "Sem funis observados."}\n\n` +
+          `Fonte B2C até ${sourceCutoffs.b2c ?? "indisponível"}; ausência de série diária é status de qualidade, não zero. ` +
+          `CRM, total e Serasa são exibidos em paralelo; não são somados.`;
         break;
       case "K-TPL": {
         const activity = templates.find((row) => row.scope === "activities.template_id");

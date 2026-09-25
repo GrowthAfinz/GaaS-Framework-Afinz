@@ -130,3 +130,6 @@ __pycache__/
 
 # credenciais do agente que carrega pacotes SFMC na fila (service_role)
 .env.agent
+# Report Live production exports are local evidence, never repository source.
+artifacts/report-live-async/golden/
+

@@ -6,6 +6,7 @@ import {
   projectSlidesForProfile,
 } from '../supabase/functions/report-sync/report-live-engine.ts';
 import { buildGenerationRetentionPlan } from '../supabase/functions/report-sync/report-live-generation.ts';
+import { validateProfileCoverage } from '../supabase/functions/report-sync/report-live-versioning.ts';
 import { archetypeFor, layoutGeometryFor } from '../supabase/functions/_shared/report-live-design.ts';
 
 const slide = (slideCode, index, partner = null) => ({
@@ -34,17 +35,26 @@ const codes = [
   'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7',
 ];
 const slides = codes.map((code, index) => slide(code, index, code.startsWith('P') ? `Parceiro ${Math.floor(index / 7)}` : null));
+slides.find((item) => item.slide_code === 'B3').source_view = 'VIEW_COVERAGE_COMPARABILITY';
 
 test('monthly and deep-dive profiles are deterministic projections of one artifact', () => {
   const monthly = projectSlidesForProfile(slides, 'executivo_mensal');
-  const monthlyAlias = projectSlidesForProfile(slides, 'monthly_report');
+  const monthlyFull = projectSlidesForProfile(slides, 'monthly_report');
+  const monthlyFullExplicit = projectSlidesForProfile(slides, 'monthly_full');
   const deepDive = projectSlidesForProfile(slides, 'deep_dive');
   assert.equal(monthly.length, 12);
   assert.equal(deepDive.length, 31);
-  assert.deepEqual(monthlyAlias.map((item) => item.slide_instance_id), monthly.map((item) => item.slide_instance_id));
+  assert.deepEqual(monthlyFullExplicit.map((item) => item.slide_instance_id), monthlyFull.map((item) => item.slide_instance_id));
+  assert.ok(monthlyFull.length > deepDive.length);
+  assert.deepEqual(
+    [...new Set(monthlyFull.map((item) => item.slide_code).filter((code) => ['P7', 'M7', 'B3', 'K-TPL'].includes(code)))],
+    [],
+  );
+  assert.ok(monthlyFull.some((item) => item.slide_code === 'B2'));
   assert.ok(monthly.some((item) => item.slide_code === 'C7'));
+  assert.ok(monthly.some((item) => item.slide_code === 'C2'));
   assert.ok(monthly.some((item) => item.slide_code === 'B1'));
-  assert.equal(monthly.filter((item) => item.slide_code.startsWith('P')).length, 4);
+  assert.equal(monthly.filter((item) => item.slide_code.startsWith('P')).length, 3);
   assert.deepEqual({
     core: deepDive.filter((item) => item.slide_code.startsWith('C')).length,
     partner: deepDive.filter((item) => item.slide_code.startsWith('P')).length,
@@ -52,8 +62,25 @@ test('monthly and deep-dive profiles are deterministic projections of one artifa
     b2c: deepDive.filter((item) => item.slide_code.startsWith('B')).length,
     conditional: deepDive.filter((item) => item.slide_code.startsWith('K-')).length,
     annex: deepDive.filter((item) => item.slide_code.startsWith('A')).length,
-  }, { core: 5, partner: 11, media: 5, b2c: 1, conditional: 2, annex: 7 });
+  }, { core: 6, partner: 10, media: 5, b2c: 1, conditional: 2, annex: 7 });
+  assert.ok(deepDive.some((item) => item.slide_code === 'C2'));
   assert.ok(deepDive.every((item) => item.run_eligibility !== 'omitir_bloqueado'));
+});
+
+test('monthly full certification validates coverage instead of a magic slide count', () => {
+  const monthlyFull = projectSlidesForProfile(slides, 'monthly_full');
+  const result = validateProfileCoverage(monthlyFull, 'monthly_full');
+  assert.equal(result.valid, true);
+  assert.equal(result.evidence.actual, monthlyFull.length);
+
+  const withoutC2 = monthlyFull.filter((item) => item.slide_code !== 'C2');
+  const missingCore = validateProfileCoverage(withoutC2, 'monthly_full');
+  assert.equal(missingCore.valid, false);
+  assert.deepEqual(missingCore.evidence.missing_core, ['C2']);
+
+  const duplicated = [...monthlyFull, monthlyFull[0]];
+  assert.equal(validateProfileCoverage(duplicated, 'monthly_full').valid, false);
+  assert.equal(validateProfileCoverage(slides, 'legacy_monthly_report').valid, true);
 });
 
 test('editorial chart formats distinguish volumes, currency and rates', () => {
