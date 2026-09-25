@@ -127,3 +127,6 @@ dist
 __pycache__/
 *.py[cod]
 
+# Report Live production exports are local evidence, never repository source.
+artifacts/report-live-async/golden/
+

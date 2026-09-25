@@ -27,7 +27,7 @@ Repositório de trabalho:
 Branch atual:
 
 ```text
-codex/report-live-async-publishing-spec
+codex/report-live-monthly-full
 ```
 
 Não grave no `calendar-estrategico/` antigo da raiz. Não altere arquivos fora do worktree, exceto outputs locais de QA em diretório explicitamente criado para isso.
@@ -41,19 +41,19 @@ Não grave no `calendar-estrategico/` antigo da raiz. Não altere arquivos fora 
 - O layout e o tema devem seguir a identidade institucional Afinz.
 - Slides precisam sair completos e bem formatados, nunca como preview de tabela ou placeholder.
 
-## Correção importante sobre cardinalidade
+## Decisão aceita sobre cardinalidade
 
 Os 57 slides publicados em agosto são a baseline de cobertura funcional e de divisão narrativa.
 
 Existem no vault e no código propostas de 12 slides (`executivo_mensal`) e 31 (`deep_dive`). A função de seleção tem teste unitário de contagem, mas os decks completos de 12/31 nunca foram renderizados, comparados visualmente nem homologados como substitutos equivalentes dos 57.
 
-Portanto:
+O passo 0 foi aceito em 2026-09-25. A regra vigente está em
+`docs/plans/report-live-async/PRODUCT_DECISIONS_2026-09-25.md`:
 
-- não use 12 ou 31 como meta;
-- não compacte para caber em uma quantidade arbitrária;
-- preserve a utilidade das divisões existentes;
-- retire apenas o que tiver motivo demonstrável;
-- toda redução exige um mapa da página antiga para o destino novo.
+- `monthly_full`/`monthly_report` é o output oficial de cardinalidade dinâmica;
+- 12 e 31 são derivados opcionais;
+- a cobertura das 57 páginas precisa estar integralmente contabilizada;
+- o renderer não decide fusão, retorno de módulo nem omissão.
 
 `K-VISA` é o único caso já decidido: slide condicional da campanha Copa Visa / LP / opt-in, fonte `VIEW_VISA_OPTIN`. A campanha acabou e o contrato foi desativado para novos runs. Preserve o histórico, mas não o recoloque no novo relatório.
 
@@ -61,22 +61,25 @@ Portanto:
 
 Leia os arquivos completos, nesta ordem:
 
-1. `docs/plans/report-live-async/CLAUDE_COWORK_RENDERER_SPEC.md`
-2. `docs/plans/report-live-async/report-render-package.schema.json`
-3. `docs/plans/report-live-async/fixtures/august-2026-baseline-57.coverage.json`
-4. `docs/plans/report-live-async/SUPABASE_ASYNC_PUBLISHING_PLAN.md` — apenas para entender a fronteira; não implemente esta parte.
-5. `MASTER_DECK_SPEC.md` na raiz de `ACALENDARIO APP`.
-6. `docs/plans/ESTUDO_RECONHECIMENTO_REPORT_LIVE.md`
-7. `docs/plans/inventario_slides.csv`
-8. `Afinz-CRM-Midia-Vault/05-Estrategia/Report-Live-Arquitetura-Editorial.md` na raiz compartilhada.
-9. `Afinz-CRM-Midia-Vault/08-Engenharia/Report-Live-Versionamento-e-Publicacao.md` na raiz compartilhada.
-10. `.claude/skills/afinz-pptx/SKILL.md` na raiz compartilhada.
-11. `.claude/skills/afinz-pptx/brand_spec.md` na raiz compartilhada.
-12. `supabase/functions/_shared/report-live-design.ts`
-13. `supabase/functions/report-sync/report-live-engine.ts`, com foco em `SlideRun`, construção de views, elegibilidade e projeção de perfis.
-14. `supabase/functions/report-sync/report-live-versioning.ts`, com foco em blueprints, hashes e certificação.
-15. `supabase/functions/report-sync/report-live-render-package.ts`
-16. `docs/plans/learning-loop/RELEASE_7C_EDITORIAL_SPEC.md`
+1. `docs/plans/report-live-async/PRODUCT_DECISIONS_2026-09-25.md`
+2. `docs/plans/report-live-async/SLIDE_COVERAGE_REVIEW.md`
+3. `docs/plans/report-live-async/SLIDE_COVERAGE_MAP.csv`
+4. `docs/plans/report-live-async/CLAUDE_COWORK_RENDERER_SPEC.md`
+5. `docs/plans/report-live-async/report-render-package.schema.json`
+6. `docs/plans/report-live-async/fixtures/august-2026-baseline-57.coverage.json`
+7. `docs/plans/report-live-async/SUPABASE_ASYNC_PUBLISHING_PLAN.md` — apenas para entender a fronteira; não implemente esta parte.
+8. `MASTER_DECK_SPEC.md` na raiz de `ACALENDARIO APP`.
+9. `docs/plans/ESTUDO_RECONHECIMENTO_REPORT_LIVE.md`
+10. `docs/plans/inventario_slides.csv`
+11. `Afinz-CRM-Midia-Vault/05-Estrategia/Report-Live-Arquitetura-Editorial.md` na raiz compartilhada.
+12. `Afinz-CRM-Midia-Vault/08-Engenharia/Report-Live-Versionamento-e-Publicacao.md` na raiz compartilhada.
+13. `.claude/skills/afinz-pptx/SKILL.md` na raiz compartilhada.
+14. `.claude/skills/afinz-pptx/brand_spec.md` na raiz compartilhada.
+15. `supabase/functions/_shared/report-live-design.ts`
+16. `supabase/functions/report-sync/report-live-engine.ts`, com foco em `SlideRun`, construção de views, elegibilidade e projeção de perfis.
+17. `supabase/functions/report-sync/report-live-versioning.ts`, com foco em blueprints, hashes e certificação.
+18. `supabase/functions/report-sync/report-live-render-package.ts`
+19. `docs/plans/learning-loop/RELEASE_7C_EDITORIAL_SPEC.md`
 
 Referências visuais locais:
 
@@ -100,7 +103,9 @@ O PDF de 57 páginas acima é uma candidata preservada para reconhecimento visua
 
 Essa diferença 62 → 57 é intencional no run histórico. Não conte blueprint bloqueado como página perdida. Para o novo renderer, o universo é sempre o array `slides[]` do pacote e a sua contabilidade explícita contra as 57 páginas históricas.
 
-## Passo 0 bloqueante — mapa dos 57 slides
+## Passo 0 concluído e aceito — mapa dos 57 slides
+
+Os dois arquivos abaixo já foram produzidos e aceitos. Esta seção permanece como registro dos critérios usados; não repita o levantamento.
 
 Antes de codar o renderer, produza:
 
@@ -161,7 +166,7 @@ Em `SLIDE_COVERAGE_REVIEW.md`, responda:
 6. qual cardinalidade resulta da análise, sem meta prévia;
 7. quais decisões precisam do product owner.
 
-Pare ao concluir o passo 0 e apresente o mapa antes de implementar. A cardinalidade e as fusões são decisões de produto, não escolhas silenciosas do renderer.
+O gate foi cumprido. Use as decisões aprovadas e avance para a implementação; qualquer nova fusão continua sendo decisão de produto, não escolha silenciosa do renderer.
 
 ## Depois do aceite do passo 0
 
@@ -199,7 +204,7 @@ Os valores desses arquivos são sintéticos e identificados como tal. Eles testa
 - O renderer não escolhe quais dados são verdadeiros.
 - Nenhuma escrita em Supabase, Google, main ou Storage.
 
-## Relatório esperado no passo 0
+## Registro do relatório entregue no passo 0
 
 Entregue:
 
