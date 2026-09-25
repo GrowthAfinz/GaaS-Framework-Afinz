@@ -235,6 +235,16 @@ test('inactive slides and completed collectors are not false signals',()=>{
  assert.equal(built.slides.some(slide=>slide.slide_code==='C3'),false);
  assert.equal(records(built.tabs.VIEW_QUALITY_INCIDENTS).some(row=>row.status==='complete'),false);
 });
+test('quality incidents never leak from a previous reporting period',()=>{
+ const input=seed();
+ input.collectionRuns=[
+   {source:'meta-july',status:'failed',started_at:'2026-07-31T12:00:00Z',rows_rejected:2},
+   {source:'meta-august',status:'failed',started_at:'2026-08-24T12:00:00Z',rows_rejected:1},
+   {source:'google-august',status:'complete',started_at:'2026-08-25T12:00:00Z',rows_rejected:0},
+ ];
+ const incidents=records(buildReport(input).tabs.VIEW_QUALITY_INCIDENTS);
+ assert.deepEqual(incidents.map(row=>row.source),['meta-august']);
+});
 test('media uses certified result at ad grain, not most frequent event or mixed windows',()=>{
  const input=seed();input.media=[{date:'2026-08-01',ad_id:'ad1',channel:'meta',campaign:'CAMP',spend:300}];
  const event={business_date:'2026-08-01',ad_id:'ad1',channel:'meta',campaign_name:'CAMP',source:'meta_results',grain_level:'ad',grain_role:'fact',canonical_event:'start_trial',source_event_name:'conversions:start_trial_mobile_app',effective_attribution_window:'7d_click',value:10,observation_status:'available'};

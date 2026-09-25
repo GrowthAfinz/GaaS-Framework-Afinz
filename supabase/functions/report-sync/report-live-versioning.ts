@@ -84,6 +84,61 @@ export interface BlueprintDiff {
   removed: string[];
 }
 
+export interface ProfileCoverageEvidence extends Record<string, unknown> {
+  profile: string;
+  actual: number;
+  duplicate_ids: string[];
+  missing_core: string[];
+  missing_sections: string[];
+  forbidden_monthly_codes: string[];
+  single_segment_slides: string[];
+}
+
+export function validateProfileCoverage(
+  slides: SlideRun[],
+  profile: string,
+): { valid: boolean; evidence: ProfileCoverageEvidence } {
+  const renderedIds = slides.map((slide) => slide.slide_instance_id);
+  const duplicateIds = [...new Set(renderedIds.filter((id, index) => renderedIds.indexOf(id) !== index))];
+  const renderedCodes = new Set(slides.map((slide) => slide.slide_code));
+  const monthlyFull = ["monthly_report", "monthly_full"].includes(profile);
+  const requiredCore = monthlyFull
+    ? ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"]
+    : ["executivo_mensal", "deep_dive"].includes(profile)
+    ? ["C0", "C1", "C2", "C4", "C7", "C8"]
+    : [];
+  const missingCore = requiredCore.filter((code) => !renderedCodes.has(code));
+  const requiredSections = monthlyFull ? ["P", "M", "B", "A"] : [];
+  const missingSections = requiredSections.filter((prefix) =>
+    !slides.some((slide) => slide.slide_code.startsWith(prefix))
+  );
+  const forbiddenMonthlyCodes = monthlyFull
+    ? [...new Set(slides.filter((slide) =>
+      ["P7", "M7", "K-TPL", "K-VISA"].includes(slide.slide_code) ||
+      (slide.slide_code === "B2" && (slide.execution_volume ?? 0) < 1) ||
+      (slide.slide_code === "B3" && slide.source_view === "VIEW_COVERAGE_COMPARABILITY")
+    ).map((slide) => slide.slide_code))]
+    : [];
+  const singleSegmentSlides = monthlyFull
+    ? slides.filter((slide) => slide.slide_code === "P2" && (slide.execution_volume ?? 0) < 2)
+      .map((slide) => slide.slide_instance_id)
+    : [];
+  const evidence: ProfileCoverageEvidence = {
+    profile,
+    actual: slides.length,
+    duplicate_ids: duplicateIds,
+    missing_core: missingCore,
+    missing_sections: missingSections,
+    forbidden_monthly_codes: forbiddenMonthlyCodes,
+    single_segment_slides: singleSegmentSlides,
+  };
+  return {
+    valid: duplicateIds.length === 0 && missingCore.length === 0 && missingSections.length === 0 &&
+      forbiddenMonthlyCodes.length === 0 && singleSegmentSlides.length === 0,
+    evidence,
+  };
+}
+
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === "object") {
@@ -457,23 +512,20 @@ export function validateArtifact(artifact: ReportBuildArtifact): ValidationResul
     { rendered_slides: renderedSlides.length },
   );
 
-  const expectedProfileSlides = artifact.report_profile === "deep_dive"
-    ? 31
-    : ["monthly_report", "executivo_mensal"].includes(artifact.report_profile)
-    ? 12
-    : null;
-  if (expectedProfileSlides !== null) {
-    push(
-      output,
-      "slides.profile_cardinality",
-      renderedSlides.length === expectedProfileSlides ? "passed" : "failed",
-      "blocking",
-      renderedSlides.length === expectedProfileSlides
-        ? `Perfil ${artifact.report_profile} contém ${expectedProfileSlides} slides.`
-        : `Perfil ${artifact.report_profile} exige ${expectedProfileSlides} slides; foram gerados ${renderedSlides.length}.`,
-      { profile: artifact.report_profile, expected: expectedProfileSlides, actual: renderedSlides.length },
-    );
-  }
+  const coverageProfile = artifact.report_profile === "monthly_report" && artifact.versions.spec !== RELEASE_VERSIONS.spec
+    ? "legacy_monthly_report"
+    : artifact.report_profile;
+  const profileCoverage = validateProfileCoverage(renderedSlides, coverageProfile);
+  push(
+    output,
+    "slides.profile_contract_coverage",
+    profileCoverage.valid ? "passed" : "failed",
+    "blocking",
+    profileCoverage.valid
+      ? `Perfil ${artifact.report_profile} preserva seu contrato editorial; a cardinalidade é ${renderedSlides.length}.`
+      : `Perfil ${artifact.report_profile} perdeu cobertura editorial obrigatória ou contém fusão não aplicada.`,
+    profileCoverage.evidence,
+  );
 
   const chartTable = artifact.tabs.VIEW_EDITORIAL_CHART_REGISTRY ?? [];
   const chartHeaders = (chartTable[0] ?? []).map(String);
