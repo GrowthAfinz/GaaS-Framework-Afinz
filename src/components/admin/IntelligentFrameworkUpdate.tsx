@@ -33,6 +33,10 @@ import type {
 import type { Activity } from '../../types/framework';
 import { classifyRentabilizacao } from '../../utils/rentabilizacaoClassify';
 import {
+    hasAquisicaoJourneyPrefix,
+    parseCanonicalAcquisitionJourney,
+} from '../../utils/intelligentImportRouting';
+import {
     parseSeqParts,
     resolveDim,
     canonicalPlurixCartJourney,
@@ -499,65 +503,6 @@ const normalizedOriginTokens = (value: unknown) =>
         return cadenceMatch?.[1] ? [token, cadenceMatch[1]] : [token];
     });
 
-const CANONICAL_JOURNEY_BU: Record<string, string> = {
-    b2c: 'B2C',
-    b2b2c: 'B2B2C',
-    plurix: 'Plurix',
-    seguros: 'Seguros',
-};
-
-const CANONICAL_JOURNEY_PARTNER: Record<string, string> = {
-    bb: 'Bem Barato',
-    bbt: 'Bem Barato',
-    dia: 'Dia',
-    serasa: 'Serasa',
-    srs: 'Serasa',
-    srsa: 'Serasa',
-    ecred: 'Serasa',
-    bpc: 'BpC',
-    bp: 'Proprietaria',
-    bsp: 'Proprietaria',
-    na: 'N/A',
-};
-
-const CANONICAL_JOURNEY_SEGMENT: Record<string, string> = {
-    crm: 'CRM',
-    ngd: 'Negados',
-    negados: 'Negados',
-    anc: 'Aprovados_nao_convertidos',
-    carrinho: 'Abandonados',
-    abandonados: 'Abandonados',
-    abd: 'Abandonados',
-    bp: 'Base_Proprietaria',
-    bsp: 'Base_Proprietaria',
-    lp: 'Leads_Parceiros',
-    leads: 'Leads_Parceiros',
-    recencia: 'Recencia_de_Compra',
-    cartonistas: 'Cartonistas',
-    cart: 'Cartonistas',
-};
-
-const parseCanonicalAcquisitionJourney = (journey: unknown) => {
-    const tokens = taxonomyTokens(journey);
-    const acquisitionAt = tokens.findIndex((token) => token === 'aquisicao');
-    const start = acquisitionAt >= 0 ? acquisitionAt + 1 : tokens[0] === 'jor' ? 1 : 0;
-    const buToken = tokens[start];
-    const bu = CANONICAL_JOURNEY_BU[buToken];
-    if (!bu) return {};
-
-    const parceiro = CANONICAL_JOURNEY_PARTNER[tokens[start + 1]];
-    const segmento = CANONICAL_JOURNEY_SEGMENT[tokens[start + 2]]
-        ?? (tokens.slice(start + 2).includes('carrinho') ? 'Abandonados' : undefined);
-
-    return {
-        bu,
-        parceiro,
-        segmento,
-        source: 'jornada canonica',
-        evidence: tokens.slice(start, start + 3).join('_'),
-    };
-};
-
 /**
  * Sugere a ordem de disparo a partir do activity_name, reaproveitando o
  * parser de sequência do taxonomy.ts (mesmo motor da Reconciliation Queue
@@ -632,7 +577,7 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
         bu: canonicalJourney.bu,
         parceiro: canonicalJourney.parceiro ?? origin?.parceiro,
         segmento: isAbandonedCart ? 'Abandonados' : canonicalJourney.segmento,
-        etapaAquisicao: isAbandonedCart ? 'Reativacao' : undefined,
+        etapaAquisicao: isAbandonedCart ? 'Reativacao' : canonicalJourney.etapaAquisicao,
         source: canonicalJourney.source ?? (activityOrigin ? 'token determinístico da activity' : journeyOrigin ? 'token determinístico da jornada' : undefined),
         evidence: canonicalJourney.evidence ?? origin?.evidence ?? (isAbandonedCart ? 'carrinho_abandonado' : undefined),
         variante,
@@ -1910,13 +1855,6 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
     });
 
     return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, mergedEcred, ignoredPerformance };
-};
-
-const hasAquisicaoJourneyPrefix = (journey: unknown) => {
-    const j = normalizeKey(journey);
-    return j.startsWith('jor_aquisicao')
-        || j.startsWith('disp_aquisicao')
-        || j.startsWith('disparo_aquisicao');
 };
 
 const isAquisicaoMetric = (metric: MetricRow) => {
