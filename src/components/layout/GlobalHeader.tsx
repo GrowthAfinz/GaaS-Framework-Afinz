@@ -132,9 +132,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                 { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => navigateToTab('originacao-b2c') },
                 { id: 'funil-aquisicao', label: 'Funil de Aquisição', icon: Funnel, onClick: () => navigateToTab('funil-aquisicao') },
                 { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => navigateToTab('relatorio') },
-                { id: 'aprendizado-growth', label: 'Aprendizado Growth', icon: BrainCircuit, onClick: () => { openGrowthLearningSection('feed'); navigateToTab('aprendizado-growth'); } },
                 { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') },
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => navigateToTab('orientador') },
+                { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: BrainCircuit, onClick: () => { openGrowthLearningSection('feed'); navigateToTab('aprendizado-growth'); } },
             ]
         },
         {

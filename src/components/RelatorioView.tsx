@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
-import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download, CalendarDays, Files, ArrowDownToLine, Sparkles, Target } from 'lucide-react';
+import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download, CalendarDays, Files, ArrowDownToLine, Target } from 'lucide-react';
 import { CalendarData, Activity } from '../types/framework';
 import { supabase } from '../services/supabaseClient';
 import { ActivityRow } from '../types/activity';
@@ -857,22 +857,18 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                     { key: 'daily' as const, label: 'Diário' },
                     { key: 'monthly' as const, label: 'Mensal' },
                     { key: 'xlsx' as const, label: 'Relatórios' },
-                    { key: 'learning' as const, label: 'Aprendizado Growth' },
                   ].map((option) => (
                     <button
                       key={option.key}
                       type="button"
-                      onClick={() => option.key === 'learning' ? openGrowthLearning('feed') : setReportMode(option.key)}
+                      onClick={() => setReportMode(option.key)}
                       className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                        option.key !== 'learning' && reportMode === option.key
+                        reportMode === option.key
                           ? 'bg-white text-slate-900 shadow-sm'
                           : 'text-white/80 hover:bg-white/15 hover:text-white'
                       }`}
                     >
-                      <span className="inline-flex items-center gap-1.5">
-                        {option.key === 'learning' && <Sparkles size={12} />}
-                        {option.label}
-                      </span>
+                      {option.label}
                     </button>
                   ))}
                 </div>
@@ -949,7 +945,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700"><Files size={19} /></span>
                 <div>
                   <h2 className="text-base font-bold text-slate-900">Report Live</h2>
-                  <p className="text-xs text-slate-500">Consumo da publicação ativa; a operação agora fica em Aprendizado Growth.</p>
+                  <p className="text-xs text-slate-500">Consumo da publicação ativa; a operação agora fica em Aprendizado e Memória.</p>
                 </div>
               </div>
               <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">

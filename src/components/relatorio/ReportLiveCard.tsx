@@ -526,7 +526,7 @@ export const ReportLiveCard: React.FC<ReportLiveCardProps> = ({
               ? access?.capabilities.generate
                 ? 'Primeiro valida as fontes. Depois libera a criação da candidata e, conforme o papel, a publicação.'
                 : 'Consulte as saídas publicadas. A geração requer papel de analista ou superior.'
-              : 'Consulte a publicação ativa. Geração, certificação e publicação ficam em Aprendizado Growth.'}
+              : 'Consulte a publicação ativa. Geração, certificação e publicação ficam em Aprendizado e Memória.'}
           </p>
         </div>
         {operational ? (

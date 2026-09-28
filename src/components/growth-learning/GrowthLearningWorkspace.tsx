@@ -64,7 +64,7 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
               <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-700">
                 <Sparkles size={14} /> Loop de aprendizado Growth
               </div>
-              <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Aprendizado Growth</h1>
+              <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Aprendizado e Memória</h1>
               <p className="mt-1 max-w-2xl text-sm text-slate-500">Decida o que agir, acompanhe compromissos e feche o ciclo com evidência.</p>
             </div>
             <div className="flex items-center gap-3 border-slate-200 lg:border-l lg:pl-5">
@@ -80,7 +80,7 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
               <div><span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Ciclo operacional</span><strong className="text-sm text-slate-800">{betCount} apostas · {outcomeCount} revisões</strong></div>
             </div>
           </div>
-          <nav className="flex gap-1 overflow-x-auto border-t border-slate-200 px-3 pt-1 sm:px-5" aria-label="Áreas de Aprendizado Growth">
+          <nav className="flex gap-1 overflow-x-auto border-t border-slate-200 px-3 pt-1 sm:px-5" aria-label="Áreas de Aprendizado e Memória">
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <button key={id} type="button" onClick={() => selectSection(id)} aria-current={section === id ? 'page' : undefined} className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-colors ${section === id ? 'border-cyan-500 text-slate-950' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900'}`}>
                 <Icon size={15} /> {label}
