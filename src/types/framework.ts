@@ -95,6 +95,7 @@ export interface Goal {
   cac_max?: number;
   plurix_meta?: number;
   b2b2c_meta?: number;
+  herdada_de?: string | null; // mês (yyyy-MM) copiado automaticamente; null = confirmada
   bus?: Record<string, { cartoes: number; aprovacoes: number; cac: number }>;
 }
 

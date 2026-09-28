@@ -22,6 +22,8 @@ import { useAppStore } from '../../store/useAppStore';
 import { deriveActivityMetrics } from '../../utils/activityMetrics';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 import { ChartTooltip } from '../ui/ChartTooltip';
+import { resolveGoalForMonth } from '../../utils/goalCarryForward';
+import { InheritedGoalNotice } from './InheritedGoalNotice';
 import {
     ACQUISITION_BUS,
     AcquisitionBU,
@@ -167,7 +169,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
     const canConsolidate = canConsolidateBUs(chartBUs);
     const isConsolidated = isMultiBU && multiBUMode === 'consolidated' && canConsolidate;
     const isMonthly = chartMode === 'monthly';
-    const currentGoal = goals.find((goal) => goal.mes === currentMonth);
+    const currentGoal = useMemo(() => resolveGoalForMonth(goals, currentMonth), [goals, currentMonth]);
     const profileFilterField = profile?.breakdown === 'parceiro' ? 'parceiros' : 'segmentos';
     const profileFilterValues = profile ? globalFilters[profileFilterField] : [];
     const hasGranularGlobalFilters =
@@ -1096,6 +1098,8 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                             </ResponsiveContainer>
                         </div>
                     </div>
+
+                    {currentGoal?.herdada_de && <InheritedGoalNotice goal={currentGoal} />}
                 </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { supabase, supabaseUrl, supabaseKey } from './supabaseClient';
-import { Activity, FrameworkRow } from '../types/framework';
+import { Activity, FrameworkRow, Goal } from '../types/framework';
 import { DailyAdMetrics, MediaInsight, CampaignMapping } from '../schemas/paid-media';
 import { B2CDataRow } from '../types/b2c';
 import { parseDate } from '../utils/formatters';
@@ -787,6 +787,16 @@ export const dataService = {
         const { error } = await supabase
             .from('goals')
             .upsert(goal, { onConflict: 'mes' });
+
+        if (error) throw error;
+    },
+
+    /** Grava metas herdadas sem sobrescrever um mês que alguém já cadastrou. */
+    async insertInheritedGoals(goals: Goal[]) {
+        if (goals.length === 0) return;
+        const { error } = await supabase
+            .from('goals')
+            .upsert(goals, { onConflict: 'mes', ignoreDuplicates: true });
 
         if (error) throw error;
     },

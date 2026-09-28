@@ -423,7 +423,18 @@ export const ConfiguracoesView: React.FC = () => {
     const [isSending, setIsSending] = useState(false);
     const [sent, setSent] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users'>('intelligent-update');
+    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users'>(() => {
+        // Atalho vindo do aviso de metas herdadas no Launch Planner.
+        try {
+            if (sessionStorage.getItem('gaas.configuracoes.tab') === 'goals') {
+                sessionStorage.removeItem('gaas.configuracoes.tab');
+                return 'goals';
+            }
+        } catch {
+            // sessionStorage indisponível: segue na aba padrão.
+        }
+        return 'intelligent-update';
+    });
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();

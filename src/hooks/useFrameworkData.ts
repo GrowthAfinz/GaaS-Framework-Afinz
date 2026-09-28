@@ -7,6 +7,7 @@ import { storageService } from '../services/storageService';
 import CsvWorker from '../workers/csvWorker?worker';
 import { WorkerMessage, WorkerResponse } from '../workers/csvWorker';
 import { activityMatchesFrente } from '../utils/activityFrente';
+import { buildInheritedGoals, toMonthKey } from '../utils/goalCarryForward';
 
 export const useFrameworkData = (): {
   data: CalendarData;
@@ -227,7 +228,14 @@ export const useFrameworkData = (): {
 
           setB2CData(finalB2C);
           setPaidMediaData(fetchedPaid);
-          useAppStore.getState().setGoals(fetchedGoals);
+          // Mês sem meta herda a do mês anterior (marcada em herdada_de até alguém confirmar).
+          const inheritedGoals = buildInheritedGoals(fetchedGoals, toMonthKey(new Date()));
+          useAppStore.getState().setGoals([...fetchedGoals, ...inheritedGoals]);
+          if (inheritedGoals.length > 0) {
+            dataService.insertInheritedGoals(inheritedGoals).catch((goalErr) => {
+              console.warn('⚠️ Falha ao gravar metas herdadas:', goalErr);
+            });
+          }
           setLoading(false);
         }).catch((importError) => {
           console.error('Erro ao importar dataService:', importError);

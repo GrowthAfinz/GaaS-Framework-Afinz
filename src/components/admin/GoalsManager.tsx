@@ -78,6 +78,7 @@ export const GoalsManager: React.FC = () => {
                 plurix_meta: goal.plurix_meta ?? 0,
                 b2c_meta: goal.b2c_meta ?? 0,
                 cac_max: goal.cac_max ?? 0,
+                herdada_de: null,
             };
 
             const nextGoals = [...goals.filter((g) => g.mes !== currentMonthKey), nextGoal];
@@ -104,7 +105,8 @@ export const GoalsManager: React.FC = () => {
                 b2b2c_meta: Number(formState.b2b2c_meta) || 0,
                 plurix_meta: Number(formState.plurix_meta) || 0,
                 b2c_meta: Number(formState.b2c_meta) || 0,
-                cac_max: currentGoal?.cac_max || 0
+                cac_max: currentGoal?.cac_max || 0,
+                herdada_de: null,
             };
 
             const nextGoals = [...goals.filter((goal) => goal.mes !== currentMonthKey), nextGoal];
