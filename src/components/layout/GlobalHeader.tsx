@@ -18,6 +18,7 @@ import {
     LayoutGrid,
     ShieldCheck,
     BrainCircuit,
+    Library,
     X,
 } from 'lucide-react';
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
@@ -135,6 +136,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                 { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') },
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => navigateToTab('orientador') },
                 { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: BrainCircuit, onClick: () => { openGrowthLearningSection('feed'); navigateToTab('aprendizado-growth'); } },
+                { id: 'vault', label: 'Vault', icon: Library, onClick: () => navigateToTab('vault') },
             ]
         },
         {
