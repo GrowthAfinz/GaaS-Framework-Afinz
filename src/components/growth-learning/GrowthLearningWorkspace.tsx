@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Brain, CalendarDays, CircleGauge, Inbox, ListChecks, Presentation, Sparkles, type LucideIcon } from 'lucide-react';
+import { Activity, Brain, CalendarDays, CircleGauge, Inbox, Library, ListChecks, Presentation, Sparkles, type LucideIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ReportLiveCard } from '../relatorio/ReportLiveCard';
@@ -8,6 +8,7 @@ import { GrowthFeedView } from './feed/GrowthFeedView';
 import { GrowthBetsView } from './bets/GrowthBetsView';
 import { GrowthOutcomesView } from './outcomes/GrowthOutcomesView';
 import { GrowthMemoryView } from './memory/GrowthMemoryView';
+import { VaultWorkspace } from '../vault/VaultWorkspace';
 
 interface GrowthLearningWorkspaceProps {
   periodStart: Date;
@@ -23,6 +24,7 @@ const SECTION_META: Record<GrowthLearningSection, {
   bets: { label: 'Apostas', icon: ListChecks },
   outcomes: { label: 'Outcomes', icon: CircleGauge },
   memory: { label: 'Memória', icon: Brain },
+  vault: { label: 'Vault', icon: Library },
 };
 
 const SECTIONS = GROWTH_LEARNING_SECTIONS.map((id) => ({ id, ...SECTION_META[id] }));
@@ -33,6 +35,7 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
   const [betCount, setBetCount] = useState(0);
   const [outcomeCount, setOutcomeCount] = useState(0);
   const [memoryCount, setMemoryCount] = useState(0);
+  const [vaultCount, setVaultCount] = useState(0);
 
   useEffect(() => {
     const syncSection = () => setSection(readGrowthLearningSection(window.location.search));
@@ -50,6 +53,7 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
     if (id === 'bets') return betCount;
     if (id === 'outcomes') return outcomeCount;
     if (id === 'memory') return memoryCount;
+    if (id === 'vault') return vaultCount;
     return 0;
   };
 
@@ -65,19 +69,19 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
                 <Sparkles size={14} /> Loop de aprendizado Growth
               </div>
               <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">Aprendizado e Memória</h1>
-              <p className="mt-1 max-w-2xl text-sm text-slate-500">Decida o que agir, acompanhe compromissos e feche o ciclo com evidência.</p>
+              <p className="mt-1 max-w-2xl text-sm text-slate-500">{section === 'vault' ? 'Consulte a fonte canônica que dá contexto ao loop e alimenta aprendizados governados.' : 'Decida o que agir, acompanhe compromissos e feche o ciclo com evidência.'}</p>
             </div>
             <div className="flex items-center gap-3 border-slate-200 lg:border-l lg:pl-5">
               <span className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-50 text-cyan-700"><CalendarDays size={17} /></span>
               <div><span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Período ativo</span><strong className="text-sm text-slate-800">{periodLabel}</strong></div>
             </div>
             <div className="flex items-center gap-3 border-slate-200 lg:border-l lg:pl-5">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600"><Inbox size={17} /></span>
-              <div><span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Fila sistêmica</span><strong className="text-sm text-slate-800">{feedCount} sinais no recorte</strong></div>
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-600">{section === 'vault' ? <Library size={17} /> : <Inbox size={17} />}</span>
+              <div><span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{section === 'vault' ? 'Base canônica' : 'Fila sistêmica'}</span><strong className="text-sm text-slate-800">{section === 'vault' ? `${vaultCount} notas indexadas` : `${feedCount} sinais no recorte`}</strong></div>
             </div>
             <div className="flex items-center gap-3 border-slate-200 lg:border-l lg:pl-5">
-              <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><Activity size={17} /></span>
-              <div><span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Ciclo operacional</span><strong className="text-sm text-slate-800">{betCount} apostas · {outcomeCount} revisões</strong></div>
+              <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700">{section === 'vault' ? <Brain size={17} /> : <Activity size={17} />}</span>
+              <div><span className="block text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">{section === 'vault' ? 'Papel no loop' : 'Ciclo operacional'}</span><strong className="text-sm text-slate-800">{section === 'vault' ? 'Fonte → evidência → memória' : `${betCount} apostas · ${outcomeCount} revisões`}</strong></div>
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-slate-200 px-3 pt-1 sm:px-5" aria-label="Áreas de Aprendizado e Memória">
@@ -98,6 +102,8 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
           <GrowthOutcomesView onCountChange={setOutcomeCount} />
         ) : section === 'memory' ? (
           <GrowthMemoryView onCountChange={setMemoryCount} />
+        ) : section === 'vault' ? (
+          <VaultWorkspace onCountChange={setVaultCount} />
         ) : section === 'report-live' ? (
           <section className="space-y-4">
             <div className="flex flex-col gap-3 border-b border-slate-200 px-1 pb-4 sm:flex-row sm:items-end sm:justify-between">
