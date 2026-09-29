@@ -17,7 +17,7 @@ import {
 
 describe('growth learning navigation contract', () => {
   it('keeps Report Live as the second operational tab', () => {
-    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'report-live', 'bets', 'outcomes', 'memory']);
+    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'report-live', 'bets', 'outcomes', 'memory', 'vault']);
   });
   it('defaults an absent or invalid section to the system feed', () => {
     expect(readGrowthLearningSection('')).toBe('feed');
@@ -29,6 +29,7 @@ describe('growth learning navigation contract', () => {
     expect(readGrowthLearningSection('?view=learning&section=outcomes')).toBe('outcomes');
     expect(readGrowthLearningSection('?view=learning&section=memory')).toBe('memory');
     expect(readGrowthLearningSection('?view=learning&section=report-live')).toBe('report-live');
+    expect(readGrowthLearningSection('?view=learning&section=vault')).toBe('vault');
   });
 
   it('preserves unrelated query context and clears a previously opened item', () => {

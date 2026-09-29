@@ -1,5 +1,5 @@
 import { supabase } from '../../services/supabaseClient';
-import { VaultNote, VaultNoteInput, VaultSyncRun } from './vaultTypes';
+import { VaultBacklink, VaultFolderFacet, VaultNote, VaultNoteInput, VaultSearchResult, VaultSyncRun } from './vaultTypes';
 
 const BATCH_SIZE = 25;
 
@@ -9,16 +9,53 @@ export async function canSyncVault(): Promise<boolean> {
   return Boolean(data);
 }
 
-export async function searchVault(query = '', folder?: string | null): Promise<VaultNote[]> {
-  const { data, error } = await supabase.rpc('gaas_search_vault', {
+export async function searchVault(
+  query = '',
+  folder?: string | null,
+  offset = 0,
+  limit = 60,
+): Promise<VaultSearchResult> {
+  const { data, error } = await supabase.rpc('gaas_search_vault_index', {
     p_query: query,
     p_folder: folder || null,
     p_layer: null,
     p_note_type: null,
-    p_limit: 500,
+    p_limit: limit,
+    p_offset: offset,
   });
   if (error) throw error;
-  return (data || []) as VaultNote[];
+  const items = data || [];
+  return {
+    items,
+    total: Number(items[0]?.total_count || 0),
+  } as VaultSearchResult;
+}
+
+export async function getVaultNote(noteId: string): Promise<VaultNote> {
+  const { data, error } = await supabase
+    .from('gaas_vault_notes')
+    .select('id,relative_path,title,aliases,folder,content_markdown,frontmatter,tags,note_type,layer,status,source,source_modified_at,indexed_at')
+    .eq('id', noteId)
+    .is('deleted_at', null)
+    .single();
+  if (error) throw error;
+  return data as VaultNote;
+}
+
+export async function listVaultFolders(): Promise<VaultFolderFacet[]> {
+  const { data, error } = await supabase.rpc('gaas_vault_folder_facets');
+  if (error) throw error;
+  return (data || []) as VaultFolderFacet[];
+}
+
+export async function listVaultBacklinks(noteId: string): Promise<VaultBacklink[]> {
+  const { data, error } = await supabase
+    .from('gaas_vault_backlinks_v')
+    .select('note_id,source_note_id,source_title,source_path,fragment,display_text')
+    .eq('note_id', noteId)
+    .order('source_title');
+  if (error) throw error;
+  return (data || []) as VaultBacklink[];
 }
 
 export async function latestVaultSync(): Promise<VaultSyncRun | null> {
