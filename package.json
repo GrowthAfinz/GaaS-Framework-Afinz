@@ -4,7 +4,9 @@
   "description": "Dashboard calendário estratégico de disparos Salesforce",
   "homepage": "https://growthafinz.github.io/GaaS-Framework-Afinz",
   "type": "module",
-  "engines": { "node": "24.11.1" },
+  "engines": {
+    "node": "24.11.1"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -22,6 +24,7 @@
     "test:growth-context-sql": "node --test scripts/test-growth-context-entry-release-7a.mjs",
     "test:growth-related-sql": "node --test scripts/test-growth-related-bets-release-7b.mjs",
     "test:growth-editorial-sql": "node --test scripts/test-growth-editorial-release-7c.mjs",
+    "test:vault-sql": "node --test scripts/test-vault-library-sql.mjs",
     "validate:report-live-office": "python scripts/validate_report_live_office_output.py --plan tmp/report-live-pptx-poc/render-plan.json --pptx output/pptx/report-live-office-poc-aug-2026.pptx --pdf output/pdf/report-live-office-poc-aug-2026.pdf",
     "check:edge": "npx --yes deno@2.9.6 check --config supabase/functions/deno.json supabase/functions/report-sync/index.ts supabase/functions/report-sync/report-live-render-package.ts supabase/functions/report-sync-v4-setup/index.ts supabase/functions/report-sync-build-candidate/index.ts supabase/functions/report-live-meta-preview/index.ts",
     "supabase:cli": "npx --yes supabase@2.117.0",
@@ -40,18 +43,22 @@
     "exceljs": "^4.4.0",
     "framer-motion": "^12.29.2",
     "idb-keyval": "^6.2.2",
+    "js-yaml": "5.4.2",
     "lucide-react": "^0.563.0",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "10.1.0",
     "react-resizable-panels": "^4.12.2",
     "recharts": "^3.5.0",
+    "remark-gfm": "4.0.1",
     "tailwind-merge": "^3.4.0",
     "xlsx": "^0.18.5",
     "zod": "^4.1.13",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@types/js-yaml": "4.0.9",
     "@types/papaparse": "^5.3.14",
     "@types/react": "^18.2.43",
     "@types/react-beautiful-dnd": "^13.1.5",

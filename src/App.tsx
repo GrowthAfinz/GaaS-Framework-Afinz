@@ -8,6 +8,7 @@ import { SetPasswordView } from './components/SetPasswordView';
 import { ResultadosView } from './components/ResultadosView';
 import { RelatorioView } from './components/RelatorioView';
 import { GrowthLearningWorkspace } from './components/growth-learning/GrowthLearningWorkspace';
+import { VaultWorkspace } from './components/vault/VaultWorkspace';
 import { isGrowthLearningView } from './components/growth-learning/growthLearningNavigation';
 import { ReportLiveOutputCard } from './components/relatorio/ReportLiveOutputCard';
 import { JornadaDisparosView } from './components/JornadaDisparosView';
@@ -294,6 +295,7 @@ function App() {
   const resultados = useResultadosMetrics(filteredData);
 
   const hasData = Object.keys(data).length > 0 || Object.keys(rentabilizacaoData).length > 0;
+  const canRenderWithoutFrameworkData = activeTab === 'vault';
 
   if (import.meta.env.DEV && urlHash === '#funil-preview') {
     return (
@@ -321,6 +323,10 @@ function App() {
         <GrowthLearningWorkspace periodStart={startDate} periodEnd={endDate} />
       </MainLayout>
     );
+  }
+
+  if (import.meta.env.DEV && urlHash === '#vault-preview') {
+    return <MainLayout><VaultWorkspace /></MainLayout>;
   }
 
   if (import.meta.env.DEV && urlHash === '#report-live-output-preview') {
@@ -424,7 +430,7 @@ function App() {
       )}
 
       <div className="flex-1 pb-10">
-        {loading && !hasData && (
+        {loading && !hasData && !canRenderWithoutFrameworkData && (
           <div className="flex flex-col items-center justify-center h-[calc(var(--screen-h)-200px)]">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
@@ -436,7 +442,7 @@ function App() {
           </div>
         )}
 
-        {!loading && !hasData && (
+        {!loading && !hasData && !canRenderWithoutFrameworkData && (
           <div className="flex flex-col items-center justify-center h-[calc(var(--screen-h)-200px)]">
             <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-slate-200 text-center shadow-lg">
               <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -455,7 +461,7 @@ function App() {
           </div>
         )}
 
-        {hasData && (
+        {(hasData || canRenderWithoutFrameworkData) && (
           <AnimatePresence mode="wait">
             <div className="h-full" key={activeTab}>
               {activeTab === 'launch' && (
@@ -530,6 +536,11 @@ function App() {
                   <GrowthLearningWorkspace periodStart={startDate} periodEnd={endDate} />
                 </PageTransition>
               )}
+              {activeTab === 'vault' && (
+                <PageTransition>
+                  <VaultWorkspace />
+                </PageTransition>
+              )}
               {activeTab === 'orientador' && (
                 <PageTransition>
                   <OrientadorView activities={Object.values(advancedFilteredData).flat()} />
@@ -588,7 +599,7 @@ function App() {
                   <DynamicEmailWorkspace />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'aprendizado-growth', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'aprendizado-growth', 'vault', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>
