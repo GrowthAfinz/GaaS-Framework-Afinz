@@ -3,8 +3,36 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PLURIX_V8_TEMPLATE } from './plurixV8Template';
 import { PLURIX_V9_TEMPLATE } from './plurixV9Template';
+import { renderDynamicEmail } from '../ampscript/renderer';
+import { emptyBriefingRow } from '../domain/briefing';
 
 describe('PLURIX V9 sequence-aware hierarchy', () => {
+  it('renders the governed primary title in E-mail 1 before the body copy', () => {
+    const row = emptyBriefingRow('plurix-v9-email-1-title');
+    Object.assign(row, {
+      NM_PRODUTO_INTERNO: 'AMIGAO',
+      TP_CAMPANHA: 'CRM',
+      SEQUENCIA: 'E-mail 1',
+      TITULO_COPY_1_AZUL: 'Conheça os benefícios do cartão +amigo',
+      COR_COPY_1: '#2C3490',
+      TAMANHO_DA_FONTE_TITULO_COPY_1: '24',
+      COPY_1_PRETO: 'Olá, %%=v(@FirstName)=%%!',
+      COR_COPY_PRETO_1: '#242424',
+      TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '18',
+    });
+    const result = renderDynamicEmail(PLURIX_V9_TEMPLATE, row, {
+      CPF: '1', PRI_NOME: 'VANIA', LIMITE: 'R$ 3.500', PRODUTO: 'AMIGAO', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'CRM',
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.html).toContain('Conheça os benefícios do cartão +amigo');
+    expect(result.html).toContain('Olá, VANIA!');
+    expect(result.html.indexOf('Conheça os benefícios do cartão +amigo'))
+      .toBeLessThan(result.html.indexOf('Olá, VANIA!'));
+    expect(PLURIX_V8_TEMPLATE.match(/TreatAsContent\(@TituloCopy1\)/g)).toHaveLength(1);
+    expect(PLURIX_V9_TEMPLATE.match(/TreatAsContent\(@TituloCopy1\)/g)).toHaveLength(2);
+  });
+
   it('adds one explicit E-mail 2 visual branch', () => {
     expect(PLURIX_V9_TEMPLATE.match(/IF @Sequencia == "E-mail 2" THEN/g)).toHaveLength(1);
     expect(PLURIX_V9_TEMPLATE).toContain('Peça agora seu cartão +amigo');

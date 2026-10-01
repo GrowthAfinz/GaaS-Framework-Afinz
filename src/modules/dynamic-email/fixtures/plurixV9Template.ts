@@ -3,6 +3,15 @@ import { PLURIX_V8_TEMPLATE } from './plurixV8Template';
 export const PLURIX_V9_TEMPLATE_ID = 'builtin-plurix-v9';
 export const PLURIX_V9_TEMPLATE_NAME = 'PLURIX V9';
 
+const EMAIL_1_PRIMARY_COPY_WITHOUT_TITLE = `            <td align="center" class="content-pad" style="padding:30px 32px 8px 32px; text-align:center;">
+              %%[ IF NOT EMPTY(@Copy1Preto) THEN ]%%`;
+
+const EMAIL_1_PRIMARY_COPY_WITH_TITLE = `            <td align="center" class="content-pad" style="padding:30px 32px 8px 32px; text-align:center;">
+              %%[ IF NOT EMPTY(@TituloCopy1) THEN ]%%
+              <h1 class="headline" style="max-width:500px; margin:0 auto 16px auto; color:%%=v(@CorCopy1)=%%; font-size:%%=v(@TamanhoFonteTituloCopy1)=%%px; line-height:1.25; font-weight:700; text-align:center;">%%=TreatAsContent(@TituloCopy1)=%%</h1>
+              %%[ ENDIF ]%%
+              %%[ IF NOT EMPTY(@Copy1Preto) THEN ]%%`;
+
 const SHARED_SECONDARY_BLOCK = `          %%[ IF NOT EMPTY(@TituloCopy2) OR NOT EMPTY(@Copy2Preto) OR (NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2)) OR NOT EMPTY(@Banner2Corpo) THEN ]%%
           <tr>
             <td style="padding:0; background-color:#ffffff;">
@@ -77,8 +86,13 @@ const buildPlurixV9Template = (): string => {
   const normalized = PLURIX_V8_TEMPLATE.replace(/\r\n/g, '\n');
   const occurrences = normalized.split(SHARED_SECONDARY_BLOCK).length - 1;
   if (occurrences !== 1) throw new Error(`Expected one shared secondary block in Plurix V8; found ${occurrences}.`);
-  const candidate = normalized.replace(SHARED_SECONDARY_BLOCK, EMAIL_2_SECONDARY_BLOCK);
+  const email1Occurrences = normalized.split(EMAIL_1_PRIMARY_COPY_WITHOUT_TITLE).length - 1;
+  if (email1Occurrences !== 1) throw new Error(`Expected one E-mail 1 primary copy block in Plurix V8; found ${email1Occurrences}.`);
+  const candidate = normalized
+    .replace(EMAIL_1_PRIMARY_COPY_WITHOUT_TITLE, EMAIL_1_PRIMARY_COPY_WITH_TITLE)
+    .replace(SHARED_SECONDARY_BLOCK, EMAIL_2_SECONDARY_BLOCK);
   if (candidate === normalized) throw new Error('No V9 transformation was applied.');
+  if (!candidate.includes(EMAIL_1_PRIMARY_COPY_WITH_TITLE)) throw new Error('E-mail 1 primary title missing from Plurix V9.');
   if (!candidate.includes('IF @Sequencia == "E-mail 2" THEN')) throw new Error('E-mail 2 branch missing from Plurix V9.');
   return candidate;
 };

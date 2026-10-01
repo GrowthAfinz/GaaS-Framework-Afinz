@@ -246,7 +246,7 @@ const initialTemplateSlots = (): EmailTemplateSlot[] => {
     : slot.id === PLURIX_V8_TEMPLATE_ID
       ? { ...slot, name: PLURIX_V8_TEMPLATE_NAME, source: PLURIX_V8_TEMPLATE, updatedAt: '2026-09-02T16:00:00.000Z' }
     : slot.id === PLURIX_V9_TEMPLATE_ID
-      ? { ...slot, name: PLURIX_V9_TEMPLATE_NAME, source: PLURIX_V9_TEMPLATE, updatedAt: '2026-09-02T20:45:00.000Z' }
+      ? { ...slot, name: PLURIX_V9_TEMPLATE_NAME, source: PLURIX_V9_TEMPLATE, version: Math.max(slot.version, 2), updatedAt: '2026-10-01T17:56:32.000Z' }
     : slot.id === B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID
       ? { ...slot, name: 'B2C Classic + Vibe · Dinâmico', source: B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, updatedAt: '2026-09-01T12:00:00.000Z' }
       : slot);
@@ -410,7 +410,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
         : slot.id === PLURIX_V8_TEMPLATE_ID
           ? { ...slot, name: PLURIX_V8_TEMPLATE_NAME, source: PLURIX_V8_TEMPLATE, version: Math.max(slot.version, 1), updatedAt: '2026-09-02T16:00:00.000Z' }
         : slot.id === PLURIX_V9_TEMPLATE_ID
-          ? { ...slot, name: PLURIX_V9_TEMPLATE_NAME, source: PLURIX_V9_TEMPLATE, version: Math.max(slot.version, 1), updatedAt: '2026-09-02T20:45:00.000Z' }
+          ? { ...slot, name: PLURIX_V9_TEMPLATE_NAME, source: PLURIX_V9_TEMPLATE, version: Math.max(slot.version, 2), updatedAt: '2026-10-01T17:56:32.000Z' }
         : slot);
       const principal = effectiveSharedTemplates.find((slot) => slot.isPrincipal) ?? effectiveSharedTemplates[0];
       setTemplateSlots(effectiveSharedTemplates); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
