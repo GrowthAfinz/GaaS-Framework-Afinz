@@ -177,8 +177,12 @@ function App() {
       }
     };
     syncLearningRoute();
+    const unsubscribeHydration = useAppStore.persist.onFinishHydration(syncLearningRoute);
     window.addEventListener('popstate', syncLearningRoute);
-    return () => window.removeEventListener('popstate', syncLearningRoute);
+    return () => {
+      unsubscribeHydration();
+      window.removeEventListener('popstate', syncLearningRoute);
+    };
   }, [setTab]);
 
   const { startDate, endDate, compareEnabled, compareMode } = usePeriod();

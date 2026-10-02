@@ -16,8 +16,8 @@ import {
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
-  it('keeps Report Live as the second operational tab', () => {
-    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'report-live', 'bets', 'outcomes', 'memory', 'vault']);
+  it('places Wiki next to the queue and preserves the operational sequence', () => {
+    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'report-live', 'bets', 'outcomes', 'memory']);
   });
   it('defaults an absent or invalid section to the system feed', () => {
     expect(readGrowthLearningSection('')).toBe('feed');
