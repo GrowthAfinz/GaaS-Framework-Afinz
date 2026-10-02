@@ -10,12 +10,9 @@ function sql(input){
  assert.equal(result.status,0,result.stderr||result.stdout);return result.stdout;
 }
 test('Results dossiers preserve immutable versions, RLS and contextual bets',()=>{
- // Node's test-child context must not leak into independent fixture processes.
- const fixtureEnv={...process.env};delete fixtureEnv.NODE_TEST_CONTEXT;
- for(const release of ['feed-release-2','bets-release-3b','outcomes-release-4','memory-release-5','learning-reuse-release-6','context-entry-release-7a']){
-  const baseline=spawnSync(process.execPath,['scripts/test-growth-'+release+'.mjs'],{cwd:root,env:fixtureEnv,encoding:'utf8'});
-  assert.equal(baseline.status,0,baseline.stderr||baseline.stdout);
- }
+ // Release 7A rebuilds its own chain (2 → 3B → 4 → 5 → 6 → 7A) and is the latest definition of the contextual-bet contract.
+ const baseline=spawnSync(process.execPath,['--test','scripts/test-growth-context-entry-release-7a.mjs'],{cwd:root,env:process.env,encoding:'utf8'});
+ assert.equal(baseline.status,0,baseline.stderr||baseline.stdout);
  sql("create table auth.users(id uuid primary key); insert into auth.users values ('11111111-1111-4111-8111-111111111111'); grant usage on schema public to authenticated,anon;");
  sql(readFileSync(resolve(root,'supabase/migrations/20261002190000_growth_results_dossiers.sql'),'utf8'));
  sql(`begin;
