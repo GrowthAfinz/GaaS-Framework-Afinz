@@ -10,11 +10,11 @@ const fields = {
 };
 const sources = { crm:'activities', media:'paid_media_metrics', b2c:'b2c_daily_metrics' };
 export const numberOrNull=(value:unknown):number|null => value===null||value===undefined||value===''?null:Number.isFinite(Number(value))?Number(value):null;
-export async function readAllRows(table:string,columns:string) {
+export async function readAllRows(table:string,columns:string,primaryKey='id') {
   const rows:Record<string,unknown>[]=[];
   let expected: number|null=null;
   for(let offset=0;;){
-    const {data,error,count}=await supabase.from(table).select(columns,offset===0?{count:'exact'}:{}).order('id').range(offset,offset+999);
+    const {data,error,count}=await supabase.from(table).select(columns,offset===0?{count:'exact'}:{}).order(primaryKey).range(offset,offset+999);
     if(error)throw error;
     if(offset===0)expected=count;
     const batch=(data||[]) as unknown as Record<string,unknown>[];
@@ -22,7 +22,7 @@ export async function readAllRows(table:string,columns:string) {
     if(!batch.length || expected!==null&&rows.length>=expected)break;
     offset+=batch.length;
   }
-  const {count,error}=await supabase.from(table).select('id',{count:'exact',head:true});
+  const {count,error}=await supabase.from(table).select(primaryKey,{count:'exact',head:true});
   if(error)throw error;
   if(count!==rows.length || expected!==rows.length)throw new Error('A fonte mudou durante a leitura. Atualize para carregar o histórico completo.');
   return rows;
@@ -33,12 +33,10 @@ export async function fetchResultsSnapshot(domain:ResultsDomain,userId:string,re
   const raw=await readAllRows(sources[domain],fields[domain]);
   let aliases:Record<string,unknown>[]=[],canonical:Record<string,unknown>[]=[];
   if(domain==='media'){
-    const results=await Promise.all([
-      supabase.from('paid_media_campaign_aliases').select('platform,source_campaign_name,canonical_campaign_id'),
-      supabase.from('canonical_paid_media_campaigns').select('canonical_campaign_id,display_name'),
+    [aliases,canonical]=await Promise.all([
+      readAllRows('paid_media_campaign_aliases','id,platform,source_campaign_name,canonical_campaign_id'),
+      readAllRows('canonical_paid_media_campaigns','canonical_campaign_id,display_name','canonical_campaign_id'),
     ]);
-    for(const result of results)if(result.error)throw result.error;
-    aliases=results[0].data||[];canonical=results[1].data||[];
   }
   const str=(v:unknown)=>typeof v==='string'?v:'';
   const rows:ResultRow[]=raw.map(r=>{

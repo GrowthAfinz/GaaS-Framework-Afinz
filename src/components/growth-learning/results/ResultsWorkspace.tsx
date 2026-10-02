@@ -71,9 +71,9 @@ export function ResultsWorkspace(){
   const previousSummary=domain==='b2c'?summarize(effectivePrevious,duplicates):prior;
   const chart=domain==='b2c'?monthly.map(point=>({...point,...summarize(b2cRows.filter(r=>r.date.startsWith(point.month)),duplicates)})):monthly;
   const drillField:keyof ResultsScope=domain==='crm'?(scope.segment?'partner':'segment'):domain==='media'?'campaign':'type';
-  const groups=[...new Set((domain==='b2c'?sourceRows.filter(r=>r.date.startsWith(month)&&r.date<=windowCut.end):current).map(r=>r[drillField]))].filter(Boolean).map(value=>{
+  const groups=[...new Set((domain==='b2c'?sourceRows.filter(r=>r.date.startsWith(month)&&r.date<=windowCut.end):current).map(r=>r[drillField]))].map(value=>{
     const subset=(domain==='b2c'?sourceRows.filter(r=>r.date.startsWith(month)&&r.date<=windowCut.end):current).filter(r=>r[drillField]===value);
-    return {value,label:drillField==='campaign'?subset[0]?.campaignLabel||value:value,summary:summarize(subset,duplicates)};
+    return {value,label:!value?'Não informado':drillField==='campaign'?subset[0]?.campaignLabel||value:value,summary:summarize(subset,duplicates)};
   }).sort((a,b)=>(b.summary.primary||0)-(a.summary.primary||0));
   const meta=META[domain];
   const trendLabel=trendMetric==='primary'?meta.primary:trendMetric==='secondary'?meta.secondary:trendMetric==='spend'?'Custo registrado':meta.ratio;
@@ -121,7 +121,7 @@ export function ResultsWorkspace(){
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="rounded-2xl border bg-white p-5"><h3 className="font-bold text-slate-900">{domain==='crm'?(scope.segment?'Parceiros neste segmento':'Segmentos no recorte'):domain==='media'?'Campanhas no recorte':'Componentes da originação'}</h3>
           {domain==='b2c'&&<p className="mt-2 text-xs text-slate-500">Total e Serasa são populações sobrepostas. Esta tabela serve à comparação, não à soma.</p>}
-          <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-slate-500"><th className="p-2">Recorte</th><th>{meta.primary}</th><th>Cobertura</th></tr></thead><tbody>{groups.map(g=><tr key={g.value} className="border-b"><td className="max-w-[280px] p-2"><button type="button" onClick={()=>setFilter(drillField,g.value)} className="text-left font-semibold text-cyan-800 hover:underline">{domain==='b2c'?TYPE_LABELS[g.label]||g.label:g.label} <ArrowRight size={12} className="inline"/></button></td><td>{fmt(g.summary.primary)}</td><td className="text-xs text-slate-500">{g.summary.primaryKnown}/{g.summary.usable}</td></tr>)}</tbody></table></div>
+          <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-slate-500"><th className="p-2">Recorte</th><th>{meta.primary}</th><th>Cobertura</th></tr></thead><tbody>{groups.map(g=><tr key={g.value} className="border-b"><td className="max-w-[280px] p-2"><button type="button" disabled={!g.value} onClick={()=>setFilter(drillField,g.value)} className="text-left font-semibold text-cyan-800 hover:underline">{domain==='b2c'?TYPE_LABELS[g.label]||g.label:g.label} <ArrowRight size={12} className="inline"/></button></td><td>{fmt(g.summary.primary)}</td><td className="text-xs text-slate-500">{g.summary.primaryKnown}/{g.summary.usable}</td></tr>)}</tbody></table></div>
         </section>
         <ResultRetrospectivePanel key={domain+month+JSON.stringify(effectiveScope)} domain={domain} scope={effectiveScope} month={month} canWrite={Boolean(user)} sourceSnapshot={{source:snapshot?.source,fetched_at:snapshot?.fetchedAt,cutoff:windowCut.end,summary:active,previous:previousSummary}}/>
       </div>
