@@ -17,7 +17,7 @@ import {
 
 describe('growth learning navigation contract', () => {
   it('places Wiki next to the queue and preserves the operational sequence', () => {
-    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'report-live', 'bets', 'outcomes', 'memory']);
+    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'results', 'report-live', 'bets', 'outcomes', 'memory']);
   });
   it('defaults an absent or invalid section to the system feed', () => {
     expect(readGrowthLearningSection('')).toBe('feed');

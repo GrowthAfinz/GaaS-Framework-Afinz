@@ -9,6 +9,7 @@ import { GrowthBetsView } from './bets/GrowthBetsView';
 import { GrowthOutcomesView } from './outcomes/GrowthOutcomesView';
 import { GrowthMemoryView } from './memory/GrowthMemoryView';
 const VaultWorkspace = lazy(() => import('../vault/VaultWorkspace').then(module => ({ default: module.VaultWorkspace })));
+const ResultsWorkspace = lazy(() => import('./results/ResultsWorkspace').then(module => ({ default: module.ResultsWorkspace })));
 
 interface GrowthLearningWorkspaceProps {
   periodStart: Date;
@@ -25,6 +26,7 @@ const SECTION_META: Record<GrowthLearningSection, {
   outcomes: { label: 'Outcomes', icon: CircleGauge },
   memory: { label: 'Memória', icon: Brain },
   vault: { label: 'Wiki', icon: Library },
+  results: { label: 'Resultados', icon: Activity },
 };
 
 const SECTIONS = GROWTH_LEARNING_SECTIONS.map((id) => ({ id, ...SECTION_META[id] }));
@@ -63,7 +65,7 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
     <div className="min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 py-4 sm:px-5">
       <div className="mx-auto max-w-[1680px] space-y-4">
         <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          {section === 'vault' ? <div className="flex items-center justify-between gap-3 px-5 py-3"><h1 className="text-sm font-bold text-slate-700">Aprendizado e Memória</h1><span className="text-xs text-slate-500">Conhecimento interno · {vaultCount} notas</span></div> : <div className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center lg:px-6">
+          {section === 'vault' || section === 'results' ? <div className="flex items-center justify-between gap-3 px-5 py-3"><h1 className="text-sm font-bold text-slate-700">Aprendizado e Memória</h1><span className="text-xs text-slate-500">{section === 'vault' ? `Conhecimento interno · ${vaultCount} notas` : 'Resultados · evolução · retrospectivas'}</span></div> : <div className="grid gap-4 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center lg:px-6">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-cyan-700">
                 <Sparkles size={14} /> Loop de aprendizado Growth
@@ -96,6 +98,8 @@ export const GrowthLearningWorkspace: React.FC<GrowthLearningWorkspaceProps> = (
 
         {section === 'feed' ? (
           <GrowthFeedView periodStart={periodStart} periodEnd={periodEnd} onCountChange={setFeedCount} />
+        ) : section === 'results' ? (
+          <Suspense fallback={<div role="status" className="rounded-xl border bg-white p-6">Carregando resultados…</div>}><ResultsWorkspace /></Suspense>
         ) : section === 'bets' ? (
           <GrowthBetsView onCountChange={setBetCount} />
         ) : section === 'outcomes' ? (

@@ -62,6 +62,8 @@ jobs:
         run: node --test scripts/test-growth-related-bets-release-7b.mjs
       - name: Growth editorial projection SQL contract
         run: node --test scripts/test-growth-editorial-release-7c.mjs
+      - name: Growth results and retrospective SQL contract
+        run: node --test scripts/test-growth-results-dossiers.mjs
       - name: TypeScript regression gate (documented main debt)
         run: npm run typecheck:release
       - name: Edge Function type checks

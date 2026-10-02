@@ -33,12 +33,11 @@ export const NAV_CONFIG: NavGroup[] = [
         ]
     },
     {
-        title: 'ANÁLISE',
+        title: 'EXPLORAR',
         items: [
             { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp },
             { id: 'resultados', label: 'Resultados', icon: BarChart3 },
             { id: 'relatorio', label: 'Relatório', icon: ClipboardList },
-            { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: BrainCircuit },
             { id: 'orientador', label: 'Orientador', icon: Lightbulb },
         ]
     },
@@ -52,7 +51,8 @@ export const NAV_CONFIG: NavGroup[] = [
     {
         title: 'FRAMEWORK',
         items: [
-            { id: 'explorador', label: 'Explorador Avançado', icon: FolderTree },
+            { id: 'explorador', label: 'Aquisição', icon: undefined },
+            { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: undefined },
             { id: 'configuracoes', label: 'Configurações', icon: Settings2 },
         ]
     }

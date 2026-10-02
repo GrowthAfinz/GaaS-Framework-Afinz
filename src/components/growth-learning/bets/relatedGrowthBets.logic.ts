@@ -74,8 +74,10 @@ export function nextGrowthBetVerification(
 
 export function growthSourceDestination(context: GrowthBetSourceContext):
   | { tab: 'relatorio'; reportMode: 'performance' | 'daily' | 'monthly' }
+  | { tab: 'aprendizado-growth'; results: true }
   | { tab: 'funil-aquisicao'; funnel: 'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz' | 'appsflyer' }
   | null {
+  if (context.sourceSurface === 'results_dossier' && /^results:(crm|media|b2c)$/.test(context.sourceRoute)) return { tab: 'aprendizado-growth', results: true };
   const reportModes = {
     'reports:overview': 'performance',
     'reports:daily': 'daily',

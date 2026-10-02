@@ -120,13 +120,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
         },
         {
             title: 'Framework',
-            direct: true,
+            direct: false,
             items: [
-                { id: 'explorador', label: 'Explorador Avançado', icon: LayoutDashboard, onClick: () => navigateToTab('explorador') },
+                { id: 'explorador', label: 'Aquisição', icon: undefined, onClick: () => navigateToTab('explorador') },
+                { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: undefined, onClick: () => { openGrowthLearningSection('results'); navigateToTab('aprendizado-growth'); } },
             ]
         },
         {
-            title: 'Análise',
+            title: 'Explorar',
             direct: false,
             items: [
                 { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => navigateToTab('originacao-b2c') },
@@ -134,7 +135,6 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                 { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => navigateToTab('relatorio') },
                 { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') },
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => navigateToTab('orientador') },
-                { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: BrainCircuit, onClick: () => { openGrowthLearningSection('feed'); navigateToTab('aprendizado-growth'); } },
             ]
         },
         {
