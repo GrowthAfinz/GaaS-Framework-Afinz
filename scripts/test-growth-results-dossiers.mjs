@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 const root=resolve(import.meta.dirname,'..');
 function sql(input){
@@ -18,7 +18,9 @@ test('Results dossiers preserve immutable versions, RLS and contextual bets',()=
   assert.equal(baseline.status,0,release+' baseline failed\n'+(baseline.stderr||baseline.stdout));
  }
  sql("create table auth.users(id uuid primary key); insert into auth.users values ('11111111-1111-4111-8111-111111111111'); grant usage on schema public to authenticated,anon;");
- sql(readFileSync(resolve(root,'supabase/migrations/20261002190000_growth_results_dossiers.sql'),'utf8'));
+ const migration=readdirSync(resolve(root,'supabase/migrations')).filter(name=>/^\d+_growth_results_dossiers\.sql$/.test(name)).sort().at(-1);
+ assert.ok(migration,'growth_results_dossiers migration not found');
+ sql(readFileSync(resolve(root,'supabase/migrations',migration),'utf8'));
  sql(`begin;
  set local role authenticated;
  select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
