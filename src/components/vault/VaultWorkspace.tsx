@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { vaultUrlTransform } from './vaultMarkdown';
 import remarkGfm from 'remark-gfm';
 import {
   canSyncVault,
@@ -279,7 +280,7 @@ export function VaultWorkspace({ onCountChange }: VaultWorkspaceProps) {
               </div>
             </header>
             <div className="max-w-none text-sm leading-7 text-slate-700">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+              <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={vaultUrlTransform} components={{
                 h1: ({ children }) => <h1 className="mb-4 mt-8 text-2xl font-bold text-slate-900 first:mt-0">{children}</h1>,
                 h2: ({ children }) => <h2 className="mb-3 mt-8 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">{children}</h2>,
                 h3: ({ children }) => <h3 className="mb-2 mt-6 text-base font-bold text-slate-900">{children}</h3>,
