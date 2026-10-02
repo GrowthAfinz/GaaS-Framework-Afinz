@@ -18,6 +18,7 @@ const surfaceLabels = {
   reports_daily: 'Relatórios · Diário',
   reports_monthly: 'Relatórios · Mensal',
   acquisition_funnel: 'Funil de Aquisição',
+  results_dossier: 'Resultados · dossiê e retrospectiva',
 } as const;
 
 const FieldError = ({ text }: { text?: string }) => text

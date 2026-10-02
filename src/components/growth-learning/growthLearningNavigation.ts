@@ -1,4 +1,4 @@
-export const GROWTH_LEARNING_SECTIONS = ['feed', 'vault', 'report-live', 'bets', 'outcomes', 'memory'] as const;
+export const GROWTH_LEARNING_SECTIONS = ['feed', 'vault', 'results', 'report-live', 'bets', 'outcomes', 'memory'] as const;
 
 export type GrowthLearningSection = typeof GROWTH_LEARNING_SECTIONS[number];
 
@@ -7,6 +7,7 @@ export const GROWTH_CONTEXT_SURFACES = [
   'reports_daily',
   'reports_monthly',
   'acquisition_funnel',
+  'results_dossier',
 ] as const;
 
 export type GrowthContextSurface = typeof GROWTH_CONTEXT_SURFACES[number];

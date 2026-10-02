@@ -108,7 +108,7 @@ const countBusinessDaysInclusive = (start: Date, end: Date) => {
 
 const getGoalTarget = (goal: Goal | undefined) => Number(goal?.b2c_meta) || 0;
 
-const createDailyRows = (
+export const createDailyRows = (
     start: Date,
     end: Date,
     filteredCrm: CalendarData,
@@ -122,6 +122,8 @@ const createDailyRows = (
     const crmByDate = new Map<string, { proposals: number; cards: number }>();
 
     b2cRows.forEach((row) => {
+        // Serasa is inside total; a separately recorded CRM component must not inflate it.
+        if ((row.tipo || 'total').toLowerCase() !== 'total' && !isSerasaType(row.tipo)) return;
         const dateKey = formatDateKey(row.data);
         const bucket = isSerasaType(row.tipo) ? serasaByDate : totalByDate;
         const current = bucket.get(dateKey) || emptyAggregate();
