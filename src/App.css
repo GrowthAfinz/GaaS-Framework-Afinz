@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Wiki uses the page scroll: a non-scrolling overflow ancestor traps sticky navigation. */
+.gaas-main-content:has([data-wiki-workspace]) {
+  overflow: visible;
+}
+
 .onboarding-funnel-workspace .overflow-x-auto {
   scrollbar-width: none;
   -ms-overflow-style: none;
