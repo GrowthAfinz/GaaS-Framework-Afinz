@@ -21,6 +21,8 @@ test('Results dossiers preserve immutable versions, RLS and contextual bets',()=
  const migration=readdirSync(resolve(root,'supabase/migrations')).filter(name=>/^\d+_growth_results_dossiers\.sql$/.test(name)).sort().at(-1);
  assert.ok(migration,'growth_results_dossiers migration not found');
  sql(readFileSync(resolve(root,'supabase/migrations',migration),'utf8'));
+ const extension=readdirSync(resolve(root,'supabase/migrations')).find(name=>name.endsWith('_wiki_operation_result_scopes.sql'));
+ assert.ok(extension); sql(readFileSync(resolve(root,'supabase/migrations',extension),'utf8'));
  sql(`begin;
  set local role authenticated;
  select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
@@ -52,6 +54,16 @@ test('Results dossiers preserve immutable versions, RLS and contextual bets',()=
   if not blocked then raise exception 'spoofed author allowed'; end if;
   bet:=public.growth_create_contextual_bet_with_memory('crm_acquisition','{"source_surface":"results_dossier","source_route":"results:crm","period_start":"2026-09-01","period_end":"2026-09-30","filters":{"segment":"Dormant"},"title":"CRM mensal","verification_view":"?view=learning&section=results&result_domain=crm&result_month=2026-09"}','CRM','A ação melhora cartões no segmento','Testar a proposta','Cartões',10,20,'maior_melhor','Pelo menos 20 cartões','2026-10-01','2026-10-31','?view=learning&section=results&result_domain=crm&result_month=2026-09','[]');
   if bet.id is null then raise exception 'contextual bet failed'; end if;
+  result:=public.growth_append_result_retrospective('renta',scope||'{"journey":"WELCOME","subgroup":"NAO","operation_id":"renta-1"}','2026-09-01',0,'Clicks recorded','','Execution evidence','Verify usage event','rentabilizacao_activities');
+  if result.revision<>1 then raise exception 'renta detail failed'; end if;
+  result:=public.growth_append_result_retrospective('crm',scope||'{"partner":"Serasa","stage":"Reativacao","subgroup":"D-7","operation_id":"crm-1"}','2026-09-01',0,'Cartoes registrados','','Leitura descritiva','Verificar cobertura','activities');
+  if result.revision<>1 then raise exception 'CRM operation detail not isolated'; end if;
+  blocked:=false;
+  begin perform public.growth_append_result_retrospective('media',scope||'{"stage":"Reativacao"}','2026-09-01',0,'Observed','','Learned','Next','Source'); exception when others then blocked:=position('incompatible_result_scope' in sqlerrm)>0; end;
+  if not blocked then raise exception 'incompatible detailed scope allowed'; end if;
+  blocked:=false;
+  begin perform public.growth_append_result_retrospective('crm',scope||'{"unknown":"unsafe"}','2026-09-01',0,'Observed','','Learned','Next','Source'); exception when others then blocked:=position('invalid_result_scope' in sqlerrm)>0; end;
+  if not blocked then raise exception 'unknown scope key allowed'; end if;
  end $$;
  reset role;
  set local role anon;
