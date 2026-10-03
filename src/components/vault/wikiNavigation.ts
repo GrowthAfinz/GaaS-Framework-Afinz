@@ -2,6 +2,7 @@ import { VaultNoteSummary } from './vaultTypes';
 
 export const WIKI_TOPICS = [
   { title: 'Comece aqui', description: 'Entenda a operação e encontre seu caminho.', target: '00-Indice/Enciclopedia-Servicos-Growth', folder: '00-Indice' },
+  { title: 'Resultados', description: 'CRM, mídia paga e B2C: evolução mensal, recortes e retrospectivas.', target: '07-Evolucao/Resultados-Evolucao-e-Retrospectivas', folder: '07-Evolucao' },
   { title: 'Produtos e propostas de valor', description: 'Fichas, benefícios, elegibilidade e restrições.', target: 'Dicionario-de-Produtos', folder: '01-Conceitos' },
   { title: 'Serviços de Growth', description: 'Quando usar cada serviço e como conectá-los.', target: '00-Indice/Enciclopedia-Servicos-Growth', folder: '04-Operacao' },
   { title: 'CRM e e-mails dinâmicos', description: 'Do briefing à régua e à operação SFMC.', target: '04-Operacao/Servico-Emails-Dinamicos', folder: '04-Operacao' },

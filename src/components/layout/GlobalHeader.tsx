@@ -123,11 +123,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             direct: false,
             items: [
                 { id: 'explorador', label: 'Aquisição', icon: undefined, onClick: () => navigateToTab('explorador') },
-                { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: undefined, onClick: () => { openGrowthLearningSection('results'); navigateToTab('aprendizado-growth'); } },
+                { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: undefined, onClick: () => { openGrowthLearningSection('vault'); navigateToTab('aprendizado-growth'); } },
             ]
         },
         {
-            title: 'Explorar',
+            title: 'Análise',
             direct: false,
             items: [
                 { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => navigateToTab('originacao-b2c') },

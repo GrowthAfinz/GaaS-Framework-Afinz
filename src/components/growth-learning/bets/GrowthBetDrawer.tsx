@@ -11,7 +11,7 @@ import {
   setGrowthBetChecklistItem,
 } from './growthBetService';
 import { GrowthBet, GrowthBetChecklistItem, GrowthBetStatus, GrowthBetUpdate, GrowthExecutionStatus, GrowthLearningApplication } from './growthBet.types';
-import { readGrowthBetSourceContextFromBeliefSnapshot, openReportsOutput } from '../growthLearningNavigation';
+import { readGrowthBetSourceContextFromBeliefSnapshot, openReportsOutput, buildResultsWikiSearch } from '../growthLearningNavigation';
 import { growthSourceDestination } from './relatedGrowthBets.logic';
 import { useAppStore } from '../../../store/useAppStore';
 import { BU, useBU } from '../../../contexts/BUContext';
@@ -62,14 +62,7 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
   const returnToSource = () => {
     if (!sourceContext || !sourceDestination) return;
     if (sourceDestination.tab === 'aprendizado-growth') {
-      const domain = sourceContext.sourceRoute.slice('results:'.length);
-      const params = new URLSearchParams();
-      params.set('view','learning'); params.set('section','results'); params.set('result_domain',domain);
-      params.set('result_month',sourceContext.periodStart.slice(0,7));
-      for (const [key,value] of Object.entries(sourceContext.filters)) {
-        if (typeof value === 'string' && ['bu','segment','partner','channel','campaign','type'].includes(key) && value) params.set('result_'+key,value);
-      }
-      window.history.pushState({},'',window.location.pathname+'?'+params.toString());
+      window.history.pushState({},'',window.location.pathname+buildResultsWikiSearch(window.location.search));
       window.dispatchEvent(new PopStateEvent('popstate'));
       setTab('aprendizado-growth');
       return;

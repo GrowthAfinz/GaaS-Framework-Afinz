@@ -33,7 +33,7 @@ export const NAV_CONFIG: NavGroup[] = [
         ]
     },
     {
-        title: 'EXPLORAR',
+        title: 'ANÁLISE',
         items: [
             { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp },
             { id: 'resultados', label: 'Resultados', icon: BarChart3 },
