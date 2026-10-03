@@ -5,17 +5,19 @@ export function validMonth(value: string | null): string {
 }
 export function cleanScope(domain: ResultsDomain, value: Partial<ResultsScope>): ResultsScope {
   const scope = { ...EMPTY_SCOPE };
-  const keys: (keyof ResultsScope)[] = domain === 'crm' ? ['bu','segment','partner','channel']
+  const keys: (keyof ResultsScope)[] = domain === 'crm' || domain === 'renta' ? ['bu','segment','partner','channel']
     : domain === 'media' ? ['channel','campaign'] : ['type'];
   keys.forEach(key => { scope[key] = typeof value[key] === 'string' ? value[key]!.slice(0, 300) : ''; });
+  const extra: (keyof ResultsScope)[] = domain==='crm'||domain==='renta' ? ['stage','subgroup','journey','safra','operation_id'] : domain==='media' ? ['objective','grain','operation_id'] : ['operation_id'];
+  extra.forEach(key => { if (typeof value[key]==='string' && value[key]) scope[key]=value[key]!.slice(0,300); });
   return scope;
 }
 export function matchesScope(row: ResultRow, scope: ResultsScope) {
-  return (Object.keys(scope) as (keyof ResultsScope)[]).every(key => !scope[key] || row[key] === scope[key]);
+  return (Object.keys(scope) as (keyof ResultsScope)[]).every(key => key==='operation_id' || !scope[key] || row[key as keyof ResultRow] === scope[key]);
 }
 export function duplicateIds(rows: ResultRow[]) {
   const groups = new Map<string, ResultRow[]>();
-  rows.filter(row => row.domain === 'crm').forEach(row => {
+  rows.filter(row => row.domain === 'crm' || row.domain === 'renta').forEach(row => {
     const group = groups.get(row.duplicateKey) || []; group.push(row); groups.set(row.duplicateKey, group);
   });
   return new Set([...groups.values()].filter(group => group.length > 1).flat().map(row => row.id));
@@ -78,8 +80,8 @@ export function resultsSearch(domain: ResultsDomain, month: string, scope: Resul
 }
 export function readResultsRoute(search: string) {
   const p=new URLSearchParams(search); const raw=p.get('result_domain');
-  const domain: ResultsDomain=raw==='media'||raw==='b2c'?raw:'crm';
-  const values=Object.fromEntries(Object.keys(EMPTY_SCOPE).map(key=>[key,p.get('result_'+key)||'']));
+  const domain: ResultsDomain=raw==='media'||raw==='b2c'||raw==='renta'?raw:'crm';
+  const values=Object.fromEntries([...Object.keys(EMPTY_SCOPE),'stage','subgroup','journey','safra','operation_id','objective','grain'].map(key=>[key,p.get('result_'+key)||'']));
   return { domain, month:validMonth(p.get('result_month')), scope:cleanScope(domain,values) };
 }
 

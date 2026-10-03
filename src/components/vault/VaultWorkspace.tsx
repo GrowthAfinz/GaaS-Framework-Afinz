@@ -1,4 +1,4 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, FolderOpen, Home, Link2, LoaderCircle, Menu, RefreshCw, Search, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,6 +8,10 @@ import { VaultBacklink, VaultFolderFacet, VaultNote, VaultNoteSummary, VaultSync
 import { vaultUrlTransform } from './vaultMarkdown';
 import { prepareWikiMarkdown, resolveWikiTarget, WIKI_TOPICS, wikiHeadingId } from './wikiNavigation';
 import { buildGrowthLearningSectionItemSearch, readGrowthLearningItem } from '../growth-learning/growthLearningNavigation';
+
+import { WikiSubjectCatalog } from './WikiSubjectCatalog';
+import { readWikiAnalytics } from './wikiAnalytics';
+const ResultsWorkspace = lazy(() => import('../growth-learning/results/ResultsWorkspace').then(module=>({default:module.ResultsWorkspace})));
 
 const PAGE_SIZE = 60;
 const dateLabel = (value?: string | null) => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Não informada';
@@ -49,6 +53,9 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const readerPage = useRef<string | null>(null);
   const selectedRef = useRef<string | null>(selectedId);
   const prepared = useMemo(() => prepareWikiMarkdown(rewriteWikilinksForReader(selected?.content_markdown || '')), [selected]);
+  const analytics = useMemo(()=>selected?readWikiAnalytics(selected.frontmatter):null,[selected]);
+  const resultHeading = prepared.headings.find(heading=>heading.id==='resultados-evolucao-e-retrospectiva');
+  const resultBlock = analytics && selected ? <section id="resultados-vivos" className="my-6 scroll-mt-24" aria-label="Resultados deste assunto"><Suspense fallback={<p role="status">Carregando resultados deste assunto…</p>}><ResultsWorkspace key={selected.id} embedded={{...analytics,noteId:selected.id}} /></Suspense></section> : null;
   const allCount = folders.reduce((sum, item) => sum + item.note_count, 0);
 
   useEffect(() => { onCountChange?.(allCount); }, [allCount, onCountChange]);
@@ -56,7 +63,9 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
 
   const navigate = useCallback((id: string | null, fragment = '') => {
     if (readerPage.current) positions.current.set(readerPage.current, window.scrollY);
-    const search = buildGrowthLearningSectionItemSearch('vault', id, window.location.search);
+    const params = new URLSearchParams(window.location.search);
+    if (id !== selectedRef.current) for (const key of [...params.keys()]) if (key.startsWith('result_')) params.delete(key);
+    const search = buildGrowthLearningSectionItemSearch('vault', id, params.toString());
     window.history.pushState({}, '', `${window.location.pathname}${search}${fragment ? `#${encodeURIComponent(fragment)}` : ''}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
     setNotice(null); setChoices([]);
@@ -241,9 +250,12 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
         {readerLoading ? <div className="flex min-h-[360px] items-center justify-center gap-2 text-sm text-slate-500"><LoaderCircle size={20} className="animate-spin" />Abrindo nota…</div> : readerError ? <div role="alert" className="py-16 text-center"><p className="text-sm text-red-700">{readerError}</p><button type="button" onClick={() => { if (selectedId) noteCache.current.delete(selectedId); setRetry(value => value + 1); }} className="mt-4 text-sm font-bold text-cyan-700 underline">Tentar novamente</button></div> : selected ? <>
           <header className="mb-5 border-b border-slate-200 pb-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs"><div className="flex items-center gap-2 text-slate-500"><button type="button" onClick={() => navigate(null)} className="font-semibold text-cyan-700">Wiki</button><ChevronRight size={12} /><span>{selected.folder.replace(/^\d+-/, '').replace(/-/g, ' ') || 'Geral'}</span></div><div className="flex items-center gap-1"><button aria-label="Voltar" type="button" onClick={() => window.history.back()} className="rounded p-2 text-slate-600 hover:bg-slate-100"><ChevronLeft size={16} /></button><button aria-label="Avançar" type="button" onClick={() => window.history.forward()} className="rounded p-2 text-slate-600 hover:bg-slate-100"><ChevronRight size={16} /></button><button type="button" onClick={() => void copyLink()} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 font-semibold text-slate-600"><Copy size={13} />Copiar link</button></div></div><h3 className="text-2xl font-bold tracking-tight text-slate-900">{selected.title}</h3><div className="mt-3 flex flex-wrap gap-2 text-xs">{selected.status && <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-600">Estado documental: {selected.status}</span>}<span className="py-1 text-slate-500">Fonte atualizada: {dateLabel(selected.source_modified_at)}</span></div><details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer">Detalhes da fonte</summary><p className="mt-2 break-all">{selected.relative_path}</p><p className="mt-1">Indexada: {dateLabel(selected.indexed_at)} · {selected.source || 'Acervo interno'}</p>{selected.tags?.length > 0 && <p className="mt-1">{selected.tags.map(tag => `#${tag}`).join(' · ')}</p>}</details></header>
           {prepared.headings.some(item => item.depth <= 3) && <details className="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"><summary className="cursor-pointer text-sm font-bold text-slate-700">Nesta página</summary><nav aria-label="Seções da nota" className="mt-3 grid gap-2 sm:grid-cols-2">{prepared.headings.filter(item => item.depth <= 3).map(item => <a key={item.id} href={`#${item.id}`} onClick={event => { event.preventDefault(); navigate(selected.id, item.id); }} className="text-xs text-cyan-700 hover:underline">{item.title}</a>)}</nav></details>}
+          {selected.frontmatter.growth_catalog && typeof selected.frontmatter.growth_catalog==='object' && <WikiSubjectCatalog key={selected.id} notes={catalog} filters={selected.frontmatter.growth_catalog as Record<string,unknown>} onOpen={navigate} />}
+          {analytics && <a href="#resultados-vivos" onClick={event=>{event.preventDefault();navigate(selected.id,'resultados-vivos');}} className="mb-4 inline-block text-sm font-semibold text-cyan-800 underline">Ver resultados, evolução e retrospectiva deste assunto</a>}
+          {!resultHeading && resultBlock}
           <div className="max-w-none break-words text-sm leading-7 text-slate-700"><ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={vaultUrlTransform} components={{
             h1: ({ node, children }) => <h4 {...headingProps(node?.position?.start.line)} className="mb-3 mt-8 scroll-mt-24 text-2xl font-bold text-slate-900">{children}</h4>,
-            h2: ({ node, children }) => <h4 {...headingProps(node?.position?.start.line)} className="mb-3 mt-8 scroll-mt-24 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">{children}</h4>,
+            h2: ({ node, children }) => <><h4 {...headingProps(node?.position?.start.line)} className="mb-3 mt-8 scroll-mt-24 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">{children}</h4>{node?.position?.start.line===resultHeading?.line && resultBlock}</>,
             h3: ({ node, children }) => <h5 {...headingProps(node?.position?.start.line)} className="mb-2 mt-6 scroll-mt-24 text-base font-bold text-slate-900">{children}</h5>,
             h4: ({ node, children }) => <h6 {...headingProps(node?.position?.start.line)} className="mt-5 scroll-mt-24 font-bold text-slate-900">{children}</h6>,
             h5: ({ node, children }) => <h6 {...headingProps(node?.position?.start.line)}>{children}</h6>,

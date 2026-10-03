@@ -4,11 +4,12 @@ import { ResultRetrospective, ResultRow, ResultsDomain, ResultsScope, ResultsSna
 
 const cache=new Map<string,{expires:number;snapshot:ResultsSnapshot}>();
 const fields = {
-  crm: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,parceiro_canonico,Canal,Cartões Gerados,Propostas,Custo Total Campanha',
-  media: 'id,date,channel,campaign,objective,ad_id,adset_id,spend,impressions,clicks,conversions',
+  crm: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,parceiro_canonico,Canal,Cartões Gerados,Propostas,Custo Total Campanha,Etapa de aquisição,Subgrupos,jornada,Safra',
+  renta: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,Parceiro,Canal,Base Acionável,Cliques,Custo Total Campanha,Etapa de aquisição,Subgrupos,jornada,Safra',
+  media: 'id,date,channel,campaign,objective,ad_id,ad_name,adset_id,adset_name,spend,impressions,clicks,conversions',
   b2c: 'id,data,tipo,propostas_total,emissoes_total',
 };
-const sources = { crm:'activities', media:'paid_media_metrics', b2c:'b2c_daily_metrics' };
+const sources = { crm:'activities', renta:'rentabilizacao_activities', media:'paid_media_metrics', b2c:'b2c_daily_metrics' };
 export const numberOrNull=(value:unknown):number|null => value===null||value===undefined||value===''?null:Number.isFinite(Number(value))?Number(value):null;
 export async function readAllRows(table:string,columns:string,primaryKey='id') {
   const rows:Record<string,unknown>[]=[];
@@ -39,23 +40,30 @@ export async function fetchResultsSnapshot(domain:ResultsDomain,userId:string,re
     ]);
   }
   const str=(v:unknown)=>typeof v==='string'?v:'';
-  const rows:ResultRow[]=raw.map(r=>{
-    const crm=domain==='crm',media=domain==='media';
+  let rows:ResultRow[]=raw.map(r=>{
+    const crm=domain==='crm'||domain==='renta',renta=domain==='renta',media=domain==='media';
     const date=crm?new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(str(r['Data de Disparo']))):str(r[media?'date':'data']);
     const channel=str(r[crm?'Canal':'channel']);
     const campaignRaw=str(r.campaign);
     const ids=[...new Set(aliases.filter(a=>a.platform===channel&&a.source_campaign_name===campaignRaw).map(a=>str(a.canonical_campaign_id)))];
     const identity=ids.length===1?ids[0]:campaignRaw;
     const label=str(canonical.find(c=>c.canonical_campaign_id===identity)?.display_name)||campaignRaw;
-    return {id:str(r.id),date,domain,bu:str(r.BU),segment:str(r.Segmento),partner:str(r.parceiro_canonico),
+    return {id:str(r.id),date,domain,bu:str(r.BU),segment:str(r.Segmento),partner:str(r[renta?'Parceiro':'parceiro_canonico']),
+      stage:str(r['Etapa de aquisição']),subgroup:str(r.Subgrupos),journey:str(r.jornada),safra:str(r.Safra),objective:str(r.objective),grain:media?(r.ad_id||r.ad_name?'ad':r.adset_id||r.adset_name?'adset':'campaign'):'',
       channel,campaign:identity,campaignLabel:label,type:str(r.tipo),
       title:crm?str(r['Activity name / Taxonomia']):media?campaignRaw:str(r.tipo),
-      primary:numberOrNull(r[crm?'Cartões Gerados':media?'clicks':'emissoes_total']),
-      secondary:numberOrNull(r[crm?'Propostas':media?'impressions':'propostas_total']),
+      primary:numberOrNull(r[renta?'Cliques':crm?'Cartões Gerados':media?'clicks':'emissoes_total']),
+      secondary:numberOrNull(r[renta?'Base Acionável':crm?'Propostas':media?'impressions':'propostas_total']),
       spend:numberOrNull(r[crm?'Custo Total Campanha':'spend']),conversions:media?numberOrNull(r.conversions):null,
       duplicateKey:crm?JSON.stringify([r['Activity name / Taxonomia'],r['Data de Disparo'],r.BU,r.Canal]):str(r.id),
       mapped:!media||ids.length===1};
   });
+  // Never add overlapping campaign/adset/ad levels for a campaign on the same day.
+  if(domain==='media') {
+    const levels=new Map<string,Set<string>>();
+    for(const row of rows){const key=JSON.stringify([row.date,row.channel,row.campaign]);const group=levels.get(key)||new Set<string>();group.add(row.grain||'');levels.set(key,group);}
+    rows=rows.map(row=>levels.get(JSON.stringify([row.date,row.channel,row.campaign]))!.size>1?{...row,primary:null,secondary:null,spend:null,conversions:null}:row);
+  }
   const snapshot={rows,fetchedAt:new Date().toISOString(),source:sources[domain]};
   // In-memory, scoped to the signed-in user; no operational data in localStorage or the static bundle.
   for(const oldKey of cache.keys())if(!oldKey.startsWith(userId+':'))cache.delete(oldKey);

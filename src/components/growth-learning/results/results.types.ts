@@ -1,10 +1,12 @@
-export type ResultsDomain = 'crm' | 'media' | 'b2c';
-export type ResultsScope = { bu: string; segment: string; partner: string; channel: string; campaign: string; type: string };
+export type ResultsDomain = 'crm' | 'renta' | 'media' | 'b2c';
+export type ResultsScope = { bu: string; segment: string; partner: string; channel: string; campaign: string; type: string;
+  stage?: string; subgroup?: string; journey?: string; safra?: string; operation_id?: string; objective?: string; grain?: string };
 export type ResultRow = {
   id: string; date: string; domain: ResultsDomain; bu: string; segment: string; partner: string;
   channel: string; campaign: string; campaignLabel: string; type: string; title: string;
   primary: number | null; secondary: number | null; spend: number | null; conversions: number | null;
   duplicateKey: string; mapped: boolean;
+  stage?: string; subgroup?: string; journey?: string; safra?: string; objective?: string; grain?: string;
 };
 export interface ResultsSnapshot { rows: ResultRow[]; fetchedAt: string; source: string }
 export interface ResultSummary {
