@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prepareWikiMarkdown, resolveWikiTarget, wikiHeadingId } from './wikiNavigation';
+import { prepareWikiMarkdown, resolveWikiTarget, wikiHeadingId, WIKI_TOPICS } from './wikiNavigation';
 import { VaultNoteSummary } from './vaultTypes';
 
 const notes = [
@@ -9,6 +9,11 @@ const notes = [
 ] as VaultNoteSummary[];
 
 describe('Wiki navigation contracts', () => {
+  it('opens Results as a canonical Wiki topic without confusing the older screen note', () => {
+    const topic=WIKI_TOPICS.find(topic=>topic.title==='Resultados')!;
+    const catalog=[{id:'screen',relative_path:'04-Operacao/Resultados.md'},{id:'topic',relative_path:'07-Evolucao/Resultados-Evolucao-e-Retrospectivas.md'}] as VaultNoteSummary[];
+    expect(resolveWikiTarget(catalog,topic.target).map(note=>note.id)).toEqual(['topic']);
+  });
   it('prefers an exact path, then a sibling; exposes ambiguous filenames', () => {
     expect(resolveWikiTarget(notes, '03-Dimensoes/Segmentos')[0].id).toBe('b');
     expect(resolveWikiTarget(notes, 'Segmentos', '01-Conceitos/Inicio.md')[0].id).toBe('a');

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildGrowthLearningSearch,
+  buildResultsWikiSearch,
   buildGrowthLearningItemSearch,
   buildGrowthLearningSectionItemSearch,
   buildGrowthBetSourceContextSearch,
@@ -17,11 +18,20 @@ import {
 
 describe('growth learning navigation contract', () => {
   it('places Wiki next to the queue and preserves the operational sequence', () => {
-    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'results', 'report-live', 'bets', 'outcomes', 'memory']);
+    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'report-live', 'bets', 'outcomes', 'memory']);
   });
   it('defaults an absent or invalid section to the system feed', () => {
     expect(readGrowthLearningSection('')).toBe('feed');
     expect(readGrowthLearningSection('?view=learning&section=unknown')).toBe('feed');
+  });
+  it('redirects old results links into the Wiki rather than another workspace', () => {
+    expect(readGrowthLearningSection('?view=learning&section=results')).toBe('vault');
+    const params=new URLSearchParams(buildResultsWikiSearch('?section=results&result_domain=crm&result_month=2026-09&item=old&bu=B2C'));
+    expect(params.get('section')).toBe('vault');
+    expect(params.get('wiki_topic')).toBe('results');
+    expect(params.get('bu')).toBe('B2C');
+    expect(params.has('item')).toBe(false);
+    expect(params.has('result_domain')).toBe(false);
   });
 
   it('recognizes every governed section', () => {

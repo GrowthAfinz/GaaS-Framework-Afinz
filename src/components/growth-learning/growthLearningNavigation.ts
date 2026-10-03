@@ -1,4 +1,4 @@
-export const GROWTH_LEARNING_SECTIONS = ['feed', 'vault', 'results', 'report-live', 'bets', 'outcomes', 'memory'] as const;
+export const GROWTH_LEARNING_SECTIONS = ['feed', 'vault', 'report-live', 'bets', 'outcomes', 'memory'] as const;
 
 export type GrowthLearningSection = typeof GROWTH_LEARNING_SECTIONS[number];
 
@@ -44,7 +44,17 @@ export function isGrowthLearningView(search: string): boolean {
 
 export function readGrowthLearningSection(search: string): GrowthLearningSection {
   const section = new URLSearchParams(search).get('section');
+  if (section === 'results') return 'vault';
   return section && SECTION_SET.has(section) ? section as GrowthLearningSection : 'feed';
+}
+
+export function buildResultsWikiSearch(currentSearch: string): string {
+  const params = new URLSearchParams(currentSearch);
+  for (const key of [...params.keys()]) if (key.startsWith('result_') || ['item','create','growth_context','wiki_q','wiki_folder','wiki_browse'].includes(key)) params.delete(key);
+  params.set('view','learning');
+  params.set('section','vault');
+  params.set('wiki_topic','results');
+  return '?'+params.toString();
 }
 
 export function buildGrowthLearningSearch(
