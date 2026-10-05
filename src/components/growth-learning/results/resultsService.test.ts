@@ -9,6 +9,15 @@ function source(count:number,batches:{data:object[];error?:object}[],end=count){
  return ranges;
 }
 describe('Complete source reads',()=>{
+ it('quotes literal column names so PostgREST preserves spaces and reserved slash',async()=>{
+  let selected='';
+  mock.from.mockImplementation(()=>({select:(columns:string,options:{head?:boolean}={})=>{
+   if(options.head)return Promise.resolve({count:0,error:null});
+   selected=columns;return {order:()=>({range:()=>Promise.resolve({count:0,data:[],error:null})})};
+  }}));
+  await readAllRows('activities','id,Data de Disparo,Activity name / Taxonomia,Cartões Gerados');
+  expect(selected).toBe(['id','Data de Disparo','Activity name / Taxonomia','Cartões Gerados'].map(column=>JSON.stringify(column)).join(','));
+ });
  it('continues pagination when the server caps a page below the requested size',async()=>{
   const ranges=source(1200,[{data:Array.from({length:500},(_,id)=>({id}))},{data:Array.from({length:500},(_,id)=>({id:id+500}))},{data:Array.from({length:200},(_,id)=>({id:id+1000}))}]);
   expect(await readAllRows('activities','id')).toHaveLength(1200);expect(ranges).toEqual([0,500,1000]);
