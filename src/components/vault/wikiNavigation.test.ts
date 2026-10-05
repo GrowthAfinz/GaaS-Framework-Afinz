@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prepareWikiMarkdown, resolveWikiTarget, wikiHeadingId, WIKI_TOPICS } from './wikiNavigation';
+import { prepareWikiMarkdown, resolveWikiTarget, wikiHeadingId, WIKI_TOPICS, wikiTopicForNote } from './wikiNavigation';
 import { VaultNoteSummary } from './vaultTypes';
 
 const notes = [
@@ -9,6 +9,12 @@ const notes = [
 ] as VaultNoteSummary[];
 
 describe('Wiki navigation contracts', () => {
+  it('keeps the related topic active when opening a subject or a connected note', () => {
+    expect(wikiTopicForNote({relative_path:'07-Evolucao/Assunto-Carrinho.md',folder:'07-Evolucao',tags:['growth-assunto']})).toBe('Resultados');
+    expect(wikiTopicForNote({relative_path:'04-Operacao/Servico-Emails-Dinamicos.md',folder:'04-Operacao',tags:[]})).toBe('CRM e e-mails dinâmicos');
+    expect(wikiTopicForNote({relative_path:'08-Engenharia/Contrato.md',folder:'08-Engenharia',tags:[]})).toBe('Engenharia e IAs');
+    expect(wikiTopicForNote(null)).toBeNull();
+  });
   it('opens Results as a canonical Wiki topic without confusing the older screen note', () => {
     const topic=WIKI_TOPICS.find(topic=>topic.title==='Resultados')!;
     const catalog=[{id:'screen',relative_path:'04-Operacao/Resultados.md'},{id:'topic',relative_path:'07-Evolucao/Resultados-Evolucao-e-Retrospectivas.md'}] as VaultNoteSummary[];
