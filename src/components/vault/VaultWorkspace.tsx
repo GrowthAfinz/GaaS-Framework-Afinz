@@ -1,4 +1,4 @@
-import { lazy, Suspense, ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, FolderOpen, Home, Link2, LoaderCircle, Menu, RefreshCw, Search, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -11,7 +11,7 @@ import { buildGrowthLearningSectionItemSearch, readGrowthLearningItem } from '..
 
 import { WikiSubjectCatalog } from './WikiSubjectCatalog';
 import { readWikiAnalytics } from './wikiAnalytics';
-const ResultsWorkspace = lazy(() => import('../growth-learning/results/ResultsWorkspace').then(module=>({default:module.ResultsWorkspace})));
+import { ResultsWorkspace } from '../growth-learning/results/ResultsWorkspace';
 
 const PAGE_SIZE = 60;
 const dateLabel = (value?: string | null) => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Não informada';
@@ -55,7 +55,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const prepared = useMemo(() => prepareWikiMarkdown(rewriteWikilinksForReader(selected?.content_markdown || '')), [selected]);
   const analytics = useMemo(()=>selected?readWikiAnalytics(selected.frontmatter):null,[selected]);
   const resultHeading = prepared.headings.find(heading=>heading.id==='resultados-evolucao-e-retrospectiva');
-  const resultBlock = analytics && selected ? <section id="resultados-vivos" className="my-6 scroll-mt-24" aria-label="Resultados deste assunto"><Suspense fallback={<p role="status">Carregando resultados deste assunto…</p>}><ResultsWorkspace key={selected.id} embedded={{...analytics,noteId:selected.id}} /></Suspense></section> : null;
+  const resultBlock = analytics && selected ? <section id="resultados-vivos" className="my-6 scroll-mt-24" aria-label="Resultados deste assunto"><ResultsWorkspace key={selected.id} embedded={{...analytics,noteId:selected.id}} /></section> : null;
   const allCount = folders.reduce((sum, item) => sum + item.note_count, 0);
 
   useEffect(() => { onCountChange?.(allCount); }, [allCount, onCountChange]);
@@ -267,8 +267,8 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
             table: ({ children }) => <div className="my-5 overflow-x-auto"><table className="w-full border-collapse text-xs">{children}</table></div>,
             th: ({ children }) => <th className="border border-slate-200 bg-slate-50 px-3 py-2 text-left font-semibold">{children}</th>,
             td: ({ children }) => <td className="border border-slate-200 px-3 py-2 align-top">{children}</td>,
-            pre: ({ children }) => <pre className="my-4 overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs leading-6 text-slate-100">{children}</pre>,
-            code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">{children}</code>,
+            pre: ({ children }) => <pre className="my-4 overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs leading-6 text-slate-100 [&>code]:block [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit">{children}</pre>,
+            code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700">{children}</code>,
             a: ({ href, children }) => {
               if (!href) return <span>{children}</span>;
               const meta = linkMeta(href);
@@ -284,3 +284,4 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     </div>
   </section>;
 }
+
