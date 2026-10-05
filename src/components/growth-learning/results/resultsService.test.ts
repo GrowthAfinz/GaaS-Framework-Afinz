@@ -28,6 +28,12 @@ describe('Complete source reads',()=>{
   expect(snapshot.rows[0].dimensions).toMatchObject({product:'Classic',order:'2'});
   expect(snapshot.rows[0].sourceStatus).toBe('Realizado');
  });
+ it('preserves rentabilization variants without inventing a template link',async()=>{
+  source(1,[{data:[{id:'renta','Data de Disparo':'2026-09-01T12:00:00Z',Produto:'Seguro','Ordem de disparo':3,Parceiro:'Plurix'}]}]);
+  const snapshot=await fetchResultsSnapshot('renta','renta-gallery-contract',true);
+  expect(snapshot.rows[0].dimensions).toMatchObject({product:'Seguro',order:'3'});
+  expect(snapshot.rows[0].dimensions?.template).toBeUndefined();
+ });
  it('quotes literal column names so PostgREST preserves spaces and reserved slash',async()=>{
   let selected='';
   mock.from.mockImplementation(()=>({select:(columns:string,options:{head?:boolean}={})=>{
