@@ -14,6 +14,7 @@ export interface ResultSummary {
   primary: number | null; secondary: number | null; spend: number | null;
   primaryKnown: number; secondaryKnown: number; spendKnown: number;
   ratio: number | null; ratioRows: number; conversions: number | null; conversionsKnown: number;
+  cac: number | null;
 }
 export interface ResultRetrospective {
   id: string; domain: ResultsDomain; scope: ResultsScope; period: string; revision: number;

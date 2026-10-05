@@ -5,7 +5,7 @@ const tagValue=(note:VaultNoteSummary,key:string)=>note.tags.find(tag=>tag.start
 const normalize=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 export function WikiSubjectCatalog({notes,filters,onOpen}:{notes:VaultNoteSummary[];filters:Record<string,unknown>;onOpen:(id:string)=>void}) {
   const [query,setQuery]=useState('');
-  const [domain,setDomain]=useState(''); const [partner,setPartner]=useState(''); const [segment,setSegment]=useState('');
+  const [domain,setDomain]=useState(()=>new URLSearchParams(window.location.search).get('wiki_front')||''); const [partner,setPartner]=useState(''); const [segment,setSegment]=useState('');
   const candidates=useMemo(()=>notes.filter(note=>note.tags.includes('growth-assunto') && ['dominio','parceiro','segmento'].every(key=>!filters[key]||note.tags.includes(key+':'+filters[key]))),[notes,filters]);
   const rows=candidates.filter(note=>normalize(note.title+' '+note.tags.join(' ')).includes(normalize(query)) && (!domain||note.tags.includes('dominio:'+domain)) && (!partner||note.tags.includes('parceiro:'+partner)) && (!segment||note.tags.includes('segmento:'+segment)));
   const fronts=[...new Set(rows.map(note=>tagValue(note,'dominio')).filter(Boolean))].sort();
