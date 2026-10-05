@@ -54,13 +54,14 @@ export async function savePartnerHeaderLogo(signatureKey: string, headerLogoUrl:
 type PoolOfferRow = {
   offer_ref: string; partner_name: string; promotion_name: string; sale_price: string; old_price: string;
   start_date: string; end_date: string; image_url: string; active: boolean; segmentacao: string; uf: string;
-  cidade: string; legal_text: string; offer_type: string;
+  cidade: string; legal_text: string; offer_type: string; edited_in_gaas_at: string | null;
 };
 
 const toOffer = (row: PoolOfferRow): PoolOffer => ({
   offerRef: row.offer_ref, partnerName: row.partner_name, promotionName: row.promotion_name, salePrice: row.sale_price,
   oldPrice: row.old_price, startDate: row.start_date, endDate: row.end_date, imageUrl: row.image_url, active: row.active,
   segmentacao: row.segmentacao, uf: row.uf, cidade: row.cidade, legalText: row.legal_text, offerType: row.offer_type,
+  editedAt: row.edited_in_gaas_at ?? undefined,
 });
 
 export async function loadPoolOffers(): Promise<PoolOffer[]> {
@@ -78,8 +79,20 @@ export async function importPoolOffers(offers: PoolOffer[], sourceFile: string):
     sale_price: offer.salePrice, old_price: offer.oldPrice, start_date: offer.startDate, end_date: offer.endDate,
     image_url: offer.imageUrl, active: offer.active, segmentacao: offer.segmentacao, uf: offer.uf, cidade: offer.cidade,
     legal_text: offer.legalText, offer_type: offer.offerType, source_file: sourceFile,
-    imported_by: userId, imported_at: new Date().toISOString(),
+    imported_by: userId, imported_at: new Date().toISOString(), edited_in_gaas_at: null, edited_by: null,
   })));
   if (error) throw error;
   return offers.length;
+}
+
+/** Altera uma oferta na cópia do GaaS. Não muda a DE do SFMC; a próxima importação sobrescreve. */
+export async function updatePoolOffer(offer: PoolOffer): Promise<PoolOffer> {
+  const userId = await requireUser('editar ofertas do pool');
+  const { data, error } = await supabase.from('dynamic_email_pool_offers').update({
+    promotion_name: offer.promotionName.trim(), sale_price: offer.salePrice.trim(), old_price: offer.oldPrice.trim(),
+    start_date: offer.startDate, end_date: offer.endDate, image_url: offer.imageUrl.trim(), active: offer.active,
+    edited_in_gaas_at: new Date().toISOString(), edited_by: userId,
+  }).eq('offer_ref', offer.offerRef).select().single();
+  if (error) throw error;
+  return toOffer(data as PoolOfferRow);
 }

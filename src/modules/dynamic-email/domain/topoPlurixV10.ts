@@ -116,6 +116,19 @@ export interface PoolOffer {
   cidade: string;
   legalText: string;
   offerType: string;
+  /** Preenchido quando a oferta foi alterada na Fábrica (vale só para a prévia). */
+  editedAt?: string;
+}
+
+/** Validação da edição manual de uma oferta na Fábrica. */
+export function validatePoolOfferEdit(offer: Pick<PoolOffer, 'promotionName' | 'salePrice' | 'startDate' | 'endDate' | 'imageUrl'>): string[] {
+  const errors: string[] = [];
+  if (!offer.promotionName.trim()) errors.push('O nome do produto é obrigatório.');
+  if (parsePoolPrice(offer.salePrice) === null) errors.push('O preço precisa ser um número, no formato 35,98.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(offer.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(offer.endDate)) errors.push('Início e fim precisam ser datas válidas.');
+  else if (offer.startDate > offer.endDate) errors.push('O início não pode ser depois do fim.');
+  if (offer.imageUrl && !/^https:\/\//i.test(offer.imageUrl)) errors.push('A imagem precisa de um link https://.');
+  return errors;
 }
 
 export interface PoolOfferOfDay {

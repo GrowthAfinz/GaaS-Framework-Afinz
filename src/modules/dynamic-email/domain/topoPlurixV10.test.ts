@@ -9,6 +9,7 @@ import {
   selectPoolOfferOfDay,
   topoV10PreviewVars,
   validateHeaderVariant,
+  validatePoolOfferEdit,
   type HeaderVariant,
 } from './topoPlurixV10';
 
@@ -146,5 +147,18 @@ describe('variáveis da prévia do V10', () => {
       HeaderModo: 'html', HdrTitulo: 'Peça seu cartão+amigo', LimiteFmt: '1.500,00',
       OfertaProduto: 'Coxão Mole Bovino Resfriado Peça/Pedaço - Kg', OfertaPrecoTxt: '35,98', OfertaData: '01/10',
     });
+  });
+});
+
+describe('edição manual de oferta do pool', () => {
+  const base = { promotionName: 'Coxão Mole - Kg', salePrice: '35,98', startDate: '2026-10-01', endDate: '2026-10-01', imageUrl: 'https://img/x.jpg' };
+  it('aceita uma oferta válida, inclusive mudando a data', () => {
+    expect(validatePoolOfferEdit({ ...base, startDate: '2026-10-08', endDate: '2026-10-10' })).toEqual([]);
+  });
+  it('recusa data invertida, preço inválido, nome vazio e imagem sem https', () => {
+    expect(validatePoolOfferEdit({ ...base, startDate: '2026-10-05', endDate: '2026-10-01' })[0]).toContain('início');
+    expect(validatePoolOfferEdit({ ...base, salePrice: 'barato' })[0]).toContain('preço');
+    expect(validatePoolOfferEdit({ ...base, promotionName: ' ' })[0]).toContain('nome');
+    expect(validatePoolOfferEdit({ ...base, imageUrl: 'http://img/x.jpg' })[0]).toContain('https');
   });
 });

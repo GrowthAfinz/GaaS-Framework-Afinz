@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, CalendarDays, Download, ImageOff, Plus, RotateCcw, Save, Store, Upload } from 'lucide-react';
+import { Archive, CalendarDays, ChevronDown, ChevronUp, Download, ImageOff, Pencil, Plus, RotateCcw, Save, Store, Upload } from 'lucide-react';
 import {
   DEFAULT_HEADER_COLORS,
   exportHeaderVariantsCsv,
@@ -9,11 +9,12 @@ import {
   parsePoolOffersCsv,
   selectPoolOfferOfDay,
   validateHeaderVariant,
+  validatePoolOfferEdit,
   type HeaderVariant,
   type PartnerHeaderAsset,
   type PoolOffer,
 } from '../domain/topoPlurixV10';
-import { importPoolOffers, savePartnerHeaderLogo, saveHeaderVariant } from '../services/topoV10Service';
+import { importPoolOffers, savePartnerHeaderLogo, saveHeaderVariant, updatePoolOffer } from '../services/topoV10Service';
 import type { SignatureSetting } from '../domain/workspace';
 
 /** Redes que comunicam só como +amigo durante a transição de marca: sem logo próprio no header. */
@@ -266,6 +267,14 @@ const PoolOffersPanel: React.FC<{ offers: PoolOffer[]; onChange: (offers: PoolOf
     finally { setImporting(false); if (fileRef.current) fileRef.current.value = ''; }
   };
 
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const replaceOffer = (saved: PoolOffer) => onChange(offers.map((item) => item.offerRef === saved.offerRef ? saved : item));
+  const offersOfDay = (day: string, signatureKey: string) => offers
+    .filter((offer) => offer.partnerName.trim().toUpperCase() === signatureKey.toUpperCase() && offer.startDate <= day && offer.endDate >= day)
+    .sort((a, b) => a.promotionName.localeCompare(b.promotionName, 'pt-BR') || a.offerRef.localeCompare(b.offerRef));
+  const rows = days.flatMap((day) => signatures.map((setting) => ({ day, setting, offer: selectPoolOfferOfDay(offers, setting.signatureKey, day) })).filter((item) => item.offer));
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -281,22 +290,90 @@ const PoolOffersPanel: React.FC<{ offers: PoolOffer[]; onChange: (offers: PoolOf
         {todayOffers.length ? `Hoje (${brDate(today)}) o bloco 3 aparece para: ${todayOffers.map((item) => item.setting.signatureLabel).join(', ')}.` : `Hoje (${brDate(today)}) nenhuma rede tem oferta vigente: o bloco 3 não aparece em nenhum e-mail.`}
       </p>
       <div className="overflow-auto rounded-lg border border-slate-100">
-        <table className="w-full min-w-[520px] text-left text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Data</th><th className="px-3 py-2">Rede</th><th className="px-3 py-2">Oferta do dia</th><th className="px-3 py-2">A partir de</th><th className="px-3 py-2">Regiões</th></tr></thead>
+        <table className="w-full min-w-[560px] text-left text-xs">
+          <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-2">Data</th><th className="px-3 py-2">Rede</th><th className="px-3 py-2">Oferta do dia</th><th className="px-3 py-2">A partir de</th><th className="px-3 py-2">Regiões</th><th className="px-3 py-2"/></tr></thead>
           <tbody>
-            {days.flatMap((day) => signatures.map((setting) => ({ day, setting, offer: selectPoolOfferOfDay(offers, setting.signatureKey, day) })).filter((item) => item.offer)).map(({ day, setting, offer }) => (
-              <tr key={`${day}-${setting.signatureKey}`} className="border-t border-slate-100">
-                <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">{brDate(day)}{day === today && <span className="ml-1 rounded bg-emerald-100 px-1 text-[10px] text-emerald-800">hoje</span>}</td>
-                <td className="px-3 py-2 text-slate-600">{setting.signatureLabel}</td>
-                <td className="px-3 py-2"><div className="flex items-center gap-2">{offer!.imageUrl && <img src={offer!.imageUrl} alt="" className="h-8 w-8 rounded object-cover"/>}<span className="text-slate-800">{offer!.productName}</span></div></td>
-                <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900">R$ {offer!.priceText}</td>
-                <td className="px-3 py-2 text-slate-600">{offer!.regions}</td>
-              </tr>
-            ))}
-            {!days.length && <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-500">Importe o export da DE_POOL_OFERTAS_PLURIX para ver as ofertas.</td></tr>}
+            {rows.map(({ day, setting, offer }) => {
+              const key = `${day}|${setting.signatureKey}`;
+              const open = editingKey === key;
+              const dayOffers = offersOfDay(day, setting.signatureKey);
+              return (
+                <React.Fragment key={key}>
+                  <tr className={`border-t border-slate-100 ${open ? 'bg-cyan-50/40' : ''}`}>
+                    <td className="whitespace-nowrap px-3 py-2 font-semibold text-slate-700">{brDate(day)}{day === today && <span className="ml-1 rounded bg-emerald-100 px-1 text-[10px] text-emerald-800">hoje</span>}</td>
+                    <td className="px-3 py-2 text-slate-600">{setting.signatureLabel}</td>
+                    <td className="px-3 py-2"><div className="flex items-center gap-2">{offer!.imageUrl && <img src={offer!.imageUrl} alt="" className="h-8 w-8 rounded object-cover"/>}<span className="text-slate-800">{offer!.productName}</span>{dayOffers.some((item) => item.editedAt) && <span className="rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-800">editada</span>}</div></td>
+                    <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900">R$ {offer!.priceText}</td>
+                    <td className="px-3 py-2 text-slate-600">{offer!.regions}</td>
+                    <td className="px-3 py-2 text-right"><button type="button" onClick={() => setEditingKey(open ? null : key)} className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 px-2 text-[11px] font-bold text-slate-700 hover:border-cyan-300 hover:text-cyan-800">{open ? <ChevronUp size={12}/> : <Pencil size={12}/>}{open ? 'Fechar' : 'Editar'}</button></td>
+                  </tr>
+                  {open && <tr><td colSpan={6} className="bg-cyan-50/40 px-3 pb-3"><OfferEditList offers={dayOffers} onSaved={replaceOffer} onAnnounce={onAnnounce}/></td></tr>}
+                </React.Fragment>
+              );
+            })}
+            {!days.length && <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-500">Importe o export da DE_POOL_OFERTAS_PLURIX para ver as ofertas.</td></tr>}
           </tbody>
         </table>
       </div>
+      {offers.length > 0 && (
+        <div className="mt-3">
+          <button type="button" onClick={() => setShowAll((current) => !current)} className="inline-flex items-center gap-1.5 text-xs font-bold text-cyan-800 hover:underline">{showAll ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}Todas as ofertas ({offers.length}), inclusive inativas e fora da tabela</button>
+          {showAll && <div className="mt-2"><OfferEditList offers={[...offers].sort((a, b) => b.startDate.localeCompare(a.startDate) || a.offerRef.localeCompare(b.offerRef))} onSaved={replaceOffer} onAnnounce={onAnnounce}/></div>}
+        </div>
+      )}
     </section>
+  );
+};
+
+const regionLabel = (offer: PoolOffer) => [offer.cidade, offer.uf].filter(Boolean).join(' · ') || 'todas as regiões';
+
+const OfferEditList: React.FC<{ offers: PoolOffer[]; onSaved: (offer: PoolOffer) => void; onAnnounce: (message: string) => void }> = ({ offers, onSaved, onAnnounce }) => (
+  <div className="space-y-2 pt-2">
+    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900">
+      Alterar aqui muda só a <b>prévia do GaaS</b>. O e-mail no SFMC lê a <code>DE_POOL_OFERTAS_PLURIX</code>: para valer no envio, a mesma mudança precisa ser feita lá. A próxima importação do export sobrescreve estas edições.
+    </p>
+    {offers.map((offer) => <OfferEditRow key={offer.offerRef} offer={offer} onSaved={onSaved} onAnnounce={onAnnounce}/>)}
+  </div>
+);
+
+const OfferEditRow: React.FC<{ offer: PoolOffer; onSaved: (offer: PoolOffer) => void; onAnnounce: (message: string) => void }> = ({ offer, onSaved, onAnnounce }) => {
+  const [draft, setDraft] = useState<PoolOffer>(offer);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setDraft(offer); }, [offer]);
+  const errors = validatePoolOfferEdit(draft);
+  const dirty = (['promotionName', 'salePrice', 'oldPrice', 'startDate', 'endDate', 'imageUrl', 'active'] as const).some((field) => draft[field] !== offer[field]);
+  const set = (patch: Partial<PoolOffer>) => setDraft((current) => ({ ...current, ...patch }));
+  const save = async () => {
+    setSaving(true);
+    try {
+      const saved = await updatePoolOffer(draft);
+      onSaved(saved);
+      onAnnounce(`Oferta ${saved.offerRef} atualizada na prévia do GaaS.`);
+    } catch (error) { onAnnounce(error instanceof Error ? error.message : 'Não foi possível salvar a oferta.'); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div className={`rounded-lg border bg-white p-3 ${dirty ? 'border-cyan-300' : 'border-slate-200'}`}>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+        <code className="font-bold text-slate-700">{offer.offerRef}</code><span>·</span><span>{regionLabel(offer)}</span>
+        {offer.editedAt && <span className="rounded bg-amber-100 px-1.5 font-bold text-amber-800">editada no GaaS em {new Date(offer.editedAt).toLocaleDateString('pt-BR')}</span>}
+        <label className="ml-auto inline-flex items-center gap-1.5 font-bold text-slate-700"><input type="checkbox" checked={draft.active} onChange={(event) => set({ active: event.target.checked })}/>Ativa</label>
+      </div>
+      <div className="grid gap-2 md:grid-cols-[minmax(0,2fr)_110px_110px_150px_150px]">
+        <TextInput label="Produto" value={draft.promotionName} onChange={(value) => set({ promotionName: value })}/>
+        <TextInput label="Preço (R$)" value={draft.salePrice} onChange={(value) => set({ salePrice: value })}/>
+        <TextInput label="Preço de (R$)" value={draft.oldPrice} onChange={(value) => set({ oldPrice: value })}/>
+        <TextInput label="Início" type="date" value={draft.startDate} onChange={(value) => set({ startDate: value })}/>
+        <TextInput label="Fim" type="date" value={draft.endDate} onChange={(value) => set({ endDate: value })}/>
+      </div>
+      <div className="mt-2 grid items-end gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+        <TextInput label="Imagem (https://)" value={draft.imageUrl} onChange={(value) => set({ imageUrl: value.trim() })}/>
+        <div className="flex gap-2">
+          <button type="button" disabled={!dirty || saving} onClick={() => setDraft(offer)} className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-600 disabled:opacity-40">Desfazer</button>
+          <button type="button" disabled={!dirty || saving || errors.length > 0} onClick={() => void save()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-3 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-40"><Save size={13}/>{saving ? 'Salvando…' : 'Salvar oferta'}</button>
+        </div>
+      </div>
+      {dirty && errors.length > 0 && <ul className="mt-2 space-y-0.5 text-[11px] text-amber-800">{errors.map((error) => <li key={error}>{error}</li>)}</ul>}
+    </div>
   );
 };
