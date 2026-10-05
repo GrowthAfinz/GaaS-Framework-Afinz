@@ -34,7 +34,7 @@ const buildColumnToVar = (source: string): Record<string, string> => {
 
 const isFilled = (value: string | undefined): boolean => typeof value === 'string' && value.trim() !== '';
 
-const sentinel = (id: string) =>
+export const blockSentinel = (id: string) =>
   `<span data-eb-block="${id}" style="display:inline-block;width:0;height:0;max-height:0;overflow:hidden;font-size:0;line-height:0" aria-hidden="true"></span>`;
 
 /**
@@ -65,7 +65,7 @@ export function injectBlockAnchors(source: string, row: BriefingRow, blocks: Anc
       'i',
     );
     if (!guard.test(out)) continue;
-    out = out.replace(guard, `$1$2${sentinel(block.id)}`);
+    out = out.replace(guard, `$1$2${blockSentinel(block.id)}`);
   }
   return out;
 }

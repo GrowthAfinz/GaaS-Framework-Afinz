@@ -182,12 +182,16 @@ const V10_HEADER_BLOCK = `          %%[ IF @HeaderModo == "imagem" THEN ]%%
           </tr>
           %%[ ENDIF ]%%`;
 
+/** Marcador inofensivo no HTML; a prévia da Fábrica troca por um pino invisível do bloco. */
+export const POOL_ANCHOR_COMMENT = '<!-- GAAS:POOL_ANCHOR -->';
+
 const BANNER_3_START = '          %%[ IF NOT EMPTY(@Banner3Corpo) THEN ]%%';
 
 const POOL_BLOCK = `          %%[ IF NOT EMPTY(@OfertaProduto) THEN ]%%
           <!-- V10: bloco 3, oferta do dia do pool de ofertas -->
           <tr>
             <td class="content-pad" style="padding:8px 24px 28px 24px; background-color:#ffffff;">
+              ${POOL_ANCHOR_COMMENT}
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F6F6FB" style="border:1px solid #E1E3F2; border-radius:14px; background-color:#F6F6FB;">
                 <tr>
                   <td colspan="2" style="padding:20px 22px 4px 22px;">

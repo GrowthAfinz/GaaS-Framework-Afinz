@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLURIX_V9_TEMPLATE } from './plurixV9Template';
-import { PLURIX_V10_TEMPLATE } from './plurixV10Template';
+import { PLURIX_V10_TEMPLATE, POOL_ANCHOR_COMMENT } from './plurixV10Template';
 import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer';
 import { emptyBriefingRow, type BriefingRow } from '../domain/briefing';
 import { parsePoolOffersCsv, topoV10PreviewVars, type HeaderVariant } from '../domain/topoPlurixV10';
@@ -42,6 +42,13 @@ describe('PLURIX V10', () => {
     expect(PLURIX_V10_TEMPLATE).toContain('LookupRows("TB_HEADER_VARIACOES"');
     expect(PLURIX_V10_TEMPLATE).toContain('LookupOrderedRows("DE_POOL_OFERTAS_PLURIX"');
     expect(PLURIX_V10_TEMPLATE.match(/%%\[/g)?.length).toBe(PLURIX_V10_TEMPLATE.match(/\]%%/g)?.length);
+  });
+
+  it('tem um único ponto de âncora para o pino do bloco 3, dentro do bloco de oferta', () => {
+    expect(PLURIX_V10_TEMPLATE.split(POOL_ANCHOR_COMMENT)).toHaveLength(2);
+    const anchor = PLURIX_V10_TEMPLATE.indexOf(POOL_ANCHOR_COMMENT);
+    expect(anchor).toBeGreaterThan(PLURIX_V10_TEMPLATE.indexOf('IF NOT EMPTY(@OfertaProduto) THEN ]%%'));
+    expect(anchor).toBeLessThan(PLURIX_V10_TEMPLATE.indexOf('E tem mais: toda semana'));
   });
 
   it('o lookup do pool nunca derruba o envio', () => {

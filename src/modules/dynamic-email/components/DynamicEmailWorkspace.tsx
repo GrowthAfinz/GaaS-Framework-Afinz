@@ -40,7 +40,7 @@ import {
   X,
 } from 'lucide-react';
 import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer';
-import { injectBlockAnchors, type AnchorBlockSpec } from '../ampscript/blockAnchors';
+import { blockSentinel, injectBlockAnchors, type AnchorBlockSpec } from '../ampscript/blockAnchors';
 import {
   applyFix,
   emptyBriefingRow,
@@ -58,10 +58,11 @@ import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
 import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plurixUxV2Template';
 import { PLURIX_V8_TEMPLATE, PLURIX_V8_TEMPLATE_ID, PLURIX_V8_TEMPLATE_NAME } from '../fixtures/plurixV8Template';
 import { PLURIX_V9_TEMPLATE, PLURIX_V9_TEMPLATE_ID, PLURIX_V9_TEMPLATE_NAME } from '../fixtures/plurixV9Template';
-import { PLURIX_V10_TEMPLATE, PLURIX_V10_TEMPLATE_ID, PLURIX_V10_TEMPLATE_NAME } from '../fixtures/plurixV10Template';
+import { PLURIX_V10_TEMPLATE, PLURIX_V10_TEMPLATE_ID, PLURIX_V10_TEMPLATE_NAME, POOL_ANCHOR_COMMENT } from '../fixtures/plurixV10Template';
 import { topoV10PreviewVars, type HeaderVariant, type PartnerHeaderAsset, type PoolOffer } from '../domain/topoPlurixV10';
 import { loadHeaderVariants, loadPartnerHeaderAssets, loadPoolOffers } from '../services/topoV10Service';
 import { TopoV10Workspace } from './TopoV10Workspace';
+import { PoolOfferEditorCard } from './PoolOfferEditorCard';
 import { HeaderVariantPicker } from './HeaderVariantPicker';
 import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
 import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailFactorySegment, type EmailTemplateSlot, type LegalText, type RulerStrategy, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
@@ -152,6 +153,7 @@ const EDITOR_SECTIONS: EditorSection[] = [
   { id: 'header', label: 'Cabeçalho visual', description: 'Primeiro elemento visível do e-mail.', imageSlot: IMAGE_SLOTS.header },
   { id: 'primary', label: 'Bloco principal', description: 'Título, conteúdo, ação principal e primeiro banner.', fields: ['TITULO_COPY_1_AZUL', 'COR_COPY_1', 'TAMANHO_DA_FONTE_TITULO_COPY_1', 'COPY_1_PRETO', 'COR_COPY_PRETO_1', 'TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1', 'TITULO_CTA_1', 'LINK_CTA_1'], imageSlot: IMAGE_SLOTS.banner1 },
   { id: 'secondary', label: 'Segundo bloco', description: 'Conteúdo complementar, segunda ação e banner.', fields: ['TITULO_COPY_2', 'COR_TITULO_COPY_2', 'TAMANHO_DA_FONTE_TITULO_COPY_2', 'COPY_2_PRETO', 'COR_COPY_2', 'TAMANHO_DA_FONTE_COPY_2', 'TITULO_CTA_2', 'LINK_CTA_2'], imageSlot: IMAGE_SLOTS.banner2 },
+  { id: 'pool', label: 'Terceiro bloco · Oferta do pool', description: 'Opcional e automático: aparece quando a rede tem oferta vigente no dia do envio (template V10).' },
   { id: 'closing', label: 'Encerramento visual', description: 'Último banner do conteúdo.', imageSlot: IMAGE_SLOTS.banner3 },
   { id: 'legal', label: 'Informações legais', description: 'Nota legal e rodapé exibidos no fim do e-mail.', fields: ['NOTA_LEGAL', 'COR_NOTA_LEGAL', 'TAMANHO_DA_FONTE_NOTA_LEGAL', 'RODAPE'] },
 ];
@@ -164,10 +166,13 @@ const STRUCTURE_BLOCKS: { id: string; num: number; label: string; textFields: Br
   { id: 'header', num: 1, label: 'Cabeçalho', textFields: [], imageField: 'HEADER' },
   { id: 'primary', num: 2, label: 'Bloco principal', textFields: ['TITULO_COPY_1_AZUL', 'COPY_1_PRETO', 'TITULO_CTA_1'], imageField: 'BANNER_1_CORPO' },
   { id: 'secondary', num: 3, label: 'Segundo bloco', textFields: ['TITULO_COPY_2', 'COPY_2_PRETO', 'TITULO_CTA_2'], imageField: 'BANNER_2_CORPO' },
-  { id: 'closing', num: 4, label: 'Encerramento', textFields: [], imageField: 'BANNER_3_CORPO' },
-  { id: 'legal', num: 5, label: 'Info. legais', textFields: ['NOTA_LEGAL', 'RODAPE'] },
+  { id: 'pool', num: 4, label: 'Oferta do pool', textFields: [] },
+  { id: 'closing', num: 5, label: 'Encerramento', textFields: [], imageField: 'BANNER_3_CORPO' },
+  { id: 'legal', num: 6, label: 'Info. legais', textFields: ['NOTA_LEGAL', 'RODAPE'] },
 ];
-const STRUCTURE_NUM: Record<string, number> = Object.fromEntries(STRUCTURE_BLOCKS.map((block) => [block.id, block.num]));
+const STRUCTURE_IDS = new Set(STRUCTURE_BLOCKS.map((block) => block.id));
+// O bloco de oferta do pool só existe no template V10; nos demais a numeração segue sem ele.
+const visibleStructureBlocks = (withPool: boolean) => STRUCTURE_BLOCKS.filter((block) => withPool || block.id !== 'pool').map((block, index) => ({ ...block, num: index + 1 }));
 // Colunas-assinatura de cada bloco (texto primeiro, imagem como fallback) — usadas
 // para injetar o marcador invisível que ancora o pino da prévia ao bloco certo.
 const STRUCTURE_ANCHOR_SPECS: AnchorBlockSpec[] = STRUCTURE_BLOCKS.map((block) => ({
@@ -448,7 +453,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     setEditorHoverBlock(id);
     requestAnimationFrame(() => setTimeout(() => document.getElementById(`eb-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30));
   };
-  const activeStructureBlock = railHoverBlock ?? editorHoverBlock ?? [...openSections].find((id) => id in STRUCTURE_NUM) ?? null;
+  const activeStructureBlock = railHoverBlock ?? editorHoverBlock ?? [...openSections].find((id) => STRUCTURE_IDS.has(id)) ?? null;
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
   const linkedTemplateId = selected?.__meta.templateSlotId && templateSlots.some((slot) => slot.id === selected.__meta.templateSlotId)
     ? selected.__meta.templateSlotId
@@ -462,7 +467,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   }) : null, [headerVariants, partnerAssets, poolOffers, previewRow, previewSendDate, subscriber.LIMITE, usesTopoV10]);
   const render = useMemo(() => {
     if (!previewRow) return { html: '', diagnostics: [] };
-    const anchoredTemplate = injectBlockAnchors(previewTemplate, previewRow, STRUCTURE_ANCHOR_SPECS);
+    const anchoredTemplate = injectBlockAnchors(previewTemplate, previewRow, STRUCTURE_ANCHOR_SPECS).replace(POOL_ANCHOR_COMMENT, blockSentinel('pool'));
     return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden', vars: topoPreview?.vars });
   }, [previewRow, previewTemplate, showMarketingNotes, subscriber, topoPreview]);
   const previewContextKey = emailPreviewContextKey(selected?.__id ?? '', linkedTemplateId);
@@ -472,7 +477,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
     const row = previewRow;
     if (!row) return [];
     const issueFields = new Set(selectedIssues.map((issue) => issue.field).filter(Boolean) as string[]);
-    return STRUCTURE_BLOCKS.map((block) => {
+    return visibleStructureBlocks(usesTopoV10).map((block) => {
+      if (block.id === 'pool') {
+        const offer = topoPreview?.offer;
+        return { id: block.id, num: block.num, label: block.label, anchor: offer ? { kind: 'text' as const, value: 'E tem mais' } : null, status: offer ? 'filled' as const : 'empty' as const, templateLocked: true };
+      }
       const rawTexts = block.textFields.map((field) => stripHtmlToText(row[field] ?? ''));
       const literalTexts = rawTexts.map(stripDynamicTokens);
       const text = literalTexts.find((value) => value.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '').length >= 4)
@@ -488,7 +497,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const templateLocked = ownedFields.length > 0 && templateActiveCols.size > 0 && ownedFields.some((field) => !templateActiveCols.has(field));
       return { id: block.id, num: block.num, label: block.label, anchor, status, templateLocked };
     });
-  }, [previewRow, selectedIssues, templateActiveCols]);
+  }, [previewRow, selectedIssues, templateActiveCols, topoPreview, usesTopoV10]);
+  const structureNum = useMemo<Record<string, number>>(() => Object.fromEntries(visibleStructureBlocks(usesTopoV10).map((block) => [block.id, block.num])), [usesTopoV10]);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
@@ -1051,13 +1061,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 {taxonomyState === 'error' && <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"><span>Não foi possível carregar a taxonomia de activities.</span><button type="button" onClick={() => void refreshTaxonomy()} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-bold"><RefreshCw size={12}/>Tentar novamente</button></div>}
               </CollapsibleBlock>
 
-              {EDITOR_SECTIONS.map((section) => {
-                const isContentBlock = STRUCTURE_NUM[section.id] != null;
+              {EDITOR_SECTIONS.filter((section) => section.id !== 'pool' || (usesTopoV10 && selected.__meta.partner === 'Plurix')).map((section) => {
+                const isContentBlock = structureNum[section.id] != null && section.id !== 'pool';
                 const lockedFields = isContentBlock ? (section.fields ?? []).filter((field) => !isColumnEditable(field)) : [];
                 const imageLocked = isContentBlock && section.imageSlot ? !isColumnEditable(section.imageSlot.image) : false;
                 return (
-                <CollapsibleBlock key={section.id} id={`eb-${section.id}`} marker={<BlockMarker num={STRUCTURE_NUM[section.id]}/>} focused={activeStructureBlock === section.id} onHoverChange={STRUCTURE_NUM[section.id] ? (hovering) => setEditorHoverBlock(hovering ? section.id : null) : undefined} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
+                <CollapsibleBlock key={section.id} id={`eb-${section.id}`} marker={<BlockMarker num={structureNum[section.id]}/>} focused={activeStructureBlock === section.id} onHoverChange={structureNum[section.id] ? (hovering) => setEditorHoverBlock(hovering ? section.id : null) : undefined} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
                   {(lockedFields.length > 0 || imageLocked) && <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-600"><Lock size={12} className="mt-px shrink-0"/><span>Parte deste bloco é fixa no template <b>{templateSlots.find((slot) => slot.id === linkedTemplateId)?.name}</b> — vem direto do HTML/AMPscript e não pode ser ajustada aqui. Para mudar, troque o template ou edite o Template-fonte.</span></p>}
+                  {section.id === 'pool' && <PoolOfferEditorCard offer={topoPreview?.offer ?? null} offers={poolOffers} signatureKey={selected.NM_PRODUTO_INTERNO} signatureLabel={selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO} date={previewSendDate} onDateChange={setPreviewSendDate} buttonLink={selected.LINK_CTA_1} onManage={() => setMode('topo')}/>}
                   {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
                   {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)} locked={isContentBlock && !isColumnEditable(field)}/>)}</div>}
                   {section.id === 'message' && <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
