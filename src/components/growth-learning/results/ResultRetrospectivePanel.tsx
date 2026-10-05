@@ -19,7 +19,7 @@ export function ResultRetrospectivePanel({domain,scope,month,canWrite,sourceSnap
   };
   const labels:Record<keyof Draft,string>={observation:'O que mudou?',interpretation:'O que pode explicar a mudança? Separe fatos de hipóteses.',learning:'Aprendizado registrado — o que ainda precisa de validação?',next_action:'Próxima ação, responsável, prazo e como verificar',evidence:'Evidências e referências'};
   const hints:Record<keyof Draft,string>={observation:'Compare com o mês anterior no mesmo recorte. O que aumentou, caiu ou ficou estável?',interpretation:'Qual contexto foi comprovado? Que explicações ainda são hipóteses?',learning:'O que a evidência permite afirmar e qual verificação falta?',next_action:'Defina ação, responsável, prazo e critério para verificar o resultado.',evidence:'Inclua links de notas, comunicações, campanhas e resultados que sustentam a leitura.'};
-  return <section className="rounded-2xl border border-cyan-100 bg-white p-5" aria-label="Retrospectiva mensal">
+  return <section id="resultados-retrospectiva" className="rounded-2xl border border-cyan-100 bg-white p-5" aria-label="Retrospectiva mensal">
     <div className="flex items-center justify-between gap-2"><h3 className="font-bold text-slate-900">Retrospectiva · {month}</h3>{latest&&<span className="text-xs text-slate-500">v{latest.revision}</span>}</div>
     <p className="mt-2 text-xs text-slate-500">Interpretar → decidir → verificar. Este registro operacional não equivale a aprendizado validado pelo loop.</p>
     {loading?<p role="status" className="mt-4 text-sm text-slate-500">Carregando retrospectiva…</p>:editing?<form onSubmit={e=>void save(e)} className="mt-4 space-y-3">
