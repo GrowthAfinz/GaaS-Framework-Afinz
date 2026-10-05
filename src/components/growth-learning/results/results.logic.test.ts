@@ -4,6 +4,15 @@ import { EMPTY_SCOPE, ResultRow } from './results.types';
 const row=(patch:Partial<ResultRow>={}):ResultRow=>({id:'1',date:'2026-09-01',domain:'crm',...EMPTY_SCOPE,campaignLabel:'',title:'',primary:10,secondary:100,spend:null,conversions:null,duplicateKey:'unique',mapped:true,...patch});
 afterEach(()=>vi.useRealTimers());
 describe('Results measurement contracts',()=>{
+ it('computes recorded CAC as total cost per card only with complete comparable CRM data',()=>{
+  expect(summarize([row({spend:100,primary:10}),row({id:'2',spend:300,primary:50})],new Set()).cac).toBeCloseTo(400/60);
+  expect(summarize([row({spend:100}),row({id:'2',spend:null})],new Set()).cac).toBeNull();
+  expect(summarize([row({spend:100,primary:null})],new Set()).cac).toBeNull();
+  expect(summarize([row({spend:100,primary:0})],new Set()).cac).toBeNull();
+  expect(summarize([row({spend:0})],new Set()).cac).toBe(0);
+  expect(summarize([row({domain:'renta',spend:100})],new Set()).cac).toBeNull();
+  expect(summarize([row({spend:100}),row({id:'2',spend:null})],new Set(['2'])).cac).toBe(10);
+ });
  it('preserves missing measures and actual zero separately',()=>{
   expect(summarize([row({primary:null,secondary:null})],new Set()).primary).toBeNull();
   expect(summarize([row({primary:0})],new Set()).primary).toBe(0);

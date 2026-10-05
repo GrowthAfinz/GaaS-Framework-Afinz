@@ -32,11 +32,15 @@ export function summarize(rows: ResultRow[], duplicates: Set<string>): ResultSum
   const paired = usable.filter(row => row.primary !== null && row.secondary !== null && row.primary >= 0 && row.secondary >= 0
     && row.primary <= row.secondary);
   const denominator = paired.reduce((s,row)=>s+(row.secondary || 0),0);
+  // Recorded CRM acquisition cost per card: only complete, comparable cost/card observations.
+  const cac = usable.length > 0 && usable.every(row=>row.domain==='crm') &&
+    primary.known===usable.length && spend.known===usable.length && primary.value! > 0
+    ? spend.value! / primary.value! : null;
   return { rows: rows.length, usable: usable.length, excluded: rows.length-usable.length,
     days: new Set(rows.map(row=>row.date)).size, primary: primary.value, secondary: secondary.value, spend: spend.value,
     primaryKnown: primary.known, secondaryKnown: secondary.known, spendKnown: spend.known,
     ratio: denominator > 0 ? 100*paired.reduce((s,row)=>s+(row.primary || 0),0)/denominator : null,
-    ratioRows: paired.length, conversions: conversions.value, conversionsKnown: conversions.known };
+    ratioRows: paired.length, conversions: conversions.value, conversionsKnown: conversions.known, cac };
 }
 export function previousMonth(month: string) {
   const [year, m] = month.split('-').map(Number);
