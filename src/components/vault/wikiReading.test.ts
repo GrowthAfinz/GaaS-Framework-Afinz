@@ -17,7 +17,7 @@ it('projects scope labels and journey drill targets while retaining the original
  expect(result.sections.map(section=>section.content).join('\n')).toBe(input);
 });
 it('keeps analytical month across notes while discarding scope from the previous note',()=>{
- const params=wikiNoteNavigationParams('?item=old&result_month=2026-09&result_domain=crm&result_partner=Serasa&result_journey=JOR_TEST&result_operation_id=old&wiki_front=CRM');
+ const params=wikiNoteNavigationParams('?item=old&result_month=2026-09&result_domain=crm&result_partner=Serasa&result_journey=JOR_TEST&result_operation_id=old&wiki_front=CRM&wiki_group=partner:Serasa&wiki_segment=Abandonados&wiki_catalog_q=teste');
  expect(params.get('result_month')).toBe('2026-09');expect(params.get('result_domain')).toBe('crm');
- expect(params.has('result_partner')).toBe(false);expect(params.has('result_journey')).toBe(false);expect(params.has('result_operation_id')).toBe(false);expect(params.has('wiki_front')).toBe(false);
+ expect(params.has('result_partner')).toBe(false);expect(params.has('result_journey')).toBe(false);expect(params.has('result_operation_id')).toBe(false);expect(params.has('wiki_front')).toBe(false);expect(params.has('wiki_group')).toBe(false);expect(params.has('wiki_segment')).toBe(false);expect(params.has('wiki_catalog_q')).toBe(false);
 });

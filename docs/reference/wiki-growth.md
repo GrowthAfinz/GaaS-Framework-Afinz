@@ -59,3 +59,29 @@ versão cadastrada, resultados e evolução dos disparos explicitamente vinculad
 Totais podem ser parciais; CAC conserva o contrato de custo/cartões completos.
 Janelas excluem as chaves duplicadas globais e dias abertos. Os atalhos para jornada
 preservam mês, nota e demais filtros para consultar sua retrospectiva.
+
+
+## Catálogo de resultados por frente, parceiro/público e segmento
+
+A navegação macro segue `Wiki > Resultados > Frente > Parceiro ou público > Segmento`.
+O catálogo mostra primeiro as frentes, depois cartões de parceiros/públicos, depois
+segmentos e, por fim, assuntos do segmento escolhido. A busca filtra o nível atual
+sem abrir uma lista global de notas. Dropdowns de parceiro/público e segmento só
+aparecem após o nível anterior. O caminho do leitor acompanha as escolhas e permite
+voltar a qualquer nível, inclusive depois de abrir um assunto.
+
+`wiki_front`, `wiki_group`, `wiki_segment` e `wiki_catalog_q` persistem o catálogo
+na URL. Mudanças de nível entram no histórico; digitação substitui o estado atual.
+Recarregar, copiar o link e usar voltar/avançar recuperam a seleção. O mês analítico
+é preservado; filtros de resultado da nota anterior continuam sendo removidos.
+Uma nota de assunto deriva o caminho de seus próprios metadados, nunca do parceiro
+ou segmento que estava aberto anteriormente.
+
+Parceiros declarados têm prioridade. Proprietaria e BU B2C sem parceiro declarado
+ficam em B2C/operação própria. Uma BU declarada sem parceiro recebe cartão `BU X`,
+sem transformar a BU em parceiro. Institucional aparece quando declarado; para
+Mídia paga, nomes com marcador explícito `[B2C]` ou palavra `Institucional` podem
+organizar o público, com aviso de que a identificação veio do nome da campanha.
+Metadados declarados vencem esses marcadores. Ausência de ambos fica explícita como
+`Sem parceiro ou público definido`; falta de segmento recebe `Assuntos gerais`.
+Não há alteração de taxonomia no banco, nos contratos analíticos ou no vault.
