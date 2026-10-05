@@ -23,7 +23,7 @@ export function assetReferences(assets:FactoryAsset[],scope:ResultsScope,rows:Re
   // Require an explicit partner or audience match; a blank is not a wildcard.
   if(!matches.some(k=>k==='partner'||k==='segment')||conflicts.some(k=>k==='bu'||k==='partner'))return [];
   const labels={bu:'BU',partner:'parceiro',segment:'público',subgroup:'subgrupo',product:'produto'};
-  const missing=dimensions.filter(k=>known(k).length&&!a[k]);
+  const missing=dimensions.filter(k=>(known(k).length&&!a[k])||(a[k]&&!known(k).length));
   const reason=conflicts.length?'Referência do mesmo parceiro; validar '+conflicts.map(k=>labels[k]).join(', '):missing.length?'Referência cadastrada; confirmar '+missing.map(k=>labels[k]).join(', '):'Dimensões cadastradas correspondem ao recorte; uso não comprovado';
   return [{id:'asset:'+a.id,title:a.name,channel:'E-mail',reason,asset:a,rows:[]}];
  });

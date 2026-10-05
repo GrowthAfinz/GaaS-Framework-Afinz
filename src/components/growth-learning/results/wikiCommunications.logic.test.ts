@@ -26,6 +26,7 @@ describe('Wiki communication evidence',()=>{
   expect(pieces[0].reason).toContain('validar público');expect(pieces[0].rows).toEqual([]);
   expect(assetReferences([{...asset,status:'draft'}],EMPTY_SCOPE,[row()])).toEqual([]);
   expect(assetReferences([asset],{...EMPTY_SCOPE,channel:'WhatsApp'},[row()])).toEqual([]);
+  expect(assetReferences([asset],{...EMPTY_SCOPE,bu:'B2C',partner:'Serasa',segment:'Abandonados'},[])[0].reason).toContain('confirmar produto');
  });
  it('preserves variants, subgroup and safra rather than manufacturing a single journey',()=>{
   expect(journeySteps([row(),row({id:'2',safra:'2026-07'}),row({id:'3',subgroup:'A'})])).toHaveLength(3);
