@@ -16,9 +16,17 @@ describe('Complete source reads',()=>{
    selected=columns;return {order:()=>({range:()=>Promise.resolve({count:0,data:[],error:null})})};
   }}));
   await fetchResultsSnapshot('crm','schema-regression',true);
-  for(const column of ['Data de Disparo','Activity name / Taxonomia','Cartões Gerados','Etapa de aquisição','Custo Total Campanha']){
+  expect(selected.split(',')).toHaveLength(54);
+  for(const column of ['Data de Disparo','Activity name / Taxonomia','Cartões Gerados','Etapa de aquisição','Custo Total Campanha','Aprovados','Base Acionável','Emissões Assistidas','Perfil de Crédito','Ordem de disparo']){
    expect(selected.split(',')).toContain(JSON.stringify(column));
   }
+ });
+ it('transports recorded funnel counts and variant dimensions without imputing missing measures',async()=>{
+  source(1,[{data:[{id:'record','Data de Disparo':'2026-09-01T12:00:00Z','Cartões Gerados':10,Propostas:100,Aprovados:80,'Base Acionável':200,'Emissões Assistidas':3,'Emissões Independentes':7,Abertura:null,Cliques:0,'Produto':'Classic','Ordem de disparo':2,status:'Realizado'}]}]);
+  const snapshot=await fetchResultsSnapshot('crm','crm-detail-transport',true);
+  expect(snapshot.rows[0].crm).toMatchObject({approved:80,actionable:200,independent:7,assisted:3,openings:null,clicks:0});
+  expect(snapshot.rows[0].dimensions).toMatchObject({product:'Classic',order:'2'});
+  expect(snapshot.rows[0].sourceStatus).toBe('Realizado');
  });
  it('quotes literal column names so PostgREST preserves spaces and reserved slash',async()=>{
   let selected='';

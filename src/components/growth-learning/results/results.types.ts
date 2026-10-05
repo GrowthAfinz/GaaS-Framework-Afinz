@@ -1,4 +1,5 @@
 export type ResultsDomain = 'crm' | 'renta' | 'media' | 'b2c';
+export type CrmMeasure = 'baseTotal'|'actionable'|'approved'|'openings'|'clicks'|'independent'|'assisted'|'deliveryRate'|'openingRate'|'clickRate'|'proposalRate'|'approvalRate'|'completionRate'|'conversionRate'|'optimization'|'channelCost'|'offerCost'|'channelUnitCost'|'offerUnitCost'|'recordedCac';
 export type ResultsScope = { bu: string; segment: string; partner: string; channel: string; campaign: string; type: string;
   stage?: string; subgroup?: string; journey?: string; safra?: string; operation_id?: string; objective?: string; grain?: string };
 export type ResultRow = {
@@ -7,6 +8,9 @@ export type ResultRow = {
   primary: number | null; secondary: number | null; spend: number | null; conversions: number | null;
   duplicateKey: string; mapped: boolean;
   stage?: string; subgroup?: string; journey?: string; safra?: string; objective?: string; grain?: string;
+  crm?: Partial<Record<CrmMeasure,number|null>>;
+  dimensions?: Record<string,string>;
+  sourceStatus?: string;
 };
 export interface ResultsSnapshot { rows: ResultRow[]; fetchedAt: string; source: string }
 export interface ResultSummary {
