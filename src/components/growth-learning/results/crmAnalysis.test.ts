@@ -1,8 +1,17 @@
 import { describe,it,expect } from 'vitest';
-import { crmSummary,crmGroups } from './crmAnalysis';
+import { crmSummary,crmGroups,summarizeCrmCompatible } from './crmAnalysis';
 import { ResultRow,EMPTY_SCOPE } from './results.types';
 const row=(p:Partial<ResultRow>={}):ResultRow=>({id:'1',date:'2026-09-01',domain:'crm',...EMPTY_SCOPE,campaignLabel:'',title:'',primary:10,secondary:100,spend:50,conversions:null,duplicateKey:'1',mapped:true,crm:{approved:50,actionable:200,independent:7,assisted:3,openings:null,clicks:0},...p});
 describe('CRM comparative contracts',()=>{
+ it('retains prior-only groups without inventing current production or zero CAC',()=>{
+  const group=crmGroups([],[row({channel:'SMS'})],new Set(),'channel')[0];
+  expect(group.summary.primary).toBeNull();expect(group.summary.cac).toBeNull();expect(group.prior.primary).toBe(10);
+ });
+ it('uses the same complete-pair CRM rate in indicators and comparisons',()=>{
+  const rows=[row(),row({id:'2',secondary:null})];
+  expect(summarizeCrmCompatible(rows,new Set()).ratio).toBeNull();
+  expect(crmSummary(rows,new Set()).cardRate).toBeNull();
+ });
  it('weights approval/finalization using complete comparable counts',()=>{
   const s=crmSummary([row(),row({id:'2',primary:30,secondary:200,crm:{approved:100,actionable:400}})],new Set());
   expect(s.approvalRate).toBe(50);expect(s.completionRate).toBeCloseTo(40/150*100);

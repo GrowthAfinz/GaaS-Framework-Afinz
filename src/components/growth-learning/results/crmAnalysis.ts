@@ -48,7 +48,7 @@ export function crmDimension(row:ResultRow,key:string):string{
 }
 export function crmGroups(current:ResultRow[],previous:ResultRow[],duplicates:Set<string>,key:string){
  const total=summarize(current,duplicates);
- return [...new Set(current.map(r=>crmDimension(r,key)))].map(value=>{
+ return [...new Set([...current,...previous].map(r=>crmDimension(r,key)))].map(value=>{
   const rows=current.filter(r=>crmDimension(r,key)===value),before=previous.filter(r=>crmDimension(r,key)===value);
   const summary=summarize(rows,duplicates),prior=summarize(before,duplicates);
   return {value,label:value&&value!=='N/A'?value:'Não informado',summary,prior,detail:crmSummary(rows,duplicates),
@@ -56,3 +56,10 @@ export function crmGroups(current:ResultRow[],previous:ResultRow[],duplicates:Se
  }).sort((a,b)=>(b.summary.primary??-1)-(a.summary.primary??-1));
 }
 
+
+export function summarizeCrmCompatible(rows:ResultRow[],duplicates:Set<string>){
+ const summary=summarize(rows,duplicates);
+ if(!rows.length||rows.some(r=>r.domain!=='crm'))return summary;
+ const ratio=crmSummary(rows,duplicates).cardRate;
+ return {...summary,ratio,ratioRows:ratio===null?0:summary.usable};
+}

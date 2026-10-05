@@ -12,7 +12,7 @@ import { EMPTY_SCOPE, ResultRow, ResultsDomain, ResultsScope, ResultsSnapshot } 
 import { matchesWikiAnalytics, WikiAnalytics, wikiResultsSearch } from '../../vault/wikiAnalytics';
 import { ResultRetrospectivePanel } from './ResultRetrospectivePanel';
 import { CrmComparisons, CrmFunnel } from './CrmComparisons';
-import { crmSummary } from './crmAnalysis';
+import { crmSummary, summarizeCrmCompatible } from './crmAnalysis';
 
 const META = {
   crm:{title:'CRM Aquisição',primary:'Cartões registrados',secondary:'Propostas',ratio:'Cartões / propostas',question:'Como a produção evoluiu neste segmento e parceiro?',note:'03-Dimensoes/Segmentos.md'},
@@ -55,9 +55,9 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
   const windowCut=comparisonWindow(month,sourceLast||closed);
   const current=rows.filter(r=>r.date.startsWith(month)&&r.date<=windowCut.end);
   const previous=rows.filter(r=>r.date.startsWith(windowCut.previous)&&r.date<=windowCut.previousEnd);
-  const summary=summarize(current,duplicates),prior=summarize(previous,duplicates);
+  const summary=summarizeCrmCompatible(current,duplicates),prior=summarizeCrmCompatible(previous,duplicates);
   const monthly=useMemo(()=>historyMonths(rows.map(r=>r.date.slice(0,7)).sort()[0]||month,month).map(m=>{
-    const s=summarize(rows.filter(r=>r.date.startsWith(m)),duplicates);
+    const s=summarizeCrmCompatible(rows.filter(r=>r.date.startsWith(m)),duplicates);
     return {month:m,approved:domain==='crm'?crmSummary(rows.filter(r=>r.date.startsWith(m)),duplicates).approved.value:null,primary:s.primary,secondary:s.secondary,spend:s.spend,ratio:s.ratio,cac:s.cac,days:s.days,excluded:s.excluded};
   }),[rows,duplicates,month,domain]);
   const navigate=(nextDomain:ResultsDomain,nextMonth=month,nextScope=scope)=>{
@@ -83,7 +83,7 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
   }).sort((a,b)=>(b.summary.primary||0)-(a.summary.primary||0));
   const meta=META[domain];
   const trendLabel=trendMetric==='approved'?'Aprovados registrados':trendMetric==='primary'?meta.primary:trendMetric==='secondary'?meta.secondary:trendMetric==='spend'?'Custo registrado':trendMetric==='cac'?'CAC registrado':meta.ratio;
-  const daily=[...new Set(effectiveCurrent.map(r=>r.date))].sort().map(date=>({date,...summarize(effectiveCurrent.filter(r=>r.date===date),duplicates)}));
+  const daily=[...new Set(effectiveCurrent.map(r=>r.date))].sort().map(date=>({date,...summarizeCrmCompatible(effectiveCurrent.filter(r=>r.date===date),duplicates)}));
   const context:GrowthBetSourceContext={
     front:domain==='crm'||domain==='renta'?'crm_acquisition':domain==='media'?'paid_media':'b2c_origin',sourceSurface:'results_dossier',
     sourceRoute:embedded?'wiki:'+embedded.noteId:'results:'+domain,periodStart:month+'-01',periodEnd:windowCut.cut?windowCut.end:month+'-01',
