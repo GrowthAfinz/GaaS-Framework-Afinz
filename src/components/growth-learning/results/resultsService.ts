@@ -1,10 +1,12 @@
 import { supabase } from '../../../services/supabaseClient';
 import { cleanScope } from './results.logic';
+import { CRM_MEASURES, CRM_DIMENSIONS } from './crmAnalysis';
+import { CrmMeasure } from './results.types';
 import { ResultRetrospective, ResultRow, ResultsDomain, ResultsScope, ResultsSnapshot } from './results.types';
 
 const cache=new Map<string,{expires:number;snapshot:ResultsSnapshot}>();
 const fields = {
-  crm: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,parceiro_canonico,Canal,Cartões Gerados,Propostas,Custo Total Campanha,Etapa de aquisição,Subgrupos,jornada,Safra',
+  crm: 'id,prog_gaas,status,created_at,updated_at,BU,jornada,Activity name / Taxonomia,Canal,Data de Disparo,Data Fim,Safra,Parceiro,SIGLA_Parceiro,Segmento,SIGLA_Segmento,Subgrupos,Etapa de aquisição,Perfil de Crédito,Produto,Oferta,Promocional,SIGLA_Oferta,Oferta 2,Promocional 2,Ordem de disparo,Base Total,Base Acionável,% Otimização de base,Custo Unitário Oferta,Custo Total da Oferta,Custo unitário do canal,Custo total canal,Custo Total Campanha,CAC,Taxa de Entrega,Taxa de Abertura,Taxa de Clique,Taxa de Proposta,Taxa de Aprovação,Taxa de Finalização,Taxa de Conversão,Cartões Gerados,Aprovados,Propostas,Emissões Independentes,Emissões Assistidas,Horário de Disparo,Abertura,Cliques,template_id,parceiro_canonico,parceiro_canonico_motivo,parceiro_canonico_confianca',
   renta: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,Parceiro,Canal,Base Acionável,Cliques,Custo Total Campanha,Etapa de aquisição,Subgrupos,jornada,Safra',
   media: 'id,date,channel,campaign,objective,ad_id,ad_name,adset_id,adset_name,spend,impressions,clicks,conversions',
   b2c: 'id,data,tipo,propostas_total,emissoes_total',
@@ -56,6 +58,8 @@ export async function fetchResultsSnapshot(domain:ResultsDomain,userId:string,re
       secondary:numberOrNull(r[renta?'Base Acionável':crm?'Propostas':media?'impressions':'propostas_total']),
       spend:numberOrNull(r[crm?'Custo Total Campanha':'spend']),conversions:media?numberOrNull(r.conversions):null,
       duplicateKey:crm?JSON.stringify([r['Activity name / Taxonomia'],r['Data de Disparo'],r.BU,r.Canal]):str(r.id),
+      crm:domain==='crm'?Object.fromEntries(Object.entries(CRM_MEASURES).map(([key,column])=>[key,numberOrNull(r[column])])) as Partial<Record<CrmMeasure,number|null>>:undefined,
+      dimensions:domain==='crm'?Object.fromEntries(Object.entries(CRM_DIMENSIONS).map(([key,column])=>[key,r[column]==null?'':String(r[column])])):undefined,sourceStatus:str(r.status),
       mapped:!media||ids.length===1};
   });
   // Never add overlapping campaign/adset/ad levels for a campaign on the same day.

@@ -11,6 +11,8 @@ import { cleanScope, comparisonWindow, duplicateIds, historyMonths, lastClosedDa
 import { EMPTY_SCOPE, ResultRow, ResultsDomain, ResultsScope, ResultsSnapshot } from './results.types';
 import { matchesWikiAnalytics, WikiAnalytics, wikiResultsSearch } from '../../vault/wikiAnalytics';
 import { ResultRetrospectivePanel } from './ResultRetrospectivePanel';
+import { CrmComparisons, CrmFunnel } from './CrmComparisons';
+import { crmSummary } from './crmAnalysis';
 
 const META = {
   crm:{title:'CRM Aquisição',primary:'Cartões registrados',secondary:'Propostas',ratio:'Cartões / propostas',question:'Como a produção evoluiu neste segmento e parceiro?',note:'03-Dimensoes/Segmentos.md'},
@@ -28,11 +30,12 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
   const [route,setRoute]=useState(()=>readResultsRoute(window.location.search));
   const [snapshot,setSnapshot]=useState<ResultsSnapshot|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
   const [refresh,setRefresh]=useState(0),[noteError,setNoteError]=useState('');
-  const [trendMetric,setTrendMetric]=useState<'primary'|'secondary'|'spend'|'ratio'|'cac'>('primary');
+  const [trendMetric,setTrendMetric]=useState<'primary'|'secondary'|'spend'|'ratio'|'cac'|'approved'>('primary');
   const request=useRef(0);
   const domain:ResultsDomain=embedded?.domain || (isPlurixAnalyst&&route.domain==='b2c'?'crm':route.domain);
   useEffect(()=>setTrendMetric('primary'),[domain]);
-  const scope=useMemo(()=>cleanScope(domain,{...(route.domain===domain?route.scope:EMPTY_SCOPE),...(embedded?.scope||{}),...(domain==='b2c'?{type:embedded?.scope.type||route.scope.type||'total'}:{}),...(isPlurixAnalyst&&domain==='crm'?{bu:'Plurix'}:{})}),[domain,route.scope,isPlurixAnalyst,embedded]);
+  const fixedScope=useMemo(()=>Object.fromEntries(Object.entries(embedded?.scope||{}).filter(([,value])=>Boolean(value))) as Partial<ResultsScope>,[embedded]);
+  const scope=useMemo(()=>cleanScope(domain,{...(route.domain===domain?route.scope:EMPTY_SCOPE),...fixedScope,...(domain==='b2c'?{type:embedded?.scope.type||route.scope.type||'total'}:{}),...(isPlurixAnalyst&&domain==='crm'?{bu:'Plurix'}:{})}),[domain,route.scope,isPlurixAnalyst,embedded]);
   useEffect(()=>{const sync=()=>setRoute(readResultsRoute(window.location.search));window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync);},[]);
   useEffect(()=>{
     const id=++request.current;setSnapshot(null);setError('');setLoading(true);
@@ -45,7 +48,7 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
   const closed=lastClosedDay();
   const sourceRows=useMemo(()=>snapshot?.rows.filter(r=>r.date && r.date<=closed && (!embedded || matchesWikiAnalytics(r,embedded)))||[],[snapshot,closed,embedded]);
   const months=useMemo(()=>[...new Set(sourceRows.map(r=>r.date.slice(0,7)))].sort().reverse(),[sourceRows]);
-  const month=(route.domain===domain?route.month:'')||months[0]||closed.slice(0,7);
+  const month=(embedded||route.domain===domain?route.month:'')||months[0]||closed.slice(0,7);
   const duplicates=useMemo(()=>duplicateIds(snapshot?.rows.filter(r=>r.date<=closed)||[]),[snapshot,closed]);
   const rows=useMemo(()=>sourceRows.filter(r=>matchesScope(r,scope)),[sourceRows,scope]);
   const sourceLast=rows.reduce((last,r)=>r.date>last?r.date:last,'');
@@ -55,10 +58,10 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
   const summary=summarize(current,duplicates),prior=summarize(previous,duplicates);
   const monthly=useMemo(()=>historyMonths(rows.map(r=>r.date.slice(0,7)).sort()[0]||month,month).map(m=>{
     const s=summarize(rows.filter(r=>r.date.startsWith(m)),duplicates);
-    return {month:m,primary:s.primary,secondary:s.secondary,spend:s.spend,ratio:s.ratio,cac:s.cac,days:s.days,excluded:s.excluded};
-  }),[rows,duplicates,month]);
+    return {month:m,approved:domain==='crm'?crmSummary(rows.filter(r=>r.date.startsWith(m)),duplicates).approved.value:null,primary:s.primary,secondary:s.secondary,spend:s.spend,ratio:s.ratio,cac:s.cac,days:s.days,excluded:s.excluded};
+  }),[rows,duplicates,month,domain]);
   const navigate=(nextDomain:ResultsDomain,nextMonth=month,nextScope=scope)=>{
-    const finalScope=cleanScope(nextDomain,{...nextScope,...(embedded?.scope||{})});
+    const finalScope=cleanScope(nextDomain,{...nextScope,...fixedScope});
     const next=embedded?wikiResultsSearch(embedded.noteId,nextDomain,nextMonth,finalScope,window.location.search):resultsSearch(nextDomain,nextMonth,finalScope,window.location.search);
     window.history.pushState({},'',window.location.pathname+next);window.dispatchEvent(new PopStateEvent('popstate'));
   };
@@ -79,7 +82,7 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
     return {value,label:!value?'Não informado':drillField==='campaign'?subset[0]?.campaignLabel||value:value,summary:summarize(subset,duplicates)};
   }).sort((a,b)=>(b.summary.primary||0)-(a.summary.primary||0));
   const meta=META[domain];
-  const trendLabel=trendMetric==='primary'?meta.primary:trendMetric==='secondary'?meta.secondary:trendMetric==='spend'?'Custo registrado':trendMetric==='cac'?'CAC registrado':meta.ratio;
+  const trendLabel=trendMetric==='approved'?'Aprovados registrados':trendMetric==='primary'?meta.primary:trendMetric==='secondary'?meta.secondary:trendMetric==='spend'?'Custo registrado':trendMetric==='cac'?'CAC registrado':meta.ratio;
   const daily=[...new Set(effectiveCurrent.map(r=>r.date))].sort().map(date=>({date,...summarize(effectiveCurrent.filter(r=>r.date===date),duplicates)}));
   const context:GrowthBetSourceContext={
     front:domain==='crm'||domain==='renta'?'crm_acquisition':domain==='media'?'paid_media':'b2c_origin',sourceSurface:'results_dossier',
@@ -119,15 +122,17 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
           {label:meta.ratio,value:active.ratio,prev:previousSummary.ratio,known:active.ratioRows},{label:domain==='b2c'?'Dias com dados':'Custo registrado',value:domain==='b2c'?(active.rows?active.days:null):active.spend,prev:domain==='b2c'?(previousSummary.rows?previousSummary.days:null):previousSummary.spend,known:domain==='b2c'?active.rows:active.spendKnown},...(domain==='crm'?[{label:'CAC registrado',value:active.cac,prev:previousSummary.cac,known:active.cac!==null?active.usable:0}]:[])].map((k,i)=><article key={k.label} className="rounded-xl border bg-white p-4"><p className="text-xs text-slate-500">{k.label}</p><p className="mt-2 text-2xl font-bold text-slate-900">{(i===4||i===3&&domain!=='b2c')?money(k.value):fmt(k.value)}{i===2&&k.value!==null?'%':''}</p><p className="mt-2 text-xs text-slate-600">{metricDelta(k.value,k.prev)}</p><p className="mt-1 text-xs text-slate-500">{k.value===null?"Dados insuficientes":k.known<active.usable?"Dados disponíveis parcialmente":i===4?"Custo registrado ÷ cartões registrados":""}</p></article>)}
       </div>
       {domain==='crm'&&<p className="text-xs text-slate-500">CAC registrado: custo das campanhas dividido pelos cartões registrados no mesmo recorte. Inclui apenas dados completos após desconsiderar duplicidades; não representa o custo integral de aquisição nem comprova atribuição individual. Sem custo ou cartões comparáveis, fica indisponível.</p>}
-      <section className="rounded-2xl border bg-white p-5" aria-label="Evolução mensal"><div className="flex items-center gap-2"><TrendingUp size={18} className="text-cyan-700"/><h3 className="font-bold text-slate-900">Evolução mensal · {trendLabel}</h3></div><label className="mt-3 block text-xs font-semibold text-slate-600">Medida da evolução<select aria-label="Medida da evolução" value={trendMetric} onChange={e=>setTrendMetric(e.target.value as typeof trendMetric)} className={'ml-2 '+input}><option value="primary">{meta.primary}</option><option value="secondary">{meta.secondary}</option><option value="ratio">{meta.ratio}</option>{domain!=='b2c'&&<option value="spend">Custo registrado</option>}{domain==='crm'&&<option value="cac">CAC registrado</option>}</select></label><p className="mt-1 text-xs text-slate-500">Meses observados até {month}; o mês recente pode ser parcial. Lacunas não são preenchidas com zero. Passe pela série e selecione o mês no filtro para abrir a retrospectiva.</p>
-        <div className="mt-4 h-64 min-w-0"><ResponsiveContainer width="100%" height="100%"><LineChart data={chart}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:11}}/><YAxis tick={{fontSize:11}}/><Tooltip formatter={(value)=>trendMetric==='cac'||trendMetric==='spend'?money(Number(value)):trendMetric==='ratio'?fmt(Number(value))+'%':fmt(Number(value))}/><Line type="monotone" dataKey={trendMetric} name={trendLabel} isAnimationActive={false} stroke="#0891b2" strokeWidth={2} dot={{r:3}} connectNulls={false}/></LineChart></ResponsiveContainer></div>
+      {domain==='crm'&&<CrmFunnel rows={current} duplicates={duplicates}/>}
+      <section className="rounded-2xl border bg-white p-5" aria-label="Evolução mensal"><div className="flex items-center gap-2"><TrendingUp size={18} className="text-cyan-700"/><h3 className="font-bold text-slate-900">Evolução mensal · {trendLabel}</h3></div><label className="mt-3 block text-xs font-semibold text-slate-600">Medida da evolução<select aria-label="Medida da evolução" value={trendMetric} onChange={e=>setTrendMetric(e.target.value as typeof trendMetric)} className={'ml-2 '+input}><option value="primary">{meta.primary}</option><option value="secondary">{meta.secondary}</option>{domain==='crm'&&<option value="approved">Aprovados registrados</option>}<option value="ratio">{meta.ratio}</option>{domain!=='b2c'&&<option value="spend">Custo registrado</option>}{domain==='crm'&&<option value="cac">CAC registrado</option>}</select></label><p className="mt-1 text-xs text-slate-500">Meses observados até {month}; o mês recente pode ser parcial. Lacunas não são preenchidas com zero. Passe pela série e selecione o mês no filtro para abrir a retrospectiva.</p>
+        <div className="mt-4 h-64 min-w-0"><ResponsiveContainer width="100%" height="100%"><LineChart data={chart}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" tick={{fontSize:11}}/><YAxis tick={{fontSize:11}} tickFormatter={v=>trendMetric==='cac'||trendMetric==='spend'?money(Number(v)):trendMetric==='ratio'?fmt(Number(v))+'%':fmt(Number(v))} width={85}/><Tooltip formatter={(value)=>trendMetric==='cac'||trendMetric==='spend'?money(Number(value)):trendMetric==='ratio'?fmt(Number(value))+'%':fmt(Number(value))}/><Line type="monotone" dataKey={trendMetric} name={trendLabel} isAnimationActive={false} stroke="#0891b2" strokeWidth={2} dot={{r:3}} connectNulls={false}/></LineChart></ResponsiveContainer></div>
         <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold text-cyan-800">Ver resultados mês a mês</summary><div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-slate-500"><th className="p-2">Mês</th><th>{meta.primary}</th><th>{meta.secondary}</th><th>Custo registrado</th>{domain==='crm'&&<th>CAC registrado</th>}<th>Dias com resultados</th></tr></thead><tbody>{chart.map(point=><tr key={point.month} className="border-b"><td className="p-2"><button type="button" className="font-semibold text-cyan-800 underline" onClick={()=>navigate(domain,point.month)}>{point.month}</button></td><td>{fmt(point.primary)}</td><td>{fmt(point.secondary)}</td><td>{money(point.spend)}</td>{domain==='crm'&&<td>{money(point.cac)}</td>}<td>{point.days}</td></tr>)}</tbody></table></div></details>
       </section>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <section className="rounded-2xl border bg-white p-5"><h3 className="font-bold text-slate-900">{domain==='crm'||domain==='renta'?(scope.segment?'Parceiros neste segmento':'Segmentos no recorte'):domain==='media'?'Campanhas no recorte':'Componentes da originação'}</h3>
+      {domain==='crm'&&<CrmComparisons current={current} previous={previous} duplicates={duplicates} scope={scope} onFilter={setFilter} onCell={(partner,channel)=>navigate(domain,month,{...scope,partner,channel})}/>}
+      <div className={domain==='crm'?'grid gap-5':'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'}>
+        {domain!=='crm'&&<section className="rounded-2xl border bg-white p-5"><h3 className="font-bold text-slate-900">{domain==='renta'?(scope.segment?'Parceiros neste recorte':'Segmentos no recorte'):domain==='media'?'Campanhas no recorte':'Componentes da originação'}</h3>
           {domain==='b2c'&&<p className="mt-2 text-xs text-slate-500">Total e Serasa são populações sobrepostas. Esta tabela serve à comparação, não à soma.</p>}
           <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-xs text-slate-500"><th className="p-2">Recorte</th><th>{meta.primary}</th><th>Dados disponíveis</th></tr></thead><tbody>{groups.map(g=><tr key={g.value} className="border-b"><td className="max-w-[280px] p-2"><button type="button" disabled={!g.value} onClick={()=>setFilter(drillField,g.value)} className="text-left font-semibold text-cyan-800 hover:underline">{domain==='b2c'?TYPE_LABELS[g.label]||g.label:g.label} <ArrowRight size={12} className="inline"/></button></td><td>{fmt(g.summary.primary)}</td><td className="text-xs text-slate-500">{g.summary.primaryKnown===g.summary.usable?'Completos':g.summary.primaryKnown?'Parciais':'Indisponíveis'}</td></tr>)}</tbody></table></div>
-        </section>
+        </section>}
         <ResultRetrospectivePanel key={domain+month+JSON.stringify(effectiveScope)} domain={domain} scope={effectiveScope} month={month} canWrite={Boolean(user)} sourceSnapshot={{source:snapshot?.source,wiki_note_id:embedded?.noteId,operation_id:embedded?.scope.operation_id,fixed_scope:embedded?.scope,selection_rules:embedded?.anyOf,fetched_at:snapshot?.fetchedAt,cutoff:windowCut.end,summary:active,previous:previousSummary}}/>
       </div>
       <details className="rounded-2xl border bg-white p-5"><summary className="cursor-pointer font-bold text-slate-900">Detalhe diário do recorte · {daily.length} dias</summary><p className="mt-2 text-xs text-slate-500">Somente dias observados. As mesmas exclusões e regras da evolução mensal se aplicam.</p><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead><tr className="border-b text-xs text-slate-500"><th className="p-2">Dia</th><th>{meta.primary}</th><th>{meta.secondary}</th><th>{meta.ratio}</th>{domain!=='b2c'&&<th>Custo registrado</th>}<th>Linhas usadas</th></tr></thead><tbody>{daily.map(d=><tr key={d.date} className="border-b"><td className="p-2">{dateLabel(d.date)}</td><td>{fmt(d.primary)}</td><td>{fmt(d.secondary)}</td><td>{fmt(d.ratio)}{d.ratio!==null?'%':''}</td>{domain!=='b2c'&&<td>{money(d.spend)}</td>}<td>{d.usable}/{d.rows}</td></tr>)}</tbody></table></div></details>
