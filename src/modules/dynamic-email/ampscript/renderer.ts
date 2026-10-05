@@ -2,7 +2,18 @@ import type { BriefingRow } from '../domain/briefing';
 
 export interface SubscriberSample { CPF: string; PRI_NOME: string; LIMITE: string; PRODUTO: string; SEQUENCIA: string; TP_CAMPANHA: string }
 export interface RenderResult { html: string; diagnostics: string[] }
-export interface RenderOptions { pendingAssets?: 'observations' | 'hidden' }
+export interface RenderOptions {
+  pendingAssets?: 'observations' | 'hidden';
+  /**
+   * Variáveis que o AMPscript calcula no SFMC a partir de outras DEs (header dinâmico,
+   * oferta do pool) e que a prévia recebe já calculadas por um espelho em TypeScript.
+   */
+  vars?: Record<string, string>;
+}
+
+// O primeiro bloco %%[ ... ]%% com SET é a lógica de preparo. A prévia não o executa
+// (as variáveis vêm de readVars ou de options.vars), então laços ali dentro são aceitos.
+const SETUP_BLOCK = /%%\[(?=[\s\S]*?\bSET\b)[\s\S]*?\]%%/i;
 
 type Vars = Record<string, string | number | boolean>;
 const MAX_RECURSION = 8;
@@ -45,7 +56,8 @@ function readVars(source: string, row: BriefingRow, subscriber: SubscriberSample
   return vars;
 }
 
-function unsupported(source: string): string[] {
+function unsupported(fullSource: string): string[] {
+  const source = fullSource.replace(SETUP_BLOCK, '');
   const errors: string[] = [];
   const patterns = [
     [/\bFOR\b/i, 'FOR'], [/\bWHILE\b/i, 'WHILE'], [/ContentBlockByKey\s*\(/i, 'ContentBlockByKey'],
@@ -139,9 +151,9 @@ function renderPendingAssetPlaceholders(html: string): string {
 
 export function renderDynamicEmail(source: string, row: BriefingRow, subscriber: SubscriberSample, options: RenderOptions = {}): RenderResult {
   const diagnostics = unsupported(source); if (diagnostics.length) return { html: '', diagnostics };
-  const vars = readVars(source, row, subscriber);
+  const vars = { ...readVars(source, row, subscriber), ...(options.vars ?? {}) };
   // The leading setup block contains lookup/SET business logic; assignments were read above. Inline content IFs remain evaluable.
-  let html = source.replace(/%%\[(?=[\s\S]*?\bSET\b)[\s\S]*?\]%%/i, '');
+  let html = source.replace(SETUP_BLOCK, '');
   html = renderConditionals(html, vars);
   html = html.replace(/%%\[\s*(?:SET|RaiseError)[\s\S]*?\]%%/gi, '');
   html = interpolate(html, vars);
