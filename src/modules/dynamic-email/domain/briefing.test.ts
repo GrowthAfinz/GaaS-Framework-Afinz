@@ -37,4 +37,14 @@ describe('briefing SFMC', () => {
     row.HEADER = 'https://image.s11.sfmc-content.com/lib/example.jpg';
     expect(validateRows([row]).get('image')?.some((issue) => issue.code === 'image-url')).toBe(false);
   });
+
+  it('aceita código de header dinâmico com aviso, sem bloquear a exportação', () => {
+    const row = emptyBriefingRow('00000000-0000-4000-8000-000000000011');
+    Object.assign(row, { DT_INICIO: '2026-01-01', DT_FIM: '2026-12-31', UTM_CAMPANHA: 'x', NM_PRODUTO_INTERNO: 'P', HEADER: 'HDR_PECA_V1' });
+    const issues = validateRows([row]).get('00000000-0000-4000-8000-000000000011') ?? [];
+    expect(issues.some((issue) => issue.code === 'image-url')).toBe(false);
+    expect(issues.find((issue) => issue.code === 'header-variant')?.severity).toBe('warning');
+    row.HEADER = 'peca seu cartao';
+    expect(validateRows([row]).get('00000000-0000-4000-8000-000000000011')?.some((issue) => issue.code === 'image-url')).toBe(true);
+  });
 });

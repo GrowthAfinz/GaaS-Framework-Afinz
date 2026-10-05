@@ -5,7 +5,7 @@ import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer
 import { emptyBriefingRow, type BriefingRow } from '../domain/briefing';
 import { parsePoolOffersCsv, topoV10PreviewVars, type HeaderVariant } from '../domain/topoPlurixV10';
 
-const row = (patch: Partial<BriefingRow> = {}): BriefingRow => Object.assign(emptyBriefingRow('plurix-v10'), {
+const row = (patch: Partial<BriefingRow> = {}): BriefingRow => Object.assign(emptyBriefingRow('00000000-0000-4000-8000-000000000010'), {
   NM_PRODUTO_INTERNO: 'AMIGAO', TP_CAMPANHA: 'Topo de Funil', SEQUENCIA: 'E-mail 3',
   TITULO_COPY_1_AZUL: 'Economia de verdade no açougue', COR_COPY_1: '#2C3490', TAMANHO_DA_FONTE_TITULO_COPY_1: '24',
   COPY_1_PRETO: '%%=v(@FirstName)=%%, carne pesa no carrinho.', COR_COPY_PRETO_1: '#242424', TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '18',

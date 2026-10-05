@@ -32,6 +32,7 @@ import {
   Search,
   Settings2,
   ShieldAlert,
+  Sparkles,
   TableProperties,
   Trash2,
   Upload,
@@ -57,6 +58,11 @@ import { DEFAULT_DYNAMIC_EMAIL_TEMPLATE } from '../fixtures/defaultTemplate';
 import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plurixUxV2Template';
 import { PLURIX_V8_TEMPLATE, PLURIX_V8_TEMPLATE_ID, PLURIX_V8_TEMPLATE_NAME } from '../fixtures/plurixV8Template';
 import { PLURIX_V9_TEMPLATE, PLURIX_V9_TEMPLATE_ID, PLURIX_V9_TEMPLATE_NAME } from '../fixtures/plurixV9Template';
+import { PLURIX_V10_TEMPLATE, PLURIX_V10_TEMPLATE_ID, PLURIX_V10_TEMPLATE_NAME } from '../fixtures/plurixV10Template';
+import { topoV10PreviewVars, type HeaderVariant, type PartnerHeaderAsset, type PoolOffer } from '../domain/topoPlurixV10';
+import { loadHeaderVariants, loadPartnerHeaderAssets, loadPoolOffers } from '../services/topoV10Service';
+import { TopoV10Workspace } from './TopoV10Workspace';
+import { HeaderVariantPicker } from './HeaderVariantPicker';
 import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
 import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailFactorySegment, type EmailTemplateSlot, type LegalText, type RulerStrategy, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
@@ -247,6 +253,8 @@ const initialTemplateSlots = (): EmailTemplateSlot[] => {
       ? { ...slot, name: PLURIX_V8_TEMPLATE_NAME, source: PLURIX_V8_TEMPLATE, updatedAt: '2026-09-02T16:00:00.000Z' }
     : slot.id === PLURIX_V9_TEMPLATE_ID
       ? { ...slot, name: PLURIX_V9_TEMPLATE_NAME, source: PLURIX_V9_TEMPLATE, version: Math.max(slot.version, 2), updatedAt: '2026-10-01T17:56:32.000Z' }
+    : slot.id === PLURIX_V10_TEMPLATE_ID
+      ? { ...slot, name: PLURIX_V10_TEMPLATE_NAME, source: PLURIX_V10_TEMPLATE, updatedAt: '2026-10-05T12:00:00.000Z' }
     : slot.id === B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID
       ? { ...slot, name: 'B2C Classic + Vibe · Dinâmico', source: B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, updatedAt: '2026-09-01T12:00:00.000Z' }
       : slot);
@@ -267,7 +275,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [template, setTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
   const [savedTemplate, setSavedTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
   const [templateSyncState, setTemplateSyncState] = useState('Carregando catálogo compartilhado…');
-  const [mode, setMode] = useState<'briefings' | 'strategy' | 'reviews' | 'library' | 'template'>('briefings');
+  const [mode, setMode] = useState<'briefings' | 'strategy' | 'reviews' | 'library' | 'template' | 'topo'>('briefings');
+  const [headerVariants, setHeaderVariants] = useState<HeaderVariant[]>([]);
+  const [partnerAssets, setPartnerAssets] = useState<PartnerHeaderAsset[]>([]);
+  const [poolOffers, setPoolOffers] = useState<PoolOffer[]>([]);
+  const [previewSendDate, setPreviewSendDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [emailStrategies, setEmailStrategies] = useState<EmailStrategy[]>([]);
   const [productContexts, setProductContexts] = useState<ProductContext[]>([]);
   const [productGuardrails, setProductGuardrails] = useState<ProductGuardrail[]>([]);
@@ -394,6 +406,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
     setManagementState([strategiesResult, governanceResult, reviewsResult].every((result) => result.status === 'fulfilled') ? 'Sincronizado com o GaaS' : 'Parte da camada gerencial ainda não está disponível');
   };
   useEffect(() => { void refreshManagement(); }, []);
+  useEffect(() => { Promise.allSettled([loadHeaderVariants(), loadPartnerHeaderAssets(), loadPoolOffers()]).then(([variants, partnerLogos, offers]) => {
+    if (variants.status === 'fulfilled') setHeaderVariants(variants.value);
+    if (partnerLogos.status === 'fulfilled') setPartnerAssets(partnerLogos.value);
+    if (offers.status === 'fulfilled') setPoolOffers(offers.value);
+  }); }, []);
   const refreshTaxonomy = async () => {
     setTaxonomyState('loading');
     try { setTaxonomy(await loadActivityTaxonomy()); setTaxonomyState('ready'); }
@@ -411,6 +428,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
           ? { ...slot, name: PLURIX_V8_TEMPLATE_NAME, source: PLURIX_V8_TEMPLATE, version: Math.max(slot.version, 1), updatedAt: '2026-09-02T16:00:00.000Z' }
         : slot.id === PLURIX_V9_TEMPLATE_ID
           ? { ...slot, name: PLURIX_V9_TEMPLATE_NAME, source: PLURIX_V9_TEMPLATE, version: Math.max(slot.version, 2), updatedAt: '2026-10-01T17:56:32.000Z' }
+        : slot.id === PLURIX_V10_TEMPLATE_ID
+          ? { ...slot, name: PLURIX_V10_TEMPLATE_NAME, source: PLURIX_V10_TEMPLATE, updatedAt: '2026-10-05T12:00:00.000Z' }
         : slot);
       const principal = effectiveSharedTemplates.find((slot) => slot.isPrincipal) ?? effectiveSharedTemplates[0];
       setTemplateSlots(effectiveSharedTemplates); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
@@ -436,11 +455,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
     : effectivePrincipalId;
   const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
+  const usesTopoV10 = previewTemplate.includes('TB_HEADER_VARIACOES');
+  const topoPreview = useMemo(() => usesTopoV10 && previewRow ? topoV10PreviewVars({
+    headerValue: previewRow.HEADER, signatureKey: previewRow.NM_PRODUTO_INTERNO, limite: subscriber.LIMITE, date: previewSendDate,
+    variants: headerVariants, assets: partnerAssets, offers: poolOffers,
+  }) : null, [headerVariants, partnerAssets, poolOffers, previewRow, previewSendDate, subscriber.LIMITE, usesTopoV10]);
   const render = useMemo(() => {
     if (!previewRow) return { html: '', diagnostics: [] };
     const anchoredTemplate = injectBlockAnchors(previewTemplate, previewRow, STRUCTURE_ANCHOR_SPECS);
-    return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden' });
-  }, [previewRow, previewTemplate, showMarketingNotes, subscriber]);
+    return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden', vars: topoPreview?.vars });
+  }, [previewRow, previewTemplate, showMarketingNotes, subscriber, topoPreview]);
   const previewContextKey = emailPreviewContextKey(selected?.__id ?? '', linkedTemplateId);
   const templateActiveCols = useMemo(() => templateActiveColumns(previewTemplate), [previewTemplate]);
   const isColumnEditable = (field: BriefingColumn) => templateActiveCols.size === 0 || templateActiveCols.has(field);
@@ -927,6 +951,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <button role="tab" aria-selected={mode === 'reviews'} onClick={() => setMode('reviews')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'reviews' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}>Revisões</button>
             <button role="tab" aria-selected={mode === 'library'} onClick={() => setMode('library')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'library' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Images className="mr-1.5 inline" size={14}/>Biblioteca de ativos</button>
             <button role="tab" aria-selected={mode === 'template'} onClick={() => setMode('template')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'template' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Code2 className="mr-1.5 inline" size={14}/>Template-fonte</button>
+            <button role="tab" aria-selected={mode === 'topo'} onClick={() => setMode('topo')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'topo' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Sparkles className="mr-1.5 inline" size={14}/>Header e ofertas</button>
           </div>
           {mode === 'briefings' && <div className="flex flex-wrap items-center justify-end gap-2">
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(event) => onFile(event.target.files?.[0])}/>
@@ -943,7 +968,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       </div>
     </header>
 
-    {mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedGuardrail={(saved) => setProductGuardrails((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace aiContext={{ briefings: rows, emailStrategies, rulers, segments: factorySegments, productContexts, productGuardrails, assets, legalTexts, templates: templateSlots, signatureSettings, reviewRuns, reviewSuggestions, defaultPartner: selected?.__meta.partner }} runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
+    {mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedGuardrail={(saved) => setProductGuardrails((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace aiContext={{ briefings: rows, emailStrategies, rulers, segments: factorySegments, productContexts, productGuardrails, assets, legalTexts, templates: templateSlots, signatureSettings, reviewRuns, reviewSuggestions, defaultPartner: selected?.__meta.partner }} runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'topo' ? <TopoV10Workspace variants={headerVariants} onVariantsChange={setHeaderVariants} assets={partnerAssets} onAssetsChange={setPartnerAssets} offers={poolOffers} onOffersChange={setPoolOffers} signatureSettings={signatureSettings} onAnnounce={setAnnouncement}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
@@ -1040,9 +1065,12 @@ export const DynamicEmailWorkspace: React.FC = () => {
                     <div className="grid gap-3 md:grid-cols-2">
                       <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/>
                       <MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
+                      {usesTopoV10 && <MiniInput label="Data de envio simulada" type="date" value={previewSendDate} onChange={(value) => setPreviewSendDate(value || new Date().toISOString().slice(0, 10))}/>}
                     </div>
+                    {usesTopoV10 && <p className="mt-2 text-[11px] leading-4 text-slate-500">Template V10: com limite preenchido, a faixa de limite pré-aprovado aparece em todos os e-mails. A data define a oferta do pool no bloco 3{topoPreview?.offer ? `: nessa data o bloco mostra ${topoPreview.offer.productName}, a partir de R$ ${topoPreview.offer.priceText}.` : ': nessa data não há oferta vigente para esta rede, então o bloco não aparece.'}</p>}
                   </div>}
-                  {section.imageSlot && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')} locked={imageLocked}/></div>}
+                  {section.id === 'header' && usesTopoV10 && <HeaderVariantPicker value={selected.HEADER} variants={headerVariants} notes={topoPreview?.diagnostics ?? []} onChange={(value) => updateField('HEADER', value)} onManage={() => setMode('topo')}/>}
+                  {section.imageSlot && !(section.id === 'header' && usesTopoV10 && topoPreview?.header.mode === 'html') && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')} locked={imageLocked}/></div>}
                   {section.id === 'closing' && selected.__meta.partner === 'Plurix' && <div className={section.imageSlot ? 'mt-3' : ''}><SignatureMatrix rows={rows} selected={selected} onEnsure={() => setRows((current) => ensurePlurixVariants(current, selected.__id, signatureSettings.filter((item) => item.status === 'inactive').map((item) => item.signatureKey)))} onSelect={setSelectedId} onManage={() => setSignatureManagerOpen(true)}/></div>}
                 </CollapsibleBlock>
                 );
@@ -1449,7 +1477,7 @@ const PartnerBriefingTree = ({ groups, emptyPartnerSlots, selectedId, selectedWe
     })}</div></div>;
 };
 
-const MiniInput = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}<input value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2.5 text-xs font-normal normal-case tracking-normal text-slate-700 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"/></label>;
+const MiniInput = ({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) => <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}<input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2.5 text-xs font-normal normal-case tracking-normal text-slate-700 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"/></label>;
 
 const isPublicImageUrl = (value: string) => { try { return new URL(value).protocol === 'https:'; } catch { return false; } };
 

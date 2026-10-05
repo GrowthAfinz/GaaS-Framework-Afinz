@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { HEADER_CODE_PATTERN } from './topoPlurixV10';
 
 export const BRIEFING_COLUMNS = [
   'DT_INICIO', 'DT_FIM', 'UTM_CAMPANHA', 'TP_CAMPANHA', 'SEQUENCIA', 'ASSUNTO', 'PRE_CABECALHO', 'HEADER',
@@ -103,6 +104,10 @@ export function validateRows(rows: BriefingRow[], today = new Date()): Map<strin
     });
     (['HEADER', 'BANNER_1_CORPO', 'BANNER_2_CORPO', 'BANNER_3_CORPO'] as BriefingColumn[]).forEach((field) => {
       const value = row[field].trim();
+      if (field === 'HEADER' && HEADER_CODE_PATTERN.test(value.toUpperCase())) {
+        issues.push({ severity: 'warning', code: 'header-variant', field, message: `HEADER usa a variação dinâmica ${value.toUpperCase()}: só é exibida com o template PLURIX V10 e com a variação ativa na DE TB_HEADER_VARIACOES.` });
+        return;
+      }
       if (value) {
         try {
           if (new URL(value).protocol !== 'https:') throw new Error('protocol');
