@@ -4,8 +4,8 @@ import { ResultRetrospective, ResultRow, ResultsDomain, ResultsScope, ResultsSna
 
 const cache=new Map<string,{expires:number;snapshot:ResultsSnapshot}>();
 const fields = {
-  crm: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,parceiro_canonico,Canal,CartÃµes Gerados,Propostas,Custo Total Campanha,Etapa de aquisiÃ§Ã£o,Subgrupos,jornada,Safra',
-  renta: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,Parceiro,Canal,Base AcionÃ¡vel,Cliques,Custo Total Campanha,Etapa de aquisiÃ§Ã£o,Subgrupos,jornada,Safra',
+  crm: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,parceiro_canonico,Canal,Cartões Gerados,Propostas,Custo Total Campanha,Etapa de aquisição,Subgrupos,jornada,Safra',
+  renta: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,Parceiro,Canal,Base Acionável,Cliques,Custo Total Campanha,Etapa de aquisição,Subgrupos,jornada,Safra',
   media: 'id,date,channel,campaign,objective,ad_id,ad_name,adset_id,adset_name,spend,impressions,clicks,conversions',
   b2c: 'id,data,tipo,propostas_total,emissoes_total',
 };
@@ -25,7 +25,7 @@ export async function readAllRows(table:string,columns:string,primaryKey='id') {
   }
   const {count,error}=await supabase.from(table).select(primaryKey,{count:'exact',head:true});
   if(error)throw error;
-  if(count!==rows.length || expected!==rows.length)throw new Error('A fonte mudou durante a leitura. Atualize para carregar o histÃ³rico completo.');
+  if(count!==rows.length || expected!==rows.length)throw new Error('A fonte mudou durante a leitura. Atualize para carregar o histórico completo.');
   return rows;
 }
 export async function fetchResultsSnapshot(domain:ResultsDomain,userId:string,refresh=false):Promise<ResultsSnapshot>{
@@ -49,11 +49,11 @@ export async function fetchResultsSnapshot(domain:ResultsDomain,userId:string,re
     const identity=ids.length===1?ids[0]:campaignRaw;
     const label=str(canonical.find(c=>c.canonical_campaign_id===identity)?.display_name)||campaignRaw;
     return {id:str(r.id),date,domain,bu:str(r.BU),segment:str(r.Segmento),partner:str(r[renta?'Parceiro':'parceiro_canonico']),
-      stage:str(r['Etapa de aquisiÃ§Ã£o']),subgroup:str(r.Subgrupos),journey:str(r.jornada),safra:str(r.Safra),objective:str(r.objective),grain:media?(r.ad_id||r.ad_name?'ad':r.adset_id||r.adset_name?'adset':'campaign'):'',
+      stage:str(r['Etapa de aquisição']),subgroup:str(r.Subgrupos),journey:str(r.jornada),safra:str(r.Safra),objective:str(r.objective),grain:media?(r.ad_id||r.ad_name?'ad':r.adset_id||r.adset_name?'adset':'campaign'):'',
       channel,campaign:identity,campaignLabel:label,type:str(r.tipo),
       title:crm?str(r['Activity name / Taxonomia']):media?campaignRaw:str(r.tipo),
-      primary:numberOrNull(r[renta?'Cliques':crm?'CartÃµes Gerados':media?'clicks':'emissoes_total']),
-      secondary:numberOrNull(r[renta?'Base AcionÃ¡vel':crm?'Propostas':media?'impressions':'propostas_total']),
+      primary:numberOrNull(r[renta?'Cliques':crm?'Cartões Gerados':media?'clicks':'emissoes_total']),
+      secondary:numberOrNull(r[renta?'Base Acionável':crm?'Propostas':media?'impressions':'propostas_total']),
       spend:numberOrNull(r[crm?'Custo Total Campanha':'spend']),conversions:media?numberOrNull(r.conversions):null,
       duplicateKey:crm?JSON.stringify([r['Activity name / Taxonomia'],r['Data de Disparo'],r.BU,r.Canal]):str(r.id),
       mapped:!media||ids.length===1};

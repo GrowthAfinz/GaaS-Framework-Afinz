@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mock=vi.hoisted(()=>({from:vi.fn()}));
 vi.mock('../../../services/supabaseClient',()=>({supabase:mock}));
-import { readAllRows, numberOrNull } from './resultsService';
+import { readAllRows, numberOrNull, fetchResultsSnapshot } from './resultsService';
 beforeEach(()=>mock.from.mockReset());
 function source(count:number,batches:{data:object[];error?:object}[],end=count){
  let page=0;const ranges:number[]=[];
@@ -9,6 +9,17 @@ function source(count:number,batches:{data:object[];error?:object}[],end=count){
  return ranges;
 }
 describe('Complete source reads',()=>{
+ it('sends the exact accented CRM schema names in the real snapshot request',async()=>{
+  let selected='';
+  mock.from.mockImplementation(()=>({select:(columns:string,options:{head?:boolean}={})=>{
+   if(options.head)return Promise.resolve({count:0,error:null});
+   selected=columns;return {order:()=>({range:()=>Promise.resolve({count:0,data:[],error:null})})};
+  }}));
+  await fetchResultsSnapshot('crm','schema-regression',true);
+  for(const column of ['Data de Disparo','Activity name / Taxonomia','Cartões Gerados','Etapa de aquisição','Custo Total Campanha']){
+   expect(selected.split(',')).toContain(JSON.stringify(column));
+  }
+ });
  it('quotes literal column names so PostgREST preserves spaces and reserved slash',async()=>{
   let selected='';
   mock.from.mockImplementation(()=>({select:(columns:string,options:{head?:boolean}={})=>{
