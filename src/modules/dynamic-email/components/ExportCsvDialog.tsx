@@ -48,6 +48,8 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
   // Inicializa já com a sugestão: esperar o efeito faria o campo piscar vazio.
   const [filename, setFilename] = useState(suggested);
   const [renamed, setRenamed] = useState(false);
+  // Aviso antes do download: o wizard do SFMC esquece essas opções a cada importação.
+  const [importTipsOpen, setImportTipsOpen] = useState(false);
   useEffect(() => { if (!renamed) setFilename(suggested); }, [suggested, renamed]);
 
   const totals = selectionTotals(tree, selection);
@@ -180,11 +182,40 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button>
           <button
             type="button" disabled={!totals.weeks}
-            onClick={() => onConfirm(new Set(selection), finalName)}
+            onClick={() => setImportTipsOpen(true)}
             className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white outline-none transition hover:bg-[#064446] focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
           ><Download size={15}/>Baixar CSV</button>
         </div>
       </div>
+
+      {importTipsOpen && <div
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-4"
+        role="alertdialog" aria-modal="true" aria-labelledby="sfmc-import-tips-title" aria-describedby="sfmc-import-tips-list"
+        onMouseDown={(event) => { if (event.target === event.currentTarget) setImportTipsOpen(false); }}
+      >
+        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="flex items-start gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-700"><TriangleAlert size={18}/></span>
+            <div className="min-w-0">
+              <h3 id="sfmc-import-tips-title" className="font-bold text-slate-900">Antes de importar no SFMC</h3>
+              <p className="mt-1 text-sm leading-5 text-slate-600">O assistente de importação não guarda estas opções. Confira toda vez, senão todas as linhas são rejeitadas.</p>
+            </div>
+          </div>
+          <ol id="sfmc-import-tips-list" className="mt-4 space-y-2 text-sm text-slate-800">
+            <li className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"><b className="text-amber-800">1.</b><span>Marque <b>“Respeitar as aspas duplas como qualificadores de texto”</b>.</span></li>
+            <li className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"><b className="text-amber-800">2.</b><span>Delimitador: <b>vírgula</b>.</span></li>
+          </ol>
+          <p className="mt-3 text-xs leading-5 text-slate-500">Também vale conferir: modo <b>Adicionar e atualizar</b>, datas no formato mês/dia/ano e a coluna <code className="rounded bg-slate-100 px-1">MENSAGEM_LIMITE</code> mapeada.</p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" onClick={() => setImportTipsOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Voltar</button>
+            <button
+              type="button" autoFocus
+              onClick={() => { setImportTipsOpen(false); onConfirm(new Set(selection), finalName); }}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white outline-none transition hover:bg-[#064446] focus-visible:ring-2 focus-visible:ring-cyan-500"
+            ><Download size={15}/>Entendi, baixar CSV</button>
+          </div>
+        </div>
+      </div>}
     </div>
   );
 };
