@@ -6,7 +6,7 @@ import { emptyBriefingRow } from '../domain/briefing';
 describe('V11 factory simulation', () => {
   for (const sequence of ['E-mail 1', 'E-mail 2']) {
     it(`renders ${sequence} with COMUNICACAO_PLX aliases, image and limit`, () => {
-      const row = emptyBriefingRow('v11');
+      const row = emptyBriefingRow();
       Object.assign(row, { SEQUENCIA: sequence, TP_CAMPANHA: 'CRM', NM_PRODUTO_INTERNO: 'AMIGAO',
         HEADER: 'https://example.com/header.png', COPY_1_PRETO: 'Olá %%=v(@FirstName)=%%',
         TITULO_COPY_1_AZUL: 'Título', COR_COPY_1: '#2C3490', TAMANHO_DA_FONTE_TITULO_COPY_1: '24' });
@@ -21,7 +21,7 @@ describe('V11 factory simulation', () => {
     });
   }
   it.each(['', '0'])('hides unavailable limit %s', (limit) => {
-    const row = emptyBriefingRow('v11-zero');
+    const row = emptyBriefingRow();
     const result = renderDynamicEmail(PLURIX_V11_TEMPLATE, row, { CPF: '00000000000', PRI_NOME: '', LIMITE: limit,
       PRODUTO: 'AMIGAO', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'CRM' });
     expect(result.html).not.toContain('limite pré-aprovado');
