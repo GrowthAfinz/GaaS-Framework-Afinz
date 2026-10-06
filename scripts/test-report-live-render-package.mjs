@@ -162,6 +162,30 @@ test('production validation blocks cardinality drift, silent loss, missing prove
   assert.ok(codes.has('retired_scope'));
 });
 
+test('production packages require structured narrative and explicit chart contracts', async () => {
+  const source = await readJson('archetypes-charts.fixture.json');
+  const slide = structuredClone(source.slides[0]);
+  slide.narrative.evidence = [];
+  slide.narrative.limitation = '';
+  const coverage = Array.from({ length: 57 }, (_, index) => ({
+    baseline_page: index + 1,
+    baseline_slide_code: index === 46 ? 'K-VISA' : `BASE-${index + 1}`,
+    disposition: index === 46 ? 'retire_closed_scope' : 'preserve',
+    target_slide_instance_ids: index === 46 ? [] : [slide.slide_instance_id],
+    rationale: index === 46 ? 'Escopo encerrado.' : 'Cobertura de teste.',
+  }));
+  const production = {
+    ...source,
+    package_kind: 'production',
+    slides: [slide],
+    expected_slide_count: 1,
+    coverage_accounting: coverage,
+  };
+  const codes = new Set(validateReportRenderPackage(production).map((issue) => issue.code));
+  assert.ok(codes.has('narrative_contract'));
+  assert.ok(codes.has('chart_contract'));
+});
+
 test('table normalization never turns missing into zero', () => {
   const dataset = tableToRenderDataset([['metric'], [null], [0], [12]]);
   assert.deepEqual(dataset.rows.map((row) => row[0]), [
