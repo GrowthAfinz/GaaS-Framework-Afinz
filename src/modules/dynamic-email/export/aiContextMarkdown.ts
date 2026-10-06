@@ -124,6 +124,7 @@ const COLUMN_DOCS: Record<BriefingColumn, ColumnDoc> = {
   COR_NOTA_LEGAL: { friendly: 'Cor da nota legal', block: 'Informações legais', html: false, personalization: false, emptyWhen: 'não' },
   TAMANHO_DA_FONTE_NOTA_LEGAL: { friendly: 'Tamanho da nota legal (px)', block: 'Informações legais', html: false, personalization: false, emptyWhen: 'não' },
   RODAPE: { friendly: 'Rodapé complementar', block: 'Rodapé', html: true, personalization: false, emptyWhen: 'pode' },
+  MENSAGEM_LIMITE: { friendly: 'Mensagem da faixa de limite pré-aprovado', block: 'Faixa de limite', html: true, personalization: false, emptyWhen: 'pode — sem mensagem a faixa não aparece (só templates V12+). Aceita só {{nome}} e {{limite}}, sem AMPscript.' },
 };
 
 const COMPOSITE_KEY: BriefingColumn[] = ['NM_PRODUTO_INTERNO', 'TP_CAMPANHA', 'SEQUENCIA'];
@@ -173,7 +174,7 @@ ${fence(`Você está trabalhando com a Fábrica de E-mails Afinz descrita neste 
 Antes de propor mudanças:
 1. identifique parceiro, produto, jornada, segmento, semana e e-mail;
 2. diferencie fatos do sistema, inferências e informações ausentes;
-3. preserve o contrato das 36 colunas do SFMC;
+3. preserve o contrato das ${BRIEFING_COLUMNS.length} colunas do SFMC;
 4. preserve conteúdo, assets, links, tracking, legal e condicionais fora do pedido;
 5. não invente benefícios, condições, preços, limites, tarifas ou aprovação;
 6. não considere um e-mail certificado sem evidência de Test Send no SFMC;
@@ -187,7 +188,7 @@ antes de gerar a versão final.`)}
 Módulo do GaaS onde uma régua de e-mails é redigida, revisada e preparada para o
 Salesforce Marketing Cloud. Três camadas:
 
-- **Briefing** — contrato técnico de 36 colunas. É o que vira linha de CSV e o que o
+- **Briefing** — contrato técnico de ${BRIEFING_COLUMNS.length} colunas. É o que vira linha de CSV e o que o
   AMPscript lê. Uma linha = um e-mail.
 - **Plano de Comunicação** — camada estratégica: papel do e-mail na régua, objetivo,
   objeção, prova, estratégia de CTA. Orienta a redação; não vai para o SFMC.
@@ -242,7 +243,7 @@ Por jornada:   Família → Tipo de jornada → Parceiro → Segmento → Semana
 | Segmento | Público da comunicação | Não confundir com jornada |
 | Semana | Cadência editorial | Agrupa e-mails |
 | E-mail | Unidade editorial | Tem uma ou mais variantes por assinatura |
-| Briefing | Contrato técnico de 36 colunas | Alimenta CSV e template |
+| Briefing | Contrato técnico de ${BRIEFING_COLUMNS.length} colunas | Alimenta CSV e template |
 | Plano de Comunicação | Direção estratégica | Orienta criação e revisão |
 | Template | HTML/AMPscript compartilhado | Renderiza os campos do briefing |
 
@@ -271,7 +272,7 @@ tracking, produto, condições, benefícios, nota legal e nomenclatura técnica.
 > Trocar o nome do parceiro no texto **não é** adaptar uma régua. Se o produto ou a
 > proposta de valor mudam, a copy inteira precisa ser reescrita.
 
-## 6. Contrato das 36 colunas
+## 6. Contrato das ${BRIEFING_COLUMNS.length} colunas
 
 Ordem oficial. Esta tabela é gerada a partir de \`BRIEFING_COLUMNS\` no código — se
 divergir do CSV, o código é a verdade.
@@ -305,7 +306,7 @@ O AMPscript resolve com \`LookupOrderedRows(..., "DT_INICIO DESC", ...)\`, valid
 
 ## 8. Importação e exportação CSV
 
-- exatamente 36 colunas, lidas **por nome**, nunca por posição;
+- exatamente ${BRIEFING_COLUMNS.length} colunas (MENSAGEM_LIMITE pode faltar em CSV antigo), lidas **por nome**, nunca por posição;
 - delimitador vírgula, sem BOM, CRLF, \`QUOTE_MINIMAL\`;
 - marcar "Respeitar as aspas duplas como qualificadores de texto" — a caixa **some a
   cada importação** e sem ela qualquer vírgula dentro de campo derruba o arquivo inteiro;
@@ -495,7 +496,7 @@ const emailSection = (
       '',
       planRows.length ? `**Plano de Comunicação**\n\n| Campo | Conteúdo |\n|---|---|\n${planRows.map(([label, value]) => `| ${label} | ${cell(value)} |`).join('\n')}` : '_Plano de Comunicação ainda não preenchido._',
       '',
-      `<details><summary>Briefing (${BRIEFING_COLUMNS.filter((column) => clean(lead[column])).length} de 36 campos preenchidos)</summary>\n\n| Coluna | Valor |\n|---|---|\n${briefingRows}\n\n</details>`,
+      `<details><summary>Briefing (${BRIEFING_COLUMNS.filter((column) => clean(lead[column])).length} de ${BRIEFING_COLUMNS.length} campos preenchidos)</summary>\n\n| Coluna | Valor |\n|---|---|\n${briefingRows}\n\n</details>`,
     ].filter((line) => line !== null) as string[]).join('\n');
   }).join('\n\n');
 };
@@ -612,7 +613,7 @@ ${templates.map((item) => {
       const role = usedTemplateIds.has(item.id)
         ? 'usado neste escopo'
         : item.isPrincipal ? '**principal global** — fallback, pode ser de outro parceiro' : 'disponível';
-      return `| \`${cell(item.id)}\` | ${cell(item.name)} | ${role} | ${item.version} | ${used.length} de 36 | ${cell(item.updatedAt)} |`;
+      return `| \`${cell(item.id)}\` | ${cell(item.name)} | ${role} | ${item.version} | ${used.length} de ${BRIEFING_COLUMNS.length} | ${cell(item.updatedAt)} |`;
     }).join('\n')}
 
 ${templates.map((item) => {

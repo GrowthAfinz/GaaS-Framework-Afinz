@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { HEADER_CODE_PATTERN } from './topoPlurixV10';
+import { validateLimitMessage } from './limitMessage';
 
 export const BRIEFING_COLUMNS = [
   'DT_INICIO', 'DT_FIM', 'UTM_CAMPANHA', 'TP_CAMPANHA', 'SEQUENCIA', 'ASSUNTO', 'PRE_CABECALHO', 'HEADER',
@@ -10,7 +11,13 @@ export const BRIEFING_COLUMNS = [
   'TITULO_CTA_2', 'LINK_CTA_2', 'BANNER_1_CORPO', 'LINK_BANNER_1_CORPO', 'BANNER_2_CORPO',
   'LINK_BANNER_2_CORPO', 'BANNER_3_CORPO', 'LINK_BANNER_3_CORPO', 'NOTA_LEGAL', 'COR_NOTA_LEGAL',
   'TAMANHO_DA_FONTE_NOTA_LEGAL', 'RODAPE',
+  // 37ª coluna (out/2026): texto da faixa de limite pré-aprovado, opcional/anulável.
+  // Fica no fim para que a DE existente só ganhe uma coluna nova, sem reordenar as demais.
+  'MENSAGEM_LIMITE',
 ] as const;
+
+/** Colunas que um CSV antigo pode não ter; entram vazias na importação. */
+export const OPTIONAL_IMPORT_COLUMNS: readonly BriefingColumn[] = ['MENSAGEM_LIMITE'];
 
 export type BriefingColumn = typeof BRIEFING_COLUMNS[number];
 export type BriefingRow = Record<BriefingColumn, string> & { __id: string; __journeyConfirmed?: boolean };
@@ -39,11 +46,13 @@ export function parseBriefingCsv(csv: string): { rows: BriefingRow[]; errors: st
     header: true, skipEmptyLines: 'greedy', transformHeader: (h) => h.trim(),
   });
   const headers = parsed.meta.fields ?? [];
-  const missing = BRIEFING_COLUMNS.filter((c) => !headers.includes(c));
+  const missing = BRIEFING_COLUMNS.filter((c) => !headers.includes(c) && !OPTIONAL_IMPORT_COLUMNS.includes(c));
+  const missingOptional = OPTIONAL_IMPORT_COLUMNS.filter((c) => !headers.includes(c));
   const extra = headers.filter((h) => !BRIEFING_COLUMNS.includes(h as BriefingColumn));
   const errors = parsed.errors.map((e) => `Linha ${e.row != null ? e.row + 2 : '?'}: ${e.message}`);
   if (missing.length) errors.unshift(`Colunas ausentes: ${missing.join(', ')}`);
   if (extra.length) errors.push(`Colunas extras ignoradas: ${extra.join(', ')}`);
+  if (!missing.length && missingOptional.length) errors.push(`CSV no formato anterior (36 colunas): ${missingOptional.join(', ')} entra vazio.`);
   if (missing.length) return { rows: [], errors };
   const rows = parsed.data.map((source, index) => {
     const row = emptyBriefingRow(`${Date.now()}-${index}`);
@@ -86,13 +95,29 @@ export function toSfmcDate(value: string): string {
   return `${p(date.getMonth() + 1)}/${p(date.getDate())}/${date.getFullYear()} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
 
+// Régua do GaaS (segmento editorial). Duas réguas podem compartilhar a chave do SFMC
+// quando só uma delas é publicada; dentro da mesma régua a chave continua única.
+const rulerScope = (row: BriefingRow) => (row as BriefingRow & { __meta?: { segment?: string } }).__meta?.segment ?? '';
+const NAME_IN_BODY_FIELDS: BriefingColumn[] = ['TITULO_COPY_1_AZUL', 'COPY_1_PRETO', 'TITULO_COPY_2', 'COPY_2_PRETO'];
+
 export function validateRows(rows: BriefingRow[], today = new Date()): Map<string, ValidationIssue[]> {
   const counts = new Map<string, number>();
-  rows.forEach((row) => counts.set(rowKey(row), (counts.get(rowKey(row)) ?? 0) + 1));
+  const scopesByKey = new Map<string, Set<string>>();
+  rows.forEach((row) => {
+    const scoped = `${rulerScope(row)}|${rowKey(row)}`;
+    counts.set(scoped, (counts.get(scoped) ?? 0) + 1);
+    scopesByKey.set(rowKey(row), (scopesByKey.get(rowKey(row)) ?? new Set()).add(rulerScope(row)));
+  });
   const result = new Map<string, ValidationIssue[]>();
   rows.forEach((row) => {
     const issues: ValidationIssue[] = [];
-    if ((counts.get(rowKey(row)) ?? 0) > 1) issues.push({ severity: 'error', code: 'duplicate-key', message: `Chave composta duplicada: ${rowKey(row)}` });
+    if ((counts.get(`${rulerScope(row)}|${rowKey(row)}`) ?? 0) > 1) issues.push({ severity: 'error', code: 'duplicate-key', message: `Chave composta duplicada: ${rowKey(row)}` });
+    const otherRulers = [...(scopesByKey.get(rowKey(row)) ?? [])].filter((scope) => scope !== rulerScope(row));
+    if (otherRulers.length) issues.push({ severity: 'warning', code: 'shared-sfmc-key', message: `A régua ${otherRulers.join(', ')} usa a mesma chave do SFMC (${rowKey(row)}). Exporte só uma delas: a importação substitui a linha na DE.` });
+    validateLimitMessage(row.MENSAGEM_LIMITE ?? '').forEach((issue) => issues.push({ ...issue, field: 'MENSAGEM_LIMITE' }));
+    if ((row.MENSAGEM_LIMITE ?? '').includes('{{nome}}') && NAME_IN_BODY_FIELDS.some((field) => /@FirstName\b/i.test(row[field] ?? ''))) {
+      issues.push({ severity: 'warning', code: 'name-repeated', field: 'COPY_1_PRETO', message: 'O nome já aparece na faixa de limite e se repete no corpo. Revise o texto para não chamar a pessoa pelo nome duas vezes.' });
+    }
     (['NM_PRODUTO_INTERNO', 'UTM_CAMPANHA'] as BriefingColumn[]).forEach((field) => {
       if (PLACEHOLDERS.has(row[field].trim().toUpperCase())) issues.push({ severity: 'error', code: 'placeholder', field, message: `${field} precisa de um valor definitivo.` });
     });
@@ -150,8 +175,11 @@ export function templateActiveColumns(templateSource: string): Set<BriefingColum
   const setupEnd = templateSource.indexOf(']%%');
   const body = setupEnd >= 0 ? templateSource.slice(setupEnd + 3) : templateSource;
   const active = new Set<BriefingColumn>();
+  const setup = setupEnd >= 0 ? templateSource.slice(0, setupEnd) : '';
   for (const [variable, column] of varToColumn) {
-    if (new RegExp(`@${variable}\\b`, 'i').test(body) && (BRIEFING_COLUMNS as readonly string[]).includes(column)) {
+    // Também conta quando o preparo deriva outra variável exibida (ex.: MENSAGEM_LIMITE → @FaixaLimite).
+    const usedInSetup = (setup.match(new RegExp(`@${variable}\\b`, 'gi')) ?? []).length > 1;
+    if ((usedInSetup || new RegExp(`@${variable}\\b`, 'i').test(body)) && (BRIEFING_COLUMNS as readonly string[]).includes(column)) {
       active.add(column as BriefingColumn);
     }
   }

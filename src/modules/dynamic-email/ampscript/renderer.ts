@@ -1,5 +1,6 @@
 import type { BriefingRow } from '../domain/briefing';
 import { formatLimite } from '../domain/topoPlurixV10';
+import { renderLimitMessage } from '../domain/limitMessage';
 
 export interface SubscriberSample { CPF: string; PRI_NOME: string; LIMITE: string; PRODUTO: string; SEQUENCIA: string; TP_CAMPANHA: string }
 export interface RenderResult { html: string; diagnostics: string[] }
@@ -65,6 +66,10 @@ function readVars(source: string, row: BriefingRow, subscriber: SubscriberSample
     vars.HeaderModo = /^https:\/\//i.test(row.HEADER.trim()) ? 'imagem' : '';
     const limit = subscriber.LIMITE.trim();
     vars.LimiteFmt = /^[0-9]+(\.[0-9]{1,2})?$/.test(limit) && Number(limit) > 0 ? formatLimite(limit) : '';
+  }
+  // V12+: o texto da faixa vem do briefing; mesmo espelho usado na validação do GaaS.
+  if (/Field\s*\(\s*@Row\s*,\s*"MENSAGEM_LIMITE"\s*\)/.test(source)) {
+    vars.FaixaLimite = renderLimitMessage(row.MENSAGEM_LIMITE ?? '', String(vars.FirstName ?? ''), subscriber.LIMITE);
   }
   return vars;
 }

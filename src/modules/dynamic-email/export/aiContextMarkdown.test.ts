@@ -41,7 +41,7 @@ const base = (patch: Partial<AiContextMarkdownInput> = {}): AiContextMarkdownInp
 });
 
 describe('buildAiContextMarkdown', () => {
-  it('documenta as 36 colunas na ordem oficial', () => {
+  it('documenta as 37 colunas na ordem oficial', () => {
     const { content } = buildAiContextMarkdown(base());
     for (const column of BRIEFING_COLUMNS) {
       expect(content, `coluna ausente: ${column}`).toContain(`\`${column}\``);
@@ -49,7 +49,7 @@ describe('buildAiContextMarkdown', () => {
     const positions = BRIEFING_COLUMNS.map((column) => content.indexOf(`| \`${column}\` |`));
     expect(positions.every((value) => value > 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-    expect(BRIEFING_COLUMNS).toHaveLength(36);
+    expect(BRIEFING_COLUMNS).toHaveLength(37);
   });
 
   it('traz a chave composta e as duas Data Extensions', () => {
@@ -172,7 +172,7 @@ describe('buildAiContextMarkdown', () => {
 
   it('reporta campos do template usados e não usados', () => {
     const { content } = buildAiContextMarkdown(base());
-    expect(content).toContain('1 de 36');
+    expect(content).toContain('1 de 37');
     expect(content).toContain('campos não lidos por este template');
   });
 });

@@ -65,6 +65,8 @@ import { loadHeaderVariants, loadPartnerHeaderAssets, loadPoolOffers } from '../
 import { TopoV10Workspace } from './TopoV10Workspace';
 import { PoolOfferEditorCard } from './PoolOfferEditorCard';
 import { HeaderVariantPicker } from './HeaderVariantPicker';
+import { LimitMessageEditor, LimitTestInput } from './LimitMessageEditor';
+import { renderLimitMessage } from '../domain/limitMessage';
 import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
 import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailFactorySegment, type EmailTemplateSlot, type LegalText, type RulerStrategy, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
@@ -89,8 +91,8 @@ const PRIMARY_TEMPLATE_KEY = 'gaas-dynamic-email-primary-template-v2';
 const ROWS_KEY = 'gaas-dynamic-email-briefings-v1';
 const COLS_KEY = 'gaas-email-factory-cols-v1';
 const DEFAULT_COLS: [number, number, number] = [1.15, 2.55, 2.1];
-const SAMPLE: SubscriberSample = { CPF: '00000000000', PRI_NOME: 'VANIA', LIMITE: 'R$ 3.500', PRODUTO: 'INSTITUCIONAL', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'Repescagem' };
-const LONG_FIELDS = new Set<BriefingColumn>(['COPY_1_PRETO', 'COPY_2_PRETO', 'NOTA_LEGAL', 'RODAPE', 'PRE_CABECALHO']);
+const SAMPLE: SubscriberSample = { CPF: '00000000000', PRI_NOME: 'VANIA', LIMITE: '3500', PRODUTO: 'INSTITUCIONAL', SEQUENCIA: 'E-mail 1', TP_CAMPANHA: 'Repescagem' };
+const LONG_FIELDS = new Set<BriefingColumn>(['MENSAGEM_LIMITE', 'COPY_1_PRETO', 'COPY_2_PRETO', 'NOTA_LEGAL', 'RODAPE', 'PRE_CABECALHO']);
 const COLOR_FIELDS = new Set<BriefingColumn>(['COR_COPY_1', 'COR_COPY_PRETO_1', 'COR_TITULO_COPY_2', 'COR_COPY_2', 'COR_NOTA_LEGAL']);
 const EDITORIAL_WEEKS = Array.from({ length: 12 }, (_, index) => `Semana ${index + 1}`);
 const ACQUISITION_PARTNER_SLOTS = ['Dia', 'Bem Barato', 'Super Nosso'] as const;
@@ -125,6 +127,7 @@ const FIELD_LABELS: Partial<Record<BriefingColumn, string>> = {
   COR_NOTA_LEGAL: 'Cor da nota legal',
   TAMANHO_DA_FONTE_NOTA_LEGAL: 'Tamanho da nota legal',
   RODAPE: 'Rodapé',
+  MENSAGEM_LIMITE: 'Mensagem da faixa de limite',
 };
 
 type ImageSlot = { label: string; description: string; image: BriefingColumn; link?: BriefingColumn };
@@ -152,6 +155,7 @@ const EDITOR_SECTIONS: EditorSection[] = [
   { id: 'identity', label: 'Campanha e vigência', description: 'Identificação usada no CSV e no lookup do SFMC.', fields: ['DT_INICIO', 'DT_FIM', 'UTM_CAMPANHA', 'TP_CAMPANHA', 'SEQUENCIA', 'NM_PRODUTO_INTERNO', 'CARTAO_NM_COMERCIAL'] },
   { id: 'message', label: 'Informações da mensagem', description: 'O que aparece na caixa de entrada antes da abertura.', fields: ['ASSUNTO', 'PRE_CABECALHO'] },
   { id: 'header', label: 'Cabeçalho visual', description: 'Primeiro elemento visível do e-mail.', imageSlot: IMAGE_SLOTS.header },
+  { id: 'limit', label: 'Faixa de limite pré-aprovado', description: 'Texto deste e-mail, igual nas 6 redes. Aparece só para quem tem limite (template V12).' },
   { id: 'primary', label: 'Bloco principal', description: 'Título, conteúdo, ação principal e primeiro banner.', fields: ['TITULO_COPY_1_AZUL', 'COR_COPY_1', 'TAMANHO_DA_FONTE_TITULO_COPY_1', 'COPY_1_PRETO', 'COR_COPY_PRETO_1', 'TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1', 'TITULO_CTA_1', 'LINK_CTA_1'], imageSlot: IMAGE_SLOTS.banner1 },
   { id: 'secondary', label: 'Segundo bloco', description: 'Conteúdo complementar, segunda ação e banner.', fields: ['TITULO_COPY_2', 'COR_TITULO_COPY_2', 'TAMANHO_DA_FONTE_TITULO_COPY_2', 'COPY_2_PRETO', 'COR_COPY_2', 'TAMANHO_DA_FONTE_COPY_2', 'TITULO_CTA_2', 'LINK_CTA_2'], imageSlot: IMAGE_SLOTS.banner2 },
   { id: 'pool', label: 'Terceiro bloco · Oferta do pool', description: 'Opcional e automático: aparece quando a rede tem oferta vigente no dia do envio (template V10).' },
@@ -165,6 +169,7 @@ const ALL_EDITOR_BLOCK_IDS = [AUDIT_SECTION_ID, ...EDITOR_SECTIONS.map((section)
 // Blocos que viram uma região visível na peça renderizada — recebem número no editor e um pino na prévia.
 const STRUCTURE_BLOCKS: { id: string; num: number; label: string; textFields: BriefingColumn[]; imageField?: BriefingColumn }[] = [
   { id: 'header', num: 1, label: 'Cabeçalho', textFields: [], imageField: 'HEADER' },
+  { id: 'limit', num: 2, label: 'Faixa de limite', textFields: [] },
   { id: 'primary', num: 2, label: 'Bloco principal', textFields: ['TITULO_COPY_1_AZUL', 'COPY_1_PRETO', 'TITULO_CTA_1'], imageField: 'BANNER_1_CORPO' },
   { id: 'secondary', num: 3, label: 'Segundo bloco', textFields: ['TITULO_COPY_2', 'COPY_2_PRETO', 'TITULO_CTA_2'], imageField: 'BANNER_2_CORPO' },
   { id: 'pool', num: 4, label: 'Oferta do pool', textFields: [] },
@@ -173,7 +178,8 @@ const STRUCTURE_BLOCKS: { id: string; num: number; label: string; textFields: Br
 ];
 const STRUCTURE_IDS = new Set(STRUCTURE_BLOCKS.map((block) => block.id));
 // O bloco de oferta do pool só existe no template V10; nos demais a numeração segue sem ele.
-const visibleStructureBlocks = (withPool: boolean) => STRUCTURE_BLOCKS.filter((block) => withPool || block.id !== 'pool').map((block, index) => ({ ...block, num: index + 1 }));
+// A faixa de limite editável só existe nos templates que leem MENSAGEM_LIMITE (V12+).
+const visibleStructureBlocks = (withPool: boolean, withLimit = false) => STRUCTURE_BLOCKS.filter((block) => (withPool || block.id !== 'pool') && (withLimit || block.id !== 'limit')).map((block, index) => ({ ...block, num: index + 1 }));
 // Colunas-assinatura de cada bloco (texto primeiro, imagem como fallback) — usadas
 // para injetar o marcador invisível que ancora o pino da prévia ao bloco certo.
 const STRUCTURE_ANCHOR_SPECS: AnchorBlockSpec[] = STRUCTURE_BLOCKS.map((block) => ({
@@ -227,7 +233,7 @@ function shiftBriefingDate(value: string, months: number, days: number): string 
 }
 
 const initials = (value: string) => (value.trim().slice(0, 2) || '—').toUpperCase();
-const segmentDisplayLabel = (value: string) => value === 'Base_Proprietaria' ? 'Topo de Funil (Base Proprietária)' : value === 'CRM' ? 'Topo de Funil (CRM)' : value;
+const segmentDisplayLabel = (value: string) => value === 'Base_Proprietaria' ? 'Topo de Funil (Base Proprietária)' : value === 'CRM' ? 'Topo de Funil (CRM)' : value === 'CRM 3' ? 'TOPO DE FUNIL (CRM) 3' : value;
 const naturalLabelSort = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' });
 const initialTemplateSlots = (): EmailTemplateSlot[] => {
   const storedPrincipalId = localStorage.getItem(PRIMARY_TEMPLATE_KEY) ?? '';
@@ -462,6 +468,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
   const usesTopoV10 = previewTemplate.includes('TB_HEADER_VARIACOES');
+  const usesLimitMessage = /Field\s*\(\s*@Row\s*,\s*"MENSAGEM_LIMITE"\s*\)/.test(previewTemplate);
+  const limitBandText = useMemo(() => usesLimitMessage && previewRow
+    ? renderLimitMessage(previewRow.MENSAGEM_LIMITE, subscriber.PRI_NOME.trim().toLocaleLowerCase('pt-BR').replace(/(^|\s)(\S)/g, (_, space: string, letter: string) => space + letter.toLocaleUpperCase('pt-BR')), subscriber.LIMITE)
+    : '', [previewRow, subscriber.LIMITE, subscriber.PRI_NOME, usesLimitMessage]);
   const topoPreview = useMemo(() => usesTopoV10 && previewRow ? topoV10PreviewVars({
     headerValue: previewRow.HEADER, signatureKey: previewRow.NM_PRODUTO_INTERNO, limite: subscriber.LIMITE, date: previewSendDate,
     variants: headerVariants, assets: partnerAssets, offers: poolOffers,
@@ -478,7 +488,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
     const row = previewRow;
     if (!row) return [];
     const issueFields = new Set(selectedIssues.map((issue) => issue.field).filter(Boolean) as string[]);
-    return visibleStructureBlocks(usesTopoV10).map((block) => {
+    return visibleStructureBlocks(usesTopoV10, usesLimitMessage).map((block) => {
+      if (block.id === 'limit') {
+        const text = stripHtmlToText(limitBandText);
+        return { id: block.id, num: block.num, label: block.label, anchor: text ? { kind: 'text' as const, value: text } : null, status: text ? 'filled' as const : 'empty' as const, templateLocked: false };
+      }
       if (block.id === 'pool') {
         const offer = topoPreview?.offer;
         return { id: block.id, num: block.num, label: block.label, anchor: offer ? { kind: 'text' as const, value: 'E tem mais' } : null, status: offer ? 'filled' as const : 'empty' as const, templateLocked: true };
@@ -498,8 +512,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const templateLocked = ownedFields.length > 0 && templateActiveCols.size > 0 && ownedFields.some((field) => !templateActiveCols.has(field));
       return { id: block.id, num: block.num, label: block.label, anchor, status, templateLocked };
     });
-  }, [previewRow, selectedIssues, templateActiveCols, topoPreview, usesTopoV10]);
-  const structureNum = useMemo<Record<string, number>>(() => Object.fromEntries(visibleStructureBlocks(usesTopoV10).map((block) => [block.id, block.num])), [usesTopoV10]);
+  }, [limitBandText, previewRow, selectedIssues, templateActiveCols, topoPreview, usesLimitMessage, usesTopoV10]);
+  const structureNum = useMemo<Record<string, number>>(() => Object.fromEntries(visibleStructureBlocks(usesTopoV10, usesLimitMessage).map((block) => [block.id, block.num])), [usesLimitMessage, usesTopoV10]);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
@@ -583,6 +597,17 @@ export const DynamicEmailWorkspace: React.FC = () => {
     const exportRows = rows.filter((row) => row.__meta.status !== 'archived'
       && weekKeys.has(weekKeyFor(row.__meta.partner, row.__meta.segment, row.__meta.weekKey)));
     if (!exportRows.length) { setAnnouncement('Selecione ao menos uma semana sem pendências para exportar.'); return; }
+    // Duas réguas do GaaS podem usar a mesma chave do SFMC; no mesmo CSV isso duplicaria a linha na DE.
+    const keyOwners = new Map<string, Set<string>>();
+    exportRows.forEach((row) => {
+      const key = [row.NM_PRODUTO_INTERNO, row.TP_CAMPANHA, row.SEQUENCIA].join(' / ');
+      keyOwners.set(key, (keyOwners.get(key) ?? new Set()).add(segmentDisplayLabel(row.__meta.segment)));
+    });
+    const collisions = [...keyOwners.entries()].filter(([, owners]) => owners.size > 1);
+    if (collisions.length) {
+      setAnnouncement(`Exporte uma régua por vez: ${[...collisions[0][1]].join(' e ')} usam a mesma chave do SFMC (${collisions[0][0]}${collisions.length > 1 ? ` e mais ${collisions.length - 1}` : ''}).`);
+      return;
+    }
     downloadText(filename, exportBriefingCsv(onlyCsvRows(exportRows)));
     setAnnouncement(`${filename} gerado com ${exportRows.length} ${exportRows.length === 1 ? 'linha' : 'linhas'} de ${weekKeys.size} ${weekKeys.size === 1 ? 'semana' : 'semanas'}.`);
     void recordExport(filename, exportRows, []);
@@ -1062,21 +1087,22 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 {taxonomyState === 'error' && <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"><span>Não foi possível carregar a taxonomia de activities.</span><button type="button" onClick={() => void refreshTaxonomy()} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-bold"><RefreshCw size={12}/>Tentar novamente</button></div>}
               </CollapsibleBlock>
 
-              {EDITOR_SECTIONS.filter((section) => section.id !== 'pool' || (usesTopoV10 && selected.__meta.partner === 'Plurix')).map((section) => {
-                const isContentBlock = structureNum[section.id] != null && section.id !== 'pool';
+              {EDITOR_SECTIONS.filter((section) => (section.id !== 'pool' || (usesTopoV10 && selected.__meta.partner === 'Plurix')) && (section.id !== 'limit' || usesLimitMessage)).map((section) => {
+                const isContentBlock = structureNum[section.id] != null && section.id !== 'pool' && section.id !== 'limit';
                 const lockedFields = isContentBlock ? (section.fields ?? []).filter((field) => !isColumnEditable(field)) : [];
                 const imageLocked = isContentBlock && section.imageSlot ? !isColumnEditable(section.imageSlot.image) : false;
                 return (
                 <CollapsibleBlock key={section.id} id={`eb-${section.id}`} marker={<BlockMarker num={structureNum[section.id]}/>} focused={activeStructureBlock === section.id} onHoverChange={structureNum[section.id] ? (hovering) => setEditorHoverBlock(hovering ? section.id : null) : undefined} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
                   {(lockedFields.length > 0 || imageLocked) && <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-600"><Lock size={12} className="mt-px shrink-0"/><span>Parte deste bloco é fixa no template <b>{templateSlots.find((slot) => slot.id === linkedTemplateId)?.name}</b> — vem direto do HTML/AMPscript e não pode ser ajustada aqui. Para mudar, troque o template ou edite o Template-fonte.</span></p>}
                   {section.id === 'pool' && <PoolOfferEditorCard offer={topoPreview?.offer ?? null} offers={poolOffers} signatureKey={selected.NM_PRODUTO_INTERNO} signatureLabel={selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO} date={previewSendDate} onDateChange={setPreviewSendDate} buttonLink={selected.LINK_CTA_1} onManage={() => setMode('topo')}/>}
+                  {section.id === 'limit' && <LimitMessageEditor value={selected.MENSAGEM_LIMITE} issues={selectedIssues.filter((issue) => issue.field === 'MENSAGEM_LIMITE')} networkCount={rows.filter((row) => row.__meta.status !== 'archived' && row.__meta.campaignGroupId === selected.__meta.campaignGroupId).length} sampleName={subscriber.PRI_NOME} sampleLimit={subscriber.LIMITE} onChange={(value) => updateField('MENSAGEM_LIMITE', value)}/>}
                   {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
                   {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)} locked={isContentBlock && !isColumnEditable(field)}/>)}</div>}
                   {section.id === 'message' && <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
                     <p className="mb-2 text-[11px] font-semibold text-slate-500">Amostra usada só na simulação da prévia — equivale aos dados do Test Send do SFMC, não vai no CSV.</p>
                     <div className="grid gap-3 md:grid-cols-2">
                       <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/>
-                      <MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
+                      <LimitTestInput value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
                       {usesTopoV10 && <MiniInput label="Data de envio simulada" type="date" value={previewSendDate} onChange={(value) => setPreviewSendDate(value || new Date().toISOString().slice(0, 10))}/>}
                     </div>
                     {usesTopoV10 && <p className="mt-2 text-[11px] leading-4 text-slate-500">Template V10: com limite preenchido, a faixa de limite pré-aprovado aparece em todos os e-mails. A data define a oferta do pool no bloco 3{topoPreview?.offer ? `: nessa data o bloco mostra ${topoPreview.offer.productName}, a partir de R$ ${topoPreview.offer.priceText}.` : ': nessa data não há oferta vigente para esta rede, então o bloco não aparece.'}</p>}
@@ -1140,7 +1166,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
             <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{selected.PRE_CABECALHO || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo</span>}</span></div>
           </div>
-          <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><MiniInput label="Limite de teste" value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
+          <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><LimitTestInput value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
         </div>
         <div className="min-h-0 flex-1 overflow-auto bg-slate-100">{render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <EmailPreviewFrame html={render.html} contextKey={`${previewContextKey}::expanded`} className="h-[72vh] w-full bg-slate-100"/>}</div>
       </section>

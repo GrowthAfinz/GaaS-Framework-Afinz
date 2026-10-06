@@ -172,6 +172,8 @@ export const sharedFields: BriefingColumn[] = [
   'TITULO_COPY_2', 'COR_TITULO_COPY_2', 'TAMANHO_DA_FONTE_TITULO_COPY_2', 'COPY_2_PRETO',
   'COR_COPY_2', 'TAMANHO_DA_FONTE_COPY_2', 'TITULO_CTA_2', 'BANNER_2_CORPO',
   'NOTA_LEGAL', 'COR_NOTA_LEGAL', 'TAMANHO_DA_FONTE_NOTA_LEGAL',
+  // Uma mensagem por e-mail, igual nas seis redes daquele toque.
+  'MENSAGEM_LIMITE',
 ];
 
 export const signatureFields: BriefingColumn[] = [

@@ -1,0 +1,951 @@
+{
+  "contract": "fabrica-xlsx-import/1",
+  "status": "draft",
+  "source": {
+    "file": "Regua_Plurix_TopoFunil_Proposta_Outubro26_v4.xlsx",
+    "sheet": "TOPO CRM 3",
+    "sha256": "56dba421bbf3f80ddd9114dd6b8737fdda1801bc2815c27f3a6ecc9cc8b83052",
+    "readAt": "2026-10-06T19:58:07-03:00",
+    "reader": "claude-opus-5-5"
+  },
+  "ruler": {
+    "name": "TOPO DE FUNIL (CRM) 3",
+    "segment": "CRM 3",
+    "tpCampanha": "CRM",
+    "businessClassification": "CRM",
+    "partner": "Plurix",
+    "product": "+amigo",
+    "templateSlotId": "builtin-plurix-v12"
+  },
+  "touches": [
+    {
+      "sequence": "E-mail 1",
+      "weekKey": "Semana 1",
+      "shared": {
+        "ASSUNTO": {
+          "value": "+5% de desconto em produtos selecionados 🤫",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F20"
+        },
+        "PRE_CABECALHO": {
+          "value": "Só quem tem o cartão +amigo tem!",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F21"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Parabéns, {{nome}}! Você tem R$ {{limite}} de limite pré-aprovado no cartão +amigo.",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F22"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Conheça os benefícios do cartão +amigo",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F23"
+        },
+        "COPY_1_PRETO": {
+          "value": "O cartão +amigo já está disponível. Conheça os benefícios:",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F24"
+        },
+        "TITULO_CTA_1": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F25"
+        },
+        "TITULO_COPY_2": {
+          "value": "Saiba como solicitar seu cartão +amigo",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F26"
+        },
+        "COPY_2_PRETO": {
+          "value": "Viu como é fácil?<br>Comece a aproveitar todos os benefícios hoje mesmo!",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F27"
+        },
+        "TITULO_CTA_2": {
+          "value": "PEDIR CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!F28"
+        },
+        "NOTA_LEGAL": {
+          "value": "Consulte termos e condições em: https://clubemaisamigo.com.br/cartao",
+          "origin": "governed",
+          "source": "Cadastro governado (TOPO CRM 3!F29)"
+        },
+        "DT_INICIO": {
+          "value": "2026-08-17T00:00",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F33)"
+        },
+        "DT_FIM": {
+          "value": "2028-10-01T23:59",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F34)"
+        },
+        "CARTAO_NM_COMERCIAL": {
+          "value": "+amigo",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F35)"
+        },
+        "HEADER": {
+          "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/header-semana1-i2.png",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F36)"
+        },
+        "COR_COPY_1": {
+          "value": "#2C3490",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F37)"
+        },
+        "TAMANHO_DA_FONTE_TITULO_COPY_1": {
+          "value": "24",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F38)"
+        },
+        "COR_COPY_PRETO_1": {
+          "value": "#242424",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F39)"
+        },
+        "TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1": {
+          "value": "18",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F40)"
+        },
+        "COR_TITULO_COPY_2": {
+          "value": "#2C3490",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F41)"
+        },
+        "TAMANHO_DA_FONTE_TITULO_COPY_2": {
+          "value": "28",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F42)"
+        },
+        "COR_COPY_2": {
+          "value": "#2C3490",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F43)"
+        },
+        "TAMANHO_DA_FONTE_COPY_2": {
+          "value": "16",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F44)"
+        },
+        "BANNER_2_CORPO": {
+          "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/como-solicitar-cartao.png",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F45)"
+        },
+        "COR_NOTA_LEGAL": {
+          "value": "#242424",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F46)"
+        },
+        "TAMANHO_DA_FONTE_NOTA_LEGAL": {
+          "value": "10",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!F47)"
+        }
+      },
+      "variants": [
+        {
+          "network": "AMIGAO",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL1_AMIGAO",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F54)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F55)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F56)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/beneficios-cartao-basicos-semana1-i2.png",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F57)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F58)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F59)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/footer-amigao.png",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F60)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://www.amigao.com/",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F61)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!F62)"
+            }
+          }
+        },
+        {
+          "network": "BOA",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL1_BOA",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F65)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F66)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F67)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/beneficios-cartao-flv-semana1-i2.png",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F68)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F69)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F70)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20241125-EM-BOA-TEMPLATE-BLACK_FRIDAY_BANCO_DE_OFERTAS/footer-hd.png",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F71)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://www.boasupermercados.com.br/",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F72)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!F73)"
+            }
+          }
+        },
+        {
+          "network": "AVENIDA",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL1_AVENIDA",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F76)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F77)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F78)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/beneficios-cartao-basicos-semana1-i2.png",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F79)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F80)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F81)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20241125-EM-AVE-TEMPLATE-BLACK_FRIDAY_BANCO_DE_OFERTAS/footer-avenida.png",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F82)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://loja.supermercadosavenida.com.br/",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F83)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!F84)"
+            }
+          }
+        },
+        {
+          "network": "COMPRE MAIS",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL1_COMPRE_MAIS",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F87)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F88)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F89)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/beneficios-cartao-basicos-semana1-i2.png",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F90)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F91)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F92)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F93)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F94)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!F95)"
+            }
+          }
+        },
+        {
+          "network": "PARANA",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL1_PARANA",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F98)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F99)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F100)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/beneficios-cartao-basicos-semana1-i2.png",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F101)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F102)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F103)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/footer-parana.png",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F104)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://www.paranasupermercados.com.br",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F105)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!F106)"
+            }
+          }
+        },
+        {
+          "network": "SUPERPAO",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL1_SUPERPAO",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F109)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F110)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F111)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-01/beneficios-cartao-basicos-semana1-i2.png",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F112)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F113)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D01",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F114)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F115)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F116)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!F117)"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "sequence": "E-mail 2",
+      "weekKey": "Semana 1",
+      "shared": {
+        "ASSUNTO": {
+          "value": "O cartão +amigo tem benefícios para você!",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G20"
+        },
+        "PRE_CABECALHO": {
+          "value": "Ative +5% de desconto em produtos selecionados",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G21"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Boa notícia, {{nome}}: você tem R$ {{limite}} de limite pré-aprovado para pedir seu cartão +amigo.",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G22"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Só com o cartão +amigo você economiza ainda mais",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G23"
+        },
+        "COPY_1_PRETO": {
+          "value": "O cartão +amigo está sempre ao seu lado, oferecendo descontos e benefícios que vão além das compras do dia a dia.",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G24"
+        },
+        "TITULO_CTA_1": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G25"
+        },
+        "TITULO_COPY_2": {
+          "value": "Só quem tem o cartão +amigo, aproveita mais:",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G26"
+        },
+        "COPY_2_PRETO": {
+          "value": "<b>•   +5% de desconto</b> em Carnes e Aves Frescas<br><b>•   +5% de desconto</b> em Leite, Arroz e Feijão<br><b>•      Até 70% de desconto</b> em consultas e exames",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G27"
+        },
+        "TITULO_CTA_2": {
+          "value": "PEDIR AGORA MEU CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "TOPO CRM 3!G28"
+        },
+        "NOTA_LEGAL": {
+          "value": "Consulte termos e condições em: https://clubemaisamigo.com.br/cartao",
+          "origin": "governed",
+          "source": "Cadastro governado (TOPO CRM 3!G29)"
+        },
+        "DT_INICIO": {
+          "value": "2026-08-17T00:00",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G33)"
+        },
+        "DT_FIM": {
+          "value": "2028-10-01T23:59",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G34)"
+        },
+        "CARTAO_NM_COMERCIAL": {
+          "value": "+amigo",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G35)"
+        },
+        "HEADER": {
+          "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-02/header02-semana1-i1.png",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G36)"
+        },
+        "COR_COPY_1": {
+          "value": "#2C3490",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G37)"
+        },
+        "TAMANHO_DA_FONTE_TITULO_COPY_1": {
+          "value": "24",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G38)"
+        },
+        "COR_COPY_PRETO_1": {
+          "value": "#242424",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G39)"
+        },
+        "TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1": {
+          "value": "18",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G40)"
+        },
+        "COR_TITULO_COPY_2": {
+          "value": "#242424",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G41)"
+        },
+        "TAMANHO_DA_FONTE_TITULO_COPY_2": {
+          "value": "28",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G42)"
+        },
+        "COR_COPY_2": {
+          "value": "#242424",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G43)"
+        },
+        "TAMANHO_DA_FONTE_COPY_2": {
+          "value": "17",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G44)"
+        },
+        "BANNER_2_CORPO": {
+          "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-02/imagem-cartoes.png",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G45)"
+        },
+        "COR_NOTA_LEGAL": {
+          "value": "#242424",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G46)"
+        },
+        "TAMANHO_DA_FONTE_NOTA_LEGAL": {
+          "value": "10",
+          "origin": "governed",
+          "source": "Briefings CRM E-mail 1 (grupo efbb143d) e E-mail 2 (grupo 4e90d050), testados com a V11 em 06/10/2026 (TOPO CRM 3!G47)"
+        }
+      },
+      "variants": [
+        {
+          "network": "AMIGAO",
+          "fields": {
+            "ASSUNTO": {
+              "value": "O Amigão tem um cartão para você!",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G53)"
+            },
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL2_AMIGAO",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G54)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G55)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G56)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G57)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G58)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G59)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/footer-amigao.png",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G60)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://www.amigao.com/",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G61)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Amigão: E-mail 1 id 28de81ba v6 · E-mail 2 id 96a6450a v4 (TOPO CRM 3!G62)"
+            }
+          }
+        },
+        {
+          "network": "BOA",
+          "fields": {
+            "ASSUNTO": {
+              "value": "O Boa Supermercados tem um cartão para você!",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G64)"
+            },
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL2_BOA",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G65)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G66)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G67)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G68)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G69)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G70)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20241125-EM-BOA-TEMPLATE-BLACK_FRIDAY_BANCO_DE_OFERTAS/footer-hd.png",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G71)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://www.boasupermercados.com.br/",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G72)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Boa: E-mail 1 id cf140da1 v6 · E-mail 2 id 6a582c01 v4 (TOPO CRM 3!G73)"
+            }
+          }
+        },
+        {
+          "network": "AVENIDA",
+          "fields": {
+            "ASSUNTO": {
+              "value": "O Supermercados Avenida tem um cartão para você!",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G75)"
+            },
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL2_AVENIDA",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G76)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G77)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G78)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G79)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G80)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G81)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20241125-EM-AVE-TEMPLATE-BLACK_FRIDAY_BANCO_DE_OFERTAS/footer-avenida.png",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G82)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://loja.supermercadosavenida.com.br/",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G83)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Avenida: E-mail 1 id 8034bf3a v6 · E-mail 2 id fbb01c00 v4 (TOPO CRM 3!G84)"
+            }
+          }
+        },
+        {
+          "network": "COMPRE MAIS",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL2_COMPRE_MAIS",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G87)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G88)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G89)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G90)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G91)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G92)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G93)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G94)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Compre Mais: E-mail 1 id 639980bb v8 · E-mail 2 id 882604c5 v5 (TOPO CRM 3!G95)"
+            }
+          }
+        },
+        {
+          "network": "PARANA",
+          "fields": {
+            "ASSUNTO": {
+              "value": "O Paraná tem um cartão para você!",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G97)"
+            },
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL2_PARANA",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G98)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G99)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G100)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G101)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G102)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G103)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/footer-parana.png",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G104)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "https://www.paranasupermercados.com.br",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G105)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Paraná: E-mail 1 id ad1db2bd v6 · E-mail 2 id 5524a5cf v4 (TOPO CRM 3!G106)"
+            }
+          }
+        },
+        {
+          "network": "SUPERPAO",
+          "fields": {
+            "UTM_CAMPANHA": {
+              "value": "PLURIX_CRM_SEMANA1_EMAIL2_SUPERPAO",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G109)"
+            },
+            "LINK_CTA_1": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G110)"
+            },
+            "LINK_CTA_2": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G111)"
+            },
+            "BANNER_1_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G112)"
+            },
+            "LINK_BANNER_1_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G113)"
+            },
+            "LINK_BANNER_2_CORPO": {
+              "value": "https://mais-amigo.onelink.me/YU3C/t6v9cyos?c=plx_topo_de_funil_padrao&af_sub1=crm&af_sub2=s1&af_sub3=plx_email_padrao_bsp_S1D02",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G114)"
+            },
+            "BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G115)"
+            },
+            "LINK_BANNER_3_CORPO": {
+              "value": "",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G116)"
+            },
+            "RODAPE": {
+              "value": "Enviado por Banco Afinz S.A - Banco Múltiplo - CNPJ: 04.814.563/0001-74<br>Afinz Instituição de Pagamento S.A - CNPJ: 60.114.865/0001-00<br>Rua XV de Novembro, 45 - Sorocaba, SP",
+              "origin": "governed",
+              "source": "Briefing CRM Superpão: E-mail 1 id 473c68b7 v7 · E-mail 2 id 5e4b5c07 v5 (TOPO CRM 3!G117)"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pendencies": [
+    {
+      "severity": "review",
+      "scope": "E-mail 1 e 2",
+      "field": "NOTA_LEGAL",
+      "message": "A faixa fala em limite pré-aprovado, mas a nota legal atual não diz \"Sujeito a análise de crédito\". Confirmar com o jurídico antes do envio."
+    },
+    {
+      "severity": "review",
+      "scope": "E-mail 1 e 2",
+      "field": "MENSAGEM_LIMITE",
+      "message": "Textos iniciais para revisão editorial. Conferir tom e a promessa de pré-aprovação."
+    },
+    {
+      "severity": "review",
+      "scope": "Compre Mais e Superpão",
+      "field": "BANNER_3_CORPO",
+      "message": "Sem assinatura de rede, como na régua CRM atual (transição de marca)."
+    },
+    {
+      "severity": "review",
+      "scope": "Régua",
+      "field": "TP_CAMPANHA",
+      "message": "Estas linhas usam a mesma chave das CRM E1/E2. Exportar só uma das duas réguas: a importação substitui a linha na DE."
+    },
+    {
+      "severity": "review",
+      "scope": "SFMC",
+      "field": "MENSAGEM_LIMITE",
+      "message": "Criar a coluna MENSAGEM_LIMITE (Texto 300, anulável) na DE de briefing antes de importar o CSV de 37 colunas."
+    },
+    {
+      "severity": "review",
+      "scope": "Jornada",
+      "field": "SEQUENCIA",
+      "message": "A DE ESTADO_SEQUENCIA_CRM guarda uma posição por CPF: só um percurso pode controlar esse estado para cada contato."
+    },
+    {
+      "severity": "review",
+      "scope": "Template",
+      "message": "A V11 foi validada no SFMC em 06/10/2026 (E-mail 1 e 2 pelo mesmo motor). A V12 ainda não teve Test Send: continua candidata."
+    }
+  ]
+}
