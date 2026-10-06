@@ -1,4 +1,5 @@
 import type { BriefingRow } from '../domain/briefing';
+import { formatLimite } from '../domain/topoPlurixV10';
 
 export interface SubscriberSample { CPF: string; PRI_NOME: string; LIMITE: string; PRODUTO: string; SEQUENCIA: string; TP_CAMPANHA: string }
 export interface RenderResult { html: string; diagnostics: string[] }
@@ -21,6 +22,9 @@ const MAX_RECURSION = 8;
 function subscriberValue(subscriber: SubscriberSample, field: string): string {
   const normalized = field.trim().toUpperCase();
   if (normalized === '_SUBSCRIBERKEY') return subscriber.CPF;
+  if (normalized === 'FIRST_NAME') return subscriber.PRI_NOME;
+  if (normalized === 'LIMITE_CRD') return subscriber.LIMITE;
+  if (normalized === 'INVESTIDA') return subscriber.PRODUTO;
   return subscriber[normalized as keyof SubscriberSample] ?? '';
 }
 
@@ -52,6 +56,15 @@ function readVars(source: string, row: BriefingRow, subscriber: SubscriberSample
   }
   for (const match of source.matchAll(/SET\s+@(\w+)\s*=\s*(?:Trim\s*\(\s*)?Field\s*\(\s*@Row\s*,\s*["']([^"']+)["']\s*\)\s*\)?/gi)) {
     vars[match[1]] = String(row[match[2] as keyof BriefingRow] ?? '').trim();
+  }
+  // V11 previews the selected state sample; it does not execute live SFMC lookups.
+  if (source.includes('SET @DE_ESTADO = "ESTADO_SEQUENCIA_CRM"')) {
+    vars.FirstName = subscriber.PRI_NOME.trim().toLocaleLowerCase('pt-BR')
+      .replace(/(^|\s)(\S)/g, (_, space: string, letter: string) => space + letter.toLocaleUpperCase('pt-BR'));
+    vars.Sequencia = subscriber.SEQUENCIA;
+    vars.HeaderModo = /^https:\/\//i.test(row.HEADER.trim()) ? 'imagem' : '';
+    const limit = subscriber.LIMITE.trim();
+    vars.LimiteFmt = /^[0-9]+(\.[0-9]{1,2})?$/.test(limit) && Number(limit) > 0 ? formatLimite(limit) : '';
   }
   return vars;
 }
