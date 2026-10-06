@@ -119,16 +119,16 @@ export function validateRows(rows: BriefingRow[], today = new Date()): Map<strin
       issues.push({ severity: 'warning', code: 'name-repeated', field: 'COPY_1_PRETO', message: 'O nome já aparece na faixa de limite e se repete no corpo. Revise o texto para não chamar a pessoa pelo nome duas vezes.' });
     }
     (['NM_PRODUTO_INTERNO', 'UTM_CAMPANHA'] as BriefingColumn[]).forEach((field) => {
-      if (PLACEHOLDERS.has(row[field].trim().toUpperCase())) issues.push({ severity: 'error', code: 'placeholder', field, message: `${field} precisa de um valor definitivo.` });
+      if (PLACEHOLDERS.has((row[field] ?? "").trim().toUpperCase())) issues.push({ severity: 'error', code: 'placeholder', field, message: `${field} precisa de um valor definitivo.` });
     });
     TEXT_FIELDS.forEach((field) => {
-      const value = row[field];
+      const value = row[field] ?? "";
       const invalidTokens = [...value.matchAll(/%%(?![=\[])([A-Z_]+)%%/gi)];
       if (invalidTokens.length) issues.push({ severity: 'error', code: 'personalization', field, ...(invalidTokens.every((token) => PERSONALIZATION_ALIASES.has(token[1].toUpperCase())) ? { fix: 'personalization' as const } : {}), message: `${field} contém personalização incompatível com TreatAsContent.` });
       if (/\r|\n/.test(value)) issues.push({ severity: 'warning', code: 'newline', field, fix: 'newlines', message: `${field} contém quebra de linha crua; converta para <br>.` });
     });
     (['HEADER', 'BANNER_1_CORPO', 'BANNER_2_CORPO', 'BANNER_3_CORPO'] as BriefingColumn[]).forEach((field) => {
-      const value = row[field].trim();
+      const value = (row[field] ?? "").trim();
       if (field === 'HEADER' && HEADER_CODE_PATTERN.test(value.toUpperCase())) {
         issues.push({ severity: 'warning', code: 'header-variant', field, message: `HEADER usa a variação dinâmica ${value.toUpperCase()}: só é exibida com o template PLURIX V10 e com a variação ativa na DE TB_HEADER_VARIACOES.` });
         return;

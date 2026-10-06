@@ -1,4 +1,4 @@
-import type { BriefingColumn, BriefingRow } from './briefing';
+import { BRIEFING_COLUMNS, type BriefingColumn, type BriefingRow } from './briefing';
 
 export const PLURIX_SIGNATURES = [
   { key: 'AMIGAO', label: 'Amigão' },
@@ -150,7 +150,14 @@ export const withMeta = (row: BriefingRow, patch: Partial<EditorialMeta> = {}): 
   __meta: { ...emptyMeta(), ...patch },
 });
 
-export const normalizeLegacyRows = (rows: BriefingRow[] | WorkspaceBriefing[]): WorkspaceBriefing[] => rows.map((row) => {
+// Cópias antigas em cache (localStorage) podem não ter colunas novas, como MENSAGEM_LIMITE.
+const withAllColumns = <T extends BriefingRow>(row: T): T => {
+  const missing = BRIEFING_COLUMNS.filter((column) => typeof row[column] !== 'string');
+  return missing.length ? { ...row, ...Object.fromEntries(missing.map((column) => [column, String(row[column] ?? '')])) } : row;
+};
+
+export const normalizeLegacyRows = (rows: BriefingRow[] | WorkspaceBriefing[]): WorkspaceBriefing[] => rows.map((source) => {
+  const row = withAllColumns(source);
   const candidate = row as WorkspaceBriefing;
   if (candidate.__meta) return candidate;
   return withMeta(row, {
