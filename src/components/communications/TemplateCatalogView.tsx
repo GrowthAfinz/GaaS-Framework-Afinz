@@ -6,6 +6,8 @@ import { AddAssetModal } from './AddAssetModal';
 import { TemplateIdChips } from './TemplateIdChips';
 import { parseSeqParts, translateTemplateId } from '../../utils/taxonomy';
 
+import { PackageContentLibrary } from './PackageContentLibrary';
+
 type CatalogSort = 'moment' | 'recent' | 'channel' | 'segment';
 const segmentOf = (t: CatalogTemplate) => translateTemplateId(t.template_id).find((part) => part.key === 'segmento')?.value || t.segmento_af_sub1 || '—';
 const subgroupOf = (t: CatalogTemplate) => {
@@ -102,6 +104,7 @@ export const TemplateCatalogView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <PackageContentLibrary templateIds={allVisible.map(t => t.template_id)} />
       {activeFilterLabels.length > 0 && (
         <div className="rounded-xl border border-cyan-100 bg-cyan-50/60 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">

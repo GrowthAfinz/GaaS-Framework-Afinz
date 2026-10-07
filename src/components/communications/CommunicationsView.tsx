@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { ArrowRight, ClipboardCheck, Inbox, Loader2, Radio, UploadCloud, X, type LucideIcon } from 'lucide-react';
 import { useReconciliation, type CatalogEntry, type OrphanRow } from '../../hooks/useReconciliation';
 import { useAppStore } from '../../store/useAppStore';
@@ -10,6 +10,8 @@ import { TemplateComposerDrawer } from './TemplateComposerDrawer';
 import { TemplateIdChips } from './TemplateIdChips';
 import { PerformanceView } from './performance/PerformanceView';
 import { AppsFlyerAuditView } from './appsflyer-audit/AppsFlyerAuditView';
+
+const PackageImportModal = lazy(() => import('./PackageImportModal').then(m => ({ default: m.PackageImportModal })));
 
 interface CommunicationsViewProps {
   mode: 'cadastro' | 'performance' | 'appsflyer-audit';
@@ -28,6 +30,8 @@ export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) 
 };
 
 const CadastroTemplates: React.FC = () => {
+  const [packageOpen, setPackageOpen] = useState(false);
+  const [catalogRevision, setCatalogRevision] = useState(0);
   const [tab, setTab] = useState<SubTab>('fila');
   const [compose, setCompose] = useState<OrphanRow | null | undefined>(undefined); // undefined=fechado, null=novo, orphan=seed
   const [queueChannel, setQueueChannel] = useState<string | null>(null); // filtro de canal vindo do header de cobertura
@@ -45,14 +49,14 @@ const CadastroTemplates: React.FC = () => {
 
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
     { id: 'fila', label: 'Fila de reconciliação', icon: Inbox, n: coverage.orfaos },
-    { id: 'asset', label: 'Templates sem peça', icon: UploadCloud, n: coverage.semAsset },
+    { id: 'asset', label: 'Templates', icon: UploadCloud, n: coverage.semAsset },
     { id: 'auditoria', label: 'Auditoria', icon: ClipboardCheck, n: reconciled.length },
   ];
 
   return (
     <div className="relative flex h-full flex-col">
       <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <h2 className="text-2xl font-bold text-slate-900">Cadastro e templates</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-bold text-slate-900">Cadastro e templates</h2><button onClick={() => setPackageOpen(true)} className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white">Importar pacote SFMC</button></div>
         <p className="mt-0.5 text-sm text-slate-500">Costure os disparos do CRM aos templates curados · governança de peças e cobertura de réguas</p>
       </div>
 
@@ -99,12 +103,14 @@ const CadastroTemplates: React.FC = () => {
                   onChanged={refetch}
                 />
               )}
-              {tab === 'asset' && <TemplateCatalogView />}
+              {tab === 'asset' && <TemplateCatalogView key={catalogRevision} />}
               {tab === 'auditoria' && <ReconciliationAudit rows={reconciled} catalog={catalog} onChanged={refetch} />}
             </div>
           </>
         )}
       </div>
+
+      {packageOpen && <Suspense fallback={<p role="status" className="p-4 text-sm">Carregando importação...</p>}><PackageImportModal onClose={() => setPackageOpen(false)} onChanged={() => { refetch(); setCatalogRevision(v => v + 1); }} /></Suspense>}
 
       {compose !== undefined && (
         <TemplateComposerDrawer seed={compose} onClose={() => setCompose(undefined)} onSaved={() => { setCompose(undefined); refetch(); }} />

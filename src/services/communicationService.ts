@@ -208,6 +208,7 @@ export async function saveCommunication(input: SaveCommunicationInput): Promise<
       .from('activities')
       .update({ template_id: templateId, updated_at: new Date().toISOString() })
       .eq('"Activity name / Taxonomia"', input.activityName)
+      .is('template_id', null)
       .select('id');
     if (linkError) throw linkError;
 
@@ -312,7 +313,7 @@ export async function addAssetToTemplate(input: AddAssetInput): Promise<{ storag
     for (const an of input.linkActivityNames ?? []) {
       const { data } = await supabase.from('activities')
         .update({ template_id: input.templateId, updated_at: new Date().toISOString() })
-        .eq('"Activity name / Taxonomia"', an).select('id');
+        .eq('"Activity name / Taxonomia"', an).is('template_id', null).select('id');
       linked += data?.length ?? 0;
     }
     return { storagePath: uploadedPath, activitiesLinked: linked };
@@ -346,6 +347,7 @@ export async function linkActivityToTemplate(activityName: string, templateId: s
     .from('activities')
     .update({ template_id: templateId, updated_at: new Date().toISOString() })
     .eq('"Activity name / Taxonomia"', activityName)
+    .is('template_id', null)
     .select('id');
   if (error) throw error;
   return data?.length ?? 0;

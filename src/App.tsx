@@ -298,7 +298,7 @@ function App() {
   const resultados = useResultadosMetrics(filteredData);
 
   const hasData = Object.keys(data).length > 0 || Object.keys(rentabilizacaoData).length > 0;
-  const canRenderWithoutFrameworkData = activeTab === 'aprendizado-growth';
+  const canRenderWithoutFrameworkData = activeTab === 'aprendizado-growth' || activeTab === 'comunicacoes' || activeTab === 'comunicacoes-cadastro';
 
   if (import.meta.env.DEV && urlHash === '#funil-preview') {
     return (

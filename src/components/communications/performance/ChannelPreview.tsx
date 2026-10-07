@@ -5,6 +5,8 @@ import { getSignedUrl } from '../../../services/communicationService';
 import { isEmailChannel } from '../../../utils/inferChannel';
 import { CHANNELS, channelKeyOf } from './perfModel';
 
+import { TemplateTextPreview } from '../previews/TemplateTextPreview';
+
 const CHANNEL_ICON = {
   email: Mail,
   whatsapp: MessageCircle,
@@ -59,13 +61,7 @@ export const ChannelPreview: React.FC<{ item: TemplatePerformance; width?: numbe
   };
 
   if (!path || failed) {
-    return (
-      <div style={{ ...frame, background: `linear-gradient(170deg, ${ch.tint}, #fff 72%)` }} className="flex flex-col items-center justify-center gap-3 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl text-white" style={{ background: ch.color }}><FileImage size={22} /></span>
-        <p className="px-6 text-xs font-semibold text-slate-500">Sem peça vinculada para este {ch.label}.</p>
-        <p className="px-8 text-[11px] leading-snug text-slate-400">Anexe o criativo no Cadastro para ver o preview real aqui.</p>
-      </div>
-    );
+    return <div style={frame} className="overflow-y-auto p-2"><TemplateTextPreview templateId={item.template.template_id} /></div>;
   }
 
   if (email) {
@@ -76,7 +72,7 @@ export const ChannelPreview: React.FC<{ item: TemplatePerformance; width?: numbe
   if (!url) return <div style={frame} className="flex items-center justify-center bg-slate-50 text-slate-300"><Loader2 size={22} className="animate-spin" /></div>;
   return (
     <div style={frame} className="flex items-start justify-center bg-white">
-      <img src={url} alt={item.template.template_id} className="h-full w-full object-contain object-top" />
+      <img src={url} onError={() => setFailed(true)} alt={item.template.template_id} className="h-full w-full object-contain object-top" />
     </div>
   );
 };
