@@ -10,7 +10,7 @@ Governança: GOVERNANÇA_LINKS_E_TEMPLATES (5).xlsx e skill gaas-template-reconc
 
 ## Motor
 
-communicationOrchestrationService consulta todas as colunas do universo relevante de activities, paginado em lotes, por nomes de atividade e jornadas dos packs, e os communication_slots existentes. Remove duplicação por activities.id. RLS do projeto é preservada. Nenhuma nova migration ou escrita operacional é necessária para calcular a fila.
+communicationOrchestrationService consulta todas as colunas do universo relevante de activities, paginado em lotes, por nomes de atividade e jornadas dos packs, e os communication_slots existentes. Remove duplicação por activities.id. O filtro PostgREST da coluna "Activity name / Taxonomia" utiliza o identificador entre aspas; o QA rejeita a forma sem aspas, que falhou na primeira conferência de produção. Oferta e Promocional recebem rótulos canônicos na UI para evitar opções duplicadas por caixa/acentuação, preservando valores/fontes originais nas evidências. RLS do projeto é preservada. Nenhuma nova migration ou escrita operacional é necessária para calcular a fila.
 
 communicationOrchestrator projeta dimensões com fonte por campo e valores alternativos: BU, parceiro/variante, origem cadastrada, canal, segmento, subgrupo, recência/cadência, família, Oferta, Promocional, Produto, etapa, perfil de crédito, safra e segunda oferta/promocional. N/A/vazio são ausência de evidência. O valor de apresentação não corrige silenciosamente a fonte; conflitos são destacados.
 

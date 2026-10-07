@@ -9,7 +9,7 @@ export async function readOrchestrationEvidence(rows:ProposalRow[]) {
  async function read<T>(table:string,column:string,values:string[]):Promise<T[]> {
   const result:T[]=[];
   for(let i=0;i<values.length;i+=40)for(let offset=0;;offset+=500){
-   const {data,error}=await supabase.from(table).select('*').in(column,values.slice(i,i+40)).order('id').range(offset,offset+499);
+   const {data,error}=await supabase.from(table).select('*').in(column.includes('/')?'"'+column+'"':column,values.slice(i,i+40)).order('id').range(offset,offset+499);
    if(error)throw error;result.push(...(data||[]) as T[]);if((data||[]).length<500)break;
   }
   return result;

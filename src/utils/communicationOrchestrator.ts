@@ -66,6 +66,7 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
  field('campaign','Promocional',[...col('Promocional'),analysis('campaign'),{value:/vibe/.test(raw)?'Vibe':/copa/.test(raw)?'Copa':null,source:'Jornada / Activity Name'}, {value:tpl?.dims.campanha,source:'Catálogo'}]);
  field('product','Produto',col('Produto'));field('stage','Etapa',col('Etapa de aquisição'));field('credit','Perfil de crédito',col('Perfil de Crédito'));field('cohort','Safra',col('Safra'));
  field('offer2','Oferta 2',col('Oferta 2'));field('promo2','Promocional 2',col('Promocional 2'));
+ for(const key of ['offer','offer2','campaign','promo2']){const f=fields[key];const normalized=norm(f.value);f.value=normalized==='padrao'?'Padrão':normalized==='vibe'?'Vibe':normalized==='copa'?'Copa':f.value;}
  const conflicts=Object.values(fields).filter(f=>f.conflict).map(f=>`${f.label}: ${f.value} (${f.source}) × ${f.alternatives.map(v=>v.value+' ('+v.source+')').join(' / ')}`);
  const manual=slots.find(s=>normalizeJourney(s.journey_name)===normalizeJourney(p.journey_name)&&s.activity_name===p.activity_name&&canalToId(s.channel)===canalToId(p.content.channel))?.metadata.moment_suggestion as ActivityMomentSuggestion|undefined;
  const rawNameSeq=sequence(parseSeq(p.activity_name));
