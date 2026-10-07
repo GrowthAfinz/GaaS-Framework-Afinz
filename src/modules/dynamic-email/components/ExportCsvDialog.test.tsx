@@ -22,15 +22,16 @@ describe('ExportCsvDialog', () => {
     const html = render();
     expect(html).toContain('Bem Barato');
     expect(html).toContain('Plurix');
-    expect(html).toContain('Semana 1');
-    expect(html).toContain('Semana 4');
+    // Semanas começam recolhidas; a régua mostra o resumo.
+    expect(html).not.toContain('Semana 1');
+    expect(html).toContain('4 semanas · 8 e-mails · 8 linhas');
     expect(html).toContain('Exportar CSV para o SFMC');
   });
 
   it('mostra e-mails e linhas separados, com a multiplicação do Plurix', () => {
     const html = render();
-    expect(html).toContain('2 e-mails · 2 linhas'); // semana Bem Barato
-    expect(html).toContain('2 e-mails · 12 linhas'); // semana Plurix, 6 assinaturas
+    expect(html).toContain('4 semanas · 8 e-mails · 8 linhas'); // régua Bem Barato
+    expect(html).toContain('2 semanas · 4 e-mails · 24 linhas'); // régua Plurix, 6 assinaturas
   });
 
   it('marca tudo que está pronto por padrão e soma as linhas', () => {

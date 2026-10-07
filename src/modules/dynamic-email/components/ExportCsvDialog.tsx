@@ -40,6 +40,13 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
 
   const [selection, setSelection] = useState<Set<string>>(() => allSelectableKeys(tree));
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Semanas começam recolhidas: abre-se só a régua que precisa de ajuste fino.
+  const [openRulers, setOpenRulers] = useState<Set<string>>(new Set());
+  const toggleRuler = (key: string) => setOpenRulers((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
 
   // A árvore pode mudar embaixo do diálogo (correção de erro, arquivamento).
   useEffect(() => { setSelection((current) => pruneSelection(tree, current)); }, [tree]);
@@ -103,15 +110,29 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
                 </div>
 
                 {open && <div className="border-t border-slate-100 px-3 py-2">
-                  {partner.rulers.map((ruler) => (
+                  {partner.rulers.map((ruler) => {
+                    const rulerOpen = openRulers.has(ruler.key);
+                    const blockedInRuler = ruler.weeks.filter((week) => week.blocked).length;
+                    return (
                     <div key={ruler.key} className="mb-1.5 last:mb-0">
-                      <label className="flex items-start gap-2 rounded-lg px-1 py-1 hover:bg-slate-50">
+                      <div className="flex items-start gap-2 rounded-lg px-1 py-1 hover:bg-slate-50">
                         <TriCheckbox state={nodeState(ruler, selection)} label={`Selecionar régua ${ruler.label}`} onChange={(checked) => toggle(ruler, checked)}/>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-bold text-slate-700">{segmentLabel(ruler.label)}</span>
-                        </span>
-                      </label>
-                      <div className="ml-5 mt-0.5 space-y-0.5">
+                        <button
+                          type="button" onClick={() => toggleRuler(ruler.key)}
+                          aria-expanded={rulerOpen}
+                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+                        >
+                          {rulerOpen ? <ChevronDown size={13} className="shrink-0 text-slate-400"/> : <ChevronRight size={13} className="shrink-0 text-slate-400"/>}
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-bold text-slate-700">{segmentLabel(ruler.label)}</span>
+                            <span className="text-[11px] text-slate-500">
+                              {ruler.weeks.length} {ruler.weeks.length === 1 ? 'semana' : 'semanas'} · {ruler.emails} {ruler.emails === 1 ? 'e-mail' : 'e-mails'} · {ruler.rows} {ruler.rows === 1 ? 'linha' : 'linhas'}
+                              {blockedInRuler ? <span className="text-red-600"> · {blockedInRuler} travada{blockedInRuler === 1 ? '' : 's'}</span> : null}
+                            </span>
+                          </span>
+                        </button>
+                      </div>
+                      {rulerOpen && <div className="ml-5 mt-0.5 space-y-0.5">
                         {ruler.weeks.map((week) => (
                           <label
                             key={week.key}
@@ -134,9 +155,10 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
                               : <CheckCircle2 size={14} className={`mt-0.5 shrink-0 ${nodeState(week, selection) === 'checked' ? 'text-cyan-600' : 'text-slate-300'}`}/>}
                           </label>
                         ))}
-                      </div>
+                      </div>}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>}
               </div>
             );
@@ -198,14 +220,29 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-50 text-amber-700"><TriangleAlert size={18}/></span>
             <div className="min-w-0">
               <h3 id="sfmc-import-tips-title" className="font-bold text-slate-900">Antes de importar no SFMC</h3>
-              <p className="mt-1 text-sm leading-5 text-slate-600">O assistente de importação não guarda estas opções. Confira toda vez, senão todas as linhas são rejeitadas.</p>
+              <p className="mt-1 text-sm leading-5 text-slate-600">Na tela <b>Importar para a extensão de dados</b>, confira assim. Sem as aspas marcadas, todas as linhas são rejeitadas.</p>
             </div>
           </div>
-          <ol id="sfmc-import-tips-list" className="mt-4 space-y-2 text-sm text-slate-800">
-            <li className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"><b className="text-amber-800">1.</b><span>Marque <b>“Respeitar as aspas duplas como qualificadores de texto”</b>.</span></li>
-            <li className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"><b className="text-amber-800">2.</b><span>Delimitador: <b>vírgula</b>.</span></li>
-          </ol>
-          <p className="mt-3 text-xs leading-5 text-slate-500">Também vale conferir: modo <b>Adicionar e atualizar</b>, datas no formato mês/dia/ano e a coluna <code className="rounded bg-slate-100 px-1">MENSAGEM_LIMITE</code> mapeada.</p>
+          <div id="sfmc-import-tips-list" className="mt-4 space-y-3 text-sm text-slate-800">
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Etapa 1 · Carregar arquivo › Configurações de importação</p>
+              <p className="mt-2"><span className="text-slate-500">Tipo de Importação:</span> <b>Adicionar uma atualização</b></p>
+              <p className="mt-2 text-slate-500">Opções de Importação:</p>
+              <ul className="mt-1 space-y-1.5">
+                <li className="flex items-start gap-2"><span aria-hidden className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border border-cyan-600 bg-cyan-600 text-[10px] font-bold text-white">✓</span><span>Ignorar linhas no arquivo de importação com dados incorretos</span></li>
+                <li className="flex items-start gap-2 rounded-md bg-amber-50 px-1 py-0.5 ring-1 ring-amber-200"><span aria-hidden className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border border-cyan-600 bg-cyan-600 text-[10px] font-bold text-white">✓</span><span><b>Respeitar as aspas duplas como qualificadores de texto</b> <span className="text-xs text-amber-800">(desmarca sozinha a cada importação)</span></span></li>
+                <li className="flex items-start gap-2 text-slate-500"><span aria-hidden className="mt-0.5 h-4 w-4 shrink-0 rounded border border-slate-300 bg-white"/><span>Normalize os números com base no local <span className="text-xs">(deixe desmarcada)</span></span></li>
+              </ul>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Etapa 2 · Configurar mapeamento</p>
+              <ul className="mt-2 space-y-1">
+                <li>Delimitador: <b>Vírgula</b></li>
+                <li>Datas no formato <b>mês/dia/ano</b></li>
+                <li>Coluna <code className="rounded bg-slate-100 px-1 text-xs">MENSAGEM_LIMITE</code> mapeada para o campo de mesmo nome</li>
+              </ul>
+            </div>
+          </div>
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={() => setImportTipsOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Voltar</button>
             <button
