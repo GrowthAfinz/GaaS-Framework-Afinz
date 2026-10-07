@@ -30,7 +30,7 @@ export function wikiReading(markdown: string) {
 // Scope belongs to the destination note. The analytical month remains the reader's context.
 export function wikiNoteNavigationParams(search:string) {
   const params=new URLSearchParams(search);
-  params.delete('wiki_front');
+  for(const key of ['wiki_front','wiki_group','wiki_segment','wiki_catalog_q'])params.delete(key);
   for(const key of [...params.keys()]) if(key.startsWith('result_') && !['result_month','result_domain'].includes(key))params.delete(key);
   return params;
 }
