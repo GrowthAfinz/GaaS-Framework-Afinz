@@ -65,3 +65,7 @@ Os ZIPs versionados em fixtures foram reduzidos a entidades necessárias e não 
 
 Não há reversão automatizada pela interface; a trilha antes/depois permite preparar compensação revisada. Não há confirmação temporal automática, integração com Wiki nem substituição da evidência manual pelo parser. Não deduplicar pessoas nem interpretar preview como prova de resultado causal.
 
+
+
+## Evolução Cadastro e Templates V2 (07/10/2026)
+A revisão deixou o modal de upload e passou à fila compartilhada Propostas. IDs/contexto/revisão agora são persistidos; operador pode editar, aprovar e rejeitar. O modal recebe o arquivo e retorna à fila. Consulte [contrato da fila e publicação de análise](COMMUNICATIONS_PROPOSAL_INBOX.md) para o estado atual e a separação produtor/reviewer. Esta atualização prevalece sobre descrições anteriores da revisão em estado local.

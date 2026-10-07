@@ -20,11 +20,11 @@ export function PackageContentLibrary({ templateIds }: { templateIds: string[] }
     <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-800">Conteúdos importados do SFMC</h3><span className="text-xs text-slate-500">{new Set(visibleVersions.map(v=>v.template_id)).size} templates no recorte · {visibleVersions.length} versões</span></div>
     <p className="text-xs text-slate-500">O texto importado permite prévia sem print. A versão atual é escolhida explicitamente; o arquivo cadastrado permanece disponível.</p>
     {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
-    {!visibleVersions.length&&!error&&<p className="rounded bg-slate-50 p-3 text-sm text-slate-500">Use Importar pacote SFMC no cabeçalho para adicionar textos e estrutura de jornadas.</p>}
+    {!visibleVersions.length&&!error&&<p className="rounded bg-slate-50 p-3 text-sm text-slate-500">Nenhum texto aprovado neste recorte. Consulte as comunicações recebidas na aba Propostas.</p>}
     {visibleVersions.length>0&&<><input aria-label="Buscar conteúdo importado" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar template ID" className="w-full rounded-lg border px-3 py-2 text-sm"/>
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{ids.map(id=>{
+    <div className="space-y-1">{ids.map(id=>{
       const rows=versions.filter(v=>v.template_id===id),current=rows.find(v=>v.is_current),first=current||rows[0];
-      return <button key={id} onClick={()=>setSelected(first)} className="space-y-2 rounded-lg border p-3 text-left hover:border-cyan-400"><TemplateIdChips id={id} showId/><p className="text-xs text-slate-500">{rows.length} versão(ões) · {current?'Atual selecionada':'Escolha da atual pendente'}</p><MessagePreview content={first.payload} compact/></button>;
+      return <button key={id} onClick={()=>setSelected(first)} className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-left hover:border-cyan-400"><TemplateIdChips id={id} showId/><p className="text-xs text-slate-500">{rows.length} versão(ões) · {current?'Atual selecionada':'Escolha da atual pendente'}</p><p className="line-clamp-1 max-w-lg text-xs text-slate-600">{first.payload.body_text||'Sem texto extraído'}</p></button>;
     })}</div></>}
     {selected&&<div className="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50/20 p-4">
       <div className="flex justify-between gap-3"><TemplateIdChips id={selected.template_id} showId/><button onClick={()=>setSelected(null)} className="text-sm text-cyan-800 underline">Fechar detalhe</button></div>

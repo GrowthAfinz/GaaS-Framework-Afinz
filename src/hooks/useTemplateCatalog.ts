@@ -20,6 +20,7 @@ export function decorateTemplate(t: CommunicationTemplate): CatalogTemplate {
 
 function decorate(t: CommunicationTemplate): CatalogTemplate {
   const m = (t.metadata ?? {}) as Record<string, unknown>;
+  const resolved = (m.resolved_context || {}) as Record<string, unknown>;
   const planned = Array.isArray(m.activity_names_planejados) ? (m.activity_names_planejados as string[]) : [];
   const metadataValues = Object.values(m).flatMap((value) => Array.isArray(value) ? value : [value]);
   const searchableText = normalizeText([
@@ -28,6 +29,7 @@ function decorate(t: CommunicationTemplate): CatalogTemplate {
     t.channel,
     t.family,
     ...metadataValues,
+    ...Object.values(resolved),
     ...planned,
   ].join(' '));
   return {
@@ -36,7 +38,7 @@ function decorate(t: CommunicationTemplate): CatalogTemplate {
     app: typeof m.app === 'string' ? m.app : '',
     campanha: typeof m.campanha === 'string' ? m.campanha : '',
     semana: typeof m.semana === 'string' ? m.semana : '',
-    segmento_af_sub1: typeof m.segmento_af_sub1 === 'string' ? m.segmento_af_sub1 : '',
+    segmento_af_sub1: typeof m.segmento_af_sub1 === 'string' ? m.segmento_af_sub1 : typeof resolved.segment === 'string' ? resolved.segment : '',
     activityNamesPlanejados: planned,
     searchableText,
   };

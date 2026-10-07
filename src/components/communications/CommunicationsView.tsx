@@ -1,13 +1,13 @@
-import React, { lazy, Suspense, useMemo, useState } from 'react';
-import { ArrowRight, ClipboardCheck, Inbox, Loader2, Radio, UploadCloud, X, type LucideIcon } from 'lucide-react';
-import { useReconciliation, type CatalogEntry, type OrphanRow } from '../../hooks/useReconciliation';
-import { useAppStore } from '../../store/useAppStore';
-import { CoverageHeader } from './CoverageHeader';
+import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { ClipboardCheck, Inbox, Loader2, UploadCloud, Upload, type LucideIcon } from 'lucide-react';
+import { useReconciliation, type OrphanRow } from '../../hooks/useReconciliation';
+import { CommunicationProposalInbox } from './CommunicationProposalInbox';
+import { readProposalInbox, readProposalEvents, type ProposalRow, type ProposalEvent } from '../../services/communicationProposalService';
+import { describeError } from '../../services/communicationService';
 import { ReconciliationQueue } from './ReconciliationQueue';
 import { ReconciliationAudit } from './ReconciliationAudit';
 import { TemplateCatalogView } from './TemplateCatalogView';
 import { TemplateComposerDrawer } from './TemplateComposerDrawer';
-import { TemplateIdChips } from './TemplateIdChips';
 import { PerformanceView } from './performance/PerformanceView';
 import { AppsFlyerAuditView } from './appsflyer-audit/AppsFlyerAuditView';
 
@@ -35,45 +35,41 @@ const CadastroTemplates: React.FC = () => {
   const [tab, setTab] = useState<SubTab>('fila');
   const [compose, setCompose] = useState<OrphanRow | null | undefined>(undefined); // undefined=fechado, null=novo, orphan=seed
   const [queueChannel, setQueueChannel] = useState<string | null>(null); // filtro de canal vindo do header de cobertura
-  const [showAtivos, setShowAtivos] = useState(false); // modal "Templates no ar"
+  const [proposals, setProposals] = useState<ProposalRow[]>([]), [events, setEvents] = useState<ProposalEvent[]>([]);
+  const [proposalLoading, setProposalLoading] = useState(true), [proposalError, setProposalError] = useState('');
   const { orphans, reconciled, catalog, coverage, loading, error, refetch } = useReconciliation();
-  const setStoreTab = useAppStore((s) => s.setTab);
-  const setPerfDeepLink = useAppStore((s) => s.setPerfDeepLink);
-
-  const ativos = useMemo(() => catalog.filter((c) => c.hasAsset && c.inCurrentFilter), [catalog]);
-
-  const abrirPerformance = (templateId: string) => {
-    setPerfDeepLink({ view: 'table', query: templateId });
-    setStoreTab('comunicacoes-performance');
-  };
-
+  const refreshProposals = useCallback(async () => {
+    setProposalLoading(true); setProposalError('');
+    try { const [rows, history] = await Promise.all([readProposalInbox(), readProposalEvents()]); setProposals(rows); setEvents(history); }
+    catch (e) { setProposalError(describeError(e)); } finally { setProposalLoading(false); }
+  }, []);
+  useEffect(() => { void refreshProposals(); const changed=()=>{void refreshProposals();}; window.addEventListener('sfmc-package-changed',changed);window.addEventListener('focus',changed);return()=>{window.removeEventListener('sfmc-package-changed',changed);window.removeEventListener('focus',changed);}; }, [refreshProposals]);
+  const changed = () => { refetch(); setCatalogRevision(v => v + 1); void refreshProposals(); };
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
-    { id: 'fila', label: 'Fila de reconciliação', icon: Inbox, n: coverage.orfaos },
-    { id: 'asset', label: 'Templates', icon: UploadCloud, n: coverage.semAsset },
-    { id: 'auditoria', label: 'Auditoria', icon: ClipboardCheck, n: reconciled.length },
+    { id: 'fila', label: 'Propostas', icon: Inbox, n: proposals.filter(p=>['ready','review'].includes(p.status)).length },
+    { id: 'asset', label: 'Biblioteca', icon: UploadCloud, n: coverage.totalTemplates },
+    { id: 'auditoria', label: 'Histórico', icon: ClipboardCheck, n: events.length },
   ];
 
   return (
     <div className="relative flex h-full flex-col">
       <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-bold text-slate-900">Cadastro e templates</h2><button onClick={() => setPackageOpen(true)} className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white">Importar pacote SFMC</button></div>
-        <p className="mt-0.5 text-sm text-slate-500">Costure os disparos do CRM aos templates curados · governança de peças e cobertura de réguas</p>
+        <h2 className="text-2xl font-bold text-slate-900">Cadastro e templates</h2>
+        <p className="mt-1 text-sm text-slate-500">Revise os IDs e comunicações propostos pela análise · aprove, rejeite ou edite</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
         {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400"><Loader2 size={18} className="animate-spin" /> Carregando cobertura…</div>
-        ) : (
-          <>
-            <CoverageHeader
-              c={coverage}
-              onOrfaosClick={() => { setQueueChannel(null); setTab('fila'); }}
-              onSemPecaClick={() => setTab('asset')}
-              onChannelClick={(label) => { setQueueChannel(label); setTab('fila'); }}
-              onAtivosClick={() => setShowAtivos(true)}
-            />
+        {loading && <p role="status" className="mb-3 flex items-center gap-2 text-xs text-slate-500"><Loader2 size={14} className="animate-spin"/>Atualizando o recorte dos disparos…</p>}
+        <>
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-white px-4 py-3 text-sm">
+              <span><strong>{proposals.filter(p=>['ready','review'].includes(p.status)).length}</strong> propostas pendentes</span>
+              <span className="text-emerald-800"><strong>{proposals.filter(p=>p.status==='ready').length}</strong> prontas</span>
+              <span className="text-amber-800"><strong>{proposals.filter(p=>p.status==='review').length}</strong> para revisar</span>
+              <span><strong>{proposals.filter(p=>p.status==='applied').length}</strong> comunicações aprovadas</span>
+              <button onClick={() => setPackageOpen(true)} className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100"><Upload size={14}/>Importar pacote SFMC</button>
+            </div>
 
             <div className="mt-5 flex items-center gap-2">
               {tabs.map((t) => {
@@ -93,117 +89,21 @@ const CadastroTemplates: React.FC = () => {
             </div>
 
             <div className="mt-5">
-              {tab === 'fila' && (
-                <ReconciliationQueue
-                  orphans={orphans}
-                  catalog={catalog}
-                  channelFilter={queueChannel}
-                  onClearChannelFilter={() => setQueueChannel(null)}
-                  onCreate={(seed) => setCompose(seed)}
-                  onChanged={refetch}
-                />
-              )}
+              {tab === 'fila' && <div className="space-y-5"><CommunicationProposalInbox rows={proposals} loading={proposalLoading} error={proposalError} onRefresh={()=>void refreshProposals()} onChanged={changed}/>
+                <details className="rounded-xl border bg-white p-4"><summary className="cursor-pointer text-sm font-semibold text-slate-600">Disparos sem template no recorte dos dashboards · {coverage.orfaos}</summary><div className="mt-4"><ReconciliationQueue orphans={orphans} catalog={catalog} channelFilter={queueChannel} onClearChannelFilter={()=>setQueueChannel(null)} onCreate={setCompose} onChanged={changed}/></div></details>
+              </div>}
               {tab === 'asset' && <TemplateCatalogView key={catalogRevision} />}
-              {tab === 'auditoria' && <ReconciliationAudit rows={reconciled} catalog={catalog} onChanged={refetch} />}
+              {tab === 'auditoria' && <div className="space-y-5"><section className="overflow-x-auto rounded-xl border bg-white"><h3 className="p-4 font-semibold">Decisões e análises de comunicação</h3>{proposalError&&<p role="alert" className="p-4 text-red-700">{proposalError}</p>}<table className="w-full text-left text-xs"><thead className="bg-slate-50"><tr><th className="p-3">Data / ação</th><th className="p-3">Comunicação / ID</th><th className="p-3">Decisão e ator</th></tr></thead><tbody>{[...events].reverse().map(e=>{const p=proposals.find(p=>p.id===e.proposal_id);return <tr key={e.id} className="border-t"><td className="p-3">{new Date(e.created_at).toLocaleString('pt-BR')}<p>{({edited:'Revisão salva',rejected:'Rejeitada',applied:'Aplicada',analysis_published:'Análise publicada',analysis_received:'Análise recebida'} as Record<string,string>)[e.action]||e.action}</p></td><td className="max-w-md break-all p-3">{p?.message.payload.activity_name}<p className="font-mono">{p?.proposed_template_id}</p></td><td className="max-w-md p-3"><p>{String(e.snapshot.note||'')}</p><details><summary className="cursor-pointer text-cyan-800">Ver registro da decisão</summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify({actor:e.actor,snapshot:e.snapshot},null,2)}</pre></details></td></tr>;})}</tbody></table>{!events.length&&<p className="p-6 text-sm text-slate-500">Nenhuma decisão aplicada ou revisão salva.</p>}</section><details className="rounded-xl border bg-white p-4"><summary className="cursor-pointer text-sm font-semibold">Vínculos históricos no recorte dos dashboards</summary><div className="mt-4"><ReconciliationAudit rows={reconciled} catalog={catalog} onChanged={changed}/></div></details></div>}
             </div>
-          </>
-        )}
+        </>
       </div>
 
-      {packageOpen && <Suspense fallback={<p role="status" className="p-4 text-sm">Carregando importação...</p>}><PackageImportModal onClose={() => setPackageOpen(false)} onChanged={() => { refetch(); setCatalogRevision(v => v + 1); }} /></Suspense>}
+      {packageOpen && <Suspense fallback={<p role="status" className="p-4 text-sm">Carregando importação...</p>}><PackageImportModal onClose={() => setPackageOpen(false)} onChanged={changed} /></Suspense>}
 
       {compose !== undefined && (
         <TemplateComposerDrawer seed={compose} onClose={() => setCompose(undefined)} onSaved={() => { setCompose(undefined); refetch(); }} />
       )}
 
-      {showAtivos && (
-        <ActiveTemplatesModal
-          templates={ativos}
-          total={coverage.totalTemplates}
-          onClose={() => setShowAtivos(false)}
-          onVerPerformance={(id) => { setShowAtivos(false); abrirPerformance(id); }}
-        />
-      )}
-    </div>
-  );
-};
-
-const CHANNEL_DOT: Record<string, string> = {
-  'E-mail': '#0ea5e9', Email: '#0ea5e9', SMS: '#f59e0b', WhatsApp: '#22c55e', Push: '#a855f7',
-};
-
-interface ActiveTemplatesModalProps {
-  templates: CatalogEntry[];
-  total: number;
-  onClose: () => void;
-  onVerPerformance: (templateId: string) => void;
-}
-
-/** Modal com os templates "no ar" (com peça, dentro do recorte). Clicar em "Ver performance" faz deep-link para a tabela de Performance filtrada pelo template. */
-const ActiveTemplatesModal: React.FC<ActiveTemplatesModalProps> = ({ templates, total, onClose, onVerPerformance }) => {
-  const [q, setQ] = useState('');
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return templates;
-    return templates.filter((t) => t.id.toLowerCase().includes(s) || (t.channel ?? '').toLowerCase().includes(s));
-  }, [templates, q]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 bg-gradient-to-br from-[#063b3d] via-[#0a5f63] to-[#00838a] px-6 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-white/15">
-              <Radio size={20} />
-            </div>
-            <div>
-              <div className="text-lg font-bold leading-tight">Templates no ar</div>
-              <div className="text-xs text-white/75">{templates.length} peças vinculadas e dentro do recorte · de {total} cadastradas</div>
-            </div>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white" title="Fechar">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="border-b border-slate-100 px-6 py-3">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Filtrar por template ID ou canal…"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none focus:border-cyan-400 focus:bg-white"
-          />
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-2">
-          {filtered.length === 0 ? (
-            <div className="py-12 text-center text-sm text-slate-400">Nenhum template encontrado.</div>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {filtered.map((t) => (
-                <li key={t.id}>
-                  <button
-                    onClick={() => onVerPerformance(t.id)}
-                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-cyan-50"
-                    title={`Ver performance de ${t.id}`}
-                  >
-                    <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: CHANNEL_DOT[t.channel] ?? '#94a3b8' }} />
-                    <span className="min-w-0 flex-1">
-                      <TemplateIdChips id={t.id} showId />
-                      <span className="mt-0.5 block text-[11px] text-slate-400">
-                        {t.channel} · {t.vinc} {t.vinc === 1 ? 'disparo vinculado' : 'disparos vinculados'}
-                      </span>
-                    </span>
-                    <span className="flex flex-shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors group-hover:bg-cyan-600 group-hover:text-white">
-                      Ver performance <ArrowRight size={13} />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

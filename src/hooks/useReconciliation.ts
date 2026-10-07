@@ -299,43 +299,25 @@ export function useReconciliation() {
     try {
       const baseSelect = '"Activity name / Taxonomia", jornada, "Canal", "BU", "Parceiro", "Segmento", "Subgrupos", "Base Total", "Data de Disparo", template_id';
 
-      let orphanQuery = supabase
-        .from('activities')
-        .select(baseSelect)
-        .is('template_id', null)
-        .not('"Activity name / Taxonomia"', 'is', null)
-        .gte('"Data de Disparo"', dataInicio)
-        .lte('"Data de Disparo"', `${dataFim} 23:59:59`)
-        .in('"Canal"', ['E-mail', 'SMS', 'WhatsApp', 'Push'])
-        .order('"Data de Disparo"', { ascending: false })
-        .limit(1500);
-      if (selectedBUs.length) orphanQuery = orphanQuery.in('BU', selectedBUs);
-      if (f.canais?.length) orphanQuery = orphanQuery.in('"Canal"', f.canais);
-      if (f.jornadas?.length) orphanQuery = orphanQuery.in('jornada', f.jornadas);
-      if (f.segmentos?.length) orphanQuery = orphanQuery.in('"Segmento"', f.segmentos);
-      if (f.parceiros?.length) orphanQuery = orphanQuery.in('"Parceiro"', f.parceiros);
-      if (f.subgrupos?.length) orphanQuery = orphanQuery.in('"Subgrupos"', f.subgrupos);
-
-      let linkedQuery = supabase
-        .from('activities')
-        .select(baseSelect)
-        .not('template_id', 'is', null)
-        .not('"Activity name / Taxonomia"', 'is', null)
-        .gte('"Data de Disparo"', dataInicio)
-        .lte('"Data de Disparo"', `${dataFim} 23:59:59`)
-        .in('"Canal"', ['E-mail', 'SMS', 'WhatsApp', 'Push'])
-        .order('"Data de Disparo"', { ascending: false })
-        .limit(2500);
-      if (selectedBUs.length) linkedQuery = linkedQuery.in('BU', selectedBUs);
-      if (f.canais?.length) linkedQuery = linkedQuery.in('"Canal"', f.canais);
-      if (f.jornadas?.length) linkedQuery = linkedQuery.in('jornada', f.jornadas);
-      if (f.segmentos?.length) linkedQuery = linkedQuery.in('"Segmento"', f.segmentos);
-      if (f.parceiros?.length) linkedQuery = linkedQuery.in('"Parceiro"', f.parceiros);
-      if (f.subgrupos?.length) linkedQuery = linkedQuery.in('"Subgrupos"', f.subgrupos);
-
-      const [{ data: acts, error: aErr }, { data: linkedActs, error: lErr }, templates] = await Promise.all([orphanQuery, linkedQuery, listTemplates()]);
-      if (aErr) throw aErr;
-      if (lErr) throw lErr;
+      const loadActivities = async (linked: boolean) => {
+        const rows: OrphanQueryRow[] = [];
+        for (let offset=0;;offset+=500) {
+          let query=supabase.from('activities').select(baseSelect)
+            .not('"Activity name / Taxonomia"','is',null)
+            .gte('"Data de Disparo"',dataInicio).lte('"Data de Disparo"',`${dataFim} 23:59:59`)
+            .in('"Canal"',['E-mail','SMS','WhatsApp','Push']).order('id').range(offset,offset+499);
+          query=linked?query.not('template_id','is',null):query.is('template_id',null);
+          if(selectedBUs.length)query=query.in('BU',selectedBUs);
+          if(f.canais?.length)query=query.in('"Canal"',f.canais);
+          if(f.jornadas?.length)query=query.in('jornada',f.jornadas);
+          if(f.segmentos?.length)query=query.in('"Segmento"',f.segmentos);
+          if(f.parceiros?.length)query=query.in('"Parceiro"',f.parceiros);
+          if(f.subgrupos?.length)query=query.in('"Subgrupos"',f.subgrupos);
+          const {data,error}=await query;if(error)throw error;
+          rows.push(...(data||[]) as OrphanQueryRow[]);if((data||[]).length<500)return rows;
+        }
+      };
+      const [acts,linkedActs,templates]=await Promise.all([loadActivities(false),loadActivities(true),listTemplates()]);
       const orphanRows = ((acts ?? []) as OrphanQueryRow[]);
       const slotMap = new Map<string, SlotMomentRow>();
       const activityNames = Array.from(new Set(orphanRows.map((r) => r['Activity name / Taxonomia']).filter((v): v is string => !!v)));
