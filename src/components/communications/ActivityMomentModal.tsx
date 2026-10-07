@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { CalendarClock, GitBranch, Loader2, Save, X } from 'lucide-react';
+import {createPortal} from 'react-dom';
 import type { OrphanRow } from '../../hooks/useReconciliation';
 import type { ActivityMomentKind, ActivityMomentSuggestion } from '../../types/communication';
 import { describeError, saveActivityMomentSuggestion } from '../../services/communicationService';
@@ -24,12 +25,15 @@ function buildLabel(kind: ActivityMomentKind, enabled: boolean, week: number, di
 }
 
 interface Props {
+  baseKnown?: boolean;
   row: OrphanRow;
   onClose: () => void;
   onChanged: () => void;
 }
 
-export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged }) => {
+export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged, baseKnown=true }) => {
+  const root=useRef<HTMLDivElement>(null);
+  useEffect(()=>{const previous=document.activeElement as HTMLElement|null,overflow=document.body.style.overflow;document.body.style.overflow='hidden';root.current?.querySelector<HTMLButtonElement>('button')?.focus();const key=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();if(e.key==='Tab'){const nodes=Array.from(root.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled])')||[]),first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};document.addEventListener('keydown',key);return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);previous?.focus();};},[onClose]);
   const seed = row.momentSuggestion;
   const [kind, setKind] = useState<ActivityMomentKind>(seed.kind);
   const [enabled, setEnabled] = useState(seed.kind === 'pontual' ? seed.enabled : true);
@@ -73,9 +77,9 @@ export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged }
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-6">
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+  return createPortal(
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/40 p-6">
+      <div ref={root} role="dialog" aria-modal="true" aria-label="Curadoria de momento" className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
           <div className="min-w-0">
             <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-cyan-600">
@@ -85,7 +89,7 @@ export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged }
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold">{row.canalLabel}</span>
               <span className="inline-flex min-w-0 items-center gap-1"><GitBranch size={12} /> <span className="truncate">{row.jornada}</span></span>
-              <span>{fmtK(row.base)} base</span>
+              <span>{baseKnown?fmtK(row.base)+' base':'Base desconhecida'}</span>
               <span>{row.exec} exec.</span>
               {row.latestDate && <span>{row.latestDate.slice(0, 10)}</span>}
             </div>
@@ -184,6 +188,6 @@ export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged }
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 };

@@ -44,6 +44,7 @@ export const TAXO: Record<DimId, TaxoDim> = {
     label: 'Campanha', dim: 'campanha',
     opts: [
       { id: 'copa', label: 'Copa', tokens: ['copa'] },
+      { id: 'vibe', label: 'Vibe', tokens: ['vibe'] },
       { id: 'cred', label: 'Crédito', tokens: ['cred', 'ecred'] },
       { id: 'reat', label: 'Reativação', tokens: ['reat', 'recencia', 'rec'] },
     ],
@@ -308,7 +309,7 @@ export interface JornadaIdentity { bu: string | null; publico: string | null; se
 
 /** Identidade estruturada derivada da jornada (null quando a jornada foge do padrão canônico). */
 export function parseJornadaIdentity(jornada: string | null | undefined): JornadaIdentity {
-  const cleaned = String(jornada ?? '').trim().replace(/^JOR_AQUISICAO_/i, '').replace(/^JOR_/i, '');
+  const cleaned = String(jornada ?? '').trim().replace(/^JOR_(?:AQUISICAO|AQS)_/i, '').replace(/^JOR_/i, '');
   const toks = cleaned.split('_').filter(Boolean);
   const buTok = normalizeTaxonomyText(toks[0]).replace(/ /g, '');
   if (!BU_JORNADA_TOKENS.has(buTok)) return { bu: null, publico: null, segmento: null };

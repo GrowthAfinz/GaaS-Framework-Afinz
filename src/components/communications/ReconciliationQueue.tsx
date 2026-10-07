@@ -23,6 +23,8 @@ function displayTemplateIdForUsage(templateId: string, usageSeq?: string | null)
 }
 
 interface Props {
+  packInbox?: React.ReactNode;
+  packCount?: number;
   orphans: OrphanRow[];
   catalog: CatalogEntry[];
   /** Filtro de canal vindo do header de cobertura (label canônico, ex.: 'E-mail'). */
@@ -39,7 +41,8 @@ const SORT_OPTIONS: [SortBy, string, LucideIcon][] = [
   ['data', 'Mais recentes', Clock],
 ];
 
-export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channelFilter, onClearChannelFilter, onCreate, onChanged }) => {
+export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, orphans, catalog, channelFilter, onClearChannelFilter, onCreate, onChanged }) => {
+  const [source,setSource] = useState<'packs'|'executions'>('packs');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todos' | 'forte' | 'novo'>('todos');
   const [sortBy, setSortBy] = useState<SortBy>('padrao');
@@ -115,8 +118,11 @@ export const ReconciliationQueue: React.FC<Props> = ({ orphans, catalog, channel
     ['novo', 'Sem template', scoped.filter((o) => o.confidence === 'novo').length],
   ];
 
+  const sources=packInbox?<div className="mb-4 flex flex-wrap gap-2 text-xs"><button onClick={()=>setSource('packs')} className={'rounded-lg border px-3 py-2 font-semibold '+(source==='packs'?'border-cyan-300 bg-cyan-50 text-cyan-800':'bg-white text-slate-500')}>Comunicações dos packs · {packCount}</button><button onClick={()=>setSource('executions')} className={'rounded-lg border px-3 py-2 font-semibold '+(source==='executions'?'border-cyan-300 bg-cyan-50 text-cyan-800':'bg-white text-slate-500')}>Disparos do dashboard sem template · {orphans.length}</button></div>:null;
+  if(packInbox&&source==='packs')return <div>{sources}{packInbox}</div>;
   return (
     <div>
+      {sources}
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5">
           {filters.map(([id, label, n]) => (
