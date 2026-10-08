@@ -5,7 +5,10 @@ import type { MessageContent, PackageMessage, ParsedPackage } from './types';
 // Package Manager entity shapes vary between exports. Only fields extracted below persist.
 type Entity = Record<string, any>;
 const channels: Record<string, string> = { WHATSAPPACTIVITY: 'WhatsApp', SMSSYNC: 'SMS', EMAILV2: 'E-mail', PUSHNOTIFICATIONACTIVITY: 'Push' };
-export const PARSER_VERSION = '1.0.0';
+export const PARSER_VERSION = '1.1.0';
+// SMS e e-mail HTML não têm botão: o link rastreado mora no corpo do asset.
+const TRACKED_URL = /https?:\/\/[^\s"'<>\\]+?af_sub3=[^\s"'<>\\]+/g;
+const AMPSCRIPT = /%%\[|LookupRows?\(|LookupOrderedRows\(/;
 const MAX_ZIP = 50 * 1024 * 1024, MAX_EXPANDED = 100 * 1024 * 1024;
 const topSchema = z.object({ name: z.string().optional(), version: z.number().optional() }).passthrough();
 const entitySchema = z.object({ data: z.record(z.string(), z.unknown()), originID: z.union([z.string(), z.number()]).optional() }).passthrough();
@@ -50,7 +53,7 @@ export function parseEntities(entries: Record<string, Uint8Array>, fileName: str
     if (!value || typeof value !== 'object') return [];
     return Object.entries(value).flatMap(([k, v]) => strings(v, path ? path + '.' + k : k, depth + 1));
   };
-  const assetContent = (asset: Entity) => {
+  const assetContent = (asset: Entity): { fields: Record<string, string>; subs: string[]; dynamic: boolean } => {
     const out: Record<string, string> = {};
     const wanted: Record<string, string> = { 'display:message': 'text', 'display:footer': 'footer', 'display:buttons.button1.value': 'link', 'display:buttons.button1.title': 'cta1', 'display:buttons.button2.title': 'cta2' };
     for (const [path, value] of strings(asset.views || {})) {
@@ -59,7 +62,13 @@ export function parseEntities(entries: Record<string, Uint8Array>, fileName: str
       if (wanted[key] && out[wanted[key]] === undefined) out[wanted[key]] = value;
       if (path.endsWith('displaymessage') && out.text === undefined) out.text = value;
     }
-    return out;
+    const tracked: string[] = [];
+    const raw = JSON.stringify(asset);
+    const dynamic = AMPSCRIPT.test(raw);
+    for (const m of raw.matchAll(TRACKED_URL)) { const url = m[0].replace(/&amp;/g, '&'); if (!tracked.includes(url)) tracked.push(url); }
+    if (out.link === undefined && tracked.length) out.link = tracked[0];
+    const subs = [...new Set(tracked.map(u => parseLink(u).af_sub3).filter((x): x is string => !!x))].sort();
+    return { fields: out, subs, dynamic };
   };
   const messages: PackageMessage[] = [];
   const journeys = [...entities.entries()].filter(([ref]) => ref.startsWith('journeys/'));
@@ -105,7 +114,7 @@ export function parseEntities(entries: Record<string, Uint8Array>, fileName: str
       const c = a.configurationArguments || {};
       const assetId = String(c.assetId || c.triggeredSend?.emailId || '').match(/assets\/([^/}]+)/)?.[1];
       const asset = assetId ? data('assets/' + assetId) : {};
-      const extracted = assetContent(asset);
+      const { fields: extracted, subs: trackedSubs, dynamic: isDynamic } = assetContent(asset);
       const tpl = c.requestBody?.template || {};
       const params: string[] = (tpl.components || []).filter((x: Entity) => x.type === 'body').flatMap((x: Entity) => (x.parameters || []).map((p: Entity) => String(p.text || '')));
       const banner = (tpl.components || []).filter((x: Entity) => x.type === 'header').flatMap((x: Entity) => (x.parameters || []).map((p: Entity) => p.image?.link)).find(Boolean) || null;
@@ -126,7 +135,8 @@ export function parseEntities(entries: Record<string, Uint8Array>, fileName: str
       const link = extracted.link || null;
       const utm = parseLink(link);
       if (a.type === 'WHATSAPPACTIVITY' && link && !utm.af_sub3) alerts.push('Link sem af_sub3');
-      if (!text && a.type === 'EMAILV2') alerts.push('Conteúdo dinâmico depende do briefing');
+      if (trackedSubs.length > 1) alerts.push('Mais de um af_sub3 no conteúdo: ' + trackedSubs.join(', '));
+      if (a.type === 'EMAILV2' && (isDynamic || !Object.keys(asset).length)) alerts.push('Conteúdo dinâmico depende do briefing');
       const content: MessageContent = {
         schema_version: 1, channel: channels[a.type], meta_template_name: tpl.name || null,
         body_text: text, body_params: params, footer: extracted.footer || null,
