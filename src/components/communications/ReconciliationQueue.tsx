@@ -1,3 +1,4 @@
+import {resolveCommunicationVisual} from '../../utils/communicationVisualResolution';
 import {CommunicationVisual} from './previews/CommunicationVisual';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles, CalendarClock, AlertTriangle, X, ArrowDownWideNarrow, Repeat, Clock, type LucideIcon } from 'lucide-react';
@@ -195,7 +196,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ refreshing=false, packInb
       ) : (
         <div className="flex flex-col gap-2">
           {list.map((o) => (
-            <OrphanCard key={o.uid} o={o} open={expanded === o.uid}
+            <OrphanCard key={o.uid} catalog={catalog} o={o} open={expanded === o.uid}
               onToggle={() => setExpanded((e) => e === o.uid ? null : o.uid)}
               onLink={() => link(o)} onCreate={() => {if(!refreshing)onCreate(o);}} onSuggest={() => {if(!refreshing)setSuggesting(o);}}
               onEditMoment={() => {if(!refreshing)setEditingMoment(o);}} busy={refreshing || !!busy} />
@@ -223,7 +224,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ refreshing=false, packInb
   );
 };
 
-const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; onSuggest: () => void; onEditMoment: () => void; busy: boolean }> = ({ o, open, onToggle, onLink, onCreate, onSuggest, onEditMoment, busy }) => {
+const OrphanCard: React.FC<{ catalog:CatalogEntry[]; o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; onSuggest: () => void; onEditMoment: () => void; busy: boolean }> = ({ catalog, o, open, onToggle, onLink, onCreate, onSuggest, onEditMoment, busy }) => {
   const m = o.match;
   const displayTemplateId = m ? m.tpl.id : '';
   const canLink = m && !o.momentConflict && o.confidence !== 'fraca' && o.confidence !== 'novo';
@@ -232,7 +233,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
       <div className="flex cursor-pointer items-center gap-3 px-4 py-3" onClick={onToggle}>
         <ChevronRight size={15} className={`shrink-0 text-slate-500 transition-transform ${open ? 'rotate-90 text-cyan-600' : ''}`} />
         <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold uppercase text-slate-500">{o.canalLabel}</span>
-        <div onClick={e=>e.stopPropagation()}>{o.packEvidence?.proposal&&<CommunicationVisual content={o.packEvidence.proposal.message.payload.content} template={m?.tpl.raw}/>}</div>
+        <div onClick={e=>e.stopPropagation()}>{o.packEvidence?.proposal&&<CommunicationVisual content={o.packEvidence.proposal.message.payload.content} template={resolveCommunicationVisual(catalog.map(t=>t.raw),o.canalLabel,o.packEvidence.proposal.observed_template_id,o.packEvidence.proposal.proposed_template_id).template} sourceLabel={resolveCommunicationVisual(catalog.map(t=>t.raw),o.canalLabel,o.packEvidence.proposal.observed_template_id,o.packEvidence.proposal.proposed_template_id).sourceLabel}/>}</div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <code className="block max-w-[420px] truncate font-mono text-xs font-semibold text-slate-800 xl:max-w-[560px]">{o.name}</code>

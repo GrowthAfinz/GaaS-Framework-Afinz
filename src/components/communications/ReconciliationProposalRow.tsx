@@ -9,7 +9,7 @@ const fmt=(v:number|null)=>v==null?'sem dado':v.toLocaleString('pt-BR',{notation
 const tags:[string,TagKind][]=[['front','front'],['partner','partner'],['channel','channel'],['segment','segment'],['subgroup','subgroup'],['offer','offer'],['campaign','campaign'],['creditVariant','segment'],['reuse','segment']];
 export const STATUS_LABEL:Record<string,string>={ready:'Pronta',review:'Com pendências',applied:'Enviada',technical:'Opt-out',rejected:'Rejeitada'};
 const STATUS_TONE:Record<string,string>={ready:'bg-emerald-50 text-emerald-800 ring-emerald-200',review:'bg-amber-50 text-amber-900 ring-amber-300',applied:'bg-cyan-50 text-cyan-900 ring-cyan-200',technical:'bg-slate-100 text-slate-700 ring-slate-200',rejected:'bg-red-50 text-red-800 ring-red-200'};
-export function ReconciliationProposalRow({row,o,open,checked,busy,onToggle,onSelect,onReview,onMoment,reuse,template}:{template?:CommunicationTemplate;row:ProposalRow;o:Orchestration;open:boolean;checked:boolean;busy:boolean;onToggle:()=>void;onSelect:()=>void;onReview:(templateId?:string)=>void;onMoment:()=>void;reuse:string}) {
+export function ReconciliationProposalRow({row,o,open,checked,busy,onToggle,onSelect,onReview,onMoment,reuse,template,visualSource}:{visualSource?:string;template?:CommunicationTemplate;row:ProposalRow;o:Orchestration;open:boolean;checked:boolean;busy:boolean;onToggle:()=>void;onSelect:()=>void;onReview:(templateId?:string)=>void;onMoment:()=>void;reuse:string}) {
  const p=row.message.payload,pending=['ready','review'].includes(row.status),conflicts=[...row.conflicts,...o.conflicts];
  const status=row.status==='ready'&&o.conflicts.length&&!row.reviewed_by?'review':row.status;
  const missing=p.is_optout?[]:missingGovernanceParameters(row);
@@ -17,7 +17,7 @@ export function ReconciliationProposalRow({row,o,open,checked,busy,onToggle,onSe
  return <article data-proposal-row={row.id} aria-label={'Comunicação '+(row.proposed_template_id||p.activity_name)} className={`overflow-hidden rounded-xl border bg-white transition-shadow ${open?'border-cyan-500 shadow-md':'border-slate-200 hover:border-slate-300'}`}>
   <div className="flex flex-wrap items-center gap-3 px-4 py-3 xl:flex-nowrap">
    <input type="checkbox" className="h-4 w-4" aria-label={'Selecionar '+p.activity_name} disabled={busy||!pending} checked={checked} onChange={onSelect}/>
-   <CommunicationVisual content={p.content} template={template}/>
+   <CommunicationVisual content={p.content} template={template} sourceLabel={visualSource}/>
    <div className="min-w-0 flex-1 basis-64 xl:basis-auto">
     <div className="flex flex-wrap items-center gap-2"><code className="max-w-[420px] truncate font-mono text-sm font-semibold text-slate-900" title={row.proposed_template_id}>{row.proposed_template_id||'Template ID a definir'}</code><button onClick={onMoment} className="inline-flex items-center gap-1 rounded-md border border-cyan-300 bg-white px-2 py-1 text-xs font-semibold text-cyan-800 hover:bg-cyan-50" title="Editar o momento na régua"><CalendarClock size={12} aria-hidden="true"/>{o.moment.label} · confiança {o.moment.confidence}</button></div>
     <div className="mt-1.5 flex flex-wrap gap-1">{tags.map(([key,kind])=>{const f=o.fields[key];return !f||f.value==='Não identificado'?null:<DimTag key={key} kind={kind} label={f.label} value={f.value} source={f.source} conflict={f.conflict}/>;})}</div>
