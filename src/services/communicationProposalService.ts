@@ -22,6 +22,12 @@ export async function readProposalInbox(): Promise<ProposalRow[]> {
  return proposals.map(p=>{const message=byId.get(p.message_id);if(!message)throw Error('Origem da proposta indisponível; atualize a fila.');return {...p,message};});
 }
 export const readProposalEvents=()=>all<ProposalEvent>('communications_proposal_events');
+export interface AgentNote { kind: 'erro'|'hipotese'|'pergunta'|'info'; text: string }
+export async function readAgentNotes(proposalId: string): Promise<{agent:string;created_at:string;notes:AgentNote[]}[]> {
+ const {data,error}=await supabase.from('communications_proposal_events').select('snapshot,created_at').eq('proposal_id',proposalId).eq('action','agent_note').order('id',{ascending:false});
+ if(error)throw error;
+ return (data||[]).map(r=>({agent:String((r.snapshot as {agent?:string}).agent||'agente'),created_at:r.created_at as string,notes:((r.snapshot as {notes?:AgentNote[]}).notes||[])}));
+}
 export async function saveProposal(p: ProposalRow, review: ReviewDecision, resolved: boolean, note: string) {
  const {error}=await supabase.rpc('save_communication_proposal',{p_id:p.id,p_revision:p.revision,p_review:review,p_resolved:resolved,p_note:note});if(error)throw error;
 }

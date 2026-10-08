@@ -2,10 +2,10 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {usePeriod} from '../../contexts/PeriodContext';
 import {PeriodSelector} from '../period-selector/PeriodSelector';
-import {X,Search,RefreshCw,Check,SlidersHorizontal,Send,Info} from 'lucide-react';
+import {X,Search,RefreshCw,Check,SlidersHorizontal,Send,Info,Sparkles} from 'lucide-react';
 import {describeError,listTemplates} from '../../services/communicationService';
 import {notifyPackageChanged,readCandidates,readContents} from '../../services/sfmcPackageService';
-import {normalizeCommunicationText,proposalGroup,readProposalReuse,reviewProposals,saveProposal,type ProposalReuse,type ProposalRow} from '../../services/communicationProposalService';
+import {normalizeCommunicationText,proposalGroup,readAgentNotes,readProposalReuse,reviewProposals,saveProposal,type AgentNote,type ProposalReuse,type ProposalRow} from '../../services/communicationProposalService';
 import {readOrchestrationEvidence} from '../../services/communicationOrchestrationService';
 import {normalizeJourney} from '../../modules/sfmc-package/parsePackage';
 import type {ApplyPreview,CandidateActivity,ReviewDecision,TemplateContent} from '../../modules/sfmc-package/types';
@@ -16,7 +16,7 @@ import {ActivityMomentModal} from './ActivityMomentModal';
 import {orchestrateCommunication,dispatchDay,missingGovernanceParameters,type FrameworkActivity,type OrchestrationSlot} from '../../utils/communicationOrchestrator';
 import {parseActivity,canalToId} from '../../utils/taxonomy';
 import type {CatalogEntry,OrphanRow} from '../../hooks/useReconciliation';
-import {HowItWorks,Segmented,controlClass} from './ui/commsUi';
+import {HowItWorks,Segmented,controlClass,fmtDay} from './ui/commsUi';
 const control='rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50';
 const button='rounded-lg bg-cyan-700 px-4 py-2 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50';
 const labels=STATUS_LABEL;
@@ -136,6 +136,7 @@ function ProposalDetail({row,onClose,onSaved,initialId}:{row:ProposalRow;onClose
  return createPortal(<div className="fixed inset-0 z-[100] flex justify-end bg-slate-950/40"><div ref={root} role="dialog" aria-modal="true" aria-labelledby="proposal-title" className="flex h-full w-full max-w-4xl flex-col bg-white shadow-2xl"><header className="flex items-center justify-between border-b px-5 py-4"><div><h2 id="proposal-title" className="font-semibold">Revisar comunicação</h2><p className="text-xs text-slate-600">Revisão {row.revision} · {labels[row.status]}</p></div><button aria-label="Fechar revisão" onClick={onClose} className={control}><X size={18}/></button></header>
  <div className="flex-1 overflow-y-auto p-5"><p className="break-all text-sm font-semibold">{p.activity_name}</p><p className="mt-1 break-all text-xs text-slate-600">{p.journey_name} · {p.content.channel} · {row.message.import_id}</p>
  <div className="mt-4 grid gap-5 md:grid-cols-[minmax(0,1fr)_300px]"><div className="space-y-4"><div className="rounded-lg bg-slate-50 p-3 text-sm"><strong>{value(row,'partner')} · {value(row,'segment')} · {value(row,'subgroup')}{row.resolved_context.campaign?' · '+String(row.resolved_context.campaign):''}</strong><p className="mt-1 text-xs">{value(row,'order')}</p>{p.paths.map((path,i)=><p key={i} className="mt-2 text-xs">{path.labels.join(' → ')}{path.waits.length?' · Esperas: '+path.waits.join(' + '):''}</p>)}</div>
+ <AgentNotes proposalId={row.id}/>
  <div className="space-y-1 text-xs">{row.reasons.map((r,i)=><p key={'r'+i} className="text-cyan-800">{r}</p>)}{row.conflicts.map((c,i)=><p key={'c'+i} className="rounded bg-amber-50 p-2 text-amber-900">{c}</p>)}<p>Alternativas: {row.alternatives.join(', ')||'Nenhuma registrada'}</p><p>ID observado: <span className="font-mono">{row.observed_template_id||'Não disponível'}</span></p></div>
  <label className="block text-sm font-medium">Template ID proposto<input aria-label="Template ID proposto" list="proposal-catalog" className={control+' mt-1 w-full font-mono'} disabled={!pending||busy} value={review.template_id} onChange={e=>{set({template_id:e.target.value.trim(),activity_ids:[],set_current:false});setResolved(false);}}/></label><datalist id="proposal-catalog">{catalog.map(t=><option key={t.template_id} value={t.template_id}>{t.title}</option>)}</datalist>
  <p className="text-xs text-slate-600">O ID preserva a caixa. A sugestão contextual não altera o link extraído nem comprova que a peça foi enviada.</p>
@@ -150,4 +151,15 @@ function ProposalDetail({row,onClose,onSaved,initialId}:{row:ProposalRow;onClose
  <details className="text-xs"><summary className="cursor-pointer text-cyan-800">Fonte e atribuição</summary><p className="mt-2 break-all">{p.link_url||'Sem link extraído'}</p><pre className="whitespace-pre-wrap">{JSON.stringify({utm:p.utm,context:row.resolved_context,analysis_id:row.analysis_id},null,2)}</pre></details>
  </div><div><MessagePreview content={p.content} compact/><p className="mt-2 text-xs text-slate-600">Prévia do conteúdo configurado no pacote; não certifica envio histórico.</p></div></div></div>
  <footer className="space-y-2 border-t p-4">{error&&<p role="alert" className="text-sm text-red-700">{error}</p>}<div className="flex justify-end gap-2"><button className={control} onClick={onClose}>Fechar</button>{pending&&<button className={button+' inline-flex items-center gap-2'} disabled={busy||!loaded||!review.template_id||(resolved&&note.trim().length<3)} onClick={async()=>{setBusy(true);setError('');try{await saveProposal(row,{...review,expected_current_id:current?.id||null},resolved,note);onSaved();}catch(e){setError(describeError(e));}finally{setBusy(false);}}}><Check size={16}/>Salvar revisão</button>}</div></footer></div></div>,document.body);
+}
+
+const NOTE_STYLE:Record<AgentNote['kind'],[string,string]>={erro:['Erro','bg-red-50 text-red-900'],pergunta:['Pergunta','bg-amber-50 text-amber-900'],hipotese:['Hipótese','bg-violet-50 text-violet-900'],info:['Info','bg-slate-50 text-slate-700']};
+function AgentNotes({proposalId}:{proposalId:string}) {
+ const [runs,setRuns]=useState<Awaited<ReturnType<typeof readAgentNotes>>>([]);
+ useEffect(()=>{let active=true;readAgentNotes(proposalId).then(r=>{if(active)setRuns(r);}).catch(()=>{});return()=>{active=false;};},[proposalId]);
+ const last=runs[0];if(!last)return null;
+ const name=last.agent==='claude'?'Claude':last.agent==='codex'?'Codex':last.agent;
+ return <section aria-label={`Análise do ${name}`} className="rounded-lg border border-violet-200 p-3"><h3 className="flex items-center gap-2 text-sm font-semibold text-violet-900"><Sparkles size={15} aria-hidden="true"/>Análise do {name}<span className="font-normal text-slate-500">· {fmtDay(last.created_at)}</span></h3>
+ <ul className="mt-2 space-y-1.5">{last.notes.map((n,i)=><li key={i} className={'flex gap-2 rounded p-2 text-sm '+NOTE_STYLE[n.kind][1]}><strong className="shrink-0">{NOTE_STYLE[n.kind][0]}</strong><span>{n.text}</span></li>)}</ul>
+ <p className="mt-2 text-xs text-slate-600">Nota de apoio. Não muda o status nem o ID proposto; a decisão continua sua.</p></section>;
 }

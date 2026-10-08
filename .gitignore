@@ -127,3 +127,6 @@ dist
 __pycache__/
 *.py[cod]
 
+
+# credenciais do agente que carrega pacotes SFMC na fila (service_role)
+.env.agent
