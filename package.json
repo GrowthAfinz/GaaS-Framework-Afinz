@@ -34,6 +34,7 @@
     "deploy": "gh-pages -d dist",
     "build:ontology": "python ../scripts/bundle_vault.py",
     "test": "vitest run",
+    "test:journey-snapshots-sql": "node scripts/test-journey-snapshots.mjs",
     "test:sfmc-package-sql": "node --test scripts/test-sfmc-package-sql.mjs scripts/test-execution-review-sql.mjs scripts/test-scoped-communication-links.mjs"
   },
   "dependencies": {

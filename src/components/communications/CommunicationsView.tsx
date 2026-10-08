@@ -11,15 +11,18 @@ import { TemplateComposerDrawer } from './TemplateComposerDrawer';
 import { PerformanceView } from './performance/PerformanceView';
 import { AppsFlyerAuditView } from './appsflyer-audit/AppsFlyerAuditView';
 
+const JourneyFlowView = lazy(() => import('./journeys/JourneyFlowView').then(m => ({ default: m.JourneyFlowView })));
+
 const PackageImportModal = lazy(() => import('./PackageImportModal').then(m => ({ default: m.PackageImportModal })));
 
 interface CommunicationsViewProps {
-  mode: 'cadastro' | 'performance' | 'appsflyer-audit';
+  mode: 'cadastro' | 'performance' | 'appsflyer-audit' | 'fluxo';
 }
 
 type SubTab = 'fila' | 'asset' | 'auditoria';
 
 export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) => {
+  if (mode === 'fluxo') return <Suspense fallback={<p role="status" className="p-6">Carregando fluxo de jornadas…</p>}><JourneyFlowView /></Suspense>;
   if (mode === 'performance') {
     return <PerformanceView />;
   }

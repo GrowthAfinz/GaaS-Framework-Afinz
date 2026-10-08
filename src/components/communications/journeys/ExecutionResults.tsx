@@ -1,0 +1,21 @@
+import React,{useEffect,useMemo,useState} from 'react';
+import {LineChart,Line,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer} from 'recharts';
+import type {FrameworkActivity} from '../../../utils/communicationOrchestrator';
+import {executionMetrics,sumCovered} from '../../../utils/contentPerformanceModel';
+import {saoPauloDay} from '../../../utils/saoPauloPeriod';
+import {Covered} from '../performance/contentUi';
+/** Existing performance metric/coverage contract, reused in journey details. Missing stays null. */
+export function ExecutionResults({rows}:{rows:FrameworkActivity[]}){
+ const [metric,setMetric]=useState('Cartões Gerados');const [day,setDay]=useState<string|null>(null);
+ useEffect(()=>setDay(null),[rows]);
+ const totals=useMemo(()=>executionMetrics(rows),[rows]);
+ const timeline=useMemo(()=>{const groups=new Map<string,FrameworkActivity[]>();for(const r of rows){if(!r['Data de Disparo'])continue;const d=saoPauloDay(r['Data de Disparo']);groups.set(d,[...(groups.get(d)||[]),r]);}return [...groups].sort(([a],[b])=>a.localeCompare(b)).map(([date,rs])=>{const v=sumCovered(rs,metric);return {date,label:date.slice(8,10)+'/'+date.slice(5,7),value:v.covered===v.total?v.value:null,coverage:v.covered+'/'+v.total};});},[rows,metric]);
+ const shown=day?rows.filter(r=>r['Data de Disparo']&&saoPauloDay(r['Data de Disparo'])===day):rows;
+ if(!rows.length)return <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Sem execução vinculada neste período.</p>;
+ return <section aria-label="Resultados das ativações" className="space-y-4">
+ <div className="grid grid-cols-3 gap-2 text-xs">{[['Base',totals.base],['Aberturas',totals.aberturas],['Cliques',totals.cliques],['Propostas',totals.propostas],['Cartões',totals.cartoes]].map(([label,v])=><div key={String(label)} className="rounded-lg bg-slate-50 p-3"><p className="mb-1 text-slate-500">{String(label)}</p><Covered v={v as typeof totals.base} strong/></div>)}</div>
+ <div><h4 className="text-sm font-semibold">Evolução no período · {totals.executions} ativações</h4><div className="my-2 flex flex-wrap gap-1">{['Base Total','Abertura','Cliques','Propostas','Cartões Gerados'].map(k=><button key={k} type="button" onClick={()=>{setMetric(k);setDay(null);}} className={`rounded px-2 py-1 text-xs ${metric===k?'bg-cyan-800 text-white':'bg-slate-100 text-slate-600'}`}>{k}</button>)}</div><div className="h-48"><ResponsiveContainer width="100%" height="100%"><LineChart data={timeline} margin={{left:0,right:14}} onClick={s=>{const label=s?.activeLabel;const p=timeline.find(t=>t.date===label);if(p)setDay(p.date);}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="date" tickFormatter={date=>String(date).slice(8,10)+'/'+String(date).slice(5,7)} tick={{fontSize:10}}/><YAxis width={50} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>v?.toLocaleString('pt-BR')??'Não informado'} labelFormatter={(_label,p)=>p?.[0]?.payload?.date||''}/><Line dataKey="value" name={metric} stroke="#0891b2" strokeWidth={2.5} connectNulls={false} dot={{r:3}}/></LineChart></ResponsiveContainer></div><p className="text-[11px] text-slate-500">Lacunas não viram zero. Clique num dia para ver as ativações.</p></div>
+ {day&&<button className="text-xs text-cyan-800" onClick={()=>setDay(null)}>Mostrar todas as ativações do período</button>}
+ <div className="max-h-72 overflow-auto rounded-lg border"><table className="w-full text-xs"><thead className="sticky top-0 bg-slate-50"><tr>{['Data / atividade','Base','Abre.','Cliques','Cartões'].map(s=><th key={s} className="p-2 text-left">{s}</th>)}</tr></thead><tbody>{shown.map(r=><tr key={r.id} className="border-t"><td className="max-w-56 p-2"><span>{r['Data de Disparo']?saoPauloDay(r['Data de Disparo']):'Sem data'}</span><p className="truncate text-[10px] text-slate-500" title={r['Activity name / Taxonomia']}>{r['Activity name / Taxonomia']}</p><p className="truncate text-[10px] text-slate-400" title={r.jornada}>{r.jornada}</p></td>{['Base Total','Abertura','Cliques','Cartões Gerados'].map(k=><td key={k} className="p-2"><Covered v={sumCovered([r],k)}/></td>)}</tr>)}</tbody></table></div>
+ </section>;
+}

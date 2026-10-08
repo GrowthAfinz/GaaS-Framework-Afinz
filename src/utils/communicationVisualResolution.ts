@@ -39,7 +39,7 @@ export function imageAssetPath(t?:CommunicationTemplate|null):string|null {
  const isImage=(p?:string|null)=>!!p&&(IMAGE_RE.test(p)||(p===t.original_path&&!!t.mime_type?.startsWith('image/')));
  return [t.preview_path,t.thumbnail_path,t.original_path].find(isImage)??null;
 }
-const textBody=(c:MessageContent|null|undefined,channel:string)=>!!c?.body_text&&TEXT_CHANNELS.includes(canalToId(c.channel)??'')&&canalToId(c.channel)===canalToId(channel);
+const textBody=(c:MessageContent|null|undefined,channel:string)=>!!c&&canalToId(c.channel)===canalToId(channel)&&((!!c.body_text&&TEXT_CHANNELS.includes(canalToId(c.channel)??''))||(canalToId(channel)==='email'&&!!c.email_html));
 
 export interface PreviewInput {
  channel:string;

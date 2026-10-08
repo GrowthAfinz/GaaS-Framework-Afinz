@@ -40,6 +40,8 @@ jobs:
         run: npm test
       - name: SFMC package ingestion SQL contracts
         run: npm run test:sfmc-package-sql
+      - name: Journey snapshot SQL contracts
+        run: npm run test:journey-snapshots-sql
       - name: Report Live contract and recovery protocol tests
         run: npm run test:report-live
       - name: Report Live renderer fixtures are reproducible

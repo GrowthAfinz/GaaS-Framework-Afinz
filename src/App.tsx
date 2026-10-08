@@ -298,7 +298,7 @@ function App() {
   const resultados = useResultadosMetrics(filteredData);
 
   const hasData = Object.keys(data).length > 0 || Object.keys(rentabilizacaoData).length > 0;
-  const canRenderWithoutFrameworkData = activeTab === 'aprendizado-growth' || activeTab === 'comunicacoes' || activeTab === 'comunicacoes-cadastro';
+  const canRenderWithoutFrameworkData = activeTab === 'aprendizado-growth' || activeTab === 'comunicacoes' || activeTab === 'comunicacoes-cadastro' || activeTab === 'comunicacoes-fluxo';
 
   if (import.meta.env.DEV && urlHash === '#funil-preview') {
     return (
@@ -578,6 +578,9 @@ function App() {
                   <CommunicationsView mode="cadastro" />
                 </PageTransition>
               )}
+              {activeTab === 'comunicacoes-fluxo' && (
+                <PageTransition><CommunicationsView mode="fluxo" /></PageTransition>
+              )}
               {activeTab === 'comunicacoes-performance' && (
                 <PageTransition>
                   <CommunicationsView mode="performance" />
@@ -593,7 +596,7 @@ function App() {
                   <DynamicEmailWorkspace />
                 </PageTransition>
               )}
-              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'aprendizado-growth', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
+              {!['launch', 'resultados', 'jornada', 'diario', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'aprendizado-growth', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-fluxo', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>

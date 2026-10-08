@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseEntities, parsePackage, parseLink, normalizeJourney, safeHttps } from './parsePackage';
+import { parseEntities, parsePackage, parseLink, normalizeJourney, safeHttps, parseJourneyGraphs } from './parsePackage';
 import { strToU8, zipSync } from 'fflate';
 describe('paridade com a skill sfmc-jornadas-pacote', () => {
   for (const [fixture, count, optouts, banners] of [['carrinho',18,4,14],['b2c',93,21,20],['plurix',2,0,0]] as const) {
@@ -48,6 +48,25 @@ describe('paridade com a skill sfmc-jornadas-pacote', () => {
     const rows=parseEntities(entries,'graph.zip').messages;
     expect(rows).toHaveLength(1);expect(rows[0].paths).toHaveLength(2);
     expect(rows[0].paths[1].waits).toEqual(['1 DAYS']);
+    const [graph]=parseJourneyGraphs(entries);
+    expect(graph.nodes).toHaveLength(3);
+    expect(graph.joins).toEqual(['sms']);
+    expect(graph.roots).toEqual(['split']);
+    expect(graph.nodes[0].outcomes.map((o: {next: string})=>o.next)).toEqual(['sms','wait']);
+  });
+  it('conserva referência de engajamento e janela Einstein sem convertê-la em espera fixa',()=>{
+    const obj=(data:unknown)=>strToU8(JSON.stringify({data}));
+    const entries={'info.json':strToU8('{}'),'entities/journeys/1.json':obj({name:'J',version:2,activities:[
+      {key:'open',name:'Abrir e-mail 1',type:'ENGAGEMENTDECISION',configurationArguments:{refActivityCustomerKey:'email1'},outcomes:[{key:'yes',metaData:{label:'Sim'},next:'sto'},{key:'no',metaData:{label:'Não'},next:null}]},
+      {key:'sto',type:'STOWAIT',configurationArguments:{params:{slidingWindowHours:12}},outcomes:[{next:'sms'}]},
+      {key:'sms',type:'SMSSYNC',name:'sms',metaData:{store:{selectedContentBuilderMessage:'Texto'}},outcomes:[]},
+    ]})};
+    const [message]=parseEntities(entries,'engagement.zip').messages;
+    expect(message.paths[0]).toEqual({labels:['Abrir e-mail 1: Sim'],waits:[]});
+    const [graph]=parseJourneyGraphs(entries);
+    expect(graph.version).toBe(2);
+    expect(graph.nodes[0].configuration.refActivityCustomerKey).toBe('email1');
+    expect(graph.nodes[1].configuration.params.slidingWindowHours).toBe(12);
   });
 });
 

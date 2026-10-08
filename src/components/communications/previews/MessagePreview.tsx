@@ -14,7 +14,11 @@ export function MessagePreview({ content, compact = false }: { content: MessageC
   const banner = safeHttps(content.banner_url);
   const text = previewText(content, fields);
   const sms = smsSegments(text);
-  if (!content.body_text || !['WhatsApp','SMS','Push'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{content.channel === 'E-mail' ? 'O pacote traz o e-mail sem as imagens publicadas. A prévia vem do HTML do template no catálogo; e-mail dinâmico (AMPscript, Plurix) depende do briefing.' : 'Texto completo não disponível para este canal.'}</p>;
+  if (content.channel === 'E-mail' && content.email_html) return <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    {!compact && <div className="border-b p-3 text-sm"><strong>{content.email_subject || 'Assunto não vem no pack'}</strong>{content.email_preheader && <p className="mt-1 text-xs text-slate-500">{content.email_preheader}</p>}</div>}
+    {compact ? <div className="h-[380px] overflow-hidden"><iframe title="Miniatura do e-mail do pack" sandbox="" srcDoc={content.email_html} tabIndex={-1} style={{width:640,height:1600,transform:'scale(0.46875)',transformOrigin:'top left',border:0}} /></div> : <iframe title="E-mail do pack" sandbox="" srcDoc={content.email_html} className="h-[600px] w-full border-0" />}
+  </div>;
+  if (!content.body_text || !['WhatsApp','SMS','Push'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{content.channel === 'E-mail' ? 'HTML de prévia não disponível neste conteúdo do pack. E-mail dinâmico (AMPscript, Plurix) depende do briefing.' : 'Texto completo não disponível para este canal.'}</p>;
   return <div className={'overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ' + (compact ? 'text-[11px]' : 'text-sm')}>
     <div className="flex items-center justify-between gap-2 bg-white px-3 py-2">
       <span className="font-semibold">{content.channel === 'SMS' ? content.sms_from || 'SMS' : content.channel==='Push'?'Afinz · Push':'Afinz · WhatsApp'}</span>

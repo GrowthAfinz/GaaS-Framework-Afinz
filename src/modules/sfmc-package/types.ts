@@ -8,6 +8,9 @@ export interface MessageContent {
   buttons: { title: string; type: 'url' | 'reply' }[];
   banner_url: string | null;
   sms_from: string | null;
+  email_html?: string | null;
+  email_subject?: string | null;
+  email_preheader?: string | null;
 }
 export interface PackageMessage {
   occurrence_key: string;
@@ -21,6 +24,7 @@ export interface PackageMessage {
   entry_filter: string | null;
   paths: { labels: string[]; waits: string[] }[];
   asset_name: string | null;
+  asset_id?: string | null;
   content: MessageContent;
   link_url: string | null;
   utm: Record<string, string | null>;
@@ -35,7 +39,17 @@ export interface ParsedPackage {
   parser_version: string;
   journeys_count: number;
   messages: PackageMessage[];
+  graphs?: JourneyGraph[];
 }
+export interface JourneyOutcome { key: string; next: string | null; label: string; metadata: Record<string, any>; arguments: Record<string, any> }
+export interface JourneyNode { key: string; name: string; type: string; configuration: Record<string, any>; outcomes: JourneyOutcome[] }
+export interface JourneyGraph {
+  reference: string; name: string; version: number;
+  entry: { trigger: Record<string, any>; event: Record<string, any>; de: Record<string, any>; entryMode: string | null };
+  goals: Record<string, any>[]; exitCriteria: Record<string, any>[];
+  nodes: JourneyNode[]; roots: string[]; joins: string[];
+}
+export interface JourneySnapshot { id: string; import_id: string; reference: string; journey_name: string; journey_version: number; graph: JourneyGraph; messages: PackageMessage[]; created_at: string }
 export interface PackageImport {
   id: string; file_name: string; package_name: string; source_scope: string;
   status: string; uploaded_at: string; messages_count: number;
