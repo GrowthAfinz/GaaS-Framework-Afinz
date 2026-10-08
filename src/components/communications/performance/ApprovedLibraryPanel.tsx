@@ -51,12 +51,13 @@ interface Props {
   contents: TemplateContentIndex | null;
   page: number;
   onPage: (p: number) => void;
+  onOpenDetail:(id:string)=>void;
   onOpenPerformance: (templateId: string) => void;
   onReviewCompatible: (templateId: string) => void;
 }
 
-export const ApprovedLibraryPanel: React.FC<Props> = ({ items, total, view, catalogRaw, contents, page, onPage, onOpenPerformance, onReviewCompatible }) => {
-  const [detail, setDetail] = useState<LibraryItem | null>(null);
+export const ApprovedLibraryPanel: React.FC<Props> = ({ items, total, view, catalogRaw, contents, page, onPage, onOpenDetail, onOpenPerformance, onReviewCompatible }) => {
+  const setDetail=(item:LibraryItem)=>onOpenDetail(item.template.template_id);
   const { rows, pages, page: current } = paginate(items, page);
   const resFor = (i: LibraryItem) => resolvePreview({ channel: i.template.channel, catalog: catalogRaw, contents, templateId: i.template.template_id });
 
@@ -73,7 +74,7 @@ export const ApprovedLibraryPanel: React.FC<Props> = ({ items, total, view, cata
                   <th className="px-2.5 py-2.5">Tags (fonte no título)</th>
                   <th className="px-2.5 py-2.5">Estado</th>
                   <th className="px-2.5 py-2.5">No período</th>
-                  <th className="px-2.5 py-2.5 text-right">Usos vinculados</th>
+                  <th className="px-2.5 py-2.5 text-right">Usos · todo o histórico</th>
                   <th className="px-2.5 py-2.5 text-right">Versões</th>
                   <th className="px-2.5 py-2.5" />
                 </tr>
@@ -83,7 +84,7 @@ export const ApprovedLibraryPanel: React.FC<Props> = ({ items, total, view, cata
                   const res = resFor(i);
                   return (
                     <tr key={i.template.template_id} className="border-b border-slate-100 align-top last:border-0 hover:bg-slate-50/60">
-                      <td className="px-2.5 py-2.5"><PreviewThumb res={res} w={46} h={58} title={i.template.template_id} assetName={i.assetNames[0]} /><span className="mt-1 block max-w-[64px] text-[9.5px] leading-tight text-slate-500" title={res.detail}>{res.label}</span></td>
+                      <td className="px-2.5 py-2.5"><PreviewThumb res={res} w={46} h={58} title={i.template.template_id} assetName={i.assetNames[0]} onOpen={()=>setDetail(i)}/><span className="mt-1 block max-w-[64px] text-[9.5px] leading-tight text-slate-500" title={res.detail}>{res.label}</span></td>
                       <td className="max-w-[280px] px-2.5 py-2.5">
                         <TemplateIdChips id={i.template.template_id} />
                         <code className="mt-0.5 block truncate text-[10px] text-slate-500" title={i.template.template_id}>{i.template.template_id}</code>
@@ -107,7 +108,7 @@ export const ApprovedLibraryPanel: React.FC<Props> = ({ items, total, view, cata
         <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {rows.map((i) => (
             <article key={i.template.template_id} className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="flex justify-center border-b border-slate-100 bg-slate-50 px-4 pt-4"><ChannelPreview res={resFor(i)} width={260} height={210} title={i.template.template_id} assetName={i.assetNames[0]} /></div>
+              <div className="flex justify-center border-b border-slate-100 bg-slate-50 px-4 pt-4"><div role="button" tabIndex={0} onClick={()=>setDetail(i)} onKeyDown={e=>{if(e.key==='Enter')setDetail(i);}}><ChannelPreview res={resFor(i)} width={260} height={210} title={i.template.template_id} assetName={i.assetNames[0]} zoomable={false}/></div></div>
               <div className="flex flex-1 flex-col gap-2 p-4">
                 <TemplateIdChips id={i.template.template_id} />
                 {i.assetNames[0] && <p className="truncate text-[11px] text-slate-700">Peça: {i.assetNames[0]}</p>}
@@ -120,26 +121,27 @@ export const ApprovedLibraryPanel: React.FC<Props> = ({ items, total, view, cata
         </div>
       )}
       <Pager page={current} pages={pages} total={items.length} unit={`template(s)${items.length !== total ? ` (de ${total})` : ''}`} onPage={onPage} />
-      {detail && <LibraryDetail item={detail} res={resFor(detail)} onClose={() => setDetail(null)} onOpenPerformance={onOpenPerformance} onReviewCompatible={onReviewCompatible} />}
+
     </div>
   );
 };
 
-const LibraryDetail: React.FC<{ item: LibraryItem; res: ReturnType<typeof resolvePreview>; onClose: () => void; onOpenPerformance: (id: string) => void; onReviewCompatible: (id: string) => void }> = ({ item, res, onClose, onOpenPerformance, onReviewCompatible }) => {
+export const LibraryDetail: React.FC<{ performance?:React.ReactNode; item: LibraryItem; res: ReturnType<typeof resolvePreview>; onClose: () => void; onOpenPerformance: (id: string) => void; onReviewCompatible: (id: string) => void }> = ({ performance, item, res, onClose, onOpenPerformance, onReviewCompatible }) => {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
+    const overflow=document.body.style.overflow;document.body.style.overflow='hidden';
     ref.current?.focus();
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose();if(e.key==='Tab'){const nodes=ref.current?.querySelectorAll<HTMLElement>('button,select,input,[tabindex="0"]');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===ref.current)){e.preventDefault();last.focus();}else if(!e.shiftKey&&(document.activeElement===last||document.activeElement===ref.current)){e.preventDefault();first.focus();}} };
     document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('keydown', key); opener?.focus?.(); };
+    return () => { document.removeEventListener('keydown', key);document.body.style.overflow=overflow; opener?.focus?.(); };
   }, [onClose]);
   const id = item.template.template_id;
   const periodRows = useMemo(() => [...item.periodExecutions].sort((a, b) => (b['Data de Disparo'] ?? '').localeCompare(a['Data de Disparo'] ?? '')), [item]);
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-3" onClick={onClose}>
-      <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Detalhes de ${id}`} onClick={(e) => e.stopPropagation()} className="grid max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl bg-white shadow-2xl outline-none md:grid-cols-[minmax(320px,40%)_1fr]">
-        <div className="flex justify-center overflow-auto border-b border-slate-200 bg-slate-50 p-4 md:border-b-0 md:border-r"><ChannelPreview res={res} width={380} height={520} title={id} assetName={item.assetNames[0]} /></div>
+      <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Detalhes de ${id}`} onClick={(e) => e.stopPropagation()} className="grid max-h-[92vh] w-full max-w-[1600px] overflow-y-auto md:overflow-hidden rounded-2xl bg-white shadow-2xl outline-none md:grid-cols-[minmax(320px,40%)_1fr]">
+        <div className="flex max-h-[40vh] justify-center overflow-auto md:max-h-none border-b border-slate-200 bg-slate-50 p-4 md:border-b-0 md:border-r"><ChannelPreview res={res} width={Math.min(480,typeof window==='undefined'?480:window.innerWidth-64)} height={650} zoomable={false} title={id} assetName={item.assetNames[0]} /></div>
         <div className="overflow-y-auto">
           <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur">
             <div className="min-w-0"><TemplateIdChips id={id} size="md" /><code className="mt-1 block truncate text-[10px] text-slate-500">{id}</code></div>
@@ -152,6 +154,7 @@ const LibraryDetail: React.FC<{ item: LibraryItem; res: ReturnType<typeof resolv
               {item.assetNames.length > 0 && <p className="mt-2 text-xs"><span className="text-slate-500">Nome original da peça (asset_name):</span> {item.assetNames.join(' · ')}</p>}
               {item.observedIds.length > 0 && <p className="mt-1 text-xs"><span className="text-slate-500">ID observado no link (af_sub3):</span> <code>{item.observedIds.join(' · ')}</code></p>}
             </section>
+            {performance}
             <section>
               <h4 className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-slate-500">Tags e origem da classificação</h4>
               <ul className="grid gap-1 text-xs sm:grid-cols-2">{item.tags.map((t, k) => <li key={k} className="flex justify-between gap-2 rounded border border-slate-100 bg-slate-50 px-2 py-1"><span><b className="text-slate-500">{FACET_LABEL[t.key]}:</b> {t.value}</span><span className="text-[10.5px] text-slate-500">{t.source}</span></li>)}</ul>
@@ -161,7 +164,7 @@ const LibraryDetail: React.FC<{ item: LibraryItem; res: ReturnType<typeof resolv
               {periodRows.length ? (
                 <>
                   <ul className="max-h-40 space-y-1 overflow-auto text-xs">{periodRows.map((r) => <li key={r.id} className="flex justify-between gap-2 rounded border border-slate-100 px-2 py-1"><span className="truncate" title={r['Activity name / Taxonomia']}><GitBranch size={10} className="mr-1 inline" />{r.jornada} · {r['Activity name / Taxonomia']}</span><span className="whitespace-nowrap text-slate-500">{r['Data de Disparo'] ? saoPauloDay(r['Data de Disparo']) : '—'}</span></li>)}</ul>
-                  <button type="button" onClick={() => { onClose(); onOpenPerformance(id); }} className="mt-2 rounded-lg border border-cyan-600 px-3 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-50">Ver métricas em “Com template vinculado”</button>
+
                 </>
               ) : <p className="text-xs text-slate-600">Sem execução vinculada neste período. Sem base, taxas, score ou datas atribuídas.</p>}
               <p className="mt-2 text-xs text-slate-600">Usos vinculados em todo o histórico: <b>{item.historyUses}</b>{item.firstUse && <> · de {item.firstUse.split('-').reverse().join('/')} a {item.lastUse?.split('-').reverse().join('/')}</>}</p>

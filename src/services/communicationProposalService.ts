@@ -39,8 +39,7 @@ export async function reviewProposals(rows: ProposalRow[], action: 'preview'|'ap
  if(error)throw error; return data as ApplyPreview & {preview_token:string; rejected?:number};
 }
 export function proposalGroup(p: ProposalRow) {
- const {evidence,order,tracking_moment,candidate_ordinal,...context}=p.resolved_context;
- return p.message.import_id+':'+JSON.stringify(Object.entries(context).sort(([a],[b])=>a.localeCompare(b)));
+ return p.message.import_id;
 }
 export function normalizeCommunicationText(text: string|null) {return (text||'').replace(/\\n/g,' ').replace(/\s+/g,' ').trim();}
 

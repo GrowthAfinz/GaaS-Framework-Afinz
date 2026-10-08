@@ -74,6 +74,6 @@ const EmailFit: React.FC<{ html: string; width: number; height: number; title: s
 };
 
 /** Miniatura clicável (tabela/listas). */
-export const ChannelThumb: React.FC<{ res: PreviewResolution; w?: number; h?: number; title?: string; assetName?: string | null }> = ({ res, w = 42, h, title, assetName }) => (
-  <PreviewThumb res={res} w={w} h={h ?? Math.round(w * 1.25)} title={title} assetName={assetName} />
+export const ChannelThumb: React.FC<{ res: PreviewResolution; w?: number; h?: number; title?: string; assetName?: string | null;onOpen?:()=>void }> = ({ res, w = 42, h, title, assetName,onOpen }) => (
+  <PreviewThumb onOpen={onOpen} res={res} w={w} h={h ?? Math.round(w * 1.25)} title={title} assetName={assetName} />
 );

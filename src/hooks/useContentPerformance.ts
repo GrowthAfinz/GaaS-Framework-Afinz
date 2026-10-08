@@ -40,9 +40,9 @@ export function useContentPerformance() {
   const catalogRaw = useMemo(() => rec.catalog.map((c) => c.raw), [rec.catalog]);
   const linked = useMemo(() => buildTemplatePerformance(rec.periodLinked, catalogRaw), [rec.periodLinked, catalogRaw]);
   const library = useMemo(() => buildApprovedLibrary({
-    catalog: catalogRaw, contents: contents.index, proposals: rec.proposals,
+    catalog: rec.catalog.filter(c=>c.inCurrentFilter||rec.periodLinked.some(a=>a.template_id===c.id)).map(c=>c.raw), contents: contents.index, proposals: rec.proposals,
     periodLinked: rec.periodLinked, historyLinked: rec.historyLinked, orphans: rec.orphans,
-  }), [catalogRaw, contents.index, rec.proposals, rec.periodLinked, rec.historyLinked, rec.orphans]);
+  }), [catalogRaw, rec.catalog, contents.index, rec.proposals, rec.periodLinked, rec.historyLinked, rec.orphans]);
 
   const recRefetch = rec.refetch;
   const refetch = useCallback(() => { recRefetch(); setContentRevision((v) => v + 1); loadPrev(); }, [recRefetch, loadPrev]);

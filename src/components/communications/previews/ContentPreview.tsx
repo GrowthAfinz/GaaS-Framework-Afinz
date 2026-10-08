@@ -89,7 +89,7 @@ export const PreviewModal: React.FC<{ res: PreviewResolution; asset: AssetState;
  * Miniatura clicável: abre o modal central amplo (Escape fecha, foco volta à miniatura).
  * Sem conteúdo disponível, mostra o motivo e não abre modal vazio.
  */
-export const PreviewThumb: React.FC<{ res: PreviewResolution; title?: string; assetName?: string | null; w?: number; h?: number; showBadge?: boolean }> = ({ res, title, assetName, w = 56, h = 64, showBadge }) => {
+export const PreviewThumb: React.FC<{ res: PreviewResolution; title?: string; assetName?: string | null; w?: number; h?: number; showBadge?: boolean;onOpen?:()=>void }> = ({ res, title, assetName, w = 56, h = 64, showBadge,onOpen }) => {
   const asset = useResolvedAsset(res);
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -103,7 +103,7 @@ export const PreviewThumb: React.FC<{ res: PreviewResolution; title?: string; as
   return (
     <div className="inline-flex shrink-0 flex-col items-start gap-1">
       {available ? (
-        <button ref={trigger} type="button" onClick={(e) => { e.stopPropagation(); setOpen(true); }} title={tip} aria-label={`Ampliar prévia de ${title ?? res.templateId ?? 'comunicação'}`}
+        <button ref={trigger} type="button" onClick={(e) => { e.stopPropagation(); if(onOpen)onOpen();else setOpen(true); }} title={tip} aria-label={`Ampliar prévia de ${title ?? res.templateId ?? 'comunicação'}`}
           className="relative block shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm hover:ring-2 hover:ring-cyan-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700" style={{ width: w, height: h }}>
           {inner}
           <span aria-hidden="true" className="absolute bottom-1 right-1 grid h-4 w-4 place-items-center rounded bg-cyan-800 text-white"><Maximize2 size={10} /></span>

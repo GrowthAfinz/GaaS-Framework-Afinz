@@ -16,6 +16,7 @@ create table communication_slots(id uuid primary key default gen_random_uuid(),j
 `;
 async function db(){
  const d=new PGlite();await d.exec(bootstrap);await d.exec(sql);await d.exec(sql);await d.exec(readFileSync(new URL('../supabase/migrations/20261007215201_communications_proposal_inbox.sql',import.meta.url),'utf8'));await d.exec(readFileSync(new URL('../supabase/migrations/20261007215620_communications_contextual_id_candidates.sql',import.meta.url),'utf8'));
+ await d.exec(readFileSync(new URL('../supabase/migrations/20261008164059_mixed_context_proposal_batches.sql',import.meta.url),'utf8'));
  await d.query("select set_config('request.jwt.claim.sub',$1,false)",[actor]);return d;
 }
 function message(extra={}){
@@ -148,12 +149,12 @@ test('proposta persistida tem fingerprint de revisão; rejeição auditável nã
  assert.equal((await d.query('select count(*)::int n from communication_template_contents')).rows[0].n,0);
  }finally{await d.close();}
 });
-test('lote heterogêneo e opt-out bloqueados; publicação de IA não sobrescreve revisão humana',async()=>{
+test('lote heterogêneo permitido e opt-out bloqueado; publicação de IA não sobrescreve revisão humana',async()=>{
  const d=await db();try{
  const pkg={package_sha256:'d'.repeat(64),file_name:'mixed.zip',package_name:'Mixed',package_version:1,parser_version:'1',journeys_count:1,messages:[message({utm:{af_sub3:'b2c_Test_D1'}}),message({occurrence_key:'other',activity_key:'other',activity_name:'carrinho21dserasa',utm:{af_sub3:'b2c_other_D1'}}),message({occurrence_key:'optout',activity_key:'out',is_optout:true})]};
  const id=(await d.query('select public.stage_sfmc_package($1::jsonb,$2) id',[JSON.stringify(pkg),'BU'])).rows[0].id;
  let rows=await proposals(d,id);assert.equal(rows.length,3);assert.equal(rows.filter(p=>p.status==='technical').length,1);
- await assert.rejects(review(d,rows.filter(p=>p.status==='ready')),/mesmo contexto/);
+ const mixed=await review(d,rows.filter(p=>p.status==='ready'));assert.ok(mixed.preview_token);
  await assert.rejects(review(d,rows.filter(p=>p.status==='technical'),'reject',null,null,'Sem conteúdo'),/pendências/);
  const p=rows.find(p=>p.status==='ready');const analysis={rule_version:'test-agent-v1',source_refs:{hash:'source'},proposals:[{message_id:p.message_id,proposed_template_id:'b2c_Agent_D2',resolved_context:p.resolved_context,reasons:['Fonte cruzada'],conflicts:[],alternatives:[]}]};
  await d.query('select public.publish_communications_analysis($1,$2::jsonb)',[id,JSON.stringify(analysis)]);
@@ -171,5 +172,19 @@ test('título Meta ausente recupera candidato governado somente com ordinal expl
  const p=(await proposals(d,s.id))[0];assert.equal(p.proposed_template_id,'b2c_car21_copa_srsa_Dispd3');assert.equal(p.status,'review');assert.equal(p.resolved_context.candidate_ordinal,'3');
  const missing=await stage(d,message({activity_name:'afz_car_vis_aqs_wpp_car_copaecred_pontual',journey_name:'JOR_AQS_B2C_21D_ABD',content:{...message().content,channel:'WhatsApp'}}));
  assert.equal((await proposals(d,missing.id))[0].proposed_template_id,'');
+ }finally{await d.close();}
+});
+
+test('aprovação de canais e segmentos diferentes mantém validação individual e escopo de importação',async()=>{
+ const d=await db();try{
+ const a=message({utm:{af_sub3:'b2c_sms_vibe_ngd_D1'}});
+ const b=message({occurrence_key:'wpp',activity_key:'wpp',activity_name:'afz_x_wpp_car',utm:{af_sub3:'b2c_car_vibe_inst_Dispd1'},content:{...a.content,channel:'WhatsApp'}});
+ const pkg={package_sha256:'e'.repeat(64),file_name:'mixed-channels.zip',package_name:'Mixed channels',package_version:1,parser_version:'1',journeys_count:1,messages:[a,b]};
+ const id=(await d.query('select public.stage_sfmc_package($1::jsonb,$2) id',[JSON.stringify(pkg),'BU'])).rows[0].id;
+ let rows=await proposals(d,id);for(const p of rows)await save(d,p);rows=await proposals(d,id);
+ const preview=await review(d,rows);assert.equal(preview.messages,2);
+ await review(d,rows,'apply',preview.preview_token,randomUUID());
+ assert.equal((await d.query('select count(*)::int n from communication_template_contents')).rows[0].n,2);
+ const channels=(await d.query('select distinct channel from communication_templates order by channel')).rows.map(r=>r.channel);assert.deepEqual(channels,['SMS','WhatsApp']);
  }finally{await d.close();}
 });

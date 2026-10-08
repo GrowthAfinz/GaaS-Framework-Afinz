@@ -17,7 +17,7 @@ import {
   type FacetFilters, type FacetKey, type ScopeFacets,
 } from '../../../utils/contentPerformanceModel';
 import type { FrameworkActivity } from '../../../utils/communicationOrchestrator';
-import { ApprovedLibraryPanel, LIBRARY_SORTS, sortLibrary, type LibrarySort } from './ApprovedLibraryPanel';
+import { LibraryDetail, ApprovedLibraryPanel, LIBRARY_SORTS, sortLibrary, type LibrarySort } from './ApprovedLibraryPanel';
 import { UNLINKED_SORTS, UnlinkedExecutionsPanel, sortUnlinked, toUnlinkedItem, type UnlinkedSort } from './UnlinkedExecutionsPanel';
 import { Pager, ScopeSelector, TagRow, paginate, tagsFromFacets } from './contentUi';
 import type { ActivityRow } from '../../../types/activity';
@@ -45,13 +45,13 @@ const STATUS_DOT: Record<string, string> = { active: 'bg-emerald-500', paused: '
 const STATUS_LABEL: Record<string, string> = { active: 'No ar', paused: 'Pausado', draft: 'Rascunho' };
 
 // Dados de prévia compartilhados (catálogo + versões carregadas uma vez): nenhuma consulta por card.
-const PreviewCtx = createContext<{ catalog: CommunicationTemplate[]; contents: TemplateContentIndex | null }>({ catalog: [], contents: null });
+const PreviewCtx = createContext<{ catalog: CommunicationTemplate[]; contents: TemplateContentIndex | null;onOpen?:(id:string)=>void }>({ catalog: [], contents: null });
 const useLinkedRes = (t: ScoredTemplate) => {
   const { catalog, contents } = useContext(PreviewCtx);
   return useMemo(() => resolvePreview({ channel: t.template.channel, catalog, contents, templateId: t.template.template_id }), [catalog, contents, t.template.channel, t.template.template_id]);
 };
-const LinkedThumb: React.FC<{ t: ScoredTemplate; w?: number; h?: number }> = ({ t, w = 42, h }) => <ChannelThumb res={useLinkedRes(t)} w={w} h={h} title={t.template.template_id} />;
-const LinkedPreview: React.FC<{ t: ScoredTemplate; width: number; height: number }> = ({ t, width, height }) => <ChannelPreview res={useLinkedRes(t)} width={width} height={height} title={t.template.template_id} />;
+const LinkedThumb: React.FC<{ t: ScoredTemplate; w?: number; h?: number }> = ({ t, w = 42, h }) => {const ctx=useContext(PreviewCtx);return <ChannelThumb onOpen={()=>ctx.onOpen?.(t.template.template_id)} res={useLinkedRes(t)} w={w} h={h} title={t.template.template_id}/>;};
+const LinkedPreview: React.FC<{ t: ScoredTemplate; width: number; height: number }> = ({ t, width, height }) => <ChannelPreview res={useLinkedRes(t)} width={width} height={height} zoomable={false} title={t.template.template_id} />;
 /** Facetas do template a partir das activities vinculadas + momento declarado no ID (contrato da régua). */
 const facetsCache = new WeakMap<ScoredTemplate, ScopeFacets>();
 function facetsOf(t: ScoredTemplate): ScopeFacets {
@@ -630,17 +630,7 @@ const PREVIEW_W = 500;
 const PREVIEW_H = 620;
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(z * 100) / 100));
 
-const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => void; onAudit: () => void }> = ({ t, onClose, onEdit, onAudit }) => {
-  const [zoom, setZoom] = useState(1);
-
-  // Fecha com Esc e reseta o zoom ao trocar de template.
-  useEffect(() => { setZoom(1); }, [t.template.template_id]);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
+const PerformanceDetails:React.FC<{t:ScoredTemplate}>=({t})=>{
   const funnel = [
     { l: 'Base', v: t.baseEnviada, pct: null as number | null },
     { l: 'Abertura', v: t.aberturas > 0 ? t.aberturas : null, pct: t.aberturas > 0 ? t.taxaAbertura : null },
@@ -649,50 +639,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
   ].filter((s) => s.v != null) as { l: string; v: number; pct: number | null; accent?: boolean }[];
   const maxF = Math.max(...funnel.map((s) => s.v), 1);
   const ch = CHANNELS[t.channelKey];
-  const per = facetPeriodLabel(t.facets);
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-md" onClick={onClose}>
-      <div className="grid h-full w-full max-w-[1600px] grid-cols-[minmax(520px,44%)_1fr] overflow-hidden rounded-2xl border border-white/40 bg-white shadow-2xl" style={{ animation: 'perfDrawer .28s ease' }} onClick={(e) => e.stopPropagation()}>
-        <style>{`@keyframes perfDrawer{from{transform:translateX(40px);opacity:.5}to{transform:translateX(0);opacity:1}}`}</style>
-        <div className="flex flex-col overflow-hidden border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white p-[18px]">
-          <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-            <ChannelTag channel={t.template.channel} soft />
-            <div className="flex items-center gap-1.5">
-              <div className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
-                <button onClick={() => setZoom((z) => clampZoom(z - 0.25))} disabled={zoom <= MIN_ZOOM} title="Diminuir zoom" className="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40"><ZoomOut size={15} /></button>
-                <button onClick={() => setZoom(1)} title="Restaurar zoom (100%)" className="min-w-[46px] rounded-md px-1 py-1 text-center text-[11px] font-bold tabular-nums text-slate-600 transition-colors hover:bg-slate-100">{Math.round(zoom * 100)}%</button>
-                <button onClick={() => setZoom((z) => clampZoom(z + 0.25))} disabled={zoom >= MAX_ZOOM} title="Aumentar zoom" className="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 disabled:opacity-40"><ZoomIn size={15} /></button>
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto">
-            <div className="flex min-h-full min-w-full items-center justify-center p-2">
-              <LinkedPreview t={t} width={Math.round(PREVIEW_W * zoom)} height={Math.round(PREVIEW_H * zoom)} />
-            </div>
-          </div>
-        </div>
-        <div className="overflow-y-auto">
-          <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-6 py-4 backdrop-blur">
-            <div className="min-w-0">
-              <TemplateIdChips id={t.template.template_id} size="md" />
-              <code className="mt-1.5 block truncate text-[10px] text-slate-400" title={t.template.template_id}>{t.template.template_id}</code>
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <ScoreRing score={t.score} size={52} />
-              <button onClick={onClose} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50" title="Fechar detalhes"><X size={18} /></button>
-            </div>
-          </div>
-          <div className="p-6 pt-4">
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            <BuChip bu={buOf(t)} />
-            {first(t.facets.segmentos) && <MetaChip title={t.facets.segmentos.join(' · ')}>{first(t.facets.segmentos)}{plusN(t.facets.segmentos)}</MetaChip>}
-            {first(t.facets.jornadas) && <MetaChip title={t.facets.jornadas.join(' · ')}><Route size={11} />{first(t.facets.jornadas)}{plusN(t.facets.jornadas)}</MetaChip>}
-            {first(t.facets.safras) && <MetaChip>{first(t.facets.safras)}</MetaChip>}
-            {per && <MetaChip>{per}</MetaChip>}
-            <StatusDot status={t.template.status} withLabel />
-          </div>
-
+return <>
           <p className="mb-1 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">Métricas somam {t.executions} execução(ões) vinculadas a este template no período. A prévia é a peça atual/catálogo e não certifica a versão enviada em cada execução.{t.resultsMeasured === 0 && ' Nenhuma execução tem resultado registrado ainda: sem score.'}</p>
           <SectionTitle>Como o score foi calculado</SectionTitle>
           <div className="flex flex-col gap-2">
@@ -743,15 +690,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
             ))}
           </div>
 
-          <div className="mt-6 flex gap-2">
-            <button onClick={onEdit} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold text-slate-700 hover:border-slate-300"><Pencil size={14} /> Editar peça</button>
-            <button onClick={onAudit} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-cyan-600 bg-cyan-600 px-3 py-2.5 text-[13px] font-bold text-white shadow-sm hover:bg-cyan-700"><ListTree size={14} /> Jornadas / activity_names</button>
-          </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+</>;
 };
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -874,6 +813,8 @@ export const PerformanceView: React.FC = () => {
     setFilters({});
     setPerfDeepLink(null);
   }, [perfDeepLink, setPerfDeepLink]);
+  const [detailId,setDetailId]=useState<string|null>(null);
+  const [libraryPeriodOnly,setLibraryPeriodOnly]=useState(true);
   const [selected, setSelected] = useState<ScoredTemplate | null>(null);
   const [editing, setEditing] = useState<TemplatePerformance | null>(null);
   const [auditing, setAuditing] = useState<ScoredTemplate | null>(null);
@@ -893,8 +834,8 @@ export const PerformanceView: React.FC = () => {
   const unlinkedFiltered = useMemo(() => sortUnlinked(unlinkedAll.filter((i) => matchesFacets(i.facets, filters) && searchMatches(i.searchText, query)), unlinkedSort.key, unlinkedSort.dir), [unlinkedAll, filters, query, unlinkedSort]);
 
   // ── visão 3: biblioteca de comunicações aprovadas ──
-  const libCounts = useMemo(() => libraryCounts(perf.library), [perf.library]);
-  const libraryAll = useMemo(() => libraryVisible(perf.library, includeDrafts), [perf.library, includeDrafts]);
+  const libCounts = useMemo(() => libraryCounts(perf.library.filter(i=>!libraryPeriodOnly||i.periodExecutions.length>0)), [perf.library,libraryPeriodOnly]);
+  const libraryAll = useMemo(() => libraryVisible(perf.library, includeDrafts).filter(i=>!libraryPeriodOnly||i.periodExecutions.length>0), [perf.library, includeDrafts,libraryPeriodOnly]);
   const libraryFiltered = useMemo(() => sortLibrary(libraryAll.filter((i) => matchesFacets(i.facets, filters) && searchMatches(i.searchText, query)), librarySort.key, librarySort.dir), [libraryAll, filters, query, librarySort]);
 
   const scopeFacets: ScopeFacets[] = useMemo(() => scope === 'linked' ? scored.map(facetsOf) : scope === 'unlinked' ? unlinkedAll.map((i) => i.facets) : libraryAll.map((i) => i.facets), [scope, scored, unlinkedAll, libraryAll]);
@@ -939,7 +880,7 @@ export const PerformanceView: React.FC = () => {
   const mode = view === 'table' ? 'table' : 'gallery';
 
   return (
-    <PreviewCtx.Provider value={previewCtx}>
+    <PreviewCtx.Provider value={{...previewCtx,onOpen:setDetailId}}>
     <div className="mx-auto max-w-[1480px] space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-500">
@@ -1010,7 +951,7 @@ export const PerformanceView: React.FC = () => {
                 {sortSelect.dir === -1 ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
               </button>
             </div>
-            {scope === 'library' && (
+          {scope === 'library' && (
               <label className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold ${draftsAvailable ? 'cursor-pointer text-slate-600' : 'cursor-not-allowed text-slate-400'}`} title={draftsAvailable ? 'Rascunhos e inativos aparecem com o estado real; não são aprovação.' : 'Não há rascunhos nem inativos no catálogo dentro dos filtros globais.'}>
                 <input type="checkbox" checked={includeDrafts} disabled={!draftsAvailable} onChange={(e) => setIncludeDrafts(e.target.checked)} className="peer sr-only" />
                 <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-checked:bg-cyan-600 peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
@@ -1068,15 +1009,16 @@ export const PerformanceView: React.FC = () => {
           {scope === 'unlinked' && (
             <UnlinkedExecutionsPanel items={unlinkedFiltered} total={unlinkedAll.length} view={mode} catalog={perf.catalog} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage} onChanged={perf.refetch} busy={perf.refreshing} />
           )}
+          {scope==='library'&&<label className="mb-3 flex items-center gap-2 text-sm">Acervo<select value={libraryPeriodOnly?'period':'all'} onChange={e=>{setLibraryPeriodOnly(e.target.value==='period');setPage(1);}} className="rounded-lg border px-3 py-2"><option value="period">Com uso no período</option><option value="all">Todas as aprovadas deste público</option></select></label>}
           {scope === 'library' && (
             <ApprovedLibraryPanel items={libraryFiltered} total={libraryAll.length} view={mode} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage}
-              onOpenPerformance={(id) => { setScope('linked'); setFilters({}); setQuery(id); }}
+              onOpenDetail={setDetailId} onOpenPerformance={setDetailId}
               onReviewCompatible={(id) => { setScope('unlinked'); setFilters({}); setQuery(id); }} />
           )}
         </div>
       )}
 
-      {selected && <Drawer t={selected} onClose={() => setSelected(null)} onEdit={() => { setEditing(selected); setSelected(null); }} onAudit={() => setAuditing(selected)} />}
+      {(selected||detailId)&&(()=>{const id=selected?.template.template_id||detailId;const item=perf.library.find(i=>i.template.template_id===id);const t=scored.find(i=>i.template.template_id===id);return item?<LibraryDetail item={item} res={resolvePreview({channel:item.template.channel,catalog:perf.catalogRaw,contents:perf.contents,templateId:id!})} performance={t?<><ScoreRing score={t.score} size={52}/><PerformanceDetails t={t}/><div className="flex gap-2"><button className="rounded border px-3 py-2" onClick={()=>{setEditing(t);setSelected(null);setDetailId(null);}}>Editar peça</button><button className="rounded border px-3 py-2" onClick={()=>setAuditing(t)}>Jornadas / activity_names</button></div></>:undefined} onClose={()=>{setSelected(null);setDetailId(null);}} onOpenPerformance={setDetailId} onReviewCompatible={id=>{setSelected(null);setDetailId(null);setScope('unlinked');setQuery(id);}}/>:null;})()}
       {auditing && <AuditModal t={auditing} onClose={() => setAuditing(null)} />}
       {editing && <CommunicationDetailModal item={editing} onClose={() => setEditing(null)} onChanged={perf.refetch} />}
     </div>
