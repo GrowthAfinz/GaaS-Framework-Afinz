@@ -5,6 +5,8 @@ import type { CommunicationTemplate } from '../../../types/communication';
 import type { TemplateContentIndex } from '../../../services/templateContentIndex';
 import { resolvePreview, type PreviewResolution } from '../../../utils/communicationVisualResolution';
 import { executionMetrics, executionMomentLabel, facetsFromRecords, templateMomentLabel, type ExecutionMetrics, type ScopeFacets } from '../../../utils/contentPerformanceModel';
+import { parseSeqParts } from '../../../utils/taxonomy';
+import type { TemplatePerformance } from '../../../utils/contentPerformanceModel';
 import { batchEligibility, effectiveBatchSelection } from '../../../utils/executionLinkEligibility';
 import { TemplateIdChips } from '../TemplateIdChips';
 import { PreviewThumb } from '../previews/ContentPreview';
@@ -51,7 +53,7 @@ export function sortUnlinked(items: UnlinkedItem[], sort: UnlinkedSort, dir: 1 |
     if (sort === 'base') return i.metrics.base.value;
     if (sort === 'executions') return i.metrics.executions;
     if (sort === 'recent') return i.metrics.latest ? Date.parse(`${i.metrics.latest}T00:00:00Z`) : null;
-    if (sort === 'moment') return i.row.momentSuggestion.dispatch == null ? null : (i.row.momentSuggestion.week ?? 0) * 1000 + i.row.momentSuggestion.dispatch;
+    if (sort === 'moment') { const m = parseSeqParts(i.row.match?.tpl.id ?? '') ?? i.row.momentSuggestion; return m.dispatch == null ? null : (m.week ?? 0) * 1000 + m.dispatch; }
     return null;
   };
   return [...items].sort((a, b) => {
@@ -67,6 +69,7 @@ export function sortUnlinked(items: UnlinkedItem[], sort: UnlinkedSort, dir: 1 |
 interface Props {
   items: UnlinkedItem[];
   total: number;
+  linked: TemplatePerformance[];
   view: 'gallery' | 'table';
   catalog: CatalogEntry[];
   catalogRaw: CommunicationTemplate[];
@@ -87,7 +90,10 @@ function previewFor(row: OrphanRow, catalogRaw: CommunicationTemplate[], content
   });
 }
 
-export const UnlinkedExecutionsPanel: React.FC<Props> = ({ items, total, view, catalog, catalogRaw, contents, page, onPage, onChanged, busy }) => {
+export const UnlinkedExecutionsPanel: React.FC<Props> = ({ items, total, linked, view, catalog, catalogRaw, contents, page, onPage, onChanged, busy }) => {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const groups = useMemo(() => groupSuggestedTemplates(items), [items]);
+  const groupPage = paginate(groups, page);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [reviewing, setReviewing] = useState<OrphanRow | null>(null);
   const [batch, setBatch] = useState<OrphanRow[] | null>(null);
@@ -98,7 +104,8 @@ export const UnlinkedExecutionsPanel: React.FC<Props> = ({ items, total, view, c
   const visibleRows = useMemo(() => items.map((i) => i.row), [items]);
   const eligibleVisible = useMemo(() => visibleRows.filter((o) => batchEligibility(o, catalog).eligible), [visibleRows, catalog]);
   const effective = useMemo(() => effectiveBatchSelection(visibleRows, selected, catalog), [visibleRows, selected, catalog]);
-  const { rows, pages, page: current } = paginate(items, page);
+  const contextPage = paginate(items, page);
+  const { rows, pages, page: current } = view === 'table' ? { ...groupPage, rows: groupPage.rows.flatMap(g => g.items) } : contextPage;
   const toggle = (uid: string) => setSelected((cur) => { const n = new Set(cur); if (n.has(uid)) n.delete(uid); else n.add(uid); return n; });
   const eligibleExec = eligibleVisible.reduce((n, o) => n + o.executionRecords.length, 0);
 
@@ -116,9 +123,10 @@ export const UnlinkedExecutionsPanel: React.FC<Props> = ({ items, total, view, c
         <button type="button" disabled={!effective.groups.length || busy} onClick={() => setBatch(effective.groups)} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-40">
           <CheckCheck size={14} />Vincular selecionados ({effective.groups.length} grupo(s) · {effective.executions} exec.)
         </button>
-        <p className="basis-full text-[10.5px] text-slate-500">Só entram grupos com candidato único, contexto completo e sem conflitos. Demais: “Revisar vínculo”, um por vez.</p>
+        <p className="basis-full text-[10.5px] text-slate-500">A seleção reúne canais e segmentos diferentes. Cada contexto é validado separadamente; abra o template para conferir os impedimentos e as execuções exatas.</p>
       </div>
 
+      <details className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs text-amber-900"><summary className="cursor-pointer font-semibold">{visibleRows.length - eligibleVisible.length} contextos precisam de revisão antes do lote</summary><ul className="mt-2 space-y-1">{visibleRows.filter(o => !batchEligibility(o, catalog).eligible).map(o => <li key={o.uid}><b>{o.match?.tpl.id ?? o.name}</b>: {batchEligibility(o, catalog).reasons.join(' ')}</li>)}</ul></details>
       {view === 'table' ? (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -144,14 +152,22 @@ export const UnlinkedExecutionsPanel: React.FC<Props> = ({ items, total, view, c
                   const elig = batchEligibility(o, catalog);
                   const res = previewFor(o, catalogRaw, contents);
                   const conflicts = [...(o.packEvidence?.conflicts ?? []), ...(o.parsed.divergencias ?? [])];
+                  const expectedSubgroup = /(?:^|_)car21_|(?:^|_)21d(?:_|$)/i.test(o.match?.tpl.id ?? '') ? 'D-21 A D>7' : /(?:^|_)carsab_/i.test(o.match?.tpl.id ?? '') ? 'D-7' : null;
+                  const subgroupWarning = expectedSubgroup && !i.facets.subgrupo.includes(expectedSubgroup) ? `Subgrupo registrado: ${i.facets.subgrupo.join(', ') || 'não informado'}; ID sugere ${expectedSubgroup}. Revisar classificação.` : null;
+                  const group = groupPage.rows.find(g => g.items.includes(i))!;
+                  const first = group.items[0] === i;
+                  const history = linked.find(t => t.template.template_id === group.id);
+                  const eligible = group.items.filter(x => batchEligibility(x.row, catalog).eligible);
                   return (
-                    <tr key={o.uid} className="border-b border-slate-100 align-top last:border-0 hover:bg-slate-50/60">
+                    <React.Fragment key={o.uid}>
+                    {first && <tr className="border-b border-slate-200 bg-cyan-50/40"><td className="p-2"><input type="checkbox" aria-label={`Selecionar elegíveis do template ${group.id}`} disabled={!eligible.length || busy} checked={eligible.length > 0 && eligible.every(x => selected.has(x.row.uid))} onChange={() => setSelected(cur => { const n = new Set(cur); const all = eligible.every(x => n.has(x.row.uid)); eligible.forEach(x => all ? n.delete(x.row.uid) : n.add(x.row.uid)); return n; })} /></td><td className="p-2"><PreviewThumb res={res} w={46} h={58} title={group.id} /></td><td colSpan={2} className="p-2"><code className="font-bold">{group.id}</code><div className="mt-1"><TemplateIdChips id={group.id} /><TagRow tags={group.items.flatMap(x => tagsFromFacets(x.facets, 'Activities')) .filter((t,index,all) => all.findIndex(a => a.key===t.key && a.value===t.value)===index)} max={20} /></div><p className="mt-1 text-amber-800">{subgroupWarning}</p><span className="text-slate-500">{group.items.length} contextos · {group.items.reduce((n,x)=>n+x.metrics.executions,0)} execuções pendentes · {eligible.length} elegíveis</span></td><td colSpan={5} className="p-2"><span className="block text-slate-500">Evolução já vinculada no período · cartões</span>{history ? <TemplateTrend points={history.timeline.map(p => ({date:p.date,value:p.cartoes}))} /> : <span className="text-slate-400">Sem execução vinculada neste período</span>}</td><td colSpan={2} className="p-2"><button className="rounded-lg border border-cyan-200 bg-white px-3 py-2 font-semibold text-cyan-800" onClick={() => setExpanded(cur => { const n = new Set(cur); n.has(group.key) ? n.delete(group.key) : n.add(group.key); return n; })}>{expanded.has(group.key) ? 'Ocultar contextos' : 'Conferir execuções e vínculo'}</button></td></tr>}
+                    {expanded.has(group.key) && <tr className="border-b border-slate-100 align-top last:border-0 hover:bg-slate-50/60">
                       <td className="px-2.5 py-2.5">
                         <input type="checkbox" aria-label={`Selecionar ${o.name} para lote`} checked={selected.has(o.uid)} disabled={!elig.eligible || busy} onChange={() => toggle(o.uid)} title={elig.eligible ? 'Elegível para lote' : elig.reasons.join(' ')} />
                       </td>
                       <td className="px-2.5 py-2.5"><PreviewThumb res={res} w={46} h={58} title={o.match?.tpl.id ?? o.name} assetName={o.packEvidence?.proposal?.message.payload.asset_name} /><span className="mt-1 block max-w-[64px] text-[9.5px] leading-tight text-slate-500" title={res.detail}>{res.label}</span></td>
                       <td className="max-w-[360px] px-2.5 py-2.5">
-                        <TagRow tags={tagsFromFacets(i.facets, 'Activities')} skip={['momento']} />
+                        <TagRow tags={tagsFromFacets(i.facets, 'Activities')} skip={['momento']} /><p className="mt-1 text-amber-800">{subgroupWarning}</p>
                         <code className="mt-1 block truncate font-mono text-[10.5px] text-slate-700" title={o.name}>{o.name}</code>
                         <span className="mt-0.5 flex items-center gap-1 truncate text-[10.5px] text-slate-500"><GitBranch size={10} />{o.jornada}</span>
                         {o.packEvidence?.proposal?.message.payload.asset_name && <span className="block truncate text-[10.5px] text-slate-600" title="Nome da peça no pack (asset_name)">Peça: {o.packEvidence.proposal.message.payload.asset_name}</span>}
@@ -174,7 +190,8 @@ export const UnlinkedExecutionsPanel: React.FC<Props> = ({ items, total, view, c
                         <p className="mt-1 line-clamp-2 text-[10.5px] text-slate-500" title={o.match?.reasons.map((r) => `${r.label}: ${r.val}`).join('\n')}>{(o.packEvidence?.source !== 'none' ? o.packEvidence?.reasons[0] : undefined) ?? o.match?.reasons.filter((r) => r.ok).map((r) => r.label).join(' · ') ?? ''}</p>
                       </td>
                       <td className="px-2.5 py-2.5"><button type="button" disabled={busy} onClick={() => setReviewing(o)} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-cyan-700 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-cyan-800 disabled:opacity-50"><Link2 size={12} />Revisar vínculo</button></td>
-                    </tr>
+                    </tr>}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -203,10 +220,27 @@ export const UnlinkedExecutionsPanel: React.FC<Props> = ({ items, total, view, c
           })}
         </div>
       )}
-      <Pager page={current} pages={pages} total={items.length} unit={`grupo(s) de execuções${items.length !== total ? ` (de ${total})` : ''}`} onPage={onPage} />
+      <Pager page={current} pages={pages} total={view === 'table' ? groups.length : items.length} unit={`template(s) / grupo(s) de execuções${items.length !== total ? ` (de ${total})` : ''}`} onPage={onPage} />
 
       {reviewing && <ExecutionLinkReviewModal row={reviewing} catalog={catalog} catalogRaw={catalogRaw} contents={contents} onClose={() => setReviewing(null)} onLinked={onChanged} />}
       {batch && <BatchLinkModal groups={batch} catalog={catalog} onClose={() => { setBatch(null); setSelected(new Set()); }} onApplied={onChanged} />}
     </div>
   );
+};
+
+export function groupSuggestedTemplates(items: UnlinkedItem[]) {
+ const groups = new Map<string, {key:string;id:string;items:UnlinkedItem[]}>();
+ for (const item of items) {
+  const ids = new Set([...(item.row.packEvidence?.ids ?? []), ...(item.row.match ? [item.row.match.tpl.id] : [])]);
+  const id = item.row.match?.tpl.id;
+  const key = id && ids.size === 1 ? `${id}::${item.row.canalLabel}` : item.row.uid;
+  const group = groups.get(key) ?? {key,id:id ?? 'Sem candidato único',items:[]};
+  group.items.push(item); groups.set(key,group);
+ }
+ return [...groups.values()];
+}
+const TemplateTrend: React.FC<{points:{date:string;value:number}[]}> = ({points}) => {
+ const max = Math.max(...points.map(p=>p.value),1);
+ const xy = points.map((p,i)=>[points.length===1 ? 50 : 100*i/(points.length-1),28-24*p.value/max]);
+ return <svg width="110" height="32" role="img" aria-label="Cartões das execuções vinculadas no período"><title>{points.map(p=>`${p.date}: ${p.value} cartões`).join('; ')}</title><polyline fill="none" stroke="#0891b2" strokeWidth="2" points={xy.map(p=>p.join(',')).join(' ')} />{xy.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="2" fill="#0891b2" />)}</svg>;
 };

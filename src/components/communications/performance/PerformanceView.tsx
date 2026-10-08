@@ -782,7 +782,7 @@ function buOf(t: ScoredTemplate): string | null {
 
 // ── ORQUESTRADOR ───────────────────────────────────────────────────────────
 type Scope = 'linked' | 'unlinked' | 'library';
-const SELECT_FACETS: FacetKey[] = ['frente', 'parceiro', 'subgrupo', 'oferta', 'promocional', 'momento'];
+const SELECT_FACETS: FacetKey[] = ['frente', 'parceiro', 'segmento', 'subgrupo', 'oferta', 'promocional', 'momento'];
 const SCOPE_HINT: Record<Scope, string> = {
   linked: 'Templates com execuções vinculadas no período. Métricas reais das execuções; a prévia não certifica a versão enviada.',
   unlinked: 'Grupos de execuções do período sem template, com as sugestões do motor de reconciliação. Vínculo só após revisão.',
@@ -847,12 +847,12 @@ export const PerformanceView: React.FC = () => {
   const unlinkedExecutions = perf.orphans.reduce((n, o) => n + o.executionRecords.length, 0);
   const scopeOptions = [
     { id: 'linked' as const, label: 'Com template vinculado', count: scored.length, unit: 'templates', sub: `${linkedExecutions.toLocaleString('pt-BR')} execuções vinculadas no período` },
-    { id: 'unlinked' as const, label: 'Disparos sem template', count: perf.orphans.length, unit: 'grupos de execuções', sub: `${unlinkedExecutions.toLocaleString('pt-BR')} execuções aguardando vínculo` },
+    { id: 'unlinked' as const, label: 'Vínculos pendentes', count: perf.orphans.length, unit: 'grupos de execuções', sub: `${unlinkedExecutions.toLocaleString('pt-BR')} execuções aguardando vínculo` },
     { id: 'library' as const, label: 'Comunicações aprovadas', count: libCounts.approved + (includeDrafts ? libCounts.drafts + libCounts.inactive : 0), unit: 'templates', sub: `${libCounts.withExecution} com execução no período${includeDrafts && libCounts.drafts ? ` · inclui ${libCounts.drafts} rascunho(s)` : ''}` },
   ];
 
   const insight = useMemo(() => {
-    if (!linkedFiltered.length) return { lead: 'Sem peças comparáveis', text: 'Tente outro segmento ou canal. Execuções sem vínculo aparecem em “Disparos sem template”.', item: null as ScoredTemplate | null };
+    if (!linkedFiltered.length) return { lead: 'Sem peças comparáveis', text: 'Tente outro segmento ou canal. Execuções sem vínculo aparecem em “Vínculos pendentes”.', item: null as ScoredTemplate | null };
     const actions = suggestedActions(linkedFiltered);
     if (actions[0]) return { lead: actions[0].title.replace(actions[0].item.template.template_id, '').trim(), text: actions[0].text, item: actions[0].item };
     const best = [...linkedFiltered].filter((t) => t.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
@@ -874,7 +874,7 @@ export const PerformanceView: React.FC = () => {
   const sortSelect = scope === 'linked'
     ? { value: sort.key, dir: sort.dir, options: SORT_OPTIONS.map((o) => ({ key: o.key as string, label: o.label })), onChange: (k: string) => { const o = SORT_OPTIONS.find((x) => x.key === k) ?? SORT_OPTIONS[0]; setSort({ key: o.key, dir: o.defaultDir }); }, flip: () => setSort((c) => ({ ...c, dir: c.dir === -1 ? 1 : -1 })), note: undefined as string | undefined }
     : scope === 'unlinked'
-      ? { value: unlinkedSort.key, dir: unlinkedSort.dir, options: UNLINKED_SORTS, onChange: (k: string) => setUnlinkedSort({ key: k as UnlinkedSort, dir: -1 }), flip: () => setUnlinkedSort((c) => ({ ...c, dir: c.dir === -1 ? 1 : -1 })), note: 'Sem valor registrado fica ao final.' }
+      ? { value: unlinkedSort.key, dir: unlinkedSort.dir, options: UNLINKED_SORTS, onChange: (k: string) => setUnlinkedSort({ key: k as UnlinkedSort, dir: k === 'moment' ? 1 : -1 }), flip: () => setUnlinkedSort((c) => ({ ...c, dir: c.dir === -1 ? 1 : -1 })), note: 'Sem valor registrado fica ao final.' }
       : { value: librarySort.key, dir: librarySort.dir, options: LIBRARY_SORTS, onChange: (k: string) => setLibrarySort({ key: k as LibrarySort, dir: k === 'id' ? 1 : -1 }), flip: () => setLibrarySort((c) => ({ ...c, dir: c.dir === -1 ? 1 : -1 })), note: LIBRARY_SORTS.find((o) => o.key === librarySort.key)?.note };
   const draftsAvailable = libCounts.drafts + libCounts.inactive;
   const mode = view === 'table' ? 'table' : 'gallery';
@@ -905,7 +905,7 @@ export const PerformanceView: React.FC = () => {
           {scored.length ? <Overview items={scored} prev={perf.previousTotals} onOpen={setSelected} /> : (
             <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
               <BarChart3 size={32} className="text-slate-300" />
-              <p className="max-w-md text-sm text-slate-500">Nenhuma execução vinculada a template no período. Revise em “Disparos sem template”, na Galeria ou Tabela.</p>
+              <p className="max-w-md text-sm text-slate-500">Nenhuma execução vinculada a template no período. Revise em “Vínculos pendentes”, na Galeria ou Tabela.</p>
             </div>
           )}
         </>
@@ -1007,7 +1007,7 @@ export const PerformanceView: React.FC = () => {
             <TableView items={linkedFiltered} sort={sort} onSort={setSort} onOpen={setSelected} page={page} onPage={setPage} />
           ))}
           {scope === 'unlinked' && (
-            <UnlinkedExecutionsPanel items={unlinkedFiltered} total={unlinkedAll.length} view={mode} catalog={perf.catalog} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage} onChanged={perf.refetch} busy={perf.refreshing} />
+            <UnlinkedExecutionsPanel items={unlinkedFiltered} linked={perf.linked} total={unlinkedAll.length} view={mode} catalog={perf.catalog} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage} onChanged={perf.refetch} busy={perf.refreshing} />
           )}
           {scope==='library'&&<label className="mb-3 flex items-center gap-2 text-sm">Acervo<select value={libraryPeriodOnly?'period':'all'} onChange={e=>{setLibraryPeriodOnly(e.target.value==='period');setPage(1);}} className="rounded-lg border px-3 py-2"><option value="period">Com uso no período</option><option value="all">Todas as aprovadas deste público</option></select></label>}
           {scope === 'library' && (
