@@ -391,9 +391,10 @@ const toSeq = (week: number | null, dispatch: number) => (
 
 export function parseSeqParts(name: string): ParsedSeq | null {
   const n = normalizeSeqText(name);
-  const compact = n.replace(/_/g, '');
+  // Keep token boundaries: Dispd1_21d is dispatch 1, not 121.
+  const compact = n;
 
-  const template = compact.match(/s0?(\d+)d0?(\d+)/);
+  const template = compact.match(/(?:^|_)s0?(\d+)_?d0?(\d+)(?=_|[^0-9]|$)/);
   if (template) {
     const week = Number(template[1]);
     const dispatch = Number(template[2]);
@@ -401,8 +402,8 @@ export function parseSeqParts(name: string): ParsedSeq | null {
   }
 
   const activity =
-    compact.match(/disp(?:aro)?0?(\d+)s(?:emana)?0?(\d+)/)
-    ?? compact.match(/d(?:isp)?0?(\d+)sem(?:ana)?0?(\d+)/);
+    compact.match(/disp(?:aro)?_?0?(\d+)_?s(?:emana)?_?0?(\d+)/)
+    ?? compact.match(/d(?:isp)?_?0?(\d+)_?sem(?:ana)?_?0?(\d+)/);
   if (activity) {
     const dispatch = Number(activity[1]);
     const week = Number(activity[2]);
@@ -418,7 +419,7 @@ export function parseSeqParts(name: string): ParsedSeq | null {
 
   // Disparo isolado marcado por "disp" + número, tolerando texto colado no meio
   // (ex.: dispcopa21, disp7vibeecred, disp4_maior/menor). Sem semana associada.
-  const dispOnly = compact.match(/disp[a-z]*?0?(\d+)/);
+  const dispOnly = compact.match(/disp[a-z]*?_?0?(\d+)/);
   if (dispOnly) {
     const dispatch = Number(dispOnly[1]);
     if (Number.isFinite(dispatch)) return { seq: toSeq(null, dispatch), week: null, dispatch, source: 'fallback' };
@@ -429,7 +430,7 @@ export function parseSeqParts(name: string): ParsedSeq | null {
   // d12refmaio_pontual, d0arefmaio_pontual). Aceita D0 como disparo válido (dia
   // zero/imediato da régua) — variantes de letra (d0a vs d0b) colapsam no mesmo
   // número, perdendo a distinção entre as duas mensagens do mesmo dia.
-  const fallback = compact.match(/d0?(\d+)[a-z]*(?:diario|pontual|$)/);
+  const fallback = compact.match(/(?:^|_)d0?(\d+)[a-z]*(?=_|$)/);
   if (fallback) {
     const dispatch = Number(fallback[1]);
     if (Number.isFinite(dispatch)) return { seq: toSeq(null, dispatch), week: null, dispatch, source: 'fallback' };

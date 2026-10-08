@@ -37,6 +37,7 @@ const CadastroTemplates: React.FC = () => {
   const [queueChannel, setQueueChannel] = useState<string | null>(null); // filtro de canal vindo do header de cobertura
   const [proposals, setProposals] = useState<ProposalRow[]>([]), [events, setEvents] = useState<ProposalEvent[]>([]);
   const [proposalLoading, setProposalLoading] = useState(true), [proposalError, setProposalError] = useState('');
+  const [evidenceRevision, setEvidenceRevision] = useState(0);
   const [summary, setSummary] = useState<InboxSummary | null>(null);
   const { orphans, reconciled, catalog, coverage, loading, error, refetch } = useReconciliation();
   const lastRefresh = useRef(0);
@@ -49,6 +50,7 @@ const CadastroTemplates: React.FC = () => {
       const [rows, history] = await Promise.all([readProposalInbox(), readProposalEvents()]);
       const sig = (list: ProposalRow[]) => list.map(p => p.id + ':' + p.revision + ':' + p.status).join('|');
       setProposals(prev => (sig(prev) === sig(rows) ? prev : rows));
+      if (!silent) setEvidenceRevision(v => v + 1);
       setEvents(prev => (prev.length === history.length && prev[prev.length - 1]?.id === history[history.length - 1]?.id ? prev : history));
     }
     catch (e) { if (!silent) setProposalError(describeError(e)); } finally { if (!silent) setProposalLoading(false); }
@@ -109,7 +111,7 @@ const CadastroTemplates: React.FC = () => {
             </div>
 
             <div className="mt-5" role="tabpanel">
-              {tab === 'fila' && <ReconciliationQueue packCount={summary ? proposals.length - summary.hidden : 0} packInbox={<CommunicationProposalInbox catalog={catalog} rows={proposals} loading={proposalLoading} error={proposalError} onRefresh={()=>void refreshProposals()} onChanged={changed} onSummary={setSummary}/>} orphans={orphans} catalog={catalog} channelFilter={queueChannel} onClearChannelFilter={()=>setQueueChannel(null)} onCreate={setCompose} onChanged={changed}/>}
+              {tab === 'fila' && <ReconciliationQueue packCount={summary ? proposals.length - summary.hidden : 0} packInbox={<CommunicationProposalInbox evidenceRevision={evidenceRevision} catalog={catalog} rows={proposals} loading={proposalLoading} error={proposalError} onRefresh={changed} onChanged={changed} onSummary={setSummary}/>} orphans={orphans} catalog={catalog} channelFilter={queueChannel} onClearChannelFilter={()=>setQueueChannel(null)} onCreate={setCompose} onChanged={changed}/>}
               {tab === 'asset' && <TemplateCatalogView key={catalogRevision} />}
               {tab === 'auditoria' && <CommunicationsAuditView events={events} proposals={proposals} error={proposalError} reconciled={reconciled} catalog={catalog} onChanged={changed} />}
             </div>

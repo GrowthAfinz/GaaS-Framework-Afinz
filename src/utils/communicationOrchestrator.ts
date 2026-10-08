@@ -2,7 +2,7 @@ import type {ProposalRow} from '../services/communicationProposalService';
 import type {CatalogEntry} from '../hooks/useReconciliation';
 import type {ActivityMomentSuggestion} from '../types/communication';
 import {normalizeJourney} from '../modules/sfmc-package/parsePackage';
-import {canalToId,matchTemplate,parseActivity,parseJornadaIdentity,parseSeq,partnerCode,resolveDim,segmentoKey,segmentoLabelCanon,translateTemplateId} from './taxonomy';
+import {canalToId,matchTemplate,parseActivity,parseSeq,partnerCode,resolveDim,segmentoKey,segmentoLabelCanon,translateTemplateId} from './taxonomy';
 
 export interface FrameworkActivity {
  id:string;jornada:string;'Activity name / Taxonomia':string;Canal:string;BU:string|null;Parceiro:string|null;
@@ -12,6 +12,7 @@ export interface FrameworkActivity {
  'Ordem de disparo':number|null;'Data de Disparo':string|null;'Horário de Disparo':string|null;
  'Base Total':number|string|null;'Base Acionável':number|string|null;template_id:string|null;
  Propostas:number|null;Aprovados:number|null;'Cartões Gerados':number|null;Cliques:number|null;
+ 'Emissões Independentes'?:number|null;'Emissões Assistidas'?:number|null;Abertura?:number|null;'Custo Total Campanha'?:number|null;
 }
 export interface OrchestrationSlot {id:string;journey_name:string;activity_name:string;channel:string;metadata:Record<string,unknown>}
 export interface DimensionEvidence {label:string;value:string;source:string;alternatives:{value:string;source:string}[];conflict:boolean}
@@ -28,21 +29,20 @@ const norm=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLower
 const distinct=(v:string[])=>[...new Map(v.filter(Boolean).map(s=>[norm(s),s])).values()];
 export function missingGovernanceParameters(row:ProposalRow) {return ['c','af_sub1','af_sub2','af_sub3'].filter(key=>!clean(row.message.payload.utm[key]));}
 export const dispatchDay=(v:string)=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v));
-function family(value:string){return /(?:^|_)carsab(?:_|$)|sabado/i.test(value)?'Carrinho Sábado':/car21|carrinho21d/i.test(value)?'Carrinho 21D':/(?:^|_)car(?:_|$)/i.test(value)?'Carrinho':null;}
-function idPartner(id:string){if(!/_(car21|carsab)_/i.test(id))return null;return /_(srsa|srasa|sersa|serasa)_/i.test(id)?'Serasa':/_inst_/i.test(id)?'Institucional':null;}
+function idPartner(id:string){if(!/_(car|car21|carsab)_/i.test(id))return null;return /_(srsa|srasa|sersa|serasa)_/i.test(id)?'Serasa':/_inst_/i.test(id)?'Institucional':null;}
 function sequence(value:string|null){const sd=value?.match(/^S(\d+)D0*(\d+)$/i),d=value?.match(/^D0*(\d+)$/i);return sd?{week:Number(sd[1]),dispatch:Number(sd[2])}:d?{week:null,dispatch:Number(d[1])}:null;}
 function sum(rows:FrameworkActivity[],column:'Base Total'|'Base Acionável') {if(!rows.length||rows.some(r=>r[column]==null||r[column]===''||!Number.isFinite(Number(r[column]))))return null;return rows.reduce((s,r)=>s+Number(r[column]),0);}
 
 export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActivity[],slots:OrchestrationSlot[],catalog:CatalogEntry[],period:{start:string;end:string}|null=null):Orchestration {
- const p=row.message.payload,context=row.resolved_context;
+ const p=row.message.payload;
  const named=universe.filter(a=>a['Activity name / Taxonomia']===p.activity_name);
  const exact=named.filter(a=>normalizeJourney(a.jornada)===normalizeJourney(p.journey_name)&&canalToId(p.content.channel)!=null&&canalToId(a.Canal)===canalToId(p.content.channel));
  const selected=period?exact.filter(a=>a['Data de Disparo']&&dispatchDay(a['Data de Disparo'])>=period.start&&dispatchDay(a['Data de Disparo'])<=period.end):exact;
  const observed=(key:keyof FrameworkActivity)=>distinct(exact.map(a=>clean(a[key])));
- const jid=parseJornadaIdentity(p.journey_name), parsed=parseActivity(p.activity_name,{jornada:p.journey_name,canal:p.content.channel});
- const raw=(p.journey_name+' '+p.activity_name).toLowerCase();
  const observedIdentifier=clean(p.utm.af_sub3)||row.observed_template_id||'';
  const identifier=row.proposed_template_id||observedIdentifier;
+ const idSource=identifier===observedIdentifier?'af_sub3 / Template ID':'Template ID proposto (revisável)';
+ const linkedIdEvidence=(extract:(id:string)=>string|null)=>observed('template_id').map(id=>({value:extract(id),source:'activities.template_id: '+id}));
  const tpl=catalog.find(t=>t.id===identifier),meta=tpl?.raw.metadata||{};
  const fields:Record<string,DimensionEvidence>={};
  function field(key:string,label:string,evidence:{value:unknown;source:string}[],canon=(s:string)=>norm(s)) {
@@ -51,27 +51,28 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
   fields[key]={label,value:first?.value||'Não identificado',source:first?.source||'Sem evidência',alternatives:values.slice(1),conflict};
  }
  const col=(key:keyof FrameworkActivity)=>observed(key).map(value=>({value,source:'activities.'+key}));
- const analysis=(key:string)=>({value:context[key],source:row.reviewed_by?'Revisão / análise aprovada':'Análise do pack'});
  const activityPartner=/serasa|srsa|(?:^|_)srs(?:_|$)|ecred/i.test(p.activity_name)?'Serasa':/institucional|aint|vibeint|copaint/i.test(p.activity_name)?'Institucional':null;
- const segment=/(?:^|_)abd(?:_|$)/.test(raw)?'Abandonados':/(?:^|_)(?:ngd|negados)(?:_|$)/.test(raw)?'Negados':parsed.segmento?segmentoLabelCanon(parsed.segmento):null;
- const sub=/sabado|(?:^|_)sab(?:_|$)/.test(raw)?'Sábado':/21d|21dias/.test(raw)?'21D':null;
- const idFront=/^b2c_/i.test(identifier)?'B2C':/^(?:b2b2c|dia|bb|plx|plurix)_/i.test(identifier)?'B2B2C':null;
- field('front','BU',[{value:idFront,source:'af_sub3 / Template ID'},...col('BU'),{value:jid.bu?.toUpperCase(),source:'Nome da jornada'}]);
- field('origin','Origem cadastrada',[...col('Parceiro')]);
- field('partner','Parceiro / variante',[{value:idPartner(identifier),source:identifier===observedIdentifier?'af_sub3 / Template ID':'Template ID proposto (revisável)'}, {value:activityPartner,source:'Activity Name'},analysis('partner'),{value:idPartner(observedIdentifier),source:'ID originalmente observado em af_sub3'},...col('parceiro_canonico'),...col('Parceiro')],s=>partnerCode(s)||norm(s));
- field('channel','Canal',[{value:p.content.channel,source:'Mensagem no pack'},...col('Canal'),{value:tpl?.channel,source:'Catálogo'}],s=>canalToId(s)||norm(s));
+ const sub=/car21|(?:^|_)21d(?:_|$)/i.test(identifier)||observed('Subgrupos').some(v=>/D-21/i.test(v))?'21D':null;
+ const idFront=/^b2c_/i.test(identifier)?'B2C':/^(?:plx|plurix)_/i.test(identifier)?'Plurix':/^(?:b2b2c|dia|bb)_/i.test(identifier)?'B2B2C':null;
+ field('front','BU',[...col('BU'),{value:idFront,source:'af_sub3 / Template ID'}]);
+ field('origin','Origem cadastrada',col('Parceiro'));
+ // Institutional is the carrinho variant for Proprietaria; retain both raw sources.
+ const partnerCanon=(s:string)=>/^(institucional|proprietaria)$/i.test(norm(s))?'proprietaria':partnerCode(s)||norm(s);
+ field('partner','Parceiro',[...col('parceiro_canonico'),...col('Parceiro'),...linkedIdEvidence(idPartner),{value:idPartner(identifier),source:idSource}, {value:activityPartner,source:'Activity Name'}],partnerCanon);
+ field('channel','Canal',[...col('Canal'),{value:p.content.channel,source:'Mensagem no pack'},{value:tpl?.channel,source:'Catálogo'}],s=>canalToId(s)||norm(s));
  const linkSegment=clean(p.utm.af_sub1);
- field('segment','Segmento',[{value:linkSegment?segmentoLabelCanon(segmentoKey(linkSegment)):null,source:'Tracking af_sub1'}, {value:meta.segmento_af_sub1,source:'Governança do catálogo'},...col('Segmento'),analysis('segment'), {value:segment,source:'Jornada / Activity Name'},{value:tpl?.dims.segmento?segmentoLabelCanon(tpl.dims.segmento):null,source:'Template ID / catálogo'}],s=>segmentoKey(s)||norm(s));
- // Operational subgroups and configured recency are intentionally separate fields.
- const registeredSubgroups=col('Subgrupos');
- const audienceSubgroups=registeredSubgroups.filter(v=>!/^diario$/i.test(v.value));
- field('subgroup','Subgrupo',[...audienceSubgroups,{value:sub==='21D'?'21D (proposto)':null,source:'Jornada 21D; limites do público ainda não confirmados'},...registeredSubgroups]);
- field('recency','Recência / cadência',[analysis('subgroup'),{value:sub,source:'Nome da jornada'}]);
- field('family','Família',[{value:family(p.journey_name)||(family(p.activity_name)==='Carrinho'&&sub==='21D'?'Carrinho 21D':family(p.activity_name)),source:'Jornada / Activity Name e recência'},{value:family(identifier),source:'Template ID proposto'},{value:family(observedIdentifier),source:'ID originalmente observado em af_sub3'}]);
- field('offer','Oferta',[...col('Oferta'),{value:/(?:^|_)(?:padrao|pad)(?:_|$)/.test(raw)?'Padrão':null,source:'Nome da jornada'}]);
- const linkCampaign=clean(p.utm.c);
- const governedCampaign=/vibe/i.test(linkCampaign)?'Vibe':/copa/i.test(linkCampaign)?'Copa':/padrao/i.test(linkCampaign)?'Padrão':null;
- field('campaign','Campanha',[{value:governedCampaign,source:'Tracking c'},...col('Promocional'),analysis('campaign'),{value:/vibe/.test(raw)?'Vibe':/copa/.test(raw)?'Copa':null,source:'Jornada / Activity Name'}, {value:tpl?.dims.campanha,source:'Catálogo'}]);
+ field('segment','Segmento',[...col('Segmento'),{value:linkSegment?segmentoLabelCanon(segmentoKey(linkSegment)):null,source:'Tracking af_sub1'}, {value:meta.segmento_af_sub1,source:'Governança do catálogo'}, {value:tpl?.dims.segmento?segmentoLabelCanon(tpl.dims.segmento):null,source:'Template ID / catálogo'}],s=>segmentoKey(s)||norm(s));
+ const subgroupLabel=(s:string)=>s.replace(/^Abandonados\s+/i,'').replace(/^diario$/i,'Diário');
+ const subgroupCanon=(s:string)=>norm(subgroupLabel(s));
+ const subgroupFromId=(id:string)=>/_(?:car21)_|(?:^|_)21d(?:_|$)/i.test(id)?'D-21 A D>7':/_(?:carsab)_|(?:^|_)sab(?:_|$)/i.test(id)?'D-7':null;
+ const idSubgroup=subgroupFromId(identifier);
+ field('subgroup','Subgrupo',[...col('Subgrupos'),...linkedIdEvidence(subgroupFromId),{value:idSubgroup,source:idSource}],subgroupCanon);
+ fields.subgroup.value=subgroupLabel(fields.subgroup.value);
+ // Oferta and Promocional are independent columns: Vibe + Padrão is valid.
+ const offerToken=(v:string)=>/(?:^|_)vibe(?:_|$)/i.test(v)?'Vibe':/(?:^|_)limite(?:_|$)/i.test(v)?'Limite':null;
+ const promoToken=(v:string)=>/(?:^|_)copa(?:_|$)/i.test(v)?'Copa':/(?:^|_)upgrade(?:_|$)/i.test(v)?'Upgrade':null;
+ field('offer','Oferta',[...col('Oferta'),...linkedIdEvidence(offerToken),{value:offerToken(identifier),source:idSource},{value:offerToken(clean(p.utm.c)),source:'Tracking c'}]);
+ field('campaign','Promocional',[...col('Promocional'),...linkedIdEvidence(promoToken),{value:promoToken(identifier),source:idSource},{value:promoToken(clean(p.utm.c)),source:'Tracking c'}]);
  field('trackingCampaign','Campanha do link',[{value:p.utm.c,source:'Tracking c'}]);
  field('trackingMoment','Momento do link',[{value:p.utm.af_sub2,source:'Tracking af_sub2'}]);
  field('observedId','ID do link',[{value:observedIdentifier,source:'Tracking af_sub3'}]);
@@ -109,20 +110,21 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
  const candidateParsed=parseActivity(p.activity_name,{jornada:p.journey_name,canal:p.content.channel,bu:fields.front.value,segmento:fields.segment.value,parceiro:fields.partner.value});
  // Reuse scoring, but do not let its legacy journey precedence overwrite governed link dimensions.
  candidateParsed.segmento=segmentoKey(fields.segment.value==='Não identificado'?'':fields.segment.value);
- candidateParsed.campanha=resolveDim('campanha',fields.campaign.value);
+ candidateParsed.campanha=resolveDim('campanha',fields.campaign.value==='Padrão'||fields.campaign.value==='Não identificado'?fields.offer.value:fields.campaign.value);
  if(moment.dispatch!=null)candidateParsed.seq=moment.week?`S${moment.week}D${String(moment.dispatch).padStart(2,'0')}`:`D${moment.dispatch}`;
- const candidates=catalog.map(t=>{const m=matchTemplate(candidateParsed,[t]);if(!m)return null;const guards:string[]=[];const tf=family(t.id),pf=fields.family.value;if(tf&&pf!=='Não identificado'&&tf!==pf)guards.push(`Família ${tf} diverge de ${pf}`);const partner=idPartner(t.id);if(partner&&activityPartner&&partner!==activityPartner)guards.push(`Parceiro ${partner} diverge de ${activityPartner}`);return {id:t.id,score:m.score,reasons:m.reasons.map(r=>(r.ok?'✓ ':'⚠ ')+r.label+': '+r.val),conflicts:guards};}).filter((v):v is NonNullable<typeof v>=>!!v).sort((a,b)=>a.conflicts.length-b.conflicts.length||b.score-a.score||a.id.localeCompare(b.id)).slice(0,5);
+ const candidates=catalog.map(t=>{const m=matchTemplate(candidateParsed,[t]);if(!m)return null;const guards:string[]=[];const candidateSubgroup=/_(?:car21)_|(?:^|_)21d(?:_|$)/i.test(t.id)?'D-21 A D>7':/_carsab_/i.test(t.id)?'D-7':null;if(candidateSubgroup&&fields.subgroup.value!=='Não identificado'&&subgroupCanon(candidateSubgroup)!==subgroupCanon(fields.subgroup.value))guards.push(`Subgrupo ${candidateSubgroup} diverge de ${fields.subgroup.value}`);const partner=idPartner(t.id);if(partner&&fields.partner.value!=='Não identificado'&&partnerCanon(partner)!==partnerCanon(fields.partner.value))guards.push(`Parceiro ${partner} diverge de ${fields.partner.value}`);return {id:t.id,score:m.score,reasons:m.reasons.map(r=>(r.ok?'✓ ':'⚠ ')+r.label+': '+r.val),conflicts:guards};}).filter((v):v is NonNullable<typeof v>=>!!v).sort((a,b)=>a.conflicts.length-b.conflicts.length||b.score-a.score||a.id.localeCompare(b.id)).slice(0,5);
  const templateParts=translateTemplateId(identifier).filter(p=>p.key!=='seq').map(p=>({label:p.label,value:p.value}));
- if(family(identifier))templateParts.push({label:'Família',value:family(identifier)!});if(idPartner(identifier))templateParts.push({label:'Variante',value:idPartner(identifier)!});if(parseSeq(identifier))templateParts.push({label:'Índice do template',value:parseSeq(identifier)!});
+ if(idSubgroup)templateParts.push({label:'Subgrupo',value:idSubgroup});if(idPartner(identifier))templateParts.push({label:'Variante',value:idPartner(identifier)!});if(parseSeq(identifier))templateParts.push({label:'Índice do template',value:parseSeq(identifier)!});
  const exactIds=new Set(exact.map(a=>a.id));
  const relatedActivities=universe.filter(a=>!exactIds.has(a.id)&&canalToId(a.Canal)===canalToId(p.content.channel)
-  &&fields.partner.value!=='Não identificado'&&(partnerCode(a.parceiro_canonico||a.Parceiro||'')||norm(a.parceiro_canonico||a.Parceiro||''))===(partnerCode(fields.partner.value)||norm(fields.partner.value))
+  &&fields.partner.value!=='Não identificado'&&partnerCanon(a.parceiro_canonico||a.Parceiro||'')===partnerCanon(fields.partner.value)
   &&fields.segment.value!=='Não identificado'&&segmentoKey(a.Segmento)!=null&&segmentoKey(a.Segmento)===segmentoKey(fields.segment.value)
   &&norm(a.BU||'')===norm(fields.front.value)
+  &&(fields.subgroup.value==='Não identificado'||subgroupCanon(a.Subgrupos||'')===subgroupCanon(fields.subgroup.value))
   &&(fields.campaign.value==='Não identificado'||norm(a.Promocional||'')===norm(fields.campaign.value))
   &&(fields.offer.value==='Não identificado'||norm(a.Oferta||'')===norm(fields.offer.value))
   &&(!period||(a['Data de Disparo']&&dispatchDay(a['Data de Disparo'])>=period.start&&dispatchDay(a['Data de Disparo'])<=period.end))
  ).sort((a,b)=>(b['Data de Disparo']||'').localeCompare(a['Data de Disparo']||''));
- const results=(['Propostas','Aprovados','Cartões Gerados','Cliques'] as const).map(key=>{const covered=selected.filter(a=>a[key]!=null&&Number.isFinite(Number(a[key])));return {label:key,value:selected.length&&covered.length===selected.length?covered.reduce((s,a)=>s+Number(a[key]),0):null,covered:covered.length,total:selected.length};});
+ const results=(['Propostas','Aprovados','Cartões Gerados','Emissões Independentes','Emissões Assistidas','Abertura','Cliques','Custo Total Campanha'] as const).map(key=>{const covered=selected.filter(a=>a[key]!=null&&Number.isFinite(Number(a[key])));return {label:key,value:selected.length&&covered.length===selected.length?covered.reduce((s,a)=>s+Number(a[key]),0):null,covered:covered.length,total:selected.length};});
  return {fields,activities:selected,relatedActivities,results,otherContexts:named.length-exact.length,conflicts,base:sum(selected,'Base Total'),actionable:sum(selected,'Base Acionável'),exec:selected.length,latest:selected.map(a=>a['Data de Disparo']).filter((d):d is string=>!!d).sort().slice(-1)[0]||null,moment,candidates,templateParts};
 }
