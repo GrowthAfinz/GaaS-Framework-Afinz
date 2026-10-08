@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react';
-import type {CommunicationTemplate} from '../../../types/communication';
+import type {CommunicationTemplate,EmailTemplateMetadata} from '../../../types/communication';
+import {ExternalLink,Printer} from 'lucide-react';
 import {getSignedUrl} from '../../../services/communicationService';
 
 // HTML do e-mail vem do catálogo (email.html no storage). O pacote do SFMC não traz a URL pública
@@ -30,4 +31,37 @@ export function EmailThumb({html}:{html:string}) {
 /** Prévia em tamanho real, rolável, sem scripts nem navegação (sandbox vazio). */
 export function EmailFrame({html,title,height='calc(var(--screen-h) * 0.62)'}:{html:string;title:string;height?:string}) {
  return <iframe title={title} sandbox="" srcDoc={html} className="w-full rounded-lg border bg-white" style={{height}}/>;
+}
+
+// Cópia sem scripts, eventos inline nem javascript: para abrir fora do iframe (nova aba / impressão).
+function sanitized(html:string,title:string):string {
+ const doc=new DOMParser().parseFromString(html,'text/html');
+ doc.querySelectorAll('script,iframe,object,embed,form').forEach(n=>n.remove());
+ doc.querySelectorAll('*').forEach(el=>{for(const a of [...el.attributes]){if(/^on/i.test(a.name)||/^\s*javascript:/i.test(a.value))el.removeAttribute(a.name);}});
+ if(!doc.title)doc.title=title;
+ return '<!DOCTYPE html>'+doc.documentElement.outerHTML;
+}
+function openCopy(html:string,title:string,print:boolean) {
+ const url=URL.createObjectURL(new Blob([sanitized(html,title)],{type:'text/html'}));
+ const win=window.open(url,'_blank');
+ if(win&&print)win.addEventListener('load',()=>{const imgs=[...win.document.images];Promise.race([Promise.all(imgs.map(i=>i.complete?null:new Promise(r=>{i.onload=i.onerror=r;}))),new Promise(r=>setTimeout(r,4000))]).then(()=>win.print());});
+ setTimeout(()=>URL.revokeObjectURL(url),60_000);
+}
+
+/** Painel do e-mail: assunto, pré-cabeçalho, ações e a prévia. */
+export function EmailPreviewPanel({html,template,height}:{html:string;template:CommunicationTemplate;height?:string}) {
+ const meta=(template.metadata||{}) as EmailTemplateMetadata;
+ const title=`E-mail ${template.template_id}`;
+ const btn='inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700';
+ return <div className="space-y-3">
+  <dl className="grid gap-2 rounded-lg border bg-slate-50 p-3 text-sm">
+   <div className="grid grid-cols-[110px_1fr] gap-2"><dt className="font-semibold text-slate-600">Assunto</dt><dd className="text-slate-900">{meta.subject||<span className="text-slate-500">Não cadastrado no catálogo</span>}</dd></div>
+   <div className="grid grid-cols-[110px_1fr] gap-2"><dt className="font-semibold text-slate-600">Pré-cabeçalho</dt><dd className="text-slate-900">{meta.preheader||<span className="text-slate-500">Não cadastrado no catálogo</span>}</dd></div>
+  </dl>
+  <div className="flex flex-wrap gap-2">
+   <button type="button" className={btn} onClick={()=>openCopy(html,title,false)}><ExternalLink size={16} aria-hidden="true"/>Abrir em nova aba</button>
+   <button type="button" className={btn} onClick={()=>openCopy(html,title,true)}><Printer size={16} aria-hidden="true"/>Salvar em PDF</button>
+  </div>
+  <EmailFrame html={html} title={title} height={height}/>
+ </div>;
 }

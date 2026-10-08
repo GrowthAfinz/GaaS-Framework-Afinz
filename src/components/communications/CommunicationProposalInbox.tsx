@@ -11,7 +11,7 @@ import {normalizeJourney} from '../../modules/sfmc-package/parsePackage';
 import type {ApplyPreview,CandidateActivity,ReviewDecision,TemplateContent} from '../../modules/sfmc-package/types';
 import type {CommunicationTemplate} from '../../types/communication';
 import {MessagePreview} from './previews/MessagePreview';
-import {EmailFrame,useTemplateHtml} from './previews/EmailHtmlPreview';
+import {EmailPreviewPanel,useTemplateHtml} from './previews/EmailHtmlPreview';
 import {ReconciliationProposalRow,STATUS_LABEL} from './ReconciliationProposalRow';
 import {ActivityMomentModal} from './ActivityMomentModal';
 import {orchestrateCommunication,dispatchDay,missingGovernanceParameters,type FrameworkActivity,type OrchestrationSlot} from '../../utils/communicationOrchestrator';
@@ -24,7 +24,7 @@ const labels=STATUS_LABEL;
 const value=(p:ProposalRow,key:string)=>String(p.resolved_context[key]||'Não identificado');
 const localDay=dispatchDay;
 const mainFilters=[['front','Frente / BU'],['segment','Segmento']] as const;
-const moreFilters=[['partner','Parceiro / origem'],['channel','Canal'],['subgroup','Subgrupo'],['campaign','Campanha'],['offer','Oferta'],['week','Semana'],['dispatch','Dia / disparo']] as const;
+const moreFilters=[['partner','Parceiro / origem'],['channel','Canal'],['subgroup','Subgrupo'],['campaign','Campanha'],['offer','Oferta'],['week','Semana'],['dispatch','Disparo']] as const;
 type Lane='governed'|'warnings'|'technical';
 type StatusFilter='pending'|'ready'|'review'|'missing'|'applied'|'rejected'|'all';
 export interface InboxSummary {pending:number;ready:number;review:number;applied:number;hidden:number}
@@ -52,7 +52,11 @@ export function CommunicationProposalInbox({rows,loading,error,onRefresh,onChang
  const [simulation,setSimulation]=useState<{result:ApplyPreview&{preview_token:string};rows:ProposalRow[];key:string}|null>(null);
  const [rejecting,setRejecting]=useState(false),[rejectNote,setRejectNote]=useState('');
  const [evidence,setEvidence]=useState<{activities:FrameworkActivity[];slots:OrchestrationSlot[]}>({activities:[],slots:[]}),[evidenceLoading,setEvidenceLoading]=useState(true),[evidenceError,setEvidenceError]=useState('');
- useEffect(()=>{let active=true;setEvidenceLoading(true);setEvidenceError('');setEvidence({activities:[],slots:[]});readOrchestrationEvidence(rows).then(data=>{if(active)setEvidence(data);}).catch(e=>{if(active)setEvidenceError(describeError(e));}).finally(()=>{if(active)setEvidenceLoading(false);});return()=>{active=false;};},[rows]);
+ // Recarrega disparos só quando o conjunto de propostas muda de verdade; mantém a lista na tela enquanto atualiza.
+ const rowsKey=useMemo(()=>rows.map(p=>p.id+':'+p.revision).join('|'),[rows]);
+ const rowsRef=useRef(rows);rowsRef.current=rows;
+ const evidenceLoaded=useRef(false);
+ useEffect(()=>{let active=true;if(!evidenceLoaded.current)setEvidenceLoading(true);setEvidenceError('');readOrchestrationEvidence(rowsRef.current).then(data=>{if(active){setEvidence(data);evidenceLoaded.current=true;}}).catch(e=>{if(active)setEvidenceError(describeError(e));}).finally(()=>{if(active)setEvidenceLoading(false);});return()=>{active=false;};},[rowsKey]);
  const invalidPeriod=!!(start&&end&&start>end),partialPeriod=!!start!==!!end;
  const periodOk=!!(start&&end&&!invalidPeriod&&!partialPeriod);
  const orchestrations=useMemo(()=>new Map(rows.map(p=>[p.id,orchestrateCommunication(p,evidence.activities,evidence.slots,catalog,periodOk?{start,end}:null)])),[rows,evidence,catalog,start,end,periodOk]);
@@ -120,7 +124,7 @@ export function CommunicationProposalInbox({rows,loading,error,onRefresh,onChang
   <div className="flex flex-col gap-2">{pageRows.map(p=><ReconciliationProposalRow key={p.id} template={catalog.find(t=>t.id===p.proposed_template_id)?.raw} row={p} o={orchestrations.get(p.id)!} open={expanded===p.id} checked={selected.includes(p.id)} busy={busy} onToggle={()=>setExpanded(expanded===p.id?null:p.id)} onSelect={()=>toggle(p)} onReview={id=>{setDetail({row:p,id});setSimulation(null);}} onMoment={()=>editMoment(p)} reuse={repeat(p)}/>)}{ready&&!loading&&!pageRows.length&&<p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">{inPeriod.length?'Nenhuma comunicação neste filtro. Limpe os filtros ou escolha outra situação.':`Nenhuma comunicação com disparo neste período.${outside>0?' Use "Mostrar fora do período" acima ou escolha outro mês no calendário.':' Importe um pacote SFMC para trazer novas comunicações.'}`}</p>}</div>
   {ready&&visible.length>25&&<div className="flex items-center justify-end gap-3 text-sm"><button className={control} disabled={page===1} onClick={()=>setPage(page-1)}>Anterior</button><span>Página {page} de {Math.max(1,Math.ceil(visible.length/25))}</span><button className={control} disabled={page*25>=visible.length} onClick={()=>setPage(page+1)}>Próxima</button></div>}
   {detail&&<ProposalDetail row={detail.row} initialId={detail.id} onClose={()=>setDetail(null)} onSaved={()=>{setDetail(null);refresh();}}/>}
-  {momentRow&&<ActivityMomentModal calendarMoment={/\bDia\b/.test(orchestrations.get(momentRow.uid)?.moment.label||'')} baseKnown={orchestrations.get(momentRow.uid)?.base!=null} row={momentRow} onClose={()=>setMomentRow(null)} onChanged={()=>{setMomentRow(null);refresh();}}/>}
+  {momentRow&&<ActivityMomentModal baseKnown={orchestrations.get(momentRow.uid)?.base!=null} row={momentRow} onClose={()=>setMomentRow(null)} onChanged={()=>{setMomentRow(null);refresh();}}/>}
  </section>;
 }
 function ProposalDetail({row,onClose,onSaved,initialId}:{row:ProposalRow;onClose:()=>void;onSaved:()=>void;initialId?:string}) {
@@ -168,7 +172,7 @@ function AgentNotes({proposalId}:{proposalId:string}) {
 
 function DetailEmail({content,template,loaded}:{content:ProposalRow['message']['payload']['content'];template?:CommunicationTemplate;loaded:boolean}) {
  const {html,loading}=useTemplateHtml(template);
- if(html)return <div><EmailFrame html={html} title={`E-mail ${template!.template_id}`}/><p className="mt-2 text-xs text-slate-600">HTML do template <span className="font-mono">{template!.template_id}</span> no catálogo. Mostra o ID proposto; não certifica o que foi enviado.</p></div>;
+ if(html)return <div><EmailPreviewPanel html={html} template={template!}/><p className="mt-2 text-xs text-slate-600">HTML do template <span className="font-mono">{template!.template_id}</span> no catálogo. Mostra o ID proposto; não certifica o que foi enviado.</p></div>;
  if(loading||!loaded)return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Carregando o e-mail do catálogo…</p>;
  return <><MessagePreview content={content} compact/><p className="mt-2 text-xs text-slate-600">{template?'O template proposto não tem HTML no catálogo.':'O ID proposto ainda não está no catálogo; a prévia aparece quando o template do e-mail for cadastrado.'}</p></>;
 }

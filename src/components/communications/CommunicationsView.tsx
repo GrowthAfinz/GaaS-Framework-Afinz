@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardCheck, Inbox, LayoutTemplate, Loader2, Upload, type LucideIcon } from 'lucide-react';
 import { useReconciliation, type OrphanRow } from '../../hooks/useReconciliation';
 import { CommunicationProposalInbox, type InboxSummary } from './CommunicationProposalInbox';
@@ -39,12 +39,28 @@ const CadastroTemplates: React.FC = () => {
   const [proposalLoading, setProposalLoading] = useState(true), [proposalError, setProposalError] = useState('');
   const [summary, setSummary] = useState<InboxSummary | null>(null);
   const { orphans, reconciled, catalog, coverage, loading, error, refetch } = useReconciliation();
-  const refreshProposals = useCallback(async () => {
-    setProposalLoading(true); setProposalError('');
-    try { const [rows, history] = await Promise.all([readProposalInbox(), readProposalEvents()]); setProposals(rows); setEvents(history); }
-    catch (e) { setProposalError(describeError(e)); } finally { setProposalLoading(false); }
+  const lastRefresh = useRef(0);
+  // silent: atualiza em segundo plano, sem trocar a fila por "carregando" nem recriar a lista quando nada mudou.
+  const refreshProposals = useCallback(async (silent = false) => {
+    lastRefresh.current = Date.now();
+    if (!silent) setProposalLoading(true);
+    setProposalError('');
+    try {
+      const [rows, history] = await Promise.all([readProposalInbox(), readProposalEvents()]);
+      const sig = (list: ProposalRow[]) => list.map(p => p.id + ':' + p.revision + ':' + p.status).join('|');
+      setProposals(prev => (sig(prev) === sig(rows) ? prev : rows));
+      setEvents(prev => (prev.length === history.length && prev[prev.length - 1]?.id === history[history.length - 1]?.id ? prev : history));
+    }
+    catch (e) { if (!silent) setProposalError(describeError(e)); } finally { if (!silent) setProposalLoading(false); }
   }, []);
-  useEffect(() => { void refreshProposals(); const changed=()=>{void refreshProposals();}; window.addEventListener('sfmc-package-changed',changed);window.addEventListener('focus',changed);return()=>{window.removeEventListener('sfmc-package-changed',changed);window.removeEventListener('focus',changed);}; }, [refreshProposals]);
+  useEffect(() => {
+    void refreshProposals();
+    const changed = () => { void refreshProposals(); };
+    // Voltar para a aba (ou sair do iframe da prévia) não pode recarregar a tela: só atualiza em silêncio, no máximo 1x/min.
+    const focused = () => { if (document.visibilityState === 'visible' && Date.now() - lastRefresh.current > 60_000) void refreshProposals(true); };
+    window.addEventListener('sfmc-package-changed', changed); window.addEventListener('focus', focused);
+    return () => { window.removeEventListener('sfmc-package-changed', changed); window.removeEventListener('focus', focused); };
+  }, [refreshProposals]);
   const changed = () => { refetch(); setCatalogRevision(v => v + 1); void refreshProposals(); };
   const tabs: { id: SubTab; label: string; icon: LucideIcon; n?: number }[] = [
     { id: 'fila', label: 'Fila de reconciliação', icon: Inbox, n: summary?.pending },
