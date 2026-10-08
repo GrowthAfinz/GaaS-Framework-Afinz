@@ -6,7 +6,7 @@ import {dispatchDay,missingGovernanceParameters} from '../../utils/communication
 import {CommunicationVisual} from './previews/CommunicationVisual';
 import {DimTag,fmtDay,type TagKind} from './ui/commsUi';
 const fmt=(v:number|null)=>v==null?'sem dado':v.toLocaleString('pt-BR',{notation:v>=1000?'compact':'standard',maximumFractionDigits:1});
-const tags:[string,TagKind][]=[['front','front'],['partner','partner'],['channel','channel'],['segment','segment'],['subgroup','subgroup'],['offer','offer'],['campaign','campaign']];
+const tags:[string,TagKind][]=[['front','front'],['partner','partner'],['channel','channel'],['segment','segment'],['subgroup','subgroup'],['offer','offer'],['campaign','campaign'],['creditVariant','segment'],['reuse','segment']];
 export const STATUS_LABEL:Record<string,string>={ready:'Pronta',review:'Com pendências',applied:'Enviada',technical:'Opt-out',rejected:'Rejeitada'};
 const STATUS_TONE:Record<string,string>={ready:'bg-emerald-50 text-emerald-800 ring-emerald-200',review:'bg-amber-50 text-amber-900 ring-amber-300',applied:'bg-cyan-50 text-cyan-900 ring-cyan-200',technical:'bg-slate-100 text-slate-700 ring-slate-200',rejected:'bg-red-50 text-red-800 ring-red-200'};
 export function ReconciliationProposalRow({row,o,open,checked,busy,onToggle,onSelect,onReview,onMoment,reuse,template}:{template?:CommunicationTemplate;row:ProposalRow;o:Orchestration;open:boolean;checked:boolean;busy:boolean;onToggle:()=>void;onSelect:()=>void;onReview:(templateId?:string)=>void;onMoment:()=>void;reuse:string}) {

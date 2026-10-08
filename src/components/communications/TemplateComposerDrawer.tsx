@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, Check, Loader2, AlertCircle } from 'lucide-react';
 import { TAXO, composeId, TEMPLATE_ID_RE, type DimId } from '../../utils/taxonomy';
-import { createDraftTemplate, linkActivityToTemplate, describeError } from '../../services/communicationService';
+import { createDraftTemplate, linkReviewedExecutions, describeError } from '../../services/communicationService';
 import type { OrphanRow } from '../../hooks/useReconciliation';
 
 const CANAL_LABEL: Record<string, string> = { email: 'E-mail', wpp: 'WhatsApp', push: 'Push', sms: 'SMS' };
@@ -39,7 +39,7 @@ export const TemplateComposerDrawer: React.FC<Props> = ({ seed, onClose, onSaved
         channel: CANAL_LABEL[dims.canal!] ?? 'E-mail',
         metadata: { source: 'composer', publico: dims.publico, campanha: dims.campanha, segmento: dims.segmento, seq },
       });
-      if (seed) await linkActivityToTemplate(seed.name, id);
+      if (seed) await linkReviewedExecutions(seed, id, 'Novo template escolhido para execuções revisadas');
       onSaved();
     } catch (err) {
       setError(describeError(err));

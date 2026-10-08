@@ -1,3 +1,7 @@
+import {projectExecutions,type ExecutionReview} from '../utils/executionProjection';
+import {readProposalInbox} from '../services/communicationProposalService';
+import {executionContextKey,executionTemplateEvidence,type ExecutionMatchEvidence} from '../utils/executionTemplateMatch';
+import type {FrameworkActivity} from '../utils/communicationOrchestrator';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '../services/supabaseClient';
@@ -39,6 +43,9 @@ export interface TemplateReuseSuggestion {
 }
 
 export interface OrphanRow {
+  executionRecords: FrameworkActivity[];
+  period: {start:string;end:string};
+  packEvidence?: ExecutionMatchEvidence;
   uid: string;
   name: string;
   jornada: string;
@@ -60,6 +67,8 @@ export interface OrphanRow {
 }
 
 export interface ReconciledRow {
+  executionRecords: FrameworkActivity[];
+  period: {start:string;end:string};
   uid: string;
   name: string;
   jornada: string;
@@ -88,18 +97,7 @@ export interface CoverageStats {
   byChannel: { ch: string; label: string; color: string; total: number; orf: number; status: string }[];
 }
 
-interface OrphanQueryRow {
-  'Activity name / Taxonomia': string | null;
-  jornada: string | null;
-  Canal: string | null;
-  BU: string | null;
-  Parceiro: string | null;
-  Segmento: string | null;
-  Subgrupos: string | null;
-  'Base Total': number | null;
-  'Data de Disparo': string | null;
-  template_id: string | null;
-}
+type OrphanQueryRow = FrameworkActivity;
 
 interface SlotMomentRow {
   id: string;
@@ -133,7 +131,7 @@ function templateDims(t: CommunicationTemplate): TemplateDims {
   };
 }
 
-const num = (v: number | null | undefined) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
+const num = (v: unknown) => (v!=null && v!=='' && Number.isFinite(Number(v)) ? Number(v) : 0);
 
 const slotKey = (journey: string | null | undefined, activity: string | null | undefined, channel: string | null | undefined) => (
   `${journey || 'Sem jornada'}::${activity || ''}::${channel || 'N/A'}`
@@ -297,14 +295,14 @@ export function useReconciliation() {
     setLoading(true);
     setError(null);
     try {
-      const baseSelect = '"Activity name / Taxonomia", jornada, "Canal", "BU", "Parceiro", "Segmento", "Subgrupos", "Base Total", "Data de Disparo", template_id';
+      const baseSelect = '*';
 
       const loadActivities = async (linked: boolean) => {
         const rows: OrphanQueryRow[] = [];
         for (let offset=0;;offset+=500) {
           let query=supabase.from('activities').select(baseSelect)
             .not('"Activity name / Taxonomia"','is',null)
-            .gte('"Data de Disparo"',dataInicio).lte('"Data de Disparo"',`${dataFim} 23:59:59`)
+            .gte('"Data de Disparo"',`${dataInicio}T00:00:00-03:00`).lte('"Data de Disparo"',`${dataFim}T23:59:59.999-03:00`)
             .in('"Canal"',['E-mail','SMS','WhatsApp','Push']).order('id').range(offset,offset+499);
           query=linked?query.not('template_id','is',null):query.is('template_id',null);
           if(selectedBUs.length)query=query.in('BU',selectedBUs);
@@ -317,8 +315,12 @@ export function useReconciliation() {
           rows.push(...(data||[]) as OrphanQueryRow[]);if((data||[]).length<500)return rows;
         }
       };
-      const [acts,linkedActs,templates]=await Promise.all([loadActivities(false),loadActivities(true),listTemplates()]);
-      const orphanRows = ((acts ?? []) as OrphanQueryRow[]);
+      const loadHistory=async()=>{const rows:FrameworkActivity[]=[];for(let offset=0;;offset+=500){const {data,error}=await supabase.from('activities').select('*').not('template_id','is',null).order('id').range(offset,offset+499);if(error)throw error;rows.push(...(data||[]) as FrameworkActivity[]);if((data||[]).length<500)return rows;}};
+      const loadReviews=async()=>{const rows:ExecutionReview[]=[];for(let offset=0;;offset+=500){const {data,error}=await supabase.from('communication_execution_reviews').select('*').order('id').range(offset,offset+499);if(error)throw error;rows.push(...(data||[]) as ExecutionReview[]);if((data||[]).length<500)return rows;}};
+      const [acts,linkedActs,templates,proposals,rawHistory,reviews]=await Promise.all([loadActivities(false),loadActivities(true),listTemplates(),readProposalInbox(),loadHistory(),loadReviews()]);
+      const projected=projectExecutions([...new Map([...acts,...linkedActs,...rawHistory].map(a=>[a.id,a])).values()],reviews);
+      const kept=new Set(projected.map(a=>a.id));const history=rawHistory.filter(a=>kept.has(a.id));
+      const orphanRows = acts.filter(a=>kept.has(a.id));
       const slotMap = new Map<string, SlotMomentRow>();
       const activityNames = Array.from(new Set(orphanRows.map((r) => r['Activity name / Taxonomia']).filter((v): v is string => !!v)));
       if (activityNames.length) {
@@ -352,9 +354,11 @@ export function useReconciliation() {
         const name = r['Activity name / Taxonomia'];
         if (!name) continue;
         const date = r['Data de Disparo'] ?? null;
-        const existing = byName.get(name);
+        const contextKey=executionContextKey(r);
+        const existing = byName.get(contextKey);
         if (existing) {
           existing.exec += 1;
+          existing.executionRecords.push(r);
           existing.base += num(r['Base Total']);
           if (date && (!existing.latestDate || date > existing.latestDate)) existing.latestDate = date;
         } else {
@@ -365,6 +369,7 @@ export function useReconciliation() {
           const slot = slotMap.get(slotKey(r.jornada, name, r.Canal));
           const momentSuggestion = readMomentSuggestion(slot?.metadata) ?? inferMomentSuggestion(name);
           const effectiveParsed = applyMomentSuggestion(parsed, momentSuggestion);
+          effectiveParsed.segmento=segmentoKey(r.Segmento)||effectiveParsed.segmento;
           const exactInFilter = effectiveParsed.seq ? momentExactTemplates(effectiveParsed, filteredCat) : filteredCat;
           const exactInCatalog = effectiveParsed.seq ? momentExactTemplates(effectiveParsed, cat) : [];
           const exactMatch = matchTemplate(effectiveParsed, exactInFilter) ?? matchTemplate(effectiveParsed, exactInCatalog);
@@ -375,7 +380,7 @@ export function useReconciliation() {
           const reuseMatch = reuseParsed
             ? matchTemplate(reuseParsed, reuseInFilter) ?? matchTemplate(reuseParsed, reuseInCatalog)
             : null;
-          const match = exactMatch ?? (reuseMatch ? {
+          let match = exactMatch ?? (reuseMatch ? {
             ...reuseMatch,
             reasons: [
               { dim: 'reuse', label: 'Regra da régua', val: reuseSuggestion?.label ?? 'Reuso esperado', ok: true },
@@ -383,15 +388,23 @@ export function useReconciliation() {
               ...reuseMatch.reasons,
             ],
           } : null);
+          const packEvidence=executionTemplateEvidence(r,proposals,history,cat);
+          if(packEvidence.source!=='none'){
+            const target=packEvidence.ids.length===1?cat.find(t=>t.id===packEvidence.ids[0]):null;
+            match=target?{tpl:target,score:packEvidence.source==='pack'&&!packEvidence.conflicts.length?100:70,reasons:packEvidence.reasons.map(val=>({dim:'evidence',label:'Evidência',val,ok:true}))}:null;
+          }
           const fallbackMatch = matchTemplate(effectiveParsed, filteredCat) ?? matchTemplate(effectiveParsed, cat);
-          const momentConflict = !!(
+          const momentConflict = packEvidence.source==='none' && !!(
             effectiveParsed.seq
             && !match
             && fallbackMatch?.tpl.dims.seq
             && fallbackMatch.tpl.dims.seq !== effectiveParsed.seq
           );
-          byName.set(name, {
-            uid: name,
+          byName.set(contextKey, {
+            uid: contextKey,
+            executionRecords:[r],
+            period:{start:dataInicio,end:dataFim},
+            packEvidence,
             name,
             jornada: r.jornada ?? '—',
             channel: chId,
@@ -403,7 +416,7 @@ export function useReconciliation() {
             latestDate: date,
             parsed: effectiveParsed,
             match,
-            confidence: confidenceOf(match),
+            confidence: packEvidence.source==='none'?confidenceOf(match):!match?'novo':packEvidence.source==='pack'&&!packEvidence.conflicts.length?'forte':'provavel',
             suggestedId: match ? match.tpl.id : (effectiveParsed.canal ? '' : ''),
             slotId: slot?.id ?? null,
             momentSuggestion,
@@ -415,15 +428,16 @@ export function useReconciliation() {
 
       const catById = new Map(cat.map((t) => [t.id, t]));
       const byLinked = new Map<string, ReconciledRow>();
-      for (const r of (linkedActs ?? []) as OrphanQueryRow[]) {
+      for (const r of linkedActs.filter(a=>kept.has(a.id))) {
         const name = r['Activity name / Taxonomia'];
         const templateId = r.template_id;
         if (!name || !templateId) continue;
         const date = r['Data de Disparo'] ?? null;
-        const uid = `${templateId}::${name}`;
+        const uid = `${templateId}::${executionContextKey(r)}`;
         const existing = byLinked.get(uid);
         if (existing) {
           existing.exec += 1;
+          existing.executionRecords.push(r);
           existing.base += num(r['Base Total']);
           if (date && (!existing.latestDate || date > existing.latestDate)) existing.latestDate = date;
         } else {
@@ -433,6 +447,7 @@ export function useReconciliation() {
           });
           byLinked.set(uid, {
             uid,
+            executionRecords:[r],period:{start:dataInicio,end:dataFim},
             name,
             jornada: r.jornada ?? '—',
             channel: chId,

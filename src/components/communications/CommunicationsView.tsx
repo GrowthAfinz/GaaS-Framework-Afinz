@@ -111,7 +111,7 @@ const CadastroTemplates: React.FC = () => {
             </div>
 
             <div className="mt-5" role="tabpanel">
-              {tab === 'fila' && <ReconciliationQueue packCount={summary ? proposals.length - summary.hidden : 0} packInbox={<CommunicationProposalInbox evidenceRevision={evidenceRevision} catalog={catalog} rows={proposals} loading={proposalLoading} error={proposalError} onRefresh={changed} onChanged={changed} onSummary={setSummary}/>} orphans={orphans} catalog={catalog} channelFilter={queueChannel} onClearChannelFilter={()=>setQueueChannel(null)} onCreate={setCompose} onChanged={changed}/>}
+              {tab === 'fila' && <ReconciliationQueue refreshing={loading||!!error} packCount={summary ? proposals.length - summary.hidden : 0} packInbox={<CommunicationProposalInbox evidenceRevision={evidenceRevision} catalog={catalog} rows={proposals} loading={proposalLoading} error={proposalError} onRefresh={changed} onChanged={changed} onSummary={setSummary}/>} orphans={orphans} catalog={catalog} channelFilter={queueChannel} onClearChannelFilter={()=>setQueueChannel(null)} onCreate={setCompose} onChanged={changed}/>}
               {tab === 'asset' && <TemplateCatalogView key={catalogRevision} />}
               {tab === 'auditoria' && <CommunicationsAuditView events={events} proposals={proposals} error={proposalError} reconciled={reconciled} catalog={catalog} onChanged={changed} />}
             </div>

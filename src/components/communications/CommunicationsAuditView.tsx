@@ -11,6 +11,7 @@ import { HowItWorks, Segmented, controlClass } from './ui/commsUi';
 
 type ActionFilter = 'all' | 'applied' | 'rejected' | 'edited' | 'analysis';
 const ACTION: Record<string, { label: string; tone: string; group: ActionFilter }> = {
+  execution_linked: { label: 'Execuções vinculadas', tone: 'bg-cyan-50 text-cyan-900 ring-cyan-200', group: 'applied' },
   applied: { label: 'Enviada', tone: 'bg-cyan-50 text-cyan-900 ring-cyan-200', group: 'applied' },
   rejected: { label: 'Rejeitada', tone: 'bg-red-50 text-red-800 ring-red-200', group: 'rejected' },
   edited: { label: 'Revisão salva', tone: 'bg-slate-100 text-slate-800 ring-slate-200', group: 'edited' },
@@ -33,7 +34,7 @@ export function CommunicationsAuditView({ events, proposals, error, reconciled, 
     if (filter !== 'all' && actionOf(e.action).group !== filter) return false;
     if (!query) return true;
     const p = byId.get(e.proposal_id);
-    return [p?.message.payload.activity_name, p?.proposed_template_id, e.actor, String(e.snapshot.note ?? '')].join(' ').toLowerCase().includes(query.toLowerCase());
+    return [p?.message.payload.activity_name, p?.proposed_template_id, e.snapshot.activity_name,e.snapshot.template_id, e.actor, String(e.snapshot.note ?? '')].join(' ').toLowerCase().includes(query.toLowerCase());
   }), [inPeriod, filter, query, byId]);
   const count = (g: ActionFilter) => g === 'all' ? inPeriod.length : inPeriod.filter((e) => actionOf(e.action).group === g).length;
 
@@ -72,7 +73,7 @@ export function CommunicationsAuditView({ events, proposals, error, reconciled, 
                   <tr key={e.id} className="border-t border-slate-200 align-top">
                     <td className="whitespace-nowrap p-3 text-slate-700">{new Date(e.created_at).toLocaleString('pt-BR')}</td>
                     <td className="p-3"><span className={`inline-block rounded-md px-2 py-1 text-xs font-bold ring-1 ${a.tone}`}>{a.label}</span></td>
-                    <td className="max-w-md p-3"><p className="break-all text-slate-800">{p?.message.payload.activity_name || 'Comunicação indisponível'}</p><p className="break-all font-mono text-xs text-slate-700">{p?.proposed_template_id || 'Sem template ID'}</p></td>
+                    <td className="max-w-md p-3"><p className="break-all text-slate-800">{p?.message.payload.activity_name || String(e.snapshot.activity_name||'Comunicação indisponível')}</p><p className="break-all font-mono text-xs text-slate-700">{p?.proposed_template_id || String(e.snapshot.template_id||'Sem template ID')}</p></td>
                     <td className="max-w-md p-3"><p className="text-slate-800">{e.actor || 'Autor não registrado'}</p>{e.snapshot.note ? <p className="text-slate-700">{String(e.snapshot.note)}</p> : null}
                       <details className="mt-1"><summary className="cursor-pointer text-sm font-semibold text-cyan-800">Ver registro completo</summary><pre className="mt-1 whitespace-pre-wrap break-all text-xs text-slate-700">{JSON.stringify({ actor: e.actor, snapshot: e.snapshot }, null, 2)}</pre></details></td>
                   </tr>

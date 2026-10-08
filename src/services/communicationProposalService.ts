@@ -21,7 +21,10 @@ export async function readProposalInbox(): Promise<ProposalRow[]> {
  const byId=new Map(messages.map(m=>[m.id,m]));
  return proposals.map(p=>{const message=byId.get(p.message_id);if(!message)throw Error('Origem da proposta indisponível; atualize a fila.');return {...p,message};});
 }
-export const readProposalEvents=()=>all<ProposalEvent>('communications_proposal_events');
+export async function readProposalEvents():Promise<ProposalEvent[]> {
+ const [events,links]=await Promise.all([all<ProposalEvent>('communications_proposal_events'),all<{id:number;actor:string;template_id:string;created_at:string;evidence:string;snapshots:Record<string,unknown>[];start_date:string;end_date:string}>('communication_execution_links')]);
+ return [...events,...links.map(l=>({id:-Number(l.id),proposal_id:'execution-link:'+l.id,actor:l.actor,action:'execution_linked',created_at:l.created_at,snapshot:{note:l.evidence,template_id:l.template_id,activity_name:l.snapshots.map(s=>s['Activity name / Taxonomia']).join(' · '),start_date:l.start_date,end_date:l.end_date,executions:l.snapshots}}))].sort((a,b)=>a.created_at.localeCompare(b.created_at));
+}
 export interface AgentNote { kind: 'erro'|'hipotese'|'pergunta'|'info'; text: string }
 export async function readAgentNotes(proposalId: string): Promise<{agent:string;created_at:string;notes:AgentNote[]}[]> {
  const {data,error}=await supabase.from('communications_proposal_events').select('snapshot,created_at').eq('proposal_id',proposalId).eq('action','agent_note').order('id',{ascending:false});

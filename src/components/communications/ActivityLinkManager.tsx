@@ -4,7 +4,7 @@ import type { CommunicationTemplate } from '../../types/communication';
 import { decorateTemplate } from '../../hooks/useTemplateCatalog';
 import { type ActivitySuggestion, type ActivitySuggestionCategory, useActivitySuggestions } from '../../hooks/useActivitySuggestions';
 import { supabase } from '../../services/supabaseClient';
-import { linkActivityToTemplate, unlinkActivity, describeError } from '../../services/communicationService';
+import { unlinkActivity, describeError } from '../../services/communicationService';
 
 interface Props {
   template: CommunicationTemplate;
@@ -265,12 +265,10 @@ export const ActivityLinkManager: React.FC<Props> = ({ template, contentText = '
                           <X size={12} />
                         </button>
                         <button
-                          onClick={() => run(`link:${s.activityName}`, () => linkActivityToTemplate(s.activityName, template.template_id))}
-                          disabled={!!busy || s.linkedToOther || s.alreadyLinked}
-                          title={s.linkedToOther ? 'Activity já vinculada a outro template' : s.alreadyLinked ? 'Activity já vinculada a este template' : 'Vincular activity a este template'}
+                          disabled title="Revise as execuções no período em Disparos sem template"
                           className="flex items-center gap-1 rounded-md bg-cyan-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
                         >
-                          {busy === `link:${s.activityName}` ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Vincular
+                          {busy === `link:${s.activityName}` ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />} Usar fila
                         </button>
                       </div>
                     </div>

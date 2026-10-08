@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import {CommunicationVisual} from './previews/CommunicationVisual';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, ChevronRight, Link2, Plus, Check, CheckCheck, GitBranch, Sparkles, CalendarClock, AlertTriangle, X, ArrowDownWideNarrow, Repeat, Clock, type LucideIcon } from 'lucide-react';
 import type { CatalogEntry, OrphanRow } from '../../hooks/useReconciliation';
-import { linkActivityToTemplate, describeError } from '../../services/communicationService';
+import { linkReviewedExecutions, describeError } from '../../services/communicationService';
 import { optLabel, type Confidence, type DimId } from '../../utils/taxonomy';
 import { TemplateSuggestionModal } from './TemplateSuggestionModal';
 import { TemplateIdChips } from './TemplateIdChips';
@@ -18,12 +19,8 @@ const CONF_STYLE: Record<Confidence, string> = {
 };
 const CONF_LABEL: Record<Confidence, string> = { forte: 'match forte', provavel: 'provável', fraca: 'fraca', novo: 'sem template' };
 
-function displayTemplateIdForUsage(templateId: string, usageSeq?: string | null) {
-  if (!usageSeq) return templateId;
-  return templateId.replace(/S\d+D\d+$/i, usageSeq);
-}
-
 interface Props {
+  refreshing?: boolean;
   packInbox?: React.ReactNode;
   packCount?: number;
   orphans: OrphanRow[];
@@ -42,7 +39,7 @@ const SORT_OPTIONS: [SortBy, string, LucideIcon][] = [
   ['data', 'Mais recentes', Clock],
 ];
 
-export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, orphans, catalog, channelFilter, onClearChannelFilter, onCreate, onChanged }) => {
+export const ReconciliationQueue: React.FC<Props> = ({ refreshing=false, packInbox, packCount=0, orphans, catalog, channelFilter, onClearChannelFilter, onCreate, onChanged }) => {
   const [source,setSource] = useState<'packs'|'executions'>('packs');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todos' | 'forte' | 'novo'>('todos');
@@ -52,6 +49,9 @@ export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, o
   const [subgrupoSel, setSubgrupoSel] = useState('todos');
   const [semanaSel, setSemanaSel] = useState('todos');
   const [disparoSel, setDisparoSel] = useState('todos');
+  const [pendingLinks,setPendingLinks]=useState<OrphanRow[]>([]);
+  const [linkNote,setLinkNote]=useState('');
+  useEffect(()=>{setPendingLinks([]);setLinkNote('');setSuggesting(null);setEditingMoment(null);},[orphans,refreshing]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState<OrphanRow | null>(null);
@@ -94,23 +94,19 @@ export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, o
   const strong = useMemo(() => scoped.filter((o) => o.confidence === 'forte'), [scoped]);
   // Divergentes (jornada × coluna) saem do vínculo em massa: exigem revisão individual.
   const bulkStrong = useMemo(
-    () => strong.filter((o) => o.match?.tpl.inCurrentFilter && !o.parsed.divergencias?.length),
-    [strong]
+    () => list.filter((o) => o.confidence==='forte' && o.match?.tpl.inCurrentFilter && (!o.parsed.divergencias?.length||o.packEvidence?.source==='pack') && !o.packEvidence?.conflicts.length),
+    [list]
   );
 
-  const link = async (o: OrphanRow) => {
-    if (!o.match) return;
-    setBusy(o.uid); setError(null);
-    try { await linkActivityToTemplate(o.name, o.match.tpl.id); onChanged(); }
-    catch (err) { setError(describeError(err)); }
-    finally { setBusy(null); }
-  };
-
-  const linkMany = async () => {
-    setBusy('bulk'); setError(null);
-    try { for (const o of bulkStrong) if (o.match) await linkActivityToTemplate(o.name, o.match.tpl.id); onChanged(); }
-    catch (err) { setError(describeError(err)); }
-    finally { setBusy(null); }
+  const link = (o:OrphanRow)=>{if(o.match&&!refreshing){setLinkNote('');setPendingLinks([o]);}};
+  const linkMany = ()=>{setLinkNote('');if(!refreshing)setPendingLinks(bulkStrong);};
+  const confirmLinks=async()=>{
+    setBusy('bulk');setError(null);
+    try {
+      for(const o of pendingLinks)if(o.match&&!refreshing)await linkReviewedExecutions(o,o.match.tpl.id,linkNote);
+      setPendingLinks([]);onChanged();
+    } catch(err){setError(describeError(err));onChanged();}
+    finally{setBusy(null);}
   };
 
   const filters: [typeof filter, string, number][] = [
@@ -142,7 +138,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, o
           )}
         </div>
         {bulkStrong.length > 0 && (
-          <button onClick={linkMany} disabled={busy === 'bulk'}
+          <button onClick={linkMany} disabled={!!busy||refreshing}
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-105 disabled:opacity-60">
             {busy === 'bulk' ? <Loader2 size={15} className="animate-spin" /> : <CheckCheck size={15} />}
             Vincular {bulkStrong.length} matches fortes
@@ -201,8 +197,8 @@ export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, o
           {list.map((o) => (
             <OrphanCard key={o.uid} o={o} open={expanded === o.uid}
               onToggle={() => setExpanded((e) => e === o.uid ? null : o.uid)}
-              onLink={() => link(o)} onCreate={() => onCreate(o)} onSuggest={() => setSuggesting(o)}
-              onEditMoment={() => setEditingMoment(o)} busy={busy === o.uid} />
+              onLink={() => link(o)} onCreate={() => {if(!refreshing)onCreate(o);}} onSuggest={() => {if(!refreshing)setSuggesting(o);}}
+              onEditMoment={() => {if(!refreshing)setEditingMoment(o);}} busy={refreshing || !!busy} />
           ))}
         </div>
       )}
@@ -215,6 +211,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, o
           onChanged={onChanged}
         />
       )}
+      {pendingLinks.length>0&&<div className="fixed inset-0 z-[140] grid place-items-center bg-slate-950/60 p-4"><div role="dialog" aria-modal="true" aria-label="Revisar vínculo de execuções" className="w-full max-w-xl rounded-xl bg-white p-5"><h3 className="font-semibold">Vincular execuções revisadas</h3><p className="my-3 text-sm">{pendingLinks.reduce((n,o)=>n+o.executionRecords.length,0)} execuções · {pendingLinks[0].period.start} a {pendingLinks[0].period.end}. Confirme que a peça corresponde ao uso nesse período. Aprovar conteúdo no pack não comprova o envio histórico.</p><div className="max-h-48 overflow-auto text-xs">{pendingLinks.map(o=><p key={o.uid} className="mb-2"><b>{o.match?.tpl.id}</b> · {o.jornada} · {o.canalLabel} · {o.exec} execuções</p>)}</div><label className="mt-3 block text-sm">Evidência da confirmação<input aria-label="Evidência do vínculo" value={linkNote} onChange={e=>setLinkNote(e.target.value)} className="mt-1 w-full rounded border p-2" placeholder="Como confirmou a peça e o período?"/></label><div className="mt-4 flex justify-end gap-2"><button disabled={!!busy||refreshing} onClick={()=>setPendingLinks([])} className="rounded border px-3 py-2">Cancelar</button><button disabled={!!busy||linkNote.trim().length<3} onClick={confirmLinks} className="rounded bg-cyan-700 px-3 py-2 text-white disabled:opacity-50">Confirmar vínculos</button></div></div></div>}
       {editingMoment && (
         <ActivityMomentModal
           row={editingMoment}
@@ -228,13 +225,14 @@ export const ReconciliationQueue: React.FC<Props> = ({ packInbox, packCount=0, o
 
 const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; onLink: () => void; onCreate: () => void; onSuggest: () => void; onEditMoment: () => void; busy: boolean }> = ({ o, open, onToggle, onLink, onCreate, onSuggest, onEditMoment, busy }) => {
   const m = o.match;
-  const displayTemplateId = m ? displayTemplateIdForUsage(m.tpl.id, o.reuseSuggestion?.usageSeq) : '';
+  const displayTemplateId = m ? m.tpl.id : '';
   const canLink = m && !o.momentConflict && o.confidence !== 'fraca' && o.confidence !== 'novo';
   return (
     <div className={`overflow-hidden rounded-xl border bg-white transition-shadow ${open ? 'border-cyan-400 shadow-md' : 'border-slate-200 hover:border-slate-300'}`}>
       <div className="flex cursor-pointer items-center gap-3 px-4 py-3" onClick={onToggle}>
         <ChevronRight size={15} className={`shrink-0 text-slate-500 transition-transform ${open ? 'rotate-90 text-cyan-600' : ''}`} />
         <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold uppercase text-slate-500">{o.canalLabel}</span>
+        <div onClick={e=>e.stopPropagation()}>{o.packEvidence?.proposal&&<CommunicationVisual content={o.packEvidence.proposal.message.payload.content} template={m?.tpl.raw}/>}</div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <code className="block max-w-[420px] truncate font-mono text-xs font-semibold text-slate-800 xl:max-w-[560px]">{o.name}</code>
@@ -252,7 +250,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
             </button>
             {!!o.parsed.divergencias?.length && (
               <span
-                title={`Jornada diverge das colunas — sugestão corrigida pela jornada:\n${o.parsed.divergencias.join('\n')}`}
+                title={`Jornada e colunas divergem; revisar fontes:\n${o.parsed.divergencias.join('\n')}`}
                 className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700"
               >
                 <AlertTriangle size={11} /> divergência
@@ -260,6 +258,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
             )}
           </div>
           <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-600"><GitBranch size={11} /> {o.jornada}</div>
+          <div className="mt-1 flex flex-wrap gap-1 text-xs text-slate-600"><span>{o.segmentoLabel}</span>{/menor/i.test(o.name)&&<span className="rounded bg-violet-50 px-2 text-violet-800">Menor · reuso de Repescagem</span>}{/maior/i.test(o.name)&&<span>· Maior</span>}<span>· {o.subgrupoLabel}</span>{o.packEvidence?.source!=='none'&&<span className="rounded bg-cyan-50 px-2 text-cyan-800">{o.packEvidence?.source==='pack'?'ID no pack':`Reuso histórico · ${o.packEvidence?.reusedJourneys} jornadas`}</span>}</div>
         </div>
         <div className="hidden shrink-0 gap-3.5 text-xs tabular-nums text-slate-500 sm:flex">
           <span><b className="text-slate-800">{fmtK(o.base)}</b> base</span>
@@ -270,8 +269,8 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
           {m ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <TemplateIdChips id={displayTemplateId} className="min-w-0 flex-1" />
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${CONF_STYLE[o.confidence]}`} title={`Score de match: ${m.score}/100 (${CONF_LABEL[o.confidence]})`}>
-                {o.confidence === 'novo' ? CONF_LABEL[o.confidence] : `${m.score}${o.confidence === 'fraca' ? ' · fraca' : ''}`}
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${CONF_STYLE[o.confidence]}`} title={o.packEvidence?.source==='pack'?'Correspondência configurada no pack; confirmar o uso histórico':o.packEvidence?.source==='history'?'Reuso histórico sugerido; exige revisão':`Score de match: ${m.score}/100 (${CONF_LABEL[o.confidence]})`}>
+                {o.packEvidence?.source==='pack'?'ID no pack':o.packEvidence?.source==='history'?'Reuso sugerido':o.confidence === 'novo' ? CONF_LABEL[o.confidence] : `${m.score}${o.confidence === 'fraca' ? ' · fraca' : ''}`}
               </span>
               {!m.tpl.hasAsset && <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">sem peça</span>}
               {!m.tpl.inCurrentFilter && <span className="shrink-0 rounded-full bg-cyan-50 px-2 py-0.5 text-xs font-bold text-cyan-700">fora dos filtros</span>}
@@ -308,6 +307,7 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
         </div>
       </div>
 
+      {open && o.packEvidence && <div className="border-t bg-slate-50 px-4 py-3 text-xs"><p>IDs candidatos: {o.packEvidence.ids.join(' · ')||'Sem ID governado'}</p>{o.packEvidence.conflicts.map(c=><p key={c} className="mt-1 text-amber-800">{c}</p>)}</div>}
       {open && (
         <div className="grid gap-5 border-t border-slate-100 bg-slate-50 p-4 md:grid-cols-2">
           <div>
@@ -329,6 +329,8 @@ const OrphanCard: React.FC<{ o: OrphanRow; open: boolean; onToggle: () => void; 
                     Template encontrado no catalogo completo, fora dos filtros atuais
                   </span>
                 )}
+                {o.packEvidence?.observedIds.map(id=><span key={id} className="rounded bg-slate-100 px-2 py-1 text-xs">ID observado: {id}</span>)}
+                {o.packEvidence?.conflicts.map(c=><span key={c} className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">{c}</span>)}
                 {m.reasons.map((r, i) => (
                   <span key={i} className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold ${r.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                     {r.ok ? <Check size={11} /> : null}<span className="opacity-70">{r.label}:</span> {r.val}

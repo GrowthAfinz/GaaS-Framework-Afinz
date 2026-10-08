@@ -1,3 +1,4 @@
+import {allowsRepescagemReuse,upgradeVariant} from './communicationReuse';
 import type {ProposalRow} from '../services/communicationProposalService';
 import type {CatalogEntry} from '../hooks/useReconciliation';
 import type {ActivityMomentSuggestion} from '../types/communication';
@@ -62,6 +63,14 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
  field('channel','Canal',[...col('Canal'),{value:p.content.channel,source:'Mensagem no pack'},{value:tpl?.channel,source:'Catálogo'}],s=>canalToId(s)||norm(s));
  const linkSegment=clean(p.utm.af_sub1);
  field('segment','Segmento',[...col('Segmento'),{value:linkSegment?segmentoLabelCanon(segmentoKey(linkSegment)):null,source:'Tracking af_sub1'}, {value:meta.segmento_af_sub1,source:'Governança do catálogo'}, {value:tpl?.dims.segmento?segmentoLabelCanon(tpl.dims.segmento):null,source:'Template ID / catálogo'}],s=>segmentoKey(s)||norm(s));
+ const reuse=allowsRepescagemReuse(p.activity_name,fields.segment.value);
+ if(reuse){
+  const f=fields.segment;
+  f.conflict=[{value:f.value,source:f.source},...f.alternatives].some(e=>!['aprovados_nao_convertidos','negados'].includes(segmentoKey(e.value)||''));
+  fields.reuse={label:'Reuso',value:'Upgrade menor → Repescagem',source:'Regra operacional confirmada',alternatives:[],conflict:false};
+ }
+ const variant=upgradeVariant(p.activity_name);
+ if(variant)fields.creditVariant={label:'Resultado da análise',value:variant==='menor'?'Menor':'Maior',source:'Activity Name',alternatives:[],conflict:false};
  const subgroupLabel=(s:string)=>s.replace(/^Abandonados\s+/i,'').replace(/^diario$/i,'Diário');
  const subgroupCanon=(s:string)=>norm(subgroupLabel(s));
  const subgroupFromId=(id:string)=>/_(?:car21)_|(?:^|_)21d(?:_|$)/i.test(id)?'D-21 A D>7':/_(?:carsab)_|(?:^|_)sab(?:_|$)/i.test(id)?'D-7':null;
@@ -70,7 +79,7 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
  fields.subgroup.value=subgroupLabel(fields.subgroup.value);
  // Oferta and Promocional are independent columns: Vibe + Padrão is valid.
  const offerToken=(v:string)=>/(?:^|_)vibe(?:_|$)/i.test(v)?'Vibe':/(?:^|_)limite(?:_|$)/i.test(v)?'Limite':null;
- const promoToken=(v:string)=>/(?:^|_)copa(?:_|$)/i.test(v)?'Copa':/(?:^|_)upgrade(?:_|$)/i.test(v)?'Upgrade':null;
+ const promoToken=(v:string)=>/(?:^|_)copa(?:_|$)/i.test(v)?'Copa':null;
  field('offer','Oferta',[...col('Oferta'),...linkedIdEvidence(offerToken),{value:offerToken(identifier),source:idSource},{value:offerToken(clean(p.utm.c)),source:'Tracking c'}]);
  field('campaign','Promocional',[...col('Promocional'),...linkedIdEvidence(promoToken),{value:promoToken(identifier),source:idSource},{value:promoToken(clean(p.utm.c)),source:'Tracking c'}]);
  field('trackingCampaign','Campanha do link',[{value:p.utm.c,source:'Tracking c'}]);
@@ -88,9 +97,10 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
  const reasons:string[]=[],alternatives:string[]=[];
  let moment:MomentEvidence={label:'Momento não identificado',week:null,dispatch:null,confidence:'baixa',source:'Sem evidência suficiente',reasons,alternatives,declared:parseSeq(identifier)};
  if(manual?.source==='manual'&&manual.enabled)moment={...moment,label:manual.label,week:manual.week??null,dispatch:manual.dispatch??null,confidence:'manual',source:'Correção manual da jornada / atividade / canal'};
+ else if(nameSeq&&nameSeq.dispatch<100)moment={...moment,...nameSeq,label:(nameSeq.week?`Semana ${nameSeq.week} · `:'')+'Disparo '+nameSeq.dispatch,confidence:'média',source:'Posição do uso declarada no Activity Name'};
  else if(idSeq&&/DispD\d+/i.test(identifier))moment={...moment,...idSeq,label:`Disparo ${idSeq.dispatch}`,confidence:'alta',source:'Disparo declarado em af_sub3 / Template ID'};
  else if(idSeq&&(idSeq.week||canalToId(p.content.channel)==='email'||segmentoKey(fields.segment.value)==='crm'))moment={...moment,...idSeq,label:(idSeq.week?`Semana ${idSeq.week} · `:'')+`Disparo ${idSeq.dispatch}`,confidence:'alta',source:'Calendário declarado em af_sub3 / Template ID'};
- else if(idSeq&&segmentoKey(fields.segment.value)==='negados')moment={...moment,...idSeq,label:`Disparo ${idSeq.dispatch}`,confidence:'alta',source:'Índice de toque da régua Negados'};
+ else if(idSeq&&(segmentoKey(fields.segment.value)==='negados'||reuse))moment={...moment,...idSeq,label:`Disparo ${idSeq.dispatch}`,confidence:'alta',source:'Índice de toque da régua Negados'};
  else if(nameSeq&&nameSeq.dispatch<100)moment={...moment,...nameSeq,label:(nameSeq.week?`Semana ${nameSeq.week} · `:'')+'Disparo '+nameSeq.dispatch,confidence:'média',source:'Posição declarada no Activity Name'};
  else if(orders.length===1)moment={...moment,dispatch:orders[0],label:`Ordem registrada ${orders[0]}`,confidence:'média',source:'activities.Ordem de disparo (escopo global/canal a revisar)'};
  else if(idSeq)moment={...moment,...idSeq,label:`Sugestão do ID · ${idSeq.week?'S'+idSeq.week+' · ':''}D${idSeq.dispatch}`,source:'Índice do template; não comprova dia relativo ou posição no ramo'};
@@ -102,14 +112,15 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
  if(exact.some(a=>a['Ordem de disparo']!=null&&a['Ordem de disparo']!>0&&!orders.includes(a['Ordem de disparo']!)))reasons.push('Ordem cadastrada incompatível com ordinal: recência ou data; ignorada na inferência.');
  const trackingSeq=sequence(clean(p.utm.af_sub2));
  if(idSeq&&trackingSeq&&!idSeq.week&&idSeq.dispatch!==trackingSeq.dispatch)conflicts.push(`Momento: af_sub3 declara ${idSeq.dispatch}, mas af_sub2 declara ${trackingSeq.dispatch}. Revisar parametrização.`);
- if(idSeq&&orders.length===1&&idSeq.dispatch!==orders[0])conflicts.push(`Momento do ID ${idSeq.dispatch} diverge da ordem cadastrada ${orders[0]}.`);
+ if(idSeq&&orders.length===1&&idSeq.dispatch!==orders[0])reasons.push(`Índice da peça ${idSeq.dispatch}; ordem do uso ${orders[0]}: dimensões separadas, possível reuso.`);
+ if(idSeq&&nameSeq&&idSeq.dispatch!==nameSeq.dispatch)reasons.push(`Peça ${parseSeq(identifier)} configurada no uso ${parseSeq(p.activity_name)}; preservar ambos os índices.`);
  reasons.push(moment.source);if(idSeq)reasons.push('Índice declarado no ID: '+parseSeq(identifier));
  if(identifier!==observedIdentifier){reasons.push('Momento do ID proposto; não comprova execução ou validade histórica.');if(observedIdentifier&&moment.confidence==='alta'){moment.confidence='média';moment.source='Template ID proposto (revisável)';}}
  if(p.utm.af_sub2)reasons.push('Momento de tracking af_sub2: '+p.utm.af_sub2+' (dimensão separada).');
  if(exact.some(a=>a['Horário de Disparo']==='00:00:00'))reasons.push('Horário 00:00 não usado como evidência de horário real.');
  const candidateParsed=parseActivity(p.activity_name,{jornada:p.journey_name,canal:p.content.channel,bu:fields.front.value,segmento:fields.segment.value,parceiro:fields.partner.value});
  // Reuse scoring, but do not let its legacy journey precedence overwrite governed link dimensions.
- candidateParsed.segmento=segmentoKey(fields.segment.value==='Não identificado'?'':fields.segment.value);
+ candidateParsed.segmento=reuse?'negados':segmentoKey(fields.segment.value==='Não identificado'?'':fields.segment.value);
  candidateParsed.campanha=resolveDim('campanha',fields.campaign.value==='Padrão'||fields.campaign.value==='Não identificado'?fields.offer.value:fields.campaign.value);
  if(moment.dispatch!=null)candidateParsed.seq=moment.week?`S${moment.week}D${String(moment.dispatch).padStart(2,'0')}`:`D${moment.dispatch}`;
  const candidates=catalog.map(t=>{const m=matchTemplate(candidateParsed,[t]);if(!m)return null;const guards:string[]=[];const candidateSubgroup=/_(?:car21)_|(?:^|_)21d(?:_|$)/i.test(t.id)?'D-21 A D>7':/_carsab_/i.test(t.id)?'D-7':null;if(candidateSubgroup&&fields.subgroup.value!=='Não identificado'&&subgroupCanon(candidateSubgroup)!==subgroupCanon(fields.subgroup.value))guards.push(`Subgrupo ${candidateSubgroup} diverge de ${fields.subgroup.value}`);const partner=idPartner(t.id);if(partner&&fields.partner.value!=='Não identificado'&&partnerCanon(partner)!==partnerCanon(fields.partner.value))guards.push(`Parceiro ${partner} diverge de ${fields.partner.value}`);return {id:t.id,score:m.score,reasons:m.reasons.map(r=>(r.ok?'✓ ':'⚠ ')+r.label+': '+r.val),conflicts:guards};}).filter((v):v is NonNullable<typeof v>=>!!v).sort((a,b)=>a.conflicts.length-b.conflicts.length||b.score-a.score||a.id.localeCompare(b.id)).slice(0,5);
@@ -118,7 +129,7 @@ export function orchestrateCommunication(row:ProposalRow,universe:FrameworkActiv
  const exactIds=new Set(exact.map(a=>a.id));
  const relatedActivities=universe.filter(a=>!exactIds.has(a.id)&&canalToId(a.Canal)===canalToId(p.content.channel)
   &&fields.partner.value!=='Não identificado'&&partnerCanon(a.parceiro_canonico||a.Parceiro||'')===partnerCanon(fields.partner.value)
-  &&fields.segment.value!=='Não identificado'&&segmentoKey(a.Segmento)!=null&&segmentoKey(a.Segmento)===segmentoKey(fields.segment.value)
+  &&fields.segment.value!=='Não identificado'&&segmentoKey(a.Segmento)!=null&&(segmentoKey(a.Segmento)===segmentoKey(fields.segment.value)||(reuse&&segmentoKey(a.Segmento)==='negados'))
   &&norm(a.BU||'')===norm(fields.front.value)
   &&(fields.subgroup.value==='Não identificado'||subgroupCanon(a.Subgrupos||'')===subgroupCanon(fields.subgroup.value))
   &&(fields.campaign.value==='Não identificado'||norm(a.Promocional||'')===norm(fields.campaign.value))

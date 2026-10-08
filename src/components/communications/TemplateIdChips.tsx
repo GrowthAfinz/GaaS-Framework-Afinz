@@ -1,5 +1,5 @@
 import React from 'react';
-import { translateTemplateId } from '../../utils/taxonomy';
+import { translateTemplateId,segmentoKeyFromTemplateId } from '../../utils/taxonomy';
 import { BU_COLORS, buOf } from './ui/commsUi';
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
 export const TemplateIdChips: React.FC<Props> = ({ id, showId, className, size = 'sm', inverse = false }) => {
   const parts: { key: string; label: string; value: string }[] = translateTemplateId(id).flatMap((part): { key: string; label: string; value: string }[] => {
     if (part.key !== 'seq') return [part];
+    if(segmentoKeyFromTemplateId(id)==='negados'||/DispD\d+/i.test(id))return [{...part,value:part.value.replace(/^Dia /,'Disparo ')}];
     const weekly = part.value.match(/^Semana (\d+) · Disparo (\d+)$/i);
     if (weekly) return [
       { ...part, key: 'week' as const, label: 'Semana', value: `Semana ${weekly[1]}` },

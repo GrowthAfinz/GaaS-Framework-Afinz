@@ -51,3 +51,18 @@ Essa projeção corrige somente métricas da fila de packs. Não certifica JobID
 DispD1_21d conserva delimitadores: Disparo 1 e subgrupo D-21 A D>7. Vibe compara com Oferta; Copa/Upgrade com Promocional. Vibe + Promocional Padrão é concordância, não conflito. No contexto carrinho, Institucional é comparável ao público Proprietaria, mantendo as duas fontes nos detalhes. O motor não cria família/recência pela jornada. Perfil, produto, etapa, safra, oferta/promocional secundários ficam na expansão. Resultados acrescentam emissões, abertura e custo registrado com cobertura; não calculam média de taxas ou CAC.
 
 Links incompletos continuam fora dos lotes. Após revisão humana com motivo obrigatório, uma única comunicação pode ser simulada e aplicada pelos RPCs existentes; opt-outs permanecem bloqueados. Não se preenche o link original nem se infere vínculo histórico. Propostas e conflitos persistidos de análises anteriores permanecem registrados; esta release corrige a projeção e não reaprova conteúdo de produção.
+
+
+## Integração pack × execução e reuso (08/10/2026)
+
+A fila de Disparos sem template consulta propostas e mensagens dos packs, catálogo e histórico completo de execuções vinculadas. O agrupamento agora preserva jornada normalizada, Activity Name, canal e dimensões do contexto; nomes iguais em jornadas diferentes não são fundidos.
+
+Prioridade: correspondência exata de jornada + atividade + canal no pack; depois candidatos de reuso histórico por BU, parceiro, segmento, subgrupo, Oferta e Promocional. O histórico é sugestão revisável, não prova de versão enviada. Índice de peça e momento da atividade ficam separados; o ID real não é reescrito para simular outro momento. Conteúdos diferentes para um ID, IDs concorrentes, links incompletos e propostas não revisadas divergentes do observado impedem classificação automática como forte. Score não é probabilidade calibrada.
+
+Regra contextual confirmada no Vault Upgrade.md: Activity Name ANC com menor, e segmento Aprovados_nao_convertidos em activities, permite peça de Repescagem/Negados. O segmento da execução continua ANC. Maior não recebe essa exceção. O tracking af_sub1 original continua visível; campanha upgrade no c não é automaticamente Promocional Upgrade. A divergência esperada ANC × Negados deixa de ser conflito do motor, mantendo as fontes e a auditoria anterior.
+
+A aprovação em massa considera apenas as linhas visíveis pelos filtros. Prévia visual do pack pode ser ampliada na própria linha. Confirmação mostra período, jornada, canal, template e número de execuções e exige evidência do operador. Atualização dos dados cancela seleção pendente. Duplicidades já aprovadas usam a projeção existente; mudança da fonte invalida essa decisão.
+
+O RPC link_communication_executions recebe snapshots completos e IDs explícitos. Revalida sessão, cadastro/canal, período local São Paulo, ausência de vínculo e snapshots sob bloqueio transacional. Rejeita concorrência e grava auditoria append-only em communication_execution_links. Não altera conteúdo, versão atual ou registros fora da seleção. Cada grupo é transacional; um lote de vários grupos pode concluir os primeiros antes de falhar em um posterior, e a fila recarrega após erro. A auditoria exibe também esses vínculos. O legado linkActivityToTemplate está bloqueado; a ação antiga do gerenciador de assets aponta para usar a fila no período.
+
+Validação: testes de reuso maior/menor, IDs e versões concorrentes, contexto e momento; contratos SQL de escopo, concorrência, permissões e atomicidade; QA browser dos filtros, visual ampliado, confirmação e preservação de outra jornada. Nenhuma execução de produção é vinculada pelo deploy.

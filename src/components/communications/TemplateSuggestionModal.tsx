@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Check, GitBranch, Link2, Loader2, Search, X } from 'lucide-react';
 import type { CatalogEntry, OrphanRow, ReconciledRow, TemplateReuseSuggestion } from '../../hooks/useReconciliation';
-import { describeError, linkActivityToTemplate } from '../../services/communicationService';
+import { describeError, linkReviewedExecutions } from '../../services/communicationService';
 import { formatSeq, optLabel, type DimId, type ParsedActivity, type TemplateDims } from '../../utils/taxonomy';
 
 type TargetRow = OrphanRow | ReconciledRow;
@@ -140,7 +140,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
     setBusy(templateId);
     setError(null);
     try {
-      await linkActivityToTemplate(row.name, templateId);
+      await linkReviewedExecutions(row, templateId, 'Escolha manual revisada no período');
       onChanged();
       onClose();
     } catch (err) {
@@ -161,7 +161,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
               <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold">{row.canalLabel}</span>
               <span className="inline-flex items-center gap-1"><GitBranch size={12} /> {row.jornada}</span>
               <span>{fmtK(row.base)} base</span>
-              <span>{row.exec} exec.</span>
+              <span>{row.exec} exec. · {row.period.start} a {row.period.end}</span>
               {currentTemplateId && <span>Atual: <code className="font-bold text-cyan-700">{currentTemplateId}</code></span>}
             </div>
           </div>

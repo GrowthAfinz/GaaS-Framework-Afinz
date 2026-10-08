@@ -341,16 +341,13 @@ export async function createDraftTemplate(input: {
   if (error) throw error;
 }
 
-/** Vincula (marca) um activity_name a um template — todas as execuções do nome. */
-export async function linkActivityToTemplate(activityName: string, templateId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from('activities')
-    .update({ template_id: templateId, updated_at: new Date().toISOString() })
-    .eq('"Activity name / Taxonomia"', activityName)
-    .is('template_id', null)
-    .select('id');
-  if (error) throw error;
-  return data?.length ?? 0;
+/** Legacy name-wide links are deliberately blocked. Use the scoped queue. */
+export async function linkActivityToTemplate(_activityName: string, _templateId: string): Promise<number> {
+  throw new Error('Vínculo por nome desativado. Revise as execuções no período em Disparos sem template.');
+}
+export async function linkReviewedExecutions(row: {executionRecords: unknown[];period:{start:string;end:string}},templateId:string,evidence:string):Promise<number> {
+  const {data,error}=await supabase.rpc('link_communication_executions',{p_template:templateId,p_snapshots:row.executionRecords,p_start:row.period.start,p_end:row.period.end,p_evidence:evidence});
+  if(error)throw error;return Number(data);
 }
 
 /** Desvincula um activity_name (volta a template_id nulo). */
