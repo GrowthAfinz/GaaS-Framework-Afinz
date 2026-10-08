@@ -25,13 +25,14 @@ function buildLabel(kind: ActivityMomentKind, enabled: boolean, week: number, di
 }
 
 interface Props {
+  calendarMoment?: boolean;
   baseKnown?: boolean;
   row: OrphanRow;
   onClose: () => void;
   onChanged: () => void;
 }
 
-export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged, baseKnown=true }) => {
+export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged, baseKnown=true, calendarMoment=false }) => {
   const root=useRef<HTMLDivElement>(null);
   useEffect(()=>{const previous=document.activeElement as HTMLElement|null,overflow=document.body.style.overflow;document.body.style.overflow='hidden';root.current?.querySelector<HTMLButtonElement>('button')?.focus();const key=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();if(e.key==='Tab'){const nodes=Array.from(root.current?.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled])')||[]),first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};document.addEventListener('keydown',key);return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);previous?.focus();};},[onClose]);
   const seed = row.momentSuggestion;
@@ -44,8 +45,8 @@ export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged, 
 
   const numericEnabled = kind === 'pontual' ? enabled : true;
   const label = useMemo(
-    () => buildLabel(kind, numericEnabled, week, dispatch),
-    [dispatch, kind, numericEnabled, week]
+    () => calendarMoment?buildLabel(kind, numericEnabled, week, dispatch).replace(/Disparo/g,'Dia'):buildLabel(kind, numericEnabled, week, dispatch),
+    [dispatch, kind, numericEnabled, week,calendarMoment]
   );
 
   const save = async () => {
@@ -116,7 +117,7 @@ export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged, 
                       : 'border-slate-200 bg-white text-slate-600 hover:border-cyan-200'
                   }`}
                 >
-                  {KIND_LABEL[id]}
+                  {calendarMoment?KIND_LABEL[id].replace(/Disparo/g,'Dia'):KIND_LABEL[id]}
                 </button>
               ))}
             </div>
@@ -138,7 +139,7 @@ export const ActivityMomentModal: React.FC<Props> = ({ row, onClose, onChanged, 
             )}
             {numericEnabled && (
               <label className="block">
-                <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Disparo</span>
+                <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">{calendarMoment?'Dia':'Disparo'}</span>
                 <input
                   type="number"
                   min={1}
