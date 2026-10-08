@@ -69,3 +69,6 @@ Validação: testes de reuso maior/menor, IDs e versões concorrentes, contexto 
 
 ### Prévia pelo ID original (2026-10-08)
 As duas filas resolvem a peça visual pelo ID original observado no link, com caixa preservada e canal compatível. Na ausência de arquivo original, podem mostrar o arquivo do ID proposto, explicitamente como candidato. A comunicação WhatsApp/SMS configurada no pack continua prioritária. A resolução visual não altera IDs, versões atuais ou vínculos. Quando nenhum arquivo existe, a miniatura informa a ausência e seu tooltip identifica o ID original; não busca peças de outros momentos. Exemplo verificado: bb_email_vibe_bsp_S3D03 e bb_email_vibe_crm_S3D03 não estavam cadastrados no catálogo.
+
+### Nome da peça e ausência de prévia
+O nome original do Content Builder permanece como asset_name no payload persistido de cada ocorrência SFMC, preservando a proveniência sem substituir o template_id. As duas filas exibem esse nome; o modal visual também. Na ausência de peça visual, um ID observado é mostrado como ID identificado · sem prévia. O tooltip distingue a indisponibilidade de HTML para a prévia nesta importação da ausência de ID.

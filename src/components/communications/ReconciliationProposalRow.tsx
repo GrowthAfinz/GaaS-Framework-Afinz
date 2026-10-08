@@ -17,12 +17,14 @@ export function ReconciliationProposalRow({row,o,open,checked,busy,onToggle,onSe
  return <article data-proposal-row={row.id} aria-label={'Comunicação '+(row.proposed_template_id||p.activity_name)} className={`overflow-hidden rounded-xl border bg-white transition-shadow ${open?'border-cyan-500 shadow-md':'border-slate-200 hover:border-slate-300'}`}>
   <div className="flex flex-wrap items-center gap-3 px-4 py-3 xl:flex-nowrap">
    <input type="checkbox" className="h-4 w-4" aria-label={'Selecionar '+p.activity_name} disabled={busy||!pending} checked={checked} onChange={onSelect}/>
-   <CommunicationVisual content={p.content} template={template} sourceLabel={visualSource}/>
+   <CommunicationVisual assetName={p.asset_name} observedId={row.observed_template_id} content={p.content} template={template} sourceLabel={visualSource}/>
    <div className="min-w-0 flex-1 basis-64 xl:basis-auto">
     <div className="flex flex-wrap items-center gap-2"><code className="max-w-[420px] truncate font-mono text-sm font-semibold text-slate-900" title={row.proposed_template_id}>{row.proposed_template_id||'Template ID a definir'}</code><button onClick={onMoment} className="inline-flex items-center gap-1 rounded-md border border-cyan-300 bg-white px-2 py-1 text-xs font-semibold text-cyan-800 hover:bg-cyan-50" title="Editar o momento na régua"><CalendarClock size={12} aria-hidden="true"/>{o.moment.label} · confiança {o.moment.confidence}</button></div>
     <div className="mt-1.5 flex flex-wrap gap-1">{tags.map(([key,kind])=>{const f=o.fields[key];return !f||f.value==='Não identificado'?null:<DimTag key={key} kind={kind} label={f.label} value={f.value} source={f.source} conflict={f.conflict}/>;})}</div>
     {missing.length>0&&<p className="mt-1.5 flex items-center gap-1 text-xs text-amber-900"><Link2Off size={12} aria-hidden="true"/>Link sem {missing.join(', ')}. O ID e as etiquetas são uma proposta da análise.</p>}
     <p className="mt-1 truncate text-xs text-slate-600" title={p.activity_name+'\n'+p.journey_name}>{p.activity_name} · {p.journey_name} · versão {p.journey_version}</p>
+    {p.asset_name&&<p className="mt-1 truncate text-xs text-slate-700" title={p.asset_name}>{p.asset_name}</p>}
+    {p.content.channel==='E-mail'&&!template&&<p className="mt-1 text-xs text-slate-600">HTML não disponível para prévia nesta importação.</p>}
    </div>
    <dl className="flex shrink-0 items-center gap-4 text-xs tabular-nums text-slate-600" title="Volume dos registros no período; não representa pessoas únicas nem certifica a versão enviada">
     <div><dt className="sr-only">Base</dt><dd><b className="text-sm text-slate-900">{fmt(o.base)}</b> base</dd><dd>{fmt(o.actionable)} acionável</dd></div>

@@ -233,7 +233,7 @@ const OrphanCard: React.FC<{ catalog:CatalogEntry[]; o: OrphanRow; open: boolean
       <div className="flex cursor-pointer items-center gap-3 px-4 py-3" onClick={onToggle}>
         <ChevronRight size={15} className={`shrink-0 text-slate-500 transition-transform ${open ? 'rotate-90 text-cyan-600' : ''}`} />
         <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold uppercase text-slate-500">{o.canalLabel}</span>
-        <div onClick={e=>e.stopPropagation()}>{o.packEvidence?.proposal&&<CommunicationVisual content={o.packEvidence.proposal.message.payload.content} template={resolveCommunicationVisual(catalog.map(t=>t.raw),o.canalLabel,o.packEvidence.proposal.observed_template_id,o.packEvidence.proposal.proposed_template_id).template} sourceLabel={resolveCommunicationVisual(catalog.map(t=>t.raw),o.canalLabel,o.packEvidence.proposal.observed_template_id,o.packEvidence.proposal.proposed_template_id).sourceLabel}/>}</div>
+        <div onClick={e=>e.stopPropagation()}>{o.packEvidence?.proposal&&<CommunicationVisual assetName={o.packEvidence.proposal.message.payload.asset_name} observedId={o.packEvidence.proposal.observed_template_id} content={o.packEvidence.proposal.message.payload.content} template={resolveCommunicationVisual(catalog.map(t=>t.raw),o.canalLabel,o.packEvidence.proposal.observed_template_id,o.packEvidence.proposal.proposed_template_id).template} sourceLabel={resolveCommunicationVisual(catalog.map(t=>t.raw),o.canalLabel,o.packEvidence.proposal.observed_template_id,o.packEvidence.proposal.proposed_template_id).sourceLabel}/>}</div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <code className="block max-w-[420px] truncate font-mono text-xs font-semibold text-slate-800 xl:max-w-[560px]">{o.name}</code>
@@ -259,6 +259,7 @@ const OrphanCard: React.FC<{ catalog:CatalogEntry[]; o: OrphanRow; open: boolean
             )}
           </div>
           <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-600"><GitBranch size={11} /> {o.jornada}</div>
+          {o.packEvidence?.proposal?.message.payload.asset_name&&<p className="mt-1 truncate text-xs text-slate-700" title={o.packEvidence.proposal.message.payload.asset_name}>{o.packEvidence.proposal.message.payload.asset_name}</p>}
           <div className="mt-1 flex flex-wrap gap-1 text-xs text-slate-600"><span>{o.segmentoLabel}</span>{/menor/i.test(o.name)&&<span className="rounded bg-violet-50 px-2 text-violet-800">Menor · reuso de Repescagem</span>}{/maior/i.test(o.name)&&<span>· Maior</span>}<span>· {o.subgrupoLabel}</span>{o.packEvidence?.source!=='none'&&<span className="rounded bg-cyan-50 px-2 text-cyan-800">{o.packEvidence?.source==='pack'?'ID no pack':`Reuso histórico · ${o.packEvidence?.reusedJourneys} jornadas`}</span>}</div>
         </div>
         <div className="hidden shrink-0 gap-3.5 text-xs tabular-nums text-slate-500 sm:flex">
