@@ -2,7 +2,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-const migration=readFileSync(new URL('../supabase/migrations/20261007234629_communication_execution_review.sql',import.meta.url),'utf8');
+const migration=readFileSync(new URL('../supabase/migrations/20261007235452_communication_execution_review.sql',import.meta.url),'utf8');
 async function db(){const d=new PGlite();await d.exec(`create role anon;create role authenticated;create schema auth;create schema gaas_sfmc_private;grant usage on schema public,auth,gaas_sfmc_private to authenticated;create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;create table activities(id uuid primary key default gen_random_uuid(),jornada text,"Activity name / Taxonomia" text,"Canal" text,"Data de Disparo" timestamptz,"Base Total" numeric,template_id text,created_at timestamptz default now(),updated_at timestamptz default now());`);await d.exec(migration);await d.query("select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false)");return d;}
 async function groups(d){return (await d.query("select public.read_execution_duplicates('2026-09-24','2026-09-24') value")).rows[0].value;}
 async function seed(d,values=[['t',66],[null,66]]){for(const [t,b] of values)await d.query(`insert into activities(jornada,"Activity name / Taxonomia","Canal","Data de Disparo","Base Total",template_id) values('JOR_TEST','activity','WhatsApp','2026-09-24T03:00:00Z',$1,$2)`,[b,t]);return (await groups(d))[0];}

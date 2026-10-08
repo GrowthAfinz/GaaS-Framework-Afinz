@@ -7,7 +7,7 @@ const source=readFileSync('scripts/test-sfmc-package-sql.mjs','utf8');
 const db=new PGlite();await db.exec(source.split('const bootstrap=`')[1].split('`;')[0]);await db.exec(`alter table activities add column "BU" text,add column "Base Total" numeric,add column "Base Acionável" numeric,add column "Oferta" text,add column "Promocional" text,add column "Ordem de disparo" integer;`);
 await db.exec(readFileSync('supabase/migrations/20261007203329_sfmc_package_ingestion.sql','utf8'));
 await db.exec(readFileSync('supabase/migrations/20261007215201_communications_proposal_inbox.sql','utf8'));await db.exec(readFileSync('supabase/migrations/20261007215620_communications_contextual_id_candidates.sql','utf8'));
-await db.exec(readFileSync('supabase/migrations/20261007234629_communication_execution_review.sql','utf8'));
+await db.exec(readFileSync('supabase/migrations/20261007235452_communication_execution_review.sql','utf8'));
 await db.query("select set_config('request.jwt.claim.sub',$1,false)",['11111111-1111-4111-8111-111111111111']);
 await db.query("insert into communication_templates(template_id,title,channel)values('b2c_carsab_vibe_inst_Dispd1','carrinho_b2c_sabado_sorteio','WhatsApp')");
 writeFileSync(out+'/index.html',`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
