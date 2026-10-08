@@ -14,7 +14,7 @@ export function MessagePreview({ content, compact = false }: { content: MessageC
   const banner = safeHttps(content.banner_url);
   const text = previewText(content, fields);
   const sms = smsSegments(text);
-  if (!content.body_text || !['WhatsApp','SMS'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">{content.channel === 'E-mail' ? 'Conteúdo dinâmico depende do briefing. O pacote preserva a estrutura, sem executar AMPscript.' : 'Texto completo não disponível para este canal.'}</p>;
+  if (!content.body_text || !['WhatsApp','SMS'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{content.channel === 'E-mail' ? 'Conteúdo dinâmico depende do briefing. O pacote preserva a estrutura, sem executar AMPscript.' : 'Texto completo não disponível para este canal.'}</p>;
   return <div className={'overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ' + (compact ? 'text-[11px]' : 'text-sm')}>
     <div className="flex items-center justify-between gap-2 bg-white px-3 py-2">
       <span className="font-semibold">{content.channel === 'SMS' ? content.sms_from || 'SMS' : 'Afinz · WhatsApp'}</span>
@@ -23,14 +23,14 @@ export function MessagePreview({ content, compact = false }: { content: MessageC
     <div className={'p-3 ' + (content.channel === 'WhatsApp' ? 'bg-[#e9f0e7]' : 'bg-slate-100')}>
       <div className={'overflow-hidden rounded-lg border p-3 shadow-sm ' + (content.channel === 'WhatsApp' ? 'border-emerald-100 bg-[#d9fdd3]' : 'border-slate-200 bg-white')}>
         {banner && failedBanner !== banner && <img src={banner} alt="Imagem do cabeçalho" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedBanner(banner)} className="mb-3 max-h-64 w-full rounded object-contain" />}
-        {banner && failedBanner === banner && <p className="mb-2 text-xs text-slate-500">Imagem indisponível na origem</p>}
+        {banner && failedBanner === banner && <p className="mb-2 text-xs text-slate-600">Imagem indisponível na origem</p>}
         <div className={'whitespace-pre-wrap break-words leading-relaxed ' + (compact ? 'max-h-48 overflow-hidden' : '')}>{formatted(text)}</div>
-        {content.footer && <p className="mt-3 text-xs text-slate-500">{content.footer}</p>}
+        {content.footer && <p className="mt-3 text-xs text-slate-600">{content.footer}</p>}
         {content.buttons.map((button, i) => <div key={i} className="mt-2 border-t border-emerald-200 pt-2 text-center font-medium text-cyan-800">{button.type === 'url' ? '↗ ' : '↩ '}{button.title}</div>)}
       </div>
     </div>
-    {!compact && content.channel === 'SMS' && <p className="px-3 py-2 text-xs text-slate-500">{sms.units} unidades · {sms.encoding} · {sms.segments} segmento(s) estimados no exemplo</p>}
-    <p className="px-3 py-2 text-[10px] text-slate-500">Prévia gerada do texto do SFMC · valores de exemplo</p>
+    {!compact && content.channel === 'SMS' && <p className="px-3 py-2 text-xs text-slate-600">{sms.units} unidades · {sms.encoding} · {sms.segments} segmento(s) estimados no exemplo</p>}
+    <p className="px-3 py-2 text-xs text-slate-600">Prévia gerada do texto do SFMC · valores de exemplo</p>
   </div>;
 }
 
