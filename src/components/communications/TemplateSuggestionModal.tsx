@@ -14,7 +14,7 @@ interface Props {
   onChanged: () => void;
 }
 
-interface RankedTemplate {
+export interface RankedTemplate {
   tpl: CatalogEntry;
   score: number;
   momentPriority: number;
@@ -47,7 +47,7 @@ function displayDim(dim: keyof TemplateDims, value: string | null) {
   return dim === 'seq' ? formatSeq(value) : optLabel(dim as DimId, value);
 }
 
-function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplateId?: string | null, reuse?: TemplateReuseSuggestion | null): RankedTemplate {
+export function rankTemplate(parsed: ParsedActivity, tpl: CatalogEntry, currentTemplateId?: string | null, reuse?: TemplateReuseSuggestion | null): RankedTemplate {
   let score = 0;
   const positives: string[] = [];
   const warnings: string[] = [];
@@ -136,11 +136,17 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
       .slice(0, 40);
   }, [catalog, currentTemplateId, query, row.parsed]);
 
+  // Escolher abre a confirmação; o vínculo exige evidência escrita pelo operador (sem texto pré-preenchido).
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState('');
+  const [checked, setChecked] = useState(false);
   const choose = async (templateId: string) => {
+    if (confirming !== templateId) { setConfirming(templateId); setEvidence(''); setChecked(false); setError(null); return; }
+    if (!checked || evidence.trim().length < 3) return;
     setBusy(templateId);
     setError(null);
     try {
-      await linkReviewedExecutions(row, templateId, 'Escolha manual revisada no período');
+      await linkReviewedExecutions(row, templateId, evidence.trim());
       onChanged();
       onClose();
     } catch (err) {
@@ -192,6 +198,15 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
         </div>
 
         {error && <div className="mx-6 mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        {confirming && (
+          <div role="group" aria-label="Confirmar vínculo" className="mx-6 mt-4 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-slate-800">
+            <p className="font-semibold">Vincular <code>{confirming}</code> a {row.executionRecords.length} execução(ões) · {row.jornada} · {row.canalLabel} · {row.period.start} a {row.period.end}</p>
+            <p className="mt-1 text-xs text-slate-600">Só estas execuções serão alteradas. Vínculos existentes não são sobrescritos e a versão atual do conteúdo não muda.</p>
+            <label className="mt-2 flex items-center gap-2 text-xs"><input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />Confirmo que esta peça corresponde a estas execuções no período</label>
+            <input aria-label="Evidência do vínculo" value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Como confirmou a peça e o período?" className="mt-2 w-full rounded border border-slate-300 bg-white p-2 text-sm" />
+            <div className="mt-2 flex justify-end gap-2"><button type="button" onClick={() => setConfirming(null)} className="rounded border bg-white px-3 py-1.5 text-xs">Cancelar</button><button type="button" disabled={!checked || evidence.trim().length < 3 || !!busy} onClick={() => choose(confirming)} className="rounded bg-cyan-700 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Confirmar vínculo</button></div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-6">
           {ranked.length === 0 ? (
@@ -236,7 +251,7 @@ export const TemplateSuggestionModal: React.FC<Props> = ({ row, catalog, current
                         className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-xs font-bold text-white hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {busy === item.tpl.id ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}
-                        {isCurrent ? 'Atual' : 'Usar template'}
+                        {isCurrent ? 'Atual' : confirming === item.tpl.id ? 'Confirmar acima' : 'Usar template'}
                       </button>
                     </div>
                   </div>

@@ -38,6 +38,20 @@ Seções: cockpit de KPIs → gráfico "Volume de disparos" (execuções por dia
 
 3 modos de visualização disponíveis: **Visão Geral**, **Galeria**, **Tabela**.
 
+### Três escopos (08/10/2026)
+
+Na Galeria e na Tabela, três seletores com contagem e unidade explícita:
+
+| Escopo | Unidade | Conteúdo |
+|---|---|---|
+| **Com template vinculado** | template com ≥1 execução vinculada no período (usos no detalhe) | métricas reais das execuções, score, diagnóstico, prévia com origem |
+| **Disparos sem template** | grupo de execuções do mesmo contexto (jornada normalizada + Activity Name + canal + BU/parceiro/segmento/subgrupo/oferta/promocional), IDs preservados | métricas com cobertura, tags das activities, momento do disparo × momento da peça, sugestão do motor, conflitos, "Revisar vínculo", seleção para lote |
+| **Comunicações aprovadas** | identidade do template (versões e ocorrências no detalhe) | estado de aprovação real, tags com fonte, prévia com origem, "Com execução no período" ou "Sem execução vinculada neste período", disparos compatíveis |
+
+A **Visão Geral** usa só as execuções vinculadas do período (escopo 1, sem filtros locais). Trocar de escopo, incluir rascunhos ou filtrar a biblioteca não altera seus indicadores.
+
+Detalhe técnico e contratos: `docs/reference/COMMUNICATIONS_ORCHESTRATION.md`, seção "Performance por conteúdo: três visões".
+
 ---
 
 ## Arquitetura de Componentes
@@ -54,9 +68,13 @@ CommunicationsView.tsx (roteador: mode 'cadastro' | 'performance')
 │   └── ActivityMomentModal.tsx, AddAssetModal.tsx, ActivityLinkManager.tsx, CadastroCobertura.tsx
 │
 └── [Performance do Conteúdo]
-    ├── PerformanceView.tsx
-    ├── TemplatePerformanceGrid.tsx
-    ├── ChannelPreview.tsx
+    ├── PerformanceView.tsx (escopos, filtros, Visão Geral, galeria/tabela/detalhe do escopo 1)
+    ├── UnlinkedExecutionsPanel.tsx (escopo 2: tabela operacional, galeria, lote)
+    ├── ExecutionLinkReviewModal.tsx (revisão individual e lote → link_communication_executions)
+    ├── ApprovedLibraryPanel.tsx (escopo 3: biblioteca e detalhe)
+    ├── ChannelPreview.tsx + previews/ContentPreview.tsx (prévia única com origem)
+    ├── contentUi.tsx (paginação, tags, métricas com cobertura, seletor de escopo)
+    ├── TemplatePerformanceGrid.tsx (legado, fora da navegação)
     └── CommunicationDetailModal.tsx
 ```
 
@@ -73,11 +91,16 @@ Tabelas Supabase:
 Storage: bucket `crm-communications`
   paths: crm/{channel}/{template_id}/original.{ext} ou .../email.html
 
-useTemplatePerformance.ts:
-  query activities WHERE template_id IS NOT NULL
-  → agrupa por template_id, soma KPIs (base, aberturas, cliques, cartões, propostas, custo)
-  → calcula CTR, taxa de conversão, CAC, timeline diária
-  → calcula período anterior automaticamente para deltas
+useContentPerformance.ts (aba Performance):
+  useReconciliation (mesmo motor da fila): activities do período paginadas em São Paulo
+    [início 00:00, fim+1 00:00), com e sem template; consolidação de duplicidades revisadas;
+    evidência de pack/histórico; catálogo; propostas; histórico vinculado
+  → buildTemplatePerformance (utils/contentPerformanceModel.ts): agrega por template_id
+  → buildApprovedLibrary: estado de aprovação, versões, asset_name, usos, disparos compatíveis
+  → loadPreviousTotals: período anterior de mesma duração (deltas), paginado
+  → useTemplateContentIndex: communication_template_contents carregado uma vez (prévias)
+
+useTemplatePerformance.ts: legado (TemplatePerformanceGrid); reaproveita o mesmo builder e limites.
 ```
 
 ---
@@ -85,9 +108,10 @@ useTemplatePerformance.ts:
 ## Casos de Uso
 
 ### 1. Vincular um disparo sem template a uma peça existente
-1. Ir em Comunicações → Cadastro e Templates → Fila de reconciliação.
-2. Localizar o disparo (filtro por BU/canal/segmento se disponível).
-3. Clicar "Sugestões" para ver templates candidatos, ou "+ Criar template" para cadastrar um novo (sem asset).
+1. Comunicações → Performance do Conteúdo → Tabela → **Disparos sem template** (ou a fila do Cadastro).
+2. Filtrar (frente, parceiro, canal, segmento, subgrupo, oferta, promocional, momento, busca).
+3. "Revisar vínculo": conferir IDs, jornada, canal, período, evidências; trocar o template se preciso; marcar a confirmação e escrever a evidência.
+4. Lote: "Selecionar elegíveis" (só grupos visíveis, com candidato único, contexto completo e sem conflito) → confirmar. Falhas por grupo aparecem no resultado.
 
 ### 2. Avaliar performance de conteúdo por canal
 1. Ir em Comunicações → Performance do Conteúdo.
@@ -114,10 +138,13 @@ useTemplatePerformance.ts:
 - `src/components/communications/ReconciliationQueue.tsx`
 - `src/components/communications/performance/PerformanceView.tsx`
 - `src/hooks/useTemplatePerformance.ts`
+- `src/hooks/useContentPerformance.ts`
+- `src/utils/contentPerformanceModel.ts`, `src/utils/executionLinkEligibility.ts`, `src/utils/saoPauloPeriod.ts`, `src/utils/communicationVisualResolution.ts`
+- `scripts/qa-content-performance.mjs` (QA isolado de navegador)
 - `docs/plans/COMMUNICATIONS_CLAUDE_DESIGN_BRIEF_CHANNELIZED_PERFORMANCE.md`
 - `docs/plans/COMMUNICATIONS_CONTENT_PERFORMANCE_V2_SPEC.md`
 - `docs/plans/ADR-002-identidade-comunicacoes-template-appsflyer.md`
 
 ---
 
-**Última Atualização:** 2026-07-05
+**Última Atualização:** 2026-10-08

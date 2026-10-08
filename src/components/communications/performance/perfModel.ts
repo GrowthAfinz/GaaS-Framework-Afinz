@@ -282,14 +282,16 @@ export interface ScoredTemplate extends TemplatePerformance {
 
 export function scoreTemplate(item: TemplatePerformance): ScoredTemplate {
   const breakdown = scoreBreakdown(item);
-  const score = computeScore(item);
+  // Execuções sem nenhum resultado registrado ainda não têm score: ausência não vira zero.
+  const measured = item.resultsMeasured > 0;
+  const score = measured ? computeScore(item) : null;
   return {
     ...item,
     channelKey: channelKeyOf(item.template.channel),
     score,
     tone: scoreTone(score),
     breakdown,
-    diagnoses: deriveDiagnoses(item, score),
+    diagnoses: measured ? deriveDiagnoses(item, score) : [],
     taxaAbertura: item.baseEnviada > 0 ? item.aberturas / item.baseEnviada : 0,
     facets: templateFacets(item),
   };

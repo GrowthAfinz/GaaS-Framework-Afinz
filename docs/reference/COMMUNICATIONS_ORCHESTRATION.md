@@ -75,3 +75,32 @@ O nome original do Content Builder permanece como asset_name no payload persisti
 
 ### Performance: prévias integradas
 A Performance renderiza a versão atual escolhida de WhatsApp, SMS ou Push, quando há corpo disponível e canal compatível. Sem essa versão, usa o arquivo do catálogo e identifica sua origem. E-mail distingue HTML de imagem. A tabela usa miniaturas reais. Métricas continuam limitadas às execuções vinculadas no período; aprovação isolada não gera performance. A peça atual não certifica a versão enviada historicamente.
+
+## Performance por conteúdo: três visões (08/10/2026)
+
+A Performance deixou de consultar só `activities` com `template_id` preenchido. Ela consome o mesmo motor da fila (`useReconciliation`, via `useContentPerformance`): activities do período com e sem template, paginadas, com a projeção de duplicidades revisadas, evidência de pack/histórico, catálogo, propostas e histórico vinculado. Não há algoritmo concorrente de sugestão.
+
+### Unidades
+- **Com template vinculado:** template com execução vinculada no período. Métricas somam essas execuções; não certificam qual versão do conteúdo foi enviada. Execução vinculada sem nenhum resultado registrado (abertura, clique, proposta, cartão) entra na contagem, mas fica sem score e sem diagnóstico; galeria e tabela mostram "—".
+- **Disparos sem template:** grupo `executionContextKey` (jornada normalizada, Activity Name, canal, BU, parceiro, segmento, subgrupo, Oferta, Promocional). Mesmo Activity Name em outra jornada, canal ou data é outro grupo. Métricas somam só valores preenchidos e mostram a cobertura (k/n); ausente é "—", nunca zero.
+- **Comunicações aprovadas:** identidade do template.
+
+### Aprovação (contrato atual, sem migração)
+Aprovada = versão aprovada na revisão do pack (`communication_template_contents`, criada só por `review_communication_proposals`/apply; o template nasce `draft`) **ou** cadastro com status `active`/`paused` no catálogo. Proposta `ready`/`review` não é aprovação; `applied` não comprova envio. `draft` sem versão aprovada é rascunho (ex.: pré-cadastro da governança). `superseded`/`archived` são inativos. Legados `active` aparecem como "Cadastro ativo no catálogo", sem aprovação histórica inferida. "Incluir rascunhos" age só na biblioteca, com contagem; desabilitado quando não há rascunho/inativo.
+
+Snapshot de produção (08/10): 213 templates; 156 ativos (5 deles com versão de pack aprovada, nenhuma marcada como atual), 57 rascunhos. Agosto/2026: 21 templates com 61 execuções vinculadas; 748 execuções sem template em ~152 grupos.
+
+### Vínculo
+Revisão individual e lote usam só `linkReviewedExecutions` → RPC `link_communication_executions` (IDs explícitos, snapshot completo, período São Paulo, canal, sem sobrescrever, auditoria). A revisão mostra IDs, jornada, canal, período, template escolhido, evidências, momento do disparo × momento da peça; permite trocar o template (busca no catálogo do mesmo canal, ranqueada por `rankTemplate`); exige caixa de confirmação e evidência escrita. Não escolhe nem altera versão atual de conteúdo. O modal de sugestões da fila também passou a exigir confirmação e evidência (antes usava texto fixo).
+
+Lote (`utils/executionLinkEligibility.ts`, regra única para fila e Performance): candidato único, sugestão forte, sem conflitos/divergências, sem conflito de momento, template no catálogo, no filtro global e no mesmo canal, execução sem vínculo e contexto completo (jornada, Activity Name, canal, BU, parceiro, segmento, data). Seleção efetiva = selecionados ∩ visíveis após filtros ∩ elegíveis. Um RPC por grupo; o resultado lista sucesso e falha por grupo e recarrega as três visões.
+
+### Prévias
+`resolvePreview` (utils/communicationVisualResolution.ts) é a regra única: comunicação do pack configurada neste uso → versão atual escolhida do template (WhatsApp/SMS/Push com corpo e canal compatível) → catálogo (HTML de e-mail ou imagem) → indisponível com motivo (e-mail sem HTML/arquivo; versões importadas sem atual escolhida; canal divergente). ID observado tem precedência; ID sugerido/proposto aparece como "candidato". IDs com caixa exata. `ContentPreview` distingue carregando, falha de acesso e ausência; miniatura abre modal central com Escape, foco preso e retorno de foco; HTML em iframe sem `allow-scripts`. Versões vêm de um índice carregado uma vez (`services/templateContentIndex.ts`) e URLs assinadas ficam em cache: nenhuma consulta por card. `CommunicationVisual` (filas) usa o mesmo componente.
+
+### Período e filtros
+Limites `[início 00:00, fim+1 00:00)` no offset de São Paulo (`utils/saoPauloPeriod.ts`) na fila, na Performance e no período anterior; consultas paginadas de 500. Filtros de frente, parceiro, canal, segmento, subgrupo, oferta, promocional, momento e busca (ID, nome da peça, jornada, Activity Name) valem nas três visões e são preservados ao trocar de escopo. Ordenações por escopo; valores ausentes ficam ao final nos dois sentidos; na biblioteca, peças sem execução não recebem posição de ranking. Listas paginadas em 24.
+
+### Validação
+Vitest 53 arquivos/354 testes (novos: `contentPerformanceModel.test.ts`, `saoPauloPeriod.test.ts`); contratos SQL `npm run test:sfmc-package-sql` 17/17; `typecheck:release` sem erro novo; build ok. QA isolado `scripts/qa-content-performance.mjs` (PGlite + migration real do RPC; nenhuma chamada a produção): contagens, modal/Escape/foco, lote limitado por filtro, vínculo movendo execuções da visão 2 para a 1, outra jornada e outubro intactos, revisão individual com troca de template, recusa de sobrescrita, rascunhos, HTML sem script, Visão Geral isolada, último dia em São Paulo e largura 390px sem overflow. Os QAs anteriores (`qa-communications-proposals.mjs`, `qa-scoped-communication-links.mjs`) foram atualizados para os novos rótulos acessíveis e para o requisito de contexto completo no lote.
+

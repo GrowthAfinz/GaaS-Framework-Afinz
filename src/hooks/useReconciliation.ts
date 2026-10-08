@@ -17,6 +17,8 @@ import {
   type Confidence, type MatchResult, type ParsedActivity, type TemplateDims,
 } from '../utils/taxonomy';
 import { runReconciliationGoldenSet } from '../utils/taxonomy.goldenset';
+import { saoPauloPeriodBounds } from '../utils/saoPauloPeriod';
+import type { ProposalRow } from '../services/communicationProposalService';
 
 // Regressão do parser roda uma vez em DEV (removido do bundle de produção).
 if (import.meta.env?.DEV) {
@@ -277,6 +279,9 @@ export function useReconciliation() {
   const [orphans, setOrphans] = useState<OrphanRow[]>([]);
   const [reconciled, setReconciled] = useState<ReconciledRow[]>([]);
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [proposals, setProposals] = useState<ProposalRow[]>([]);
+  const [periodLinked, setPeriodLinked] = useState<FrameworkActivity[]>([]);
+  const [historyLinked, setHistoryLinked] = useState<FrameworkActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -296,13 +301,15 @@ export function useReconciliation() {
     setError(null);
     try {
       const baseSelect = '*';
+      // Período global inclusivo em dias de São Paulo: [início 00:00, fim+1 00:00).
+      const bounds = saoPauloPeriodBounds(dataInicio, dataFim);
 
       const loadActivities = async (linked: boolean) => {
         const rows: OrphanQueryRow[] = [];
         for (let offset=0;;offset+=500) {
           let query=supabase.from('activities').select(baseSelect)
             .not('"Activity name / Taxonomia"','is',null)
-            .gte('"Data de Disparo"',`${dataInicio}T00:00:00-03:00`).lte('"Data de Disparo"',`${dataFim}T23:59:59.999-03:00`)
+            .gte('"Data de Disparo"',bounds.gte).lt('"Data de Disparo"',bounds.lt)
             .in('"Canal"',['E-mail','SMS','WhatsApp','Push']).order('id').range(offset,offset+499);
           query=linked?query.not('template_id','is',null):query.is('template_id',null);
           if(selectedBUs.length)query=query.in('BU',selectedBUs);
@@ -465,6 +472,9 @@ export function useReconciliation() {
       }
 
       setCatalog(cat);
+      setProposals(proposals);
+      setPeriodLinked(linkedActs.filter(a=>kept.has(a.id)));
+      setHistoryLinked(history);
       setOrphans(Array.from(byName.values()));
       setReconciled(Array.from(byLinked.values()));
     } catch (err) {
@@ -510,5 +520,5 @@ export function useReconciliation() {
     };
   }, [orphans, reconciled, catalog]);
 
-  return { orphans, reconciled, catalog, coverage, loading, error, refetch: fetchData };
+  return { orphans, reconciled, catalog, coverage, loading, error, refetch: fetchData, proposals, periodLinked, historyLinked };
 }

@@ -45,7 +45,7 @@ try {
  await page.getByRole('button',{name:/Mostrar as .* fora do período/}).click();
  const search=page.getByPlaceholder('ID, etiqueta, jornada ou Activity Name');await search.fill('disp1vibeecred');assert.equal(await list.count(),1);
  for(const option of ['priority:-1','base:-1','exec:-1','recent:-1','order:1']){await page.getByLabel('Ordenar por',{exact:true}).selectOption(option);assert.equal(await list.count(),1);}
- await list.first().getByRole('button',{name:'Ampliar prévia visual'}).click();await page.getByRole('dialog',{name:'Prévia visual da comunicação'}).waitFor();await page.screenshot({path:out+'/05-preview-expanded.png'});await page.keyboard.press('Escape');
+ await list.first().getByRole('button',{name:/^Ampliar prévia/}).click();await page.getByRole('dialog',{name:/^Prévia/}).waitFor();await page.screenshot({path:out+'/05-preview-expanded.png'});await page.keyboard.press('Escape');
  await list.first().getByRole('button',{name:'Ver detalhes'}).click();await page.screenshot({path:out+'/06-framework-expanded.png'});
  await list.first().getByRole('button',{name:'Revisar',exact:true}).click();await page.getByLabel('Template ID proposto').waitFor();
  await page.getByLabel('Template ID proposto').fill('b2c_car_vibe_srsa_Dispd1');await page.getByLabel('Motivo da revisão').fill('Confirmação individual do ID e do público Serasa da atividade.');

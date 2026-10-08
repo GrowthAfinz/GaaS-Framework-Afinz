@@ -9,6 +9,7 @@ import { TemplateSuggestionModal } from './TemplateSuggestionModal';
 import { TemplateIdChips } from './TemplateIdChips';
 import { ActivityMomentModal } from './ActivityMomentModal';
 import { Segmented } from './ui/commsUi';
+import { applyBatchLinks, batchEligibility, type BatchOutcome } from '../../utils/executionLinkEligibility';
 
 const fmtK = (n: number) => n >= 1000 ? `${(n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: n >= 100000 ? 0 : 1 })}k` : String(Math.round(n));
 const CONF_ORDER: Record<Confidence, number> = { forte: 0, provavel: 1, fraca: 2, novo: 3 };
@@ -94,20 +95,23 @@ export const ReconciliationQueue: React.FC<Props> = ({ refreshing=false, packInb
 
   const strong = useMemo(() => scoped.filter((o) => o.confidence === 'forte'), [scoped]);
   // Divergentes (jornada × coluna) saem do vínculo em massa: exigem revisão individual.
-  const bulkStrong = useMemo(
-    () => list.filter((o) => o.confidence==='forte' && o.match?.tpl.inCurrentFilter && (!o.parsed.divergencias?.length||o.packEvidence?.source==='pack') && !o.packEvidence?.conflicts.length),
-    [list]
-  );
+  // Regra única de lote (compartilhada com a Performance): candidato único, contexto suficiente, sem conflitos.
+  const bulkStrong = useMemo(() => list.filter((o) => batchEligibility(o, catalog).eligible), [list, catalog]);
 
   const link = (o:OrphanRow)=>{if(o.match&&!refreshing){setLinkNote('');setPendingLinks([o]);}};
   const linkMany = ()=>{setLinkNote('');if(!refreshing)setPendingLinks(bulkStrong);};
+  const [outcomes,setOutcomes]=useState<BatchOutcome[]|null>(null);
   const confirmLinks=async()=>{
+    if(refreshing)return;
     setBusy('bulk');setError(null);
     try {
-      for(const o of pendingLinks)if(o.match&&!refreshing)await linkReviewedExecutions(o,o.match.tpl.id,linkNote);
-      setPendingLinks([]);onChanged();
-    } catch(err){setError(describeError(err));onChanged();}
-    finally{setBusy(null);}
+      // Um grupo por chamada (transacional por grupo): falhas parciais são reportadas, não escondidas.
+      const result=await applyBatchLinks(pendingLinks,linkNote,linkReviewedExecutions,describeError);
+      const failed=result.filter(r=>!r.ok);
+      setPendingLinks([]);
+      if(failed.length){setOutcomes(result);setError(`${result.length-failed.length} de ${result.length} grupos vinculados. ${failed.length} falharam: `+failed.map(f=>`${f.templateId||'sem template'} (${f.error})`).join(' · '));}
+      onChanged();
+    } finally{setBusy(null);}
   };
 
   const filters: [typeof filter, string, number][] = [
@@ -187,7 +191,7 @@ export const ReconciliationQueue: React.FC<Props> = ({ refreshing=false, packInb
         </select>
       </div>
 
-      {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
+      {error && <p role="alert" className="mb-2 text-xs text-red-700">{error}{outcomes&&<button type="button" onClick={()=>{setOutcomes(null);setError(null);}} className="ml-2 underline">ok</button>}</p>}
 
       {scoped.length === 0 ? (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700">

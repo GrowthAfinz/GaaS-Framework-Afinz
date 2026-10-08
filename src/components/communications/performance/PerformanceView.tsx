@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BarChart3, Flame, Gauge, LayoutGrid,
   Lightbulb, Link2, ListTree, Loader2, Pencil, Rows3, Route, Search, Send, Users2, X, Zap,
@@ -7,7 +7,19 @@ import {
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { usePeriod } from '../../../contexts/PeriodContext';
 import { useAppStore } from '../../../store/useAppStore';
-import { useTemplatePerformance, type PerformancePrevTotals, type TemplatePerformance } from '../../../hooks/useTemplatePerformance';
+import type { PerformancePrevTotals, TemplatePerformance } from '../../../hooks/useTemplatePerformance';
+import { useContentPerformance } from '../../../hooks/useContentPerformance';
+import type { CommunicationTemplate } from '../../../types/communication';
+import type { TemplateContentIndex } from '../../../services/templateContentIndex';
+import { resolvePreview } from '../../../utils/communicationVisualResolution';
+import {
+  FACET_LABEL, facetOptions, facetsFromRecords, libraryCounts, libraryVisible, matchesFacets, searchMatches, templateMomentLabel,
+  type FacetFilters, type FacetKey, type ScopeFacets,
+} from '../../../utils/contentPerformanceModel';
+import type { FrameworkActivity } from '../../../utils/communicationOrchestrator';
+import { ApprovedLibraryPanel, LIBRARY_SORTS, sortLibrary, type LibrarySort } from './ApprovedLibraryPanel';
+import { UNLINKED_SORTS, UnlinkedExecutionsPanel, sortUnlinked, toUnlinkedItem, type UnlinkedSort } from './UnlinkedExecutionsPanel';
+import { Pager, ScopeSelector, TagRow, paginate, tagsFromFacets } from './contentUi';
 import type { ActivityRow } from '../../../types/activity';
 import { CommunicationDetailModal } from '../CommunicationDetailModal';
 import { TemplateIdChips } from '../TemplateIdChips';
@@ -31,6 +43,32 @@ const TONE: Record<Tone | 'info', { chip: string; glyph: string; fill: string; s
 
 const STATUS_DOT: Record<string, string> = { active: 'bg-emerald-500', paused: 'bg-amber-500', draft: 'bg-slate-400' };
 const STATUS_LABEL: Record<string, string> = { active: 'No ar', paused: 'Pausado', draft: 'Rascunho' };
+
+// Dados de prévia compartilhados (catálogo + versões carregadas uma vez): nenhuma consulta por card.
+const PreviewCtx = createContext<{ catalog: CommunicationTemplate[]; contents: TemplateContentIndex | null }>({ catalog: [], contents: null });
+const useLinkedRes = (t: ScoredTemplate) => {
+  const { catalog, contents } = useContext(PreviewCtx);
+  return useMemo(() => resolvePreview({ channel: t.template.channel, catalog, contents, templateId: t.template.template_id }), [catalog, contents, t.template.channel, t.template.template_id]);
+};
+const LinkedThumb: React.FC<{ t: ScoredTemplate; w?: number; h?: number }> = ({ t, w = 42, h }) => <ChannelThumb res={useLinkedRes(t)} w={w} h={h} title={t.template.template_id} />;
+const LinkedPreview: React.FC<{ t: ScoredTemplate; width: number; height: number }> = ({ t, width, height }) => <ChannelPreview res={useLinkedRes(t)} width={width} height={height} title={t.template.template_id} />;
+/** Facetas do template a partir das activities vinculadas + momento declarado no ID (contrato da régua). */
+const facetsCache = new WeakMap<ScoredTemplate, ScopeFacets>();
+function facetsOf(t: ScoredTemplate): ScopeFacets {
+  let f = facetsCache.get(t);
+  if (!f) {
+    const rows = t.timeline.flatMap((p) => p.activities) as unknown as FrameworkActivity[];
+    f = facetsFromRecords(rows, [templateMomentLabel(t.template.template_id, t.facets.segmentos[0])]);
+    if (!f.canal.length) f.canal = [CHANNELS[t.channelKey].label];
+    facetsCache.set(t, f);
+  }
+  return f;
+}
+/** Elemento clicável sem aninhar <button> (a miniatura interna tem seu próprio botão de ampliar). */
+const clickable = (fn: () => void) => ({
+  role: 'button' as const, tabIndex: 0, onClick: fn,
+  onKeyDown: (e: React.KeyboardEvent) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); fn(); } },
+});
 
 // ── ATOMS ─────────────────────────────────────────────────────────────────────
 const ChannelTag: React.FC<{ channel: string; soft?: boolean }> = ({ channel, soft }) => {
@@ -143,21 +181,6 @@ const SEGMENT_STAGE_FALLBACK: Record<string, string> = {
 const segmentKey = (value: string) => value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s-]+/g, '_');
 const segmentLabel = (value: string) => SEGMENT_LABELS[segmentKey(value)] ?? value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 const stageLabel = (value: string, stages: string[]) => stages[0]?.replace(/_/g, ' ') ?? SEGMENT_STAGE_FALLBACK[segmentKey(value)] ?? 'Etapa não informada';
-
-/** chips de referência (segmento · campanha · safra · período) reutilizados nas views */
-const RefChips: React.FC<{ t: ScoredTemplate }> = ({ t }) => {
-  const f = t.facets;
-  const seg = first(f.segmentos), jor = first(f.jornadas), saf = first(f.safras), per = facetPeriodLabel(f);
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      <BuChip bu={buOf(t)} />
-      {seg && <MetaChip title={f.segmentos.join(' · ')}>{seg}{plusN(f.segmentos)}</MetaChip>}
-      {jor && <MetaChip title={f.jornadas.join(' · ')}><Route size={11} />{jor}{plusN(f.jornadas)}</MetaChip>}
-      {saf && <MetaChip title={f.safras.join(' · ')}>{saf}</MetaChip>}
-      {per && <MetaChip>{per}</MetaChip>}
-    </div>
-  );
-};
 
 // ── GRÁFICOS (área temporal reutilizável) ─────────────────────────────────────
 type MetricKind = 'int' | 'pct' | 'brl';
@@ -404,9 +427,9 @@ const Overview: React.FC<{ items: ScoredTemplate[]; prev?: PerformancePrevTotals
           {champions.map((t, i) => {
             const sig = signatureMetric(t);
             return (
-              <button key={t.template.template_id} onClick={() => onOpen(t)} className="grid w-full grid-cols-[24px_42px_1fr_auto_auto_minmax(140px,180px)_16px] items-center gap-3.5 border-t border-slate-100 px-4 py-3 text-left transition-colors first:border-t-0 hover:bg-slate-50">
+              <div key={t.template.template_id} {...clickable(() => onOpen(t))} className="grid w-full cursor-pointer grid-cols-[24px_42px_1fr_auto_auto_minmax(140px,180px)_16px] items-center gap-3.5 border-t border-slate-100 px-4 py-3 text-left transition-colors first:border-t-0 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700">
                 <span className="text-center text-sm font-bold tabular-nums text-slate-300">{i + 1}</span>
-                <ChannelThumb item={t} w={42} />
+                <LinkedThumb t={t} w={42} />
                 <div className="min-w-0">
                   <TemplateIdChips id={t.template.template_id} />
                   <div className="mt-0.5 truncate text-[11px] text-slate-500">{contextLabel(t)}</div>
@@ -419,7 +442,7 @@ const Overview: React.FC<{ items: ScoredTemplate[]; prev?: PerformancePrevTotals
                   <ScoreBadge score={t.score} sm />
                 </div>
                 <ArrowRight size={15} className="text-slate-300" />
-              </button>
+              </div>
             );
           })}
         </div>
@@ -443,26 +466,27 @@ const GalCard: React.FC<{ t: ScoredTemplate; onOpen: () => void }> = ({ t, onOpe
   const ch = CHANNELS[t.channelKey];
   const sig = signatureMetric(t);
   return (
-    <button onClick={onOpen} className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-xl">
+    <div {...clickable(onOpen)} className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700">
       <div className="relative flex h-[248px] justify-center overflow-hidden border-b border-slate-100 px-4 pt-4" style={{ background: `linear-gradient(170deg, ${ch.tint}, #fff 78%)` }}>
         <div className="absolute right-3 top-3 z-10"><ChannelTag channel={t.template.channel} /></div>
-        <ChannelPreview item={t} width={280} height={228} />
+        <LinkedPreview t={t} width={280} height={228} />
       </div>
       <div className="flex flex-1 flex-col gap-2.5 p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-2"><StatusDot status={t.template.status} /><TemplateIdChips id={t.template.template_id} /></span>
           <ScoreBadge score={t.score} sm />
         </div>
-        <RefChips t={t} />
+        <TagRow tags={tagsFromFacets(facetsOf(t))} skip={['canal']} max={7} />
+        <div className="text-[10.5px] text-slate-500">{fmt.k(t.baseEnviada)} base · {t.executions} execuções{t.resultsMeasured === 0 && ' · sem resultado registrado'}</div>
         <div className="grid grid-cols-4 gap-1.5">
-          <KTile v={sig.v} l={sig.l} />
-          <KTile v={fmt.pctFrac(t.ctr, 2)} l="CTR" />
-          <KTile v={fmt.int(t.cartoes)} l="cartões" accent />
+          <KTile v={t.resultsMeasured ? sig.v : "—"} l={sig.l} />
+          <KTile v={t.resultsMeasured ? fmt.pctFrac(t.ctr, 2) : "—"} l="CTR" />
+          <KTile v={t.resultsMeasured ? fmt.int(t.cartoes) : "—"} l="cartões" accent />
           <KTile v={t.cacEfetivo > 0 ? fmt.brl(t.cacEfetivo) : '—'} l={t.custoEstimado ? 'CAC est.' : 'CAC'} />
         </div>
         <div className="mt-auto flex flex-wrap gap-1.5">{t.diagnoses.filter((d) => d !== 'custo_parcial').slice(0, 2).map((d) => <DiagBadge key={d} id={d} />)}</div>
       </div>
-    </button>
+    </div>
   );
 };
 
@@ -474,13 +498,15 @@ const KTile: React.FC<{ v: string; l: string; accent?: boolean }> = ({ v, l, acc
 );
 
 // ── TABELA ─────────────────────────────────────────────────────────────────
-type SortKey = 'score' | 'recent' | 'moment' | 'entregas' | 'cliques' | 'propostas' | 'cartoes' | 'cacEfetivo' | 'taxaAbertura' | 'ctr' | 'taxaConversao';
+type SortKey = 'score' | 'recent' | 'moment' | 'base' | 'executions' | 'entregas' | 'cliques' | 'propostas' | 'cartoes' | 'cacEfetivo' | 'taxaAbertura' | 'ctr' | 'taxaConversao';
 type SortState = { key: SortKey; dir: 1 | -1 };
 
 const SORT_OPTIONS: { key: SortKey; label: string; defaultDir: 1 | -1 }[] = [
   { key: 'score', label: 'Melhor score', defaultDir: -1 },
   { key: 'recent', label: 'Mais recentes', defaultDir: -1 },
   { key: 'moment', label: 'Ordem da régua', defaultDir: 1 },
+  { key: 'base', label: 'Maior base', defaultDir: -1 },
+  { key: 'executions', label: 'Mais execuções', defaultDir: -1 },
   { key: 'entregas', label: 'Mais entregas', defaultDir: -1 },
   { key: 'cliques', label: 'Mais cliques', defaultDir: -1 },
   { key: 'propostas', label: 'Mais propostas', defaultDir: -1 },
@@ -496,6 +522,8 @@ const sortValue = (t: ScoredTemplate, key: SortKey): number | null => {
     if (!moment) return null;
     return moment.week == null ? 100000 + moment.dispatch : moment.week * 1000 + moment.dispatch;
   }
+  if (key === 'base') return t.baseEnviada;
+  if (key === 'executions') return t.executions;
   if (key === 'entregas' && !t.temEntrega) return null;
   const value = Number(t[key]);
   if (!Number.isFinite(value)) return null;
@@ -517,11 +545,13 @@ const COLS: { key: SortKey; label: string }[] = [
   { key: 'cartoes', label: 'Cartões' }, { key: 'cacEfetivo', label: 'CAC' }, { key: 'score', label: 'Score' },
 ];
 
-const TableView: React.FC<{ items: ScoredTemplate[]; sort: SortState; onSort: (sort: SortState) => void; onOpen: (t: ScoredTemplate) => void }> = ({ items, sort, onSort, onOpen }) => {
+const TableView: React.FC<{ items: ScoredTemplate[]; sort: SortState; onSort: (sort: SortState) => void; onOpen: (t: ScoredTemplate) => void; page: number; onPage: (p: number) => void }> = ({ items, sort, onSort, onOpen, page, onPage }) => {
   const sorted = useMemo(() => sortTemplates(items, sort), [items, sort]);
+  const { rows, pages, page: current } = paginate(sorted, page);
   const setS = (key: SortKey) => onSort(sort.key === key ? { key, dir: sort.dir === -1 ? 1 : -1 } : { key, dir: key === 'cacEfetivo' ? 1 : -1 });
 
   return (
+    <div className="space-y-3">
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs">
@@ -529,6 +559,8 @@ const TableView: React.FC<{ items: ScoredTemplate[]; sort: SortState; onSort: (s
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
               <th className="px-2.5 py-2.5">Template / criativo</th>
               <th className="px-2.5 py-2.5">Contexto</th>
+              <th className="cursor-pointer select-none px-2.5 py-2.5 text-right hover:text-cyan-700" onClick={() => setS('base')}><span className={`inline-flex items-center gap-1 ${sort.key === 'base' ? 'text-cyan-700' : ''}`}>Base{sort.key === 'base' && (sort.dir === -1 ? <ArrowDown size={11} /> : <ArrowUp size={11} />)}</span></th>
+              <th className="cursor-pointer select-none px-2.5 py-2.5 text-right hover:text-cyan-700" onClick={() => setS('executions')}><span className={`inline-flex items-center gap-1 ${sort.key === 'executions' ? 'text-cyan-700' : ''}`}>Exec.{sort.key === 'executions' && (sort.dir === -1 ? <ArrowDown size={11} /> : <ArrowUp size={11} />)}</span></th>
               {COLS.map((c) => (
                 <th key={c.key} className="cursor-pointer select-none px-2.5 py-2.5 text-right hover:text-cyan-700" onClick={() => setS(c.key)}>
                   <span className={`inline-flex items-center gap-1 ${sort.key === c.key ? 'text-cyan-700' : ''}`}>{c.label}{sort.key === c.key && (sort.dir === -1 ? <ArrowDown size={11} /> : <ArrowUp size={11} />)}</span>
@@ -539,27 +571,32 @@ const TableView: React.FC<{ items: ScoredTemplate[]; sort: SortState; onSort: (s
             </tr>
           </thead>
           <tbody>
-            {sorted.map((t) => {
-              const seg = first(t.facets.segmentos), jor = first(t.facets.jornadas), per = facetPeriodLabel(t.facets);
+            {rows.map((t) => {
+              const jor = first(t.facets.jornadas), per = facetPeriodLabel(t.facets);
+              const f = facetsOf(t);
               return (
                 <tr key={t.template.template_id} onClick={() => onOpen(t)} className="cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50">
                   <td className="px-2.5 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <ChannelThumb item={t} w={34} h={42} />
+                      <LinkedThumb t={t} w={34} h={42} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5"><StatusDot status={t.template.status} /><TemplateIdChips id={t.template.template_id} /></div>
                         <div className="mt-0.5 max-w-[240px] truncate text-[10.5px] text-slate-400">{String((t.template.metadata as Record<string, unknown> | undefined)?.subject ?? t.template.title ?? contextLabel(t))}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-2.5 py-2.5">
-                    <div className="flex flex-wrap items-center gap-1.5"><BuChip bu={buOf(t)} />{seg && <MetaChip title={t.facets.segmentos.join(' · ')}>{seg}{plusN(t.facets.segmentos)}</MetaChip>}</div>
-                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-400">{jor && <span className="inline-flex items-center gap-1 truncate max-w-[200px]"><Route size={10} />{jor}</span>}{per && <span>· {per}</span>}</div>
+                  <td className="max-w-[340px] px-2.5 py-2.5">
+                    <TagRow tags={tagsFromFacets(f)} skip={['canal', 'momento']} max={7} />
+                    <div className="mt-1 text-[10.5px] font-semibold text-slate-600">{f.momento[0] ? `Momento: ${f.momento[0]}` : 'Momento não declarado no ID'}</div>
+                    <div className="mt-0.5 truncate text-[10px] text-slate-400" title={t.activityNames.join(' · ')}>{t.activityNames[0]}{plusN(t.activityNames)}</div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">{jor && <span className="inline-flex max-w-[200px] items-center gap-1 truncate"><Route size={10} />{jor}{plusN(t.facets.jornadas)}</span>}{per && <span>· {per}</span>}</div>
                   </td>
+                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{fmt.k(t.baseEnviada)}</td>
+                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{t.executions}</td>
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{t.aberturas > 0 ? fmt.pctFrac(t.taxaAbertura, t.taxaAbertura < 0.1 ? 1 : 0) : <span className="text-slate-300">—</span>}</td>
-                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{fmt.pctFrac(t.ctr, 2)}</td>
-                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{fmt.pctFrac(t.taxaConversao, t.taxaConversao < 0.0001 ? 3 : 2)}</td>
-                  <td className="px-2.5 py-2.5 text-right text-sm font-bold tabular-nums text-cyan-700">{fmt.int(t.cartoes)}</td>
+                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{t.resultsMeasured ? fmt.pctFrac(t.ctr, 2) : <span className="text-slate-300" title="Sem resultado registrado">—</span>}</td>
+                  <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">{t.resultsMeasured ? fmt.pctFrac(t.taxaConversao, t.taxaConversao < 0.0001 ? 3 : 2) : <span className="text-slate-300">—</span>}</td>
+                  <td className="px-2.5 py-2.5 text-right text-sm font-bold tabular-nums text-cyan-700">{t.resultsMeasured ? fmt.int(t.cartoes) : <span className="text-slate-300">—</span>}</td>
                   <td className="px-2.5 py-2.5 text-right tabular-nums text-slate-700">
                     {t.cacEfetivo > 0 ? (
                       <span className="inline-flex items-center gap-1">
@@ -577,7 +614,9 @@ const TableView: React.FC<{ items: ScoredTemplate[]; sort: SortState; onSort: (s
           </tbody>
         </table>
       </div>
-      <div className="border-t border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[11px] text-slate-400">* CAC estimado pelo custo de canal quando não há custo real vinculado. Clique numa linha para abrir o drilldown.</div>
+      <div className="border-t border-slate-100 bg-slate-50 px-3.5 py-2.5 text-[11px] text-slate-500">Métricas somam as execuções vinculadas ao template no período; não certificam qual versão do conteúdo foi enviada. * CAC estimado pelo custo de canal quando não há custo real vinculado. Clique numa linha para abrir o detalhe.</div>
+      </div>
+      <Pager page={current} pages={pages} total={items.length} unit="template(s)" onPage={onPage} />
     </div>
   );
 };
@@ -629,7 +668,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
           </div>
           <div className="flex-1 overflow-auto">
             <div className="flex min-h-full min-w-full items-center justify-center p-2">
-              <ChannelPreview item={t} width={Math.round(PREVIEW_W * zoom)} height={Math.round(PREVIEW_H * zoom)} />
+              <LinkedPreview t={t} width={Math.round(PREVIEW_W * zoom)} height={Math.round(PREVIEW_H * zoom)} />
             </div>
           </div>
         </div>
@@ -654,6 +693,7 @@ const Drawer: React.FC<{ t: ScoredTemplate; onClose: () => void; onEdit: () => v
             <StatusDot status={t.template.status} withLabel />
           </div>
 
+          <p className="mb-1 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">Métricas somam {t.executions} execução(ões) vinculadas a este template no período. A prévia é a peça atual/catálogo e não certifica a versão enviada em cada execução.{t.resultsMeasured === 0 && ' Nenhuma execução tem resultado registrado ainda: sem score.'}</p>
           <SectionTitle>Como o score foi calculado</SectionTitle>
           <div className="flex flex-col gap-2">
             {t.breakdown.map((b) => (
@@ -802,197 +842,244 @@ function buOf(t: ScoredTemplate): string | null {
 }
 
 // ── ORQUESTRADOR ───────────────────────────────────────────────────────────
+type Scope = 'linked' | 'unlinked' | 'library';
+const SELECT_FACETS: FacetKey[] = ['frente', 'parceiro', 'subgrupo', 'oferta', 'promocional', 'momento'];
+const SCOPE_HINT: Record<Scope, string> = {
+  linked: 'Templates com execuções vinculadas no período. Métricas reais das execuções; a prévia não certifica a versão enviada.',
+  unlinked: 'Grupos de execuções do período sem template, com as sugestões do motor de reconciliação. Vínculo só após revisão.',
+  library: 'Comunicações aprovadas (versão aprovada no pack ou cadastro ativo/pausado no catálogo). Sem execução, não há métrica nem ranking.',
+};
+
 export const PerformanceView: React.FC = () => {
-  const { data, previousTotals, loading, error, refetch } = useTemplatePerformance();
+  const perf = useContentPerformance();
   const { startDate, endDate } = usePeriod();
   const perfDeepLink = useAppStore((s) => s.perfDeepLink);
   const setPerfDeepLink = useAppStore((s) => s.setPerfDeepLink);
   const [view, setView] = useState<ViewMode>('gallery');
-  const [channel, setChannel] = useState<ChannelKey | 'all'>('all');
+  const [scope, setScope] = useState<Scope>('linked');
+  const [filters, setFilters] = useState<FacetFilters>({});
   const [query, setQuery] = useState('');
-  const [segment, setSegment] = useState('all');
-  const [showDrafts, setShowDrafts] = useState(false);
+  const [includeDrafts, setIncludeDrafts] = useState(false);
   const [sort, setSort] = useState<SortState>({ key: 'score', dir: -1 });
+  const [unlinkedSort, setUnlinkedSort] = useState<{ key: UnlinkedSort; dir: 1 | -1 }>({ key: 'priority', dir: -1 });
+  const [librarySort, setLibrarySort] = useState<{ key: LibrarySort; dir: 1 | -1 }>({ key: 'period', dir: -1 });
+  const [page, setPage] = useState(1);
 
-  // Deep-link vindo do card "Templates no ar" (Cadastro): abre a view+filtro pedidos.
+  // Deep-link vindo do card "Templates no ar" (Cadastro): abre a view+busca pedidas.
   useEffect(() => {
     if (!perfDeepLink) return;
     setView(perfDeepLink.view);
+    setScope('linked');
     setQuery(perfDeepLink.query);
-    setChannel('all');
-    setSegment('all');
+    setFilters({});
     setPerfDeepLink(null);
   }, [perfDeepLink, setPerfDeepLink]);
   const [selected, setSelected] = useState<ScoredTemplate | null>(null);
   const [editing, setEditing] = useState<TemplatePerformance | null>(null);
   const [auditing, setAuditing] = useState<ScoredTemplate | null>(null);
 
-  const scored = useMemo<ScoredTemplate[]>(() => data.map(scoreTemplate), [data]);
-  const segmentOptions = useMemo(() => {
-    const bySegment = new Map<string, { value: string; stages: Set<string>; templates: Set<string> }>();
-    scored.forEach((t) => t.facets.segmentos.forEach((value) => {
-      const key = segmentKey(value);
-      const current = bySegment.get(key) ?? { value, stages: new Set<string>(), templates: new Set<string>() };
-      t.facets.etapas.forEach((stage) => current.stages.add(stage));
-      current.templates.add(t.template.template_id);
-      bySegment.set(key, current);
-    }));
-    return Array.from(bySegment.entries())
-      .map(([key, option]) => ({ key, value: option.value, stages: Array.from(option.stages), count: option.templates.size }))
-      .sort((a, b) => segmentLabel(a.value).localeCompare(segmentLabel(b.value), 'pt-BR'));
-  }, [scored]);
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return scored.filter((t) => {
-      if (!showDrafts && t.template.status === 'draft') return false;
-      if (segment !== 'all' && !t.facets.segmentos.some((value) => segmentKey(value) === segment)) return false;
-      if (channel !== 'all' && t.channelKey !== channel) return false;
-      if (!q) return true;
-      return searchBlob(t).includes(q);
-    });
-  }, [scored, channel, query, segment, showDrafts]);
-  const ordered = useMemo(() => sortTemplates(filtered, sort), [filtered, sort]);
+  // Página volta ao início sempre que o recorte muda (escopo, filtros, busca, ordenação, rascunhos).
+  useEffect(() => { setPage(1); }, [scope, filters, query, includeDrafts, sort, unlinkedSort, librarySort, view]);
 
-  const hiddenDrafts = useMemo(() => scored.filter((t) => t.template.status === 'draft').length, [scored]);
+  // ── visão 1: templates com execução vinculada ──
+  const scored = useMemo<ScoredTemplate[]>(() => perf.linked.map(scoreTemplate), [perf.linked]);
+  const assetNamesById = useMemo(() => new Map(perf.library.map((i) => [i.template.template_id, i.assetNames])), [perf.library]);
+  const linkedFiltered = useMemo(() => scored.filter((t) => matchesFacets(facetsOf(t), filters)
+    && searchMatches(`${searchBlob(t)} ${(assetNamesById.get(t.template.template_id) ?? []).join(' ')}`, query)), [scored, filters, query, assetNamesById]);
+  const linkedOrdered = useMemo(() => sortTemplates(linkedFiltered, sort), [linkedFiltered, sort]);
+
+  // ── visão 2: grupos de execuções sem template ──
+  const unlinkedAll = useMemo(() => perf.orphans.map(toUnlinkedItem), [perf.orphans]);
+  const unlinkedFiltered = useMemo(() => sortUnlinked(unlinkedAll.filter((i) => matchesFacets(i.facets, filters) && searchMatches(i.searchText, query)), unlinkedSort.key, unlinkedSort.dir), [unlinkedAll, filters, query, unlinkedSort]);
+
+  // ── visão 3: biblioteca de comunicações aprovadas ──
+  const libCounts = useMemo(() => libraryCounts(perf.library), [perf.library]);
+  const libraryAll = useMemo(() => libraryVisible(perf.library, includeDrafts), [perf.library, includeDrafts]);
+  const libraryFiltered = useMemo(() => sortLibrary(libraryAll.filter((i) => matchesFacets(i.facets, filters) && searchMatches(i.searchText, query)), librarySort.key, librarySort.dir), [libraryAll, filters, query, librarySort]);
+
+  const scopeFacets: ScopeFacets[] = useMemo(() => scope === 'linked' ? scored.map(facetsOf) : scope === 'unlinked' ? unlinkedAll.map((i) => i.facets) : libraryAll.map((i) => i.facets), [scope, scored, unlinkedAll, libraryAll]);
+  const segmentChips = useMemo(() => facetOptions(scopeFacets, 'segmento'), [scopeFacets]);
+  const setFacet = (key: FacetKey, value: string) => setFilters((cur) => { const next = { ...cur }; if (!value || value === 'all') delete next[key]; else next[key] = value; return next; });
+  const activeFilters = Object.keys(filters).length + (query.trim() ? 1 : 0);
+
+  const linkedExecutions = scored.reduce((n, t) => n + t.executions, 0);
+  const unlinkedExecutions = perf.orphans.reduce((n, o) => n + o.executionRecords.length, 0);
+  const scopeOptions = [
+    { id: 'linked' as const, label: 'Com template vinculado', count: scored.length, unit: 'templates', sub: `${linkedExecutions.toLocaleString('pt-BR')} execuções vinculadas no período` },
+    { id: 'unlinked' as const, label: 'Disparos sem template', count: perf.orphans.length, unit: 'grupos de execuções', sub: `${unlinkedExecutions.toLocaleString('pt-BR')} execuções aguardando vínculo` },
+    { id: 'library' as const, label: 'Comunicações aprovadas', count: libCounts.approved + (includeDrafts ? libCounts.drafts + libCounts.inactive : 0), unit: 'templates', sub: `${libCounts.withExecution} com execução no período${includeDrafts && libCounts.drafts ? ` · inclui ${libCounts.drafts} rascunho(s)` : ''}` },
+  ];
+
   const insight = useMemo(() => {
-    if (!filtered.length) return {
-      lead: 'Sem peças comparáveis',
-      text: 'Tente outro segmento, canal ou ative os rascunhos.',
-      item: null,
-    };
-    const actions = suggestedActions(filtered);
-    if (actions[0]) return {
-      lead: actions[0].title.replace(actions[0].item.template.template_id, '').trim(),
-      text: actions[0].text,
-      item: actions[0].item,
-    };
-    const best = [...filtered].filter((t) => t.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
-    if (best) return {
-      lead: 'Lidera o recorte',
-      text: `Score ${best.score}/100. Compare oferta, CTA e abertura com as peças de menor score do mesmo segmento.`,
-      item: best,
-    };
-    return {
-      lead: 'Próxima análise',
-      text: 'Compare peças do mesmo segmento e etapa de funil; depois altere apenas o canal para reduzir diferenças de contexto.',
-      item: null,
-    };
-  }, [filtered]);
+    if (!linkedFiltered.length) return { lead: 'Sem peças comparáveis', text: 'Tente outro segmento ou canal. Execuções sem vínculo aparecem em “Disparos sem template”.', item: null as ScoredTemplate | null };
+    const actions = suggestedActions(linkedFiltered);
+    if (actions[0]) return { lead: actions[0].title.replace(actions[0].item.template.template_id, '').trim(), text: actions[0].text, item: actions[0].item };
+    const best = [...linkedFiltered].filter((t) => t.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+    if (best) return { lead: 'Lidera o recorte', text: `Score ${best.score}/100. Compare oferta, CTA e abertura com as peças de menor score do mesmo segmento.`, item: best };
+    return { lead: 'Próxima análise', text: 'Compare peças do mesmo segmento e etapa de funil; depois altere apenas o canal para reduzir diferenças de contexto.', item: null };
+  }, [linkedFiltered]);
 
   const periodLabel = `${startDate.toLocaleDateString('pt-BR')} – ${endDate.toLocaleDateString('pt-BR')}`;
+  const previewCtx = useMemo(() => ({ catalog: perf.catalogRaw, contents: perf.contents }), [perf.catalogRaw, perf.contents]);
 
-  if (loading) return <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400"><Loader2 size={18} className="animate-spin" /> Calculando performance…</div>;
-  if (error) return <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><AlertTriangle size={16} /> {error}</div>;
-  if (data.length === 0) return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
-      <BarChart3 size={32} className="text-slate-300" />
-      <p className="max-w-md text-sm text-slate-400">A performance por template aparece conforme os disparos vinculados acumulam resultado no período filtrado.</p>
-    </div>
-  );
+  if (perf.initialLoading) return <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400"><Loader2 size={18} className="animate-spin" /> Calculando performance…</div>;
+  if (perf.error && !scored.length && !perf.orphans.length) return <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><AlertTriangle size={16} /> {perf.error}</div>;
 
   const views: [ViewMode, string, React.ReactNode][] = [
     ['overview', 'Visão Geral', <Gauge size={15} key="g" />],
     ['gallery', 'Galeria', <LayoutGrid size={15} key="l" />],
     ['table', 'Tabela', <Rows3 size={15} key="r" />],
   ];
+  const sortSelect = scope === 'linked'
+    ? { value: sort.key, dir: sort.dir, options: SORT_OPTIONS.map((o) => ({ key: o.key as string, label: o.label })), onChange: (k: string) => { const o = SORT_OPTIONS.find((x) => x.key === k) ?? SORT_OPTIONS[0]; setSort({ key: o.key, dir: o.defaultDir }); }, flip: () => setSort((c) => ({ ...c, dir: c.dir === -1 ? 1 : -1 })), note: undefined as string | undefined }
+    : scope === 'unlinked'
+      ? { value: unlinkedSort.key, dir: unlinkedSort.dir, options: UNLINKED_SORTS, onChange: (k: string) => setUnlinkedSort({ key: k as UnlinkedSort, dir: -1 }), flip: () => setUnlinkedSort((c) => ({ ...c, dir: c.dir === -1 ? 1 : -1 })), note: 'Sem valor registrado fica ao final.' }
+      : { value: librarySort.key, dir: librarySort.dir, options: LIBRARY_SORTS, onChange: (k: string) => setLibrarySort({ key: k as LibrarySort, dir: k === 'id' ? 1 : -1 }), flip: () => setLibrarySort((c) => ({ ...c, dir: c.dir === -1 ? 1 : -1 })), note: LIBRARY_SORTS.find((o) => o.key === librarySort.key)?.note };
+  const draftsAvailable = libCounts.drafts + libCounts.inactive;
+  const mode = view === 'table' ? 'table' : 'gallery';
 
   return (
+    <PreviewCtx.Provider value={previewCtx}>
     <div className="mx-auto max-w-[1480px] space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-500">
-          Recorte: <b className="text-slate-700">{periodLabel}</b> · {filtered.length} de {data.length} templates<span className="ml-2">Com execuções vinculadas no período. Aprovação sem vínculo não entra nas métricas.</span>
+          Recorte: <b className="text-slate-700">{periodLabel}</b> (dias de São Paulo)
+          {perf.refreshing && <span role="status" className="ml-2 inline-flex items-center gap-1 text-cyan-700"><Loader2 size={12} className="animate-spin" />Atualizando…</span>}
         </div>
         <div className="inline-flex rounded-xl bg-slate-100 p-[3px]">
           {views.map(([id, label, icon]) => (
-            <button key={id} onClick={() => setView(id)} className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${view === id ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{icon}{label}</button>
+            <button key={id} onClick={() => setView(id)} aria-pressed={view === id} className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition-colors ${view === id ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{icon}{label}</button>
           ))}
         </div>
       </div>
+      {perf.error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{perf.error}</div>}
+      {perf.contentsError && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">Não foi possível acessar as versões de conteúdo do pack ({perf.contentsError}). Prévias de WhatsApp/SMS/Push podem aparecer como indisponíveis.</div>}
 
-      {view !== 'overview' && (
-        <div className="space-y-3">
-        <section aria-labelledby="segment-filter-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-            <div><h3 id="segment-filter-title" className="text-sm font-bold text-slate-800">Escolha o segmento</h3><p className="mt-0.5 text-xs text-slate-400">Compare primeiro peças do mesmo público e etapa de funil.</p></div>
-            {segment !== 'all' && <button type="button" onClick={() => setSegment('all')} className="text-xs font-semibold text-cyan-700 hover:text-cyan-900">Limpar seleção</button>}
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <button type="button" onClick={() => setSegment('all')} aria-pressed={segment === 'all'} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${segment === 'all' ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
-              <span className="block text-xs font-bold text-slate-800">Todos os segmentos</span><span className="mt-0.5 block text-[10px] text-slate-400">{scored.length} templates</span>
-            </button>
-            {segmentOptions.map((option) => (
-              <button key={option.key} type="button" onClick={() => setSegment(option.key)} aria-pressed={segment === option.key} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${segment === option.key ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
-                <span className="block text-xs font-bold text-slate-800">{segmentLabel(option.value)}</span><span className="mt-0.5 block text-[10px] text-slate-400">{stageLabel(option.value, option.stages)} · {option.count} tmpl.</span>
-              </button>
-            ))}
-          </div>
-        </section>
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          <button onClick={() => setChannel('all')} className={`rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${channel === 'all' ? 'bg-slate-900 text-white ring-slate-900' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>Todos</button>
-          {CHANNEL_ORDER.map((ch) => (
-            <button key={ch} onClick={() => setChannel(channel === ch ? 'all' : ch)} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold"
-              style={channel === ch ? { color: CHANNELS[ch].dark, background: CHANNELS[ch].tint, borderColor: CHANNELS[ch].color } : { color: '#475569', background: '#fff', borderColor: '#e7ebf0' }}>
-              <span className="h-2 w-2 rounded-full" style={{ background: CHANNELS[ch].color }} />{CHANNELS[ch].label}
-            </button>
-          ))}
-          <div className="ml-auto inline-flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600">
-            <span className="border-r border-slate-200 px-2.5 py-2 text-slate-400">Ordenar</span>
-            <select
-              value={sort.key}
-              onChange={(e) => {
-                const option = SORT_OPTIONS.find((item) => item.key === e.target.value) ?? SORT_OPTIONS[0];
-                setSort({ key: option.key, dir: option.defaultDir });
-              }}
-              className="bg-white px-2.5 py-2 outline-none"
-              aria-label="Ordenar templates por"
-            >
-              {SORT_OPTIONS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
-            </select>
-            <button type="button" onClick={() => setSort((current) => ({ ...current, dir: current.dir === -1 ? 1 : -1 }))} className="border-l border-slate-200 p-2 text-cyan-700 hover:bg-cyan-50" title="Inverter ordem" aria-label="Inverter ordem">
-              {sort.dir === -1 ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
-            </button>
-          </div>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold text-slate-600">
-            <input type="checkbox" checked={showDrafts} onChange={(e) => setShowDrafts(e.target.checked)} className="peer sr-only" />
-            <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-checked:bg-cyan-600 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
-            Rascunhos {showDrafts ? 'on' : 'off'}{hiddenDrafts > 0 ? ` (${hiddenDrafts})` : ''}
-          </label>
-          <div className="flex min-w-[280px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-400 md:max-w-[420px]">
-            <Search size={14} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por template, segmento, jornada ou activity_name…" className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
-          </div>
-        </div>
-        <aside className="flex items-start gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-3" aria-label="Insight do recorte">
-          <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-cyan-700 shadow-sm"><Lightbulb size={15} /></span>
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-cyan-700">Insight e sugestão de análise</p>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <span className="text-sm font-semibold text-slate-800">{insight.lead}</span>
-              {insight.item && <TemplateIdChips id={insight.item.template.template_id} />}
+      {view === 'overview' ? (
+        <>
+          <p className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-600">
+            Resultados <b>somente das execuções vinculadas</b> no período: {scored.length} templates · {linkedExecutions.toLocaleString('pt-BR')} execuções.
+            {' '}{unlinkedExecutions > 0 ? `${unlinkedExecutions.toLocaleString('pt-BR')} execuções sem template e as peças sem execução não entram nestes indicadores.` : 'Peças sem execução não entram nestes indicadores.'}
+          </p>
+          {scored.length ? <Overview items={scored} prev={perf.previousTotals} onOpen={setSelected} /> : (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
+              <BarChart3 size={32} className="text-slate-300" />
+              <p className="max-w-md text-sm text-slate-500">Nenhuma execução vinculada a template no período. Revise em “Disparos sem template”, na Galeria ou Tabela.</p>
             </div>
-            <p className="mt-1 text-sm leading-relaxed text-slate-600">{insight.text}</p>
-          </div>
-        </aside>
-        </div>
-      )}
-
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
-          <Search size={28} className="text-slate-300" /><p className="text-sm text-slate-400">Nenhuma peça neste filtro.</p>
-        </div>
-      ) : view === 'overview' ? (
-        <Overview items={filtered} prev={previousTotals} onOpen={setSelected} />
-      ) : view === 'gallery' ? (
-        <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {ordered.map((t) => <GalCard key={t.template.template_id} t={t} onOpen={() => setSelected(t)} />)}
-        </div>
+          )}
+        </>
       ) : (
-        <TableView items={filtered} sort={sort} onSort={setSort} onOpen={setSelected} />
+        <div className="space-y-3">
+          <ScopeSelector<Scope> value={scope} options={scopeOptions} onChange={setScope} />
+          <p className="px-1 text-xs text-slate-600">{SCOPE_HINT[scope]}</p>
+
+          <section aria-labelledby="segment-filter-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div><h3 id="segment-filter-title" className="text-sm font-bold text-slate-800">Escolha o segmento</h3><p className="mt-0.5 text-xs text-slate-400">Compare primeiro peças do mesmo público e etapa de funil.</p></div>
+              {activeFilters > 0 && <button type="button" onClick={() => { setFilters({}); setQuery(''); }} className="text-xs font-semibold text-cyan-700 hover:text-cyan-900">Limpar filtros ({activeFilters})</button>}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button type="button" onClick={() => setFacet('segmento', 'all')} aria-pressed={!filters.segmento} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${!filters.segmento ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+                <span className="block text-xs font-bold text-slate-800">Todos os segmentos</span><span className="mt-0.5 block text-[10px] text-slate-400">{scopeFacets.length} {scope === 'unlinked' ? 'grupos' : 'templates'}</span>
+              </button>
+              {segmentChips.map((option) => (
+                <button key={option.value} type="button" onClick={() => setFacet('segmento', option.value)} aria-pressed={filters.segmento === option.value} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${filters.segmento === option.value ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+                  <span className="block text-xs font-bold text-slate-800">{segmentLabel(option.value)}</span><span className="mt-0.5 block text-[10px] text-slate-400">{stageLabel(option.value, [])} · {option.count} {scope === 'unlinked' ? 'grupos' : 'tmpl.'}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <button onClick={() => setFacet('canal', 'all')} className={`rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${!filters.canal ? 'bg-slate-900 text-white ring-slate-900' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'}`}>Todos</button>
+            {CHANNEL_ORDER.map((ch) => {
+              const on = filters.canal === CHANNELS[ch].label;
+              return (
+                <button key={ch} onClick={() => setFacet('canal', on ? 'all' : CHANNELS[ch].label)} aria-pressed={on} className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold"
+                  style={on ? { color: CHANNELS[ch].dark, background: CHANNELS[ch].tint, borderColor: CHANNELS[ch].color } : { color: '#475569', background: '#fff', borderColor: '#e7ebf0' }}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: CHANNELS[ch].color }} />{CHANNELS[ch].label}
+                </button>
+              );
+            })}
+            <div className="ml-auto inline-flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600">
+              <span className="border-r border-slate-200 px-2.5 py-2 text-slate-400">Ordenar</span>
+              <select value={sortSelect.value} onChange={(e) => sortSelect.onChange(e.target.value)} className="bg-white px-2.5 py-2 outline-none" aria-label="Ordenar por">
+                {sortSelect.options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+              </select>
+              <button type="button" onClick={sortSelect.flip} className="border-l border-slate-200 p-2 text-cyan-700 hover:bg-cyan-50" title="Inverter ordem" aria-label="Inverter ordem">
+                {sortSelect.dir === -1 ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+              </button>
+            </div>
+            {scope === 'library' && (
+              <label className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-semibold ${draftsAvailable ? 'cursor-pointer text-slate-600' : 'cursor-not-allowed text-slate-400'}`} title={draftsAvailable ? 'Rascunhos e inativos aparecem com o estado real; não são aprovação.' : 'Não há rascunhos nem inativos no catálogo dentro dos filtros globais.'}>
+                <input type="checkbox" checked={includeDrafts} disabled={!draftsAvailable} onChange={(e) => setIncludeDrafts(e.target.checked)} className="peer sr-only" />
+                <span className="relative h-5 w-9 rounded-full bg-slate-200 transition-colors peer-checked:bg-cyan-600 peer-disabled:opacity-50 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-sm after:transition-transform peer-checked:after:translate-x-4" />
+                Incluir rascunhos ({libCounts.drafts}{libCounts.inactive ? ` + ${libCounts.inactive} inativos` : ''})
+              </label>
+            )}
+            <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-400 md:max-w-[420px]">
+              <Search size={14} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Buscar" placeholder="Buscar por ID, nome da peça, jornada ou Activity Name…" className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
+              {query && <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca" className="text-slate-400 hover:text-slate-700"><X size={14} /></button>}
+            </div>
+            <div className="flex basis-full flex-wrap items-center gap-1.5">
+              {SELECT_FACETS.map((key) => {
+                const opts = facetOptions(scopeFacets, key);
+                const value = filters[key] ?? 'all';
+                if (!opts.length && value === 'all') return null;
+                return (
+                  <select key={key} value={value} onChange={(e) => setFacet(key, e.target.value)} aria-label={FACET_LABEL[key]}
+                    className={`rounded-md border px-2 py-1.5 text-xs font-semibold ${value !== 'all' ? 'border-cyan-400 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-600'}`}>
+                    <option value="all">{FACET_LABEL[key]}: todos</option>
+                    {value !== 'all' && !opts.some((o) => o.value === value) && <option value={value}>{value} (0)</option>}
+                    {opts.map((o) => <option key={o.value} value={o.value}>{o.value} ({o.count})</option>)}
+                  </select>
+                );
+              })}
+              {sortSelect.note && <span className="text-[11px] text-slate-500">{sortSelect.note}</span>}
+            </div>
+          </div>
+
+          {scope === 'linked' && (
+            <aside className="flex items-start gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-3" aria-label="Insight do recorte">
+              <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white text-cyan-700 shadow-sm"><Lightbulb size={15} /></span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-cyan-700">Insight e sugestão de análise</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5"><span className="text-sm font-semibold text-slate-800">{insight.lead}</span>{insight.item && <TemplateIdChips id={insight.item.template.template_id} />}</div>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">{insight.text}</p>
+              </div>
+            </aside>
+          )}
+
+          {scope === 'linked' && (linkedFiltered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
+              <Search size={28} className="text-slate-300" /><p className="text-sm text-slate-400">{scored.length ? 'Nenhuma peça neste filtro.' : 'Nenhum template com execução vinculada no período.'}</p>
+            </div>
+          ) : mode === 'gallery' ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {paginate(linkedOrdered, page).rows.map((t) => <GalCard key={t.template.template_id} t={t} onOpen={() => setSelected(t)} />)}
+              </div>
+              <Pager page={paginate(linkedOrdered, page).page} pages={paginate(linkedOrdered, page).pages} total={linkedOrdered.length} unit={`template(s)${linkedOrdered.length !== scored.length ? ` (de ${scored.length})` : ''}`} onPage={setPage} />
+            </div>
+          ) : (
+            <TableView items={linkedFiltered} sort={sort} onSort={setSort} onOpen={setSelected} page={page} onPage={setPage} />
+          ))}
+          {scope === 'unlinked' && (
+            <UnlinkedExecutionsPanel items={unlinkedFiltered} total={unlinkedAll.length} view={mode} catalog={perf.catalog} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage} onChanged={perf.refetch} busy={perf.refreshing} />
+          )}
+          {scope === 'library' && (
+            <ApprovedLibraryPanel items={libraryFiltered} total={libraryAll.length} view={mode} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage}
+              onOpenPerformance={(id) => { setScope('linked'); setFilters({}); setQuery(id); }}
+              onReviewCompatible={(id) => { setScope('unlinked'); setFilters({}); setQuery(id); }} />
+          )}
+        </div>
       )}
 
       {selected && <Drawer t={selected} onClose={() => setSelected(null)} onEdit={() => { setEditing(selected); setSelected(null); }} onAudit={() => setAuditing(selected)} />}
       {auditing && <AuditModal t={auditing} onClose={() => setAuditing(null)} />}
-      {editing && <CommunicationDetailModal item={editing} onClose={() => setEditing(null)} onChanged={refetch} />}
+      {editing && <CommunicationDetailModal item={editing} onClose={() => setEditing(null)} onChanged={perf.refetch} />}
     </div>
+    </PreviewCtx.Provider>
   );
 };
