@@ -72,3 +72,6 @@ As duas filas resolvem a peça visual pelo ID original observado no link, com ca
 
 ### Nome da peça e ausência de prévia
 O nome original do Content Builder permanece como asset_name no payload persistido de cada ocorrência SFMC, preservando a proveniência sem substituir o template_id. As duas filas exibem esse nome; o modal visual também. Na ausência de peça visual, um ID observado é mostrado como ID identificado · sem prévia. O tooltip distingue a indisponibilidade de HTML para a prévia nesta importação da ausência de ID.
+
+### Performance: prévias integradas
+A Performance renderiza a versão atual escolhida de WhatsApp, SMS ou Push, quando há corpo disponível e canal compatível. Sem essa versão, usa o arquivo do catálogo e identifica sua origem. E-mail distingue HTML de imagem. A tabela usa miniaturas reais. Métricas continuam limitadas às execuções vinculadas no período; aprovação isolada não gera performance. A peça atual não certifica a versão enviada historicamente.

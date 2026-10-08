@@ -15,3 +15,10 @@ it('renders untrusted message text as escaped React nodes with examples', () => 
   expect(html).not.toContain('src="javascript');
 });
 
+
+it('renders a push body visually without inventing missing content',()=>{
+ const content={schema_version:1,channel:'Push',body_text:'Conclua seu pedido',body_params:[],buttons:[],footer:null,banner_url:null,sms_from:null,meta_template_name:null} as MessageContent;
+ const html=renderToStaticMarkup(<MessagePreview content={content}/>);
+ expect(html).toContain('Afinz · Push');expect(html).toContain('Conclua seu pedido');
+ expect(renderToStaticMarkup(<MessagePreview content={{...content,body_text:null}}/>)).toContain('Texto completo não disponível');
+});

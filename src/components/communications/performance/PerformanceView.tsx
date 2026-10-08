@@ -900,7 +900,7 @@ export const PerformanceView: React.FC = () => {
     <div className="mx-auto max-w-[1480px] space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-500">
-          Recorte: <b className="text-slate-700">{periodLabel}</b> · {filtered.length} de {data.length} templates
+          Recorte: <b className="text-slate-700">{periodLabel}</b> · {filtered.length} de {data.length} templates<span className="ml-2">Com execuções vinculadas no período. Aprovação sem vínculo não entra nas métricas.</span>
         </div>
         <div className="inline-flex rounded-xl bg-slate-100 p-[3px]">
           {views.map(([id, label, icon]) => (

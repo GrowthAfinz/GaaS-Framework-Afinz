@@ -14,10 +14,10 @@ export function MessagePreview({ content, compact = false }: { content: MessageC
   const banner = safeHttps(content.banner_url);
   const text = previewText(content, fields);
   const sms = smsSegments(text);
-  if (!content.body_text || !['WhatsApp','SMS'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{content.channel === 'E-mail' ? 'O pacote traz o e-mail sem as imagens publicadas. A prévia vem do HTML do template no catálogo; e-mail dinâmico (AMPscript, Plurix) depende do briefing.' : 'Texto completo não disponível para este canal.'}</p>;
+  if (!content.body_text || !['WhatsApp','SMS','Push'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{content.channel === 'E-mail' ? 'O pacote traz o e-mail sem as imagens publicadas. A prévia vem do HTML do template no catálogo; e-mail dinâmico (AMPscript, Plurix) depende do briefing.' : 'Texto completo não disponível para este canal.'}</p>;
   return <div className={'overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ' + (compact ? 'text-[11px]' : 'text-sm')}>
     <div className="flex items-center justify-between gap-2 bg-white px-3 py-2">
-      <span className="font-semibold">{content.channel === 'SMS' ? content.sms_from || 'SMS' : 'Afinz · WhatsApp'}</span>
+      <span className="font-semibold">{content.channel === 'SMS' ? content.sms_from || 'SMS' : content.channel==='Push'?'Afinz · Push':'Afinz · WhatsApp'}</span>
       {!compact && <button type="button" onClick={() => setFields(!fields)} className="rounded border px-2 py-1 text-xs text-cyan-800">{fields ? 'Mostrar exemplo' : 'Mostrar campos'}</button>}
     </div>
     <div className={'p-3 ' + (content.channel === 'WhatsApp' ? 'bg-[#e9f0e7]' : 'bg-slate-100')}>
