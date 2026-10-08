@@ -29,6 +29,8 @@ export function executionTemplateEvidence(a:FrameworkActivity,proposals:Proposal
     for(const p of governed){
       const projection=orchestrateCommunication(p,[a],[],catalog);
       conflicts.push(...projection.conflicts);
+      const missingContext=['front','partner','channel','segment','offer','campaign'].filter(key=>projection.fields[key].value==='Não identificado');
+      if(missingContext.length)conflicts.push('Contexto incompleto para lote: '+missingContext.map(key=>projection.fields[key].label).join(', '));
       if(p.proposed_template_id!==p.message.payload.utm.af_sub3&&p.status!=='applied'&&!p.reviewed_by)conflicts.push('ID proposto difere do link e ainda não foi revisado.');
     }
     if(ids.some(id=>!catalog.some(t=>t.id===id)))conflicts.push('Aprovar o cadastro da peça antes de vincular execuções.');
