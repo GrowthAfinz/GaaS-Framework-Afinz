@@ -14,7 +14,7 @@ export function MessagePreview({ content, compact = false }: { content: MessageC
   const banner = safeHttps(content.banner_url);
   const text = previewText(content, fields);
   const sms = smsSegments(text);
-  if (!content.body_text || !['WhatsApp','SMS'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{content.channel === 'E-mail' ? 'Conteúdo dinâmico depende do briefing. O pacote preserva a estrutura, sem executar AMPscript.' : 'Texto completo não disponível para este canal.'}</p>;
+  if (!content.body_text || !['WhatsApp','SMS'].includes(content.channel)) return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">{content.channel === 'E-mail' ? 'O pacote traz o e-mail sem as imagens publicadas. A prévia vem do HTML do template no catálogo; e-mail dinâmico (AMPscript, Plurix) depende do briefing.' : 'Texto completo não disponível para este canal.'}</p>;
   return <div className={'overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ' + (compact ? 'text-[11px]' : 'text-sm')}>
     <div className="flex items-center justify-between gap-2 bg-white px-3 py-2">
       <span className="font-semibold">{content.channel === 'SMS' ? content.sms_from || 'SMS' : 'Afinz · WhatsApp'}</span>

@@ -11,6 +11,7 @@ import {normalizeJourney} from '../../modules/sfmc-package/parsePackage';
 import type {ApplyPreview,CandidateActivity,ReviewDecision,TemplateContent} from '../../modules/sfmc-package/types';
 import type {CommunicationTemplate} from '../../types/communication';
 import {MessagePreview} from './previews/MessagePreview';
+import {EmailFrame,useTemplateHtml} from './previews/EmailHtmlPreview';
 import {ReconciliationProposalRow,STATUS_LABEL} from './ReconciliationProposalRow';
 import {ActivityMomentModal} from './ActivityMomentModal';
 import {orchestrateCommunication,dispatchDay,missingGovernanceParameters,type FrameworkActivity,type OrchestrationSlot} from '../../utils/communicationOrchestrator';
@@ -150,7 +151,7 @@ function ProposalDetail({row,onClose,onSaved,initialId}:{row:ProposalRow;onClose
  {pending&&<><label className="block text-sm">Motivo da revisão<textarea aria-label="Motivo da revisão" className={control+' mt-1 w-full'} value={note} disabled={busy} onChange={e=>setNote(e.target.value)} placeholder="Confirme a proposta ou explique a correção e o reuso intencional"/></label><p className="text-xs text-slate-600">Motivo opcional. "Salvar e marcar pronta" manda a comunicação para Prontas; depois é só Aprovar e Enviar na fila.</p></>}
  <section className="rounded-lg border p-3 text-xs"><h3 className="font-semibold">Reuso de texto no acervo aprovado</h3>{reuse?<><p className="mt-1 text-slate-600">Cobertura: {reuse.coverage.approved_versions} versões com texto · {reuse.coverage.linked_activities} execuções com template. Comparação exata do texto normalizado.</p>{reuse.matches.map(r=><p key={r.content_id} className="mt-2 break-all"><strong className="font-mono">{r.template_id}</strong> · {r.linked_activities} execuções vinculadas ao ID · {r.same_context_activities} no mesmo parceiro/segmento · última data {r.last_dispatch?localDay(r.last_dispatch):'não comprovada'}</p>)}{!reuse.matches.length&&<p className="mt-2">Nenhum texto equivalente no acervo aprovado consultado. Histórico sem texto fica fora desta comparação.</p>}<p className="mt-2 text-slate-600">Vínculo ao ID não certifica qual versão foi enviada. Reuso pode ser intencional; não mede repetição por pessoa.</p></>:<p className="mt-1">Consulta ainda não disponível.</p>}</section>
  <details className="text-xs"><summary className="cursor-pointer text-cyan-800">Fonte e atribuição</summary><p className="mt-2 break-all">{p.link_url||'Sem link extraído'}</p><pre className="whitespace-pre-wrap">{JSON.stringify({utm:p.utm,context:row.resolved_context,analysis_id:row.analysis_id},null,2)}</pre></details>
- </div><div><MessagePreview content={p.content} compact/><p className="mt-2 text-xs text-slate-600">Prévia do conteúdo configurado no pacote; não certifica envio histórico.</p></div></div></div>
+ </div><div>{p.content.channel==='E-mail'?<DetailEmail content={p.content} template={catalog.find(t=>t.template_id===review.template_id)} loaded={loaded}/>:<><MessagePreview content={p.content} compact/><p className="mt-2 text-xs text-slate-600">Prévia do conteúdo configurado no pacote; não certifica envio histórico.</p></>}</div></div></div>
  <footer className="space-y-2 border-t p-4">{error&&<p role="alert" className="text-sm text-red-700">{error}</p>}<div className="flex justify-end gap-2"><button className={control} onClick={onClose}>Fechar</button>{pending&&<><button className={control} disabled={busy||!loaded||!review.template_id} onClick={()=>persist(false)}>Salvar com pendências</button><button className={button+' inline-flex items-center gap-2'} disabled={busy||!loaded||!review.template_id} onClick={()=>persist(true)}><Check size={16}/>Salvar e marcar pronta</button></>}</div></footer></div></div>,document.body);
 }
 
@@ -163,4 +164,11 @@ function AgentNotes({proposalId}:{proposalId:string}) {
  return <section aria-label={`Análise do ${name}`} className="rounded-lg border border-violet-200 p-3"><h3 className="flex items-center gap-2 text-sm font-semibold text-violet-900"><Sparkles size={15} aria-hidden="true"/>Análise do {name}<span className="font-normal text-slate-500">· {fmtDay(last.created_at)}</span></h3>
  <ul className="mt-2 space-y-1.5">{last.notes.map((n,i)=><li key={i} className={'flex gap-2 rounded p-2 text-sm '+NOTE_STYLE[n.kind][1]}><strong className="shrink-0">{NOTE_STYLE[n.kind][0]}</strong><span>{n.text}</span></li>)}</ul>
  <p className="mt-2 text-xs text-slate-600">Nota de apoio. Não muda o status nem o ID proposto; a decisão continua sua.</p></section>;
+}
+
+function DetailEmail({content,template,loaded}:{content:ProposalRow['message']['payload']['content'];template?:CommunicationTemplate;loaded:boolean}) {
+ const {html,loading}=useTemplateHtml(template);
+ if(html)return <div><EmailFrame html={html} title={`E-mail ${template!.template_id}`}/><p className="mt-2 text-xs text-slate-600">HTML do template <span className="font-mono">{template!.template_id}</span> no catálogo. Mostra o ID proposto; não certifica o que foi enviado.</p></div>;
+ if(loading||!loaded)return <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Carregando o e-mail do catálogo…</p>;
+ return <><MessagePreview content={content} compact/><p className="mt-2 text-xs text-slate-600">{template?'O template proposto não tem HTML no catálogo.':'O ID proposto ainda não está no catálogo; a prévia aparece quando o template do e-mail for cadastrado.'}</p></>;
 }
