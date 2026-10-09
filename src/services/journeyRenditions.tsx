@@ -56,7 +56,7 @@ export async function prepareRendition(meta:MessageMeta,provided?:PackageMessage
   : await toPng(node,{width,height,pixelRatio:1,skipFonts:true,backgroundColor:'#fff',cacheBust:false});
  const result={url,width,height,warnings:[...new Set(warnings)],source:res.label,at:Date.now()};if(cacheable(meta)){await set(key,result).catch(()=>{});await persistRendition(meta,result,owner).catch(()=>{});}const stored=(await keys().catch(()=>[])).filter(k=>String(k).startsWith(`journey-rendition:v2:${actor}:`));if(stored.length>20)await Promise.all(stored.slice(0,stored.length-20).map(k=>del(k)));if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('journey-preview-ready',{detail:{fingerprint:meta.content_fingerprint}}));return result;
  }finally{host.remove();}
- });jobs.set(key,job);job.catch(()=>{jobs.delete(key);if(cacheable(meta))void renditionState(meta,owner,'failed').catch(()=>{});});return job;
+ });jobs.set(key,job);job.then(()=>jobs.delete(key),()=>{jobs.delete(key);if(cacheable(meta))void renditionState(meta,owner,'failed').catch(()=>{});});return job;
 }
 async function renditionState(meta:MessageMeta,owner:string,status:string){const {data}=await supabase.auth.getSession();if(data.session?.user.id!==owner)return;const {error}=await supabase.from('journey_preview_renditions').upsert({owner_id:owner,snapshot_id:meta.snapshot_id,occurrence_key:meta.occurrence_key,content_fingerprint:meta.content_fingerprint,renderer_version:'flow-v2-1',status,updated_at:new Date().toISOString()});if(error)throw error;}
 async function persistRendition(meta:MessageMeta,r:Rendition,owner:string){
