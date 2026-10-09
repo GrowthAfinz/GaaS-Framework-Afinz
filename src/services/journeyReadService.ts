@@ -17,7 +17,9 @@ async function rpc<T>(name:string,args:Record<string,unknown>={}){const {data,er
 export const readJourneyIndex=()=>cachedJourneyRead<JourneyIndexItem[]>('index',300000,()=>rpc('read_journey_flow_index'));
 export const readJourneyManifest=(id:string)=>cachedJourneyRead<JourneyManifest>('manifest:'+id,3600000,()=>rpc('read_journey_flow_manifest',{p_snapshot:id}));
 export const readJourneyMessage=(id:string,key:string)=>cachedJourneyRead<PackageMessage>('message:'+id+key,3600000,()=>rpc('read_journey_flow_message',{p_snapshot:id,p_occurrence:key}));
-export interface ScopedResults {complete:boolean;rows:FrameworkActivity[];reviews:ExecutionReview[];exact_ids:string[];count:number}
+export interface ScopedResults {complete:boolean;rows:FrameworkActivity[];reviews:ExecutionReview[];exact_ids:string[];linked_template_ids?:string[];count:number}
 export const readJourneyResults=(id:string,key:string,start:string,end:string,templates:boolean)=>cachedJourneyRead<ScopedResults>(JSON.stringify(['results',id,key,start,end,templates]),60000,()=>rpc('read_journey_flow_results',{p_snapshot:id,p_occurrence:key,p_start:start,p_end:end,p_templates:templates}));
 export const readJourneyReuse=(id:string,key:string)=>cachedJourneyRead<JourneyReuse[]>('reuse:'+id+key,300000,()=>rpc('read_journey_flow_reuse',{p_snapshot:id,p_occurrence:key}));
+export interface JourneyCoverage {first:string|null;last:string|null;historical_records:number;period_records:number;unlinked_records:number}
+export const readJourneyCoverage=(id:string,key:string,start:string,end:string)=>cachedJourneyRead<JourneyCoverage>(JSON.stringify(['coverage',id,key,start,end]),60000,()=>rpc('read_journey_flow_coverage',{p_snapshot:id,p_occurrence:key,p_start:start,p_end:end}));
 export async function readCurrentContent(id:string):Promise<TemplateContent[]>{return cachedJourneyRead('current:'+id,60000,async()=>{const {data,error}=await supabase.from('communication_template_contents').select('*').eq('template_id',id).eq('is_current',true);if(error)throw error;return data||[];});}

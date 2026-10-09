@@ -2,6 +2,26 @@
 
 Implementação de 08/10/2026. Entrada: **Comunicações → Fluxo de jornadas**.
 
+## Correção de prévias e cobertura — 09/10/2026
+
+A Performance também consulta a origem visual da versão atual escolhida: exige observações aprovadas com uma mesma importação e HTML de referência. Origens ambíguas são excluídas, sem alterar payload/hash ou selecionar uma versão automaticamente. A recuperação de conteúdo é individual e respeita RLS.
+
+A leitura principal conserva HTML no e-mail e `MessagePreview` em WhatsApp/SMS/push. Não troca o conteúdo legível por uma captura rasterizada. E-mail de catálogo continua identificado como catálogo; quando o HTML parcial do pack perde imagens e existe HTML compatível no catálogo, o resolvedor comum oferece esse fallback. Imagens ausentes sem fallback continuam como prévia incompleta, sem emprestar peças de outros IDs/canais.
+
+O parser 1.3.0 extrai recursos visuais em uma coleção separada: HTML pequeno referencia `sfmc-asset:<id>` e cada imagem é persistida uma vez por importação/asset. `sfmc_visual_assets` e `sfmc_visual_messages` são projeções privadas com RLS; não alteram payloads originais, versões aprovadas ou vínculos. Na leitura individual, o servidor resolve as referências. O índice nunca carrega os arquivos. A ingestão é atômica para UI e agente, com os limites/ator do staging e rollback de recursos inválidos. Limite de 12 milhões de caracteres base64 por imagem, HTML de referência de 750 mil caracteres e coleção de até 60 milhões de caracteres; excesso mantém aviso explícito.
+
+Os quatro ZIPs existentes foram conferidos pelo SHA-256 e receberam recuperação aditiva de **29 e-mails e 53 assets**. Recursos grandes foram derivados para prévia de até 1.280 px, conservando animação quando existente; os ZIPs originais permanecem a fonte binária. Consulta autenticada: 29 HTMLs disponíveis, zero referências pendentes e zero `src` vazio. Permaneceram 60 snapshots, 19 conteúdos aprovados, zero versão atual e 1.073 registros vinculados. Miniaturas rasterizadas continuam no Storage privado; os recursos recuperados são deduplicados na projeção do banco.
+
+Renderer `flow-v2-2` e cache local `v3` invalidam as capturas antigas. O PNG de e-mail usa o renderer nativo via SVG/XHTML; se necessário, o fallback simplificado recebe aviso. A leitura ao vivo permanece em HTML, preservando texto e animações. QA visual confirmou banner e tipografia no leitor e no PDF paginado.
+
+Resultados distinguem ausência no período, registros históricos, filtros/atribuição e pendências de vínculo. A cobertura conta registros de origem antes da revisão de duplicidades; não é adicionada ao total de performance. Há ações para selecionar o último mês com registros ou abrir o cadastro para revisar vínculos. Datas de referência seguem São Paulo. “Usos dos templates vinculados” admite IDs comprovados no histórico exato da jornada/activity/canal e reúne seus usos no período selecionado. Não usa ID proposto/observado como confirmação de envio.
+
+Entrega é taxa ponderada pela Base Total somente quando todos os registros possuem taxa e denominador válidos. Cobertura parcial permanece não informada. O gráfico permite entrega diária; lacunas não viram zero. Esse contrato vale para os quatro canais.
+
+Push existe no catálogo (6 templates com arquivo) e no framework (669 registros, 312 vinculados) na consulta de 09/10; **nenhum dos quatro packs possui push**. Não são criados nós ou conteúdos de push fictícios para completar o fluxo.
+
+Migrações: `20261009032759_sfmc_visual_resources.sql`, `20261009033702_sfmc_visual_atomic_stage.sql`, `20261009034036_journey_historical_template_scope.sql` , `20261009035453_visual_missing_resource_notice.sql` e `20261009040158_approved_visual_origins.sql`. Verificação: 378 testes frontend, contratos SQL/RLS/rollback/imagens faltantes e QA em navegador com packs e registros reais, incluindo exportações. A cobertura de arquivos do catálogo não certifica a integridade visual de todos os seus HTMLs.
+
 ## V2: navegação e carregamento
 
 O operador escolhe contexto de público/parceiro, segmento, jornada e versão antes de abrir o fluxo. Não há jornada automática na primeira visita. A última seleção fica na sessão do usuário; classificação ausente continua explícita. Filtros de canal, subgrupo, oferta, promocional, momento, ID e vínculo destacam caminhos sem apagar ramos. A estrutura do pack independe do período; cobertura e resultados respeitam o recorte global em dias de São Paulo.

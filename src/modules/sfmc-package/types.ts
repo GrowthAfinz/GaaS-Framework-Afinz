@@ -32,6 +32,7 @@ export interface PackageMessage {
   alerts: string[];
 }
 export interface ParsedPackage {
+  visuals?: {assets:{key:string;mime:string;file:string}[];messages:{occurrence_key:string;html:string}[]};
   file_name: string;
   package_name: string;
   package_version: number;
@@ -58,6 +59,7 @@ export interface StoredMessage {
   id: string; import_id: string; payload: PackageMessage; decision: 'pending' | 'rejected' | 'applied';
 }
 export interface TemplateContent {
+  visual_origin?: {snapshot_id:string;occurrence_key:string};
   id: string; template_id: string; content_hash: string; payload: MessageContent;
   is_current: boolean; first_seen_at: string;
 }

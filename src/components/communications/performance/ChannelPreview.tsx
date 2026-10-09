@@ -31,11 +31,13 @@ export const ChannelPreview: React.FC<{ res: PreviewResolution; width?: number; 
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const frame: React.CSSProperties = { width, height, background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #e7ebf0', boxShadow: '0 12px 30px rgba(15,23,42,.12)' };
-  const text = (res.kind === 'pack_message' || res.kind === 'pack_current') && !!res.content;
+  const text = !res.visualOrigin&&(res.kind === 'pack_message' || res.kind === 'pack_current') && !!res.content;
   const ready = text || asset.state === 'ready';
 
   let body: React.ReactNode;
-  if (text) body = <div className="h-full overflow-auto"><MessagePreview content={res.content!} /></div>;
+  if(asset.content?.email_html)body=<EmailFit html={asset.content.email_html} width={width} height={height-22} title={title??res.templateId??''}/>;
+  else if(asset.content)body=<MessagePreview content={asset.content}/>;
+  else if (text) body = <div className="h-full overflow-auto"><MessagePreview content={res.content!} /></div>;
   else if (asset.state === 'loading') body = <div className="flex h-full items-center justify-center bg-slate-50 text-slate-300"><Loader2 size={22} className="animate-spin" aria-label="Carregando prévia" /></div>;
   else if (asset.state === 'error') body = <div className="flex h-full flex-col items-center justify-center gap-2 bg-rose-50 p-4 text-center text-xs text-rose-800"><AlertTriangle size={20} aria-hidden="true" />Falha ao acessar o arquivo da prévia.<span className="text-rose-700/80">Tente atualizar; o vínculo não foi alterado.</span></div>;
   else if (res.kind === 'catalog_html' && asset.html) body = <EmailFit html={asset.html} width={width} height={height - 22} title={title ?? res.templateId ?? ''} />;

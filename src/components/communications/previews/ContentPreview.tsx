@@ -5,13 +5,18 @@ import type { PreviewResolution } from '../../../utils/communicationVisualResolu
 import { cachedSignedUrl } from '../../../services/templateContentIndex';
 import { MessagePreview } from './MessagePreview';
 import { EmailPreviewPanel, EmailThumb, useTemplateHtml } from './EmailHtmlPreview';
+import {readJourneyMessage} from '../../../services/journeyReadService';
+import type {MessageContent} from '../../../modules/sfmc-package/types';
 
 // Prévia única para fila, biblioteca e Performance. A resolução (qual conteúdo, de onde) vem de
 // resolvePreview; aqui só se carrega o recurso e se distingue: carregando, falha de acesso e ausência.
 
-type AssetState = { state: 'none' | 'loading' | 'ready' | 'error'; url?: string; html?: string };
+type AssetState = { state: 'none' | 'loading' | 'ready' | 'error'; url?: string; html?: string;content?:MessageContent };
 
 export function useResolvedAsset(res: PreviewResolution): AssetState {
+  const originKey=res.visualOrigin?res.visualOrigin.snapshot_id+':'+res.visualOrigin.occurrence_key:'';
+  const [recovered,setRecovered]=useState<AssetState&{key?:string}>({state:'none'});
+  useEffect(()=>{let alive=true;setRecovered({state:res.visualOrigin?'loading':'none',key:originKey});if(res.visualOrigin)readJourneyMessage(res.visualOrigin.snapshot_id,res.visualOrigin.occurrence_key).then(m=>{if(alive)setRecovered({state:'ready',content:m.content,key:originKey});}).catch(()=>{if(alive)setRecovered({state:'error',key:originKey});});return()=>{alive=false;};},[originKey]);
   const [image, setImage] = useState<AssetState>({ state: 'none' });
   const isImage = res.kind === 'catalog_image' && !!res.assetPath;
   useEffect(() => {
@@ -22,6 +27,7 @@ export function useResolvedAsset(res: PreviewResolution): AssetState {
     return () => { alive = false; };
   }, [isImage, res.assetPath]);
   const email = useTemplateHtml(res.kind === 'catalog_html' ? res.template : null);
+  if(res.visualOrigin)return recovered.key===originKey?recovered:{state:'loading'};
   if (res.kind === 'catalog_html') return email.html ? { state: 'ready', html: email.html } : email.failed ? { state: 'error' } : { state: 'loading' };
   if (isImage) return image;
   return { state: res.kind === 'pack_message' || res.kind === 'pack_current' ? 'ready' : 'none' };
@@ -40,7 +46,8 @@ export const ProvenanceBadge: React.FC<{ res: PreviewResolution; className?: str
 
 /** Conteúdo renderizado (sem moldura). `scaleTo` reduz mensagens de texto para miniaturas. */
 const Body: React.FC<{ res: PreviewResolution; asset: AssetState; compact?: boolean; full?: boolean }> = ({ res, asset, compact, full }) => {
-  if ((res.kind === 'pack_message' || res.kind === 'pack_current') && res.content) return <MessagePreview content={res.content} compact={compact} />;
+  if(asset.content)return <MessagePreview content={asset.content} compact={compact}/>;
+  if (!res.visualOrigin&&(res.kind === 'pack_message' || res.kind === 'pack_current') && res.content) return <MessagePreview content={res.content} compact={compact} />;
   if (asset.state === 'loading') return <div className="grid h-full min-h-[48px] w-full place-items-center text-slate-400"><Loader2 size={16} className="animate-spin" aria-label="Carregando prévia" /></div>;
   if (asset.state === 'error') return <div className="grid h-full w-full place-items-center p-1 text-center text-[10px] leading-tight text-rose-700"><span><AlertTriangle size={12} className="mx-auto mb-0.5" aria-hidden="true" />Falha ao carregar a prévia</span></div>;
   if (res.kind === 'catalog_html' && asset.html) return full && res.template ? <EmailPreviewPanel html={asset.html} template={res.template} height="calc(var(--screen-h) * 0.6)" /> : <EmailThumb html={asset.html} />;

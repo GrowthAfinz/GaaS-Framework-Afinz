@@ -6,7 +6,7 @@ import { materializeEmailHtml } from './emailPackageHtml';
 // Package Manager entity shapes vary between exports. Only fields extracted below persist.
 type Entity = Record<string, any>;
 const channels: Record<string, string> = { WHATSAPPACTIVITY: 'WhatsApp', SMSSYNC: 'SMS', EMAILV2: 'E-mail', PUSHNOTIFICATIONACTIVITY: 'Push' };
-export const PARSER_VERSION = '1.2.0';
+export const PARSER_VERSION = '1.3.0';
 // SMS e e-mail HTML não têm botão: o link rastreado mora no corpo do asset.
 const TRACKED_URL = /https?:\/\/[^\s"'<>\\]+?af_sub3=[^\s"'<>\\]+/g;
 const AMPSCRIPT = /%%\[|LookupRows?\(|LookupOrderedRows\(/;
@@ -96,6 +96,7 @@ export function parseEntities(entries: Record<string, Uint8Array>, fileName: str
     return { fields: out, subs, dynamic };
   };
   const messages: PackageMessage[] = [];
+  const visualAssets=new Map<string,{key:string;mime:string;file:string}>(),visualMessages:{occurrence_key:string;html:string}[]=[];
   let previewBytes=0;
   const assets = new Map([...entities.entries()].filter(([ref]) => ref.startsWith('assets/')).map(([ref, e]) => [ref.slice(7), e.data]));
   const journeys = [...entities.entries()].filter(([ref]) => ref.startsWith('journeys/'));
@@ -166,6 +167,7 @@ export function parseEntities(entries: Record<string, Uint8Array>, fileName: str
       if (trackedSubs.length > 1) alerts.push('Mais de um af_sub3 no conteúdo: ' + trackedSubs.join(', '));
       if (a.type === 'EMAILV2' && (isDynamic || !Object.keys(asset).length)) alerts.push('Conteúdo dinâmico depende do briefing');
       let emailHtml=a.type==='EMAILV2'?materializeEmailHtml(asset,assets):null;
+      if(a.type==='EMAILV2'){const html=materializeEmailHtml(asset,assets,(key,mime,file)=>{visualAssets.set(key,{key,mime,file});return 'sfmc-asset:'+key;});if(html)visualMessages.push({occurrence_key:ref+':'+(d.version||1)+':'+a.key,html});}
       const bytes=emailHtml?new TextEncoder().encode(emailHtml).byteLength:0;
       if(previewBytes+bytes>6_000_000){emailHtml=null;alerts.push('Prévia HTML excede o limite de conteúdo do pacote');}else previewBytes+=bytes;
       if(a.type==='EMAILV2'&&!emailHtml&&!isDynamic&&Object.keys(asset).length)alerts.push('Prévia HTML não disponível no conteúdo exportado');
@@ -194,7 +196,7 @@ export function parseEntities(entries: Record<string, Uint8Array>, fileName: str
   }
   for (const message of messages) if (message.utm.af_sub3 && (trackingUses.get(message.utm.af_sub3)?.size || 0) > 1) message.alerts.push('Mesmo af_sub3 observado em atividades diferentes');
   if (messages.length > 3000) throw new Error('Pacote excede 3.000 mensagens.');
-  return { file_name: fileName, package_name: info.name || fileName, package_version: info.version || 1, parser_version: PARSER_VERSION, journeys_count: journeys.length, messages, graphs: parseJourneyGraphs(entries) };
+  return { file_name: fileName, package_name: info.name || fileName, package_version: info.version || 1, parser_version: PARSER_VERSION, journeys_count: journeys.length, messages, graphs: parseJourneyGraphs(entries),visuals:{assets:[...visualAssets.values()],messages:visualMessages} };
 }
 export async function parsePackage(bytes: ArrayBuffer, fileName: string): Promise<ParsedPackage> {
   if (bytes.byteLength > MAX_ZIP) throw new Error('O ZIP deve ter até 50 MB.');

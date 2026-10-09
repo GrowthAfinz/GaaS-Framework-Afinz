@@ -1,6 +1,6 @@
 /** Materialize the exported slot tree and embedded image files, without network access.
  * Render only in a sandbox without scripts or same-origin permissions. */
-export function materializeEmailHtml(asset: Record<string, any>, assets: Map<string, Record<string, any>>): string | null {
+export function materializeEmailHtml(asset: Record<string, any>, assets: Map<string, Record<string, any>>, imageReference?: (id:string,mime:string,file:string)=>string): string | null {
   function expand(v: Record<string, any>, depth = 0): string {
     if (depth > 40) throw new Error('Árvore de slots do e-mail muito profunda.');
     let html = typeof v?.content === 'string' ? v.content : '';
@@ -20,6 +20,7 @@ export function materializeEmailHtml(asset: Record<string, any>, assets: Map<str
     if (path === 'fileProperties/publishedURL' && typeof linked.file === 'string') {
       const ext = String(linked.fileProperties?.fileName || '').split('.').pop()?.toLowerCase();
       const mime = ({png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp'} as Record<string,string>)[ext || ''];
+      if(imageReference&&mime&&linked.file.length<=12_000_000&&/^[A-Za-z0-9+/=\r\n]+$/.test(linked.file))return imageReference(id,mime,linked.file);
       // Large images keep their published URL instead of multiplying base64 per occurrence.
       if (mime && linked.file.length<=300_000 && /^[A-Za-z0-9+/=\r\n]+$/.test(linked.file)) return `data:${mime};base64,${linked.file}`;
     }

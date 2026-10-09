@@ -9,7 +9,7 @@ export async function listPackageImports(): Promise<PackageImport[]> {
   const { data, error } = await supabase.from('sfmc_package_imports').select('*').order('uploaded_at', { ascending: false }).limit(50);
   if (error) throw error; return data || [];
 }
-export async function stagePackage(pkg: ParsedPackage, scope: string) { const frozen=structuredClone(pkg);const id=await rpc<string>('stage_sfmc_package', { p_package: frozen, p_scope: scope });if(typeof window!=='undefined'){window.dispatchEvent(new Event('sfmc-package-changed'));void import('./journeyRenditions').then(r=>r.warmImportPreviews(id,frozen)).catch(()=>{});}return id; }
+export async function stagePackage(pkg: ParsedPackage, scope: string) { const frozen=structuredClone(pkg);const visuals=frozen.visuals;const id=await rpc<string>('stage_sfmc_package', { p_package: frozen, p_scope: scope });if(typeof window!=='undefined'){window.dispatchEvent(new Event('sfmc-package-changed'));void import('./journeyRenditions').then(r=>r.warmImportPreviews(id,{...frozen,visuals})).catch(()=>{});}return id; }
 export async function readPackage(id: string): Promise<StoredMessage[]> {
   const result: StoredMessage[] = [];
   for (let offset = 0; ; offset += 500) {
@@ -37,7 +37,11 @@ export async function readContents(templateId?: string): Promise<TemplateContent
     if (templateId) query = query.eq('template_id', templateId);
     const { data, error } = await query;
     if (error) throw error;
-    result.push(...(data || [])); if ((data || []).length < 500) return result;
+    result.push(...(data || [])); if ((data || []).length < 500) {
+      try{const {data:origins,error:originError}=await supabase.rpc('read_approved_visual_origins');
+      if(!originError&&Array.isArray(origins)){const byId=new Map(origins.map(r=>[r.content_id,r.origin]));for(const c of result){const origin=byId.get(c.id);if(origin)c.visual_origin=origin;}}}catch{/* Optional recovery metadata must not hide the original catalog. */}
+      return result;
+    }
   }
 }
 export function notifyPackageChanged() { if(typeof window!=='undefined')window.dispatchEvent(new Event('sfmc-package-changed')); }
