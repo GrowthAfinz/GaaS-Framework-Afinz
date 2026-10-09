@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, AnomalyType } from '../../types/framework';
-import { X, Edit2, Check, ExternalLink, ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Layers } from 'lucide-react';
+import { X, Edit2, Check, ExternalLink, ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import { deriveActivityMetrics, aggregateMetrics } from '../../utils/activityMetrics';
 import { useAppStore } from '../../store/useAppStore';
 import { useExplorerStore } from '../../store/explorerStore';
@@ -14,6 +14,9 @@ interface DailyDetailsModalProps {
     onEdit?: (activity: Activity) => void;
     onConfirmDraft?: (activity: Activity) => void;
     titleOverride?: string;
+    previousDate?: Date;
+    nextDate?: Date;
+    onDateChange?: (date: Date) => void;
 }
 
 type DailySortKey =
@@ -80,6 +83,9 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
     onEdit,
     onConfirmDraft,
     titleOverride,
+    previousDate,
+    nextDate,
+    onDateChange,
 }) => {
     const setTab = useAppStore((s) => s.setTab);
     const frente = useAppStore((s) => s.viewSettings.frente);
@@ -179,12 +185,34 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
                             {anomalyFilters.length > 0 && ' (filtrado)'}
                         </p>
                     </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        {onDateChange && (
+                            <nav aria-label="Navegar entre dias com disparos" className="flex items-center gap-1 mr-2">
+                                {[
+                                    { target: previousDate, label: 'Dia anterior com disparos', Icon: ChevronLeft },
+                                    { target: nextDate, label: 'Próximo dia com disparos', Icon: ChevronRight },
+                                ].map(({ target, label, Icon }) => (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        disabled={!target}
+                                        onClick={() => target && onDateChange(target)}
+                                        aria-label={target ? `${label}: ${target.toLocaleDateString('pt-BR')}` : label}
+                                        title={target ? `${label}: ${target.toLocaleDateString('pt-BR')}` : 'Não há outro dia com disparos nesta direção'}
+                                        className="p-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 transition"
+                                    >
+                                        <Icon size={20} aria-hidden="true" />
+                                    </button>
+                                ))}
+                            </nav>
+                        )}
                     <button
                         onClick={onClose}
                         className="p-2 hover:bg-slate-100 rounded-lg transition text-slate-400 hover:text-slate-900"
                     >
                         <X size={20} />
                     </button>
+                    </div>
                 </div>
 
                 {/* ── Resumo do dia ──────────────────────────────────── */}

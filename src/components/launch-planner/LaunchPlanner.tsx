@@ -1,4 +1,4 @@
-import React, { useState, useDeferredValue } from 'react';
+import React, { useState, useDeferredValue, useMemo } from 'react';
 import { CalendarData, FilterState, Activity } from '../../types/framework';
 import { DashboardLayout } from './DashboardLayout';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
@@ -30,6 +30,22 @@ export const LaunchPlanner: React.FC<LaunchPlannerProps> = ({ data, onActivityUp
     // Get available segmentos and determine active one
     const { availableSegmentos } = useAdvancedFilters(data, deferredFilters);
     const activeSegmento = filters.segmentos[0] || availableSegmentos[0] || 'Todos';
+
+    // Use the same activity population as the calendar, preserving its filters.
+    const dispatchDays = useMemo(() => {
+        const days = new Map<string, Date>();
+        Object.values(data).flat().forEach(activity => {
+            const date = activity.dataDisparo;
+            if (!date || Number.isNaN(date.getTime())) return;
+            days.set(format(date, 'yyyy-MM-dd'), new Date(date.getFullYear(), date.getMonth(), date.getDate()));
+        });
+        return [...days.values()].sort((a, b) => a.getTime() - b.getTime());
+    }, [data]);
+    const selectedDay = selectedDate
+        ? new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime()
+        : null;
+    const previousDate = selectedDay === null ? undefined : [...dispatchDays].reverse().find(day => day.getTime() < selectedDay);
+    const nextDate = selectedDay === null ? undefined : dispatchDays.find(day => day.getTime() > selectedDay);
 
     const handleDayClick = (date: Date) => {
         setSelectedDate(date);
@@ -109,6 +125,9 @@ export const LaunchPlanner: React.FC<LaunchPlannerProps> = ({ data, onActivityUp
             {selectedDate && (
                 <DailyDetailsModal
                     date={selectedDate}
+                    previousDate={previousDate}
+                    nextDate={nextDate}
+                    onDateChange={setSelectedDate}
                     activities={getActivitiesForDate(selectedDate)}
                     onClose={() => setSelectedDate(null)}
                     onEdit={handleEditActivity}
