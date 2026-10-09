@@ -347,7 +347,9 @@ export async function linkActivityToTemplate(_activityName: string, _templateId:
 }
 export async function linkReviewedExecutions(row: {executionRecords: unknown[];period:{start:string;end:string}},templateId:string,evidence:string):Promise<number> {
   const {data,error}=await supabase.rpc('link_communication_executions',{p_template:templateId,p_snapshots:row.executionRecords,p_start:row.period.start,p_end:row.period.end,p_evidence:evidence});
-  if(error)throw error;return Number(data);
+  if(error)throw error;
+  if(typeof window!=='undefined')window.dispatchEvent(new Event('communication-links-changed'));
+  return Number(data);
 }
 
 /** Desvincula um activity_name (volta a template_id nulo). */

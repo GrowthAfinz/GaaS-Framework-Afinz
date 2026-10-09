@@ -9,7 +9,7 @@ export async function listPackageImports(): Promise<PackageImport[]> {
   const { data, error } = await supabase.from('sfmc_package_imports').select('*').order('uploaded_at', { ascending: false }).limit(50);
   if (error) throw error; return data || [];
 }
-export function stagePackage(pkg: ParsedPackage, scope: string) { return rpc<string>('stage_sfmc_package', { p_package: pkg, p_scope: scope }); }
+export async function stagePackage(pkg: ParsedPackage, scope: string) { const frozen=structuredClone(pkg);const id=await rpc<string>('stage_sfmc_package', { p_package: frozen, p_scope: scope });if(typeof window!=='undefined'){window.dispatchEvent(new Event('sfmc-package-changed'));void import('./journeyRenditions').then(r=>r.warmImportPreviews(id,frozen)).catch(()=>{});}return id; }
 export async function readPackage(id: string): Promise<StoredMessage[]> {
   const result: StoredMessage[] = [];
   for (let offset = 0; ; offset += 500) {
@@ -22,8 +22,10 @@ export function readCandidates(id: string) { return rpc<CandidateActivity[]>('sf
 export function previewApply(id: string, decisions: ReviewDecision[]) {
   return rpc<ApplyPreview & { preview_token: string }>('preview_sfmc_package_apply', { p_import_id: id, p_decisions: decisions });
 }
-export function applyPackage(id: string, decisions: ReviewDecision[], token: string, key: string) {
-  return rpc<ApplyPreview>('apply_sfmc_package_import', { p_import_id: id, p_decisions: decisions, p_preview_token: token, p_idempotency_key: key });
+export async function applyPackage(id: string, decisions: ReviewDecision[], token: string, key: string) {
+  const result = await rpc<ApplyPreview>('apply_sfmc_package_import', { p_import_id: id, p_decisions: decisions, p_preview_token: token, p_idempotency_key: key });
+  notifyPackageChanged();
+  return result;
 }
 export function rejectMessages(id: string, messageIds: string[]) {
   return rpc<void>('reject_sfmc_package_messages', { p_import_id: id, p_message_ids: messageIds });
@@ -38,5 +40,5 @@ export async function readContents(templateId?: string): Promise<TemplateContent
     result.push(...(data || [])); if ((data || []).length < 500) return result;
   }
 }
-export function notifyPackageChanged() { window.dispatchEvent(new Event('sfmc-package-changed')); }
+export function notifyPackageChanged() { if(typeof window!=='undefined')window.dispatchEvent(new Event('sfmc-package-changed')); }
 

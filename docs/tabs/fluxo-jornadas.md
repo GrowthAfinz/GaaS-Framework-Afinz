@@ -2,6 +2,22 @@
 
 Implementação de 08/10/2026. Entrada: **Comunicações → Fluxo de jornadas**.
 
+## V2: navegação e carregamento
+
+O operador escolhe contexto de público/parceiro, segmento, jornada e versão antes de abrir o fluxo. Não há jornada automática na primeira visita. A última seleção fica na sessão do usuário; classificação ausente continua explícita. Filtros de canal, subgrupo, oferta, promocional, momento, ID e vínculo destacam caminhos sem apagar ramos. A estrutura do pack independe do período; cobertura e resultados respeitam o recorte global em dias de São Paulo.
+
+O canvas usa SVG e layout próprio. Arraste atualiza a transformação diretamente; miniaturas são montadas na área visível e uma margem. Enquadrar considera largura e altura. Tela cheia usa a API nativa; quando indisponível, expande o workspace. Uma única ficha abre compacta ou ampliada dentro do mesmo workspace, com navegação entre mensagens e retorno ao zoom anterior. Resultados e outros usos só são consultados quando suas abas são abertas.
+
+`journeyReadService` consulta índice leve, manifesto da jornada selecionada, mensagem individual e resultados delimitados. Não carrega todos os HTMLs ou todo o histórico para abrir o módulo. Cache de leitura usa identidade autenticada, TTL, limite de memória e invalidação após mudanças. O restante do GaaS conserva seu carregamento global existente.
+
+Prévias derivadas usam `MessagePreview` e o HTML exportado sanitizado, sem scripts ou execução de AMPscript. São preparadas ao abrir/exportar e, após staging pela UI, em segundo plano com concorrência limitada. IndexedDB e registros privados separam usuário, snapshot, fingerprint de conteúdo e versão do renderer. Catálogo é fallback identificado; sua imagem não vira prova do conteúdo enviado. Falhas de imagens externas aparecem como avisos e não bloqueiam ingestão/aprovação.
+
+PNG exporta o fluxo completo, o caminho destacado ou fluxo com fichas, independentemente do zoom. PDF tem fluxo vetorial e fichas paginadas para comunicações longas. PNG limita resolução/memória; jornadas excessivas orientam usar PDF ou um caminho. Preview indisponível permanece explícito. Não há screenshot parcial do viewport como exportação final.
+
+Migrações adicionais aplicadas: `20261009013157_journey_flow_v2_read.sql` e `20261009015520_journey_preview_renditions.sql`. RPCs SECURITY INVOKER respeitam RLS; anônimo não recebe conteúdo. Renditions pertencem ao usuário e usam o bucket privado existente, sem mudar suas políticas. Consulta de performance fecha os grupos de execução para aplicar a revisão de duplicidades existente; não deduplica por asset reutilizado. Acima de 5.000 registros, recorte incompleto retorna aviso, nunca soma parcial silenciosa.
+
+Validação V2: 371 testes frontend; contratos SQL de snapshots, leitura leve, RLS, cache privado, fechamento de grupos e período vazio; navegador com pack e execuções reais, seleção progressiva, tela cheia, leitor único, reuso, filtros e downloads PNG/PDF. Preservados 60 snapshots, 19 conteúdos, nenhuma versão atual e 1.073 execuções vinculadas. A integração futura com memória de Growth continua separada desta entrega.
+
 ## Experiência
 
 Consulta visual da estrutura exportada pelo Package Manager, separada da operação de aprovação de templates. Selecionar jornada e versão abre um canvas com ícones por tipo, conectores ortogonais, rótulos de ramo, mensagens numeradas e miniaturas. Zoom, arraste, ajuste à tela e modo “Só fluxo”.

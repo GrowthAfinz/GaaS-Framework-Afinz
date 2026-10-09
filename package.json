@@ -1,7 +1,7 @@
 {
   "name": "calendar-estrategico",
   "version": "1.0.0",
-  "description": "Dashboard calend\u00e1rio estrat\u00e9gico de disparos Salesforce",
+  "description": "Dashboard calendário estratégico de disparos Salesforce",
   "homepage": "https://growthafinz.github.io/GaaS-Framework-Afinz",
   "type": "module",
   "engines": {
@@ -34,7 +34,7 @@
     "deploy": "gh-pages -d dist",
     "build:ontology": "python ../scripts/bundle_vault.py",
     "test": "vitest run",
-    "test:journey-snapshots-sql": "node scripts/test-journey-snapshots.mjs",
+    "test:journey-snapshots-sql": "node scripts/test-journey-snapshots.mjs && node scripts/test-journey-flow-v2-sql.mjs",
     "test:sfmc-package-sql": "node --test scripts/test-sfmc-package-sql.mjs scripts/test-execution-review-sql.mjs scripts/test-scoped-communication-links.mjs"
   },
   "dependencies": {
@@ -45,8 +45,11 @@
     "exceljs": "^4.4.0",
     "fflate": "0.8.3",
     "framer-motion": "^12.29.2",
+    "html-to-image": "1.11.13",
+    "html2canvas": "1.4.1",
     "idb-keyval": "^6.2.2",
     "js-yaml": "5.4.2",
+    "jspdf": "4.2.1",
     "lucide-react": "^0.563.0",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
@@ -55,6 +58,7 @@
     "react-resizable-panels": "^4.12.2",
     "recharts": "^3.5.0",
     "remark-gfm": "4.0.1",
+    "svg2pdf.js": "2.8.1",
     "tailwind-merge": "^3.4.0",
     "xlsx": "^0.18.5",
     "zod": "^4.1.13",

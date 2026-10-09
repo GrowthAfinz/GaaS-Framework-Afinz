@@ -188,7 +188,7 @@ export interface LibraryItem {
  compatibleOrphans:OrphanRow[];tags:SourcedTag[];facets:ScopeFacets;searchText:string;
 }
 
-function tagsFor(t:CommunicationTemplate,history:FrameworkActivity[]):SourcedTag[] {
+export function tagsFor(t:CommunicationTemplate,history:FrameworkActivity[]):SourcedTag[] {
  const tags:SourcedTag[]=[];const seen=new Set<FacetKey>();
  const add=(key:FacetKey,values:unknown[],source:string)=>{if(seen.has(key))return;const vals=uniq(key,values);if(!vals.length)return;seen.add(key);vals.forEach(value=>tags.push({key,value,source}));};
  const meta=(t.metadata??{}) as Record<string,unknown>;
