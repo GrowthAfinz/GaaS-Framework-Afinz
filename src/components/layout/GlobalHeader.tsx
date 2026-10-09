@@ -142,7 +142,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             direct: false,
             items: [
                 { id: 'comunicacoes-cadastro', label: 'Cadastro e Templates', icon: LayoutGrid, onClick: () => navigateToTab('comunicacoes-cadastro') },
-                { id: 'comunicacoes-fluxo', label: 'Fluxo de jornadas', icon: GitBranch, onClick: () => navigateToTab('comunicacoes-fluxo') },
+                { id: 'comunicacoes-fluxo', label: 'Fluxo de Jornada', icon: GitBranch, onClick: () => navigateToTab('comunicacoes-fluxo') },
                 { id: 'comunicacoes-performance', label: 'Performance do Conteúdo', icon: BarChart3, onClick: () => navigateToTab('comunicacoes-performance') },
                 { id: 'comunicacoes-email-dinamico', label: 'Fábrica de E-mails', icon: Mail, onClick: () => navigateToTab('comunicacoes-email-dinamico') },
                 { id: 'comunicacoes-appsflyer-auditoria', label: 'Auditoria AppsFlyer', icon: ShieldCheck, onClick: () => navigateToTab('comunicacoes-appsflyer-auditoria') },
