@@ -1,0 +1,34 @@
+{
+  "contract": "gaas-emails-input/1",
+  "status": "draft",
+  "generatedBy": { "tool": "claude", "model": "claude-opus-5-5", "generatedAt": "2026-10-15T21:00:00-03:00" },
+  "source": { "kind": "conversa" },
+  "ruler": { "segment": "V2 TOPO DE FUNIL DINÂMICO", "partner": "Plurix", "tpCampanha": "Topo de Funil", "templateSlotId": "builtin-plurix-v13" },
+  "emails": [
+    {
+      "sequence": "E-mail 1",
+      "weekKey": "Semana 1",
+      "fields": {
+        "COPY_1_PRETO": {
+          "value": "Já pensou em aproveitar as melhores <b>vantagens e descontos {no_mercado} e fora dele</b>? Com o <b>cartão de crédito +amigo</b>, você pode <b>economizar em produtos selecionados</b> e ainda contar com benefícios que vão além das compras. Peça seu cartão e aproveite:",
+          "origin": "ia",
+          "source": "conversa 15/10/2026: nome do supermercado nos E-mails 1 e 2, decisão do analista"
+        }
+      },
+      "factsUsed": []
+    },
+    {
+      "sequence": "E-mail 2",
+      "weekKey": "Semana 1",
+      "fields": {
+        "COPY_1_PRETO": {
+          "value": "Na hora de escolher como pagar suas compras, contar com <b>vantagens extras faz toda diferença.</b><br>O <b>cartão +amigo</b> foi feito para trazer mais possibilidades para sua rotina, com <b>DESCONTOS EXCLUSIVOS em produtos selecionados</b> {no_mercado} e benefícios para você aproveitar no dia a dia.",
+          "origin": "ia",
+          "source": "conversa 15/10/2026: nome do supermercado nos E-mails 1 e 2, decisão do analista"
+        }
+      },
+      "factsUsed": []
+    }
+  ],
+  "pendencies": []
+}

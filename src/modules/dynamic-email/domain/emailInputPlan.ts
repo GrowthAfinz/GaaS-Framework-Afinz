@@ -8,6 +8,9 @@ import {
 import type { EmailInput, EmailInputResult } from "./emailInput";
 import type { WorkspaceBriefing } from "./workspace";
 export type ConflictChoices = Record<string, "gaas" | "file">;
+/** Migrations antigas gravaram import_source livre (origem, mudança), sem base: não conta como importação. */
+const hasBaseline = (source: unknown): boolean =>
+  Boolean(source && typeof source === "object" && (source as { baseline?: object }).baseline && Object.keys((source as { baseline: object }).baseline).length);
 export function planEmailInput(
   result: EmailInputResult,
   existing: WorkspaceBriefing[],
@@ -27,7 +30,9 @@ export function planEmailInput(
       id: row.__id,
       version: row.__meta.version,
       row,
-      importSource: row.__meta.importSource ?? {
+      // Rascunho que nunca veio de arquivo: o estado atual é a base. Sem edição posterior a
+      // proteger, a proposta do arquivo vale (o conflito fica para quem editou depois de importar).
+      importSource: hasBaseline(row.__meta.importSource) ? row.__meta.importSource! : {
         contract: "gaas-emails-input/1",
         importKey: importKeyFor(
           ruler.segment,
@@ -37,7 +42,7 @@ export function planEmailInput(
         file: "GaaS",
         sheet: "",
         importedAt: "",
-        baseline: {},
+        baseline: Object.fromEntries(BRIEFING_COLUMNS.map((c) => [c, row[c]])) as Record<BriefingColumn, string>,
         provenance: {},
       },
     })),

@@ -38,3 +38,20 @@ describe('ida e volta V2',()=>{
   expect(repeated.find(p=>p.existingId===applied[0].__id)?.next.ASSUNTO).toBe('Edição da pessoa no GaaS');
  });
 });
+
+describe('supermercado nos E-mails 1 e 2 (decisão de 15/10/2026)', async () => {
+ const mercado = (await import('../fixtures/input_gaas_emails_v2_topo_mercado_20261015.json')).default;
+ it('só o texto principal muda, sem conflito e sem bloqueio, com o nome certo por rede', () => {
+  // Como em produção: import_source livre gravado pelas migrations, sem base.
+  const initial = rows().map((r) => ({ ...r, __meta: { ...r.__meta, importSource: { importKey: 'x', origem: 'migration', mudanca: 'y' } as never } })); const prepared = prepareEmailInput(mercado, context(initial));
+  expect(prepared.problems.filter((p) => p.severity === 'error')).toEqual([]);
+  const plan = planEmailInput(prepared, initial);
+  expect(plan).toHaveLength(12);
+  expect(plan.every((p) => p.action === 'update' && p.diffs.length === 1 && p.diffs[0].column === 'COPY_1_PRETO' && p.diffs[0].decision !== 'conflict')).toBe(true);
+  const text = (seq: string, net: string) => plan.find((p) => p.incoming.sequence === seq && p.incoming.network === net)!.next.COPY_1_PRETO;
+  expect(text('E-mail 1', 'AMIGAO')).toContain('<b>vantagens e descontos no Amigão e fora dele</b>');
+  expect(text('E-mail 1', 'SUPERPAO')).toContain('no seu supermercado e fora dele');
+  expect(text('E-mail 2', 'BOA')).toContain('produtos selecionados</b> no Boa e benefícios');
+  expect(plan.every((p) => p.next.LINK_CTA_1 === initial.find((r) => r.__id === p.existingId)!.LINK_CTA_1)).toBe(true);
+ });
+});

@@ -40,11 +40,12 @@ describe('gravação autenticada de importação em Postgres local',()=>{
   await saveEmailInputDrafts(JSON.stringify(input),'input.json','a'.repeat(64),{},after);
   expect((await state.load())).toHaveLength(24);expect((await db.query<{count:number}>('select count(*)::int as count from versions')).rows[0].count).toBe(12);
  });
- it('recusa sessão ausente, estado alterado e fixture histórica bloqueada antes de gravar',async()=>{
+ it('recusa sessão ausente, estado alterado e arquivo com bloqueio antes de gravar',async()=>{
   const reviewed=await state.load();const input=validInput();const choices=choicesFor(input,reviewed);
   state.authenticated=false;await expect(saveEmailInputDrafts(JSON.stringify(input),'x','a'.repeat(64),choices,reviewed)).rejects.toThrow('Sessão');state.authenticated=true;
   await expect(saveEmailInputDrafts(JSON.stringify(input),'x','a'.repeat(64),choices,[])).rejects.toThrow('mudou');
-  await expect(saveEmailInputDrafts(JSON.stringify(fixture),'x','a'.repeat(64),choices,reviewed)).rejects.toThrow('bloqueios');
+  const blocked=structuredClone(fixture);blocked.emails[0].fields.COPY_1_PRETO.value='Compre no Superpão';
+  await expect(saveEmailInputDrafts(JSON.stringify(blocked),'x','a'.repeat(64),choices,reviewed)).rejects.toThrow('bloqueios');
   expect((await db.query<{count:number}>('select count(*)::int as count from versions')).rows[0].count).toBe(0);
  });
 });

@@ -54,6 +54,20 @@ Detalhe técnico e contratos: `docs/reference/COMMUNICATIONS_ORCHESTRATION.md`, 
 
 ---
 
+## Fábrica de E-mails: aba Prompt e IA (15/10/2026)
+
+Três passos na própria aba:
+
+1. **Exportar pacote:** skill em zip (Agent Skills) ou Markdown único, montada na hora a partir do banco:
+   ficha do produto, regras de escrita, catálogo de blocos, contrato `gaas-emails-input/1`, régua com
+   estado atual e esqueletos de prévia renderizados pelo template real.
+2. **Criar com a IA:** guia para Claude, ChatGPT (instruções do Projeto) e Claude Code, com primeiras
+   mensagens prontas. A IA devolve dois PNGs (celular e desktop) com a régua inteira e, aprovado, o JSON.
+3. **Importar e aprovar:** valida, completa campos governados, mostra a régua com a proposta (rede,
+   dispositivo, com ou sem nome), as diferenças por campo e grava como rascunho com histórico.
+
+Passo a passo: [how-to](../../how-to/criar-emails-com-ia-prompt-e-ia.md).
+
 ## Arquitetura de Componentes
 
 ```

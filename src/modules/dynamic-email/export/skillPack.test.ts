@@ -12,7 +12,7 @@ const SEGMENT = 'V2 TOPO DE FUNIL DINÂMICO';
 const context = (): SkillPackContext => ({
   briefings: before.map((b) => withMeta({ ...emptyBriefingRow(), ...b.data }, { partner: 'Plurix', segment: SEGMENT, weekKey: b.weekKey, campaignGroupId: `g-${b.sequence}`, version: 1, status: 'draft', templateSlotId: PLURIX_V13_TEMPLATE_ID })),
   emailStrategies: [], rulers: [], assets: [],
-  productContexts: [{ id: 'p', product: '+amigo', partner: 'Plurix', status: 'active', version: 1, differentiators: ['A partir de +5% em produtos selecionados', 'Até 40 dias para pagar', 'É um cartão Visa', 'Programa Você Bem: até 70% em consultas'], toneOfVoice: 'Direto e concreto.' }],
+  productContexts: [{ id: 'p', product: '+amigo', partner: 'Plurix', status: 'active', version: 1, differentiators: ['A partir de +5% em produtos selecionados', 'Até 40 dias para pagar', 'É um cartão Visa', 'Programa Você Bem: até 70% em consultas'], toneOfVoice: 'Direto e concreto — sem banco.' }],
   productGuardrails: [],
   templates: [{ id: PLURIX_V13_TEMPLATE_ID, name: 'PLURIX V13', source: PLURIX_V13_TEMPLATE, isPrincipal: false, version: 1, updatedAt: '' } as SkillPackContext['templates'][number]],
 });
@@ -27,7 +27,8 @@ describe('pacote Prompt e IA', () => {
     expect(pack.files.every((f) => f.path.startsWith('gaas-emails-plurix/'))).toBe(true);
     expect(skill.content).toMatch(/^---\nname: gaas-emails-plurix\ndescription: .{40,1024}\n---/);
     expect(skill.content.split('\n').length).toBeLessThan(500);
-    expect(pack.files.map((f) => f.content).join('')).not.toContain('—');
+    expect(pack.files.filter((f) => f.kind === 'md').map((f) => f.content).join('')).not.toContain('—');
+    expect(skill.content).toContain('Direto e concreto, sem banco.');
   });
 
   it('resume a régua com o próximo e-mail e os blocos lidos do HTML', () => {

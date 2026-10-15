@@ -482,12 +482,15 @@ ${images.length ? `| Nome | Uso | URL |\n|---|---|---|\n${images.map((a) => `| $
 
 // ------------------------------------------------------------------ montagem
 
+/** Nome da skill (e da pasta do zip): um parceiro só vira gaas-emails-<parceiro>. */
+export const skillNameFor = (partners: string[]) => (partners.length === 1 ? `gaas-emails-${slugify(partners[0])}` : 'gaas-fabrica-emails');
+
 export function buildSkillPack(context: SkillPackContext, options: SkillPackOptions): SkillPack {
   const warnings: string[] = [];
   const all = summarizeRulers(context);
   const summaries = all.filter((s) => options.rulerKeys.includes(s.key));
   const partners = [...new Set((summaries.length ? summaries : all).map((s) => s.partner))];
-  const skillName = partners.length === 1 ? `gaas-emails-${slugify(partners[0])}` : 'gaas-fabrica-emails';
+  const skillName = skillNameFor(partners);
   const root = (path: string) => `${skillName}/${path}`;
   const files: PackFile[] = [];
   const manifest: { generatedAt: string; facts: string; rulers: unknown[] } = {
@@ -567,7 +570,8 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
     { path: root('scripts/montar_previa.py'), kind: 'py', role: 'Prévia fiel, desktop e celular', content: montarPreviaPy },
   );
   // Nada de dado sensível sai no pacote (CPF, e-mail, token), mesmo vindo de texto livre.
-  for (const file of files) if (file.kind === 'md') file.content = sanitizeAiPackText(file.content);
+  // Travessão vindo de texto do banco (tom de voz, regras) vira vírgula: a IA copia o estilo do que lê.
+  for (const file of files) if (file.kind === 'md') file.content = sanitizeAiPackText(file.content).replace(/\s*—\s*/g, ', ');
   return { skillName, files, rulers: summaries, warnings };
 }
 
@@ -579,7 +583,7 @@ export function zipSkillPack(pack: SkillPack): Uint8Array {
 }
 
 /** Instruções para colar em um Projeto do ChatGPT (limite de ~8.000 caracteres). */
-export function chatGptProjectInstructions(pack: SkillPack): string {
+export function chatGptProjectInstructions(pack: Pick<SkillPack, 'skillName'>): string {
   return `Você trabalha com a Fábrica de E-mails do GaaS. Nos arquivos deste projeto está ${pack.skillName}.zip.
 1. No começo de cada conversa, descompacte o zip com o Code Interpreter e leia ${pack.skillName}/SKILL.md inteiro. Siga o fluxo e as regras dele.
 2. Leia os arquivos de references/ quando o SKILL.md pedir. Não invente benefício: a única fonte é references/produto.md.
