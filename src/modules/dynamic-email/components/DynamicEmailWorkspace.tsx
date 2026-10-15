@@ -146,6 +146,8 @@ const IMAGE_SLOTS: Record<'header' | 'banner1' | 'banner2' | 'banner3', ImageSlo
   banner2: { label: 'Banner do segundo bloco', description: 'Imagem exibida após o segundo botão', image: 'BANNER_2_CORPO', link: 'LINK_BANNER_2_CORPO' },
   banner3: { label: 'Banner de encerramento', description: 'Última imagem antes das informações legais', image: 'BANNER_3_CORPO', link: 'LINK_BANNER_3_CORPO' },
 };
+const HEADER_CARD_SLOT: ImageSlot = { label: 'Cartão do header', description: 'PNG do cartão com fundo transparente, à direita do texto', image: 'HEADER_IMAGEM_CARTAO' };
+const HEADER_LOGO_SLOT: ImageSlot = { label: 'Logo do header', description: 'Logo da rede que aparece abaixo das linhas de texto', image: 'HEADER_LOGO' };
 
 type EditorSection = {
   id: string;
@@ -339,6 +341,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [renameValue, setRenameValue] = useState('');
   const [moveTarget, setMoveTarget] = useState<{ groupId: string; label: string; current: { partner: string; segment: string; weekKey: string } } | null>(null);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  // E-mails em que a pessoa ligou o header dinâmico e ainda não escreveu a linha principal.
+  const [dynamicHeaderOn, setDynamicHeaderOn] = useState<Set<string>>(new Set());
   const [editorHoverBlock, setEditorHoverBlock] = useState<string | null>(null);
   const [railHoverBlock, setRailHoverBlock] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -490,6 +494,18 @@ export const DynamicEmailWorkspace: React.FC = () => {
     return { offer, vars: { OfertaProduto: offer?.productName ?? '', OfertaPrecoTxt: offer?.priceText ?? '', OfertaImagem: offer?.imageUrl ?? '', OfertaData: offer ? `${day}/${month}` : '' } };
   }, [poolOffers, previewRow, previewSendDate, usesPool, usesTopoV10]);
   const poolOffer = topoPreview?.offer ?? briefingPoolPreview?.offer ?? null;
+  const selectedGroupRows = useMemo(() => selected ? rows.filter((row) => row.__meta.status !== 'archived' && row.__meta.campaignGroupId === selected.__meta.campaignGroupId) : [], [rows, selected]);
+  const isDynamicHeader = !!selected && usesBriefingHeader && (!!selected.HEADER_TITULO.trim() || dynamicHeaderOn.has(selected.__meta.campaignGroupId));
+  const setDynamicHeader = (enabled: boolean) => {
+    if (!selected) return;
+    const groupId = selected.__meta.campaignGroupId;
+    if (enabled) { setDynamicHeaderOn((current) => new Set(current).add(groupId)); return; }
+    const filled = selected.HEADER_TITULO.trim() || selected.HEADER_SUBTITULO.trim() || selected.HEADER_IMAGEM_CARTAO.trim();
+    if (filled && !window.confirm('Desligar o header dinâmico apaga a linha principal, a secundária e o cartão deste e-mail nas 6 redes. Os logos das assinaturas ficam guardados. Continuar?')) return;
+    (['HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO'] as BriefingColumn[]).forEach((field) => updateField(field, ''));
+    setDynamicHeaderOn((current) => { const next = new Set(current); next.delete(groupId); return next; });
+  };
+  const setRowField = (rowId: string, field: BriefingColumn, value: string) => setRows((current) => current.map((row) => row.__id === rowId ? { ...row, [field]: value } : row));
   const render = useMemo(() => {
     if (!previewRow) return { html: '', diagnostics: [] };
     const anchoredTemplate = injectBlockAnchors(previewTemplate, previewRow, STRUCTURE_ANCHOR_SPECS).replace(POOL_ANCHOR_COMMENT, blockSentinel('pool'));
@@ -1081,6 +1097,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <div id="email-editor-scroll" className="p-3.5">
             <label className="mb-2.5 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
             {selectedIssues.length > 0 && <div className="mb-2.5 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
+            <EmailConfigSummary
+              templateName={templateSlots.find((slot) => slot.id === linkedTemplateId)?.name ?? 'Template principal'}
+              sfmcKey={[selected.NM_PRODUTO_INTERNO, selected.TP_CAMPANHA, selected.SEQUENCIA].map((value) => value || '?').join(' · ')}
+              header={isDynamicHeader ? { label: 'Dinâmico', detail: `logos ${selectedGroupRows.filter((row) => row.HEADER_LOGO.trim()).length}/${selectedGroupRows.length}`, ok: selectedGroupRows.every((row) => row.HEADER_LOGO.trim()) && !!selected.HEADER_TITULO.trim() } : selected.HEADER.trim() ? { label: 'Imagem', ok: true } : { label: 'Sem header', ok: false }}
+              limit={usesLimitMessage ? { label: selected.MENSAGEM_LIMITE.trim() ? 'Ativa' : 'Sem mensagem', ok: !!selected.MENSAGEM_LIMITE.trim() } : null}
+              pool={usesPool && selected.__meta.partner === 'Plurix' ? { label: poolOffer ? `Oferta em ${previewSendDate.split('-').reverse().slice(0, 2).join('/')}` : 'Sem oferta no dia', ok: true } : null}
+              signatures={selected.__meta.partner === 'Plurix' ? selectedGroupRows.length : null}
+              issues={{ errors: selectedIssues.filter((issue) => issue.severity === 'error').length, warnings: selectedIssues.filter((issue) => issue.severity === 'warning').length }}
+              onOpen={(id) => focusStructureBlock(id)}
+            />
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Blocos do e-mail</span>
               <div className="flex gap-1">
@@ -1097,6 +1123,19 @@ export const DynamicEmailWorkspace: React.FC = () => {
                   <TaxonomySelect label="Semana editorial" value={selected.__meta.weekKey} options={taxonomyOptions.weeks} onChange={(value) => updateGroupMeta({ weekKey: value })}/>
                 </div>
                 <div className="mt-2"><ActivityNameSelect value={selected.__meta.activityNames[0] ?? ''} options={taxonomyOptions.activityNames} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, activityNames: value ? [value] : [] } })}/></div>
+                <DynamicHeaderPanel
+                  supported={usesBriefingHeader}
+                  enabled={isDynamicHeader}
+                  groupRows={selectedGroupRows}
+                  selectedId={selected.__id}
+                  assets={assets}
+                  onToggle={setDynamicHeader}
+                  onLogo={(rowId, url) => setRowField(rowId, 'HEADER_LOGO', url)}
+                  onLogoAll={(url) => selectedGroupRows.forEach((row) => setRowField(row.__id, 'HEADER_LOGO', url))}
+                  onSelectRow={setSelectedId}
+                  onCreateAsset={() => setMode('library')}
+                  onEditTexts={() => focusStructureBlock('header')}
+                />
                 {taxonomyState === 'loading' && <p className="mt-2 text-xs text-slate-500">Carregando opções da tabela activities…</p>}
                 {taxonomyState === 'error' && <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"><span>Não foi possível carregar a taxonomia de activities.</span><button type="button" onClick={() => void refreshTaxonomy()} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-bold"><RefreshCw size={12}/>Tentar novamente</button></div>}
               </CollapsibleBlock>
@@ -1121,12 +1160,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
                     </div>
                     {usesTopoV10 && <p className="mt-2 text-[11px] leading-4 text-slate-500">Template V10: com limite preenchido, a faixa de limite pré-aprovado aparece em todos os e-mails. A data define a oferta do pool no bloco 3{topoPreview?.offer ? `: nessa data o bloco mostra ${topoPreview.offer.productName}, a partir de R$ ${topoPreview.offer.priceText}.` : ': nessa data não há oferta vigente para esta rede, então o bloco não aparece.'}</p>}
                   </div>}
-                  {section.id === 'header' && usesBriefingHeader && <div className="mb-3 space-y-2">
-                    <p className="text-[11px] leading-4 text-slate-500">Header dinâmico (V13): com a linha principal preenchida, o topo vira texto sobre o azul do +amigo, com o cartão à direita. Vale para as 6 redes deste e-mail. Sem a linha principal, o template usa a imagem do HEADER.</p>
-                    <div className="grid gap-3 md:grid-cols-2">{(['HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO'] as BriefingColumn[]).map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)}/>)}</div>
-                  </div>}
+                  {section.id === 'header' && usesBriefingHeader && (isDynamicHeader ? <div className="mb-3 space-y-3">
+                    <p className="flex items-start gap-1.5 rounded-lg bg-cyan-50 px-3 py-2 text-[11px] leading-4 text-cyan-900"><Info size={12} className="mt-px shrink-0"/><span>Header dinâmico ligado: texto sobre o azul do +amigo, com o cartão à direita. Linhas e cartão valem para as 6 redes deste e-mail; o logo é de cada assinatura e fica em <button type="button" onClick={() => focusStructureBlock(AUDIT_SECTION_ID)} className="font-bold underline">Organização e auditoria</button>.</span></p>
+                    <div className="grid gap-3 md:grid-cols-2">{(['HEADER_TITULO', 'HEADER_SUBTITULO'] as BriefingColumn[]).map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)}/>)}</div>
+                    <ImageUrlCard slot={HEADER_CARD_SLOT} imageUrl={selected.HEADER_IMAGEM_CARTAO} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField('HEADER_IMAGEM_CARTAO', value)} onCreateAsset={() => setMode('library')}/>
+                  </div> : <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11px] leading-4 text-slate-600"><Info size={12} className="mt-px shrink-0"/><span>Header por imagem. Para usar o header dinâmico (texto, cartão e logo da rede), ligue a opção em <button type="button" onClick={() => focusStructureBlock(AUDIT_SECTION_ID)} className="font-bold underline">Organização e auditoria</button>.</span></p>)}
                   {section.id === 'header' && usesTopoV10 && <HeaderVariantPicker value={selected.HEADER} variants={headerVariants} notes={topoPreview?.diagnostics ?? []} onChange={(value) => updateField('HEADER', value)} onManage={() => setMode('topo')}/>}
-                  {section.imageSlot && !(section.id === 'header' && ((usesTopoV10 && topoPreview?.header.mode === 'html') || (usesBriefingHeader && selected.HEADER_TITULO.trim()))) && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')} locked={imageLocked}/></div>}
+                  {section.imageSlot && !(section.id === 'header' && ((usesTopoV10 && topoPreview?.header.mode === 'html') || isDynamicHeader)) && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')} locked={imageLocked}/></div>}
                   {section.id === 'closing' && selected.__meta.partner === 'Plurix' && <div className={section.imageSlot ? 'mt-3' : ''}><SignatureMatrix rows={rows} selected={selected} onEnsure={() => setRows((current) => ensurePlurixVariants(current, selected.__id, signatureSettings.filter((item) => item.status === 'inactive').map((item) => item.signatureKey)))} onSelect={setSelectedId} onManage={() => setSignatureManagerOpen(true)}/></div>}
                 </CollapsibleBlock>
                 );
@@ -1980,6 +2020,90 @@ const ExternalReviewWorkspace = ({ runs, suggestions, syncState, onRefresh, onDe
 const DiffValue = ({ label, value, proposed = false }: { label: string; value: unknown; proposed?: boolean }) => <div className={`rounded-lg border p-2 ${proposed ? 'border-emerald-200 bg-emerald-50' : 'border-red-100 bg-red-50/50'}`}><div className="text-[9px] font-bold uppercase text-slate-500">{label}</div><pre className="mt-1 whitespace-pre-wrap break-words font-sans text-xs text-slate-800">{typeof value === 'string' ? value : JSON.stringify(value, null, 2)}</pre></div>;
 const EmptyManagementState = () => <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-xs text-slate-500">A camada existe, mas ainda não recebeu conteúdo governado.</div>;
 
+const ASSET_SLOT_LABELS: Record<string, string> = {
+  header: 'Header (imagem inteira)', header_card: 'Cartão do header dinâmico', header_logo: 'Logo do header dinâmico',
+  banner_1: 'Banner 1', banner_2: 'Banner 2', banner_3: 'Banner de encerramento', signature: 'Assinatura (rodapé da rede)', generic: 'Genérico',
+};
+
+type SummaryItem = { label: string; detail?: string; ok: boolean };
+
+/** Faixa compacta com a configuração do e-mail; cada item abre o bloco correspondente. */
+const EmailConfigSummary = ({ templateName, sfmcKey, header, limit, pool, signatures, issues, onOpen }: {
+  templateName: string; sfmcKey: string; header: SummaryItem; limit: SummaryItem | null; pool: SummaryItem | null;
+  signatures: number | null; issues: { errors: number; warnings: number }; onOpen: (blockId: string) => void;
+}) => {
+  const chip = (key: string, title: string, item: SummaryItem, blockId: string) => <button key={key} type="button" onClick={() => onOpen(blockId)} className={`flex min-w-0 flex-col items-start rounded-lg border px-2.5 py-1.5 text-left outline-none transition hover:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-500 ${item.ok ? 'border-slate-200 bg-white' : 'border-amber-200 bg-amber-50'}`}>
+    <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{title}</span>
+    <span className={`max-w-full truncate text-xs font-bold ${item.ok ? 'text-slate-800' : 'text-amber-900'}`}>{item.label}{item.detail ? <span className="font-semibold text-slate-500"> · {item.detail}</span> : null}</span>
+  </button>;
+  return <section aria-label="Resumo da configuração do e-mail" className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+      <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Resumo do e-mail</span>
+      <span className="min-w-0 truncate text-[11px] text-slate-500" title={templateName}>{templateName}</span>
+    </div>
+    <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
+      {chip('key', 'Chave no SFMC', { label: sfmcKey, ok: !sfmcKey.includes('?') }, 'identity')}
+      {chip('header', 'Header', header, 'header')}
+      {limit && chip('limit', 'Faixa de limite', limit, 'limit')}
+      {pool && chip('pool', 'Bloco 3 · pool', pool, 'pool')}
+      {signatures != null && chip('signatures', 'Assinaturas', { label: `${signatures} ${signatures === 1 ? 'versão' : 'versões'}`, ok: signatures > 0 }, 'closing')}
+      {chip('issues', 'Pendências', { label: issues.errors ? `${issues.errors} ${issues.errors === 1 ? 'erro' : 'erros'}` : 'Sem erro', detail: issues.warnings ? `${issues.warnings} ${issues.warnings === 1 ? 'aviso' : 'avisos'}` : undefined, ok: !issues.errors }, 'organizacao')}
+    </div>
+  </section>;
+};
+
+/** Chave "Header dinâmico" e logo de cada assinatura (entra no header, abaixo das linhas de texto). */
+const DynamicHeaderPanel = ({ supported, enabled, groupRows, selectedId, assets, onToggle, onLogo, onLogoAll, onSelectRow, onCreateAsset, onEditTexts }: {
+  supported: boolean; enabled: boolean; groupRows: WorkspaceBriefing[]; selectedId: string; assets: EmailAsset[];
+  onToggle: (enabled: boolean) => void; onLogo: (rowId: string, url: string) => void; onLogoAll: (url: string) => void;
+  onSelectRow: (id: string) => void; onCreateAsset: () => void; onEditTexts: () => void;
+}) => {
+  const [picking, setPicking] = useState<WorkspaceBriefing | null>(null);
+  const missing = groupRows.filter((row) => !row.HEADER_LOGO.trim()).length;
+  const label = (row: WorkspaceBriefing) => row.__meta.subgroup || PLURIX_SIGNATURES.find(({ key }) => key === row.NM_PRODUTO_INTERNO.toUpperCase())?.label || row.NM_PRODUTO_INTERNO || 'Versão';
+  return <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-slate-800">Header dinâmico</p>
+        <p className="text-[11px] leading-4 text-slate-500">{supported ? 'Texto sobre o azul do +amigo, cartão à direita e logo da rede de cada assinatura.' : 'Disponível a partir do template PLURIX V13. Troque o template deste e-mail para usar.'}</p>
+      </div>
+      <div role="radiogroup" aria-label="Header dinâmico" className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+        {([['Não', false], ['Sim', true]] as const).map(([text, value]) => <button key={text} type="button" role="radio" aria-checked={enabled === value} disabled={!supported} onClick={() => enabled !== value && onToggle(value)} className={`rounded-md px-3 py-1 text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50 ${enabled === value ? 'bg-white text-cyan-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{text}</button>)}
+      </div>
+    </div>
+    {enabled && <div className="mt-3 space-y-2">
+      <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px] leading-4 ${missing ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'}`}>
+        <span>{missing ? <><b>Conecte o logo de cada assinatura.</b> Faltam {missing} de {groupRows.length}; sem logo, o header sai só com o texto e o cartão.</> : <>Todas as {groupRows.length} assinaturas têm logo no header.</>}</span>
+        <button type="button" onClick={onEditTexts} className="font-bold underline">Editar textos e cartão</button>
+      </div>
+      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+        {groupRows.map((row) => <li key={row.__id} className={`flex items-center gap-3 px-3 py-2 ${row.__id === selectedId ? 'bg-cyan-50/60' : ''}`}>
+          <div className="grid h-9 w-20 shrink-0 place-items-center overflow-hidden rounded-md bg-[#4A5BA6]">{row.HEADER_LOGO.trim() && isPublicImageUrl(row.HEADER_LOGO) ? <img src={row.HEADER_LOGO} alt="" className="max-h-7 max-w-[72px] object-contain"/> : <span className="text-[9px] font-bold uppercase text-white/70">sem logo</span>}</div>
+          <button type="button" onClick={() => onSelectRow(row.__id)} className="min-w-0 flex-1 truncate text-left text-xs font-bold text-slate-800 hover:text-cyan-800">{label(row)}</button>
+          {row.HEADER_LOGO.trim() ? <CheckCircle2 size={14} className="shrink-0 text-emerald-500"/> : <AlertTriangle size={14} className="shrink-0 text-amber-500"/>}
+          <button type="button" onClick={() => setPicking(row)} className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan-300 bg-cyan-50 px-2 py-1 text-[11px] font-bold text-cyan-900 hover:bg-cyan-100"><Images size={12}/>{row.HEADER_LOGO.trim() ? 'Trocar' : 'Escolher'}</button>
+        </li>)}
+      </ul>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+        <span>O logo de cada rede vem da biblioteca de ativos (tipo “Logo do header dinâmico”).</span>
+        <span className="flex gap-2">
+          {groupRows.some((row) => row.HEADER_LOGO.trim()) && groupRows.some((row) => !row.HEADER_LOGO.trim()) && <button type="button" onClick={() => onLogoAll(groupRows.find((row) => row.HEADER_LOGO.trim())!.HEADER_LOGO)} className="font-bold text-cyan-800 underline">Usar o mesmo logo nas que faltam</button>}
+          <button type="button" onClick={onCreateAsset} className="font-bold text-cyan-800 underline">Cadastrar logo</button>
+        </span>
+      </div>
+    </div>}
+    {picking && <AssetPickerModal
+      assets={assets}
+      slot={{ ...HEADER_LOGO_SLOT, label: `Logo do header · ${label(picking)}` }}
+      selectedUrl={picking.HEADER_LOGO}
+      contextProduct={picking.NM_PRODUTO_INTERNO}
+      contextPartner={picking.__meta.partner}
+      onClose={() => setPicking(null)}
+      onSelect={(asset) => { onLogo(picking.__id, asset.externalUrl); setPicking(null); }}
+    />}
+  </div>;
+};
+
 const SignatureMatrix = ({ rows, selected, onEnsure, onSelect, onManage }: { rows: WorkspaceBriefing[]; selected: WorkspaceBriefing; onEnsure: () => void; onSelect: (id: string) => void; onManage: () => void }) => {
   const group = rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId);
   const isPlurix = group.some((row) => PLURIX_SIGNATURES.some(({ key }) => key === row.NM_PRODUTO_INTERNO.toUpperCase()));
@@ -2028,7 +2152,7 @@ const AssetLibrary = ({ assets, setAssets, taxonomy }: { assets: EmailAsset[]; s
   });
   const clearFilters = () => { setFilterQuery(''); setFilterSlot(''); setFilterPartner(''); setFilterSubgroup(''); };
   const persist = async () => { if (!draft.name || !isPublicImageUrl(draft.externalUrl)) { setMessage('Informe um nome e uma URL pública HTTPS do Salesforce.'); return; } try { const saved = await saveAsset(draft); setAssets((current) => [saved, ...current.filter((item) => item.id !== saved.id)]); setDraft({ id: crypto.randomUUID(), name: '', externalUrl: '', slot: 'generic', tags: [], status: 'ready', version: 1 }); setMessage('Ativo salvo. Nenhuma imagem foi enviada ao Supabase.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Falha ao salvar ativo.'); } };
-  return <main className="pt-4"><div className="grid gap-4 xl:grid-cols-[380px_1fr]"><section id="asset-library-form" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-bold text-slate-900">Cadastrar URL do Salesforce</h2><p className="mt-1 text-sm text-slate-500">A biblioteca guarda só a referência e os metadados; o arquivo continua no Content Builder.</p><div className="mt-4 space-y-3"><MetaField label="Nome do ativo" value={draft.name} list="none" onChange={(name) => setDraft({ ...draft, name })}/><MetaField label="URL pública da imagem" value={draft.externalUrl} list="none" onChange={(externalUrl) => setDraft({ ...draft, externalUrl })}/><MetaField label="Link ao clicar (opcional)" value={draft.clickUrl ?? ''} list="none" onChange={(clickUrl) => setDraft({ ...draft, clickUrl })}/><label className="block text-xs font-semibold text-slate-700">Posição<select value={draft.slot} onChange={(event) => setDraft({ ...draft, slot: event.target.value as EmailAsset['slot'] })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">{['header','banner_1','banner_2','banner_3','signature','generic'].map((slot) => <option key={slot}>{slot}</option>)}</select></label><div className="grid grid-cols-2 gap-2"><LibrarySelect label="Parceiro" value={draft.partner ?? ''} placeholder="Selecione…" options={partnerOptions} onChange={(partner) => setDraft({ ...draft, partner })}/><LibrarySelect label="Subgrupo" value={draft.subgroup ?? ''} placeholder="Selecione…" options={subgroupOptions} onChange={(subgroup) => setDraft({ ...draft, subgroup })}/></div>{draft.externalUrl && isPublicImageUrl(draft.externalUrl) && <img src={draft.externalUrl} alt="Prévia do novo ativo" className="max-h-44 w-full rounded-lg bg-slate-100 object-contain"/>}<button onClick={persist} className="w-full rounded-lg bg-cyan-700 px-4 py-3 text-sm font-bold text-white"><Save className="mr-2 inline" size={15}/>Salvar na biblioteca</button>{message && <p className="text-xs text-slate-600">{message}</p>}</div></section><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Ativos disponíveis</h2><p className="text-sm text-slate-500">{filteredAssets.length} de {assets.length} referências</p></div><Images className="text-cyan-700"/></div><div className="sticky top-2 z-10 mt-4 grid gap-2 rounded-xl border border-slate-200 bg-slate-50/95 p-3 shadow-sm backdrop-blur md:grid-cols-[minmax(180px,1fr)_repeat(3,minmax(130px,0.55fr))_auto]"><label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3"><Search size={15} className="text-slate-400"/><span className="sr-only">Buscar ativos</span><input value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} placeholder="Buscar nome, bandeira ou tag…" className="h-10 min-w-0 flex-1 text-sm outline-none"/></label><LibrarySelect label="" value={filterSlot} placeholder="Todas as posições" options={['header','banner_1','banner_2','banner_3','signature','generic']} onChange={setFilterSlot}/><LibrarySelect label="" value={filterPartner} placeholder="Todos os parceiros" options={partnerOptions} onChange={setFilterPartner}/><LibrarySelect label="" value={filterSubgroup} placeholder="Todos os subgrupos" options={subgroupOptions} onChange={setFilterSubgroup}/><button type="button" onClick={clearFilters} className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Limpar</button></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filteredAssets.map((asset) => <article key={asset.id} className="overflow-hidden rounded-xl border border-slate-200"><div className="grid h-36 place-items-center bg-slate-100"><img src={asset.externalUrl} alt={asset.altText || asset.name} className="max-h-36 w-full object-contain"/></div><div className="p-3"><div className="font-bold text-slate-800">{asset.name}</div><div className="mt-1 text-xs text-slate-500">{asset.slot} · {partnerLabel(asset.partner ?? '')}{asset.subgroup ? ` · ${asset.subgroup}` : ''}</div><button onClick={() => navigator.clipboard.writeText(asset.externalUrl)} className="mt-2 text-xs font-bold text-cyan-700">Copiar URL</button></div></article>)}</div>{filteredAssets.length === 0 && <div className="py-16 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={28}/><b className="text-slate-700">Nenhum ativo neste recorte</b><p className="mt-1 text-xs">Limpe um filtro ou ajuste a busca.</p></div>}</section></div></main>;
+  return <main className="pt-4"><div className="grid gap-4 xl:grid-cols-[380px_1fr]"><section id="asset-library-form" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-bold text-slate-900">Cadastrar URL do Salesforce</h2><p className="mt-1 text-sm text-slate-500">A biblioteca guarda só a referência e os metadados; o arquivo continua no Content Builder.</p><div className="mt-4 space-y-3"><MetaField label="Nome do ativo" value={draft.name} list="none" onChange={(name) => setDraft({ ...draft, name })}/><MetaField label="URL pública da imagem" value={draft.externalUrl} list="none" onChange={(externalUrl) => setDraft({ ...draft, externalUrl })}/><MetaField label="Link ao clicar (opcional)" value={draft.clickUrl ?? ''} list="none" onChange={(clickUrl) => setDraft({ ...draft, clickUrl })}/><label className="block text-xs font-semibold text-slate-700">Posição<select value={draft.slot} onChange={(event) => setDraft({ ...draft, slot: event.target.value as EmailAsset['slot'] })} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">{['header','header_card','header_logo','banner_1','banner_2','banner_3','signature','generic'].map((slot) => <option key={slot} value={slot}>{ASSET_SLOT_LABELS[slot] ?? slot}</option>)}</select></label><div className="grid grid-cols-2 gap-2"><LibrarySelect label="Parceiro" value={draft.partner ?? ''} placeholder="Selecione…" options={partnerOptions} onChange={(partner) => setDraft({ ...draft, partner })}/><LibrarySelect label="Subgrupo" value={draft.subgroup ?? ''} placeholder="Selecione…" options={subgroupOptions} onChange={(subgroup) => setDraft({ ...draft, subgroup })}/></div>{draft.externalUrl && isPublicImageUrl(draft.externalUrl) && <img src={draft.externalUrl} alt="Prévia do novo ativo" className="max-h-44 w-full rounded-lg bg-slate-100 object-contain"/>}<button onClick={persist} className="w-full rounded-lg bg-cyan-700 px-4 py-3 text-sm font-bold text-white"><Save className="mr-2 inline" size={15}/>Salvar na biblioteca</button>{message && <p className="text-xs text-slate-600">{message}</p>}</div></section><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-bold text-slate-900">Ativos disponíveis</h2><p className="text-sm text-slate-500">{filteredAssets.length} de {assets.length} referências</p></div><Images className="text-cyan-700"/></div><div className="sticky top-2 z-10 mt-4 grid gap-2 rounded-xl border border-slate-200 bg-slate-50/95 p-3 shadow-sm backdrop-blur md:grid-cols-[minmax(180px,1fr)_repeat(3,minmax(130px,0.55fr))_auto]"><label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3"><Search size={15} className="text-slate-400"/><span className="sr-only">Buscar ativos</span><input value={filterQuery} onChange={(event) => setFilterQuery(event.target.value)} placeholder="Buscar nome, bandeira ou tag…" className="h-10 min-w-0 flex-1 text-sm outline-none"/></label><LibrarySelect label="" value={filterSlot} placeholder="Todas as posições" options={['header','header_card','header_logo','banner_1','banner_2','banner_3','signature','generic']} onChange={setFilterSlot}/><LibrarySelect label="" value={filterPartner} placeholder="Todos os parceiros" options={partnerOptions} onChange={setFilterPartner}/><LibrarySelect label="" value={filterSubgroup} placeholder="Todos os subgrupos" options={subgroupOptions} onChange={setFilterSubgroup}/><button type="button" onClick={clearFilters} className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 hover:border-cyan-300 hover:text-cyan-800">Limpar</button></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filteredAssets.map((asset) => <article key={asset.id} className="overflow-hidden rounded-xl border border-slate-200"><div className="grid h-36 place-items-center bg-slate-100"><img src={asset.externalUrl} alt={asset.altText || asset.name} className="max-h-36 w-full object-contain"/></div><div className="p-3"><div className="font-bold text-slate-800">{asset.name}</div><div className="mt-1 text-xs text-slate-500">{asset.slot} · {partnerLabel(asset.partner ?? '')}{asset.subgroup ? ` · ${asset.subgroup}` : ''}</div><button onClick={() => navigator.clipboard.writeText(asset.externalUrl)} className="mt-2 text-xs font-bold text-cyan-700">Copiar URL</button></div></article>)}</div>{filteredAssets.length === 0 && <div className="py-16 text-center text-sm text-slate-500"><Search className="mx-auto mb-2 text-slate-300" size={28}/><b className="text-slate-700">Nenhum ativo neste recorte</b><p className="mt-1 text-xs">Limpe um filtro ou ajuste a busca.</p></div>}</section></div></main>;
 };
 
 const LibrarySelect = ({ label, value, placeholder, options, onChange }: { label: string; value: string; placeholder: string; options: string[]; onChange: (value: string) => void }) => <label className="block text-xs font-semibold text-slate-700">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"><option value="">{placeholder}</option>{options.map((option) => <option key={option} value={option}>{option === 'N/A' ? 'Parceiro não informado (N/A)' : option}</option>)}</select></label>;
@@ -2061,7 +2185,7 @@ const ImageUrlCard = ({ slot, imageUrl, destinationUrl, assets = [], contextProd
   </div>;
 };
 
-const assetSlotFor = (slot: ImageSlot): EmailAsset['slot'] => slot.image === 'HEADER' ? 'header' : slot.image === 'BANNER_1_CORPO' ? 'banner_1' : slot.image === 'BANNER_2_CORPO' ? 'banner_2' : 'banner_3';
+const assetSlotFor = (slot: ImageSlot): EmailAsset['slot'] => slot.image === 'HEADER' ? 'header' : slot.image === 'HEADER_IMAGEM_CARTAO' ? 'header_card' : slot.image === 'HEADER_LOGO' ? 'header_logo' : slot.image === 'BANNER_1_CORPO' ? 'banner_1' : slot.image === 'BANNER_2_CORPO' ? 'banner_2' : 'banner_3';
 
 const AssetPickerModal = ({ assets, slot, selectedUrl, contextProduct, contextPartner, onClose, onSelect }: { assets: EmailAsset[]; slot: ImageSlot; selectedUrl: string; contextProduct: string; contextPartner: string; onClose: () => void; onSelect: (asset: EmailAsset) => void }) => {
   const [query, setQuery] = useState('');
@@ -2069,7 +2193,7 @@ const AssetPickerModal = ({ assets, slot, selectedUrl, contextProduct, contextPa
   const targetSlot = assetSlotFor(slot);
   const context = `${contextProduct} ${contextPartner}`.toUpperCase();
   const contextual = (asset: EmailAsset) => !!asset.product && context.includes(asset.product.toUpperCase());
-  const matching = assets.filter((asset) => asset.slot === targetSlot || asset.slot === 'generic' || (targetSlot === 'banner_3' && asset.slot === 'signature')).sort((a, b) => Number(contextual(b)) - Number(contextual(a)));
+  const matching = assets.filter((asset) => asset.slot === targetSlot || asset.slot === 'generic' || (targetSlot === 'banner_3' && asset.slot === 'signature') || (targetSlot === 'header_card' && asset.slot === 'header')).sort((a, b) => Number(contextual(b)) - Number(contextual(a)));
   const source = scope === 'recommended' && matching.length ? matching : assets;
   const filtered = source.filter((asset) => [asset.name, asset.partner, asset.product, asset.subgroup, ...asset.tags].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-label={`Selecionar ${slot.label}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"><header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5"><div><h2 className="text-lg font-bold text-slate-900">Escolher {slot.label.toLowerCase()}</h2><p className="text-sm text-slate-500">Ativos aprovados; a URL continua hospedada fora do Supabase.</p></div><button onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Fechar biblioteca"><X size={20}/></button></header><div className="flex flex-wrap gap-2 border-b border-slate-200 bg-slate-50 p-4"><label className="flex min-w-64 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3"><Search size={15} className="text-slate-400"/><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar bandeira, campanha ou nome…" className="h-10 min-w-0 flex-1 text-sm outline-none"/></label><div className="flex rounded-lg border border-slate-200 bg-white p-1">{([['recommended','Recomendados'],['all','Todos']] as const).map(([value, label]) => <button key={value} onClick={() => setScope(value)} className={`rounded-md px-3 py-2 text-xs font-bold ${scope === value ? 'bg-cyan-100 text-cyan-800' : 'text-slate-500'}`}>{label}</button>)}</div></div><div className="overflow-y-auto p-4"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filtered.map((asset) => <button key={asset.id} onClick={() => onSelect(asset)} className={`overflow-hidden rounded-xl border bg-white text-left outline-none transition hover:-translate-y-0.5 hover:border-cyan-400 hover:shadow-md focus-visible:ring-2 focus-visible:ring-cyan-500 ${selectedUrl === asset.externalUrl ? 'border-cyan-500 ring-2 ring-cyan-100' : 'border-slate-200'}`}><div className="relative grid h-44 place-items-center bg-slate-100 p-2"><img src={asset.externalUrl} alt={asset.altText || asset.name} className="max-h-40 w-full object-contain"/><span className="absolute left-2 top-2 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white">Aprovado</span>{asset.slot === targetSlot && <span className="absolute right-2 top-2 rounded-full bg-cyan-700 px-2 py-1 text-[10px] font-bold text-white">Recomendado</span>}</div><div className="p-3"><div className="truncate text-sm font-bold text-slate-900">{asset.name}</div><div className="mt-1 text-xs text-slate-500">{asset.product || asset.partner || 'Uso geral'} · {asset.width && asset.height ? `${asset.width} × ${asset.height}px` : asset.slot}</div><div className="mt-2 flex flex-wrap gap-1">{asset.tags.slice(0, 3).map((tag) => <span key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{tag}</span>)}</div></div></button>)}</div>{filtered.length === 0 && <div className="py-16 text-center text-sm text-slate-500"><ImageIcon className="mx-auto mb-2 text-slate-300" size={28}/>Nenhum ativo encontrado neste filtro.</div>}</div></div></div>;

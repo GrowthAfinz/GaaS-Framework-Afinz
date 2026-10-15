@@ -135,6 +135,7 @@ export function validateRows(rows: BriefingRow[], today = new Date()): Map<strin
     const headerSubtitle = (row.HEADER_SUBTITULO ?? '').trim();
     if (headerTitle.length > HEADER_TITLE_LIMIT) issues.push({ severity: 'warning', code: 'header-title-length', field: 'HEADER_TITULO', message: `A linha principal do header tem ${headerTitle.length} caracteres; o ideal é até ${HEADER_TITLE_LIMIT} para não quebrar em três linhas.` });
     if (headerSubtitle.length > HEADER_SUBTITLE_LIMIT) issues.push({ severity: 'warning', code: 'header-subtitle-length', field: 'HEADER_SUBTITULO', message: `A linha secundária do header tem ${headerSubtitle.length} caracteres; o ideal é até ${HEADER_SUBTITLE_LIMIT}.` });
+    if (headerTitle && !(row.HEADER_LOGO ?? '').trim()) issues.push({ severity: 'warning', code: 'header-logo-missing', field: 'HEADER_LOGO', message: `Header dinâmico ligado, mas a assinatura ${row.NM_PRODUTO_INTERNO || 'desta versão'} está sem logo no header. Conecte a imagem da rede em Organização e auditoria.` });
     if (!headerTitle && (headerSubtitle || (row.HEADER_IMAGEM_CARTAO ?? '').trim())) issues.push({ severity: 'warning', code: 'header-title-missing', field: 'HEADER_TITULO', message: 'Sem a linha principal, o header dinâmico não aparece (o template usa o HEADER como imagem).' });
     (['HEADER', 'BANNER_1_CORPO', 'BANNER_2_CORPO', 'BANNER_3_CORPO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO'] as BriefingColumn[]).forEach((field) => {
       const value = (row[field] ?? "").trim();

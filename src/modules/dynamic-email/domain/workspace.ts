@@ -37,7 +37,7 @@ export type EmailAsset = {
   name: string;
   externalUrl: string;
   clickUrl?: string;
-  slot: 'header' | 'banner_1' | 'banner_2' | 'banner_3' | 'signature' | 'generic';
+  slot: 'header' | 'header_card' | 'header_logo' | 'banner_1' | 'banner_2' | 'banner_3' | 'signature' | 'generic';
   bu?: string;
   partner?: string;
   segment?: string;
@@ -181,13 +181,14 @@ export const sharedFields: BriefingColumn[] = [
   'NOTA_LEGAL', 'COR_NOTA_LEGAL', 'TAMANHO_DA_FONTE_NOTA_LEGAL',
   // Uma mensagem por e-mail, igual nas seis redes daquele toque.
   'MENSAGEM_LIMITE',
-  // Header dinâmico do V13: o mesmo nas seis redes do e-mail.
-  'HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO',
+  // Header dinâmico do V13: textos e cartão iguais nas seis redes; o logo é de cada assinatura.
+  'HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO',
 ];
 
 export const signatureFields: BriefingColumn[] = [
   'NM_PRODUTO_INTERNO', 'HEADER', 'LINK_CTA_1', 'LINK_CTA_2', 'BANNER_1_CORPO',
   'LINK_BANNER_1_CORPO', 'LINK_BANNER_2_CORPO', 'BANNER_3_CORPO', 'LINK_BANNER_3_CORPO', 'RODAPE', 'UTM_CAMPANHA',
+  'HEADER_LOGO',
 ];
 
 export const partnerLabel = (value: string) => value === 'N/A'
