@@ -77,10 +77,20 @@ export interface CartAudience {
     conflict?: string;
 }
 
+// Business-owner confirmations on 2026-10-15 override ambiguous activity names.
+// Prefix aliases share the same key; do not broaden these rules to other journeys.
+const CONFIRMED_CART_AUDIENCES: Record<string, string> = {
+    jor_aquisicao_plurix_carrinho_sabado_pad_26: 'Abandonados D-7',
+    jor_aquisicao_plurix_na_abd_carrinho21d_set_26: 'Abandonados D-21 A D>7',
+    jor_aquisicao_b2c_propri_abd_meio_de_funil_padrao_na_abri26: 'Abandonados D-21 A D>7',
+};
+
 /** Audience age is independent of dispatch offsets (d0/d2/d7) and cadence. */
 export const inferCartAudience = (journey: unknown, activityName: unknown, historicalSubgroup?: string): CartAudience => {
     const j = normalizeJourneyKey(journey);
     const a = normalizeJourneyKey(activityName);
+    const confirmedAudience = CONFIRMED_CART_AUDIENCES[acquisitionJourneyIdentity(j)];
+    if (confirmedAudience) return { subgrupo: confirmedAudience };
     const text = `${j} ${a}`;
     const cartJourney = /carrinho|abandonad|(?:^|_)(?:abd|abn)(?:_|$)/.test(j);
     // The first CAR token in afz_car_vis is the card PRODUCT, not the audience.

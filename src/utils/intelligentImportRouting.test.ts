@@ -60,7 +60,7 @@ describe('acquisition audience contract', () => {
     });
     it.each([
         ['JOR_AQS_PLURIX_21D_ABD', 'plu_car_vis_aqs_wpp_car_21d1copa_diario', 'Abandonados D-21 A D>7'],
-        ['JOR_AQS_PLURIX_CARRINHO_SABADO_PAD_26', 'plu_car_plx_aqs_wpp_car_sabadoplurix21diasd7_20260926', 'Abandonados D-21 A D>7'],
+        ['JOR_AQS_PLURIX_CARRINHO_SABADO_PAD_26', 'plu_car_plx_aqs_wpp_car_sabadoplurix21diasd7_20260926', 'Abandonados D-7'],
         ['JOR_AQS_B2C_NA_ABD', 'afz_car_vis_aqs_wpp_car_disparo1sabado_20260307', 'Abandonados D-7'],
         ['JOR_AQS_PLURIX_CARRINHO', 'afz_car_vis_aqs_wpp_car_d7institucional_diario', 'Diario'],
     ])('resolves audience independently of cadence: %s / %s', (j, a, subgrupo) => {
@@ -82,5 +82,16 @@ describe('acquisition audience contract', () => {
     it('does not interpret the card product token as an abandoned audience', () => {
         expect(inferCartAudience('JOR_AQS_PLURIX_NA_ANC_MEIO_DE_FUNIL', 'plu_car_plx_aqs_wpp_anc_disp1_diario')).toEqual({});
         expect(inferCartAudience('JOR_AQS_B2C_NA_NGD_MEIO_DE_FUNIL', 'afz_car_vis_aqs_sms_ngd_disp1_diario')).toEqual({});
+    });
+    it.each(['JOR_AQS', 'JOR_AQUISICAO'])('uses owner-confirmed journey windows for %s', (prefix) => {
+        expect(inferCartAudience(`${prefix}_PLURIX_CARRINHO_SABADO_PAD_26`,
+            'plu_car_plx_aqs_wpp_car_sabadoplurix21diasd7_20260926', 'Abandonados D-21 A D>7'))
+            .toEqual({ subgrupo: 'Abandonados D-7' });
+        expect(inferCartAudience(`${prefix}_B2C_PROPRI_ABD_MEIO_DE_FUNIL_PADRAO_NA_ABRI26`,
+            'afz_car_vis_aqs_wpp_car_disparo1sabado(apiserasa)_20260406'))
+            .toEqual({ subgrupo: 'Abandonados D-21 A D>7' });
+        expect(inferCartAudience(`${prefix}_PLURIX_NA_ABD_CARRINHO21D_SET_26`,
+            'plu_car_plx_aqs_wpp_car_carrinho21dplurix_20260924'))
+            .toEqual({ subgrupo: 'Abandonados D-21 A D>7' });
     });
 });

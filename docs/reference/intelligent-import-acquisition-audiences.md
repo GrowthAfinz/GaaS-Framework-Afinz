@@ -20,7 +20,10 @@ modalidades de produto ou elegibilidade sem fonte governada.
 
 ## Precedência e preservação
 
-- Janela explícita 21D/21DIAS vence cadência `diario` e nome genérico sábado.
+- Confirmação do responsável pela operação para uma jornada exata vence a inferência
+  pelo nome da activity. As grafias JOR_AQS e JOR_AQUISICAO são equivalentes.
+- Na ausência de confirmação específica, janela explícita 21D/21DIAS vence cadência
+  `diario` e nome genérico sábado.
 - 7D e 21D explícitos simultâneos bloqueiam o candidato para revisão.
 - D0/D2/D7/D21 da sequência não indicam idade do público.
 - Sábado/fim de semana segue a convenção 7D, mas não sobrescreve um histórico
@@ -51,7 +54,7 @@ Projeto `mipiwxadnpwtcgfcedym`; execução auditável
   aprovados 13, cartões 7. São métricas atribuídas pelo contrato do importador.
 - Os 122 registros existentes preservaram UUID, métricas e todos os campos fora
   de Subgrupos/Etapa/updated_at, com assertiva por linha na mesma transação.
-- Um caso B2C de 06/04/2026 ficou em revisão: activity
+- Na execução inicial, um caso B2C de 06/04/2026 ficou em revisão: activity
   `afz_car_vis_aqs_wpp_car_disparo1sabado(apiserasa)_20260406`, histórico 21D e
   apenas sinal de sábado no nome. O valor anterior foi preservado.
 
@@ -68,3 +71,22 @@ preservação dos campos não alterados. O CSV (61) foi reprocessado sem gravaç
 após a correção, os cinco disparos novos são reconhecidos como duplicados,
 mantendo os mesmos UUIDs. Isso não certifica completude de todo o CSV nem substitui
 a revisão dos avisos gerais de performance sem âncora.
+
+## Confirmação posterior do responsável — 15/10/2026
+
+A confirmação direta do usuário substitui a inferência inicial nestas jornadas:
+
+| Jornada (prefixos AQS/AQUISICAO equivalentes) | Janela confirmada |
+|---|---|
+| JOR_AQS_PLURIX_CARRINHO_SABADO_PAD_26 | 7D: Abandonados D-7 |
+| JOR_AQS_PLURIX_NA_ABD_CARRINHO21D_SET_26 | >7 até 21D: Abandonados D-21 A D>7 |
+| JOR_AQUISICAO_B2C_PROPRI_ABD_MEIO_DE_FUNIL_PADRAO_NA_ABRI26 | >7 até 21D: Abandonados D-21 A D>7 |
+
+A primeira jornada é 7D mesmo quando a activity contém `21dias`. Essa exceção é
+restrita à jornada exata e não muda as outras famílias de sábado ou 21D.
+
+Execução `caecd1b0-b2c6-462b-8b06-b1f797c3a1dc`: cinco subgrupos Plurix corrigidos
+para 7D, zero inserts em activities e demais campos preservados. O caso B2C foi
+confirmado sem alteração do registro; a revisão inicial foi encerrada. Não há
+pendências nessas duas execuções. Os before/after e as confirmações estão no
+histórico do importador. A classificação 21D da jornada SET_26 foi preservada.

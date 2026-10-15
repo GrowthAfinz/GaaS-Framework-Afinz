@@ -85,4 +85,18 @@ describe('intelligent importer cart audience and BI aliases', () => {
         explicit.splice(10, 5, '0', '0', '0', '0', '0');
         expect(processDinamicaBI([header, explicit], []).candidates[0].finalized).toBe(0);
     });
+    it('refreshes Plurix Saturday to confirmed 7D and accepts the confirmed B2C 21D audience', () => {
+        const j = 'JOR_AQS_PLURIX_CARRINHO_SABADO_PAD_26';
+        const name = 'plu_car_plx_aqs_wpp_car_sabadoplurix21diasd7_20260926';
+        const old = historical(j, name); old.subgrupo = 'Abandonados D-21 A D>7';
+        old.raw!.Subgrupos = old.subgrupo;
+        const c = processDinamicaBI([header, row(j, name)], [old]).candidates[0];
+        expect(c).toMatchObject({ status: 'ready', subgrupo: 'Abandonados D-7', canonicalDimensionRefresh: true });
+        expect(c.canonicalDimensionFields).toContain('subgrupo');
+        const b2c = 'JOR_AQUISICAO_B2C_PROPRI_ABD_MEIO_DE_FUNIL_PADRAO_NA_ABRI26';
+        const b2cName = 'afz_car_vis_aqs_wpp_car_disparo1sabado(apiserasa)_20260406';
+        const b = processDinamicaBI([header, row(b2c, b2cName)], []).candidates[0];
+        expect(b.subgrupo).toBe('Abandonados D-21 A D>7');
+        expect(b.status).not.toBe('conflict');
+    });
 });
