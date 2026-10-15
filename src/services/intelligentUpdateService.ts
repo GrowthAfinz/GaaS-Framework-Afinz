@@ -203,7 +203,7 @@ const cacFromCusto = (
 ): number | null => {
     if (custoTotalCampanha == null || !Number.isFinite(custoTotalCampanha)) return null;
     if (cartoes == null || !Number.isFinite(cartoes) || cartoes <= 0) return null;
-    return Number(calcularCACPrevisto(custoTotalCampanha, cartoes).toFixed(2));
+    return calcularCACPrevisto(custoTotalCampanha, cartoes);
 };
 
 export const numericPatch = (candidate: IntelligentUpdateCandidatePayload): Record<string, number | string | null> => {
@@ -236,26 +236,9 @@ export const numericPatch = (candidate: IntelligentUpdateCandidatePayload): Reco
     // (BI renomeou no SFMC). Aplicado apenas em candidatos aceitos pelo humano.
     if (candidate.journey && (!candidate.metricRefresh || candidate.canonicalDimensionRefresh)) patch['jornada'] = candidate.journey;
 
-    // Recalcula o custo sempre que a base acionável entra no patch — custo é determinístico
-    // a partir de base × tarifa do canal, então precisa acompanhar a base.
-    const custo = candidate.delivered !== undefined
-        ? custoPatch(candidate.channel, candidate.delivered, candidate.date)
-        : {};
-
-    // Recalcula o CAC quando custo e cartões estão ambos determinados neste patch
-    // (custo acompanha a base; cartões vêm em `finalized`). Só grava quando os dois
-    // são conhecidos aqui — evita sobrescrever com valor parcial em refresh isolado.
-    const cacUpdate: Record<string, number | null> = {};
-    if ('Custo Total Campanha' in custo && candidate.finalized !== undefined) {
-        cacUpdate['CAC'] = cacFromCusto(custo['Custo Total Campanha'], candidate.finalized);
-    }
-
-    return {
-        ...patch,
-        ...custo,
-        ...cacUpdate,
-        updated_at: new Date().toISOString(),
-    };
+    // O RPC calcula custos e CAC com a linha completa, incluindo tarifa e incentivo
+    // históricos. Um patch parcial do arquivo não pode zerar esses componentes.
+    return { ...patch, updated_at: new Date().toISOString() };
 };
 
 export const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
@@ -442,7 +425,7 @@ const applyConfirmedActivityChanges = async (
 
         chunk.forEach((row) => {
             if (!appliedByKey.has(row.__candidateKey)) {
-                appliedByKey.set(row.__candidateKey, { id: row.id, table: targetTable });
+                throw new Error(`Atualizacao nao confirmada pelo banco: ${row.id}`);
             }
         });
 

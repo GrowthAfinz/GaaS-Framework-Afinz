@@ -90,3 +90,38 @@ para 7D, zero inserts em activities e demais campos preservados. O caso B2C foi
 confirmado sem alteração do registro; a revisão inicial foi encerrada. Não há
 pendências nessas duas execuções. Os before/after e as confirmações estão no
 histórico do importador. A classificação 21D da jornada SET_26 foi preservada.
+
+## Custos e CAC — correção em 15/10/2026
+
+O RPC de atualização ignorava os campos financeiros enviados pelo cliente. Agora deriva
+custo e CAC usando a linha existente e as métricas recebidas, inclusive em arquivos
+parciais. Preserva tarifas positivas registradas e custos positivos de campanha quando
+a base entregue não mudou. Quando a base muda, preserva o componente de incentivo
+já observado; incentivo sem evidência permanece desconhecido. Não aplica custo de
+oferta por toda a base usando uma taxa histórica por cartão.
+
+Tarifas ausentes usam somente o contrato canônico conhecido de 2025/2026 em
+frameworkFields.ts. Canal/data não cobertos não recebem preço inventado. O cliente
+deixa a atualização financeira ao RPC. Inserts continuam calculando canal × entregues;
+o trigger activities_derive_cac garante divisão numeric no banco para todos os escritores.
+CAC é NULL quando custo ou denominador são desconhecidos, ou cartões <= 0.
+Arredondamento fica na apresentação. IDs ausentes ou repetidos bloqueiam o lote inteiro.
+
+Lote auditável activity_data_correction_audit.batch_key = finance-20261015-v1:
+5.602 activities com alteração financeira; 464 custos de campanha, 4.725 totais de
+canal, 463 tarifas ausentes e 1.909 CAC alterados. Os conjuntos se sobrepõem.
+Foram mantidos os 8.150 registros e todos os campos não financeiros. Custos positivos
+de campanha existentes e os 21 registros com incentivo positivo foram preservados.
+Validação posterior: zero custos de campanha ausentes com entregues positivos;
+zero divergências de CAC; zero custos totais de canal nulos.
+
+Revisão humana separada: 49 Dia/CRM e 19 conflitos NGD/ANC; 377 grupos por
+Activity Name + canal + dia de São Paulo (764 registros). Nenhuma classificação ou
+exclusão automática. Há 786 divergências entre cartões e soma das emissões; exemplos
+recentes de 13 e 14/10 também apresentam assistidas/independentes 0/0 no CSV fonte.
+Isso não permite redistribuição artificial. Um custo unitário de oferta de -2 em
+06/01/2026 continua sinalizado para apuração, sem sobrescrever o custo registrado.
+
+Validação: testes do importador, suíte src completa, typecheck de release; no banco,
+testes transacionais revertidos cobrem atualização parcial de cartões/entregues,
+preservação de tarifa e incentivo, custo zero, CAC indefinido e atomicidade com ID ausente.

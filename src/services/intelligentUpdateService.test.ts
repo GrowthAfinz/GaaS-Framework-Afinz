@@ -13,6 +13,21 @@ const candidate = (overrides = {}): IntelligentUpdateCandidatePayload => ({
 });
 
 describe('acquisition persistence safeguards', () => {
+    it('leaves financial updates to the RPC so partial performance cannot erase historical incentives', () => {
+        const patch = numericPatch(candidate({ delivered: 771, finalized: 4 }));
+        expect(patch['Base Acionável']).toBe(771);
+        expect(patch['Cartões Gerados']).toBe(4);
+        for (const field of ['Custo Total Campanha', 'Custo unitário do canal', 'Custo total canal', 'CAC']) {
+            expect(patch).not.toHaveProperty(field);
+        }
+    });
+    it('does not round new CAC or manufacture costs without observed delivery', () => {
+        const row = buildInsertPayload(candidate({ delivered: 128, finalized: 18 }));
+        expect(row.CAC).toBeCloseTo(48.7936 / 18, 12);
+        expect(row.CAC).not.toBe(2.71);
+        expect(buildInsertPayload(candidate({ finalized: 18 })).CAC).toBeNull();
+        expect(buildInsertPayload(candidate({ delivered: 128, finalized: 0 })).CAC).toBeNull();
+    });
     it('patches only the canonical dimensions that actually changed', () => {
         const patch = numericPatch(candidate({ metricRefresh: true, canonicalDimensionRefresh: true,
             canonicalDimensionFields: ['subgrupo'] }));
