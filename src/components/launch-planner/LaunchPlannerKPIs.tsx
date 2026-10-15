@@ -12,13 +12,14 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Eye, EyeOff, Info, Layers3 } from 'lucide-react';
 import { Activity, FilterState, Goal } from '../../types/framework';
 import { useB2CAnalysis } from '../../hooks/useB2CAnalysis';
 import { useBU } from '../../contexts/BUContext';
 import { useAppStore } from '../../store/useAppStore';
+import { parseDate } from '../../utils/formatters';
 import { deriveActivityMetrics } from '../../utils/activityMetrics';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 import { ChartTooltip } from '../ui/ChartTooltip';
@@ -137,6 +138,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
     currentMonth,
 }) => {
     const rentab = useAppStore((state) => state.viewSettings.frente === 'rentabilizacao');
+    const b2cData = useAppStore((state) => state.b2cData);
     const allStoreActivities = useAppStore((state) => state.activities);
     const globalFilters = useAppStore((state) => state.viewSettings.filtrosGlobais);
     const setGlobalFilters = useAppStore((state) => state.setGlobalFilters);
@@ -145,6 +147,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
     const { dailyAnalysis, yearMonthlyAnalysis } = useB2CAnalysis();
     const { selectedBUs } = useBU();
 
+    const [comparisonMode, setComparisonMode] = useState<'goal' | 'previous'>('goal');
     const [chartMode, setChartMode] = useState<ChartMode>('daily');
     const [multiBUMode, setMultiBUMode] = useState<MultiBUMode>('comparison');
     const [showSerasa, setShowSerasa] = useState(false);
@@ -474,6 +477,65 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
         return { data, totalsByBU, goalsByBU, lastObservedIndex };
     }, [activities, chartBUs, currentGoal, currentMonth, dailyAnalysis, hasGranularGlobalFilters, isConsolidated, singleBU]);
 
+    // Index historical CRM with the same non-date filters as the visible month.
+    // Calendar subtraction deliberately leaves nonexistent days (e.g. 31/02) empty.
+    const historical = useMemo(() => {
+        const daily = new Map<string, ActivityAggregate>();
+        const monthly = new Map<string, ActivityAggregate>();
+        allStoreActivities.forEach((activity) => {
+            if (!activity.dataDisparo || Number.isNaN(activity.dataDisparo.getTime()) ||
+                !chartBUs.includes(activity.bu as AcquisitionBU) ||
+                !matchesGlobalFilters(activity, globalFilters)) return;
+            const date = format(activity.dataDisparo, 'yyyy-MM-dd');
+            for (const [map, key] of [[daily, date], [monthly, date.slice(0, 7)]] as const) {
+                const value = map.get(key) ?? { ...EMPTY_AGGREGATE };
+                addAggregate(value, metricValue(activity));
+                map.set(key, value);
+            }
+        });
+        const external = new Map<string, number>();
+        b2cData.forEach((row) => {
+            if ((row.tipo || 'total').toLowerCase() !== 'total') return;
+            const date = parseDate(row.data);
+            if (!date) return;
+            const key = format(date, 'yyyy-MM-dd');
+            external.set(key, (external.get(key) ?? 0) + (Number(row.emissoes_b2c_total) || 0));
+        });
+        return { daily, monthly, external };
+    }, [allStoreActivities, b2cData, chartBUs, globalFilters]);
+
+    const previousMonth = format(subMonths(new Date(`${currentMonth}-01T12:00:00`), 1), 'yyyy-MM');
+    const previousLabel = format(new Date(`${previousMonth}-01T12:00:00`), 'MMM/yy', { locale: ptBR });
+    const supportsPrevious = Boolean(singleBU || isConsolidated);
+    const showPrevious = comparisonMode === 'previous' && supportsPrevious;
+    const comparisonPacing = useMemo(() => {
+        const days = new Date(Number(previousMonth.slice(0, 4)), Number(previousMonth.slice(5, 7)), 0).getDate();
+        const externalCurrent = singleBU === 'B2C' && !hasGranularGlobalFilters &&
+            dailyAnalysis.some((row) => row.data.startsWith(currentMonth) && row.emissoes_b2c_total > 0);
+        const observed = externalCurrent ? historical.external : historical.daily;
+        const lastDay = Math.max(0, ...Array.from(observed.keys())
+            .filter((key) => key.startsWith(previousMonth))
+            .map((key) => Number(key.slice(-2))));
+        let cumulative = 0;
+        return pacingData.data.map((row, index) => {
+            const day = index + 1;
+            const key = `${previousMonth}-${String(day).padStart(2, '0')}`;
+            cumulative += externalCurrent ? historical.external.get(key) ?? 0 : historical.daily.get(key)?.cartoes ?? 0;
+            return { ...row, previous_cards: day <= days && day <= lastDay ? cumulative : null };
+        });
+    }, [currentMonth, dailyAnalysis, hasGranularGlobalFilters, historical, pacingData.data, previousMonth, singleBU]);
+    const comparisonCAC = useMemo(() => timeChartData.map((row) => {
+        const date = new Date(`${String(row.data).slice(0, 10)}T12:00:00`);
+        const previous = subMonths(date, 1);
+        const sameDayExists = isMonthly || previous.getDate() === date.getDate();
+        const key = format(previous, isMonthly ? 'yyyy-MM' : 'yyyy-MM-dd');
+        const value = (isMonthly ? historical.monthly : historical.daily).get(key);
+        return { ...row, previous_cac: sameDayExists && value && value.cartoes > 0 && value.custo > 0
+            ? value.custo / value.cartoes : null };
+    }), [historical, isMonthly, timeChartData]);
+    const previousCards = pacingData.lastObservedIndex >= 0
+        ? comparisonPacing[pacingData.lastObservedIndex]?.previous_cards ?? null : null;
+
     const singleSummary = useMemo(() => {
         const included = singleBU ? [singleBU] : chartBUs;
         const totalCards = included.reduce((sum, bu) => sum + (pacingData.totalsByBU[bu] ?? 0), 0);
@@ -598,8 +660,32 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
         />
     );
 
+    useEffect(() => {
+        if (!supportsPrevious) setComparisonMode('goal');
+    }, [supportsPrevious]);
+
+    const comparisonTooltip = <ChartTooltip showTotal={false}
+        formatValue={(value, entry) => {
+            const name = String(entry?.name ?? '');
+            if (name.includes('CAC')) return formatCurrency(value);
+            if (name.includes('Atingimento')) return `${value.toFixed(2).replace('.', ',')}%`;
+            return value.toLocaleString('pt-BR');
+        }}
+        isRate={() => true} />;
+
     const renderModeControls = () => (
         <div className="flex flex-wrap items-center justify-end gap-2">
+            <div role="group" aria-label="Referência dos gráficos" className="inline-flex items-center gap-0.5 rounded-lg border border-slate-200/80 bg-slate-100/70 p-0.5">
+                {([{ key: 'goal', label: 'Vs meta' }, { key: 'previous', label: 'Vs mês anterior' }] as const).map(({ key, label }) => (
+                    <button key={key} type="button" aria-pressed={comparisonMode === key}
+                        disabled={key === 'previous' && !supportsPrevious}
+                        title={key === 'previous' && !supportsPrevious ? 'Selecione uma BU ou consolide B2B2C + Plurix para comparar o histórico.' : label}
+                        onClick={() => setComparisonMode(key)}
+                        className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-40 ${comparisonMode === key ? 'bg-white text-slate-800 shadow-sm ring-1 ring-slate-200/60' : 'text-slate-500 hover:text-slate-800'}`}>
+                        {label}
+                    </button>
+                ))}
+            </div>
             {isMultiBU && (
                 <div className="inline-flex items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
                     <button
@@ -746,6 +832,14 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                 {renderModeControls()}
             </div>
 
+            {showPrevious && (
+                <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500" role="status">
+                    <span className="inline-flex items-center gap-1.5"><span className="w-4 border-t-2" style={{ borderColor: profile?.color ?? '#0EA5E9' }} />Período selecionado</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed border-emerald-500" />{`Acumulado: ${previousLabel} · mesmo dia do mês${isMonthly ? ' | CAC: mês anterior a cada ponto' : ''}`}</span>
+                    {!comparisonPacing.some((row) => row.previous_cards !== null) && <span>Sem histórico de cartões no mês anterior para este recorte.</span>}
+                    {!comparisonCAC.some((row) => row.previous_cac !== null) && <span>Sem CAC comparável no mês anterior.</span>}
+                </div>
+            )}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-4">
                     <div className={chartCardClass}>
@@ -753,14 +847,18 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                             <div className="min-w-0">
                                 <ChartHeading
                                     title={
-                                        profile
+                                        showPrevious
+                                            ? `ACUMULADO TOTAL CARTÕES ${singleBU ?? 'B2B2C + PLURIX'} VS MÊS ANTERIOR`
+                                            : profile
                                             ? profile.accumulatedTitle
                                             : isConsolidated
                                                 ? 'ACUMULADO TOTAL B2B2C + PLURIX VS META'
                                                 : 'ATINGIMENTO ACUMULADO DA META POR BU'
                                     }
                                     helpText={
-                                        profile || isConsolidated
+                                        showPrevious
+                                            ? `Acumulados alinhados pelo dia do mês. Referência: ${previousLabel}; dias inexistentes ou posteriores à última observação ficam sem valor.`
+                                            : profile || isConsolidated
                                             ? 'Realizado acumulado até o último dia observado versus a meta acumulada esperada.'
                                             : 'Cada BU é comparada contra sua própria meta; os percentuais não são somados.'
                                     }
@@ -772,12 +870,12 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                             {singleSummary.totalCards.toLocaleString('pt-BR')}
                                         </span>
                                         <span className="text-xs text-slate-400">
-                                            / {singleSummary.goalCards.toLocaleString('pt-BR')}
+                                            {showPrevious ? (previousCards === null ? 'Sem histórico comparável' : `/ ${previousCards.toLocaleString('pt-BR')} em ${previousLabel}`) : `/ ${singleSummary.goalCards.toLocaleString('pt-BR')}`}
                                         </span>
                                     </div>
                                 )}
                             </div>
-                            {(profile || isConsolidated) && (
+                            {(profile || isConsolidated) && !showPrevious && (
                                 <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
                                     singleSummary.progress >= 100
                                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
@@ -789,7 +887,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                         </div>
                         <div className="min-h-0 flex-1">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={pacingData.data} onClick={handleChartClick} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+                                <LineChart data={showPrevious ? comparisonPacing : pacingData.data} onClick={handleChartClick} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
                                     <CartesianGrid stroke="#e8edf3" vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={18} />
                                     <YAxis
@@ -799,13 +897,13 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                         width={44}
                                         tickFormatter={(value) => profile || isConsolidated ? formatCompact(value) : `${Number(value).toFixed(0)}%`}
                                     />
-                                    <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                    <Tooltip content={comparisonTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
                                     {profile || isConsolidated ? (
                                         <>
                                             <Line
                                                 {...lineCommonProps}
-                                                dataKey="meta_consolidada"
-                                                name="Meta acumulada"
+                                                dataKey={showPrevious ? "previous_cards" : "meta_consolidada"}
+                                                name={showPrevious ? `Acumulado ${previousLabel}` : "Meta acumulada"}
                                                 stroke="#10B981"
                                                 strokeDasharray="5 4"
                                                 dot={false}
@@ -860,12 +958,12 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                         </div>
                         <div className="min-h-0 flex-1">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={timeChartData} onClick={handleChartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }}>
+                                <LineChart data={showPrevious ? comparisonCAC : timeChartData} onClick={handleChartClick} margin={{ top: 8, right: 8, left: -6, bottom: 0 }}>
                                     <CartesianGrid stroke="#e8edf3" vertical={false} />
                                     <XAxis dataKey="displayDate" tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} minTickGap={12} />
                                     <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={42} tickFormatter={(value) => `R$${Number(value).toFixed(0)}`} />
-                                    <Tooltip content={chartTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
-                                    {profile && getCacGoal(currentGoal, profile.bu) > 0 && (
+                                    <Tooltip content={comparisonTooltip} wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }} />
+                                    {!showPrevious && profile && getCacGoal(currentGoal, profile.bu) > 0 && (
                                         <ReferenceLine
                                             y={getCacGoal(currentGoal, profile.bu)}
                                             stroke="#94A3B8"
@@ -873,7 +971,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                             label={{ value: 'Limite', position: 'insideTopRight', fontSize: 9, fill: '#64748B' }}
                                         />
                                     )}
-                                    {!profile && !isConsolidated && chartBUs.map((bu) => {
+                                    {!showPrevious && !profile && !isConsolidated && chartBUs.map((bu) => {
                                         const cacGoal = getCacGoal(currentGoal, bu);
                                         return cacGoal > 0 ? (
                                             <ReferenceLine
@@ -885,6 +983,10 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                                             />
                                         ) : null;
                                     })}
+                                    {showPrevious && (
+                                        <Line {...lineCommonProps} dataKey="previous_cac" name={isMonthly ? 'CAC do mês anterior' : `CAC ${previousLabel}`}
+                                            stroke="#10B981" strokeDasharray="5 4" dot={false} />
+                                    )}
                                     {profile ? (
                                         <Line
                                             {...lineCommonProps}
