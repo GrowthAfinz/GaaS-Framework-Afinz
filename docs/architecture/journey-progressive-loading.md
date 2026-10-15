@@ -1,29 +1,39 @@
-# Fluxo de Jornada — carregamento sob demanda
+# Fluxo de Jornada — catálogo e workspace
 
-Implementado em 15/10/2026.
+Atualizado em 15/10/2026.
 
-O operador escolhe Frente → Parceiro/Público → Segmento → Jornada → Versão do pack e clica em **Abrir jornada**. A seleção anterior pode ser restaurada na sessão, mas não abre o grafo automaticamente.
+## Entrada e navegação
 
-- `read_journey_flow_directory()` retorna somente os identificadores dos packs e a classificação necessária aos seletores. Não consulta a visão de mensagens visuais nem retorna HTML, previews, fingerprints, grafo ou resultados.
-- `read_journey_flow_detail(p_snapshot)` retorna os metadados de mensagens de uma única versão. É chamada junto com o manifesto somente após a abertura explícita. Mensagem completa, resultados e cobertura continuam sob demanda.
-- O diretório cruza as classificações em conjunto, sem reprocessar o HTML por candidato. As correspondências exatas e aliases mantêm os mesmos nomes, canais e períodos de evidência. Não cria vínculos ou altera registros históricos.
-- Todas as funções usam `security invoker`, autenticação e RLS existentes. O cache é restrito à sessão; importações e mudanças de vínculos o invalidam.
-- Mudar um seletor fecha o fluxo anterior. Respostas antigas não repintam uma seleção nova. Falhas apresentam **Tentar novamente**.
+A tela abre um catálogo leve de todas as jornadas extraídas dos packs acessíveis. As tabelas são agrupadas por BU → parceiro/público → segmento e mostram somente nome e última atividade registrada, ordenada da mais recente para a mais antiga. Jornadas sem histórico continuam disponíveis com indicação explícita. Cada nome é contado uma vez, independentemente do número de versões ou grupos em que aparece. Os grupos permanecem fixos durante o refinamento do recorte, com rolagem interna.
 
-Validação: contratos SQL com RLS, aliases e períodos; interação Playwright com serviços simulados; testes de navegação/cache/facetas; gate TypeScript e build de produção. O teste de interação pode ser executado com `node scripts/test-journey-progressive-ui.mjs` (requer Chromium do Playwright).
+- **Frente** é um bloco cinza fixo em Aquisição. O antigo seletor Frente foi renomeado para **BU**, respeitando as BUs do cabeçalho global.
+- B2C usa **Público / origem** e B2B2C usa **Parceiro / público**. Plurix mostra **N/A**, cinza e não interativo, sem divisão por bandeira.
+- Proprietaria/Proprietária e Institucional representam **Institucional**, conforme definição explícita do usuário. Ausência de identificação de outras BUs não vira Institucional.
+- Público, segmento e canal/subgrupo compartilham o estado dos filtros globais. Busca, oferta, promocional, momento, vínculo e atividade no período ficam na faixa secundária.
+- Os filtros devem coincidir numa mesma comunicação e num mesmo contexto histórico. Não se combinam atributos de mensagens ou execuções diferentes para inventar uma correspondência.
+- A última atividade é histórica; o período selecionado restringe resultados e os filtros de vínculo/atividade no período. As datas respeitam America/Sao_Paulo.
+- Clique na linha ou escolha um nome para abrir a versão mais recente compatível com o recorte. A versão vem preenchida; pode ser trocada posteriormente. O seletor de jornada também mostra a data histórica.
+- **Classificação pendente** preserva o acesso aos packs incompletos; nenhum pack é descartado pela ausência de histórico. Retornar ao catálogo preserva filtros e a posição de navegação.
 
-Medições em produção sob role `authenticated`, antes da publicação do frontend: diretório de 60 versões/176 ocorrências com 71.316 bytes em aproximadamente 587 ms; detalhe do maior pack em aproximadamente 605 ms. São medições pontuais de execução no banco, sem rede/renderização; não constituem SLA.
+## Contratos de leitura
 
+- `read_journey_flow_catalog(p_start,p_end)` retorna identificadores das versões, classificação e resumos históricos por tupla de BU/público/segmento/canal/subgrupo/oferta/promocional. Inclui recência histórica e contagem/flags de vínculo no período. Não retorna grafo, HTML, previews, fingerprints nem linhas de performance.
+- `read_journey_flow_detail(p_snapshot)` e o manifesto são consultados somente após escolher uma jornada. O conteúdo integral da comunicação continua sob demanda no leitor.
+- `read_journey_flow_performance_page(p_snapshot,p_start,p_end,p_cursor,p_limit)` é chamada somente quando Performance está visível. O cliente pede 30 grupos por página; cursor descendente por data/jornada/Activity Name/canal. Um grupo de revisão não é dividido entre páginas. Grupos acima de 5.000 linhas retornam `complete=false`, sem resultados parciais, e a interface pede um período menor.
+- `journey_flow_activity_matches` centraliza correspondência exata de jornada normalizada, Activity Name e canal, além dos aliases com período de evidência. Não cria vínculos nem altera o histórico.
+- Todas as funções usam `security invoker`, autenticação, search_path fixo e RLS existentes. PUBLIC/anon não executam as funções. As duas consultas JSON usam PL/pgSQL com JIT desativado apenas na chamada para evitar custo de compilação desproporcional.
+- Cache por identidade da sessão: catálogo/detalhe 5 minutos, performance 1 minuto, manifesto 1 hora. Importações e alterações de vínculos invalidam o cache. Mudança de período não exibe os resumos do período anterior; respostas antigas não substituem a seleção atual. Falhas oferecem **Tentar novamente**.
 
-## Classificação da navegação — 15/10/2026
+## Desenho e performance
 
-- Frente respeita as BUs selecionadas no cabeçalho global. B2C usa o seletor **Público / origem**; B2B2C usa **Parceiro**. O primeiro item é Todos os públicos/parceiros.
-- Plurix apresenta **N/A** num bloco cinza não interativo. Selecionar a frente já habilita o segmento; não existe divisão por bandeira ou parceiro.
-- Proprietaria/Proprietária e Institucional são o mesmo público de navegação, **Institucional**, conforme definição explícita do usuário. Valores ausentes ou N/A de outras frentes continuam sem identificação; não são convertidos automaticamente em Institucional.
-- Identificação no nome do pack é fallback para frente/segmento e tokens explícitos de parceiro. Templates e revisões continuam disponíveis como fontes. Revisão de público da mensagem pode diferir do histórico: nenhuma classificação da peça é aplicada aos resultados de uma execução.
-- O diretório mantém apenas metadados leves. O serviço associa a identidade da jornada às mensagens sem novas consultas. Conteúdo e grafo só são lidos após Abrir jornada.
-- O acesso **Classificação pendente** preserva packs com campos faltantes. Packs parcialmente identificados também aparecem na frente conhecida em Todos os públicos/parceiros. Ausência de histórico não impede a consulta ao pack.
-- Uma jornada compartilhada pode aparecer em mais de um público. O grafo completo é preservado; mensagens do recorte são destacadas e as demais permanecem acessíveis.
-- No leitor da comunicação, **Classificação e fontes** distingue nome do pack, classificação da mensagem e valores registrados no histórico. O cache continua por sessão; seleções são salvas na chave v3 sem abertura automática.
+A área do desenho mede o espaço disponível considerando o zoom CSS global, com altura física mínima de 440 px no modo normal. Pan/zoom manual e foco não são perdidos ao redimensionar ou expandir Performance. O modo tela cheia mantém o mesmo workspace.
 
-Validação adicional: testes de alias Institucional, Plurix N/A, revisão versus execução, pares de BU/parceiro sem combinações inventadas, fallback do pack, pendentes e acesso ao grafo por público; interação em desktop/mobile com filtros globais, retry e respostas atrasadas. Auditoria somente de leitura do diretório real: 60 snapshots, sem mensagens inacessíveis pela navegação normal ou pelo acesso de pendências.
+O botão fixo **Performance** abre um painel flutuante à direita, com tabela e carregamento paginado. O painel pode ocupar o workspace inteiro e voltar à jornada preservando o desenho. Selecionar um nó filtra o painel; **Localizar no fluxo** faz o caminho inverso quando a correspondência é única. Resultados ambíguos não recebem localização falsa. O contador descreve somente os registros das páginas carregadas. Dados ausentes são —; custo e CAC observado usam valores registrados, sem custo presumido.
+
+O pin **Último disparo registrado** destaca a ocorrência mais recente do recorte. Empates são mantidos; atividades operacionais/opt-out e correspondências ambíguas não recebem pin. O pin não representa posição atual dos contatos nem comprova a versão do pack enviada. Classificação revisada da peça nunca reclassifica os resultados históricos da execução.
+
+## Validação
+
+Contratos SQL cobrem autenticação/RLS, aliases, períodos, payload leve e paginação sem sobreposição ou divisão de grupos. Testes unitários cobrem contagem de nomes, versões compatíveis, tuplas, recência, ausência de histórico e pins. `node scripts/test-journey-progressive-ui.mjs` usa serviços simulados e componentes reais para catálogo, filtros globais/secundários, Plurix, versões, altura com zoom global, tela cheia, paginação/expansão, retorno ao desenho, retry de catálogo e mobile. Gere o CSS de QA antes com `npx tailwindcss -i src/App.css -o tmp/journey-workspace.css --minify`.
+
+Medições pontuais no banco real sob role authenticated, em transação revertida antes da publicação: catálogo ~129 ms e primeira página do maior snapshot ~656 ms. Não incluem rede/renderização e não constituem SLA. A consulta de catálogo substitui a antiga leitura inicial de mensagens visuais.

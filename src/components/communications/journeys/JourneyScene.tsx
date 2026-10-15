@@ -1,5 +1,5 @@
 import React,{memo,useEffect,useState} from 'react';
-import {Mail,MessageCircle,MessageSquare,Bell,Clock,GitBranch,LogOut,FilePen,Lightbulb,HelpCircle} from 'lucide-react';
+import {Mail,MessageCircle,MessageSquare,Bell,Clock,GitBranch,LogOut,FilePen,Lightbulb,HelpCircle,MapPin} from 'lucide-react';
 import type {JourneyManifest,MessageMeta} from '../../../modules/sfmc-package/journeyV2';
 import {graphPoint,messageFacets} from '../../../modules/sfmc-package/journeyV2';
 import {nominalDay,type FlowLayout,type FlowNode} from '../../../modules/sfmc-package/journeyFlow';
@@ -7,7 +7,7 @@ import {imageAssetPath} from '../../../utils/communicationVisualResolution';
 import {canalToId} from '../../../utils/taxonomy';
 import {cachedSignedUrl} from '../../../services/templateContentIndex';
 const icons:Record<string,typeof Mail>={EMAILV2:Mail,SMSSYNC:MessageSquare,WHATSAPPACTIVITY:MessageCircle,PUSHNOTIFICATIONACTIVITY:Bell,STOWAIT:Lightbulb,EXIT:LogOut,UPDATECONTACTDATA:FilePen,ENGAGEMENTDECISION:GitBranch,MULTICRITERIADECISION:HelpCircle,RANDOMSPLIT:GitBranch};
-export const SceneNode=memo(function SceneNode({n,m,compact,highlight,muted,visible,preparedImage,renditionPath,onOpen}:{preparedImage?:string;renditionPath?:string;n:FlowNode;m?:MessageMeta;compact:boolean;highlight:boolean;muted:boolean;visible:boolean;onOpen:(key:string)=>void}){
+export const SceneNode=memo(function SceneNode({n,m,compact,highlight,muted,visible,preparedImage,renditionPath,latestDate,onOpen}:{preparedImage?:string;renditionPath?:string;latestDate?:string;n:FlowNode;m?:MessageMeta;compact:boolean;highlight:boolean;muted:boolean;visible:boolean;onOpen:(key:string)=>void}){
  const p=graphPoint(n,compact),wait=/WAIT/.test(n.type),diamond=wait||/DECISION|SPLIT|OPTIMIZER/.test(n.type);
  const Icon=icons[n.type]||(wait?Clock:HelpCircle),color=n.type==='STOWAIT'?'#172554':n.type==='EXIT'?'#84cc16':diamond?'#f59e0b':'#2dd4bf';
  const [image,setImage]=useState<string|null>(null);
@@ -17,7 +17,8 @@ export const SceneNode=memo(function SceneNode({n,m,compact,highlight,muted,visi
  const moment=m?messageFacets(m).momento[0]:null;
  const label=m?(moment||m.channel):n.type==='EXIT'?nominalDay(n).replace(/^Dia /,'Sai no dia '):n.type==='STOWAIT'?'Einstein STO':n.name.replace(/\s+afz_.*$/i,'');
  const title=m?`${n.number} · ${m.activity_name}`:n.name;
- return <g transform={`translate(${p.x},${p.y})`} opacity={muted?.27:1} data-communication={m?.activity_key} data-scope-match={m?!muted:undefined}>
+ return <g transform={`translate(${p.x},${p.y})`} opacity={muted?.27:1} data-communication={m?.activity_key} data-scope-match={m?!muted:undefined} data-latest-activity={latestDate}>
+ {latestDate&&<g aria-label={'Último disparo registrado '+latestDate} transform="translate(-89,-67)"><title>{'Último disparo registrado: '+latestDate+'. Não indica posição dos contatos nem comprova a versão enviada.'}</title><rect width={178} height={23} rx={11} fill="#fffbeb" stroke="#f59e0b"/><MapPin x={7} y={4} width={14} height={14} color="#b45309"/><text x={26} y={15} fontSize={10} fill="#92400e">Último disparo registrado</text></g>}
  {highlight&&<rect x={-72} y={-38} width={144} height={m&&!compact?168:98} rx={12} fill="#ecfeff" stroke="#0891b2"/>}
  {m&&<text y={-34} textAnchor="middle" fontSize={11} fill="#0e7490">{nominalDay(n)}</text>}
  <g role={m?'button':undefined} tabIndex={m?0:undefined} aria-label={m?`Abrir comunicação ${n.number}: ${m.activity_name}`:undefined} style={{cursor:m?'pointer':'default'}} onClick={m?()=>onOpen(m.activity_key):undefined} onKeyDown={m?e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onOpen(m.activity_key);}}:undefined}>
@@ -35,7 +36,7 @@ export const SceneNode=memo(function SceneNode({n,m,compact,highlight,muted,visi
  <title>{path?'Miniatura do catálogo':banner?'Banner do pack':'Conteúdo visual disponível ao abrir'}</title></g>}
  </g>;
 });
-export const JourneyScene=memo(function JourneyScene({manifest,layout,messages,compact,focus,matches,bounds,images,onOpen}:{images?:Map<string,string>;manifest:JourneyManifest;layout:FlowLayout;messages:MessageMeta[];compact:boolean;focus:Set<string>;matches:Set<string>|null;bounds:{left:number;top:number;right:number;bottom:number};onOpen:(key:string)=>void}){
+export const JourneyScene=memo(function JourneyScene({manifest,layout,messages,compact,focus,matches,bounds,images,latestPins,onOpen}:{images?:Map<string,string>;latestPins?:Record<string,string>;manifest:JourneyManifest;layout:FlowLayout;messages:MessageMeta[];compact:boolean;focus:Set<string>;matches:Set<string>|null;bounds:{left:number;top:number;right:number;bottom:number};onOpen:(key:string)=>void}){
  const by=new Map(messages.map(m=>[m.activity_key,m])),nodes=new Map(layout.nodes.map(n=>[n.key,n]));
  const entry=manifest.graph.entry;
  return <svg data-journey-scene xmlns="http://www.w3.org/2000/svg" width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`} style={{fontFamily:'Arial,sans-serif',overflow:'visible'}}>
@@ -46,6 +47,6 @@ export const JourneyScene=memo(function JourneyScene({manifest,layout,messages,c
  <text x={95} y={141} textAnchor="middle" fontSize={10} fill="#64748b">FILTRO</text><text x={95} y={162} textAnchor="middle" fontSize={10} fill="#334155"><title>{entry.trigger?.description}</title>{String(entry.trigger?.description||'Não informado').slice(0,29)}</text>
  <text x={95} y={205} textAnchor="middle" fontSize={10} fill="#64748b">AGENDAMENTO / REENTRADA</text><text x={95} y={225} textAnchor="middle" fontSize={10} fill="#334155">{entry.event?.metaData?.scheduleFlowMode==='runOnce'?'Ao publicar':'Ver configuração do pack'}</text><text x={95} y={247} textAnchor="middle" fontSize={10} fill="#334155">{entry.entryMode==='MultipleEntries'?'Reentrada permitida':entry.entryMode?'Reentrada conforme pack':'Não informado'}</text></g>
  {layout.nodes.filter(n=>n.col===0).map(n=>{const p=graphPoint(n,compact);return <path key={'entry'+n.key} d={`M208 ${p.y}H${p.x-22}`} stroke="#cbdced" strokeWidth={2}/>})}
- {layout.nodes.map(n=>{const p=graphPoint(n,compact);return <SceneNode key={n.key} n={n} m={by.get(n.key)} compact={compact} highlight={matches&&by.get(n.key)?matches.has(n.key):focus.has(n.key)} muted={!!matches&&!!by.get(n.key)&&!matches.has(n.key)} preparedImage={images?.get(n.key)} renditionPath={manifest.renditions?.[n.key]?.thumbnail_path} visible={p.x>bounds.left-200&&p.x<bounds.right+200&&p.y>bounds.top-200&&p.y<bounds.bottom+200} onOpen={onOpen}/>})}
+ {layout.nodes.map(n=>{const p=graphPoint(n,compact);return <SceneNode key={n.key} n={n} m={by.get(n.key)} compact={compact} highlight={matches&&by.get(n.key)?matches.has(n.key):focus.has(n.key)} muted={!!matches&&!!by.get(n.key)&&!matches.has(n.key)} preparedImage={images?.get(n.key)} latestDate={latestPins?.[n.key]} renditionPath={manifest.renditions?.[n.key]?.thumbnail_path} visible={p.x>bounds.left-200&&p.x<bounds.right+200&&p.y>bounds.top-200&&p.y<bounds.bottom+200} onOpen={onOpen}/>})}
  </svg>;
 });

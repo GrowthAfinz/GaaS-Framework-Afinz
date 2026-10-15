@@ -14,7 +14,7 @@ export interface MessageMeta {
 export interface JourneyIndexItem {id:string;import_id:string;reference:string;journey_name:string;journey_version:number;created_at:string;messages:MessageMeta[]}
 export interface JourneyManifest extends Omit<JourneyIndexItem,'messages'>{graph:JourneyGraph;renditions?:Record<string,{full_path:string;thumbnail_path:string;content_fingerprint:string;width:number;height:number;warnings:string[];source:string}>}
 export interface JourneyReuse {snapshot_id:string;occurrence_key:string;activity_key:string;journey_name:string;journey_version:number;activity_name:string;channel:string;asset_name:string|null;observed_template_id:string|null;evidence:'exact_content'|'template_id'|'shared_asset'}
-export type JourneyScopeMessage=Pick<MessageMeta,'contexts'|'catalog'|'review_context'|'channel'|'observed_template_id'|'journey_name'>;
+export type JourneyScopeMessage=Pick<MessageMeta,'contexts'|'catalog'|'review_context'|'channel'|'observed_template_id'|'journey_name'> & Partial<Pick<MessageMeta,'activity_key'|'occurrence_key'|'activity_name'|'is_optout'>>;
 export interface JourneyDirectoryItem extends Omit<JourneyIndexItem,'messages'>{messages:JourneyScopeMessage[]}
 export function messageFacets(m:JourneyScopeMessage):ScopeFacets {
  const f=facetsFromRecords(m.contexts||[]);
@@ -75,11 +75,11 @@ export function messageContextKeys(m:JourneyScopeMessage):string[]{
  return [...new Set((m.contexts?.length?m.contexts.map(r=>({...m,contexts:[r]})):[m]).flatMap(row=>contextKey(messageFacets(row))))];
 }
 export function needsClassification(m:JourneyScopeMessage){const f=messageFacets(m);return !f.frente.length||!f.segmento.length||(f.frente.some(v=>v!=='Plurix')&&!f.parceiro.length);}
-export function contextLabel(key:string){const {front,audience}=parseJourneyContext(key);return front===PENDING_FRONT?PENDING_FRONT:`${front} · ${front==='Plurix'?'N/A':audience===ALL_AUDIENCES?(front==='B2C'?'Todos os públicos':'Todos os parceiros'):audience}`;}
+export function contextLabel(key:string){const {front,audience}=parseJourneyContext(key);return front===PENDING_FRONT?PENDING_FRONT:`${front===ALL_AUDIENCES?'Todas as BUs':front} · ${front==='Plurix'?'N/A':audience===ALL_AUDIENCES?(front==='B2C'?'Todos os públicos':'Todos os parceiros'):audience}`;}
 function matchesSegment(f:ScopeFacets,segment:string){return !segment||(segment===PENDING_SEGMENT||segment==='Sem classificação'?!f.segmento.length:f.segmento.some(v=>facetNorm(v)===facetNorm(canonFacet('segmento',segment))));}
 export function matchesContext(m:JourneyScopeMessage,context:string,segment:string){
  const f=messageFacets(m),want=parseJourneyContext(context);
- const match=!context||(want.front===PENDING_FRONT?needsClassification(m):messageContextKeys(m).some(key=>{const pair=parseJourneyContext(key);return pair.front===want.front&&(want.front==='Plurix'||want.audience===ALL_AUDIENCES||pair.audience===want.audience);}));
+ const match=!context||(want.front===PENDING_FRONT?needsClassification(m):messageContextKeys(m).some(key=>{const pair=parseJourneyContext(key);return (want.front===ALL_AUDIENCES||pair.front===want.front)&&(want.front==='Plurix'||want.audience===ALL_AUDIENCES||pair.audience===want.audience);}));
  return match&&matchesSegment(f,segment);
 }
 /** Historical results never inherit the selected message's review or pack-based fallback. */
@@ -87,7 +87,7 @@ export function executionMatchesContext(r:FrameworkActivity,context:string,segme
  const f=facetsFromRecords([r]),want=parseJourneyContext(context);
  if(!matchesSegment(f,segment))return false;
  if(!context||want.front===PENDING_FRONT)return true;
- if(!f.frente.map(canonicalFront).includes(want.front))return false;
+ if(want.front!==ALL_AUDIENCES&&!f.frente.map(canonicalFront).includes(want.front))return false;
  return want.front==='Plurix'||want.audience===ALL_AUDIENCES||(want.audience===UNKNOWN_AUDIENCE?!f.parceiro.length:f.parceiro.map(canonicalAudience).includes(want.audience));
 }
 export function classificationSources(m:JourneyScopeMessage):string[]{

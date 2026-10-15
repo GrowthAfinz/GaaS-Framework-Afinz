@@ -14,6 +14,9 @@ export async function cachedJourneyRead<T>(key:string,ttl:number,load:()=>Promis
  if(!next)throw Error('Sessão necessária.');return cache.read(identity+':'+key,ttl,load);
 }
 async function rpc<T>(name:string,args:Record<string,unknown>={}){const {data,error}=await supabase.rpc(name,args);if(error)throw error;if(data===null)throw Error('Fonte indisponível ou sem acesso.');return data as T;}
+export const readJourneyCatalog=(start:string,end:string)=>cachedJourneyRead<JourneyDirectoryItem[]>(JSON.stringify(['catalog',start,end]),300000,async()=>{const rows=await rpc<JourneyDirectoryItem[]>('read_journey_flow_catalog',{p_start:start,p_end:end});return rows.map(withJourneyIdentity);});
+export interface JourneyPerformancePage {complete:boolean;rows:FrameworkActivity[];reviews:ExecutionReview[];matches:{id:string;activity_keys:string[]}[];has_more:boolean;cursor:Record<string,string>|null;count:number}
+export const readJourneyPerformancePage=(id:string,start:string,end:string,cursor:Record<string,string>|null)=>cachedJourneyRead<JourneyPerformancePage>(JSON.stringify(['performance',id,start,end,cursor]),60000,()=>rpc('read_journey_flow_performance_page',{p_snapshot:id,p_start:start,p_end:end,p_cursor:cursor,p_limit:30}));
 export const readJourneyDirectory=()=>cachedJourneyRead<JourneyDirectoryItem[]>('directory',300000,async()=>{const rows=await rpc<JourneyDirectoryItem[]>('read_journey_flow_directory');return rows.map(withJourneyIdentity);});
 function withJourneyIdentity<T extends JourneyDirectoryItem>(entry:T):T{return {...entry,messages:entry.messages.map(m=>({...m,journey_name:entry.journey_name}))};}
 export const readJourneyDetail=(id:string)=>cachedJourneyRead<JourneyIndexItem>('detail:'+id,300000,async()=>withJourneyIdentity(await rpc<JourneyIndexItem>('read_journey_flow_detail',{p_snapshot:id})));
