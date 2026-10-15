@@ -200,7 +200,7 @@ export function planImport(incoming: ExpandedImportRow[], existing: ExistingImpo
     BRIEFING_COLUMNS.forEach((column) => {
       const sheet = item.row[column] ?? '';
       const gaas = current.row[column] ?? '';
-      const baseline = current.importSource?.baseline[column];
+      const baseline = current.importSource?.baseline?.[column];
       if (sheet === gaas) return;
       let decision: FieldDecision;
       if (baseline === undefined) decision = 'conflict';

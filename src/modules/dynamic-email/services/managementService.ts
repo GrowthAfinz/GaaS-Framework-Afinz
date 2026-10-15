@@ -79,7 +79,7 @@ export async function loadEmailStrategies(): Promise<EmailStrategy[]> {
   return (emailResult.data ?? []).map((row: Record<string, any>) => strategyFromRow(row, rulers.get(row.ruler_strategy_id)));
 }
 
-export async function saveEmailStrategy(strategy: EmailStrategy): Promise<EmailStrategy> {
+export async function saveEmailStrategy(strategy: EmailStrategy, options: { create?: boolean; fromAiImport?: boolean } = {}): Promise<EmailStrategy> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Sessão autenticada necessária para salvar a estratégia.');
   const payload = {
@@ -92,9 +92,11 @@ export async function saveEmailStrategy(strategy: EmailStrategy): Promise<EmailS
     technical_status: strategy.technicalStatus, editorial_status: strategy.editorialStatus, visual_status: strategy.visualStatus,
     certification_status: strategy.certificationStatus, field_provenance: { ...strategy.fieldProvenance, semantic_fields: 'human' },
     updated_by: auth.user.id, updated_by_type: 'human', update_source: 'gaas',
-    change_reason: 'Edição humana na Fábrica de E-mails', llm_model: null, llm_run_id: null,
+    change_reason: options.fromAiImport ? strategy.changeReason : 'Edição humana na Fábrica de E-mails', llm_model: options.fromAiImport ? strategy.llmModel : null, llm_run_id: null,
   };
-  const { data, error } = await supabase.from('dynamic_email_email_strategies').update(payload).eq('id', strategy.id).eq('version', strategy.version).select().single();
+  const { data, error } = options.create
+    ? await supabase.from('dynamic_email_email_strategies').insert({ ...payload, ruler_strategy_id: strategy.rulerStrategyId ?? null, created_by: auth.user.id }).select().single()
+    : await supabase.from('dynamic_email_email_strategies').update(payload).eq('id', strategy.id).eq('version', strategy.version).select().single();
   if (error) throw new Error(error.code === 'PGRST116' ? 'A estratégia mudou em outra sessão. Recarregue antes de salvar.' : error.message);
   return strategyFromRow(data, { name: strategy.rulerName, business_front: strategy.businessFront, journey_family: strategy.journeyFamily, journey_type: strategy.journeyType });
 }

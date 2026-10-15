@@ -15,6 +15,7 @@ const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
     templateSlotId: record.template_slot_id ?? undefined,
     acknowledgedMissingActivity: Boolean(record.acknowledged_missing_activity),
     legalOverride: Boolean(record.legal_override),
+    importSource: record.import_source ?? null,
   });
 };
 
@@ -110,7 +111,7 @@ export async function saveSignatureSetting(setting: SignatureSetting): Promise<S
   return { partner: data.partner, signatureKey: data.signature_key, signatureLabel: data.signature_label, status: data.status, effectiveFrom: data.effective_from ?? undefined };
 }
 
-export async function saveBriefings(entries: Array<{ row: WorkspaceBriefing; warnings: string[] }>): Promise<WorkspaceBriefing[]> {
+export async function saveBriefings(entries: Array<{ row: WorkspaceBriefing; warnings: string[]; changeSummary?: string }>): Promise<WorkspaceBriefing[]> {
   if (!entries.length) return [];
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('Sessão autenticada necessária para salvar.');
@@ -129,17 +130,19 @@ export async function saveBriefings(entries: Array<{ row: WorkspaceBriefing; war
     journey_confirmed: Boolean(row.__journeyConfirmed),
     acknowledged_missing_activity: Boolean(row.__meta.acknowledgedMissingActivity),
     legal_override: Boolean(row.__meta.legalOverride),
+    ...(row.__meta.importSource ? { import_source: row.__meta.importSource } : {}),
     updated_by: auth.user.id,
     updated_at: new Date().toISOString(),
   }));
   const { data, error } = await supabase.from('dynamic_email_briefings').upsert(payloads).select();
   if (error) throw error;
   const payloadById = new Map(payloads.map((payload) => [payload.id, payload]));
-  const { error: versionError } = await supabase.from('dynamic_email_briefing_versions').upsert(entries.map(({ row, warnings }) => ({
+  const { error: versionError } = await supabase.from('dynamic_email_briefing_versions').upsert(entries.map(({ row, warnings, changeSummary }) => ({
     briefing_id: row.__id,
     version: row.__meta.version,
     snapshot: payloadById.get(row.__id),
     warnings,
+    change_summary: changeSummary ?? null,
     saved_by: auth.user.id,
   })), { onConflict: 'briefing_id,version', ignoreDuplicates: true });
   if (versionError) throw versionError;

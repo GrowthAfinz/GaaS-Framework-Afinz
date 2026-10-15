@@ -729,3 +729,6 @@ endereço físico, tracking e renderização no cliente de e-mail.`);
     omittedSections: omitted,
   };
 }
+
+/** Redação compartilhada com o pacote Prompt e IA. */
+export const sanitizeAiPackText = (text: string): string => clean(text);

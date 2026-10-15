@@ -1,3 +1,4 @@
+import type { ImportSourceRecord } from './xlsxImport';
 import { BRIEFING_COLUMNS, type BriefingColumn, type BriefingRow } from './briefing';
 
 export const PLURIX_SIGNATURES = [
@@ -24,6 +25,7 @@ export type EditorialMeta = {
   savedAt?: string;
   acknowledgedMissingActivity?: boolean;
   legalOverride?: boolean;
+  importSource?: ImportSourceRecord | null;
 };
 
 export type WorkspaceBriefing = BriefingRow & { __meta: EditorialMeta };
