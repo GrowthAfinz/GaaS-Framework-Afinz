@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLURIX_V12_TEMPLATE } from './plurixV12Template';
-import { PLURIX_V13_TEMPLATE } from './plurixV13Template';
+import { PLURIX_V13_TEMPLATE, V13_HEADER_BRAND_LOGO } from './plurixV13Template';
 import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer';
 import { emptyBriefingRow, templateActiveColumns, type BriefingRow } from '../domain/briefing';
 import { plurixEnvelope } from '../domain/sfmcEnvelope';
@@ -47,6 +47,17 @@ describe('PLURIX V13 (candidata)', () => {
     expect(html).toContain('src="https://img/logo-amigo.png"');
     expect(html).toContain('background-color:#4A5BA6');
     expect(html.indexOf('Até 40 dias')).toBeLessThan(html.indexOf('Boa notícia, Vania'));
+  });
+
+  it('segue a peça do marketing: +amigo branco fixo, logo da rede ao lado, Tahoma e cartão de 300px', () => {
+    const { html } = renderDynamicEmail(PLURIX_V13_TEMPLATE, row(), sample());
+    expect(html).toContain(`src="${V13_HEADER_BRAND_LOGO}"`);
+    expect(html.indexOf(V13_HEADER_BRAND_LOGO)).toBeLessThan(html.indexOf('src="https://img/logo-amigo.png"'));
+    expect(html).toMatch(/class="hdr-title"[^>]*font-family:Tahoma, Geneva, sans-serif;[^>]*font-size:28px/);
+    expect(html).toContain('width="300"');
+    const semLogo = renderDynamicEmail(PLURIX_V13_TEMPLATE, row({ HEADER_LOGO: '' }), sample()).html;
+    expect(semLogo).toContain(V13_HEADER_BRAND_LOGO);
+    expect(semLogo).not.toContain('class="hdr-partner"');
   });
 
   it('sem linha principal, HEADER volta a ser imagem como na V12', () => {

@@ -131,7 +131,7 @@ const FIELD_LABELS: Partial<Record<BriefingColumn, string>> = {
   HEADER_TITULO: 'Linha principal do header (até 34)',
   HEADER_SUBTITULO: 'Linha secundária do header (até 60)',
   HEADER_IMAGEM_CARTAO: 'Imagem do cartão no header (PNG)',
-  HEADER_LOGO: 'Logo no header (PNG)',
+  HEADER_LOGO: 'Logo da rede no header (PNG)',
 };
 
 type ImageSlot = { label: string; description: string; image: BriefingColumn; link?: BriefingColumn };
@@ -147,7 +147,7 @@ const IMAGE_SLOTS: Record<'header' | 'banner1' | 'banner2' | 'banner3', ImageSlo
   banner3: { label: 'Banner de encerramento', description: 'Última imagem antes das informações legais', image: 'BANNER_3_CORPO', link: 'LINK_BANNER_3_CORPO' },
 };
 const HEADER_CARD_SLOT: ImageSlot = { label: 'Cartão do header', description: 'PNG do cartão com fundo transparente, à direita do texto', image: 'HEADER_IMAGEM_CARTAO' };
-const HEADER_LOGO_SLOT: ImageSlot = { label: 'Logo do header', description: 'Logo da rede que aparece abaixo das linhas de texto', image: 'HEADER_LOGO' };
+const HEADER_LOGO_SLOT: ImageSlot = { label: 'Logo da rede', description: 'Aparece ao lado do +amigo branco, abaixo das linhas de texto', image: 'HEADER_LOGO' };
 
 type EditorSection = {
   id: string;
@@ -2021,7 +2021,7 @@ const DiffValue = ({ label, value, proposed = false }: { label: string; value: u
 const EmptyManagementState = () => <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-xs text-slate-500">A camada existe, mas ainda não recebeu conteúdo governado.</div>;
 
 const ASSET_SLOT_LABELS: Record<string, string> = {
-  header: 'Header (imagem inteira)', header_card: 'Cartão do header dinâmico', header_logo: 'Logo do header dinâmico',
+  header: 'Header (imagem inteira)', header_card: 'Cartão do header dinâmico', header_logo: 'Logo da rede (header dinâmico)',
   banner_1: 'Banner 1', banner_2: 'Banner 2', banner_3: 'Banner de encerramento', signature: 'Assinatura (rodapé da rede)', generic: 'Genérico',
 };
 
@@ -2073,7 +2073,7 @@ const DynamicHeaderPanel = ({ supported, enabled, groupRows, selectedId, assets,
     </div>
     {enabled && <div className="mt-3 space-y-2">
       <div className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px] leading-4 ${missing ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-900'}`}>
-        <span>{missing ? <><b>Conecte o logo de cada assinatura.</b> Faltam {missing} de {groupRows.length}; sem logo, o header sai só com o texto e o cartão.</> : <>Todas as {groupRows.length} assinaturas têm logo no header.</>}</span>
+        <span>{missing ? <><b>Conecte o logo de cada assinatura.</b> Faltam {missing} de {groupRows.length}; sem ele, o header sai só com o +amigo branco.</> : <>Todas as {groupRows.length} assinaturas têm logo no header.</>}</span>
         <button type="button" onClick={onEditTexts} className="font-bold underline">Editar textos e cartão</button>
       </div>
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
@@ -2085,7 +2085,7 @@ const DynamicHeaderPanel = ({ supported, enabled, groupRows, selectedId, assets,
         </li>)}
       </ul>
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
-        <span>O logo de cada rede vem da biblioteca de ativos (tipo “Logo do header dinâmico”).</span>
+        <span>O +amigo branco é fixo; ao lado entra o logo da rede, vindo da biblioteca (tipo “Logo da rede (header dinâmico)”).</span>
         <span className="flex gap-2">
           {groupRows.some((row) => row.HEADER_LOGO.trim()) && groupRows.some((row) => !row.HEADER_LOGO.trim()) && <button type="button" onClick={() => onLogoAll(groupRows.find((row) => row.HEADER_LOGO.trim())!.HEADER_LOGO)} className="font-bold text-cyan-800 underline">Usar o mesmo logo nas que faltam</button>}
           <button type="button" onClick={onCreateAsset} className="font-bold text-cyan-800 underline">Cadastrar logo</button>

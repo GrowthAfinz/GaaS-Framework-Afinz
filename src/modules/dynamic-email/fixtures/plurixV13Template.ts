@@ -138,25 +138,32 @@ const V12_IMAGE_HEADER = `          %%[ IF @HeaderModo == "imagem" THEN ]%%
             </td>
           </tr>
           %%[ ENDIF ]%%`;
+/** Logo +amigo branco, fixo no header dinâmico (o mesmo da peça aprovada pelo marketing). */
+export const V13_HEADER_BRAND_LOGO = 'https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c460d98e-264a-4f75-940f-d62d6b40dabf.png';
+const HEADER_FONT = 'Tahoma, Geneva, sans-serif';
+
+// Reproduz a peça de referência do marketing: duas colunas de 50%, texto em Tahoma
+// (título 28px negrito, apoio 18px), logo +amigo branco + logo da rede lado a lado, e o
+// cartão ocupando a coluna da direita (300px), encostado no topo.
 const V13_HTML_HEADER = `${V12_IMAGE_HEADER}
           %%[ IF @HeaderModo == "html" THEN ]%%
           <!-- V13: header dinâmico, textos e imagens do próprio briefing -->
           <tr>
             <td bgcolor="${FUNDO}" style="padding:0; background-color:${FUNDO};">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${FUNDO}" style="background-color:${FUNDO};">
                 <tr>
-                  <td width="56%" valign="middle" class="stack-column hdr-copy" style="width:56%; padding:34px 12px 30px 30px;">
-                    <div class="hdr-title" style="margin:0 0 12px 0; color:${COR_TITULO}; font-size:30px; line-height:1.15; font-weight:700;">%%=v(@HdrTitulo)=%%</div>
+                  <td width="50%" valign="top" class="stack-column hdr-copy" style="width:50%; padding:30px 3px 24px 20px; font-family:${HEADER_FONT};">
+                    <div class="hdr-title" style="margin:0; font-family:${HEADER_FONT}; color:${COR_TITULO}; font-size:28px; line-height:1.25; font-weight:bold;">%%=v(@HdrTitulo)=%%</div>
                     %%[ IF NOT EMPTY(@HdrSubtitulo) THEN ]%%
-                    <div class="hdr-sub" style="margin:0 0 18px 0; color:${COR_SUBTITULO}; font-size:18px; line-height:1.4;">%%=v(@HdrSubtitulo)=%%</div>
+                    <div class="hdr-sub" style="margin:18px 0 0 0; font-family:${HEADER_FONT}; color:${COR_SUBTITULO}; font-size:18px; line-height:1.5;">%%=v(@HdrSubtitulo)=%%</div>
                     %%[ ENDIF ]%%
-                    %%[ IF NOT EMPTY(@HdrLogo) THEN ]%%
-                    <img class="hdr-logo" src="%%=v(@HdrLogo)=%%" alt="+amigo" height="26" style="display:block; height:26px; width:auto; border:0;">
-                    %%[ ENDIF ]%%
+                    <div class="hdr-logos" style="margin:22px 0 0 0; line-height:0; font-size:0;">
+                      <img class="hdr-brand" src="${V13_HEADER_BRAND_LOGO}" alt="+amigo" width="80" height="21" style="display:inline-block; vertical-align:middle; width:80px; height:21px; border:0;">%%[ IF NOT EMPTY(@HdrLogo) THEN ]%%<img class="hdr-partner" src="%%=v(@HdrLogo)=%%" alt="" width="80" style="display:inline-block; vertical-align:middle; width:80px; height:auto; max-height:21px; margin-left:8px; border:0;">%%[ ENDIF ]%%
+                    </div>
                   </td>
-                  <td width="44%" align="center" valign="bottom" class="stack-column hdr-card" style="width:44%; padding:22px 22px 0 0;">
+                  <td width="50%" align="center" valign="top" class="stack-column hdr-card" style="width:50%; padding:0 0 0 3px;">
                     %%[ IF NOT EMPTY(@HdrCartao) THEN ]%%
-                    <img src="%%=v(@HdrCartao)=%%" alt="Cartão +amigo Visa" width="240" style="display:block; width:100%; max-width:240px; height:auto; border:0; margin:0 auto;">
+                    <img src="%%=v(@HdrCartao)=%%" alt="Cartão +amigo Visa" width="300" style="display:block; width:100%; max-width:300px; height:auto; border:0; margin:0 auto;">
                     %%[ ENDIF ]%%
                   </td>
                 </tr>
@@ -205,10 +212,10 @@ const POOL_BLOCK = `          %%[ IF NOT EMPTY(@OfertaProduto) THEN ]%%
 `;
 
 const MOBILE_ANCHOR = '      .stack-image { padding: 8px 22px 24px 22px !important; }\n';
-const MOBILE_V13 = `${MOBILE_ANCHOR}      .hdr-copy { padding: 26px 22px 8px 22px !important; text-align: center !important; }
-      .hdr-title { font-size: 26px !important; }
-      .hdr-logo { margin: 0 auto !important; }
-      .hdr-card { padding: 8px 40px 0 40px !important; }
+const MOBILE_V13 = `${MOBILE_ANCHOR}      .hdr-copy { padding: 26px 20px 6px 20px !important; }
+      .hdr-title { font-size: 24px !important; }
+      .hdr-sub { font-size: 16px !important; margin-top: 12px !important; }
+      .hdr-card { padding: 4px 48px 0 48px !important; }
 `;
 
 function buildPlurixV13(): string {

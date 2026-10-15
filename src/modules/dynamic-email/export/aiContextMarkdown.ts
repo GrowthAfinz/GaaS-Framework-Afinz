@@ -127,7 +127,7 @@ const COLUMN_DOCS: Record<BriefingColumn, ColumnDoc> = {
   HEADER_TITULO: { friendly: 'Linha principal do header dinâmico (até 34)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode — sem ela o header dinâmico não aparece (V13+)' },
   HEADER_SUBTITULO: { friendly: 'Linha secundária do header dinâmico (até 60)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode' },
   HEADER_IMAGEM_CARTAO: { friendly: 'Imagem do cartão no header (PNG HTTPS)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode' },
-  HEADER_LOGO: { friendly: 'Logo no header dinâmico (PNG HTTPS)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode' },
+  HEADER_LOGO: { friendly: 'Logo da rede no header dinâmico, ao lado do +amigo branco fixo (PNG HTTPS)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode' },
   MENSAGEM_LIMITE: { friendly: 'Mensagem da faixa de limite pré-aprovado', block: 'Faixa de limite', html: true, personalization: false, emptyWhen: 'pode — sem mensagem a faixa não aparece (só templates V12+). Aceita só {{nome}} e {{limite}}, sem AMPscript.' },
 };
 
