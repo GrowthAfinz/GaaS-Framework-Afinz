@@ -16,6 +16,8 @@ export const PLURIX_V13_TP_CAMPANHA = 'Topo de Funil';
  * 2. TP_CAMPANHA "Topo de Funil" e sequência de E-mail 1 a E-mail 8.
  * 3. Bloco 3 da V10: oferta do dia do pool (DE_POOL_OFERTAS_PLURIX). Sem oferta vigente,
  *    o bloco não aparece e o envio segue; o lookup nunca chama RaiseError.
+ * 4. Do E-mail 3 em diante, segundo bloco sem imagem em largura total (GENERIC_BLOCK2_V13).
+ * 5. Faixa de limite amarela nos e-mails ímpares e bege nos pares (LIMIT_BAND_TD_V13).
  *
  * A prévia da Fábrica não executa este preparo: header e faixa são espelhados em
  * ampscript/renderer.ts e a oferta em domain/topoPlurixV10.ts (selectPoolOfferOfDay).
@@ -211,6 +213,52 @@ const POOL_BLOCK = `          %%[ IF NOT EMPTY(@OfertaProduto) THEN ]%%
           %%[ ENDIF ]%%
 `;
 
+/**
+ * Segundo bloco do E-mail 3 em diante: sem BANNER_2_CORPO, a coluna de imagem (45%) ficava vazia e os
+ * blocos de conteúdo (grade, números) espremidos em 55%. Sem imagem, o bloco usa a largura total, igual
+ * ao E-mail 1 (título na faixa cinza, texto e botão abaixo). Com imagem, segue o layout em duas colunas.
+ */
+const GENERIC_BLOCK2_START = `          %%[ ELSE ]%%
+          %%[ IF NOT EMPTY(@TituloCopy2) OR NOT EMPTY(@Copy2Preto) OR (NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2)) OR NOT EMPTY(@Banner2Corpo) THEN ]%%`;
+const GENERIC_BLOCK2_V13 = `          %%[ ELSE ]%%
+          %%[ IF EMPTY(@Banner2Corpo) THEN ]%%
+          <!-- V13: segundo bloco sem imagem, largura total como no E-mail 1 -->
+          %%[ IF NOT EMPTY(@TituloCopy2) THEN ]%%
+          <tr>
+            <td align="center" bgcolor="#F6F6FB" class="content-pad" style="padding:26px 32px 24px 32px; background-color:#F6F6FB;">
+              <h2 class="headline" style="max-width:500px; margin:0 auto 18px auto; color:%%=v(@CorTituloCopy2)=%%; font-size:%%=v(@TamanhoFonteTituloCopy2)=%%px; line-height:1.25; font-weight:700; text-align:center;">%%=TreatAsContent(@TituloCopy2)=%%</h2>
+            </td>
+          </tr>
+          %%[ ENDIF ]%%
+          %%[ IF NOT EMPTY(@Copy2Preto) OR (NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2)) THEN ]%%
+          <tr>
+            <td align="center" class="content-pad cta-cell" style="padding:24px 32px 32px 32px;">
+              %%[ IF NOT EMPTY(@Copy2Preto) THEN ]%%
+              <div class="body-copy" style="max-width:480px; margin:0 auto 18px auto; color:%%=v(@CorCopy2)=%%; font-size:%%=v(@TamanhoFonteCopy2)=%%px; line-height:1.6; text-align:center;">%%=TreatAsContent(@Copy2Preto)=%%</div>
+              %%[ ENDIF ]%%
+              %%[ IF NOT EMPTY(@TituloCTA2) AND NOT EMPTY(@LinkCTA2) THEN ]%%
+              <a class="cta-link" href="%%=RedirectTo(TreatAsContent(@LinkCTA2))=%%" target="_blank" style="display:inline-block; min-width:280px; border-radius:10px; background-color:#2C3490; color:#ffffff; padding:15px 26px; font-size:15px; line-height:20px; text-align:center; text-decoration:none; font-weight:700;">%%=TreatAsContent(@TituloCTA2)=%%</a>
+              %%[ ENDIF ]%%
+            </td>
+          </tr>
+          %%[ ENDIF ]%%
+          %%[ ENDIF ]%%
+          %%[ IF NOT EMPTY(@Banner2Corpo) THEN ]%%`;
+
+/**
+ * Faixa de limite alternando as cores da marca por e-mail: amarelo (#E6A813) nos ímpares e bege
+ * (#EBE0CF) nos pares, para a pessoa perceber que é uma mensagem nova da régua. O texto continua
+ * azul #2C3490, com contraste suficiente nos dois fundos.
+ */
+export const V13_LIMIT_BAND_YELLOW = '#E6A813';
+export const V13_LIMIT_BAND_BEIGE = '#EBE0CF';
+const LIMIT_BAND_TD = '            <td align="center" class="content-pad" bgcolor="#FFF4D6" style="padding:14px 32px; background-color:#FFF4D6;">';
+const LIMIT_BAND_TD_V13 = `            %%[ IF @Sequencia == "E-mail 2" OR @Sequencia == "E-mail 4" OR @Sequencia == "E-mail 6" OR @Sequencia == "E-mail 8" THEN ]%%
+            <td align="center" class="content-pad" bgcolor="${V13_LIMIT_BAND_BEIGE}" style="padding:14px 32px; background-color:${V13_LIMIT_BAND_BEIGE};">
+            %%[ ELSE ]%%
+            <td align="center" class="content-pad" bgcolor="${V13_LIMIT_BAND_YELLOW}" style="padding:14px 32px; background-color:${V13_LIMIT_BAND_YELLOW};">
+            %%[ ENDIF ]%%`;
+
 const MOBILE_ANCHOR = '      .stack-image { padding: 8px 22px 24px 22px !important; }\n';
 const MOBILE_V13 = `${MOBILE_ANCHOR}      .hdr-copy { padding: 26px 20px 6px 20px !important; }
       .hdr-title { font-size: 24px !important; }
@@ -229,6 +277,8 @@ function buildPlurixV13(): string {
   source = replaceOnce(source, V12_IMAGE_HEADER, V13_HTML_HEADER, 'header HTML');
   source = replaceOnce(source, BANNER_3_START, `${POOL_BLOCK}${BANNER_3_START}`, 'bloco 3');
   source = replaceOnce(source, MOBILE_ANCHOR, MOBILE_V13, 'CSS mobile');
+  source = replaceOnce(source, GENERIC_BLOCK2_START, GENERIC_BLOCK2_V13, 'segundo bloco sem imagem');
+  source = replaceOnce(source, LIMIT_BAND_TD, LIMIT_BAND_TD_V13, 'cor da faixa de limite');
   return source;
 }
 

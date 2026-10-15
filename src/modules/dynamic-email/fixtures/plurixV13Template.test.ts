@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PLURIX_V12_TEMPLATE } from './plurixV12Template';
-import { PLURIX_V13_TEMPLATE, V13_HEADER_BRAND_LOGO } from './plurixV13Template';
+import { PLURIX_V13_TEMPLATE, V13_HEADER_BRAND_LOGO, V13_LIMIT_BAND_BEIGE, V13_LIMIT_BAND_YELLOW } from './plurixV13Template';
 import { renderDynamicEmail, type SubscriberSample } from '../ampscript/renderer';
 import { emptyBriefingRow, templateActiveColumns, type BriefingRow } from '../domain/briefing';
 import { plurixEnvelope } from '../domain/sfmcEnvelope';
@@ -81,6 +81,28 @@ describe('PLURIX V13 (candidata)', () => {
     const active = templateActiveColumns(PLURIX_V13_TEMPLATE);
     for (const column of ['HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO', 'MENSAGEM_LIMITE'] as const) expect(active.has(column)).toBe(true);
     expect(plurixEnvelope(PLURIX_V13_TEMPLATE)?.version).toBe('V13');
+  });
+
+  it('faixa de limite amarela nos e-mails ímpares e bege nos pares', () => {
+    for (const [sequencia, cor, outra] of [['E-mail 1', V13_LIMIT_BAND_YELLOW, V13_LIMIT_BAND_BEIGE], ['E-mail 2', V13_LIMIT_BAND_BEIGE, V13_LIMIT_BAND_YELLOW],
+      ['E-mail 3', V13_LIMIT_BAND_YELLOW, V13_LIMIT_BAND_BEIGE], ['E-mail 4', V13_LIMIT_BAND_BEIGE, V13_LIMIT_BAND_YELLOW]]) {
+      const { html } = renderDynamicEmail(PLURIX_V13_TEMPLATE, row({ SEQUENCIA: sequencia }), sample({ SEQUENCIA: sequencia }));
+      expect(html).toContain(`bgcolor="${cor}"`);
+      expect(html).not.toContain(`bgcolor="${outra}"`);
+    }
+    expect(PLURIX_V13_TEMPLATE).not.toContain('#FFF4D6');
+  });
+
+  it('do E-mail 3 em diante, segundo bloco sem imagem ocupa a largura total; com imagem, duas colunas', () => {
+    const bloco2 = { TITULO_COPY_2: 'Mais motivos para aproveitar as compras', COPY_2_PRETO: '<p>grade</p>', TITULO_CTA_2: 'QUERO MEU CARTÃO +AMIGO', LINK_CTA_2: 'https://app' };
+    const semImagem = renderDynamicEmail(PLURIX_V13_TEMPLATE, row(bloco2), sample()).html;
+    expect(semImagem).toContain('segundo bloco sem imagem, largura total');
+    expect(semImagem).not.toContain('class="stack-column stack-copy" style="width:55%');
+    expect(semImagem).toContain('<p>grade</p>');
+    const comImagem = renderDynamicEmail(PLURIX_V13_TEMPLATE, row({ ...bloco2, BANNER_2_CORPO: 'https://img/cartoes.png' }), sample()).html;
+    expect(comImagem).not.toContain('segundo bloco sem imagem, largura total');
+    expect(comImagem).toContain('class="stack-column stack-copy" style="width:55%');
+    expect(comImagem).toContain('src="https://img/cartoes.png"');
   });
 
   it('não deixa AMPscript sem resolver', () => {

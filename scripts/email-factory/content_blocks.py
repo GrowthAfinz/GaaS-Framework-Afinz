@@ -16,6 +16,7 @@ YELLOW = "#E7A921"
 CARD = "#F4F5FB"
 BORDER = "#E1E3F2"
 MUTED = "#4A4F6A"
+INK = "#242424"  # mesmo preto do texto principal (COR_COPY_PRETO_1)
 DE_FIELD_LIMIT = 4000  # tamanho das colunas de texto da TB_BRIEFING_CAMPANHA_AQUISICAO
 
 
@@ -39,9 +40,15 @@ def closing(text, allow_html=True):
     return f'<p style="margin:16px 0 0 0;text-align:center;font-weight:700;color:{NAVY};">{_t(text, allow_html)}</p>'
 
 
-def benefit_grid(items, mark="&#10003;"):
+def _highlight(text):
+    """Negrito do marketing na explicação do cartão: sai em preto, para o número se destacar do cinza."""
+    return text.replace("<b>", f'<b style="color:{INK};">')
+
+
+def benefit_grid(items, mark="&#10003;", allow_html=False):
     """Grade 2x2 (ou 2xN) de cartões: selo, título curto e uma linha de explicação.
     items: lista de (titulo, descricao). Use de 2 a 6 itens, número par de preferência.
+    allow_html=True aceita <b> na explicação (ex.: "<b>Até 70%</b> de desconto"), em preto.
 
     Cada cartão é a própria célula da tabela: células da mesma linha sempre têm a mesma
     altura (inclusive no Outlook), então a grade fica simétrica mesmo com textos de tamanhos
@@ -49,12 +56,13 @@ def benefit_grid(items, mark="&#10003;"):
     empilha as células e a margin-bottom (ignorada em célula de tabela) passa a valer."""
     cells = []
     for title, desc in items:
+        body = _highlight(desc) if allow_html else _t(desc)
         cells.append(
             f'<td class="stack-column" width="50%" valign="top" bgcolor="{CARD}" '
             f'style="width:50%;padding:16px;text-align:left;background-color:{CARD};border:1px solid {BORDER};'
             f'border-radius:12px;margin-bottom:10px;">{_badge(mark)}'
             f'<p style="margin:10px 0 4px 0;font-size:14px;line-height:1.3;font-weight:700;color:{NAVY};">{_t(title)}</p>'
-            f'<p style="margin:0;font-size:13px;line-height:1.45;color:{MUTED};">{_t(desc)}</p></td>')
+            f'<p style="margin:0;font-size:13px;line-height:1.45;color:{MUTED};">{body}</p></td>')
     rows = ["".join(cells[i:i + 2]) for i in range(0, len(cells), 2)]
     body = "".join(f"<tr>{row}</tr>" for row in rows)
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="10" border="0" '
@@ -79,10 +87,10 @@ def stat_tiles(items):
 
 
 def check_list(items):
-    """Lista vertical com selo de check, alinhada à esquerda. items: lista de textos (aceita <b>)."""
+    """Lista vertical com selo de check, alinhada à esquerda, texto em preto. items: lista de textos (aceita <b>)."""
     rows = "".join(
         f'<tr><td width="38" valign="top" style="width:38px;padding:6px 0;">{_badge("&#10003;")}</td>'
-        f'<td valign="middle" style="padding:6px 0;text-align:left;font-size:15px;line-height:1.45;">{_t(text, True)}</td></tr>'
+        f'<td valign="middle" style="padding:6px 0;text-align:left;font-size:15px;line-height:1.45;color:{INK};">{_t(text, True)}</td></tr>'
         for text in items)
     return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">{rows}</table>'
 
