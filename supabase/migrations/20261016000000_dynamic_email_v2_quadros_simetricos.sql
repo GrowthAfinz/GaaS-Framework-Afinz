@@ -1,0 +1,13 @@
+-- V2 TOPO DE FUNIL DINÂMICO, E-mail 2: números em destaque simétricos (quadros com a mesma altura).
+with alvo as (
+  select id, briefing_data || jsonb_build_object('COPY_2_PRETO', $gaas$<p style="margin:0 0 14px 0;text-align:center;">No Clube você conta com ofertas, eventos e sorteios. Com o <b>cartão +amigo</b>, você tem tudo isso e mais <b>+5% de desconto extra em produtos selecionados</b> sempre que paga com ele.</p><table role="presentation" width="100%" cellpadding="0" cellspacing="10" border="0" style="margin:0 auto;border-collapse:separate;"><tr><td class="stack-column" width="33%" valign="top" bgcolor="#F4F5FB" style="width:33%;padding:16px 10px;text-align:center;background-color:#F4F5FB;border:1px solid #E1E3F2;border-radius:12px;margin-bottom:10px;"><p style="margin:0;font-size:26px;line-height:1.1;font-weight:700;color:#2C3490;">+5%</p><p style="margin:6px 0 0 0;font-size:13px;line-height:1.35;color:#4A4F6A;">OFF em produtos selecionados</p></td><td class="stack-column" width="33%" valign="top" bgcolor="#F4F5FB" style="width:33%;padding:16px 10px;text-align:center;background-color:#F4F5FB;border:1px solid #E1E3F2;border-radius:12px;margin-bottom:10px;"><p style="margin:0;font-size:26px;line-height:1.1;font-weight:700;color:#2C3490;">40 dias</p><p style="margin:6px 0 0 0;font-size:13px;line-height:1.35;color:#4A4F6A;">para pagar</p></td><td class="stack-column" width="33%" valign="top" bgcolor="#F4F5FB" style="width:33%;padding:16px 10px;text-align:center;background-color:#F4F5FB;border:1px solid #E1E3F2;border-radius:12px;margin-bottom:10px;"><p style="margin:0;font-size:26px;line-height:1.1;font-weight:700;color:#2C3490;">70%</p><p style="margin:6px 0 0 0;font-size:13px;line-height:1.35;color:#4A4F6A;">OFF em consultas e medicamentos</p></td></tr></table><p style="margin:16px 0 0 0;text-align:center;font-weight:700;color:#2C3490;">As melhores vantagens do mercado na palma da sua mão!</p>$gaas$) as dados
+  from public.dynamic_email_briefings
+  where segment = 'V2 TOPO DE FUNIL DINÂMICO' and status <> 'archived' and briefing_data->>'SEQUENCIA' = 'E-mail 2'
+), atualizados as (
+  update public.dynamic_email_briefings b set briefing_data = alvo.dados, version = b.version + 1, updated_at = now()
+  from alvo where b.id = alvo.id and b.briefing_data is distinct from alvo.dados
+  returning b.id, b.version, b.briefing_data
+)
+insert into public.dynamic_email_briefing_versions (briefing_id, version, snapshot, change_summary, warnings)
+select id, version, briefing_data, 'Números em destaque simétricos (E-mail 2).', '[]'::jsonb from atualizados
+on conflict (briefing_id, version) do nothing;

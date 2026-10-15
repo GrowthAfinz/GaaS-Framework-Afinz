@@ -62,18 +62,20 @@ def benefit_grid(items, mark="&#10003;"):
 
 
 def stat_tiles(items):
-    """Números em destaque lado a lado (2 ou 3). items: lista de (numero, legenda)."""
+    """Números em destaque lado a lado (2 ou 3). items: lista de (numero, legenda).
+
+    Mesma técnica da grade: cada quadro é uma célula da mesma linha, então todos ficam com a
+    mesma altura e o número fica alinhado no topo, independente do tamanho da legenda."""
     width = f"{100 // len(items)}%"
     cells = "".join(
-        f'<td class="stack-column" width="{width}" valign="top" style="width:{width};padding:5px;">'
-        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
-        f'style="background-color:{CARD};border:1px solid {BORDER};border-radius:12px;">'
-        f'<tr><td style="padding:16px 10px;text-align:center;">'
+        f'<td class="stack-column" width="{width}" valign="top" bgcolor="{CARD}" '
+        f'style="width:{width};padding:16px 10px;text-align:center;background-color:{CARD};border:1px solid {BORDER};'
+        f'border-radius:12px;margin-bottom:10px;">'
         f'<p style="margin:0;font-size:26px;line-height:1.1;font-weight:700;color:{NAVY};">{_t(number)}</p>'
-        f'<p style="margin:6px 0 0 0;font-size:13px;line-height:1.35;color:{MUTED};">{_t(label)}</p>'
-        f'</td></tr></table></td>'
+        f'<p style="margin:6px 0 0 0;font-size:13px;line-height:1.35;color:{MUTED};">{_t(label)}</p></td>'
         for number, label in items)
-    return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;"><tr>{cells}</tr></table>'
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="10" border="0" '
+            f'style="margin:0 auto;border-collapse:separate;"><tr>{cells}</tr></table>')
 
 
 def check_list(items):
