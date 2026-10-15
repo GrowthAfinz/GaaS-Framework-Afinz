@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     hasAquisicaoJourneyPrefix,
     parseCanonicalAcquisitionJourney,
+    inferCartAudience,
+    acquisitionJourneyIdentity,
 } from './intelligentImportRouting';
 
 describe('intelligent import journey routing', () => {
@@ -44,5 +46,37 @@ describe('intelligent import journey routing', () => {
             parceiro: 'Proprietaria',
             segmento: 'Abandonados',
         });
+    });
+});
+
+describe('acquisition audience contract', () => {
+    it.each(['JOR_AQS', 'JOR_AQUISICAO'])('handles compact and legacy layouts with %s', (prefix) => {
+        expect(parseCanonicalAcquisitionJourney(`${prefix}_PLURIX_21D_ABD_REATIVACAO_PADRAO_COPA_JUN26`))
+            .toMatchObject({ bu: 'Plurix', segmento: 'Abandonados', etapaAquisicao: 'Reativacao' });
+        expect(parseCanonicalAcquisitionJourney(`${prefix}_B2C_CARRINHO_21D_PAD_VIBE_OUT26`))
+            .toMatchObject({ bu: 'B2C', segmento: 'Abandonados' });
+        expect(parseCanonicalAcquisitionJourney(`${prefix}_B2B2C_BB_ANC_UPGRADE_PAD_VIBE_OUT26`))
+            .toMatchObject({ parceiro: 'Bem Barato', segmento: 'Aprovados_nao_convertidos', etapaAquisicao: 'Meio_de_Funil' });
+    });
+    it.each([
+        ['JOR_AQS_PLURIX_21D_ABD', 'plu_car_vis_aqs_wpp_car_21d1copa_diario', 'Abandonados D-21 A D>7'],
+        ['JOR_AQS_PLURIX_CARRINHO_SABADO_PAD_26', 'plu_car_plx_aqs_wpp_car_sabadoplurix21diasd7_20260926', 'Abandonados D-21 A D>7'],
+        ['JOR_AQS_B2C_NA_ABD', 'afz_car_vis_aqs_wpp_car_disparo1sabado_20260307', 'Abandonados D-7'],
+        ['JOR_AQS_PLURIX_CARRINHO', 'afz_car_vis_aqs_wpp_car_d7institucional_diario', 'Diario'],
+    ])('resolves audience independently of cadence: %s / %s', (j, a, subgrupo) => {
+        expect(inferCartAudience(j, a)).toEqual({ subgrupo });
+    });
+    it('does not reinterpret a dispatch offset as audience age', () => {
+        expect(inferCartAudience('JOR_AQS_PLURIX_CARRINHO', 'plu_car_plx_aqs_email_car_d21_diario'))
+            .toEqual({ subgrupo: 'Diario' });
+    });
+    it('normalizes prefix identity only', () => {
+        expect(acquisitionJourneyIdentity('JOR_AQS_PLURIX_NA_NGD')).toBe(acquisitionJourneyIdentity('JOR_AQUISICAO_PLURIX_NA_NGD'));
+    });
+    it('keeps a curated audience when only cadence is known and reviews a weak weekend conflict', () => {
+        expect(inferCartAudience('JOR_AQS_B2C_NA_ABD', 'afz_car_vis_aqs_wpp_car_d7_diario', 'Abandonados D-21 A D>7'))
+            .toEqual({ subgrupo: 'Abandonados D-21 A D>7' });
+        expect(inferCartAudience('JOR_AQS_B2C_NA_ABD', 'afz_car_vis_aqs_wpp_car_sabado_pontual', 'Abandonados D-21 A D>7').conflict)
+            .toBeTruthy();
     });
 });

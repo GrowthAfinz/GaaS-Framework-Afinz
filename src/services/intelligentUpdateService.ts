@@ -1,3 +1,4 @@
+import { acquisitionJourneyIdentity } from '../utils/intelligentImportRouting';
 import { supabase } from './supabaseClient';
 import type { Activity } from '../types/framework';
 import { classifyRentabilizacao } from '../utils/rentabilizacaoClassify';
@@ -61,6 +62,7 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     conflictReason?: string;
     metricRefresh?: boolean;
     canonicalDimensionRefresh?: boolean;
+    canonicalDimensionFields?: string[];
     auditRequired?: boolean;
     manualOverrides?: Array<{
         field: string;
@@ -71,7 +73,7 @@ export interface IntelligentUpdateCandidatePayload extends IntelligentUpdateMetr
     }>;
 }
 
-const journeyFamily = (journey: string) => journey
+const journeyFamily = (journey: string) => acquisitionJourneyIdentity(journey)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
@@ -204,10 +206,12 @@ const cacFromCusto = (
     return Number(calcularCACPrevisto(custoTotalCampanha, cartoes).toFixed(2));
 };
 
-const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
+export const numericPatch = (candidate: IntelligentUpdateCandidatePayload): Record<string, number | string | null> => {
     const patch: Record<string, number | string | null> = {};
     const manuallyChanged = new Set((candidate.manualOverrides ?? []).map((override) => override.field));
-    const includeDimension = (field: string) => !candidate.metricRefresh || candidate.canonicalDimensionRefresh || manuallyChanged.has(field);
+    const includeDimension = (field: string) => !candidate.metricRefresh
+        || Boolean(candidate.canonicalDimensionRefresh && candidate.canonicalDimensionFields?.includes(field))
+        || manuallyChanged.has(field);
 
     if (candidate.sent !== undefined) patch['Base Total'] = candidate.sent;
     if (candidate.delivered !== undefined) patch['Base Acionável'] = candidate.delivered;
@@ -254,7 +258,7 @@ const numericPatch = (candidate: IntelligentUpdateCandidatePayload) => {
     };
 };
 
-const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
+export const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
   // Custo determinístico por canal × base acionável e CAC derivado dele — calculados
   // uma vez para gravar ambos coerentes no insert (sem isto o CAC nascia nulo).
   const custo = custoPatch(candidate.channel, candidate.delivered ?? null, candidate.date);
@@ -283,11 +287,11 @@ const buildInsertPayload = (candidate: IntelligentUpdateCandidatePayload) => {
     'Base Acionável': candidate.delivered ?? null,
     'Abertura': candidate.opens ?? null,
     'Cliques': candidate.clicks ?? null,
-    'Cartões Gerados': candidate.finalized ?? 0,
-    'Aprovados': candidate.approved ?? 0,
-    'Propostas': candidate.proposals ?? 0,
-    'Emissões Independentes': candidate.independent ?? 0,
-    'Emissões Assistidas': candidate.assisted ?? 0,
+    'Cartões Gerados': candidate.finalized ?? null,
+    'Aprovados': candidate.approved ?? null,
+    'Propostas': candidate.proposals ?? null,
+    'Emissões Independentes': candidate.independent ?? null,
+    'Emissões Assistidas': candidate.assisted ?? null,
     ...custo,
     'CAC': cacFromCusto(custo['Custo Total Campanha'], candidate.finalized ?? 0),
     updated_at: new Date().toISOString(),

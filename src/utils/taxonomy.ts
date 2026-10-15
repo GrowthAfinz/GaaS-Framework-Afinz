@@ -637,7 +637,7 @@ export const PLURIX_CART_ASSISTED_JOURNEY = 'JOR_AQUISICAO_PLURIX_CARRINHO_ABAND
  */
 export function canonicalPlurixCartJourney(journey: unknown, activityName: unknown): string {
   const journeyKey = normalizeJourneyKey(journey);
-  const isPlurixCartJourney = journeyKey.includes('aquisicao_plurix_carrinho_abandonado');
+  const isPlurixCartJourney = /(?:aquisicao|aqs)_plurix_carrinho_abandonado/.test(journeyKey);
   if (!isPlurixCartJourney || journeyKey.includes('teste')) return String(journey ?? '').trim();
 
   const activityKey = normalizeJourneyKey(activityName);
@@ -654,7 +654,7 @@ export function cleanJourneyName(name: string): string {
   if (!name) return name;
   let clean = name;
   // Remove prefix JOR_AQUISICAO_ or JOR_
-  clean = clean.replace(/^JOR_AQUISICAO_/, '');
+  clean = clean.replace(/^JOR_(?:AQUISICAO|AQS)_/i, '');
   clean = clean.replace(/^JOR_/, '');
   // Remove starting underscore
   clean = clean.replace(/^_/, '');

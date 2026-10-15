@@ -35,6 +35,8 @@ import { classifyRentabilizacao } from '../../utils/rentabilizacaoClassify';
 import {
     hasAquisicaoJourneyPrefix,
     parseCanonicalAcquisitionJourney,
+    acquisitionJourneyIdentity,
+    inferCartAudience,
 } from '../../utils/intelligentImportRouting';
 import {
     parseSeqParts,
@@ -159,6 +161,7 @@ interface UpdateCandidate extends MetricRow {
     matchedActivity?: Activity;
     metricRefresh?: boolean;
     canonicalDimensionRefresh?: boolean;
+    canonicalDimensionFields?: string[];
     auditRequired?: boolean;
     manualOverrides?: ManualOverride[];
 }
@@ -578,6 +581,7 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
         parceiro: canonicalJourney.parceiro ?? origin?.parceiro,
         segmento: isAbandonedCart ? 'Abandonados' : canonicalJourney.segmento,
         etapaAquisicao: isAbandonedCart ? 'Reativacao' : canonicalJourney.etapaAquisicao,
+        subgrupo: inferCartAudience(metric.journey, metric.activityName).subgrupo,
         source: canonicalJourney.source ?? (activityOrigin ? 'token determinístico da activity' : journeyOrigin ? 'token determinístico da jornada' : undefined),
         evidence: canonicalJourney.evidence ?? origin?.evidence ?? (isAbandonedCart ? 'carrinho_abandonado' : undefined),
         variante,
@@ -676,8 +680,8 @@ const buildDispatchSignature = (activityName: unknown, channel: unknown, date: u
     `${normalizeKey(activityName)}|${canonicalChannel(String(channel))}|${toDateKey(date)}`;
 
 const isSameJourneyFamily = (currentJourney: unknown, otherJourney: unknown) => {
-    const current = normalizeKey(currentJourney);
-    const other = normalizeKey(otherJourney);
+    const current = acquisitionJourneyIdentity(currentJourney);
+    const other = acquisitionJourneyIdentity(otherJourney);
     return current === other;
 };
 
@@ -1002,7 +1006,7 @@ const inferTaxonomy = (metric: MetricRow) => {
     // fechamento-copa-report.
     const etapaAquisicao = segmento === 'Abandonados' ? 'Reativacao' : deterministic.etapaAquisicao;
 
-    return { bu, parceiro, segmento, etapaAquisicao, subgrupo: isNovosCopa ? 'Copa' : undefined };
+    return { bu, parceiro, segmento, etapaAquisicao, subgrupo: isNovosCopa ? 'Copa' : deterministic.subgrupo };
 };
 
 const emptySuggestions = SUGGESTION_FIELDS.reduce<Partial<Record<SuggestionField, FieldSuggestion[]>>>((acc, field) => {
@@ -1173,7 +1177,7 @@ const suggestAllFields = (
                 ? deterministic.segmento || taxonomy.segmento
                 : field === 'etapaAquisicao'
                     ? deterministic.etapaAquisicao
-                    : undefined;
+                    : field === 'subgrupo' ? deterministic.subgrupo : undefined;
         const deterministicSuggestion: FieldSuggestion[] = deterministicValue
             ? [{
                 value: deterministicValue,
@@ -1215,7 +1219,7 @@ const MONTH_RANK: Record<string, number> = {
     jan: 1, fev: 2, mar: 3, abr: 4, abri: 4, mai: 5, maio: 5, jun: 6,
     jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12,
 };
-const PERIOD_TOKEN_RE = /(jan|fev|mar|abri|abr|maio|mai|jun|jul|ago|set|out|nov|dez)\s*(\d{4}|\d{2})/gi;
+const PERIOD_TOKEN_RE = /(jan|fev|mar|abri|abr|maio|mai|jun|jul|ago|set|out|nov|dez)[_\s]*(\d{4}|\d{2})/gi;
 const VARIANT_JUNK_RE = /\(teste\)|\bteste\b|\(interno\)|\binterno\b|\(v\d\)|_v\d(?:\b|_)|\(copiar\)|rascunho|nova jornada/i;
 
 const journeyPeriodRank = (journey: string): number => {
@@ -1235,14 +1239,15 @@ const journeyPeriodRank = (journey: string): number => {
 
 // "tronco" da jornada sem o token de periodo: identifica a campanha base
 const journeyStem = (journey: string): string =>
-    normalizeKey(journey).replace(PERIOD_TOKEN_RE, ' ').replace(/\s+/g, ' ').trim();
+    acquisitionJourneyIdentity(journey).replace(PERIOD_TOKEN_RE, ' ').replace(/\s+/g, ' ').trim();
 
 // Recebe as jornadas distintas que colidem na mesma assinatura (arquivo) e
 // devolve o papel de cada uma: winner (canonica/gravavel) | superseded | ambiguous.
 // knownJourneys = jornadas que ja existem na base (para preferir nome novo no caso 2).
 const electCanonicalJourney = (
     journeys: string[],
-    knownJourneys: Set<string>
+    knownJourneys: Set<string>,
+    activityName = '',
 ): Map<string, CanonicalRole> => {
     const roles = new Map<string, CanonicalRole>();
     const distinct = Array.from(new Set(journeys.map((j) => (j ?? '').trim()).filter(Boolean)));
@@ -1267,6 +1272,29 @@ const electCanonicalJourney = (
 
     if (pool.length === 0) { mark(distinct, 'ambiguous'); return roles; }
     if (pool.length === 1) { mark(pool, 'winner'); return roles; }
+
+    // Prefix-only aliases are one journey. Prefer the new spelling, exactly once.
+    if (new Set(pool.map(acquisitionJourneyIdentity)).size === 1) {
+        const winner = [...pool].sort((a, b) =>
+            Number(/^jor_aqs_/i.test(b)) - Number(/^jor_aqs_/i.test(a)) || a.localeCompare(b))[0];
+        elect(winner, pool);
+        return roles;
+    }
+
+    // Observed Plurix BI aliases for the SAME operational signature. An explicit
+    // 21D activity disambiguates SAB vs 21D; never use this to merge different activities.
+    const plurix21 = inferCartAudience('', activityName).subgrupo === 'Abandonados D-21 A D>7'
+        && pool.every((j) => /^jor_(?:aqs|aquisicao)_plurix_na_abd_carrinho(?:21d|_sab)_/i.test(j));
+    if (plurix21) {
+        const explicit = pool.filter((j) => /_carrinho21d_/i.test(j));
+        if (explicit.length) {
+            const ranked = [...explicit].sort((a, b) => journeyPeriodRank(b) - journeyPeriodRank(a));
+            if (ranked.length === 1 || journeyPeriodRank(ranked[0]) > journeyPeriodRank(ranked[1])) {
+                elect(ranked[0], pool);
+                return roles;
+            }
+        }
+    }
 
     const pickNewestUnique = (candidates: string[]): string | null => {
         let best = -1;
@@ -1474,7 +1502,15 @@ const buildCandidate = (
             normalizeKey(getRaw(existingDispatch!, ['Segmento'])) !== normalizeKey(taxonomy.segmento)
             || normalizeKey(getRaw(existingDispatch!, ['Etapa de aquisicao', 'Etapa de aquisição'])) !== normalizeKey(taxonomy.etapaAquisicao)
         );
-    const hasCanonicalDimensionRefresh = canonicalJourneyChanged || canonicalCartDimensionChanged;
+    const resolvedAudience = inferCartAudience(metric.journey, metric.activityName,
+        existingDispatch ? activityField(existingDispatch, 'subgrupo') : undefined);
+    if (resolvedAudience.subgrupo) taxonomy.subgrupo = resolvedAudience.subgrupo;
+    const canonicalAudienceChanged = Boolean(existingDispatch) && Boolean(taxonomy.subgrupo)
+        && normalizeKey(getRaw(existingDispatch!, ['Subgrupos'])) !== normalizeKey(taxonomy.subgrupo);
+    const canonicalStageChanged = Boolean(existingDispatch) && Boolean(taxonomy.etapaAquisicao)
+        && normalizeKey(getRaw(existingDispatch!, ['Etapa de aquisição'])) !== normalizeKey(taxonomy.etapaAquisicao);
+    const audienceConflict = resolvedAudience.conflict;
+    const hasCanonicalDimensionRefresh = canonicalJourneyChanged || canonicalCartDimensionChanged || canonicalAudienceChanged || canonicalStageChanged;
     const hasMetricRefresh = refreshDetails.length > 0 || hasCanonicalDimensionRefresh;
     const collidesWithAnotherJourney = historicalSignatureMatches.length > 0 && !existsInBase;
     const renamedJourneyPct = Math.round(renamedJourneySimilarity * 100);
@@ -1482,7 +1518,7 @@ const buildCandidate = (
     // Duplicacao do BI: a mesma activity+canal+data vem com varios nomes de jornada
     // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
     const fileJourneys = Array.from(new Set([metric.journey, ...Array.from(importedJourneys)])).filter(Boolean);
-    const canonicalRoles = electCanonicalJourney(fileJourneys, historyIndex.knownJourneys);
+    const canonicalRoles = electCanonicalJourney(fileJourneys, historyIndex.knownJourneys, metric.activityName);
     const myRole = canonicalRoles.get(normalizeKey(metric.journey));
     const fileSuperseded = myRole === 'superseded';
     const fileAmbiguous = myRole === 'ambiguous';
@@ -1503,7 +1539,7 @@ const buildCandidate = (
         ? 'error'
         : duplicateCount > 1
             ? 'duplicate'
-            : (fileSuperseded || fileAmbiguous)
+            : (fileSuperseded || fileAmbiguous || Boolean(audienceConflict))
                 // Nome antigo/variante do BI, ou colisao sem vencedor claro => conflito (nunca grava no escuro)
                 ? 'conflict'
                 : existsInBase
@@ -1521,7 +1557,7 @@ const buildCandidate = (
         ...metric,
         status,
         matchCount: 0,
-        fieldToReview: missingCritical
+        fieldToReview: audienceConflict ? 'Janela do publico' : missingCritical
             ? 'Chave'
             : duplicateCount > 1
                 ? 'Duplicidade'
@@ -1538,7 +1574,7 @@ const buildCandidate = (
                                 : status === 'ready'
                                     ? 'Aprovar'
                                     : 'Sugestoes',
-        suggestion: fileSuperseded
+        suggestion: audienceConflict || (fileSuperseded
             ? `Nome antigo/variante do BI; canonica: ${winnerJourney ?? '-'}`
             : fileAmbiguous
                 ? 'Colisao de jornada sem vencedor claro'
@@ -1547,15 +1583,15 @@ const buildCandidate = (
                         ? (renamedJourneyMatch
                             ? `Mesma activity, canal e data com jornada ${renamedJourneyPct}% similar; atualizar para nome canonico novo`
                             : hasCanonicalDimensionRefresh
-                            ? 'Classificacao canonica de carrinho mudou para Reativacao'
+                            ? 'Classificacao canonica de segmento, etapa ou janela do publico mudou'
                             : `${refreshDetails.length} metricas mudaram desde a ultima atualizacao`)
                         : 'Disparo ja existe na base de dados')
                     : collidesWithAnotherJourney
                         ? 'Mesma activity, canal e data existem em outra jornada; tratado como novo disparo'
                     : status === 'ready'
                         ? 'Sugestoes historicas fortes'
-                        : 'Revisar campos sugeridos',
-        confidence: hasMetricRefresh
+                        : 'Revisar campos sugeridos'),
+        confidence: audienceConflict ? 0 : hasMetricRefresh
             ? 100
             : missingCritical || duplicateCount > 1 || fileSuperseded || fileAmbiguous || existsInBase ? 0 : averageConfidence,
         confidenceBreakdown: hasMetricRefresh
@@ -1576,6 +1612,8 @@ const buildCandidate = (
                                     ...(renamedJourneyMatch ? [`jornada similar ${renamedJourneyPct}%: ${existingDispatch?.jornada ?? '-'} -> ${metric.journey}`] : []),
                                     ...(canonicalJourneyChanged ? [`jornada: ${existingDispatch?.jornada ?? '-'} -> ${metric.journey}`] : []),
                                     ...(canonicalCartDimensionChanged ? ['carrinho abandonado: Segmento/Etapa -> Abandonados/Reativacao'] : []),
+                                    ...(canonicalAudienceChanged ? [`Subgrupos -> ${taxonomy.subgrupo}`] : []),
+                                    ...(canonicalStageChanged ? [`Etapa -> ${taxonomy.etapaAquisicao}`] : []),
                                 ].join(' | ')
                                 : 'activity, canal, data e jornada ja existem na base de dados')
                             : collidesWithAnotherJourney
@@ -1586,7 +1624,7 @@ const buildCandidate = (
         bu: hasDeterministicBasePropria || hasExplicitBuToken ? taxonomy.bu : valueFor('bu', taxonomy.bu),
         parceiro: valueFor('parceiro', taxonomy.parceiro),
         segmento: hasDeterministicBasePropria || hasDeterministicNovosCopa || taxonomy.segmento === 'Abandonados' ? taxonomy.segmento : valueFor('segmento', taxonomy.segmento),
-        subgrupo: hasDeterministicNovosCopa ? taxonomy.subgrupo : valueFor('subgrupo', 'N/A'),
+        subgrupo: taxonomy.subgrupo || valueFor('subgrupo', 'N/A'),
         etapaAquisicao: taxonomy.etapaAquisicao || valueFor('etapaAquisicao', ''),
         perfilCredito: valueFor('perfilCredito', ''),
         produto: valueFor('produto', 'Cartao'),
@@ -1601,8 +1639,13 @@ const buildCandidate = (
         matchedActivity: (fileSuperseded || fileAmbiguous) ? undefined : existingDispatch,
         // Conflito de jornada (superseded/ambiguo) nunca e update seguro: nao deve
         // aparecer no rotulo/filtro "Atualizar metricas", mesmo que as metricas tenham mudado.
-        metricRefresh: hasMetricRefresh && !fileSuperseded && !fileAmbiguous,
-        canonicalDimensionRefresh: hasCanonicalDimensionRefresh && !fileSuperseded && !fileAmbiguous,
+        metricRefresh: hasMetricRefresh && !fileSuperseded && !fileAmbiguous && !audienceConflict,
+        canonicalDimensionRefresh: hasCanonicalDimensionRefresh && !fileSuperseded && !fileAmbiguous && !audienceConflict,
+        canonicalDimensionFields: [
+            ...(canonicalCartDimensionChanged ? ['segmento', 'etapaAquisicao'] : []),
+            ...(canonicalAudienceChanged ? ['subgrupo'] : []),
+            ...(canonicalStageChanged ? ['etapaAquisicao'] : []),
+        ],
         auditRequired: renamedJourneyMatch,
         conflictReason: fileSuperseded
             ? 'superseded_file_journey'
@@ -1789,7 +1832,9 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         const sameJourney = candidates.filter((item) =>
             row.journey && isSameJourneyFamily(item.candidate.journey, row.journey)
         );
-        const pool = sameJourney.length > 0 ? sameJourney : candidates;
+        const exactJourney = sameJourney.filter((item) =>
+            normalizeKey(item.candidate.journey) === normalizeKey(row.journey));
+        const pool = exactJourney.length > 0 ? exactJourney : sameJourney.length > 0 ? sameJourney : candidates;
         const match = pool.sort((a, b) => a.diff - b.diff)[0]?.candidate;
 
         if (match) return match;
@@ -1807,7 +1852,10 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
             const ecredSameJourney = ecredCandidates.filter((item) =>
                 row.journey && isSameJourneyFamily(item.candidate.journey, row.journey)
             );
-            const ecredPool = ecredSameJourney.length > 0 ? ecredSameJourney : ecredCandidates;
+            const ecredExactJourney = ecredSameJourney.filter((item) =>
+                normalizeKey(item.candidate.journey) === normalizeKey(row.journey));
+            const ecredPool = ecredExactJourney.length > 0 ? ecredExactJourney
+                : ecredSameJourney.length > 0 ? ecredSameJourney : ecredCandidates;
             const ecredMatch = ecredPool.sort((a, b) => a.diff - b.diff)[0]?.candidate;
             if (ecredMatch) mergedEcred += 1;
             return ecredMatch;
@@ -1846,12 +1894,6 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         addMetricValue(anchor, row, 'independent');
         anchor.sourceBlocks = Array.from(new Set([...(anchor.sourceBlocks ?? [anchor.sourceBlock]), 'performance']));
         mergedPerformance += hasConversionMetric(row) ? 1 : 0;
-    });
-
-    anchors.forEach((anchor) => {
-        GROUP_RESULT_FIELDS.forEach((field) => {
-            if (typeof anchor[field] !== 'number') (anchor as any)[field] = 0;
-        });
     });
 
     return { rows: anchors, mergedResidual, ignoredResidual, mergedPerformance, mergedEcred, ignoredPerformance };
@@ -2318,7 +2360,7 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
     };
 };
 
-const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
+export const processDinamicaBI = (matrix: string[][], activities: Activity[]): ProcessResult => {
     const warnings: string[] = [];
     const historyIndex = buildHistoryIndex(activities);
 

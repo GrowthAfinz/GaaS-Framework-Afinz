@@ -3,6 +3,7 @@ export interface CanonicalAcquisitionJourney {
     parceiro?: string;
     segmento?: string;
     etapaAquisicao?: string;
+    subgrupo?: string;
     source?: string;
     evidence?: string;
 }
@@ -61,10 +62,46 @@ const CANONICAL_JOURNEY_SEGMENT: Record<string, string> = {
 
 const canonicalFunnelStage = (tokens: string[]): string | undefined => {
     const joined = `_${tokens.join('_')}_`;
-    if (joined.includes('_topo_de_funil_')) return 'Topo_de_Funil';
+    if (joined.includes('_topo_de_funil_')) return 'Aquisicao';
     if (joined.includes('_meio_de_funil_')) return 'Meio_de_Funil';
     if (joined.includes('_fundo_de_funil_')) return 'Fundo_de_Funil';
     return undefined;
+};
+
+/** Prefix aliases have one identity for matching; preserve the source spelling in storage. */
+export const acquisitionJourneyIdentity = (journey: unknown): string =>
+    normalizeJourneyKey(journey).replace(/^jor_aqs_/, 'jor_aquisicao_');
+
+export interface CartAudience {
+    subgrupo?: string;
+    conflict?: string;
+}
+
+/** Audience age is independent of dispatch offsets (d0/d2/d7) and cadence. */
+export const inferCartAudience = (journey: unknown, activityName: unknown, historicalSubgroup?: string): CartAudience => {
+    const j = normalizeJourneyKey(journey);
+    const a = normalizeJourneyKey(activityName);
+    const text = `${j} ${a}`;
+    if (!/(carrinho|abandonad|(?:^|_)abd(?:_|$)|(?:^|_)car_)/.test(text)) return {};
+    // A leading digit boundary prevents dispatch 121d from becoming audience 21d.
+    const age21 = (s: string) => /(?:^|[^a-z0-9])21(?:dias|d)(?![a-z])|carrinho21d|(?:plurix|sabado)21dias/.test(s);
+    const age7 = (s: string) => /(?:^|[^a-z0-9])7(?:dias|d)(?:$|[^a-z0-9])|carrinho7d/.test(s);
+    const has21 = age21(text);
+    const has7 = age7(text);
+    if (has21 && has7) return { conflict: 'Janela do publico conflitante: 7D e 21D' };
+    if (has21) return { subgrupo: 'Abandonados D-21 A D>7' };
+    if (has7) return { subgrupo: 'Abandonados D-7' };
+    if (/sabado|(?:^|_)sab(?:_|$)|fim[_ -]*(?:de[_ -]*)?semana/.test(text)) {
+        if (historicalSubgroup === 'Abandonados D-21 A D>7') {
+            return { conflict: 'Sabado sem janela explicita diverge do publico historico 21D' };
+        }
+        return { subgrupo: 'Abandonados D-7' };
+    }
+    if (/(?:^|_)diario(?:_|$)/.test(text)) {
+        return { subgrupo: historicalSubgroup === 'Abandonados D-7' || historicalSubgroup === 'Abandonados D-21 A D>7'
+            ? historicalSubgroup : 'Diario' };
+    }
+    return {};
 };
 
 /**
@@ -93,14 +130,21 @@ export const parseCanonicalAcquisitionJourney = (journey: unknown): CanonicalAcq
     if (!bu) return {};
 
     const parceiro = CANONICAL_JOURNEY_PARTNER[tokens[start + 1]];
-    const segmento = CANONICAL_JOURNEY_SEGMENT[tokens[start + 2]]
-        ?? (tokens.slice(start + 2).includes('carrinho') ? 'Abandonados' : undefined);
+    const audienceTokens = tokens.slice(start + (parceiro !== undefined ? 2 : 1));
+    // Legacy PLURIX_21D_ABD and compact B2C_CARRINHO omit the partner slot.
+    const segmento = audienceTokens.slice(0, 3)
+        .map((token) => CANONICAL_JOURNEY_SEGMENT[token]).find(Boolean)
+        ?? (audienceTokens.some((token) => token.startsWith('carrinho')) ? 'Abandonados' : undefined);
+    const etapaAquisicao = segmento === 'Abandonados' ? 'Reativacao'
+        : segmento === 'Negados' || segmento === 'Aprovados_nao_convertidos' ? 'Meio_de_Funil'
+            : canonicalFunnelStage(tokens.slice(start + 1))
+                ?? (segmento === 'CRM' || segmento === 'Base_Proprietaria' ? 'Aquisicao' : undefined);
 
     return {
         bu,
         parceiro,
         segmento,
-        etapaAquisicao: canonicalFunnelStage(tokens.slice(start + 3)),
+        etapaAquisicao,
         source: 'jornada canonica',
         evidence: tokens.slice(start, start + 3).join('_'),
     };
