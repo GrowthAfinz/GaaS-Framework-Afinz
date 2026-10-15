@@ -14,8 +14,9 @@ export async function cachedJourneyRead<T>(key:string,ttl:number,load:()=>Promis
  if(!next)throw Error('Sessão necessária.');return cache.read(identity+':'+key,ttl,load);
 }
 async function rpc<T>(name:string,args:Record<string,unknown>={}){const {data,error}=await supabase.rpc(name,args);if(error)throw error;if(data===null)throw Error('Fonte indisponível ou sem acesso.');return data as T;}
-export const readJourneyDirectory=()=>cachedJourneyRead<JourneyDirectoryItem[]>('directory',300000,()=>rpc('read_journey_flow_directory'));
-export const readJourneyDetail=(id:string)=>cachedJourneyRead<JourneyIndexItem>('detail:'+id,300000,()=>rpc('read_journey_flow_detail',{p_snapshot:id}));
+export const readJourneyDirectory=()=>cachedJourneyRead<JourneyDirectoryItem[]>('directory',300000,async()=>{const rows=await rpc<JourneyDirectoryItem[]>('read_journey_flow_directory');return rows.map(withJourneyIdentity);});
+function withJourneyIdentity<T extends JourneyDirectoryItem>(entry:T):T{return {...entry,messages:entry.messages.map(m=>({...m,journey_name:entry.journey_name}))};}
+export const readJourneyDetail=(id:string)=>cachedJourneyRead<JourneyIndexItem>('detail:'+id,300000,async()=>withJourneyIdentity(await rpc<JourneyIndexItem>('read_journey_flow_detail',{p_snapshot:id})));
 export const readJourneyIndex=()=>cachedJourneyRead<JourneyIndexItem[]>('index',300000,()=>rpc('read_journey_flow_index'));
 export const readJourneyManifest=(id:string)=>cachedJourneyRead<JourneyManifest>('manifest:'+id,3600000,()=>rpc('read_journey_flow_manifest',{p_snapshot:id}));
 export const readJourneyMessage=(id:string,key:string)=>cachedJourneyRead<PackageMessage>('message:'+id+key,3600000,()=>rpc('read_journey_flow_message',{p_snapshot:id,p_occurrence:key}));
