@@ -5,7 +5,7 @@ export type ContentBlock =
   | { type: 'stat_tiles'; items: Array<{ number: string; label: string }> }
   | { type: 'check_list'; items: string[] };
 
-const escapeText = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+const escapeText = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 export function validateBlockText(text: string): void {
   if (/[\r\n]/.test(text)) throw new Error('Quebra de linha crua não permitida.');
   if (Array.from(text).length > 4000) throw new Error('Texto excede 4000 caracteres.');
@@ -20,7 +20,7 @@ export function closing(value: string, allowHtml = true): string { const text = 
 const table = (body: string, spacing: number, separate = false) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="${spacing}" border="0" style="margin:0 auto;${separate ? 'border-collapse:separate;' : ''}">${body}</table>`;
 export function benefitGrid(items: Array<{ title: string; text: string }>, allowHtml = false): string {
   if (items.length < 2 || items.length % 2) throw new Error('Grade exige número par de itens, a partir de 2.');
-  const cells = items.map(item => { const title = textFor(item.title, false); const body = textFor(item.text, allowHtml).replaceAll('<b>', '<b style="color:#242424;">'); const mark = '&#10003;'; return `<td class="stack-column" width="50%" valign="top" bgcolor="#F4F5FB" style="width:50%;padding:16px;text-align:left;background-color:#F4F5FB;border:1px solid #E1E3F2;border-radius:12px;margin-bottom:10px;"><div style="width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;">${mark}</div><p style="margin:10px 0 4px 0;font-size:14px;line-height:1.3;font-weight:700;color:#2C3490;">${title}</p><p style="margin:0;font-size:13px;line-height:1.45;color:#4A4F6A;">${body}</p></td>`; });
+  const cells = items.map(item => { const title = textFor(item.title, false); const body = textFor(item.text, allowHtml).split('<b>').join('<b style="color:#242424;">'); const mark = '&#10003;'; return `<td class="stack-column" width="50%" valign="top" bgcolor="#F4F5FB" style="width:50%;padding:16px;text-align:left;background-color:#F4F5FB;border:1px solid #E1E3F2;border-radius:12px;margin-bottom:10px;"><div style="width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;">${mark}</div><p style="margin:10px 0 4px 0;font-size:14px;line-height:1.3;font-weight:700;color:#2C3490;">${title}</p><p style="margin:0;font-size:13px;line-height:1.45;color:#4A4F6A;">${body}</p></td>`; });
   const rows: string[] = [];
   for (let i = 0; i < cells.length; i += 2) rows.push(`<tr>${cells.slice(i, i + 2).join('')}</tr>`);
   return table(rows.join(''), 10, true);

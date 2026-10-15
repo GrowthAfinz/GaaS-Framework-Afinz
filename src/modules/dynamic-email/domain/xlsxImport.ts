@@ -150,7 +150,9 @@ export function validateImportPayload(input: unknown): { payload?: ImportPayload
 
 /** O que o GaaS guarda da última importação para comparar a próxima (coluna import_source). */
 export type ImportSourceRecord = {
-  contract: typeof IMPORT_CONTRACT;
+  contract: typeof IMPORT_CONTRACT | 'gaas-emails-input/1';
+  generatedBy?: { tool: string; model: string; generatedAt: string };
+  approvedBy?: string;
   importKey: string;
   file: string;
   sheet: string;
