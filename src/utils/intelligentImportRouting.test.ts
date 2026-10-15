@@ -79,4 +79,8 @@ describe('acquisition audience contract', () => {
         expect(inferCartAudience('JOR_AQS_B2C_NA_ABD', 'afz_car_vis_aqs_wpp_car_sabado_pontual', 'Abandonados D-21 A D>7').conflict)
             .toBeTruthy();
     });
+    it('does not interpret the card product token as an abandoned audience', () => {
+        expect(inferCartAudience('JOR_AQS_PLURIX_NA_ANC_MEIO_DE_FUNIL', 'plu_car_plx_aqs_wpp_anc_disp1_diario')).toEqual({});
+        expect(inferCartAudience('JOR_AQS_B2C_NA_NGD_MEIO_DE_FUNIL', 'afz_car_vis_aqs_sms_ngd_disp1_diario')).toEqual({});
+    });
 });

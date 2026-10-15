@@ -82,7 +82,10 @@ export const inferCartAudience = (journey: unknown, activityName: unknown, histo
     const j = normalizeJourneyKey(journey);
     const a = normalizeJourneyKey(activityName);
     const text = `${j} ${a}`;
-    if (!/(carrinho|abandonad|(?:^|_)abd(?:_|$)|(?:^|_)car_)/.test(text)) return {};
+    const cartJourney = /carrinho|abandonad|(?:^|_)(?:abd|abn)(?:_|$)/.test(j);
+    // The first CAR token in afz_car_vis is the card PRODUCT, not the audience.
+    const cartActivity = /carrinho|abandonad|(?:^|_)(?:abd|abn)(?:_|$)|_(?:wpp|sms|email|push)_car_/.test(a);
+    if (!cartJourney && !cartActivity) return {};
     // A leading digit boundary prevents dispatch 121d from becoming audience 21d.
     const age21 = (s: string) => /(?:^|[^a-z0-9])21(?:dias|d)(?![a-z])|carrinho21d|(?:plurix|sabado)21dias/.test(s);
     const age7 = (s: string) => /(?:^|[^a-z0-9])7(?:dias|d)(?:$|[^a-z0-9])|carrinho7d/.test(s);
