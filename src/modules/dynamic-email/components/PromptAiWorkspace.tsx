@@ -11,9 +11,10 @@ import { planEmailInput, type ConflictChoices } from '../domain/emailInputPlan';
 import type { ImportProblem, PlannedBriefing } from '../domain/xlsxImport';
 import type { WorkspaceBriefing } from '../domain/workspace';
 import {
-  buildSkillPack, chatGptProjectInstructions, estimateTokens, markdownBundle, skillNameFor, summarizeRulers, zipSkillPack,
+  attachImages, buildSkillPack, chatGptProjectInstructions, estimateTokens, markdownBundle, packImageUrls, skillNameFor, summarizeRulers, zipSkillPack,
   type PackFile, type PackRulerSummary, type SkillPackContext,
 } from '../export/skillPack';
+import { fetchPackImages } from '../services/emailImageService';
 
 export interface PromptAiWorkspaceProps {
   context: SkillPackContext;
@@ -169,9 +170,24 @@ const ExportPanel = ({ context, onNext, selection }: { context: SkillPackContext
   const visible = rulers.filter((r) => (!partner || r.partner === partner) && (!query || `${r.partner} ${r.segment}`.toLowerCase().includes(query.toLowerCase())));
   const toggle = (key: string) => setSelected((current) => (current.includes(key) ? current.filter((k) => k !== key) : [...current, key]));
   const size = format === 'zip' ? zipped?.length ?? 0 : new TextEncoder().encode(markdown).length;
-  const download = () => {
-    if (format === 'zip' && zipped) saveBlob(`${pack.skillName}.zip`, new Blob([zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer], { type: "application/zip" }));
-    else saveBlob(`${pack.skillName}.md`, new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
+  const imageUrls = useMemo(() => packImageUrls(pack), [pack]);
+  const [downloading, setDownloading] = useState(false);
+  const [imageNote, setImageNote] = useState<{ tone: 'ok' | 'warn'; text: string } | null>(null);
+  const download = async () => {
+    if (format === 'markdown') { saveBlob(`${pack.skillName}.md`, new Blob([markdown], { type: 'text/markdown;charset=utf-8' })); return; }
+    setDownloading(true); setImageNote(null);
+    try {
+      // O sandbox da IA não acessa a internet: as imagens vão dentro do zip.
+      const { images, failed } = await fetchPackImages(imageUrls);
+      const bytes = zipSkillPack(attachImages(pack, images));
+      saveBlob(`${pack.skillName}.zip`, new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/zip' }));
+      setImageNote(failed.length
+        ? { tone: 'warn', text: `${Object.keys(images).length} imagens no zip; ${failed.length} não vieram e vão aparecer quebradas no quadro.` }
+        : { tone: 'ok', text: `${Object.keys(images).length} imagens embutidas no zip: os quadros saem completos mesmo sem internet.` });
+    } catch (error) {
+      if (zipped) saveBlob(`${pack.skillName}.zip`, new Blob([zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength) as ArrayBuffer], { type: 'application/zip' }));
+      setImageNote({ tone: 'warn', text: `Baixei o zip sem as imagens (${error instanceof Error ? error.message : String(error)}). Os quadros vão sair com imagens quebradas.` });
+    } finally { setDownloading(false); }
   };
   return (
     <div className="grid gap-5 xl:grid-cols-[400px_minmax(0,1fr)]">
@@ -236,9 +252,11 @@ const ExportPanel = ({ context, onNext, selection }: { context: SkillPackContext
             <div><div className="text-lg font-bold">{kb(size)}</div><div className="text-[10px] uppercase tracking-wider text-cyan-200">{format === 'zip' ? 'zip' : 'markdown'}</div></div>
             <div><div className="text-lg font-bold">~{Math.round(estimateTokens(pack.files) / 1000)}k</div><div className="text-[10px] uppercase tracking-wider text-cyan-200">tokens de texto</div></div>
           </div>
-          <button onClick={download} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-cyan-950 transition hover:bg-cyan-50">
-            <Download size={16}/>Baixar {format === 'zip' ? `${pack.skillName}.zip` : `${pack.skillName}.md`}
+          <button onClick={() => void download()} disabled={downloading} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-cyan-950 transition hover:bg-cyan-50 disabled:opacity-70">
+            {downloading ? <Loader2 size={16} className="animate-spin"/> : <Download size={16}/>}{downloading ? `Buscando ${imageUrls.length} imagens…` : `Baixar ${format === 'zip' ? `${pack.skillName}.zip` : `${pack.skillName}.md`}`}
           </button>
+          {format === 'zip' && !imageNote && <p className="mt-2 text-center text-[11px] text-cyan-100/80">+ {imageUrls.length} imagens dos e-mails, buscadas no download</p>}
+          {imageNote && <p role="status" className={`mt-2 rounded-lg px-2.5 py-1.5 text-[11px] ${imageNote.tone === 'ok' ? 'bg-emerald-400/15 text-emerald-100' : 'bg-amber-400/20 text-amber-100'}`}>{imageNote.text}</p>}
           <button onClick={onNext} className="mt-2 flex w-full items-center justify-center gap-1.5 text-xs font-bold text-cyan-100 hover:text-white">Como usar na IA<ArrowRight size={13}/></button>
           {pack.warnings.length > 0 && <ul className="mt-3 space-y-1 rounded-lg bg-white/10 p-2 text-[11px] text-amber-100">{pack.warnings.slice(0, 4).map((w) => <li key={w}>{w}</li>)}</ul>}
         </section>

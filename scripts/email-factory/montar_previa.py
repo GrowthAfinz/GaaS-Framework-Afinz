@@ -24,6 +24,8 @@ solto em previa/emails/.
 Fora o Playwright (opcional, só para o PNG), usa a biblioteca padrão do Python.
 """
 import argparse
+import base64
+import mimetypes
 import html as html_lib
 import json
 import re
@@ -70,6 +72,18 @@ def pick_email(ruler, sequence):
     same_parity = [e for e in ruler["emails"] if number(e["sequence"]) % 2 == n % 2]
     pool = same_parity or ruler["emails"]
     return max(pool, key=lambda e: number(e["sequence"])), True
+
+
+def embed_images(page, manifest):
+    """O sandbox da IA não tem internet: troca a URL de cada imagem pelo arquivo do pacote,
+    embutido no próprio HTML (data URI), para o PNG sair com as imagens."""
+    for url, path in manifest.get("images", {}).items():
+        if url in page:
+            file = SKILL_DIR / path
+            if file.exists():
+                mime = mimetypes.guess_type(file.name)[0] or "image/png"
+                page = page.replace(url, f"data:{mime};base64,{base64.b64encode(file.read_bytes()).decode()}")
+    return page
 
 
 def fill(skeleton, values, with_name):
@@ -202,7 +216,11 @@ def main():
                 print(f"REVISAR   {sequence}: {', '.join(hidden)} estava(m) sem imagem no e-mail atual; "
                       "a prévia mantém o layout sem imagem. Confira na importação do GaaS.")
             skeleton = (SKILL_DIR / entry["networks"][network]["skeleton"][variant]).read_text(encoding="utf-8")
-            page = fill(skeleton, values, with_name)
+            page = embed_images(fill(skeleton, values, with_name), manifest)
+            missing = sorted(set(re.findall(r'https://[^\s"\'()<>]+?\.(?:png|jpe?g|gif|webp)', page)))
+            if missing and network == networks[0]:
+                print(f"REVISAR   {sequence}: {len(missing)} imagem(ns) fora do pacote; sem internet ela(s) aparece(m) quebrada(s). "
+                      "Use imagens da régua ou da biblioteca listadas em references/regua-*.md.")
             slug = f'{sequence.replace(" ", "").replace("-", "").lower()}_{network.replace(" ", "").lower()}_{variant}.html'
             (out / "emails" / slug).write_text(page, encoding="utf-8")
             week = (email or {}).get("weekKey") or entry.get("weekKey", "")

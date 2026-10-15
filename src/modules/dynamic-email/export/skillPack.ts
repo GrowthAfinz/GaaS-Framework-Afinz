@@ -28,8 +28,9 @@ export const EDITORIAL_FIELDS = BRIEFING_COLUMNS.filter((field) => !isGovernedFi
 export const GOVERNED_FIELDS = BRIEFING_COLUMNS.filter((field) => isGovernedField(field));
 const SAMPLE_NAME = 'VANIA';
 
-export type PackFileKind = 'md' | 'json' | 'py' | 'html' | 'txt';
-export interface PackFile { path: string; content: string; kind: PackFileKind; role: string }
+export type PackFileKind = 'md' | 'json' | 'py' | 'html' | 'txt' | 'image';
+/** Imagem leva `bytes` (binário) e `content` vazio; o resto é texto. */
+export interface PackFile { path: string; content: string; kind: PackFileKind; role: string; bytes?: Uint8Array }
 export interface PackEmailSummary {
   sequence: string; weekKey: string; status: string; networks: number; subject: string;
   headerTitle: string; greeting: string; blockTypes: string[] | null; isNext?: boolean;
@@ -212,6 +213,8 @@ ${tone ? `Tom de voz do produto: ${tone}` : ''}
    O PNG precisa do Playwright: se faltar, rode \`pip install playwright\` e
    \`python -m playwright install chromium\`. Sem como instalar, entregue os dois \`quadro_*.html\`.
    Opções: \`--rede BOA\`, \`--sem-nome\` (pessoa sem nome na base), \`--todas\` (um par por rede).
+   As imagens dos e-mails já estão em \`assets/imagens/\` (o sandbox não acessa a internet): use só imagens
+   da régua ou da biblioteca listada em \`references/regua-<segmento>.md\`; URL de fora aparece quebrada.
 7. **Ajuste** até o analista escrever "aprovado". Só então entregue o JSON final para download.
 8. **Explique a importação**: GaaS > Fábrica de E-mails > Prompt e IA > Importar. O GaaS valida de novo,
    completa os campos governados, mostra a prévia e grava como rascunho com histórico.
@@ -575,11 +578,46 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
   return { skillName, files, rulers: summaries, warnings };
 }
 
-export const packBytes = (files: PackFile[]) => files.reduce((sum, f) => sum + new TextEncoder().encode(f.content).length, 0);
-export const estimateTokens = (files: PackFile[]) => Math.ceil(files.filter((f) => f.kind !== 'html').reduce((sum, f) => sum + f.content.length, 0) / 4);
+export const packBytes = (files: PackFile[]) => files.reduce((sum, f) => sum + (f.bytes?.length ?? new TextEncoder().encode(f.content).length), 0);
+export const estimateTokens = (files: PackFile[]) => Math.ceil(files.filter((f) => f.kind !== 'html' && f.kind !== 'image').reduce((sum, f) => sum + f.content.length, 0) / 4);
 
 export function zipSkillPack(pack: SkillPack): Uint8Array {
-  return zipSync(Object.fromEntries(pack.files.map((f) => [f.path, strToU8(f.content)])), { level: 9 });
+  return zipSync(Object.fromEntries(pack.files.map((f) => [f.path, f.bytes ?? strToU8(f.content)])), { level: 9 });
+}
+
+const IMAGE_URL = /https:\/\/[^\s"'()<>]+?\.(?:png|jpe?g|gif|webp)(?=["'\s)<>]|$)/gi;
+/** Todas as imagens que aparecem nos esqueletos, nos textos atuais e na biblioteca do pacote. */
+export function packImageUrls(pack: SkillPack): string[] {
+  const urls = new Set<string>();
+  for (const file of pack.files) if (file.kind !== 'image') for (const match of file.content.matchAll(IMAGE_URL)) urls.add(match[0]);
+  return [...urls].sort();
+}
+
+export type FetchedImage = { contentType: string; bytes: Uint8Array };
+const EXTENSION: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+
+/**
+ * O sandbox da IA não acessa a internet: as imagens vão dentro do pacote (assets/imagens/) e o
+ * manifesto aponta URL -> arquivo, para montar_previa.py embutir cada uma no HTML do quadro.
+ */
+export function attachImages(pack: SkillPack, images: Record<string, FetchedImage>): SkillPack {
+  const root = `${pack.skillName}/`;
+  const map: Record<string, string> = {};
+  const files: PackFile[] = [];
+  Object.entries(images).forEach(([url, image], index) => {
+    const base = slugify(url.split('/').pop()?.replace(/\.[a-z]+$/i, '') ?? 'imagem').slice(0, 40);
+    const path = `assets/imagens/${String(index + 1).padStart(2, '0')}-${base}.${EXTENSION[image.contentType] ?? 'png'}`;
+    map[url] = path;
+    files.push({ path: root + path, kind: 'image', role: `Imagem de ${new URL(url).hostname}`, content: '', bytes: image.bytes });
+  });
+  const manifestPath = `${root}assets/previa/manifesto.json`;
+  return {
+    ...pack,
+    files: [
+      ...pack.files.map((f) => (f.path === manifestPath ? { ...f, content: JSON.stringify({ ...JSON.parse(f.content), images: map }) } : f)),
+      ...files,
+    ],
+  };
 }
 
 /** Instruções para colar em um Projeto do ChatGPT (limite de ~8.000 caracteres). */
@@ -596,7 +634,7 @@ export function chatGptProjectInstructions(pack: Pick<SkillPack, 'skillName'>): 
 export function markdownBundle(pack: SkillPack): string {
   const order = (f: PackFile) => (f.path.endsWith('SKILL.md') ? 0 : f.kind === 'md' ? 1 : f.kind === 'json' ? 2 : 3);
   return [...pack.files]
-    .filter((f) => f.kind !== 'html' && !f.path.endsWith('manifesto.json'))
+    .filter((f) => f.kind !== 'html' && f.kind !== 'image' && !f.path.endsWith('manifesto.json'))
     .sort((a, b) => order(a) - order(b))
     .map((f) => (f.kind === 'md' ? `<!-- arquivo: ${f.path} -->\n\n${f.content}` : `## Arquivo \`${f.path}\`\n\n${fence(f.kind === 'py' ? 'python' : f.kind === 'json' ? 'json' : '', f.content)}`))
     .join('\n\n---\n\n')

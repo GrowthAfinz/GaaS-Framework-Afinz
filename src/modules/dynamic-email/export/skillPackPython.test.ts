@@ -10,7 +10,7 @@ import { withMeta } from '../domain/workspace';
 import { prepareEmailInput } from '../domain/emailInput';
 import { renderDynamicEmail } from '../ampscript/renderer';
 import { PLURIX_V13_TEMPLATE, PLURIX_V13_TEMPLATE_ID } from '../fixtures/plurixV13Template';
-import { buildSkillPack, type SkillPackContext } from './skillPack';
+import { attachImages, buildSkillPack, packImageUrls, type SkillPackContext } from './skillPack';
 
 const python = ['python3', 'python'].find((bin) => spawnSync(bin, ['--version']).status === 0);
 const SEGMENT = 'V2 TOPO DE FUNIL DINÂMICO';
@@ -21,7 +21,10 @@ const briefings = before.map((b) => withMeta({ ...emptyBriefingRow(), ...b.data 
 describe.skipIf(!python)('scripts Python do pacote', () => {
   const dir = mkdtempSync(join(tmpdir(), 'gp-'));
   const pack = buildSkillPack({ briefings, productContexts: products, productGuardrails: [], emailStrategies: [], rulers: [], assets: [], templates: [{ id: PLURIX_V13_TEMPLATE_ID, name: 'PLURIX V13', source: PLURIX_V13_TEMPLATE } as SkillPackContext['templates'][number]] }, { rulerKeys: [`Plurix|${SEGMENT}`], previewNetworks: 'all', includeTemplateSource: false, generatedAt: '2026-10-15T20:00:00.000Z' });
-  for (const f of pack.files) { const p = join(dir, f.path); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, f.content); }
+  // Imagens falsas no lugar das baixadas pela função email-image-proxy.
+  const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const withImages = attachImages(pack, Object.fromEntries(packImageUrls(pack).map((u) => [u, { contentType: 'image/png', bytes: png }])));
+  for (const f of withImages.files) { const p = join(dir, f.path); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, f.bytes ?? f.content); }
   const skill = join(dir, pack.skillName);
   const input = join(skill, 'assets', 'exemplo_input.json');
 
@@ -44,7 +47,7 @@ describe.skipIf(!python)('scripts Python do pacote', () => {
   it('montar_previa gera o mesmo HTML que a importação do GaaS', () => {
     for (const extra of [[], ['--sem-nome'], ['--rede', 'AVENIDA', '--sem-nome'], ['--rede', 'COMPRE MAIS', '--sem-nome']]) execFileSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'montar_previa.py'), input, ...extra, '--saida', join(dir, 'previa')], { encoding: 'utf8' });
     const prepared = prepareEmailInput(fixture, { briefings, products, guardrails: [] });
-    const norm = (s: string) => s.replace(/<img\b[^>]*\bsrc=""[^>]*>/g, '').replace(/\s+/g, ' ');
+    const norm = (s: string) => s.replace(/<img\b[^>]*\bsrc=""[^>]*>/g, '').replace(/data:image\/png;base64,[A-Za-z0-9+/=]+|https:\/\/[^"\s]+?\.(?:png|jpe?g)/g, 'IMG').replace(/\s+/g, ' ');
     for (const [sequence, network, file, name] of [['E-mail 4', 'AMIGAO', 'email4_amigao_nome', 'VANIA'], ['E-mail 3', 'COMPRE MAIS', 'email3_compremais_sem_nome', ''], ['E-mail 4', 'AVENIDA', 'email4_avenida_sem_nome', '']] as const) {
       const row = prepared.rows.find((r) => r.sequence === sequence && r.network === network)!.row;
       const gaas = renderDynamicEmail(PLURIX_V13_TEMPLATE, row, { CPF: '0', PRI_NOME: name, LIMITE: '3500', PRODUTO: network, SEQUENCIA: sequence, TP_CAMPANHA: row.TP_CAMPANHA }, { pendingAssets: 'hidden' }).html;
@@ -54,5 +57,9 @@ describe.skipIf(!python)('scripts Python do pacote', () => {
     expect(board).toContain('E-mail 1 · Semana 1');
     expect(board).toContain('rascunho (atual)');
     expect(board).toContain('proposta (novo)');
+    // Sem internet no sandbox: toda imagem do pacote vai embutida no quadro.
+    expect(packImageUrls(pack).length).toBeGreaterThan(5);
+    expect(board).toContain('data:image/png;base64,');
+    expect(board).not.toMatch(/https:\/\/(?:image\.relacionamento|stoplxmkt)[^"]+\.png/);
   });
 });
