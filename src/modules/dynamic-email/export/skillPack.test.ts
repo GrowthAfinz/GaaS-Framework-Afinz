@@ -27,6 +27,8 @@ describe('pacote Prompt e IA', () => {
     expect(pack.files.every((f) => f.path.startsWith('gaas-emails-plurix/'))).toBe(true);
     expect(skill.content).toMatch(/^---\nname: gaas-emails-plurix\ndescription: .{40,1024}\n---/);
     expect(skill.content.split('\n').length).toBeLessThan(500);
+    // O upload do claude.ai recusa descrição com qualquer coisa parecida com tag XML.
+    expect(skill.content.match(/^description: (.*)$/m)![1]).not.toMatch(/[<>]/);
     expect(pack.files.filter((f) => f.kind === 'md').map((f) => f.content).join('')).not.toContain('—');
     expect(skill.content).toContain('Direto e concreto, sem banco.');
   });

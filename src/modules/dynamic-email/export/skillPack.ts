@@ -172,12 +172,12 @@ const editorialValues = (row: BriefingRow) => Object.fromEntries(EDITORIAL_FIELD
 function skillMd(skillName: string, summaries: PackRulerSummary[], context: SkillPackContext, generatedAt: string) {
   const partners = [...new Set(summaries.map((s) => s.partner))];
   const segments = summaries.map((s) => s.segment);
-  const description = `Escreve e ajusta e-mails de aquisição da Fábrica de E-mails do GaaS${partners.length ? ` (${partners.join(', ')})` : ''}, mostra a prévia fiel no template real e entrega o arquivo input_gaas_emails_<segmento>_<AAAAMMDD>.json para importar no GaaS. Use quando pedirem para criar, revisar ou mudar e-mails de régua${segments.length ? ` (${segments.slice(0, 4).join(', ')})` : ''}, mandarem a aba Briefing Fábrica ou um briefing, ou pedirem o JSON de importação da Fábrica.`.slice(0, 1024);
+  const description = `Escreve e ajusta e-mails de aquisição da Fábrica de E-mails do GaaS${partners.length ? ` (${partners.join(', ')})` : ''}, mostra a prévia fiel no template real e entrega o arquivo JSON input_gaas_emails (por segmento e data) para importar no GaaS. Use quando pedirem para criar, revisar ou mudar e-mails de régua${segments.length ? ` (${segments.slice(0, 4).join(', ')})` : ''}, mandarem a aba Briefing Fábrica ou um briefing, ou pedirem o JSON de importação da Fábrica.`.slice(0, 1024);
   const tone = context.productContexts.find((p) => p.status === 'active' && partners.includes(p.partner ?? ''))?.toneOfVoice;
   const rulerLines = summaries.map((s) => `- \`references/regua-${s.slug}.md\`: ${s.partner} · ${s.segment} (${s.emails.length} e-mails, ${s.templateName}). Estado atual no formato do contrato: \`assets/reguas/${s.slug}.json\`.`);
   return `---
 name: ${skillName}
-description: ${description.replace(/\n/g, ' ')}
+description: ${description.replace(/\n/g, ' ').replace(/[<>]/g, '')}
 ---
 
 # Fábrica de E-mails do GaaS: criação com IA
