@@ -1,5 +1,5 @@
 import { PLURIX_V11_TEMPLATE } from './plurixV11Template';
-import { LIMIT_NAME_FALLBACK } from '../domain/limitMessage';
+import { LIMIT_NAME_REMOVALS } from '../domain/limitMessage';
 
 export const PLURIX_V12_TEMPLATE_ID = 'builtin-plurix-v12';
 export const PLURIX_V12_TEMPLATE_NAME = 'PLURIX V12 · mensagem de limite no briefing (candidata)';
@@ -12,7 +12,7 @@ export const PLURIX_V12_TEMPLATE_NAME = 'PLURIX V12 · mensagem de limite no bri
  * - A faixa só aparece com LIMITE_CRD positivo E mensagem preenchida.
  * - Só {{nome}} e {{limite}} são substituídos, com Replace. O campo nunca passa por
  *   TreatAsContent, então AMPscript escrito ali não executa.
- * - Sem nome na audiência, {{nome}} vira "cliente".
+ * - Sem nome na audiência, {{nome}} some com a vírgula ("Boa notícia:").
  * - Sobrou marcador desconhecido: a faixa some em vez de vazar {{ }}.
  *
  * Tudo o mais (audiência, estado, chave CRM, vigência, header por imagem, sem pool) é
@@ -34,15 +34,18 @@ const V12_LAST_FIELD = `SET @Rodape = Field(@Row, "RODAPE")
 SET @MensagemLimite = Field(@Row, "MENSAGEM_LIMITE")`;
 
 const V11_POOL_COMMENT = `/* Pool explicitamente desligado: nenhuma consulta e nenhum bloco. */`;
+const NAME_REMOVAL = LIMIT_NAME_REMOVALS.reduce((expr, marker) => `Replace(${expr}, "${marker}", "")`, 'Trim(@MensagemLimite)');
 const V12_LIMIT_BAND = `/* V12: texto da faixa vem do briefing. Apenas {{nome}} e {{limite}} sao trocados;
-   o campo nao passa por TreatAsContent. Sem limite positivo ou sem mensagem, sem faixa. */
+   o campo nao passa por TreatAsContent. Sem limite positivo ou sem mensagem, sem faixa.
+   Sem nome, {{nome}} sai junto com a virgula: "Boa noticia, {{nome}}:" vira "Boa noticia:". */
 SET @FaixaLimite = ""
 IF NOT EMPTY(@LimiteFmt) AND NOT EMPTY(@MensagemLimite) THEN
-  SET @NomeFaixa = @FirstName
-  IF EMPTY(@NomeFaixa) THEN
-    SET @NomeFaixa = "${LIMIT_NAME_FALLBACK}"
+  IF EMPTY(@FirstName) THEN
+    SET @FaixaTexto = ${NAME_REMOVAL}
+  ELSE
+    SET @FaixaTexto = Replace(Trim(@MensagemLimite), "{{nome}}", @FirstName)
   ENDIF
-  SET @FaixaLimite = Replace(Replace(Trim(@MensagemLimite), "{{nome}}", @NomeFaixa), "{{limite}}", @LimiteFmt)
+  SET @FaixaLimite = Replace(@FaixaTexto, "{{limite}}", @LimiteFmt)
   IF IndexOf(@FaixaLimite, "{{") > 0 OR IndexOf(@FaixaLimite, "%%") > 0 THEN
     SET @FaixaLimite = ""
   ENDIF

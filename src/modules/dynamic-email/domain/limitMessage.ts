@@ -7,8 +7,16 @@
  */
 
 export const LIMIT_MESSAGE_MARKERS = ['{{nome}}', '{{limite}}'] as const;
-/** Usado no lugar de {{nome}} quando a audiência não traz FIRST_NAME. Decisão de 06/10/2026. */
-export const LIMIT_NAME_FALLBACK = 'cliente';
+/**
+ * Sem nome na audiência, {{nome}} some junto com a vírgula ou o espaço que o acompanha
+ * ("Boa notícia, {{nome}}:" vira "Boa notícia:"). Decisão de 15/10/2026, no lugar de "cliente".
+ * A ordem importa e é a mesma do AMPscript (LIMIT_NAME_REMOVALS).
+ */
+export const LIMIT_NAME_REMOVALS = [', {{nome}}', '{{nome}}, ', ' {{nome}}', '{{nome}}'] as const;
+
+export function removeNameMarker(text: string): string {
+  return LIMIT_NAME_REMOVALS.reduce((current, marker) => current.split(marker).join(''), text);
+}
 /** Mesmo comprimento da coluna Text na DE TB_BRIEFING_CAMPANHA_AQUISICAO. */
 export const LIMIT_MESSAGE_MAX = 300;
 const ALLOWED_TAGS = /^<\/?(?:b|strong|i|em|br)\s*\/?>$/i;
@@ -49,6 +57,7 @@ export function validateLimitMessage(message: string): LimitMessageIssue[] {
   const tags = text.match(/<[^>]*>/g) ?? [];
   if (tags.some((tag) => !ALLOWED_TAGS.test(tag))) issues.push({ severity: 'error', code: 'limit-html', message: 'Só são aceitas as marcações <b>, <strong>, <i>, <em> e <br>.' });
   if (text.length > LIMIT_MESSAGE_MAX) issues.push({ severity: 'error', code: 'limit-length', message: `A mensagem tem ${text.length} caracteres; o máximo é ${LIMIT_MESSAGE_MAX}.` });
+  if (/^\s*(<[^>]+>\s*)*\{\{nome\}\}/.test(text)) issues.push({ severity: 'warning', code: 'limit-name-start', message: 'Evite começar com {{nome}}: sem nome na base, a frase começaria em minúscula. Prefira "Boa notícia, {{nome}}: ...".' });
   if (!text.includes('{{limite}}')) issues.push({ severity: 'warning', code: 'limit-without-value', message: 'A mensagem não mostra o valor do limite ({{limite}}).' });
   if (RISKY_PROMISES.test(text)) issues.push({ severity: 'warning', code: 'limit-promise', message: 'Revise a promessa: pré-aprovação continua sujeita a análise de crédito.' });
   return issues;
@@ -62,8 +71,9 @@ export function renderLimitMessage(message: string, firstName: string, limitRaw:
   const text = message.trim();
   const limit = formatLimitValue(limitRaw);
   if (!text || !limit) return '';
-  const name = firstName.trim() || LIMIT_NAME_FALLBACK;
-  const result = text.split('{{nome}}').join(name).split('{{limite}}').join(limit);
+  const name = firstName.trim();
+  const withName = name ? text.split('{{nome}}').join(name) : removeNameMarker(text);
+  const result = withName.split('{{limite}}').join(limit);
   return result.includes('{{') || result.includes('%%') ? '' : result;
 }
 

@@ -10,8 +10,11 @@ describe('faixa de limite com texto do briefing', () => {
     expect(renderLimitMessage(E2, 'Vania', '1500.5')).toBe('Boa notícia, Vania: você tem R$ 1.500,50 de limite pré-aprovado para pedir seu cartão +amigo.');
   });
 
-  it('nome vazio vira "cliente", sem vírgula solta', () => {
-    expect(renderLimitMessage(E1, '  ', '3500')).toBe('Parabéns, cliente! Você tem R$ 3.500,00 de limite pré-aprovado no cartão +amigo.');
+  it('nome vazio some junto com a vírgula, sem citar ninguém', () => {
+    expect(renderLimitMessage(E1, '  ', '3500')).toBe('Parabéns! Você tem R$ 3.500,00 de limite pré-aprovado no cartão +amigo.');
+    expect(renderLimitMessage(E2, '', '3500')).toBe('Boa notícia: você tem R$ 3.500,00 de limite pré-aprovado para pedir seu cartão +amigo.');
+    expect(renderLimitMessage('Olá {{nome}}! R$ {{limite}}', '', '10')).toBe('Olá! R$ 10,00');
+    expect(validateLimitMessage('{{nome}}, você tem R$ {{limite}}').map((issue) => issue.code)).toContain('limit-name-start');
   });
 
   it.each([['', 'ausente'], ['0', 'zero'], ['0.00', 'zero'], ['R$ 3.500', 'inválido'], ['3.500,00', 'inválido'], ['abc', 'inválido']])('limite %s (%s) não mostra faixa', (limit) => {

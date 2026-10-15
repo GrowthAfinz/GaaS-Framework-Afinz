@@ -41,20 +41,24 @@ def closing(text, allow_html=True):
 
 def benefit_grid(items, mark="&#10003;"):
     """Grade 2x2 (ou 2xN) de cartões: selo, título curto e uma linha de explicação.
-    items: lista de (titulo, descricao). Use de 2 a 6 itens, número par de preferência."""
+    items: lista de (titulo, descricao). Use de 2 a 6 itens, número par de preferência.
+
+    Cada cartão é a própria célula da tabela: células da mesma linha sempre têm a mesma
+    altura (inclusive no Outlook), então a grade fica simétrica mesmo com textos de tamanhos
+    diferentes. O espaço entre cartões vem de cellspacing; no celular a classe stack-column
+    empilha as células e a margin-bottom (ignorada em célula de tabela) passa a valer."""
     cells = []
     for title, desc in items:
         cells.append(
-            f'<td class="stack-column" width="50%" valign="top" style="width:50%;padding:5px;">'
-            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
-            f'style="background-color:{CARD};border:1px solid {BORDER};border-radius:12px;">'
-            f'<tr><td style="padding:16px;text-align:left;">{_badge(mark)}'
-            f'<p style="margin:10px 0 4px 0;font-size:15px;line-height:1.3;font-weight:700;color:{NAVY};">{_t(title)}</p>'
-            f'<p style="margin:0;font-size:13px;line-height:1.45;color:{MUTED};">{_t(desc)}</p>'
-            f'</td></tr></table></td>')
+            f'<td class="stack-column" width="50%" valign="top" bgcolor="{CARD}" '
+            f'style="width:50%;padding:16px;text-align:left;background-color:{CARD};border:1px solid {BORDER};'
+            f'border-radius:12px;margin-bottom:10px;">{_badge(mark)}'
+            f'<p style="margin:10px 0 4px 0;font-size:14px;line-height:1.3;font-weight:700;color:{NAVY};">{_t(title)}</p>'
+            f'<p style="margin:0;font-size:13px;line-height:1.45;color:{MUTED};">{_t(desc)}</p></td>')
     rows = ["".join(cells[i:i + 2]) for i in range(0, len(cells), 2)]
     body = "".join(f"<tr>{row}</tr>" for row in rows)
-    return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">{body}</table>'
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="10" border="0" '
+            f'style="margin:0 auto;border-collapse:separate;">{body}</table>')
 
 
 def stat_tiles(items):

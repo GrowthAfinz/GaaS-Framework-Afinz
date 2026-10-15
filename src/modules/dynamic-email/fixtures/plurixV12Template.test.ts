@@ -54,8 +54,9 @@ describe('PLURIX V12 (candidata)', () => {
     expect(html.indexOf('Parabéns, Vania')).toBeLessThan(html.indexOf('Conheça os benefícios do cartão'));
   });
 
-  it('nome ausente usa "cliente"', () => {
-    expect(band(render(row(), subscriber({ PRI_NOME: '' })).html)).toBe('Parabéns, cliente! Você tem R$ 3.500,00 de limite pré-aprovado no cartão +amigo.');
+  it('nome ausente some com a vírgula', () => {
+    expect(PLURIX_V12_TEMPLATE).toContain('Replace(Replace(Replace(Replace(Trim(@MensagemLimite), ", {{nome}}", ""), "{{nome}}, ", ""), " {{nome}}", ""), "{{nome}}", "")');
+    expect(band(render(row(), subscriber({ PRI_NOME: '' })).html)).toBe('Parabéns! Você tem R$ 3.500,00 de limite pré-aprovado no cartão +amigo.');
   });
 
   it.each(['', '0', 'R$ 3.500'])('limite "%s" não mostra faixa', (limit) => {

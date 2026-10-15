@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { AlertTriangle, Info } from 'lucide-react';
 import type { ValidationIssue } from '../domain/briefing';
-import { LIMIT_MESSAGE_MAX, LIMIT_NAME_FALLBACK, limitInputState, normalizeLimitInput, renderLimitMessage } from '../domain/limitMessage';
+import { LIMIT_MESSAGE_MAX, limitInputState, normalizeLimitInput, renderLimitMessage } from '../domain/limitMessage';
 
 // Escapa tudo e só devolve as marcações permitidas na faixa (sem atributos).
 const safeBandHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -46,7 +46,7 @@ export function LimitMessageEditor({ value, issues, networkCount, sampleName, sa
       <span className={`ml-auto ${value.length > LIMIT_MESSAGE_MAX ? 'font-bold text-red-700' : 'text-slate-500'}`}>{value.length}/{LIMIT_MESSAGE_MAX}</span>
     </div>
     <p className="flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11px] leading-4 text-slate-600"><Info size={12} className="mt-px shrink-0"/>
-      <span>Vale para as {networkCount || 6} versões de rede deste e-mail; os outros e-mails têm a própria mensagem. {'{{limite}}'} sai como moeda (R$ 3.500,00). Sem nome na base, {'{{nome}}'} vira “{LIMIT_NAME_FALLBACK}”. Sem limite positivo ou com a mensagem vazia, a faixa não aparece. O texto não executa AMPscript.</span></p>
+      <span>Vale para as {networkCount || 6} versões de rede deste e-mail; os outros e-mails têm a própria mensagem. {'{{limite}}'} sai como moeda (R$ 3.500,00). Sem nome na base, {'{{nome}}'} sai junto com a vírgula (“Boa notícia:”). Varie a saudação a cada e-mail da régua. Sem limite positivo ou com a mensagem vazia, a faixa não aparece. O texto não executa AMPscript.</span></p>
     {(errors.length > 0 || warnings.length > 0) && <ul className="space-y-1">
       {[...errors, ...warnings].map((issue) => <li key={`${issue.code}-${issue.message}`} className={`flex items-start gap-1.5 rounded-lg px-3 py-2 text-[11px] leading-4 ${issue.severity === 'error' ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-900'}`}><AlertTriangle size={12} className="mt-px shrink-0"/>{issue.message}</li>)}
     </ul>}
