@@ -461,7 +461,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const issuesByRow = useMemo(() => validateRows(activeRows), [activeRows]);
   const rowsInCurrentView = useMemo(() => briefingRowsForView(rows, showArchived), [rows, showArchived]);
   const selected = rowsInCurrentView.find((row) => row.__id === selectedId) ?? rowsInCurrentView[0];
-  useEffect(() => { setOpenSections(new Set()); setEditorHoverBlock(null); setRailHoverBlock(null); }, [selected?.__id]);
+  // Trocar de assinatura dentro do mesmo e-mail mantém os blocos abertos; trocar de e-mail recolhe.
+  useEffect(() => { setOpenSections(new Set()); setEditorHoverBlock(null); setRailHoverBlock(null); }, [selected?.__meta.campaignGroupId]);
   const toggleSection = (id: string) => setOpenSections((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const focusStructureBlock = (id: string) => {
     setOpenSections((current) => (current.has(id) ? current : new Set(current).add(id)));
@@ -1119,7 +1120,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 <div className="grid gap-2 md:grid-cols-2">
                   <TaxonomySelect label="Parceiro" value={selected.__meta.partner} options={taxonomyOptions.partners} onChange={(value) => updateGroupMeta({ partner: value, segment: '', weekKey: '', activityNames: [], ...(value !== 'Plurix' ? { subgroup: '' } : {}) })}/>
                   <TaxonomySelect label="Segmento" value={selected.__meta.segment} options={taxonomyOptions.segments} onChange={(value) => updateGroupMeta({ segment: value, activityNames: [] })}/>
-                  <TaxonomySelect label="Assinatura / subgrupo" value={selected.__meta.subgroup} options={taxonomyOptions.subgroups} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, subgroup: value } })}/>
+                  {selected.__meta.partner === 'Plurix' && selectedGroupRows.length > 1
+                    ? <SignatureVersionSelect rows={selectedGroupRows} selectedId={selected.__id} onSelect={setSelectedId}/>
+                    : <TaxonomySelect label="Assinatura / subgrupo" value={selected.__meta.subgroup} options={taxonomyOptions.subgroups} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, subgroup: value } })}/>}
                   <TaxonomySelect label="Semana editorial" value={selected.__meta.weekKey} options={taxonomyOptions.weeks} onChange={(value) => updateGroupMeta({ weekKey: value })}/>
                 </div>
                 <div className="mt-2"><ActivityNameSelect value={selected.__meta.activityNames[0] ?? ''} options={taxonomyOptions.activityNames} onChange={(value) => updateSelected({ __meta: { ...selected.__meta, activityNames: value ? [value] : [] } })}/></div>
@@ -1578,6 +1581,13 @@ const MiniInput = ({ label, value, onChange, type = 'text' }: { label: string; v
 const isPublicImageUrl = (value: string) => { try { return new URL(value).protocol === 'https:'; } catch { return false; } };
 
 const MetaField = ({ label, value, list, onChange }: { label: string; value: string; list: string; onChange: (value: string) => void }) => <label className="text-xs font-semibold text-slate-700">{label}<input list={list} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-cyan-400"/></label>;
+
+/** No Plurix cada assinatura é uma versão do e-mail: escolher a rede abre a versão dela (e a prévia troca). */
+const SignatureVersionSelect = ({ rows, selectedId, onSelect }: { rows: WorkspaceBriefing[]; selectedId: string; onSelect: (id: string) => void }) => {
+  const label = (row: WorkspaceBriefing) => PLURIX_SIGNATURES.find(({ key }) => key === row.NM_PRODUTO_INTERNO.toUpperCase())?.label ?? (row.NM_PRODUTO_INTERNO || row.__meta.subgroup || 'Versão');
+  const ordered = [...rows].sort((a, b) => PLURIX_SIGNATURES.findIndex(({ key }) => key === a.NM_PRODUTO_INTERNO.toUpperCase()) - PLURIX_SIGNATURES.findIndex(({ key }) => key === b.NM_PRODUTO_INTERNO.toUpperCase()));
+  return <label className="block text-xs font-semibold text-slate-700">Assinatura em edição<select value={selectedId} onChange={(event) => onSelect(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-800 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100">{ordered.map((row) => <option key={row.__id} value={row.__id}>{label(row)}</option>)}</select><span className="mt-1 block text-[10px] font-normal text-slate-500">Troca a versão aberta no editor e na prévia.</span></label>;
+};
 
 const TaxonomySelect = ({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) => <label className="block text-xs font-semibold text-slate-700">{label}<select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-100"><option value="" disabled>Selecione uma opção…</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
 
