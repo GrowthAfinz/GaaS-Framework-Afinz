@@ -60,7 +60,7 @@ import { PLURIX_UX_V2_TEMPLATE, PLURIX_UX_V2_TEMPLATE_ID } from '../fixtures/plu
 import { PLURIX_V8_TEMPLATE, PLURIX_V8_TEMPLATE_ID, PLURIX_V8_TEMPLATE_NAME } from '../fixtures/plurixV8Template';
 import { PLURIX_V9_TEMPLATE, PLURIX_V9_TEMPLATE_ID, PLURIX_V9_TEMPLATE_NAME } from '../fixtures/plurixV9Template';
 import { PLURIX_V10_TEMPLATE, PLURIX_V10_TEMPLATE_ID, PLURIX_V10_TEMPLATE_NAME, POOL_ANCHOR_COMMENT } from '../fixtures/plurixV10Template';
-import { topoV10PreviewVars, type HeaderVariant, type PartnerHeaderAsset, type PoolOffer } from '../domain/topoPlurixV10';
+import { selectPoolOfferOfDay, topoV10PreviewVars, type HeaderVariant, type PartnerHeaderAsset, type PoolOffer } from '../domain/topoPlurixV10';
 import { loadHeaderVariants, loadPartnerHeaderAssets, loadPoolOffers } from '../services/topoV10Service';
 import { TopoV10Workspace } from './TopoV10Workspace';
 import { PoolOfferEditorCard } from './PoolOfferEditorCard';
@@ -128,6 +128,10 @@ const FIELD_LABELS: Partial<Record<BriefingColumn, string>> = {
   TAMANHO_DA_FONTE_NOTA_LEGAL: 'Tamanho da nota legal',
   RODAPE: 'Rodapé',
   MENSAGEM_LIMITE: 'Mensagem da faixa de limite',
+  HEADER_TITULO: 'Linha principal do header (até 34)',
+  HEADER_SUBTITULO: 'Linha secundária do header (até 60)',
+  HEADER_IMAGEM_CARTAO: 'Imagem do cartão no header (PNG)',
+  HEADER_LOGO: 'Logo no header (PNG)',
 };
 
 type ImageSlot = { label: string; description: string; image: BriefingColumn; link?: BriefingColumn };
@@ -233,7 +237,7 @@ function shiftBriefingDate(value: string, months: number, days: number): string 
 }
 
 const initials = (value: string) => (value.trim().slice(0, 2) || '—').toUpperCase();
-const segmentDisplayLabel = (value: string) => value === 'Base_Proprietaria' ? 'Topo de Funil (Base Proprietária)' : value === 'CRM' ? 'Topo de Funil (CRM)' : value === 'CRM 3' ? 'TOPO DE FUNIL (CRM) 3' : value;
+const segmentDisplayLabel = (value: string) => value === 'Base_Proprietaria' ? 'Topo de Funil (Base Proprietária)' : value === 'CRM' ? 'Topo de Funil (CRM)' : value === 'CRM 3' ? 'TOPO DE FUNIL (CRM) 3' : value === 'Topo de Funil Dinâmico' ? 'TOPO DE FUNIL DINÂMICO' : value;
 const naturalLabelSort = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { numeric: true, sensitivity: 'base' });
 const initialTemplateSlots = (): EmailTemplateSlot[] => {
   const storedPrincipalId = localStorage.getItem(PRIMARY_TEMPLATE_KEY) ?? '';
@@ -468,6 +472,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
   const usesTopoV10 = previewTemplate.includes('TB_HEADER_VARIACOES');
+  // V13: o bloco 3 vem do pool e o header dinâmico vem do próprio briefing.
+  const usesPool = usesTopoV10 || previewTemplate.includes('DE_POOL_OFERTAS_PLURIX');
+  const usesBriefingHeader = /Field\s*\(\s*@Row\s*,\s*"HEADER_TITULO"\s*\)/.test(previewTemplate);
   const usesLimitMessage = /Field\s*\(\s*@Row\s*,\s*"MENSAGEM_LIMITE"\s*\)/.test(previewTemplate);
   const limitBandText = useMemo(() => usesLimitMessage && previewRow
     ? renderLimitMessage(previewRow.MENSAGEM_LIMITE, subscriber.PRI_NOME.trim().toLocaleLowerCase('pt-BR').replace(/(^|\s)(\S)/g, (_, space: string, letter: string) => space + letter.toLocaleUpperCase('pt-BR')), subscriber.LIMITE)
@@ -476,11 +483,18 @@ export const DynamicEmailWorkspace: React.FC = () => {
     headerValue: previewRow.HEADER, signatureKey: previewRow.NM_PRODUTO_INTERNO, limite: subscriber.LIMITE, date: previewSendDate,
     variants: headerVariants, assets: partnerAssets, offers: poolOffers,
   }) : null, [headerVariants, partnerAssets, poolOffers, previewRow, previewSendDate, subscriber.LIMITE, usesTopoV10]);
+  const briefingPoolPreview = useMemo(() => {
+    if (usesTopoV10 || !usesPool || !previewRow) return null;
+    const offer = selectPoolOfferOfDay(poolOffers, previewRow.NM_PRODUTO_INTERNO, previewSendDate);
+    const [, month, day] = (offer?.date ?? '').split('-');
+    return { offer, vars: { OfertaProduto: offer?.productName ?? '', OfertaPrecoTxt: offer?.priceText ?? '', OfertaImagem: offer?.imageUrl ?? '', OfertaData: offer ? `${day}/${month}` : '' } };
+  }, [poolOffers, previewRow, previewSendDate, usesPool, usesTopoV10]);
+  const poolOffer = topoPreview?.offer ?? briefingPoolPreview?.offer ?? null;
   const render = useMemo(() => {
     if (!previewRow) return { html: '', diagnostics: [] };
     const anchoredTemplate = injectBlockAnchors(previewTemplate, previewRow, STRUCTURE_ANCHOR_SPECS).replace(POOL_ANCHOR_COMMENT, blockSentinel('pool'));
-    return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden', vars: topoPreview?.vars });
-  }, [previewRow, previewTemplate, showMarketingNotes, subscriber, topoPreview]);
+    return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden', vars: topoPreview?.vars ?? briefingPoolPreview?.vars });
+  }, [briefingPoolPreview, previewRow, previewTemplate, showMarketingNotes, subscriber, topoPreview]);
   const previewContextKey = emailPreviewContextKey(selected?.__id ?? '', linkedTemplateId);
   const templateActiveCols = useMemo(() => templateActiveColumns(previewTemplate), [previewTemplate]);
   const isColumnEditable = (field: BriefingColumn) => templateActiveCols.size === 0 || templateActiveCols.has(field);
@@ -488,13 +502,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
     const row = previewRow;
     if (!row) return [];
     const issueFields = new Set(selectedIssues.map((issue) => issue.field).filter(Boolean) as string[]);
-    return visibleStructureBlocks(usesTopoV10, usesLimitMessage).map((block) => {
+    return visibleStructureBlocks(usesPool, usesLimitMessage).map((block) => {
       if (block.id === 'limit') {
         const text = stripHtmlToText(limitBandText);
         return { id: block.id, num: block.num, label: block.label, anchor: text ? { kind: 'text' as const, value: text } : null, status: text ? 'filled' as const : 'empty' as const, templateLocked: false };
       }
       if (block.id === 'pool') {
-        const offer = topoPreview?.offer;
+        const offer = poolOffer;
         return { id: block.id, num: block.num, label: block.label, anchor: offer ? { kind: 'text' as const, value: 'E tem mais' } : null, status: offer ? 'filled' as const : 'empty' as const, templateLocked: true };
       }
       const rawTexts = block.textFields.map((field) => stripHtmlToText(row[field] ?? ''));
@@ -512,8 +526,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const templateLocked = ownedFields.length > 0 && templateActiveCols.size > 0 && ownedFields.some((field) => !templateActiveCols.has(field));
       return { id: block.id, num: block.num, label: block.label, anchor, status, templateLocked };
     });
-  }, [limitBandText, previewRow, selectedIssues, templateActiveCols, topoPreview, usesLimitMessage, usesTopoV10]);
-  const structureNum = useMemo<Record<string, number>>(() => Object.fromEntries(visibleStructureBlocks(usesTopoV10, usesLimitMessage).map((block) => [block.id, block.num])), [usesLimitMessage, usesTopoV10]);
+  }, [limitBandText, poolOffer, previewRow, selectedIssues, templateActiveCols, usesLimitMessage, usesPool]);
+  const structureNum = useMemo<Record<string, number>>(() => Object.fromEntries(visibleStructureBlocks(usesPool, usesLimitMessage).map((block) => [block.id, block.num])), [usesLimitMessage, usesPool]);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
@@ -1087,14 +1101,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 {taxonomyState === 'error' && <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800"><span>Não foi possível carregar a taxonomia de activities.</span><button type="button" onClick={() => void refreshTaxonomy()} className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-bold"><RefreshCw size={12}/>Tentar novamente</button></div>}
               </CollapsibleBlock>
 
-              {EDITOR_SECTIONS.filter((section) => (section.id !== 'pool' || (usesTopoV10 && selected.__meta.partner === 'Plurix')) && (section.id !== 'limit' || usesLimitMessage)).map((section) => {
+              {EDITOR_SECTIONS.filter((section) => (section.id !== 'pool' || (usesPool && selected.__meta.partner === 'Plurix')) && (section.id !== 'limit' || usesLimitMessage)).map((section) => {
                 const isContentBlock = structureNum[section.id] != null && section.id !== 'pool' && section.id !== 'limit';
                 const lockedFields = isContentBlock ? (section.fields ?? []).filter((field) => !isColumnEditable(field)) : [];
                 const imageLocked = isContentBlock && section.imageSlot ? !isColumnEditable(section.imageSlot.image) : false;
                 return (
                 <CollapsibleBlock key={section.id} id={`eb-${section.id}`} marker={<BlockMarker num={structureNum[section.id]}/>} focused={activeStructureBlock === section.id} onHoverChange={structureNum[section.id] ? (hovering) => setEditorHoverBlock(hovering ? section.id : null) : undefined} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
                   {(lockedFields.length > 0 || imageLocked) && <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-600"><Lock size={12} className="mt-px shrink-0"/><span>Parte deste bloco é fixa no template <b>{templateSlots.find((slot) => slot.id === linkedTemplateId)?.name}</b> — vem direto do HTML/AMPscript e não pode ser ajustada aqui. Para mudar, troque o template ou edite o Template-fonte.</span></p>}
-                  {section.id === 'pool' && <PoolOfferEditorCard offer={topoPreview?.offer ?? null} offers={poolOffers} signatureKey={selected.NM_PRODUTO_INTERNO} signatureLabel={selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO} date={previewSendDate} onDateChange={setPreviewSendDate} buttonLink={selected.LINK_CTA_1} onManage={() => setMode('topo')}/>}
+                  {section.id === 'pool' && <PoolOfferEditorCard offer={poolOffer} offers={poolOffers} signatureKey={selected.NM_PRODUTO_INTERNO} signatureLabel={selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO} date={previewSendDate} onDateChange={setPreviewSendDate} buttonLink={selected.LINK_CTA_1} onManage={() => setMode('topo')}/>}
                   {section.id === 'limit' && <LimitMessageEditor value={selected.MENSAGEM_LIMITE} issues={selectedIssues.filter((issue) => issue.field === 'MENSAGEM_LIMITE')} networkCount={rows.filter((row) => row.__meta.status !== 'archived' && row.__meta.campaignGroupId === selected.__meta.campaignGroupId).length} sampleName={subscriber.PRI_NOME} sampleLimit={subscriber.LIMITE} onChange={(value) => updateField('MENSAGEM_LIMITE', value)}/>}
                   {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
                   {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)} locked={isContentBlock && !isColumnEditable(field)}/>)}</div>}
@@ -1103,12 +1117,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
                     <div className="grid gap-3 md:grid-cols-2">
                       <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/>
                       <LimitTestInput value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
-                      {usesTopoV10 && <MiniInput label="Data de envio simulada" type="date" value={previewSendDate} onChange={(value) => setPreviewSendDate(value || new Date().toISOString().slice(0, 10))}/>}
+                      {usesPool && <MiniInput label="Data de envio simulada" type="date" value={previewSendDate} onChange={(value) => setPreviewSendDate(value || new Date().toISOString().slice(0, 10))}/>}
                     </div>
                     {usesTopoV10 && <p className="mt-2 text-[11px] leading-4 text-slate-500">Template V10: com limite preenchido, a faixa de limite pré-aprovado aparece em todos os e-mails. A data define a oferta do pool no bloco 3{topoPreview?.offer ? `: nessa data o bloco mostra ${topoPreview.offer.productName}, a partir de R$ ${topoPreview.offer.priceText}.` : ': nessa data não há oferta vigente para esta rede, então o bloco não aparece.'}</p>}
                   </div>}
+                  {section.id === 'header' && usesBriefingHeader && <div className="mb-3 space-y-2">
+                    <p className="text-[11px] leading-4 text-slate-500">Header dinâmico (V13): com a linha principal preenchida, o topo vira texto sobre o azul do +amigo, com o cartão à direita. Vale para as 6 redes deste e-mail. Sem a linha principal, o template usa a imagem do HEADER.</p>
+                    <div className="grid gap-3 md:grid-cols-2">{(['HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO'] as BriefingColumn[]).map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)}/>)}</div>
+                  </div>}
                   {section.id === 'header' && usesTopoV10 && <HeaderVariantPicker value={selected.HEADER} variants={headerVariants} notes={topoPreview?.diagnostics ?? []} onChange={(value) => updateField('HEADER', value)} onManage={() => setMode('topo')}/>}
-                  {section.imageSlot && !(section.id === 'header' && usesTopoV10 && topoPreview?.header.mode === 'html') && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')} locked={imageLocked}/></div>}
+                  {section.imageSlot && !(section.id === 'header' && ((usesTopoV10 && topoPreview?.header.mode === 'html') || (usesBriefingHeader && selected.HEADER_TITULO.trim()))) && <div className={section.fields ? 'mt-3' : ''}><ImageUrlCard slot={section.imageSlot} imageUrl={selected[section.imageSlot.image]} destinationUrl={section.imageSlot.link ? selected[section.imageSlot.link] : undefined} assets={assets} contextProduct={selected.NM_PRODUTO_INTERNO} contextPartner={selected.__meta.partner} onImageUrl={(value) => updateField(section.imageSlot!.image, value)} onDestinationUrl={section.imageSlot.link ? (value) => updateField(section.imageSlot!.link!, value) : undefined} onCreateAsset={() => setMode('library')} locked={imageLocked}/></div>}
                   {section.id === 'closing' && selected.__meta.partner === 'Plurix' && <div className={section.imageSlot ? 'mt-3' : ''}><SignatureMatrix rows={rows} selected={selected} onEnsure={() => setRows((current) => ensurePlurixVariants(current, selected.__id, signatureSettings.filter((item) => item.status === 'inactive').map((item) => item.signatureKey)))} onSelect={setSelectedId} onManage={() => setSignatureManagerOpen(true)}/></div>}
                 </CollapsibleBlock>
                 );

@@ -124,6 +124,10 @@ const COLUMN_DOCS: Record<BriefingColumn, ColumnDoc> = {
   COR_NOTA_LEGAL: { friendly: 'Cor da nota legal', block: 'Informações legais', html: false, personalization: false, emptyWhen: 'não' },
   TAMANHO_DA_FONTE_NOTA_LEGAL: { friendly: 'Tamanho da nota legal (px)', block: 'Informações legais', html: false, personalization: false, emptyWhen: 'não' },
   RODAPE: { friendly: 'Rodapé complementar', block: 'Rodapé', html: true, personalization: false, emptyWhen: 'pode' },
+  HEADER_TITULO: { friendly: 'Linha principal do header dinâmico (até 34)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode — sem ela o header dinâmico não aparece (V13+)' },
+  HEADER_SUBTITULO: { friendly: 'Linha secundária do header dinâmico (até 60)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode' },
+  HEADER_IMAGEM_CARTAO: { friendly: 'Imagem do cartão no header (PNG HTTPS)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode' },
+  HEADER_LOGO: { friendly: 'Logo no header dinâmico (PNG HTTPS)', block: 'Cabeçalho visual', html: false, personalization: false, emptyWhen: 'pode' },
   MENSAGEM_LIMITE: { friendly: 'Mensagem da faixa de limite pré-aprovado', block: 'Faixa de limite', html: true, personalization: false, emptyWhen: 'pode — sem mensagem a faixa não aparece (só templates V12+). Aceita só {{nome}} e {{limite}}, sem AMPscript.' },
 };
 

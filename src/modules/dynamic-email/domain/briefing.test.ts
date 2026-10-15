@@ -28,7 +28,7 @@ describe('briefing SFMC', () => {
     expect(validateRows([a, b]).get('a')?.some((issue) => issue.code === 'duplicate-key')).toBe(true);
   });
 
-  it('mantém exatamente as 37 colunas governadas, com MENSAGEM_LIMITE no fim', () => { expect(BRIEFING_COLUMNS).toHaveLength(37); expect(BRIEFING_COLUMNS[BRIEFING_COLUMNS.length - 1]).toBe('MENSAGEM_LIMITE'); });
+  it('mantém exatamente as 41 colunas governadas, com as colunas novas no fim', () => { expect(BRIEFING_COLUMNS).toHaveLength(41); expect(BRIEFING_COLUMNS.slice(36)).toEqual(['MENSAGEM_LIMITE', 'HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO']); });
 
   it('bloqueia imagem local, base64 ou URL sem HTTPS', () => {
     const row = emptyBriefingRow('image');
@@ -48,7 +48,7 @@ describe('briefing SFMC', () => {
     expect(validateRows([row]).get('00000000-0000-4000-8000-000000000011')?.some((issue) => issue.code === 'image-url')).toBe(true);
   });
 
-  it('faz round-trip do CSV de 37 colunas com aspas, vírgulas, datas e a mensagem de limite', () => {
+  it('faz round-trip do CSV de 41 colunas com aspas, vírgulas, datas e a mensagem de limite', () => {
     const row = emptyBriefingRow('00000000-0000-4000-8000-0000000000a1');
     Object.assign(row, {
       DT_INICIO: '2026-08-17T00:00', DT_FIM: '2028-10-01T23:59', UTM_CAMPANHA: 'PLURIX_CRM_SEMANA1_EMAIL1_AMIGAO', NM_PRODUTO_INTERNO: 'AMIGAO', TP_CAMPANHA: 'CRM', SEQUENCIA: 'E-mail 1',
@@ -56,8 +56,8 @@ describe('briefing SFMC', () => {
       MENSAGEM_LIMITE: 'Parabéns, {{nome}}! Você tem R$ {{limite}} de limite pré-aprovado no cartão +amigo.',
     });
     const csv = exportBriefingCsv([row]);
-    expect(csv.split('\r\n')[0].split(',')).toHaveLength(37);
-    expect(csv.split('\r\n')[0].endsWith(',RODAPE,MENSAGEM_LIMITE')).toBe(true);
+    expect(csv.split('\r\n')[0].split(',')).toHaveLength(41);
+    expect(csv.split('\r\n')[0].endsWith(',RODAPE,MENSAGEM_LIMITE,HEADER_TITULO,HEADER_SUBTITULO,HEADER_IMAGEM_CARTAO,HEADER_LOGO')).toBe(true);
     const back = parseBriefingCsv(csv);
     expect(back.errors).toEqual([]);
     const parsed = back.rows[0];
@@ -78,7 +78,7 @@ describe('briefing SFMC', () => {
     const parsed = parseBriefingCsv(legacy);
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.rows[0].MENSAGEM_LIMITE).toBe('');
-    expect(parsed.errors.join(' ')).toContain('36 colunas');
+    expect(parsed.errors.join(' ')).toContain('formato anterior');
   });
 
   it('a mesma chave do SFMC em réguas diferentes do GaaS vira aviso, não duplicidade', () => {

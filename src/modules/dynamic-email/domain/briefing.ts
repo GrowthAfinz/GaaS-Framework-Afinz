@@ -14,10 +14,14 @@ export const BRIEFING_COLUMNS = [
   // 37ª coluna (out/2026): texto da faixa de limite pré-aprovado, opcional/anulável.
   // Fica no fim para que a DE existente só ganhe uma coluna nova, sem reordenar as demais.
   'MENSAGEM_LIMITE',
+  // 38ª a 41ª (out/2026): header dinâmico lido do próprio briefing (template V13).
+  'HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO',
 ] as const;
 
 /** Colunas que um CSV antigo pode não ter; entram vazias na importação. */
-export const OPTIONAL_IMPORT_COLUMNS: readonly BriefingColumn[] = ['MENSAGEM_LIMITE'];
+export const OPTIONAL_IMPORT_COLUMNS: readonly BriefingColumn[] = ['MENSAGEM_LIMITE', 'HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO'];
+export const HEADER_TITLE_LIMIT = 34;
+export const HEADER_SUBTITLE_LIMIT = 60;
 
 export type BriefingColumn = typeof BRIEFING_COLUMNS[number];
 export type BriefingRow = Record<BriefingColumn, string> & { __id: string; __journeyConfirmed?: boolean };
@@ -52,7 +56,7 @@ export function parseBriefingCsv(csv: string): { rows: BriefingRow[]; errors: st
   const errors = parsed.errors.map((e) => `Linha ${e.row != null ? e.row + 2 : '?'}: ${e.message}`);
   if (missing.length) errors.unshift(`Colunas ausentes: ${missing.join(', ')}`);
   if (extra.length) errors.push(`Colunas extras ignoradas: ${extra.join(', ')}`);
-  if (!missing.length && missingOptional.length) errors.push(`CSV no formato anterior (36 colunas): ${missingOptional.join(', ')} entra vazio.`);
+  if (!missing.length && missingOptional.length) errors.push(`CSV no formato anterior: ${missingOptional.join(', ')} entra vazio.`);
   if (missing.length) return { rows: [], errors };
   const rows = parsed.data.map((source, index) => {
     const row = emptyBriefingRow(`${Date.now()}-${index}`);
@@ -127,7 +131,12 @@ export function validateRows(rows: BriefingRow[], today = new Date()): Map<strin
       if (invalidTokens.length) issues.push({ severity: 'error', code: 'personalization', field, ...(invalidTokens.every((token) => PERSONALIZATION_ALIASES.has(token[1].toUpperCase())) ? { fix: 'personalization' as const } : {}), message: `${field} contém personalização incompatível com TreatAsContent.` });
       if (/\r|\n/.test(value)) issues.push({ severity: 'warning', code: 'newline', field, fix: 'newlines', message: `${field} contém quebra de linha crua; converta para <br>.` });
     });
-    (['HEADER', 'BANNER_1_CORPO', 'BANNER_2_CORPO', 'BANNER_3_CORPO'] as BriefingColumn[]).forEach((field) => {
+    const headerTitle = (row.HEADER_TITULO ?? '').trim();
+    const headerSubtitle = (row.HEADER_SUBTITULO ?? '').trim();
+    if (headerTitle.length > HEADER_TITLE_LIMIT) issues.push({ severity: 'warning', code: 'header-title-length', field: 'HEADER_TITULO', message: `A linha principal do header tem ${headerTitle.length} caracteres; o ideal é até ${HEADER_TITLE_LIMIT} para não quebrar em três linhas.` });
+    if (headerSubtitle.length > HEADER_SUBTITLE_LIMIT) issues.push({ severity: 'warning', code: 'header-subtitle-length', field: 'HEADER_SUBTITULO', message: `A linha secundária do header tem ${headerSubtitle.length} caracteres; o ideal é até ${HEADER_SUBTITLE_LIMIT}.` });
+    if (!headerTitle && (headerSubtitle || (row.HEADER_IMAGEM_CARTAO ?? '').trim())) issues.push({ severity: 'warning', code: 'header-title-missing', field: 'HEADER_TITULO', message: 'Sem a linha principal, o header dinâmico não aparece (o template usa o HEADER como imagem).' });
+    (['HEADER', 'BANNER_1_CORPO', 'BANNER_2_CORPO', 'BANNER_3_CORPO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO'] as BriefingColumn[]).forEach((field) => {
       const value = (row[field] ?? "").trim();
       if (field === 'HEADER' && HEADER_CODE_PATTERN.test(value.toUpperCase())) {
         issues.push({ severity: 'warning', code: 'header-variant', field, message: `HEADER usa a variação dinâmica ${value.toUpperCase()}: só é exibida com o template PLURIX V10 e com a variação ativa na DE TB_HEADER_VARIACOES.` });

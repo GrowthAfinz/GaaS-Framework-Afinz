@@ -181,6 +181,8 @@ export const sharedFields: BriefingColumn[] = [
   'NOTA_LEGAL', 'COR_NOTA_LEGAL', 'TAMANHO_DA_FONTE_NOTA_LEGAL',
   // Uma mensagem por e-mail, igual nas seis redes daquele toque.
   'MENSAGEM_LIMITE',
+  // Header dinâmico do V13: o mesmo nas seis redes do e-mail.
+  'HEADER_TITULO', 'HEADER_SUBTITULO', 'HEADER_IMAGEM_CARTAO', 'HEADER_LOGO',
 ];
 
 export const signatureFields: BriefingColumn[] = [
