@@ -14,7 +14,9 @@ export interface MessageMeta {
 export interface JourneyIndexItem {id:string;import_id:string;reference:string;journey_name:string;journey_version:number;created_at:string;messages:MessageMeta[]}
 export interface JourneyManifest extends Omit<JourneyIndexItem,'messages'>{graph:JourneyGraph;renditions?:Record<string,{full_path:string;thumbnail_path:string;content_fingerprint:string;width:number;height:number;warnings:string[];source:string}>}
 export interface JourneyReuse {snapshot_id:string;occurrence_key:string;activity_key:string;journey_name:string;journey_version:number;activity_name:string;channel:string;asset_name:string|null;observed_template_id:string|null;evidence:'exact_content'|'template_id'|'shared_asset'}
-export function messageFacets(m:MessageMeta):ScopeFacets {
+export type JourneyScopeMessage=Pick<MessageMeta,'contexts'|'catalog'|'review_context'|'channel'|'observed_template_id'>;
+export interface JourneyDirectoryItem extends Omit<JourneyIndexItem,'messages'>{messages:JourneyScopeMessage[]}
+export function messageFacets(m:JourneyScopeMessage):ScopeFacets {
  const f=facetsFromRecords(m.contexts||[]);
  const catalog=m.catalog||({template_id:m.observed_template_id||'',channel:m.channel,metadata:{}} as CommunicationTemplate);
  const enriched={...catalog,metadata:{...catalog.metadata,resolved_context:m.review_context||catalog.metadata?.resolved_context}};
@@ -28,7 +30,7 @@ export function contextKey(f:ScopeFacets):string[]{
  return fronts.flatMap(front=>partners.map(partner=>JSON.stringify([front,partner])));
 }
 export function contextLabel(key:string){const [front,partner]=JSON.parse(key) as string[];return partner==='Origem não informada'?front:`${front} · ${partner}`;}
-export function matchesContext(m:MessageMeta,context:string,segment:string){const f=messageFacets(m);return (!context||contextKey(f).includes(context))&&(!segment||f.segmento.includes(segment));}
+export function matchesContext(m:JourneyScopeMessage,context:string,segment:string){const f=messageFacets(m);return (!context||contextKey(f).includes(context))&&(!segment||f.segmento.includes(segment));}
 export function manifestMessages(ms:MessageMeta[]):PackageMessage[]{return ms.map(m=>({activity_name:m.activity_name,activity_key:m.activity_key,content:{channel:m.channel}} as PackageMessage));}
 export function graphPoint(n:{col:number;row:number},compact:boolean){return {x:300+n.col*180,y:70+n.row*(compact?115:190)};}
 export function fitViewport(layout:FlowLayout,width:number,height:number,compact:boolean){

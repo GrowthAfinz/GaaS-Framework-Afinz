@@ -44,5 +44,38 @@ const invalid={visuals:{assets:[{key:'new',mime:'image/png',file:'YWJj'},{key:'b
 await d.exec(readFileSync('supabase/migrations/20261009035453_visual_missing_resource_notice.sql','utf8'));await d.query('update sfmc_visual_messages set html=$1 where import_id=$2',['<img src="">',snapshot]);await d.exec('set role authenticated');assert.ok((await d.query('select read_journey_flow_message($1,$2) v',[snapshot,message.occurrence_key])).rows[0].v.alerts.some(a=>a.includes('Imagem ausente')));await d.exec('reset role');await d.exec('create table communication_template_contents(id uuid primary key,payload jsonb);create table communication_template_content_observations(message_id uuid,content_id uuid,observed_at timestamptz default now());grant select on communication_template_contents,communication_template_content_observations to authenticated;');
 await d.exec(readFileSync('supabase/migrations/20261009040158_approved_visual_origins.sql','utf8'));
 const approvedId='00000000-0000-0000-0000-000000000020',sourceId='00000000-0000-0000-0000-000000000021';await d.query('insert into communication_template_contents values($1,$2)',[approvedId,JSON.stringify(message.content)]);await d.query('insert into sfmc_package_messages values($1,$2,$3)',[sourceId,snapshot,JSON.stringify(message)]);await d.query('insert into communication_template_content_observations(message_id,content_id) values($1,$2)',[sourceId,approvedId]);await d.exec('set role authenticated');assert.equal((await d.query('select read_approved_visual_origins() v')).rows[0].v[0].content_id,approvedId);await d.exec('reset role');
-await d.query('insert into sfmc_package_messages values($1,$2,$3)',['00000000-0000-0000-0000-000000000022',other,JSON.stringify(message)]);await d.query('insert into communication_template_content_observations(message_id,content_id) values($1,$2)',['00000000-0000-0000-0000-000000000022',approvedId]);await d.query('update sfmc_package_imports set uploaded_by=$1 where id=$2',[actor,other]);await d.exec('set role authenticated');assert.equal((await d.query('select read_approved_visual_origins() v')).rows[0].v.length,0);await d.exec('reset role');await d.close();console.log('Visual recovery SQL: private assets, owner-only repair, immutable originals, old cache invalidation, historical template scope and atomic rollback passed.');
+await d.query('insert into sfmc_package_messages values($1,$2,$3)',['00000000-0000-0000-0000-000000000022',other,JSON.stringify(message)]);await d.query('insert into communication_template_content_observations(message_id,content_id) values($1,$2)',['00000000-0000-0000-0000-000000000022',approvedId]);await d.query('update sfmc_package_imports set uploaded_by=$1 where id=$2',[actor,other]);await d.exec('set role authenticated');assert.equal((await d.query('select read_approved_visual_origins() v')).rows[0].v.length,0);await d.exec('reset role');await d.exec(readFileSync('supabase/migrations/20261015183926_journey_progressive_loading.sql','utf8'));
+await d.exec('set role anon');
+await assert.rejects(()=>d.query('select read_journey_flow_directory()'),/permission denied/);
+await assert.rejects(()=>d.query('select read_journey_flow_detail($1)',[snapshot]),/permission denied/);
+await d.exec('reset role;set role authenticated');
+const directory=(await d.query('select read_journey_flow_directory() v')).rows[0].v;
+assert.equal(directory.length,2);
+assert.ok(!JSON.stringify(directory).includes('PRIVATE_HTML'));
+assert.ok(!JSON.stringify(directory).includes('preview_hint'));
+assert.ok(!JSON.stringify(directory).includes('content_fingerprint'));
+assert.ok(!JSON.stringify(directory).includes('graph'));
+const detail=(await d.query('select read_journey_flow_detail($1) v',[snapshot])).rows[0].v;
+assert.equal(detail.id,snapshot);
+assert.equal(detail.messages.length,1);
+assert.equal(detail.messages[0].activity_key,'a');
+assert.deepEqual(directory.find(x=>x.id===snapshot).messages[0].contexts,
+ detail.messages[0].contexts.map(({BU,Parceiro,Segmento})=>({BU,Parceiro,Segmento})));
+assert.equal((await d.query('select read_journey_flow_detail(null) v')).rows[0].v,null);
+// A matching alias includes only its evidenced period and never duplicates an exact match.
+await d.exec('reset role');
+await d.query(`insert into journey_flow_context_aliases values($1,$2,'OTHER','other-act','E-mail','2026-11-01','2026-11-30','fixture')`,[snapshot,message.occurrence_key]);
+await d.exec('set role authenticated');
+assert.equal((await d.query('select count(*)::int n from journey_flow_context_rows($1,$2)',[snapshot,message.occurrence_key])).rows[0].n,4);
+await d.exec('reset role');
+await d.query('update journey_flow_context_aliases set end_date=$1',['2026-11-02']);
+await d.exec('set role authenticated');
+assert.equal((await d.query('select count(*)::int n from journey_flow_context_rows($1,$2)',[snapshot,message.occurrence_key])).rows[0].n,3);
+// A second owner cannot see either navigation or detail for this owner's imports.
+await d.exec(`reset role;select set_config('test.uid','00000000-0000-0000-0000-000000000099',false);set role authenticated`);
+assert.deepEqual((await d.query('select read_journey_flow_directory() v')).rows[0].v,[]);
+assert.equal((await d.query('select read_journey_flow_detail($1) v',[snapshot])).rows[0].v,null);
+await d.exec('reset role');
+console.log('Progressive journey SQL: scope-only directory, single snapshot detail, RLS and alias date bounds passed.');
+await d.close();console.log('Visual recovery SQL: private assets, owner-only repair, immutable originals, old cache invalidation, historical template scope and atomic rollback passed.');
 console.log('Flow V2 SQL: index/manifest leves, RLS invoker, mensagem isolada, fechamento de grupo, período vazio e reuso sem vazamento passaram.');
