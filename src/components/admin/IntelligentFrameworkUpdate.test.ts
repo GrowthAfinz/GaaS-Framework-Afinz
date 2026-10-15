@@ -19,6 +19,36 @@ const historical = (journey: string, name = activityName): Activity => ({
 } as unknown as Activity);
 
 describe('intelligent importer cart audience and BI aliases', () => {
+    it('preserves external marketplace cards without an assisted/independent split', () => {
+        const j = 'JOR_AQS_B2C_CARRINHO_REATIVACAO_VIBE_PAD_26';
+        const name = 'afz_car_vis_aqs_wpp_car_d0ecredvibe_diario';
+        const external = row(j,name); external[9] = 'ECRED-API';
+        external.splice(10,5,'214','214','31','0','0');
+        const c = processDinamicaBI([header,external],[]).candidates[0];
+        expect(c).toMatchObject({ finalized:31, assisted:0, independent:0 });
+    });
+    it('keeps standard opt-out replies separate across journeys, including similar names', () => {
+        const name = 'afz_car_vis_aqs_wpp_apr_resposta_optout_pontual';
+        const j1 = 'JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_SET26';
+        const j2 = 'JOR_AQS_B2C_NA_NGD_MEIO_DE_FUNIL_PAD_VIBE_SET26';
+        const second = row(j2,name); second[12] = '9';
+        const result = processDinamicaBI([header, row(j1,name), second], [historical(j1,name)]);
+        expect(result.candidates).toHaveLength(2);
+        expect(result.candidates.every(c => c.status !== 'conflict')).toBe(true);
+        expect(result.candidates.find(c => c.journey === j2)?.matchedActivity).toBeUndefined();
+        expect(result.candidates.find(c => c.journey === j1)?.finalized).toBe(2);
+        expect(result.candidates.find(c => c.journey === j2)?.finalized).toBe(9);
+    });
+    it('refreshes a wrong ANC segment even when the stage already matches', () => {
+        const j = 'JOR_AQS_B2C_BP_ANC_AQUISICAO_VIBE_DOBRO_DEZ25';
+        const name = 'afz_car_vis_aqs_wpp_apr_upgrade_diario';
+        const old = historical(j,name);
+        old.raw!.Segmento = old.segmento = 'Base_Proprietaria';
+        old.raw!['Etapa de aquisição'] = old.etapaAquisicao = 'Meio_de_Funil';
+        const c = processDinamicaBI([header,row(j,name)],[old]).candidates[0];
+        expect(c.segmento).toBe('Aprovados_nao_convertidos');
+        expect(c.canonicalDimensionFields).toContain('segmento');
+    });
     it('elects one explicit 21D alias and never sums repeated journey volumes/results', () => {
         const journeys = ['JOR_AQS_PLURIX_NA_ABD_CARRINHO_SAB_SET_26',
             'JOR_AQS_PLURIX_NA_ABD_CARRINHO21D_SET_26', 'JOR_AQS_PLURIX_NA_ABD_CARRINHO21D_OUT26'];

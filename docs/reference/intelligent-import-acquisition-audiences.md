@@ -125,3 +125,15 @@ Isso não permite redistribuição artificial. Um custo unitário de oferta de -
 Validação: testes do importador, suíte src completa, typecheck de release; no banco,
 testes transacionais revertidos cobrem atualização parcial de cartões/entregues,
 preservação de tarifa e incentivo, custo zero, CAC indefinido e atomicidade com ID ausente.
+
+## Confirmações de classificação e origem — 15/10/2026
+
+- Dia / CRM tem etapa Aquisicao; não é Reativacao. Corrigidos 49 registros.
+- JOR_AQUISICAO_B2C_BP_ANC_AQUISICAO_VIBE_DOBRO_DEZ25 (nome DEZ2 informado de forma abreviada): parceiro Proprietaria, segmento Aprovados_nao_convertidos; 3 segmentos corrigidos. BP no slot do parceiro não transforma o público ANC em Base_Proprietaria.
+- JOR_AQUISICAO_PLURIX_NA_NGD_MEIO_DE_FUNIL_PADRAO_NA_ABRI26: Negados / Meio_de_Funil (repescagem); 1 segmento corrigido, o outro já estava correto.
+- Run auditável: 770c704f-031a-4ad4-9728-6e54b7b0f393, 53 activities, métricas/custos/demais campos preservados.
+- Respostas padrão afz_car_vis_aqs_wpp_apr_resposta_optout_pontual e afz_car_bbt_aqs_wpp_apr_resposta_optout_pontual podem existir em jornadas diferentes. Isso não é duplicidade nem prova de renomeação. Preservar contexto da jornada; não propagar resultados entre essas jornadas. Repetição na mesma jornada/canal/data ainda precisa revisão.
+- Serasa/ECRED é marketplace/API externo à jornada padrão: cartões podem chegar sem apontamento assistido/independente; preservar os campos recebidos (inclusive 0/0), sem redistribuição artificial. A triagem anterior tinha 703 casos com evidência no nome/parceiro que passam a exceção aceita; 83 sem essa evidência continuam para verificar origem, não como erros confirmados.
+- 21 registros de oferta unitária R$76,50 em 2025 foram confirmados corretos pelo responsável; não alterar. Priorizar custos de 2026 em diante.
+
+O importador passa a detectar mudança de segmento canônico mesmo quando a etapa já coincide e mantém a jornada explícita acima de um indício de público na activity. Campos canônicos continuam passando por confirmação no fluxo de importação. Há 15 classificações antigas restantes com sugestões por registro, ainda não aplicadas; divergência entre jornada e activity exige evidência do período.

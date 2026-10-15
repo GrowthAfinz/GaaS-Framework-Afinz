@@ -4,6 +4,7 @@ import {
     parseCanonicalAcquisitionJourney,
     inferCartAudience,
     acquisitionJourneyIdentity,
+    isStandardOptOutResponse,
 } from './intelligentImportRouting';
 
 describe('intelligent import journey routing', () => {
@@ -50,6 +51,19 @@ describe('intelligent import journey routing', () => {
 });
 
 describe('acquisition audience contract', () => {
+    it.each(['JOR_AQS', 'JOR_AQUISICAO'])('uses the confirmed CRM, ANC and NGD dimensions for %s', prefix => {
+        expect(parseCanonicalAcquisitionJourney(`${prefix}_B2B2C_DIA_CRM_MEIO_DE_FUNIL`))
+            .toMatchObject({ parceiro: 'Dia', segmento: 'CRM', etapaAquisicao: 'Aquisicao' });
+        expect(parseCanonicalAcquisitionJourney(`${prefix}_B2C_BP_ANC_AQUISICAO_VIBE_DOBRO_DEZ25`))
+            .toMatchObject({ parceiro: 'Proprietaria', segmento: 'Aprovados_nao_convertidos', etapaAquisicao: 'Meio_de_Funil' });
+        expect(parseCanonicalAcquisitionJourney(`${prefix}_PLURIX_NA_NGD_MEIO_DE_FUNIL_PADRAO_NA_ABRI26`))
+            .toMatchObject({ segmento: 'Negados', etapaAquisicao: 'Meio_de_Funil' });
+    });
+    it('recognizes only the confirmed standard opt-out replies', () => {
+        expect(isStandardOptOutResponse('afz_car_vis_aqs_wpp_apr_resposta_optout_pontual')).toBe(true);
+        expect(isStandardOptOutResponse('afz_car_bbt_aqs_wpp_apr_resposta_optout_pontual')).toBe(true);
+        expect(isStandardOptOutResponse('afz_car_vis_aqs_wpp_apr_disp1_pontual')).toBe(false);
+    });
     it.each(['JOR_AQS', 'JOR_AQUISICAO'])('handles compact and legacy layouts with %s', (prefix) => {
         expect(parseCanonicalAcquisitionJourney(`${prefix}_PLURIX_21D_ABD_REATIVACAO_PADRAO_COPA_JUN26`))
             .toMatchObject({ bu: 'Plurix', segmento: 'Abandonados', etapaAquisicao: 'Reativacao' });

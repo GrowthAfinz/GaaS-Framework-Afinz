@@ -37,6 +37,7 @@ import {
     parseCanonicalAcquisitionJourney,
     acquisitionJourneyIdentity,
     inferCartAudience,
+    isStandardOptOutResponse,
 } from '../../utils/intelligentImportRouting';
 import {
     parseSeqParts,
@@ -538,7 +539,9 @@ const inferDeterministicDimensions = (metric: Pick<MetricRow, 'journey' | 'activ
     const activityTokens = normalizedOriginTokens(metric.activityName);
     const journeyTokens = normalizedOriginTokens(metric.journey);
     const canonicalJourney = parseCanonicalAcquisitionJourney(metric.journey);
-    const isAbandonedCart = hasAbandonedCartSignal(metric.journey, metric.activityName);
+    const isAbandonedCart = canonicalJourney.segmento
+        ? canonicalJourney.segmento === 'Abandonados'
+        : hasAbandonedCartSignal(metric.journey, metric.activityName);
     const findOrigin = (tokens: string[]) => {
         if (tokens.some((token) => ['bb', 'bbt'].includes(token))
             || tokens.includes('bem') && tokens.includes('barato')
@@ -1406,6 +1409,7 @@ const propagateGroupEmissions = (candidates: UpdateCandidate[]): UpdateCandidate
     });
     groups.forEach((group) => {
         if (group.length < 2) return; // sem colisao de jornada
+        if (isStandardOptOutResponse(group[0].activityName)) return;
         GROUP_RESULT_FIELDS.forEach((field) => {
             let best = 0;
             group.forEach((candidate) => {
@@ -1447,7 +1451,7 @@ const buildCandidate = (
     const compatibleHistoricalMatches = historicalSignatureMatches.filter(
         (activity) => isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
     );
-    const renamedHistoricalMatches = compatibleHistoricalMatches.length > 0
+    const renamedHistoricalMatches = compatibleHistoricalMatches.length > 0 || isStandardOptOutResponse(metric.activityName)
         ? []
         : historicalSignatureMatches
             .map((activity) => ({
@@ -1509,15 +1513,20 @@ const buildCandidate = (
         && normalizeKey(getRaw(existingDispatch!, ['Subgrupos'])) !== normalizeKey(taxonomy.subgrupo);
     const canonicalStageChanged = Boolean(existingDispatch) && Boolean(taxonomy.etapaAquisicao)
         && normalizeKey(getRaw(existingDispatch!, ['Etapa de aquisição'])) !== normalizeKey(taxonomy.etapaAquisicao);
+    const canonicalSegmentChanged = Boolean(existingDispatch) && Boolean(taxonomy.segmento)
+        && Boolean(parseCanonicalAcquisitionJourney(metric.journey).segmento)
+        && normalizeKey(getRaw(existingDispatch!, ['Segmento'])) !== normalizeKey(taxonomy.segmento);
     const audienceConflict = resolvedAudience.conflict;
-    const hasCanonicalDimensionRefresh = canonicalJourneyChanged || canonicalCartDimensionChanged || canonicalAudienceChanged || canonicalStageChanged;
+    const hasCanonicalDimensionRefresh = canonicalJourneyChanged || canonicalCartDimensionChanged || canonicalAudienceChanged || canonicalStageChanged || canonicalSegmentChanged;
     const hasMetricRefresh = refreshDetails.length > 0 || hasCanonicalDimensionRefresh;
     const collidesWithAnotherJourney = historicalSignatureMatches.length > 0 && !existsInBase;
     const renamedJourneyPct = Math.round(renamedJourneySimilarity * 100);
 
     // Duplicacao do BI: a mesma activity+canal+data vem com varios nomes de jornada
     // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
-    const fileJourneys = Array.from(new Set([metric.journey, ...Array.from(importedJourneys)])).filter(Boolean);
+    const fileJourneys = Array.from(new Set([metric.journey, ...Array.from(importedJourneys)])).filter(journey =>
+        Boolean(journey) && (!isStandardOptOutResponse(metric.activityName)
+            || acquisitionJourneyIdentity(journey) === acquisitionJourneyIdentity(metric.journey)));
     const canonicalRoles = electCanonicalJourney(fileJourneys, historyIndex.knownJourneys, metric.activityName);
     const myRole = canonicalRoles.get(normalizeKey(metric.journey));
     const fileSuperseded = myRole === 'superseded';
@@ -1645,6 +1654,7 @@ const buildCandidate = (
             ...(canonicalCartDimensionChanged ? ['segmento', 'etapaAquisicao'] : []),
             ...(canonicalAudienceChanged ? ['subgrupo'] : []),
             ...(canonicalStageChanged ? ['etapaAquisicao'] : []),
+            ...(canonicalSegmentChanged && !canonicalCartDimensionChanged ? ['segmento'] : []),
         ],
         auditRequired: renamedJourneyMatch,
         conflictReason: fileSuperseded

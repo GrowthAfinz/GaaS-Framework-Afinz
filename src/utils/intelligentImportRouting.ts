@@ -72,6 +72,10 @@ const canonicalFunnelStage = (tokens: string[]): string | undefined => {
 export const acquisitionJourneyIdentity = (journey: unknown): string =>
     normalizeJourneyKey(journey).replace(/^jor_aqs_/, 'jor_aquisicao_');
 
+/** Standard operational replies are reused across journeys; that is not a rename. */
+export const isStandardOptOutResponse = (activityName: unknown): boolean =>
+    /^afz_car_(?:vis|bbt)_aqs_wpp_apr_resposta_optout_pontual$/.test(normalizeJourneyKey(activityName));
+
 export interface CartAudience {
     subgrupo?: string;
     conflict?: string;
@@ -148,7 +152,8 @@ export const parseCanonicalAcquisitionJourney = (journey: unknown): CanonicalAcq
     const segmento = audienceTokens.slice(0, 3)
         .map((token) => CANONICAL_JOURNEY_SEGMENT[token]).find(Boolean)
         ?? (audienceTokens.some((token) => token.startsWith('carrinho')) ? 'Abandonados' : undefined);
-    const etapaAquisicao = segmento === 'Abandonados' ? 'Reativacao'
+    const etapaAquisicao = segmento === 'CRM' ? 'Aquisicao'
+        : segmento === 'Abandonados' ? 'Reativacao'
         : segmento === 'Negados' || segmento === 'Aprovados_nao_convertidos' ? 'Meio_de_Funil'
             : canonicalFunnelStage(tokens.slice(start + 1))
                 ?? (segmento === 'CRM' || segmento === 'Base_Proprietaria' ? 'Aquisicao' : undefined);
