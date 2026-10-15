@@ -16,8 +16,8 @@ export const IMPORT_CONTRACT = 'fabrica-xlsx-import/1';
 
 const columnSchema = z.enum(BRIEFING_COLUMNS);
 
-/** De onde veio cada valor. "missing" é explícito: nada é inventado. */
-export const FIELD_ORIGINS = ['xlsx', 'governed', 'inferred', 'missing'] as const;
+/** De onde veio cada valor. "missing" é explícito: nada é inventado. "ia": escrito pela IA na conversa, aprovado pelo analista. */
+export const FIELD_ORIGINS = ['xlsx', 'governed', 'inferred', 'missing', 'ia'] as const;
 export type FieldOrigin = typeof FIELD_ORIGINS[number];
 
 const fieldSchema = z.object({

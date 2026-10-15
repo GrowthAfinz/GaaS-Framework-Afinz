@@ -22,10 +22,10 @@ describe('ida e volta V2',()=>{
   const checks=[...sql.matchAll(pattern)];expect(checks.length).toBe(16);
   for(const [,sequence,network,field,hash] of checks) for(const {row} of result.rows.filter(r=>r.sequence===sequence&&(!network||r.network===network))) expect(createHash('md5').update(row[field as keyof typeof row] as string).digest('hex'),`${sequence}.${network}.${field}`).toBe(hash);
  });
- it('mantém o bloqueio editorial histórico do header e4 explícito',()=>{
+ it('header longo do E-mail 4 vira aviso, não bloqueio',()=>{
   const result=prepareEmailInput(fixture,context());
-  expect(result.problems.filter(p=>p.severity==='error').every(p=>p.where.endsWith('HEADER_TITULO'))).toBe(true);
-  expect(result.problems.filter(p=>p.severity==='error')).toHaveLength(6);
+  expect(result.problems.filter(p=>p.severity==='error')).toHaveLength(0);
+  expect(result.problems.filter(p=>p.severity==='warning'&&p.where.startsWith('E-mail 4')&&p.where.endsWith('HEADER_TITULO'))).toHaveLength(6);
  });
  it('não duplica nem muda versão na reimportação; preserva edição feita no GaaS',()=>{
   const initial=rows(); const prepared=prepareEmailInput(fixture,context(initial));

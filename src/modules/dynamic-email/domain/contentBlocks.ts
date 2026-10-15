@@ -124,3 +124,42 @@ export function renderContentBlocks(blocks: ContentBlock[]): string {
     throw new Error("COPY_2_PRETO excede 4000 caracteres.");
   return html;
 }
+
+const unescapeText = (text: string) =>
+  text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+const BLOCK_PATTERN =
+  /<p style="margin:0 0 14px 0;text-align:center;">([\s\S]*?)<\/p>|<p style="margin:16px 0 0 0;text-align:center;font-weight:700;color:#2C3490;">([\s\S]*?)<\/p>|<table role="presentation"[^>]*>([\s\S]*?)<\/table>/y;
+const CELL_TEXT = /<p style="margin:10px 0 4px 0;[^"]*">([\s\S]*?)<\/p><p style="margin:0;[^"]*">([\s\S]*?)<\/p><\/td>/g;
+const TILE_TEXT = /<p style="margin:0;font-size:26px;[^"]*">([\s\S]*?)<\/p><p style="margin:6px 0 0 0;[^"]*">([\s\S]*?)<\/p><\/td>/g;
+const CHECK_TEXT = /<td valign="middle"[^>]*>([\s\S]*?)<\/td><\/tr>/g;
+const STEP_TEXT = /<p style="margin:4px 0 2px 0;[^"]*">([\s\S]*?)<\/p><p style="margin:0;[^"]*">([\s\S]*?)<\/p><\/td><\/tr>/g;
+
+/**
+ * Caminho inverso de renderContentBlocks: lê o COPY_2_PRETO gerado pelo catálogo e devolve
+ * os blocos, para a IA editar um e-mail existente como dados. Só aceita o resultado quando
+ * renderizar de novo dá exatamente o mesmo HTML; texto legado ou editado à mão volta null.
+ */
+export function parseContentBlocks(html: string): ContentBlock[] | null {
+  if (!html.trim()) return null;
+  const blocks: ContentBlock[] = [];
+  BLOCK_PATTERN.lastIndex = 0;
+  let position = 0;
+  while (position < html.length) {
+    BLOCK_PATTERN.lastIndex = position;
+    const match = BLOCK_PATTERN.exec(html);
+    if (!match) return null;
+    position = BLOCK_PATTERN.lastIndex;
+    const [, leadText, closingText, body] = match;
+    if (leadText !== undefined) blocks.push({ type: "lead", text: leadText });
+    else if (closingText !== undefined) blocks.push({ type: "closing", text: closingText });
+    else if (body.includes("font-size:26px")) blocks.push({ type: "stat_tiles", items: [...body.matchAll(TILE_TEXT)].map((m) => ({ number: unescapeText(m[1]), label: unescapeText(m[2]) })) });
+    else if (body.includes('class="stack-column"')) blocks.push({ type: "benefit_grid", items: [...body.matchAll(CELL_TEXT)].map((m) => ({ title: unescapeText(m[1]), text: m[2].split('<b style="color:#242424;">').join("<b>") })) });
+    else if (body.includes('valign="middle"')) blocks.push({ type: "check_list", items: [...body.matchAll(CHECK_TEXT)].map((m) => m[1]) });
+    else blocks.push({ type: "steps", items: [...body.matchAll(STEP_TEXT)].map((m) => ({ title: unescapeText(m[1]), text: unescapeText(m[2]) })) });
+  }
+  try {
+    return renderContentBlocks(blocks) === html ? blocks : null;
+  } catch {
+    return null;
+  }
+}

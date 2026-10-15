@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import before from '../fixtures/emailInputV2Before.json';
+import fixture from '../fixtures/input_gaas_emails_v2_topo_20261015.json';
+import { emptyBriefingRow } from '../domain/briefing';
+import { withMeta } from '../domain/workspace';
+import { prepareEmailInput } from '../domain/emailInput';
+import { renderDynamicEmail } from '../ampscript/renderer';
+import { PLURIX_V13_TEMPLATE, PLURIX_V13_TEMPLATE_ID } from '../fixtures/plurixV13Template';
+import { buildSkillPack, type SkillPackContext } from './skillPack';
+
+const python = ['python3', 'python'].find((bin) => spawnSync(bin, ['--version']).status === 0);
+const SEGMENT = 'V2 TOPO DE FUNIL DINÂMICO';
+const products: SkillPackContext['productContexts'] = [{ id: 'p', product: '+amigo', partner: 'Plurix', status: 'active', version: 1, differentiators: ['A partir de +5%', 'Até 40 dias para pagar', 'Visa', 'até 70% em consultas'] }];
+const briefings = before.map((b) => withMeta({ ...emptyBriefingRow(), ...b.data }, { partner: 'Plurix', segment: SEGMENT, weekKey: b.weekKey, campaignGroupId: `g-${b.sequence}`, version: 1, status: 'draft', templateSlotId: PLURIX_V13_TEMPLATE_ID }));
+
+/** Os scripts do pacote rodam fora do GaaS: a prévia deles precisa ser a mesma da importação. */
+describe.skipIf(!python)('scripts Python do pacote', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gp-'));
+  const pack = buildSkillPack({ briefings, productContexts: products, productGuardrails: [], emailStrategies: [], rulers: [], assets: [], templates: [{ id: PLURIX_V13_TEMPLATE_ID, name: 'PLURIX V13', source: PLURIX_V13_TEMPLATE } as SkillPackContext['templates'][number]] }, { rulerKeys: [`Plurix|${SEGMENT}`], previewNetworks: 'all', includeTemplateSource: false, generatedAt: '2026-10-15T20:00:00.000Z' });
+  for (const f of pack.files) { const p = join(dir, f.path); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, f.content); }
+  const skill = join(dir, pack.skillName);
+  const input = join(skill, 'assets', 'exemplo_input.json');
+
+  it('validar_input aceita o exemplo e só pede revisão do header longo', () => {
+    const out = execFileSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'validar_input.py'), input], { encoding: 'utf8' });
+    expect(out).toContain('BLOQUEIA (0)');
+    expect(out).toContain('E-mail 4.HEADER_TITULO');
+  });
+
+  it('validar_input bloqueia marca em transição e fato fora da ficha', () => {
+    const bad = structuredClone(fixture);
+    bad.emails[0].fields.COPY_1_PRETO.value = 'Compre no Superpão com 90% de desconto';
+    const path = join(dir, 'ruim.json'); writeFileSync(path, JSON.stringify(bad));
+    const run = spawnSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'validar_input.py'), path], { encoding: 'utf8' });
+    expect(run.status).toBe(1);
+    expect(run.stdout).toContain('Superpão');
+    expect(run.stdout).toContain('"90%"');
+  });
+
+  it('montar_previa gera o mesmo HTML que a importação do GaaS', () => {
+    execFileSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'montar_previa.py'), input, '--todas', '--saida', join(dir, 'previa')], { encoding: 'utf8' });
+    const prepared = prepareEmailInput(fixture, { briefings, products, guardrails: [] });
+    const norm = (s: string) => s.replace(/<img\b[^>]*\bsrc=""[^>]*>/g, '').replace(/\s+/g, ' ');
+    for (const [sequence, network, file, name] of [['E-mail 4', 'AMIGAO', 'email4_amigao_nome', 'VANIA'], ['E-mail 3', 'COMPRE MAIS', 'email3_compremais_sem_nome', ''], ['E-mail 4', 'AVENIDA', 'email4_avenida_sem_nome', '']] as const) {
+      const row = prepared.rows.find((r) => r.sequence === sequence && r.network === network)!.row;
+      const gaas = renderDynamicEmail(PLURIX_V13_TEMPLATE, row, { CPF: '0', PRI_NOME: name, LIMITE: '3500', PRODUTO: network, SEQUENCIA: sequence, TP_CAMPANHA: row.TP_CAMPANHA }, { pendingAssets: 'hidden' }).html;
+      expect(norm(readFileSync(join(dir, 'previa', `${file}.html`), 'utf8')), file).toBe(norm(gaas));
+    }
+    expect(readFileSync(join(dir, 'previa', 'index.html'), 'utf8')).toContain('Celular 375px');
+  });
+});

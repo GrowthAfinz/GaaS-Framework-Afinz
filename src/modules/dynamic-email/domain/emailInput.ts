@@ -72,7 +72,8 @@ export const emailInputSchema = z.object({
         sequence: z.string().regex(/^E-mail [1-9]\d*$/),
         weekKey: z.string().regex(/^Semana [1-9]\d*$/),
         fields: inputFields,
-        secondBlock: z.array(contentBlockSchema).min(1),
+        /** Opcional em e-mail que já existe: ausente, o GaaS mantém o segundo bloco atual. */
+        secondBlock: z.array(contentBlockSchema).min(1).optional(),
         networkOverrides: z.record(z.string(), inputFields).optional(),
         factsUsed: z.array(z.string().min(1)),
       }),
@@ -103,7 +104,7 @@ export const NETWORK_PLACE: Record<string, string> = {
   "COMPRE MAIS": "no seu supermercado",
   SUPERPAO: "no seu supermercado",
 };
-const normalize = (s: string) =>
+export const normalizeFactText = (s: string) =>
   s
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -111,14 +112,41 @@ const normalize = (s: string) =>
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+const normalize = normalizeFactText;
+/** Abertura da faixa de limite ("Boa notícia", "Ainda dá tempo"): não se repete na régua. */
+export const limitOpening = (message: string) => normalize(message.split(",")[0] ?? "");
+/**
+ * Texto da ficha de produto e dos guardrails liberados, normalizado. Todo fato citado
+ * (factsUsed, números com % ou "dias") precisa aparecer aqui. O pacote exportado leva
+ * o mesmo texto, para a IA conferir antes de entregar.
+ */
+export function productFacts(products: ProductContext[], allGuardrails: ProductGuardrail[], partner: string) {
+  const activeProducts = products.filter(
+    (p) => p.status === "active" && (!p.partner || p.partner === partner),
+  );
+  const guardrails = allGuardrails.filter(
+    (g) => g.status === "active" && activeProducts.some((p) => p.id === g.productContextId),
+  );
+  const corpus = normalize(
+    activeProducts
+      .map((p) => [p.valueProposition, ...p.differentiators, p.brandContext].join(" "))
+      .join(" ") +
+      " " +
+      guardrails
+        .filter((g) => g.allowedStatus !== "blocked" && g.guardrailType !== "prohibited" && g.citationStatus !== "nao")
+        .map((g) => [g.title, g.ruleText, g.valueExact].join(" "))
+        .join(" "),
+  );
+  return { corpus, guardrails, products: activeProducts };
+}
 const sequenceNumber = (s: string) => Number(s.replace("E-mail ", ""));
 /** O dia é a posição do e-mail na semana (duas mensagens/semana na V2). */
 export function inheritEmailCode(
   value: string,
   sequence: number,
   week: number,
+  day = ((sequence - 1) % 2) + 1,
 ): string {
-  const day = ((sequence - 1) % 2) + 1;
   return value
     .replace(/S\d+D\d+/g, `S${week}D${String(day).padStart(2, "0")}`)
     .replace(/_EMAIL\d+_/g, `_EMAIL${sequence}_`);
@@ -178,33 +206,7 @@ export function prepareEmailInput(
       where: "ruler",
       message: "Campanha ou template não coincide com a régua do GaaS.",
     });
-  const activeProducts = context.products.filter(
-    (p) =>
-      p.status === "active" &&
-      (!p.partner || p.partner === payload.ruler.partner),
-  );
-  const guardrails = context.guardrails.filter(
-    (g) =>
-      g.status === "active" &&
-      activeProducts.some((p) => p.id === g.productContextId),
-  );
-  const allowed = normalize(
-    activeProducts
-      .map((p) =>
-        [p.valueProposition, ...p.differentiators, p.brandContext].join(" "),
-      )
-      .join(" ") +
-      " " +
-      guardrails
-        .filter(
-          (g) =>
-            g.allowedStatus !== "blocked" &&
-            g.guardrailType !== "prohibited" &&
-            g.citationStatus !== "nao",
-        )
-        .map((g) => [g.title, g.ruleText, g.valueExact].join(" "))
-        .join(" "),
-  );
+  const { corpus: allowed, guardrails } = productFacts(context.products, context.guardrails, payload.ruler.partner);
   const seen = new Set<string>();
   const emails = [...payload.emails].sort(
     (a, b) => sequenceNumber(a.sequence) - sequenceNumber(b.sequence),
@@ -214,7 +216,7 @@ export function prepareEmailInput(
     const week = Number(email.weekKey.replace("Semana ", ""));
     let second = "";
     try {
-      second = renderContentBlocks(email.secondBlock);
+      second = email.secondBlock ? renderContentBlocks(email.secondBlock) : "";
     } catch (error) {
       problems.push({
         severity: "error",
@@ -242,6 +244,8 @@ export function prepareEmailInput(
     const before = emails.find((e) => sequenceNumber(e.sequence) === n - 1);
     if (
       before &&
+      before.secondBlock &&
+      email.secondBlock &&
       before.secondBlock.map((b) => b.type).join("|") ===
         email.secondBlock.map((b) => b.type).join("|")
     )
@@ -272,7 +276,9 @@ export function prepareEmailInput(
             row.SEQUENCIA === `E-mail ${n - 1}` &&
             row.NM_PRODUTO_INTERNO === network,
         );
-      const base = predecessor ?? (n === 1 ? existing : undefined);
+      // E-mail que já existe parte dele mesmo (links e assinatura aprovados não mudam);
+      // e-mail novo parte do E-mail N-1 da mesma rede e troca o código do e-mail.
+      const base = existing ?? predecessor;
       if (!base) {
         problems.push({
           severity: "error",
@@ -349,10 +355,18 @@ export function prepareEmailInput(
           justification: data.justification,
         };
       }
-      provenance.COPY_2_PRETO = {origin:'inferred',source:'JSON secondBlock',justification:'HTML gerado pelo catálogo governado de blocos do GaaS.'};
-      row.COPY_2_PRETO = second
-        .split("{no_mercado}")
-        .join(NETWORK_PLACE[network]);
+      if (email.secondBlock) {
+        provenance.COPY_2_PRETO = {origin:'inferred',source:'JSON secondBlock',justification:'HTML gerado pelo catálogo governado de blocos do GaaS.'};
+        row.COPY_2_PRETO = second
+          .split("{no_mercado}")
+          .join(NETWORK_PLACE[network]);
+      } else if (!existing) {
+        problems.push({
+          severity: "error",
+          where: `${where}.secondBlock`,
+          message: "E-mail novo precisa do segundo bloco (secondBlock).",
+        });
+      }
       if (
         /compre\s*mais|super\s*pao/.test(normalize(row.COPY_2_PRETO)) ||
         row.COPY_2_PRETO.includes("%%INVESTIDA%%")
@@ -371,10 +385,15 @@ export function prepareEmailInput(
       row.TP_CAMPANHA = payload.ruler.tpCampanha;
       row.SEQUENCIA = email.sequence;
       row.NM_PRODUTO_INTERNO = network;
+      // Links, UTM, assinatura e textos legais: o e-mail existente mantém os dele; o novo herda
+      // do E-mail N-1 trocando S{semana}D{dia} e _EMAIL{n}_. Cores e tamanhos seguem o padrão
+      // visual da régua (E-mail N-1) quando ele existe.
       for (const field of BRIEFING_COLUMNS.filter(isGovernedField)) {
-        row[field] = (/^(LINK_|UTM_CAMPANHA)/.test(field) ? inheritEmailCode(base[field], n, week, day) : base[field]);
-        provenance[field] = { origin: "governed", source: `GaaS ${base.__id}` };
-        filled.push({ where, field, source: `${base.SEQUENCIA} / ${network}` });
+        const style = /^(COR_|TAMANHO_)/.test(field);
+        const from = style ? predecessor ?? base : base;
+        row[field] = !existing && /^(LINK_|UTM_CAMPANHA)/.test(field) ? inheritEmailCode(from[field], n, week, day) : from[field];
+        provenance[field] = { origin: "governed", source: `GaaS ${from.__id}` };
+        filled.push({ where, field, source: from === existing ? `mantido de ${email.sequence} / ${network}` : `herdado de ${from.SEQUENCIA} / ${network}` });
       }
       for (const [field, max] of [
         ["ASSUNTO", 50],
@@ -384,19 +403,22 @@ export function prepareEmailInput(
       ] as const)
         if (Array.from(row[field]).length > max)
           problems.push({
-            severity: "error",
+            // Tamanho é risco de layout (quebra de linha), não erro técnico: o analista decide.
+            severity: "warning",
             where: `${where}.${field}`,
-            message: `Máximo de ${max} caracteres.`,
+            message: `Passa de ${max} caracteres (${Array.from(row[field]).length}); confira a quebra na prévia.`,
           });
-      if (
-        /FirstName|\{\{nome\}\}|amig[aã]o|avenida|\bboa\b|paran[aá]|supermercado|compre mais|superp[aã]o/i.test(
-          row.ASSUNTO,
-        )
-      )
+      if (/FirstName|\{\{nome\}\}|PRI_NOME/i.test(row.ASSUNTO))
         problems.push({
           severity: "error",
           where: `${where}.ASSUNTO`,
-          message: "Assunto não pode conter nome da pessoa nem da rede.",
+          message: "Assunto não pode conter o nome da pessoa.",
+        });
+      else if (/amig[aã]o|avenida|paran[aá]|compre mais|superp[aã]o/i.test(row.ASSUNTO))
+        problems.push({
+          severity: "warning",
+          where: `${where}.ASSUNTO`,
+          message: "Assunto cita a rede; o mesmo assunto vale para as 6 assinaturas.",
         });
       for (const field of ["TITULO_CTA_1", "TITULO_CTA_2"] as const)
         if (
@@ -426,24 +448,26 @@ export function prepareEmailInput(
           where: `${where}.MENSAGEM_LIMITE`,
           message: issue.message,
         });
+      // A saudação ("Boa notícia", "Ainda dá tempo"...) muda a cada e-mail da régua.
+      const opening = limitOpening(row.MENSAGEM_LIMITE);
       if (
-        current.some(
+        opening &&
+        (current.some(
           (other) =>
             other.SEQUENCIA !== email.sequence &&
             !emails.some((e) => e.sequence === other.SEQUENCIA) &&
-            other.MENSAGEM_LIMITE &&
-            normalize(other.MENSAGEM_LIMITE) === normalize(row.MENSAGEM_LIMITE),
+            limitOpening(other.MENSAGEM_LIMITE) === opening,
         ) ||
-        emails.some(
-          (other) =>
-            other !== email &&
-            other.fields.MENSAGEM_LIMITE?.value === row.MENSAGEM_LIMITE,
-        )
+          emails.some(
+            (other) =>
+              other !== email &&
+              limitOpening(other.fields.MENSAGEM_LIMITE?.value ?? "") === opening,
+          ))
       )
         problems.push({
           severity: "error",
           where: `${where}.MENSAGEM_LIMITE`,
-          message: "Faixa já usada em outro e-mail da régua.",
+          message: "Saudação da faixa já usada em outro e-mail da régua.",
         });
       const supplied = normalize(
         Object.entries(fields)
