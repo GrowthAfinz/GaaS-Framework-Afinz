@@ -42,14 +42,17 @@ describe.skipIf(!python)('scripts Python do pacote', () => {
   });
 
   it('montar_previa gera o mesmo HTML que a importação do GaaS', () => {
-    execFileSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'montar_previa.py'), input, '--todas', '--saida', join(dir, 'previa')], { encoding: 'utf8' });
+    for (const extra of [[], ['--sem-nome'], ['--rede', 'AVENIDA', '--sem-nome'], ['--rede', 'COMPRE MAIS', '--sem-nome']]) execFileSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'montar_previa.py'), input, ...extra, '--saida', join(dir, 'previa')], { encoding: 'utf8' });
     const prepared = prepareEmailInput(fixture, { briefings, products, guardrails: [] });
     const norm = (s: string) => s.replace(/<img\b[^>]*\bsrc=""[^>]*>/g, '').replace(/\s+/g, ' ');
     for (const [sequence, network, file, name] of [['E-mail 4', 'AMIGAO', 'email4_amigao_nome', 'VANIA'], ['E-mail 3', 'COMPRE MAIS', 'email3_compremais_sem_nome', ''], ['E-mail 4', 'AVENIDA', 'email4_avenida_sem_nome', '']] as const) {
       const row = prepared.rows.find((r) => r.sequence === sequence && r.network === network)!.row;
       const gaas = renderDynamicEmail(PLURIX_V13_TEMPLATE, row, { CPF: '0', PRI_NOME: name, LIMITE: '3500', PRODUTO: network, SEQUENCIA: sequence, TP_CAMPANHA: row.TP_CAMPANHA }, { pendingAssets: 'hidden' }).html;
-      expect(norm(readFileSync(join(dir, 'previa', `${file}.html`), 'utf8')), file).toBe(norm(gaas));
+      expect(norm(readFileSync(join(dir, 'previa', 'emails', `${file}.html`), 'utf8')), file).toBe(norm(gaas));
     }
-    expect(readFileSync(join(dir, 'previa', 'index.html'), 'utf8')).toContain('Celular 375px');
+    const board = readFileSync(join(dir, 'previa', 'quadro_celular.html'), 'utf8');
+    expect(board).toContain('E-mail 1 · Semana 1');
+    expect(board).toContain('rascunho (atual)');
+    expect(board).toContain('proposta (novo)');
   });
 });

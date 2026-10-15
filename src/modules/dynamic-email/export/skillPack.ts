@@ -205,9 +205,13 @@ ${tone ? `Tom de voz do produto: ${tone}` : ''}
    \`assets/contrato.schema.json\` (exemplo completo em \`assets/exemplo_input.json\`, explicação em
    \`references/contrato.md\`). Mande só os e-mails que mudam.
 5. **Confira**: \`python scripts/validar_input.py <arquivo>\`. Corrija todo BLOQUEIA antes de seguir.
-6. **Mostre a prévia**: \`python scripts/montar_previa.py <arquivo>\` (\`--todas\` para as 6 redes).
-   Apresente \`previa/index.html\` (desktop 600px e celular 375px, com e sem nome) e, junto, uma lista
-   curta do que mudou e do que depende de decisão do analista.
+6. **Mostre a prévia em dois PNGs**: \`python scripts/montar_previa.py <arquivo>\` gera
+   \`previa/quadro_celular.png\` e \`previa/quadro_desktop.png\`, com todos os e-mails da régua lado a lado
+   (os que o arquivo não mexe aparecem como estão hoje, rotulados "pronto (atual)"; o novo vem com borda
+   tracejada). Mostre as duas imagens e, junto, uma lista curta do que mudou e do que depende do analista.
+   O PNG precisa do Playwright: se faltar, rode \`pip install playwright\` e
+   \`python -m playwright install chromium\`. Sem como instalar, entregue os dois \`quadro_*.html\`.
+   Opções: \`--rede BOA\`, \`--sem-nome\` (pessoa sem nome na base), \`--todas\` (um par por rede).
 7. **Ajuste** até o analista escrever "aprovado". Só então entregue o JSON final para download.
 8. **Explique a importação**: GaaS > Fábrica de E-mails > Prompt e IA > Importar. O GaaS valida de novo,
    completa os campos governados, mostra a prévia e grava como rascunho com histórico.
@@ -241,7 +245,7 @@ ${rulerLines.join('\n')}
 - \`assets/contrato.schema.json\`, \`assets/exemplo_input.json\`: contrato e exemplo válido.
 - \`assets/previa/\`: esqueletos do template real, um por e-mail e rede, usados por \`montar_previa.py\`.
 - \`scripts/content_blocks.py\`: o mesmo gerador de blocos do GaaS (saída idêntica).
-- \`scripts/validar_input.py\`, \`scripts/montar_previa.py\`: conferência e prévia, só biblioteca padrão.
+- \`scripts/validar_input.py\`, \`scripts/montar_previa.py\`: conferência e os dois quadros de prévia.
 `;
 }
 
@@ -512,10 +516,10 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
       return found.length ? found : fallback;
     };
     const nextRows = probe.rows.filter((r) => r.sequence === nextSequence).map((r) => r.row);
-    const emailEntries: Array<{ sequence: string; weekKey: string; exists: boolean; greeting: string; networks: Record<string, unknown> }> = [];
+    const emailEntries: Array<{ sequence: string; weekKey: string; exists: boolean; status: string; greeting: string; networks: Record<string, unknown> }> = [];
     const groups = [
-      ...summary.emails.map((e) => ({ sequence: e.sequence, weekKey: e.weekKey, exists: true, greeting: e.greeting, rows: probed(e.sequence, rows.filter((r) => r.SEQUENCIA === e.sequence)) })),
-      ...(nextRows.length ? [{ sequence: nextSequence, weekKey: nextWeek, exists: false, greeting: '', rows: nextRows }] : []),
+      ...summary.emails.map((e) => ({ sequence: e.sequence, weekKey: e.weekKey, exists: true, status: e.status, greeting: e.greeting, rows: probed(e.sequence, rows.filter((r) => r.SEQUENCIA === e.sequence)) })),
+      ...(nextRows.length ? [{ sequence: nextSequence, weekKey: nextWeek, exists: false, status: 'draft', greeting: '', rows: nextRows }] : []),
     ];
     if (!template) warnings.push(`${summary.segment}: template ${summary.templateSlotId} não carregado; o pacote sai sem prévia desta régua.`);
     for (const group of groups) {
@@ -534,7 +538,7 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
         }
         if (Object.keys(skeleton).length) networks[row.NM_PRODUTO_INTERNO] = { skeleton, tokens: skeletonTokens(row), current: { ...editorialValues(row), ...(group.exists ? {} : { COPY_2_PRETO: '' }) } };
       }
-      emailEntries.push({ sequence: group.sequence, weekKey: group.weekKey, exists: group.exists, greeting: group.greeting, networks });
+      emailEntries.push({ sequence: group.sequence, weekKey: group.weekKey, exists: group.exists, status: group.status, greeting: group.greeting, networks });
     }
     manifest.rulers.push({
       slug: summary.slug, segment: summary.segment, partner: summary.partner, tpCampanha: summary.tpCampanha,
@@ -579,7 +583,7 @@ export function chatGptProjectInstructions(pack: SkillPack): string {
   return `Você trabalha com a Fábrica de E-mails do GaaS. Nos arquivos deste projeto está ${pack.skillName}.zip.
 1. No começo de cada conversa, descompacte o zip com o Code Interpreter e leia ${pack.skillName}/SKILL.md inteiro. Siga o fluxo e as regras dele.
 2. Leia os arquivos de references/ quando o SKILL.md pedir. Não invente benefício: a única fonte é references/produto.md.
-3. Para conferir e mostrar a prévia, rode os scripts da pasta scripts/ (python ${pack.skillName}/scripts/validar_input.py e montar_previa.py) e ofereça o previa/index.html para download.
+3. Para conferir e mostrar a prévia, rode python ${pack.skillName}/scripts/validar_input.py e montar_previa.py e mostre os dois PNGs (previa/quadro_celular.png e previa/quadro_desktop.png). Se o PNG não sair, ofereça os dois quadro_*.html para download.
 4. Só entregue o JSON final (input_gaas_emails_<segmento>_<AAAAMMDD>.json) depois que o analista escrever "aprovado".
 5. Responda em português do Brasil, com frases curtas e sem travessão.`;
 }

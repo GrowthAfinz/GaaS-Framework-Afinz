@@ -8,14 +8,20 @@ textos do arquivo, monta o segundo bloco com scripts/content_blocks.py e aplica 
 regras do template para nome, limite e supermercado.
 
 Uso:
-    python scripts/montar_previa.py input.json                 # rede AMIGAO, com e sem nome
-    python scripts/montar_previa.py input.json --todas         # as 6 redes
-    python scripts/montar_previa.py input.json --rede BOA --email "E-mail 4"
-    python scripts/montar_previa.py input.json --saida pasta/  # padrão: ./previa
+    python scripts/montar_previa.py input.json              # quadros da régua na rede AMIGAO
+    python scripts/montar_previa.py input.json --rede BOA   # outra assinatura
+    python scripts/montar_previa.py input.json --sem-nome   # pessoa sem nome na base
+    python scripts/montar_previa.py input.json --todas      # um par de quadros por rede
 
-Gera previa/index.html (uma página com desktop 680px e celular 375px lado a lado, alternando
-com/sem nome) e um .html solto por e-mail e rede. Mostre o index.html para o analista.
-Só usa a biblioteca padrão do Python.
+Gera dois quadros com todos os e-mails da régua lado a lado (os que o arquivo não mexe
+aparecem como estão hoje, com o rótulo "pronto (atual)"):
+    previa/quadro_celular.png   (375px por e-mail)
+    previa/quadro_desktop.png   (680px por e-mail)
+Esses dois PNGs são a entrega para o analista. O PNG usa o Playwright
+(pip install playwright && python -m playwright install chromium); sem ele, o script deixa
+quadro_celular.html e quadro_desktop.html com o mesmo conteúdo. Cada e-mail também sai
+solto em previa/emails/.
+Fora o Playwright (opcional, só para o PNG), usa a biblioteca padrão do Python.
 """
 import argparse
 import html as html_lib
@@ -92,45 +98,68 @@ def email_values(email, entry, network, place):
     return {k: v.replace("{no_mercado}", place) for k, v in current.items()}
 
 
-PAGE = """<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Prévia dos e-mails</title><style>
-body{{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;background:#eef1f6;color:#1f2937}}
-header{{position:sticky;top:0;z-index:2;background:#0f3d4a;color:#fff;padding:14px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}}
-header h1{{font-size:16px;margin:0}} header span{{font-size:12px;opacity:.8}}
-.tabs{{display:flex;gap:6px;flex-wrap:wrap}} .tabs button{{border:0;border-radius:999px;padding:6px 12px;font-weight:600;cursor:pointer;background:#ffffff22;color:#fff}}
-.tabs button[aria-pressed=true]{{background:#fff;color:#0f3d4a}}
-section{{padding:18px 20px}} h2{{font-size:15px;margin:0 0 4px}} .meta{{font-size:12px;color:#64748b;margin-bottom:10px}}
-.row{{display:flex;gap:18px;align-items:flex-start;overflow-x:auto}} figure{{margin:0}} figcaption{{font-size:11px;color:#64748b;margin-bottom:4px}}
-iframe{{border:0;background:#fff;border-radius:10px;box-shadow:0 4px 18px #0f172a1f;height:1500px}}
-.warn{{font-size:12px;background:#fff7e6;border:1px solid #f5c26b;border-radius:8px;padding:6px 10px;margin-bottom:8px}}
-</style></head><body>
-<header><h1>Prévia dos e-mails</h1><span>{subtitle}</span>
-<div class="tabs" id="nome"><button aria-pressed="true" data-v="nome">Com nome ({name})</button><button aria-pressed="false" data-v="sem_nome">Sem nome na base</button></div>
-<div class="tabs" id="redes">{network_tabs}</div></header>
-{sections}
+STATUS_LABEL = {"ready": "pronto", "draft": "rascunho", "needs_review": "em revisão", "blocked": "bloqueado"}
+
+BOARD = """<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>{title}</title><style>
+body{{margin:0;padding:24px 18px 32px;background:#e9ebf3;font-family:Segoe UI,Arial,sans-serif;color:#2C3490}}
+.board{{display:flex;gap:18px;align-items:flex-start}}
+.col{{flex:0 0 auto}} .col h2{{margin:0;font-size:17px;letter-spacing:.3px}} .col p{{margin:2px 0 10px;font-size:11px;font-weight:700;color:#4A4F6A}}
+.frame{{background:#f2f4f7;padding:{pad}px;border-radius:4px}}
+.col.nova .frame{{outline:2px dashed #E7A921;outline-offset:-2px}}
+iframe{{display:block;border:0;width:{width}px;background:#f2f4f7}}
+</style></head><body><div class="board">{columns}</div>
 <script>
-const data = {data};
-let variant = "nome", network = {first_network};
-function paint() {{
-  document.querySelectorAll("section[data-email]").forEach(sec => {{
-    const html = (data[sec.dataset.email][network] || {{}})[variant] || "<p style='font-family:sans-serif;padding:20px'>Sem prévia para esta rede.</p>";
-    sec.querySelectorAll("iframe").forEach(f => {{ f.srcdoc = html; }});
-  }});
-  document.querySelectorAll("#nome button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === variant));
-  document.querySelectorAll("#redes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === network));
-}}
-document.querySelectorAll("#nome button").forEach(b => b.onclick = () => {{ variant = b.dataset.v; paint(); }});
-document.querySelectorAll("#redes button").forEach(b => b.onclick = () => {{ network = b.dataset.v; paint(); }});
-paint();
+const frames=[...document.querySelectorAll("iframe")];let pending=frames.length;
+const fit=f=>{{const d=f.contentDocument;f.style.height=Math.max(d.documentElement.scrollHeight,d.body.scrollHeight)+"px";}};
+frames.forEach(f=>{{const done=()=>{{fit(f);if(--pending===0)setTimeout(()=>{{frames.forEach(fit);window.__ready=true;}},400);}};
+  if(f.contentDocument&&f.contentDocument.readyState==="complete"&&f.contentDocument.body&&f.contentDocument.body.childElementCount)done();else f.addEventListener("load",done,{{once:true}});}});
+setTimeout(()=>{{frames.forEach(fit);window.__ready=true;}},15000);
 </script></body></html>"""
 
 
+def label(entry, email):
+    """Rótulo da coluna: e-mail que o arquivo não mexe aparece como está hoje."""
+    if email is None:
+        return f'{STATUS_LABEL.get(entry.get("status", ""), entry.get("status", "") or "atual")} (atual)'
+    return "proposta" if entry.get("exists") else "proposta (novo)"
+
+
+def board_html(ruler, columns, width, title):
+    cells = []
+    for sequence, week, caption, page, new in columns:
+        doc = html_lib.escape(page, quote=True)
+        cells.append(f'<div class="col{" nova" if new else ""}"><h2>{html_lib.escape(sequence)} · {html_lib.escape(week)}</h2>'
+                     f'<p>{html_lib.escape(caption)}</p><div class="frame"><iframe srcdoc="{doc}" title="{html_lib.escape(sequence)}"></iframe></div></div>')
+    return BOARD.format(title=html_lib.escape(title), columns="".join(cells), width=width, pad=6 if width < 500 else 8)
+
+
+def to_png(html_path, png_path, page_width):
+    """PNG do quadro com o Chromium do Playwright. Sem Playwright, fica o HTML (mesmo conteúdo)."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return "sem Playwright: pip install playwright && python -m playwright install chromium"
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={"width": page_width, "height": 1000})
+            page.goto(html_path.resolve().as_uri())
+            page.wait_for_function("window.__ready === true", timeout=30000)
+            page.screenshot(path=str(png_path), full_page=True)
+            browser.close()
+        return None
+    except Exception as error:  # navegador ausente, sem rede para as imagens etc.
+        return f"falhou ao gerar PNG ({error.__class__.__name__}: {str(error).splitlines()[0][:160]})"
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Prévia fiel dos e-mails do input_gaas_emails.")
+    parser = argparse.ArgumentParser(description="Quadros de prévia (celular e desktop) da régua com o input_gaas_emails.")
     parser.add_argument("input")
-    parser.add_argument("--rede", default="AMIGAO")
-    parser.add_argument("--todas", action="store_true", help="gera as 6 redes")
-    parser.add_argument("--email", help='só um e-mail, ex.: "E-mail 4"')
+    parser.add_argument("--rede", default=None, help="assinatura mostrada (padrão: a primeira da régua, AMIGAO)")
+    parser.add_argument("--todas", action="store_true", help="um par de quadros para cada uma das 6 redes")
+    parser.add_argument("--sem-nome", action="store_true", help="amostra de pessoa sem nome na base")
+    parser.add_argument("--so-arquivo", action="store_true", help="só os e-mails do arquivo, sem os atuais da régua")
     parser.add_argument("--saida", default="previa")
     args = parser.parse_args()
 
@@ -145,49 +174,51 @@ def main():
     ruler = next((r for r in manifest["rulers"] if r["segment"] == payload["ruler"]["segment"] and r["partner"] == payload["ruler"]["partner"]), None)
     if not ruler:
         sys.exit("A régua do arquivo não está no pacote: exporte de novo no GaaS incluindo essa régua.")
-    networks = list(ruler["places"]) if args.todas else [args.rede]
+    networks = list(ruler["places"]) if args.todas else [args.rede or next(iter(ruler["places"]))]
+    with_name = not args.sem_nome
+    variant = "nome" if with_name else "sem_nome"
     out = Path(args.saida)
-    out.mkdir(parents=True, exist_ok=True)
+    (out / "emails").mkdir(parents=True, exist_ok=True)
 
-    data, sections = {}, []
-    for email in payload["emails"]:
-        if args.email and email["sequence"] != args.email:
-            continue
-        entry, approximate = pick_email(ruler, email["sequence"])
-        data[email["sequence"]] = {}
-        for network in networks:
+    by_sequence = {e["sequence"]: e for e in payload["emails"]}
+    sequences = sorted({e["sequence"] for e in ruler["emails"] if e.get("exists")} | set(by_sequence), key=number)
+    if args.so_arquivo:
+        sequences = [s for s in sequences if s in by_sequence]
+
+    results = []
+    for network in networks:
+        columns = []
+        for sequence in sequences:
+            email = by_sequence.get(sequence)
+            entry, approximate = pick_email(ruler, sequence)
             if network not in entry["networks"]:
                 continue
-            values = email_values(email, entry, network, ruler["places"][network])
+            if approximate:
+                print(f"REVISAR   {sequence}: sem esqueleto próprio, usei o layout do {entry['sequence']}.")
+            values = email_values(email or {}, entry, network, ruler["places"][network])
             tokens = set(entry["networks"][network].get("tokens", []))
             hidden = [f for f, v in values.items() if v and f not in tokens and f in IMAGE_FIELDS]
-            if hidden and network == networks[0]:
-                print(f"REVISAR   {email['sequence']}: {', '.join(hidden)} estava(m) sem imagem no e-mail atual; "
+            if email and hidden and network == networks[0]:
+                print(f"REVISAR   {sequence}: {', '.join(hidden)} estava(m) sem imagem no e-mail atual; "
                       "a prévia mantém o layout sem imagem. Confira na importação do GaaS.")
-            data[email["sequence"]][network] = {}
-            for variant, with_name in (("nome", True), ("sem_nome", False)):
-                skeleton = (SKILL_DIR / entry["networks"][network]["skeleton"][variant]).read_text(encoding="utf-8")
-                page = fill(skeleton, values, with_name)
-                data[email["sequence"]][network][variant] = page
-                slug = f'{email["sequence"].replace(" ", "").replace("-", "").lower()}_{network.replace(" ", "").lower()}_{variant}.html'
-                (out / slug).write_text(page, encoding="utf-8")
-        note = (f'<div class="warn">Sem esqueleto próprio: layout do {entry["sequence"]}. Links e semana são '
-                f'definidos pelo GaaS na importação.</div>') if approximate else ""
-        subject = html_lib.escape(email.get("fields", {}).get("ASSUNTO", {}).get("value", ""))
-        pre = html_lib.escape(email.get("fields", {}).get("PRE_CABECALHO", {}).get("value", ""))
-        sections.append(
-            f'<section data-email="{html_lib.escape(email["sequence"])}"><h2>{html_lib.escape(email["sequence"])} · {html_lib.escape(email.get("weekKey", ""))}</h2>'
-            f'<div class="meta">Assunto: <b>{subject or "(mantido)"}</b> · Pré-cabeçalho: {pre or "(mantido)"}</div>{note}'
-            f'<div class="row"><figure><figcaption>Desktop (janela de 680px)</figcaption><iframe title="desktop" style="width:680px"></iframe></figure>'
-            f'<figure><figcaption>Celular 375px</figcaption><iframe title="celular" style="width:375px"></iframe></figure></div></section>')
+            skeleton = (SKILL_DIR / entry["networks"][network]["skeleton"][variant]).read_text(encoding="utf-8")
+            page = fill(skeleton, values, with_name)
+            slug = f'{sequence.replace(" ", "").replace("-", "").lower()}_{network.replace(" ", "").lower()}_{variant}.html'
+            (out / "emails" / slug).write_text(page, encoding="utf-8")
+            week = (email or {}).get("weekKey") or entry.get("weekKey", "")
+            columns.append((sequence, week, label(entry, email), page, email is not None and not entry.get("exists")))
 
-    tabs = "".join(f'<button aria-pressed="false" data-v="{html_lib.escape(n)}">{html_lib.escape(n)}</button>' for n in networks)
-    index = PAGE.format(subtitle=html_lib.escape(f'{ruler["partner"]} · {ruler["segment"]}'), name=SAMPLE_NAME,
-                        network_tabs=tabs, sections="".join(sections),
-                        data=json.dumps(data, ensure_ascii=False).replace("</", "<\\/"),
-                        first_network=json.dumps(networks[0]))
-    (out / "index.html").write_text(index, encoding="utf-8")
-    print(f"Prévia em {out / 'index.html'} ({len(data)} e-mail(s), {len(networks)} rede(s)).")
+        suffix = "" if len(networks) == 1 else f"_{network.replace(' ', '').lower()}"
+        for kind, width in (("celular", 375), ("desktop", 680)):
+            html_path = out / f"quadro_{kind}{suffix}.html"
+            title = f'{ruler["segment"]} · {network} · {kind}'
+            html_path.write_text(board_html(ruler, columns, width, title), encoding="utf-8")
+            page_width = len(columns) * (width + 34) + 40
+            problem = to_png(html_path, html_path.with_suffix(".png"), page_width)
+            results.append((html_path.with_suffix(".png") if not problem else html_path, problem))
+
+    for path, problem in results:
+        print(f"Quadro: {path}" + (f"  ({problem}; entregue o HTML)" if problem else ""))
 
 
 if __name__ == "__main__":
