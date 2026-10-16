@@ -244,7 +244,10 @@ bloco e avise que a prévia fiel aparece na importação do GaaS.
 
 - Nenhum benefício, número, prazo ou condição fora de \`references/produto.md\`. Na dúvida, registre em
   \`pendencies\` em vez de escrever.
-- Pré-aprovação é sujeita a análise de crédito: nunca "aprovado", "garantido" ou "sem análise".
+- Pré-aprovação é sujeita a análise de crédito: nunca "aprovado", "garantido" ou "sem análise". Mas
+  chamada não hesita: nada de "se aprovado" ou "sujeito a análise" em assunto, pré-cabeçalho, header,
+  faixa ou botão. A condição vai uma vez no corpo, junto do benefício (veja "Copy que vende" em
+  \`references/escrita.md\`); a nota legal fixa do e-mail já diz "Sujeito a análise de crédito".
 - Nunca cite Compre Mais nem Superpão (transição de marca). Para falar do supermercado da pessoa, escreva
   \`{no_mercado}\`: o GaaS troca por "no Amigão", "no Avenida", "no Boa", "no Paraná" ou "no seu supermercado".
 - Nome da pessoa só como \`%%=v(@FirstName)=%%\` (ou \`PRI_NOME\`). Nunca no assunto.
@@ -503,7 +506,9 @@ antes e depois. Cada conceito traz:
 - **cena da arte**: um objeto ou momento concreto, sem pessoas, que conta a mesma história do título.
 
 Nota de 0 a 2: entende em 3 segundos; diferente dos e-mails anteriores; soa como a marca (qualidades
-acima); concreto em vez de genérico; dentro das regras da ficha. Recomende um, com uma frase do porquê.
+acima); concreto em vez de genérico; **vende sem hesitar** (chamada afirmativa, sem "se aprovado",
+"pode", "caso"; a condição fica no corpo); dentro das regras da ficha. Recomende um, com uma frase do
+porquê. Siga "Copy que vende" em \`references/escrita.md\`.
 
 **Como apresentar o ponto de decisão 1:** uma tabela curta com as 6 tensões e as notas, os 2 ou 3 caminhos
 do nível 2 e os 3 conceitos completos da tensão recomendada. Pergunte: "Seguimos com esta tensão e este
@@ -561,6 +566,11 @@ ${rails.map((g) => `| ${cell(g.guardrailType)} | ${cell(g.title)} | ${cell(g.rul
 Fonte: Plano de Comunicação do GaaS (ficha de produto e guardrails ativos). É a única fonte de fatos:
 todo número, prazo, percentual ou benefício do e-mail precisa estar aqui. \`validar_input.py\` confere
 com o mesmo texto que o GaaS usa na importação.
+
+**Como ler "condicionar à aprovação" (ou "sujeito a análise de crédito") numa regra abaixo:** a condição
+aparece **uma vez, no corpo do e-mail, junto do benefício**, em frase afirmativa ("o cartão virtual
+aparece no app assim que o seu cartão é aprovado"), mais a nota legal fixa do e-mail. Não vai para
+assunto, pré-cabeçalho, header, faixa nem botão. O que nunca pode é prometer aprovação.
 
 ${sections.join('\n')}`;
 }
@@ -621,6 +631,30 @@ Se o arquivo trouxer algum desses campos, o valor é descartado com aviso.
   e não use palavra genérica no lugar do nome ("cliente").
 - Nunca prometa aprovação: pré-aprovação segue sujeita a análise de crédito.
 
+## Copy que vende
+
+O e-mail é de venda. A chamada precisa ser verdadeira sozinha e afirmativa; a condição fica visível,
+perto do benefício, sem contaminar cada linha.
+
+- **Chamadas sem hesitação:** assunto, pré-cabeçalho, título e subtítulo do header, faixa de limite,
+  títulos de bloco e botões nunca levam "se aprovado", "caso aprovado", "sujeito a", "mediante",
+  "pode ser que". Venda a **ação** (pedir, usar, levar) e o **ganho concreto**, nunca a dúvida.
+- **Sem prometer aprovação:** também nunca "aprovado", "garantido", "já é seu", "liberado". A chamada
+  fala do que a pessoa faz (pedir pelo app) ou do que o cartão oferece, não do resultado da análise.
+- **Onde fica a condição:** uma vez, no texto principal ou no segundo bloco, colada ao benefício que
+  depende dela, em frase afirmativa. A nota legal fixa ("Sujeito a análise de crédito...") completa.
+- **Presente e imperativo:** "Peça pelo app", "Use no app", "Leve para o caixa". Evite "você pode",
+  "talvez", "quem sabe".
+- **Ganho concreto em vez de adjetivo:** "pão, frutas e carne no mesmo cartão" vale mais que
+  "vantagens incríveis".
+
+| Ruim (hesita) | Bom (vende sem prometer) |
+|---|---|
+| Título: "Seu cartão pode estar no app" | "Seu cartão +amigo no app" |
+| Subtítulo: "Se aprovado, o cartão virtual aparece no app para usar" | "Peça pelo app e use o cartão virtual no dia a dia" |
+| Pré-cabeçalho: "Se aprovado, o cartão virtual aparece no app. Sujeito a análise de crédito." | "Peça em poucos toques e acompanhe tudo pelo app." |
+| Corpo, sem a condição | Corpo: "...e assim que o seu cartão é aprovado, o cartão virtual aparece no app para você usar." |
+
 ## Texto
 
 - Só \`<b>\` e \`<br>\`, sem atributos, negrito sempre fechado, sem quebra de linha crua.
@@ -635,6 +669,8 @@ Se o arquivo trouxer algum desses campos, o valor é descartado com aviso.
 1. Todo número, prazo e benefício está na ficha? Os fatos estão em \`factsUsed\`?
 2. Assunto sem nome e com até ~50 caracteres? Header com até 34?
 3. Faixa no formato certo e com abertura nova?
+3b. Chamadas (assunto, pré-cabeçalho, header, faixa, botões) sem "se aprovado"/"sujeito a"? Condição uma
+    vez no corpo, junto do benefício?
 4. Nenhuma marca proibida, nenhum campo governado, nenhuma tag fora de <b> e <br>?
 5. Segundo bloco simétrico e com formato diferente do e-mail anterior?
 6. Status "draft" e \`ruler\` igual ao do pacote?

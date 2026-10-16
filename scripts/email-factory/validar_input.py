@@ -28,6 +28,10 @@ CTA_VERBS = ("PEÇA", "PEDIR", "SOLICITE", "SOLICITAR", "CONFIRA", "CONFERIR", "
              "CONHEÇA", "CONHECER", "ACESSE", "ACESSAR", "DESCUBRA", "DESCOBRIR", "VEJA", "COMECE", "SAIBA",
              "QUERO", "FAÇA", "BAIXE", "ATIVE")
 SOFT_LIMITS = {"ASSUNTO": 50, "PRE_CABECALHO": 90, "HEADER_TITULO": 34, "HEADER_SUBTITULO": 60}
+# Chamada que hesita derruba a venda: a condição vai no corpo e na nota legal, não aqui.
+HEADLINE_FIELDS = {"ASSUNTO", "PRE_CABECALHO", "HEADER_TITULO", "HEADER_SUBTITULO", "MENSAGEM_LIMITE",
+                   "TITULO_COPY_1_AZUL", "TITULO_COPY_2", "TITULO_CTA_1", "TITULO_CTA_2"}
+HEDGES = re.compile(r"\bse (?:for )?aprovad|\bcaso (?:seja )?aprovad|sujeit[oa] a|\bmediante\b|\bpode ser que\b", re.I)
 RISKY_PROMISES = re.compile(r"garantid|aprova[çc][ãa]o (?:j[áa] )?(?:definitiv|certa)|sem an[áa]lise|100% aprovad|j[áa] est[áa] aprovad", re.I)
 FIRST_NAME = "%%=v(@FirstName)=%%"
 
@@ -167,6 +171,9 @@ def validate(payload, manifest):
                     err(where, "Não cite Compre Mais nem Superpão e não use %%INVESTIDA%%: use {no_mercado}.")
                 if field in SOFT_LIMITS and len(value) > SOFT_LIMITS[field]:
                     warn(where, f"{len(value)} caracteres; o recomendado é até {SOFT_LIMITS[field]}.")
+                if field in HEADLINE_FIELDS and HEDGES.search(value):
+                    warn(where, 'Chamada hesitante ("se aprovado", "sujeito a"...): venda a ação e o ganho; '
+                                'a condição vai uma vez no corpo, junto do benefício.')
                 if field == "ASSUNTO":
                     if re.search(r"FirstName|\{\{nome\}\}|PRI_NOME", value, re.I):
                         err(where, "Assunto não leva o nome da pessoa.")

@@ -39,6 +39,12 @@ describe('gaas-emails-input/1', () => {
    const input=structuredClone(fixture); input.emails[0].fields.COPY_1_PRETO.value=value;
    expect(prepareEmailInput(input,context()).problems.some(p=>p.severity==='error')).toBe(true);
  });
+ it('avisa chamada hesitante, mas aceita a condição no corpo',()=>{
+   const input=structuredClone(fixture); input.emails[1].fields.HEADER_SUBTITULO.value='Se aprovado, use o cartão no app'; input.emails[1].fields.COPY_1_PRETO.value='Assim que o seu cartão é aprovado, ele aparece no app.';
+   const problems=prepareEmailInput(input,context()).problems;
+   expect(problems.some(p=>p.severity==='warning'&&p.where.endsWith('HEADER_SUBTITULO')&&p.message.includes('hesitante'))).toBe(true);
+   expect(problems.some(p=>p.where.endsWith('COPY_1_PRETO')&&p.message.includes('hesitante'))).toBe(false);
+ });
  it('bloqueia fatos sem ficha e estado ready',()=>{
    const input=structuredClone(fixture); input.emails[0].factsUsed.push('100%');
    expect(prepareEmailInput(input,context()).problems.some(p=>p.message.includes('100%'))).toBe(true);

@@ -96,6 +96,8 @@ export const isGovernedField = (field: string) =>
     "DT_FIM",
     "template_slot_id",
   ].includes(field);
+/** Condicional que derruba a venda numa chamada (assunto, header, botões...). */
+const HEDGES = /\bse (?:for )?aprovad|\bcaso (?:seja )?aprovad|sujeit[oa] a|\bmediante\b|\bpode ser que\b/i;
 export const NETWORK_PLACE: Record<string, string> = {
   AMIGAO: "no Amigão",
   AVENIDA: "no Avenida",
@@ -414,7 +416,14 @@ export function prepareEmailInput(
           where: `${where}.ASSUNTO`,
           message: "Assunto não pode conter o nome da pessoa.",
         });
-      else if (/amig[aã]o|avenida|paran[aá]|compre mais|superp[aã]o/i.test(row.ASSUNTO))
+      for (const field of ["ASSUNTO", "PRE_CABECALHO", "HEADER_TITULO", "HEADER_SUBTITULO", "MENSAGEM_LIMITE", "TITULO_COPY_1_AZUL", "TITULO_COPY_2", "TITULO_CTA_1", "TITULO_CTA_2"] as const)
+        if (fields[field] && HEDGES.test(row[field] ?? ""))
+          problems.push({
+            severity: "warning",
+            where: `${where}.${field}`,
+            message: 'Chamada hesitante ("se aprovado", "sujeito a"): a condição vai uma vez no corpo; a nota legal já cobre.',
+          });
+      if (!/FirstName|\{\{nome\}\}|PRI_NOME/i.test(row.ASSUNTO) && /amig[aã]o|avenida|paran[aá]|compre mais|superp[aã]o/i.test(row.ASSUNTO))
         problems.push({
           severity: "warning",
           where: `${where}.ASSUNTO`,

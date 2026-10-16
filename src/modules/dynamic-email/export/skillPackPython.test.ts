@@ -48,6 +48,14 @@ describe.skipIf(!python)('scripts Python do pacote', () => {
     expect(out).toContain('E-mail 4.HEADER_TITULO');
   });
 
+  it('validar_input avisa chamada com "se aprovado"', () => {
+    const hedged = structuredClone(fixture);
+    hedged.emails[1].fields.HEADER_SUBTITULO.value = 'Se aprovado, use o cartão no app';
+    const path = join(dir, 'hesitante.json'); writeFileSync(path, JSON.stringify(hedged));
+    const run = spawnSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'validar_input.py'), path], { encoding: 'utf8' });
+    expect(run.stdout).toContain('E-mail 4.HEADER_SUBTITULO: Chamada hesitante');
+  });
+
   it('validar_input bloqueia marca em transição e fato fora da ficha', () => {
     const bad = structuredClone(fixture);
     bad.emails[0].fields.COPY_1_PRETO.value = 'Compre no Superpão com 90% de desconto';
