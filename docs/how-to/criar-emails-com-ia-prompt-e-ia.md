@@ -39,6 +39,16 @@ Depois do "aprovado", entrega `input_gaas_emails_<segmento>_<AAAAMMDD>.json`.
 O PNG usa o Playwright (`pip install playwright` e `python -m playwright install chromium`).
 Sem ele, a IA entrega os quadros em HTML.
 
+### Arte do header
+
+Em e-mail novo (ou quando o tema do header muda), a skill propõe 2 ou 3 direções de arte: reaproveitar
+uma arte aprovada ou criar uma nova. Para a nova, entrega o prompt pronto e os arquivos para anexar
+(cartão oficial, tirado do vetor do guia de marca, e duas artes de estilo). Você gera no Gemini ou no
+ChatGPT e sobe a imagem na conversa; `preparar_arte.py` encaixa no header (1247 x 977, borda esquerda
+no azul #4A5BA6) e mostra as opções lado a lado no e-mail. Se o cartão sair alterado, a skill refaz
+pelo caminho B: a IA gera só a cena e o script coloca o cartão oficial. A arte final vai junto com o
+JSON; a URL entra depois de subir no SFMC (pendência de revisão no arquivo).
+
 ## 3. Importar e aprovar
 
 1. Passo **Importar e aprovar**: solte o JSON ou cole o conteúdo.

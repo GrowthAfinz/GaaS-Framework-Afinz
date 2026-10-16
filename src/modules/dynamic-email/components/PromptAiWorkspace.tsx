@@ -11,7 +11,7 @@ import { planEmailInput, type ConflictChoices } from '../domain/emailInputPlan';
 import type { ImportProblem, PlannedBriefing } from '../domain/xlsxImport';
 import type { WorkspaceBriefing } from '../domain/workspace';
 import {
-  attachImages, buildSkillPack, chatGptProjectInstructions, estimateTokens, markdownBundle, packImageUrls, skillNameFor, summarizeRulers, zipSkillPack,
+  attachBrandFiles, attachImages, BRAND_FILES, buildSkillPack, chatGptProjectInstructions, estimateTokens, markdownBundle, packImageUrls, skillNameFor, summarizeRulers, zipSkillPack,
   type PackFile, type PackRulerSummary, type SkillPackContext,
 } from '../export/skillPack';
 import { fetchPackImages } from '../services/emailImageService';
@@ -28,6 +28,12 @@ type PackFormat = 'zip' | 'markdown';
 const kb = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toLocaleString('pt-BR', { maximumFractionDigits: bytes < 10240 ? 1 : 0 })} KB`);
 const sequenceNumber = (value: string) => Number(value.replace(/\D/g, '')) || 0;
 const sha256 = async (text: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))).map((b) => b.toString(16).padStart(2, '0')).join('');
+/** Cartão oficial e máscara de bordas, servidos pelo próprio GaaS (public/email-factory/marca/). */
+const fetchBrandFiles = async () => Object.fromEntries(await Promise.all(Object.keys(BRAND_FILES).map(async (name) => {
+  const response = await fetch(`${import.meta.env.BASE_URL}email-factory/marca/${name}`);
+  if (!response.ok) throw new Error(`peça de marca ${name} indisponível`);
+  return [name, new Uint8Array(await response.arrayBuffer())] as const;
+})));
 const saveBlob = (name: string, blob: Blob) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -178,8 +184,8 @@ const ExportPanel = ({ context, onNext, selection }: { context: SkillPackContext
     setDownloading(true); setImageNote(null);
     try {
       // O sandbox da IA não acessa a internet: as imagens vão dentro do zip.
-      const { images, failed } = await fetchPackImages(imageUrls);
-      const bytes = zipSkillPack(attachImages(pack, images));
+      const [{ images, failed }, brand] = await Promise.all([fetchPackImages(imageUrls), fetchBrandFiles()]);
+      const bytes = zipSkillPack(attachBrandFiles(attachImages(pack, images), brand));
       saveBlob(`${pack.skillName}.zip`, new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/zip' }));
       setImageNote(failed.length
         ? { tone: 'warn', text: `${Object.keys(images).length} imagens no zip; ${failed.length} não vieram e vão aparecer quebradas no quadro.` }
@@ -275,7 +281,7 @@ const ExportPanel = ({ context, onNext, selection }: { context: SkillPackContext
 // ------------------------------------------------------------------ usar na IA
 
 const starters = (segment: string) => [
-  ['Criar o próximo e-mail', `Crie o próximo e-mail da régua ${segment}. Antes de escrever, me faça as perguntas que precisar. Depois me mostre os dois quadros (celular e desktop).`],
+  ['Criar o próximo e-mail', `Crie o próximo e-mail da régua ${segment}. Antes de escrever, me faça as perguntas que precisar. Depois me mostre os dois quadros (celular e desktop) e me proponha a arte do header, com o prompt para gerar no Gemini ou no ChatGPT.`],
   ['Ajustar e-mails existentes', `Quero ajustar os E-mails [números] da régua ${segment}: [descreva a mudança]. Parta do estado atual da régua e me mostre os dois quadros antes de gerar o JSON.`],
   ['Transformar a aba Briefing Fábrica', `Segue a aba Briefing Fábrica da planilha, para a régua ${segment}. Leia os e-mails novos por rótulo, me faça as perguntas de alinhamento e só depois monte os e-mails e os quadros de prévia.`],
 ] as const;

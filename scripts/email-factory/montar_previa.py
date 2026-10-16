@@ -12,6 +12,7 @@ Uso:
     python scripts/montar_previa.py input.json --rede BOA   # outra assinatura
     python scripts/montar_previa.py input.json --sem-nome   # pessoa sem nome na base
     python scripts/montar_previa.py input.json --todas      # um par de quadros por rede
+    python scripts/montar_previa.py input.json --arte "E-mail 5=previa/artes/arte_gemini_A1.png"
 
 Gera dois quadros com todos os e-mails da régua lado a lado (os que o arquivo não mexe
 aparecem como estão hoje, com o rótulo "pronto (atual)"):
@@ -175,7 +176,14 @@ def main():
     parser.add_argument("--sem-nome", action="store_true", help="amostra de pessoa sem nome na base")
     parser.add_argument("--so-arquivo", action="store_true", help="só os e-mails do arquivo, sem os atuais da régua")
     parser.add_argument("--saida", default="previa")
+    parser.add_argument("--arte", action="append", default=[],
+                        help='arte nova do header, ex.: --arte "E-mail 5=previa/artes/arte_gemini_A1.png"')
     args = parser.parse_args()
+    arts = {}
+    for item in args.arte:
+        sequence, _, path = item.partition("=")
+        data = Path(path.strip()).read_bytes()
+        arts[sequence.strip()] = "data:image/png;base64," + base64.b64encode(data).decode()
 
     payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
     manifest = load_manifest()
@@ -210,6 +218,8 @@ def main():
             if approximate:
                 print(f"REVISAR   {sequence}: sem esqueleto próprio, usei o layout do {entry['sequence']}.")
             values = email_values(email or {}, entry, network, ruler["places"][network])
+            if sequence in arts:  # arte nova ainda sem URL: entra do arquivo local
+                values["HEADER_IMAGEM_CARTAO"] = arts[sequence]
             tokens = set(entry["networks"][network].get("tokens", []))
             hidden = [f for f, v in values.items() if v and f not in tokens and f in IMAGE_FIELDS]
             if email and hidden and network == networks[0]:

@@ -10,7 +10,7 @@ import { withMeta } from '../domain/workspace';
 import { prepareEmailInput } from '../domain/emailInput';
 import { renderDynamicEmail } from '../ampscript/renderer';
 import { PLURIX_V13_TEMPLATE, PLURIX_V13_TEMPLATE_ID } from '../fixtures/plurixV13Template';
-import { attachImages, buildSkillPack, packImageUrls, type SkillPackContext } from './skillPack';
+import { attachBrandFiles, attachImages, BRAND_FILES, buildSkillPack, packImageUrls, type SkillPackContext } from './skillPack';
 
 const python = ['python3', 'python'].find((bin) => spawnSync(bin, ['--version']).status === 0);
 const SEGMENT = 'V2 TOPO DE FUNIL DINÂMICO';
@@ -23,10 +23,24 @@ describe.skipIf(!python)('scripts Python do pacote', () => {
   const pack = buildSkillPack({ briefings, productContexts: products, productGuardrails: [], emailStrategies: [], rulers: [], assets: [], templates: [{ id: PLURIX_V13_TEMPLATE_ID, name: 'PLURIX V13', source: PLURIX_V13_TEMPLATE } as SkillPackContext['templates'][number]] }, { rulerKeys: [`Plurix|${SEGMENT}`], previewNetworks: 'all', includeTemplateSource: false, generatedAt: '2026-10-15T20:00:00.000Z' });
   // Imagens falsas no lugar das baixadas pela função email-image-proxy.
   const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  const withImages = attachImages(pack, Object.fromEntries(packImageUrls(pack).map((u) => [u, { contentType: 'image/png', bytes: png }])));
+  const brand = Object.fromEntries(Object.keys(BRAND_FILES).map((name) => [name, new Uint8Array(readFileSync(new URL(`../../../../public/email-factory/marca/${name}`, import.meta.url)))]));
+  const withImages = attachBrandFiles(attachImages(pack, Object.fromEntries(packImageUrls(pack).map((u) => [u, { contentType: 'image/png', bytes: png }]))), brand);
   for (const f of withImages.files) { const p = join(dir, f.path); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, f.bytes ?? f.content); }
   const skill = join(dir, pack.skillName);
   const input = join(skill, 'assets', 'exemplo_input.json');
+
+  it('preparar_arte encaixa a arte no header (1247 x 977) e o caminho B usa o cartão oficial', () => {
+    const hasPillow = spawnSync(python!, ['-c', 'import PIL']).status === 0;
+    if (!hasPillow) return;
+    // Cena falsa: PNG 300 x 200 azul liso, gerado pelo próprio Pillow.
+    const scene = join(dir, 'cena_B1.png');
+    execFileSync(python!, ['-c', `from PIL import Image; Image.new('RGB', (300, 200), (70, 88, 160)).save(r'${scene}')`]);
+    const out = execFileSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'preparar_arte.py'), input, scene, '--email', 'E-mail 4', '--saida', join(dir, 'artes')], { encoding: 'utf8' });
+    expect(out).toContain('cartão oficial colocado pelo script');
+    const png = readFileSync(join(dir, 'artes', 'arte_cena_B1.png'));
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1247, 977]);
+    expect(readFileSync(join(dir, 'artes', 'quadro_artes_celular.html'), 'utf8')).toContain('cena_B1');
+  });
 
   it('validar_input aceita o exemplo e só pede revisão do header longo', () => {
     const out = execFileSync(python!, ['-X', 'utf8', join(skill, 'scripts', 'validar_input.py'), input], { encoding: 'utf8' });

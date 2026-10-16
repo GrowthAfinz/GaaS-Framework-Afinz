@@ -2,6 +2,7 @@ import { strToU8, zipSync } from 'fflate';
 import contentBlocksPy from '../../../../scripts/email-factory/content_blocks.py?raw';
 import validarInputPy from '../../../../scripts/email-factory/validar_input.py?raw';
 import montarPreviaPy from '../../../../scripts/email-factory/montar_previa.py?raw';
+import prepararArtePy from '../../../../scripts/email-factory/preparar_arte.py?raw';
 import { renderDynamicEmail } from '../ampscript/renderer';
 import { BRIEFING_COLUMNS, type BriefingColumn, type BriefingRow } from '../domain/briefing';
 import { parseContentBlocks, type ContentBlock } from '../domain/contentBlocks';
@@ -215,8 +216,22 @@ ${tone ? `Tom de voz do produto: ${tone}` : ''}
    Opções: \`--rede BOA\`, \`--sem-nome\` (pessoa sem nome na base), \`--todas\` (um par por rede).
    As imagens dos e-mails já estão em \`assets/imagens/\` (o sandbox não acessa a internet): use só imagens
    da régua ou da biblioteca listada em \`references/regua-<segmento>.md\`; URL de fora aparece quebrada.
-7. **Ajuste** até o analista escrever "aprovado". Só então entregue o JSON final para download.
-8. **Explique a importação**: GaaS > Fábrica de E-mails > Prompt e IA > Importar. O GaaS valida de novo,
+7. **Proponha a arte do header** (e-mail novo, ou quando o tema do header muda). Siga
+   \`references/arte-header.md\`:
+   - ofereça 2 ou 3 direções: reaproveitar uma arte aprovada (catálogo no mesmo arquivo) ou criar
+     uma nova, cada uma com uma frase do que aparece e por que conversa com o título;
+   - para arte nova, entregue o prompt pronto (caminho A, com o cartão oficial como referência) e
+     os 3 arquivos para anexar (cartão + 2 artes de estilo), para download. Diga em qual IA gerar
+     (Gemini ou ChatGPT; ainda em teste, ofereça os dois);
+   - quando o analista subir as imagens geradas, rode
+     \`python scripts/preparar_arte.py <arquivo> --email "E-mail N" <imagens>\` e mostre
+     \`previa/artes/quadro_artes_desktop.png\` e \`quadro_artes_celular.png\` (atual x candidatas no
+     e-mail). Se o cartão saiu alterado, refaça pelo caminho B (só a cena, \`--caminho B\`);
+   - com a arte escolhida, refaça os quadros da régua com
+     \`--arte "E-mail N=previa/artes/arte_<nome>.png"\`.
+8. **Ajuste** até o analista escrever "aprovado". Só então entregue o JSON final e, se houver, a arte
+   final (\`previa/artes/arte_<nome>.png\`) para download.
+9. **Explique a importação**: GaaS > Fábrica de E-mails > Prompt e IA > Importar. O GaaS valida de novo,
    completa os campos governados, mostra a prévia e grava como rascunho com histórico.
 
 Sem execução de código: siga a lista de conferência de \`references/escrita.md\`, descreva a prévia bloco a
@@ -249,6 +264,131 @@ ${rulerLines.join('\n')}
 - \`assets/previa/\`: esqueletos do template real, um por e-mail e rede, usados por \`montar_previa.py\`.
 - \`scripts/content_blocks.py\`: o mesmo gerador de blocos do GaaS (saída idêntica).
 - \`scripts/validar_input.py\`, \`scripts/montar_previa.py\`: conferência e os dois quadros de prévia.
+- \`references/arte-header.md\`, \`assets/marca/\`, \`scripts/preparar_arte.py\`: direção de arte do header,
+  cartão oficial e encaixe das artes geradas.
+`;
+}
+
+/** O que aparece em cada arte de header já aprovada (pelo id do arquivo no SFMC). */
+const ART_DESCRIPTIONS: Record<string, { text: string; people?: boolean }> = {
+  'c6f51660-3c13-448e-aef3-5a68efaf2310': { text: 'cartão +amigo sozinho, em pé e inclinado, com sinais de "+" bege' },
+  '49b01a5b-dc3f-47a3-9ef5-afa14915626e': { text: 'cesta de compras com hortifrúti, pão e queijo, cartão +amigo à frente' },
+  '29a7dd93-cebf-47eb-9a7c-822ffcfc2be2': { text: 'mãe e filha sorrindo com carrinho de compras e dois cartões', people: true },
+};
+type ApprovedArt = { url: string; text: string; people: boolean; emails: string[] };
+const describeArt = (url: string) => Object.entries(ART_DESCRIPTIONS).find(([id]) => url.includes(id))?.[1];
+
+function artHeaderMd(arts: ApprovedArt[]) {
+  const styleRefs = arts.filter((a) => !a.people).slice(0, 2);
+  const catalog = arts.map((a) => `| ${cell(a.text)} | ${a.emails.join(', ')} | ${a.people ? 'sim' : 'não'} | ${cell(a.url)} |`);
+  return `# Arte do header dinâmico
+
+O header do template V13 tem o título e o subtítulo em HTML à esquerda e uma **imagem à direita**
+(\`HEADER_IMAGEM_CARTAO\`), exibida com 300px de largura. No celular, a imagem desce para baixo do título.
+
+## Especificação
+
+- Arquivo final: **PNG 1247 x 977** (proporção 1.28). \`preparar_arte.py\` corta e acerta isso sozinho.
+- Fundo: degradê azul de **#4A5BA6** (canto superior esquerdo) a **#2C3490** (inferior direito).
+  A borda esquerda precisa ser #4A5BA6 puro: ela encosta no título e qualquer diferença vira emenda.
+  O script esfuma essa borda e os cantos como nas artes aprovadas.
+- Sinais de "+" com cantos arredondados, bege **#EBE0CF** com leve transparência, 3 ou 4 soltos.
+- Margem livre de 10% em todas as bordas. Assunto no centro, ocupando cerca de 65% da largura.
+- **Nunca:** pessoas ou partes do corpo (decisão do analista para artes novas), texto ou número na
+  imagem, logos de supermercado ou de marcas, outras bandeiras, dinheiro, embalagem com rótulo legível.
+- O cartão é o **oficial** (\`assets/marca/cartao_oficial_frente.png\`, do vetor do guia de marca).
+  Visa, chip, aproximação, curva dourada e logo +amigo não podem mudar. Inclinar o cartão inteiro é
+  o que as artes aprovadas já fazem; nunca rotacionar ou distorcer o logo sozinho.
+- Cores da marca (guia +amigo): azul #2C3490, bege #EBE0CF, amarelo #E6A813. Tom visual: próximo,
+  caloroso, do dia a dia do mercado.
+
+## Como propor
+
+1. Leia o título do header, o benefício principal e o papel do e-mail na régua.
+2. Ofereça 2 ou 3 direções, cada uma em uma linha: o que aparece e por que conversa com o título.
+   Inclua pelo menos uma opção de **reaproveitar** uma arte aprovada (abaixo), que não custa nada.
+3. Sugestões por benefício, sem pessoas:
+   - desconto no mercado: sacola ou cesta com hortifrúti fresco, pão, frutas coloridas;
+   - prazo para pagar: carrinho cheio com sensação de folga, sacolas organizadas;
+   - Visa dentro e fora do mercado: mala pequena, óculos de sol, sacola de compras, objetos de passeio;
+   - saúde (Programa Você Bem): frutas, garrafa de água, objetos de bem-estar, sem remédio com rótulo;
+   - cartão virtual no app: celular com a tela só azul, sem interface nem texto.
+4. Não repita a arte do e-mail anterior da régua.
+
+## Catálogo de artes aprovadas
+
+O arquivo local de cada URL está em \`assets/imagens/\` (o \`assets/previa/manifesto.json\`, chave
+\`images\`, liga URL a arquivo).
+
+| O que aparece | Usada em | Pessoas | URL |
+|---|---|---|---|
+${catalog.join('\n') || '| nenhuma arte catalogada | | | |'}
+
+## Arte nova: caminho A (cartão oficial como referência)
+
+Entregue para download, nesta ordem: \`assets/marca/cartao_oficial_frente.png\`${styleRefs.map((a) => ` e o arquivo de ${a.url.split('/').pop()}`).join('')} (artes de estilo).
+Peça para gerar 2 variações. No Gemini, proporção 5:4; no ChatGPT tudo bem 3:2, o script corta.
+Troque [CENA] pela direção escolhida:
+
+\`\`\`text
+Crie uma imagem publicitária para o topo de um e-mail do cartão de crédito +amigo, de uma rede de
+supermercados. A imagem fica à direita de um título, sobre um fundo azul.
+
+IMAGENS ANEXADAS
+1. Frente oficial do cartão +amigo. É o produto: ele precisa aparecer IDÊNTICO, sem nenhuma
+   alteração. Mantenha exatamente o logo VISA, o chip prateado, o símbolo de aproximação, a curva
+   dourada, as formas de nuvem em azul, o logo "+amigo" com o coração amarelo, as cores e as
+   proporções. Não escreva nem acrescente nada no cartão.
+2 e 3. Artes já aprovadas desta campanha. Siga o mesmo estilo: fundo, luz, sombra, sinais de "+"
+   e o tipo de composição.
+
+CENA
+[CENA]. O cartão +amigo fica em destaque na frente, em pé, levemente inclinado (cerca de 12 graus),
+em perspectiva 3D, com espessura visível e sombra suave.
+
+FUNDO E BORDAS
+Degradê azul liso de #4A5BA6 (canto superior esquerdo) a #2C3490 (canto inferior direito), sem
+textura, sem chão, sem cenário. A faixa da borda esquerda precisa ser azul #4A5BA6 puro e liso.
+
+ELEMENTOS
+3 ou 4 sinais de "+" com cantos arredondados, bege claro #EBE0CF com leve transparência, soltos ao
+redor da cena (dois grandes e dois pequenos).
+
+COMPOSIÇÃO
+Paisagem, proporção 5:4. Cena e cartão no centro, cerca de 65% da largura. Margem livre de 10% em
+todas as bordas, só com o fundo azul.
+
+PROIBIDO
+Pessoas, mãos ou partes do corpo; qualquer texto, letra ou número além do que já existe no cartão;
+outros cartões, bandeiras, dinheiro; logos de supermercado ou de marcas; rótulos legíveis.
+
+ESTILO
+Foto de produto realista de estúdio, luz suave de cima à esquerda, cores vivas, alta nitidez.
+\`\`\`
+
+## Arte nova: caminho B (só a cena; o script coloca o cartão)
+
+Use quando o cartão do caminho A sair alterado. Anexe só as artes de estilo, sem o cartão, e use o
+mesmo prompt trocando IMAGENS ANEXADAS e CENA por:
+
+\`\`\`text
+IMAGENS ANEXADAS
+As duas imagens são artes aprovadas desta campanha. Siga o mesmo estilo, mas NÃO desenhe nenhum
+cartão: um cartão será colocado depois por cima da cena.
+
+CENA
+[CENA], um pouco atrás e à direita do centro. Deixe livre a área do centro da imagem, da metade
+da altura para baixo, numa faixa de cerca de 30% da largura: ali entra o cartão. Nada nessa área.
+\`\`\`
+
+Depois rode \`preparar_arte.py ... --caminho B\`.
+
+## Arte no arquivo final
+
+A arte nova ainda não tem URL (sobe no SFMC só depois de aprovada). No JSON, mantenha em
+\`HEADER_IMAGEM_CARTAO\` a URL da arte aprovada mais parecida e registre em \`pendencies\` (severity
+"review"): "Arte nova arte_<nome>.png: subir no SFMC e trocar HEADER_IMAGEM_CARTAO no GaaS".
+Entregue o PNG final junto com o JSON.
 `;
 }
 
@@ -556,6 +696,18 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
     if (options.includeTemplateSource && template) files.push({ path: root(`assets/template_${slugify(template.id)}.ampscript`), kind: 'txt', role: `AMPscript completo de ${template.name}`, content: template.source });
   }
 
+  const arts = new Map<string, ApprovedArt>();
+  for (const summary of summaries) {
+    for (const row of rulerRows(context.briefings, summary.key)) {
+      const url = row.HEADER_IMAGEM_CARTAO?.trim();
+      if (!url) continue;
+      const known = describeArt(url);
+      const art = arts.get(url) ?? { url, text: known?.text ?? 'sem descrição (abra o arquivo para ver)', people: Boolean(known?.people), emails: [] };
+      const label = `${summary.segment} ${row.SEQUENCIA}`;
+      if (!art.emails.includes(label)) art.emails.push(label);
+      arts.set(url, art);
+    }
+  }
   const firstRuler = summaries[0] ? rulerRows(context.briefings, summaries[0].key) : [];
   files.unshift(
     { path: root('SKILL.md'), kind: 'md', role: 'Instruções principais: papel, fluxo e regras', content: skillMd(skillName, summaries, context, options.generatedAt) },
@@ -563,6 +715,7 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
     { path: root('references/escrita.md'), kind: 'md', role: 'Campos editoriais, limites e conferência', content: escritaMd(firstRuler[0]) },
     { path: root('references/blocos.md'), kind: 'md', role: 'Catálogo do segundo bloco', content: blocosMd() },
     { path: root('references/contrato.md'), kind: 'md', role: 'O arquivo JSON campo a campo', content: contratoMd() },
+    { path: root('references/arte-header.md'), kind: 'md', role: 'Direção de arte do header, catálogo e prompts para IA de imagem', content: artHeaderMd([...arts.values()]) },
     { path: root('assets/contrato.schema.json'), kind: 'json', role: 'JSON Schema do contrato', content: JSON.stringify(emailInputJsonSchema(), null, 2) },
     { path: root('assets/exemplo_input.json'), kind: 'json', role: 'Exemplo válido: E-mails 3 e 4 da V2', content: JSON.stringify(exampleInput, null, 2) },
   );
@@ -571,6 +724,7 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
     { path: root('scripts/content_blocks.py'), kind: 'py', role: 'Gerador dos blocos (mesmo HTML do GaaS)', content: contentBlocksPy },
     { path: root('scripts/validar_input.py'), kind: 'py', role: 'Conferência do arquivo antes de entregar', content: validarInputPy },
     { path: root('scripts/montar_previa.py'), kind: 'py', role: 'Prévia fiel, desktop e celular', content: montarPreviaPy },
+    { path: root('scripts/preparar_arte.py'), kind: 'py', role: 'Encaixa e compara artes geradas no header', content: prepararArtePy },
   );
   // Nada de dado sensível sai no pacote (CPF, e-mail, token), mesmo vindo de texto livre.
   // Travessão vindo de texto do banco (tom de voz, regras) vira vírgula: a IA copia o estilo do que lê.
@@ -594,6 +748,16 @@ export function packImageUrls(pack: SkillPack): string[] {
 }
 
 export type FetchedImage = { contentType: string; bytes: Uint8Array };
+
+/** Peças de marca servidas em public/email-factory/marca/ e copiadas para assets/marca/ do pacote. */
+export const BRAND_FILES: Record<string, string> = {
+  'cartao_oficial_frente.png': 'Cartão +amigo oficial (vetor do guia de marca), fundo transparente',
+  'mascara_bordas.png': 'Esfumado de bordas das artes aprovadas',
+};
+export function attachBrandFiles(pack: SkillPack, files: Record<string, Uint8Array>): SkillPack {
+  const extra = Object.entries(files).map(([name, bytes]): PackFile => ({ path: `${pack.skillName}/assets/marca/${name}`, kind: 'image', role: BRAND_FILES[name] ?? name, content: '', bytes }));
+  return { ...pack, files: [...pack.files, ...extra] };
+}
 const EXTENSION: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 
 /**
