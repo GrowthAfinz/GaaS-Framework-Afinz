@@ -18,7 +18,8 @@ const MAX_BYTES = 3 * 1024 * 1024;
 const MAX_URLS = 60;
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  // supabase-js 2.9x também manda X-Supabase-Client-*; sem eles aqui o navegador bloqueia a chamada.
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-region",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -45,7 +46,11 @@ async function fetchImage(raw: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method === "OPTIONS") {
+    // Devolve exatamente os cabeçalhos que o navegador pediu: versões futuras do cliente não quebram.
+    const asked = req.headers.get("access-control-request-headers");
+    return new Response("ok", { headers: { ...CORS, ...(asked ? { "Access-Control-Allow-Headers": asked } : {}) } });
+  }
   if (req.method !== "POST") return json({ error: "Use POST" }, 405);
   let urls: unknown;
   try { ({ urls } = await req.json()); } catch { return json({ error: "Corpo JSON inválido" }, 400); }
