@@ -281,7 +281,7 @@ const ExportPanel = ({ context, onNext, selection }: { context: SkillPackContext
 // ------------------------------------------------------------------ usar na IA
 
 const starters = (segment: string) => [
-  ['Criar o próximo e-mail', `Crie o próximo e-mail da régua ${segment}. Antes de escrever, me faça as perguntas que precisar. Depois me mostre os dois quadros (celular e desktop) e me proponha a arte do header, com o prompt para gerar no Gemini ou no ChatGPT.`],
+  ['Criar o próximo e-mail', `Crie o próximo e-mail da régua ${segment}. Siga a árvore de temas: me mostre as tensões e os conceitos para eu escolher. Depois escreva, me mostre os dois quadros (celular e desktop) e proponha a arte do header, com o prompt para gerar no Gemini ou no ChatGPT.`],
   ['Ajustar e-mails existentes', `Quero ajustar os E-mails [números] da régua ${segment}: [descreva a mudança]. Parta do estado atual da régua e me mostre os dois quadros antes de gerar o JSON.`],
   ['Transformar a aba Briefing Fábrica', `Segue a aba Briefing Fábrica da planilha, para a régua ${segment}. Leia os e-mails novos por rótulo, me faça as perguntas de alinhamento e só depois monte os e-mails e os quadros de prévia.`],
 ] as const;

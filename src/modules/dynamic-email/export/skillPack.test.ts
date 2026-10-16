@@ -6,7 +6,7 @@ import before from '../fixtures/emailInputV2Before.json';
 import { emptyBriefingRow } from '../domain/briefing';
 import { withMeta } from '../domain/workspace';
 import { PLURIX_V13_TEMPLATE, PLURIX_V13_TEMPLATE_ID } from '../fixtures/plurixV13Template';
-import { buildSkillPack, chatGptProjectInstructions, EDITORIAL_FIELDS, markdownBundle, summarizeRulers, zipSkillPack, type SkillPackContext } from './skillPack';
+import { buildSkillPack, chatGptProjectInstructions, EDITORIAL_FIELDS, markdownBundle, overusedTerms, summarizeRulers, zipSkillPack, type SkillPackContext } from './skillPack';
 
 const SEGMENT = 'V2 TOPO DE FUNIL DINÂMICO';
 const context = (): SkillPackContext => ({
@@ -51,6 +51,23 @@ describe('pacote Prompt e IA', () => {
     expect(amigao).toContain('S2D02');
     expect(amigao).not.toContain('@@BANNER_2_CORPO@@');
     expect(EDITORIAL_FIELDS).not.toContain('LINK_CTA_1');
+  });
+
+  it('árvore de temas: lentes, dois pontos de decisão e o que a régua já disse', () => {
+    const tree = pack.files.find((f) => f.path.endsWith('references/arvore-de-temas.md'))!.content;
+    for (const lens of ['Bolso', 'Rotina', 'Família', 'Orgulho', 'Desconfiança', 'Vizinhança']) expect(tree).toContain(`| ${lens} |`);
+    expect(tree).toContain('Ponto de decisão 2');
+    expect(tree).toContain('| E-mail 3 |');
+    expect(pack.files.find((f) => f.path.endsWith('/SKILL.md'))!.content).toContain('references/arvore-de-temas.md');
+  });
+
+  it('anticlichê conta expressão repetida em vários e-mails, sem botão nem vocabulário de benefício', () => {
+    const rows = context().briefings.filter((r) => r.NM_PRODUTO_INTERNO === 'AMIGAO');
+    const terms = overusedTerms(rows).map((t) => t.term);
+    expect(terms.length).toBeGreaterThan(0);
+    expect(terms).not.toContain('desconto');
+    expect(terms).not.toContain('quero meu');
+    expect(terms.every((t) => !t.includes('amigão'))).toBe(true);
   });
 
   it('gera zip, Markdown único e instruções do ChatGPT dentro do limite', () => {

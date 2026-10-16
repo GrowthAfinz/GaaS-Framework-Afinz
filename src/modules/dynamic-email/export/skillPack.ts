@@ -198,9 +198,12 @@ ${tone ? `Tom de voz do produto: ${tone}` : ''}
 1. **Entenda o pedido.** Leia \`references/produto.md\` e a régua em \`references/regua-<segmento>.md\`.
    Se vier a aba Briefing Fábrica ou uma planilha, leia por rótulo (coluna "Onde fica"), não por posição,
    e pule as linhas automáticas.
-2. **Pergunte antes de escrever** quando faltar algo que muda o e-mail: qual e-mail da régua, o benefício
-   principal, o papel do e-mail. No máximo três perguntas, objetivas.
-3. **Escreva** os campos editoriais seguindo \`references/escrita.md\` e monte o segundo bloco com o
+2. **E-mail novo ou tema novo: siga a árvore de temas** (\`references/arvore-de-temas.md\`) antes de
+   escrever. Nunca parta da primeira ideia: gere tensões por lente, ligue cada uma a um benefício da
+   ficha, monte conceitos em territórios diferentes e dê nota. O analista decide em dois pontos só:
+   **(1)** tensão e conceito (níveis 1 e 3), **(2)** os quadros com a arte. Para ajustar e-mail que já
+   existe, pergunte só o que falta (no máximo três perguntas).
+3. **Escreva** a partir do conceito escolhido: os campos editoriais seguindo \`references/escrita.md\` e monte o segundo bloco com o
    catálogo de \`references/blocos.md\`. Para ajustar e-mail que já existe, parta de
    \`assets/reguas/<segmento>.json\`: é o estado atual da régua no mesmo formato do contrato.
 4. **Salve** o rascunho como \`input_gaas_emails_<segmento>_<AAAAMMDD>.json\`, no formato de
@@ -216,8 +219,8 @@ ${tone ? `Tom de voz do produto: ${tone}` : ''}
    Opções: \`--rede BOA\`, \`--sem-nome\` (pessoa sem nome na base), \`--todas\` (um par por rede).
    As imagens dos e-mails já estão em \`assets/imagens/\` (o sandbox não acessa a internet): use só imagens
    da régua ou da biblioteca listada em \`references/regua-<segmento>.md\`; URL de fora aparece quebrada.
-7. **Proponha a arte do header** (e-mail novo, ou quando o tema do header muda). Siga
-   \`references/arte-header.md\`:
+7. **Proponha a arte do header** (e-mail novo, ou quando o tema do header muda). A cena nasce do
+   conceito escolhido na árvore, não de um tema genérico. Siga \`references/arte-header.md\`:
    - ofereça 2 ou 3 direções: reaproveitar uma arte aprovada (catálogo no mesmo arquivo) ou criar
      uma nova, cada uma com uma frase do que aparece e por que conversa com o título;
    - para arte nova, entregue o prompt pronto (caminho A, com o cartão oficial como referência) e
@@ -255,6 +258,7 @@ bloco e avise que a prévia fiel aparece na importação do GaaS.
 
 ## Arquivos
 
+- \`references/arvore-de-temas.md\`: árvore de temas (tensões, conceitos, notas, anticlichê, marca).
 - \`references/produto.md\`: ficha do produto, benefícios que podem ser citados e como.
 - \`references/escrita.md\`: cada campo editorial, limites, faixa de limite, botões e conferência final.
 - \`references/blocos.md\`: catálogo do segundo bloco com exemplos reais e regras visuais.
@@ -304,8 +308,11 @@ O header do template V13 tem o título e o subtítulo em HTML à esquerda e uma 
 
 ## Como propor
 
-1. Leia o título do header, o benefício principal e o papel do e-mail na régua.
-2. Ofereça 2 ou 3 direções, cada uma em uma linha: o que aparece e por que conversa com o título.
+1. Parta da **cena do conceito** escolhido na árvore de temas (\`references/arvore-de-temas.md\`), do
+   título do header e do papel do e-mail na régua.
+2. Ofereça 2 ou 3 direções, cada uma em uma linha: o que aparece e por que conta a mesma história do
+   título. Prefira um objeto ou momento concreto (lista de compras, sacola organizada, mesa posta) a
+   "compras genéricas".
    Inclua pelo menos uma opção de **reaproveitar** uma arte aprovada (abaixo), que não custa nada.
 3. Sugestões por benefício, sem pessoas:
    - desconto no mercado: sacola ou cesta com hortifrúti fresco, pão, frutas coloridas;
@@ -389,6 +396,132 @@ A arte nova ainda não tem URL (sobe no SFMC só depois de aprovada). No JSON, m
 \`HEADER_IMAGEM_CARTAO\` a URL da arte aprovada mais parecida e registre em \`pendencies\` (severity
 "review"): "Arte nova arte_<nome>.png: subir no SFMC e trocar HEADER_IMAGEM_CARTAO no GaaS".
 Entregue o PNG final junto com o JSON.
+`;
+}
+
+const STOPWORDS = new Set(('a o e é de do da dos das em no na nos nas um uma uns umas para pra por com sem que se seu sua seus suas '
+  + 'você voce mais muito ao aos à às ou como já ja até ate também tambem ainda isso esse essa este esta são sao ser tem ter '
+  + 'vai pode the br nbsp meu minha cartão cartao amigo crédito credito visa olá ola vania amigão amigao avenida paraná parana '
+  // vocabulário de benefício é fato da ficha, não clichê
+  + 'desconto descontos dias produtos selecionados consultas exames medicamentos prazo pagar saúde saude programa').split(' '));
+/** Palavras e pares de palavras que a régua já repete em vários e-mails: a skill evita no e-mail novo. */
+export function overusedTerms(rows: WorkspaceBriefing[], limit = 15): Array<{ term: string; emails: number }> {
+  // Só texto livre: botões e segundo bloco repetem benefícios de propósito.
+  const fields: BriefingColumn[] = ['ASSUNTO', 'PRE_CABECALHO', 'HEADER_TITULO', 'HEADER_SUBTITULO', 'TITULO_COPY_1_AZUL', 'COPY_1_PRETO', 'TITULO_COPY_2'];
+  const perEmail = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const terms = new Set<string>();
+    for (const field of fields) {
+      // pares só dentro do mesmo campo e da mesma frase
+      for (const sentence of (row[field] ?? '').replace(/<[^>]*>/g, ' ').replace(/%%[^%]*%%|\{[^}]*\}/g, ' ').toLowerCase().split(/[.!?:;,]/)) {
+        const words = sentence.normalize('NFC').match(/[a-záàâãéêíóôõúç]+/g)?.filter((w) => w.length > 2 && !STOPWORDS.has(w)) ?? [];
+        words.forEach((w, i) => { terms.add(w); if (i) terms.add(`${words[i - 1]} ${w}`); });
+      }
+    }
+    const bag = perEmail.get(row.SEQUENCIA) ?? new Set<string>();
+    terms.forEach((t) => bag.add(t));
+    perEmail.set(row.SEQUENCIA, bag);
+  }
+  const counts = new Map<string, number>();
+  perEmail.forEach((bag) => bag.forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
+  const minEmails = Math.max(2, Math.ceil(perEmail.size / 2));
+  return [...counts.entries()]
+    .filter(([, n]) => n >= minEmails)
+    .sort((a, b) => b[1] - a[1] || b[0].split(' ').length - a[0].split(' ').length || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([term, emails]) => ({ term, emails }));
+}
+
+function treeMd(summaries: PackRulerSummary[], overused: Map<string, Array<{ term: string; emails: number }>>) {
+  const said = summaries.map((s) => `### ${s.partner} · ${s.segment}
+
+| E-mail | Título do header | Abertura da faixa | Segundo bloco |
+|---|---|---|---|
+${s.emails.map((e) => `| ${e.sequence} | ${cell(e.headerTitle)} | ${cell(e.greeting.split(',')[0])} | ${cell(e.blockTypes?.join(' + ') ?? 'legado')} |`).join('\n')}
+
+Expressões que essa régua já repete (evite no e-mail novo): ${(overused.get(s.key) ?? []).map((t) => `"${t.term}" (${t.emails} e-mails)`).join(', ') || 'nenhuma acima do limite'}.`);
+  return `# Árvore de temas
+
+Use para todo e-mail novo, ou quando o tema do e-mail muda. Ela existe porque a primeira ideia de uma IA
+costuma ser a mesma de qualquer outra IA: respostas de modelos de linguagem se parecem muito mais entre si
+do que as de pessoas (PNAS Nexus, 2026). Os antídotos são: partir de uma tensão real do cliente, abrir
+caminhos por lentes diferentes, escrever cada caminho separado e dar nota antes de escolher.
+
+## Nível 0: contexto (não mostre ao analista)
+
+Leia antes de qualquer coisa:
+- \`references/regua-<segmento>.md\`: papel de cada e-mail, o que já foi dito, benefícios já usados.
+- \`references/produto.md\`: benefícios permitidos e como citar. Público: membros do Clube que já
+  compram no supermercado, não pediram o cartão e não demonstraram interesse.
+- O guia de marca +amigo (abaixo).
+
+### Guia de marca +amigo (resumo)
+
+- **Propósito:** tornar ainda mais acessível para muitos o que é de poucos.
+- **Qualidades:** simplesmente eficientes (direto, ágil, objetivo); afetuosos, de coração (próximo,
+  caloroso, cuidadoso); vizinhos engajados (conhece o cliente de perto, conversa descontraída).
+- **Benefícios de marca:** faz cada compra valer a pena; tem tudo de bom (pão fresquinho, carne de
+  primeira, frutas e verduras); passa confiança.
+- **Cores:** azul #2C3490, bege #EBE0CF, amarelo #E6A813. **Fonte:** Noka.
+- **Tom do produto:** fala de preço, de carrinho e do dia a dia, não de crédito nem de banco.
+
+## Nível 1: tensões (ponto de decisão 1, junto com o nível 3)
+
+Escreva **uma tensão por lente**, cada uma em um parágrafo próprio, sem reaproveitar palavras-chave da
+anterior. Tensão = uma verdade do cliente que incomoda, em primeira pessoa ou em frase de observação.
+
+| Lente | Pergunta que gera a tensão |
+|---|---|
+| Bolso | O que aperta no orçamento dessa pessoa? |
+| Rotina | Onde ela perde tempo ou se irrita fazendo compras? |
+| Família | Por quem ela faz as compras e o que quer garantir? |
+| Orgulho | Quando ela sente que fez uma compra bem-feita? |
+| Desconfiança | O que a afasta de pedir um cartão? |
+| Vizinhança | Qual é a relação dela com o mercado do bairro? |
+
+Nota de 0 a 2 em cada critério:
+- **Relevância:** acontece de verdade com esse público?
+- **Novidade na régua:** a régua ainda não falou disso (compare com "O que a régua já disse")?
+- **Resposta do produto:** existe benefício da ficha que responde sem forçar?
+
+## Nível 2: tensão, benefício e prova
+
+Para as 2 ou 3 tensões com maior nota, ligue um benefício permitido e a forma de citar (regra de
+\`references/produto.md\`: "até 40 dias", "a partir de 5%", "sujeito a análise de crédito").
+Descarte a tensão que só se resolve com promessa que o produto não sustenta.
+
+## Nível 3: conceitos
+
+Para a tensão escolhida (ou a recomendada), monte **3 conceitos em territórios diferentes**:
+números (o benefício em destaque), cuidado (afeto, família), cena do dia a dia (um momento concreto) ou
+antes e depois. Cada conceito traz:
+
+- a ideia em uma frase;
+- título do header (até 34 caracteres) e subtítulo (até 60);
+- assunto (até ~50, sem nome) e pré-cabeçalho;
+- abertura da faixa de limite, diferente das já usadas;
+- **cena da arte**: um objeto ou momento concreto, sem pessoas, que conta a mesma história do título.
+
+Nota de 0 a 2: entende em 3 segundos; diferente dos e-mails anteriores; soa como a marca (qualidades
+acima); concreto em vez de genérico; dentro das regras da ficha. Recomende um, com uma frase do porquê.
+
+**Como apresentar o ponto de decisão 1:** uma tabela curta com as 6 tensões e as notas, os 2 ou 3 caminhos
+do nível 2 e os 3 conceitos completos da tensão recomendada. Pergunte: "Seguimos com esta tensão e este
+conceito, ou prefere outro?". Se o analista escolher outra tensão, refaça só o nível 3.
+
+## Nível 4: execução
+
+Do conceito escolhido saem o texto completo, o segundo bloco, os quadros e o prompt da arte
+(\`references/arte-header.md\`). Antes de mostrar os quadros, passe o filtro anticlichê:
+- nenhuma das expressões que a régua já repete (lista abaixo), a não ser que seja a palavra do benefício;
+- pelo menos uma imagem concreta no texto principal (um produto, um momento, um lugar);
+- nada de abertura genérica ("Já pensou...", "Que tal...") se a régua já usou.
+
+**Ponto de decisão 2:** os quadros com a arte. Ajuste até o "aprovado".
+
+## O que a régua já disse
+
+${said.join('\n\n') || 'Nenhuma régua no pacote: pergunte ao analista o que os e-mails anteriores já disseram.'}
 `;
 }
 
@@ -715,6 +848,7 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
     { path: root('references/escrita.md'), kind: 'md', role: 'Campos editoriais, limites e conferência', content: escritaMd(firstRuler[0]) },
     { path: root('references/blocos.md'), kind: 'md', role: 'Catálogo do segundo bloco', content: blocosMd() },
     { path: root('references/contrato.md'), kind: 'md', role: 'O arquivo JSON campo a campo', content: contratoMd() },
+    { path: root('references/arvore-de-temas.md'), kind: 'md', role: 'Árvore de temas: tensões, conceitos, notas e anticlichê', content: treeMd(summaries, new Map(summaries.map((s) => [s.key, overusedTerms(rulerRows(context.briefings, s.key).filter((r, i, all) => all.findIndex((o) => o.SEQUENCIA === r.SEQUENCIA) === i))]))) },
     { path: root('references/arte-header.md'), kind: 'md', role: 'Direção de arte do header, catálogo e prompts para IA de imagem', content: artHeaderMd([...arts.values()]) },
     { path: root('assets/contrato.schema.json'), kind: 'json', role: 'JSON Schema do contrato', content: JSON.stringify(emailInputJsonSchema(), null, 2) },
     { path: root('assets/exemplo_input.json'), kind: 'json', role: 'Exemplo válido: E-mails 3 e 4 da V2', content: JSON.stringify(exampleInput, null, 2) },

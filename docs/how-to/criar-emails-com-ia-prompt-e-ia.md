@@ -39,6 +39,14 @@ Depois do "aprovado", entrega `input_gaas_emails_<segmento>_<AAAAMMDD>.json`.
 O PNG usa o Playwright (`pip install playwright` e `python -m playwright install chromium`).
 Sem ele, a IA entrega os quadros em HTML.
 
+### Árvore de temas
+
+Para e-mail novo, a skill não parte da primeira ideia. Ela gera 6 tensões do cliente (lentes bolso,
+rotina, família, orgulho, desconfiança e vizinhança), liga as melhores a um benefício da ficha e monta 3
+conceitos em territórios diferentes, com nota. Você decide em dois pontos: tensão e conceito, e depois os
+quadros com a arte. A régua entra como contexto (o que já foi dito) e a lista anticlichê é calculada na
+exportação a partir dos textos da própria régua.
+
 ### Arte do header
 
 Em e-mail novo (ou quando o tema do header muda), a skill propõe 2 ou 3 direções de arte: reaproveitar
