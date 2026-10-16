@@ -223,9 +223,10 @@ ${tone ? `Tom de voz do produto: ${tone}` : ''}
    conceito escolhido na árvore, não de um tema genérico. Siga \`references/arte-header.md\`:
    - ofereça 2 ou 3 direções: reaproveitar uma arte aprovada (catálogo no mesmo arquivo) ou criar
      uma nova, cada uma com uma frase do que aparece e por que conversa com o título;
-   - para arte nova, entregue o prompt pronto (caminho A, com o cartão oficial como referência) e
-     os 3 arquivos para anexar (cartão + 2 artes de estilo), para download. Diga em qual IA gerar
-     (Gemini ou ChatGPT; ainda em teste, ofereça os dois);
+   - para arte nova, entregue **uma caixa de prompt só** (vale para ChatGPT e Gemini, com o formato
+     dentro) e, para download, **só** \`assets/marca/cartao_oficial_frente.png\` e, opcional,
+     \`assets/marca/placa_estilo.png\`. Nunca anexe artes aprovadas: a IA copia o conteúdo delas.
+     Padrão: ChatGPT. No Gemini, só pela ferramenta de criar imagem (veja \`references/arte-header.md\`);
    - quando o analista subir as imagens geradas, rode
      \`python scripts/preparar_arte.py <arquivo> --email "E-mail N" <imagens>\` e mostre
      \`previa/artes/quadro_artes_desktop.png\` e \`quadro_artes_celular.png\` (atual x candidatas no
@@ -277,17 +278,17 @@ ${rulerLines.join('\n')}
 }
 
 /** O que aparece em cada arte de header já aprovada (pelo id do arquivo no SFMC). */
-const ART_DESCRIPTIONS: Record<string, { text: string; people?: boolean }> = {
-  'c6f51660-3c13-448e-aef3-5a68efaf2310': { text: 'cartão +amigo sozinho, em pé e inclinado, com sinais de "+" bege' },
-  '49b01a5b-dc3f-47a3-9ef5-afa14915626e': { text: 'cesta de compras com hortifrúti, pão e queijo, cartão +amigo à frente' },
-  '29a7dd93-cebf-47eb-9a7c-822ffcfc2be2': { text: 'mãe e filha sorrindo com carrinho de compras e dois cartões', people: true },
+const ART_DESCRIPTIONS: Record<string, { text: string; people?: boolean; objects: string[] }> = {
+  'c6f51660-3c13-448e-aef3-5a68efaf2310': { text: 'cartão +amigo sozinho, em pé e inclinado, com sinais de "+" bege', objects: ['cartão sozinho flutuando sem nenhum objeto'] },
+  '49b01a5b-dc3f-47a3-9ef5-afa14915626e': { text: 'cesta de compras com hortifrúti, pão e queijo, cartão +amigo à frente', objects: ['cesta ou sacola de compras cheia', 'baguete ou pão comprido', 'alface', 'tomate', 'pimentão', 'queijo', 'ovos', 'salmão', 'garrafa de vinho', 'azeite', 'banana', 'laranja', 'aspargo'] },
+  '29a7dd93-cebf-47eb-9a7c-822ffcfc2be2': { text: 'mãe e filha sorrindo com carrinho de compras e dois cartões', people: true, objects: ['carrinho de supermercado', 'pessoas'] },
 };
-type ApprovedArt = { url: string; text: string; people: boolean; emails: string[] };
+type ApprovedArt = { url: string; text: string; people: boolean; emails: string[]; objects: string[] };
 const describeArt = (url: string) => Object.entries(ART_DESCRIPTIONS).find(([id]) => url.includes(id))?.[1];
 
 function artHeaderMd(arts: ApprovedArt[]) {
-  const styleRefs = arts.filter((a) => !a.people).slice(0, 2);
   const catalog = arts.map((a) => `| ${cell(a.text)} | ${a.emails.join(', ')} | ${a.people ? 'sim' : 'não'} | ${cell(a.url)} |`);
+  const avoid = [...new Set(arts.flatMap((a) => a.objects))];
   return `# Arte do header dinâmico
 
 O header do template V13 tem o título e o subtítulo em HTML à esquerda e uma **imagem à direita**
@@ -298,7 +299,9 @@ O header do template V13 tem o título e o subtítulo em HTML à esquerda e uma 
 - Arquivo final: **PNG 1247 x 977** (proporção 1.28). \`preparar_arte.py\` corta e acerta isso sozinho.
 - Fundo: degradê azul de **#4A5BA6** (canto superior esquerdo) a **#2C3490** (inferior direito).
   A borda esquerda precisa ser #4A5BA6 puro: ela encosta no título e qualquer diferença vira emenda.
-  O script esfuma essa borda e os cantos como nas artes aprovadas.
+  O script troca o tom do fundo gerado pelo degradê exato das artes aprovadas (só horizontal: #4A5BA6
+  puro no primeiro quarto, escurecendo até #2B3790 na direita) sem mexer nos objetos, e esfuma os
+  cantos. Por isso o fundo da IA não precisa sair perfeito, mas os objetos não podem encostar na borda.
 - Sinais de "+" com cantos arredondados, bege **#EBE0CF** com leve transparência, 3 ou 4 soltos.
 - Margem livre de 10% em todas as bordas. Assunto no centro, ocupando cerca de 65% da largura.
 - **Nunca:** pessoas ou partes do corpo (decisão do analista para artes novas), texto ou número na
@@ -309,20 +312,31 @@ O header do template V13 tem o título e o subtítulo em HTML à esquerda e uma 
 - Cores da marca (guia +amigo): azul #2C3490, bege #EBE0CF, amarelo #E6A813. Tom visual: próximo,
   caloroso, do dia a dia do mercado.
 
+## Por que só o cartão vai anexado (teste de 16/10/2026)
+
+- **A IA trata imagem anexada como conteúdo, não como "estilo".** Com as artes aprovadas anexadas como
+  referência, o ChatGPT copiou a cesta do E-mail 2 (pão, alface, tomate, pimentão) para dentro de uma
+  sacola. Por isso: anexe **só o cartão oficial** (o que precisa sair idêntico) e descreva o estilo em
+  texto. Se quiser uma referência visual, use \`assets/marca/placa_estilo.png\`: só degradê e "+", sem
+  objeto nenhum para copiar.
+- **ChatGPT é o padrão**: no teste, manteve o cartão oficial idêntico (Visa, chip, curva, +amigo).
+- **Gemini só pela ferramenta de criar imagem** (Nano Banana). No chat comum com o modelo Pro ele
+  pesquisou na web, ignorou os anexos e inventou um cartão genérico ("BANK NAME").
+
 ## Como propor
 
 1. Parta da **cena do conceito** escolhido na árvore de temas (\`references/arvore-de-temas.md\`), do
    título do header e do papel do e-mail na régua.
 2. Ofereça 2 ou 3 direções, cada uma em uma linha: o que aparece e por que conta a mesma história do
-   título. Prefira um objeto ou momento concreto (lista de compras, sacola organizada, mesa posta) a
-   "compras genéricas".
-   Inclua pelo menos uma opção de **reaproveitar** uma arte aprovada (abaixo), que não custa nada.
-3. Sugestões por benefício, sem pessoas:
-   - desconto no mercado: sacola ou cesta com hortifrúti fresco, pão, frutas coloridas;
-   - prazo para pagar: carrinho cheio com sensação de folga, sacolas organizadas;
-   - Visa dentro e fora do mercado: mala pequena, óculos de sol, sacola de compras, objetos de passeio;
-   - saúde (Programa Você Bem): frutas, garrafa de água, objetos de bem-estar, sem remédio com rótulo;
-   - cartão virtual no app: celular com a tela só azul, sem interface nem texto.
+   título. A cena precisa de **objetos que nenhuma arte do catálogo tem** (lista "Não usar" abaixo).
+   Inclua pelo menos uma opção de **reaproveitar** uma arte aprovada, que não custa nada.
+3. Ideias por benefício, sem pessoas e sem repetir o catálogo:
+   - desconto no mercado: etiqueta de preço de papel em branco presa ao cartão, carrinho pequeno de
+     brinquedo com um único item, pote de vidro com moedas trocado por pote com o cartão;
+   - prazo para pagar: ampulheta, calendário de mesa com folhas em branco, relógio de parede simples;
+   - Visa dentro e fora do mercado: mala de mão, óculos de sol, chapéu de praia, xícara de café;
+   - saúde (Programa Você Bem): garrafa de água, toalha dobrada, tênis de corrida, maçã verde;
+   - cartão virtual no app: celular com o cartão na tela, carteira de couro fechada ao lado.
 4. Não repita a arte do e-mail anterior da régua.
 
 ## Catálogo de artes aprovadas
@@ -334,57 +348,72 @@ O arquivo local de cada URL está em \`assets/imagens/\` (o \`assets/previa/mani
 |---|---|---|---|
 ${catalog.join('\n') || '| nenhuma arte catalogada | | | |'}
 
-## Arte nova: caminho A (cartão oficial como referência)
+## Não usar (já aparece nas artes aprovadas)
 
-Entregue para download, nesta ordem: \`assets/marca/cartao_oficial_frente.png\`${styleRefs.map((a) => ` e o arquivo de ${a.url.split('/').pop()}`).join('')} (artes de estilo).
-Peça para gerar 2 variações. No Gemini, proporção 5:4; no ChatGPT tudo bem 3:2, o script corta.
-Troque [CENA] pela direção escolhida:
+${avoid.map((o) => `- ${o}`).join('\n') || '- nada catalogado'}
+
+## Arte nova: o prompt (uma caixa só, para ChatGPT e Gemini)
+
+Para download: \`assets/marca/cartao_oficial_frente.png\` (obrigatório) e
+\`assets/marca/placa_estilo.png\` (opcional). Troque [CENA] pela direção escolhida e [NAO_USAR] pela
+lista "Não usar" acima, numa linha separada por vírgulas. Para variar, peça uma segunda imagem com
+**outra cena** ("agora troque os objetos por ..."), não "outra variação" da mesma.
 
 \`\`\`text
 Crie uma imagem publicitária para o topo de um e-mail do cartão de crédito +amigo, de uma rede de
 supermercados. A imagem fica à direita de um título, sobre um fundo azul.
 
-IMAGENS ANEXADAS
+FORMATO
+Imagem horizontal, proporção 5:4. Se a ferramenta não tiver 5:4, use 4:3 ou 3:2. Deixe margem livre
+de 10% em todas as bordas, só com o fundo.
+
+IMAGEM ANEXADA
 1. Frente oficial do cartão +amigo. É o produto: ele precisa aparecer IDÊNTICO, sem nenhuma
    alteração. Mantenha exatamente o logo VISA, o chip prateado, o símbolo de aproximação, a curva
    dourada, as formas de nuvem em azul, o logo "+amigo" com o coração amarelo, as cores e as
    proporções. Não escreva nem acrescente nada no cartão.
-2 e 3. Artes já aprovadas desta campanha. Siga o mesmo estilo: fundo, luz, sombra, sinais de "+"
-   e o tipo de composição.
+2. (Se anexada) Placa de estilo: mostra só o fundo e os sinais de "+". Use para cor e clima; ela não
+   tem objetos e não deve ser copiada como cena.
 
 CENA
 [CENA]. O cartão +amigo fica em destaque na frente, em pé, levemente inclinado (cerca de 12 graus),
-em perspectiva 3D, com espessura visível e sombra suave.
+em perspectiva 3D, com espessura visível e sombra suave. Use só os objetos descritos aqui.
 
-FUNDO E BORDAS
-Degradê azul liso de #4A5BA6 (canto superior esquerdo) a #2C3490 (canto inferior direito), sem
-textura, sem chão, sem cenário. A faixa da borda esquerda precisa ser azul #4A5BA6 puro e liso.
+NÃO USAR
+[NAO_USAR].
+
+FUNDO
+Degradê azul liso, de azul médio acinzentado (#4A5BA6) na metade esquerda até azul-marinho
+(#2C3490) na borda direita. Sem textura, sem chão, sem cenário, sem brilho forte atrás dos objetos.
+A borda esquerda inteira é azul médio acinzentado (#4A5BA6) liso.
 
 ELEMENTOS
-3 ou 4 sinais de "+" com cantos arredondados, bege claro #EBE0CF com leve transparência, soltos ao
-redor da cena (dois grandes e dois pequenos).
+3 ou 4 sinais de "+" com cantos arredondados, cor bege-areia clara (#EBE0CF) com leve
+transparência, soltos ao redor da cena (dois grandes e dois pequenos).
 
 COMPOSIÇÃO
-Paisagem, proporção 5:4. Cena e cartão no centro, cerca de 65% da largura. Margem livre de 10% em
-todas as bordas, só com o fundo azul.
+Cena e cartão juntos no centro, levemente à direita, ocupando cerca de 60% da largura. Nenhum
+objeto encosta nas bordas.
 
 PROIBIDO
 Pessoas, mãos ou partes do corpo; qualquer texto, letra ou número além do que já existe no cartão;
-outros cartões, bandeiras, dinheiro; logos de supermercado ou de marcas; rótulos legíveis.
+outros cartões, bandeiras, dinheiro; logos de supermercado, de marcas ou de fabricante; rótulos
+legíveis; interface de aplicativo em telas.
 
 ESTILO
-Foto de produto realista de estúdio, luz suave de cima à esquerda, cores vivas, alta nitidez.
+Foto de produto realista de estúdio, luz suave de cima à esquerda, sombras macias, cores naturais,
+alta nitidez.
 \`\`\`
 
-## Arte nova: caminho B (só a cena; o script coloca o cartão)
+## Caminho B (só a cena; o script coloca o cartão)
 
-Use quando o cartão do caminho A sair alterado. Anexe só as artes de estilo, sem o cartão, e use o
-mesmo prompt trocando IMAGENS ANEXADAS e CENA por:
+Use quando o cartão sair alterado. **Não anexe o cartão** (só a placa de estilo, se quiser) e troque
+no prompt os blocos IMAGEM ANEXADA e CENA por:
 
 \`\`\`text
-IMAGENS ANEXADAS
-As duas imagens são artes aprovadas desta campanha. Siga o mesmo estilo, mas NÃO desenhe nenhum
-cartão: um cartão será colocado depois por cima da cena.
+IMAGEM ANEXADA
+(Se anexada) Placa de estilo: só fundo e sinais de "+", para cor e clima. NÃO desenhe nenhum cartão:
+um cartão será colocado depois por cima da cena.
 
 CENA
 [CENA], um pouco atrás e à direita do centro. Deixe livre a área do centro da imagem, da metade
@@ -570,7 +599,8 @@ com o mesmo texto que o GaaS usa na importação.
 **Como ler "condicionar à aprovação" (ou "sujeito a análise de crédito") numa regra abaixo:** a condição
 aparece **uma vez, no corpo do e-mail, junto do benefício**, em frase afirmativa ("o cartão virtual
 aparece no app assim que o seu cartão é aprovado"), mais a nota legal fixa do e-mail. Não vai para
-assunto, pré-cabeçalho, header, faixa nem botão. O que nunca pode é prometer aprovação.
+assunto, pré-cabeçalho, header, faixa nem botão. O que nunca pode é prometer aprovação. Seguir essa
+forma já cumpre a regra: não registre pendência por isso.
 
 ${sections.join('\n')}`;
 }
@@ -871,7 +901,7 @@ export function buildSkillPack(context: SkillPackContext, options: SkillPackOpti
       const url = row.HEADER_IMAGEM_CARTAO?.trim();
       if (!url) continue;
       const known = describeArt(url);
-      const art = arts.get(url) ?? { url, text: known?.text ?? 'sem descrição (abra o arquivo para ver)', people: Boolean(known?.people), emails: [] };
+      const art = arts.get(url) ?? { url, text: known?.text ?? 'sem descrição (abra o arquivo para ver)', people: Boolean(known?.people), emails: [], objects: known?.objects ?? [] };
       const label = `${summary.segment} ${row.SEQUENCIA}`;
       if (!art.emails.includes(label)) art.emails.push(label);
       arts.set(url, art);
@@ -923,6 +953,8 @@ export type FetchedImage = { contentType: string; bytes: Uint8Array };
 export const BRAND_FILES: Record<string, string> = {
   'cartao_oficial_frente.png': 'Cartão +amigo oficial (vetor do guia de marca), fundo transparente',
   'mascara_bordas.png': 'Esfumado de bordas das artes aprovadas',
+  'fundo_header.png': 'Degradê de fundo das artes aprovadas (perfil horizontal #4A5BA6 a #2B3790)',
+  'placa_estilo.png': 'Referência visual opcional para a IA de imagem: só degradê e sinais de +, sem objetos',
 };
 export function attachBrandFiles(pack: SkillPack, files: Record<string, Uint8Array>): SkillPack {
   const extra = Object.entries(files).map(([name, bytes]): PackFile => ({ path: `${pack.skillName}/assets/marca/${name}`, kind: 'image', role: BRAND_FILES[name] ?? name, content: '', bytes }));

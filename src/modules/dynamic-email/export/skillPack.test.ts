@@ -70,6 +70,15 @@ describe('pacote Prompt e IA', () => {
     expect(terms.every((t) => !t.includes('amigão'))).toBe(true);
   });
 
+  it('prompt de arte anexa só o cartão, traz o formato e proíbe objetos das artes aprovadas', () => {
+    const art = pack.files.find((f) => f.path.endsWith('references/arte-header.md'))!.content;
+    expect(art).toContain('FORMATO');
+    expect(art).toContain('NÃO USAR');
+    expect(art).not.toContain('Artes já aprovadas desta campanha. Siga o mesmo estilo');
+    expect(art).toContain('baguete ou pão comprido');
+    expect(art).toContain('placa_estilo.png');
+  });
+
   it('gera zip, Markdown único e instruções do ChatGPT dentro do limite', () => {
     const unzipped = unzipSync(zipSkillPack(pack));
     expect(Object.keys(unzipped)).toContain('gaas-emails-plurix/SKILL.md');
