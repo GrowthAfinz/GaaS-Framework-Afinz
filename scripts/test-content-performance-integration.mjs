@@ -23,6 +23,7 @@ const sql = readFileSync(
 );
 await db.exec(sql);
 await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_approved_proposal_auto_attribution.sql')),'utf8'));
+await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_automatic_attribution_manual_override.sql')),'utf8'));
 const origin = (
   await db.query(
     "insert into sfmc_package_imports(source_scope,sfmc_bu) values('Afinz','Afinz') returning id",
@@ -96,6 +97,11 @@ const history = (await db.query("select read_sfmc_ingestion_history() v"))
   .rows[0].v;
 assert.equal(history.alerts.length, 2);
 assert.ok(history.imports[0].sfmc_bu === "Afinz");
+await db.exec('reset role');
+await db.query('update activities set template_id=null where id=$1',[pending]);assert.equal(await linked(pending),null);
+await db.query('update activities set template_id=template_id where id=$1',[pending]);assert.equal(await linked(pending),null);
+assert.ok((await db.query('select revoked_at from communication_auto_links where activity_id=$1',[pending])).rows[0].revoked_at);
+await db.query("update activities set template_id='other' where id=$1",[pending]);assert.equal(await linked(pending),'other');
 await db.exec("reset role;set role anon");
 await assert.rejects(
   () => db.query("select read_sfmc_ingestion_history()"),
