@@ -69,3 +69,24 @@ Não há reversão automatizada pela interface; a trilha antes/depois permite pr
 
 ## Evolução Cadastro e Templates V2 (07/10/2026)
 A revisão deixou o modal de upload e passou à fila compartilhada Propostas. IDs/contexto/revisão agora são persistidos; operador pode editar, aprovar e rejeitar. O modal recebe o arquivo e retorna à fila. Consulte [contrato da fila e publicação de análise](COMMUNICATIONS_PROPOSAL_INBOX.md) para o estado atual e a separação produtor/reviewer. Esta atualização prevalece sobre descrições anteriores da revisão em estado local.
+
+
+## Atualização 19/10/2026 — performance por atividade e vínculo automático
+
+Contrato implementado nesta release:
+
+- Performance → Todos é o recorte inicial. A unidade é BU de negócio + jornada normalizada + Activity Name exata + canal; cada activities.id entra uma vez após a projeção de revisões válidas. Atividades e execuções têm contagens separadas.
+- Registros sem template preservam KPIs e evolução. A ação Vincular no Cadastro de templates leva jornada, canal, Activity Name e IDs pendentes; a volta preserva o recorte da Performance.
+- O leitor do Fluxo mostra resultados da atividade mesmo com template_id nulo. O painel da jornada carrega todas as páginas antes de apresentar totais. Fluxo e Todos compartilham ExecutionResults: base total/acionável, abertura, clique, propostas, aprovados, cartões, custo, CAC e evolução diária (barras de volume e linha de taxa).
+- Taxas e CAC exigem cobertura completa dos componentes; zero medido é distinto de ausência. Não se infere passagem de pessoas por ramos ou vigência da versão apenas a partir de resultados agregados.
+- A identidade do template é separada do momento operacional e do dia relativo do grafo. Reuso de D02 no quarto toque não renomeia a peça nem muda a posição da atividade.
+- A entrada de activities, o término da ingestão de um pack e a aprovação de um conteúdo/cadastro conhecido tentam atribuição automática por jornada + Activity Name + canal exatos. Só um ID comprovado no pack/cadastro aprovado, sem conflito e sem divergência histórica, é elegível. Nomes parecidos, títulos, ordem e score não autorizam vínculo automático.
+- Templates novos permanecem em aprovação. Nenhum vínculo já preenchido é substituído. IDs diferentes para a mesma atividade aparecem como notificação na Performance e em Configurações → Packs SFMC; novas atribuições ficam suspensas.
+- communication_auto_links conserva a execução de origem, regra, template e importação. RLS permite consulta autenticada, sem escrita direta. Funções de escrita ficam no schema privado.
+- Configurações → Packs SFMC mostra ingestões, snapshots/versões por jornada, pendências de conteúdo e notificações. A data de recebimento do pack é diferente da criação do snapshot e da última execução. A origem da conta SFMC é Afinz ou Plurix; B2C/B2B2C são dimensões de negócio.
+- Importações legadas sem conta SFMC declarada conservam source_scope e não ganham uma BU inferida. Nas próximas cargas por agente, usar --escopo Afinz ou --escopo Plurix; o parser e stage_core continuam compartilhados.
+- Histórico de ingestão representa pacotes efetivamente recebidos no banco. Falhas de leitura antes do staging continuam sendo apresentadas pelo importador e não são inventadas como ingestões concluídas.
+
+Validação: scripts/test-content-performance-integration.mjs (PGlite), src/utils/activityPerformance.test.ts, journeyFlow.test.ts, scripts/qa-activity-performance.mjs e scripts/test-journey-progressive-ui.mjs. A migração é 20261019141419_content_performance_integration.sql.
+
+Conferência em produção após a migração: 8.150 registros preservados; hash de todos os campos de origem/métricas inalterado (exceto template_id e updated_at); nenhum dos 1.169 vínculos preexistentes alterado; 29 vínculos automáticos novos. Outubro: 227 execuções e 685 cartões mantidos, vínculos passaram de 16 para 35. Na B2C SEM1, as duas execuções de 05 e 06/10 passaram a b2c_email_vibe_bsp_S1D01.

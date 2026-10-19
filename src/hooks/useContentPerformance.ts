@@ -1,3 +1,4 @@
+import {uniqueExecutions} from '../utils/activityPerformance';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { useReconciliation } from './useReconciliation';
@@ -44,6 +45,7 @@ export function useContentPerformance() {
     periodLinked: rec.periodLinked, historyLinked: rec.historyLinked, orphans: rec.orphans,
   }), [catalogRaw, rec.catalog, contents.index, rec.proposals, rec.periodLinked, rec.historyLinked, rec.orphans]);
 
+  const executions=useMemo(()=>uniqueExecutions([...rec.periodLinked,...rec.orphans.flatMap(o=>o.executionRecords)]),[rec.periodLinked,rec.orphans]);
   const recRefetch = rec.refetch;
   const refetch = useCallback(() => { recRefetch(); setContentRevision((v) => v + 1); loadPrev(); }, [recRefetch, loadPrev]);
   const [loadedOnce, setLoadedOnce] = useState(false);
@@ -51,6 +53,7 @@ export function useContentPerformance() {
 
   return {
     period: { start, end },
+    executions,
     linked, orphans: rec.orphans, library, catalog: rec.catalog, catalogRaw, contents: contents.index,
     contentsError: contents.error, previousTotals: previous,
     /** Primeira carga (sem dados ainda). Recargas posteriores não desmontam a tela. */

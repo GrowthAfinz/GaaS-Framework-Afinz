@@ -1,3 +1,4 @@
+import {useAppStore} from '../../store/useAppStore';
 import {resolveCommunicationVisual} from '../../utils/communicationVisualResolution';
 import {CommunicationVisual} from './previews/CommunicationVisual';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -42,7 +43,9 @@ const SORT_OPTIONS: [SortBy, string, LucideIcon][] = [
 ];
 
 export const ReconciliationQueue: React.FC<Props> = ({ refreshing=false, packInbox, packCount=0, orphans, catalog, channelFilter, onClearChannelFilter, onCreate, onChanged }) => {
-  const [source,setSource] = useState<'packs'|'executions'>('packs');
+  const linkTarget=useAppStore(s=>s.communicationLinkTarget);
+  const [source,setSource] = useState<'packs'|'executions'>(linkTarget?'executions':'packs');
+  useEffect(()=>{if(linkTarget)setSource('executions');},[linkTarget]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todos' | 'forte' | 'novo'>('todos');
   const [sortBy, setSortBy] = useState<SortBy>('padrao');
@@ -60,8 +63,8 @@ export const ReconciliationQueue: React.FC<Props> = ({ refreshing=false, packInb
   const [editingMoment, setEditingMoment] = useState<OrphanRow | null>(null);
 
   const scoped = useMemo(
-    () => (channelFilter ? orphans.filter((o) => o.canalLabel === channelFilter) : orphans),
-    [orphans, channelFilter]
+    () => (channelFilter ? orphans.filter((o) => o.canalLabel === channelFilter) : orphans).filter(o=>!linkTarget||(o.jornada===linkTarget.journey&&o.name===linkTarget.activity&&o.canalLabel===linkTarget.channel&&o.executionRecords.some(r=>linkTarget.ids.includes(r.id)))),
+    [orphans, channelFilter, linkTarget]
   );
 
   const canalOptions = useMemo(() => Array.from(new Set(scoped.map((o) => o.canalLabel))).sort(), [scoped]);

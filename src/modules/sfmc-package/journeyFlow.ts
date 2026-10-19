@@ -37,8 +37,8 @@ export function nominalDay(node:FlowNode):string {if(node.pathsLimited||node.tim
 /** Period rows come from the existing reconciliation hook. Never link by template suggestion. */
 export function occurrenceExecutions(message:PackageMessage,messages:PackageMessage[],rows:FrameworkActivity[],allTemplate=false,confirmedIds:string[]=[]):FrameworkActivity[] {
  const same=(a:PackageMessage)=>a.activity_name===message.activity_name&&canalToId(a.content.channel)===canalToId(message.content.channel);
- const exact=rows.filter(r=>normalizeJourney(r.jornada||'')===normalizeJourney(message.journey_name)&&r['Activity name / Taxonomia']?.trim()===message.activity_name&&canalToId(r.Canal)===canalToId(message.content.channel)&&!!r.template_id);
+ const exact=rows.filter(r=>normalizeJourney(r.jornada||'')===normalizeJourney(message.journey_name)&&r['Activity name / Taxonomia']?.trim()===message.activity_name&&canalToId(r.Canal)===canalToId(message.content.channel));
  if(!allTemplate&&messages.filter(same).length>1)return [];
  if(!allTemplate)return [...new Map(exact.map(r=>[r.id,r])).values()];
- const ids=new Set([...exact.map(r=>r.template_id),...confirmedIds]);return [...new Map(rows.filter(r=>ids.has(r.template_id)&&canalToId(r.Canal)===canalToId(message.content.channel)).map(r=>[r.id,r])).values()];
+ const ids=new Set([...exact.map(r=>r.template_id).filter((id):id is string=>!!id),...confirmedIds]);return [...new Map(rows.filter(r=>ids.has(r.template_id)&&canalToId(r.Canal)===canalToId(message.content.channel)).map(r=>[r.id,r])).values()];
 }

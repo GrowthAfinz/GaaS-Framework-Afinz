@@ -1,3 +1,7 @@
+import {SfmcIngestionHistory} from '../SfmcIngestionHistory';
+import {ExecutionResults} from '../journeys/ExecutionResults';
+import {ActivityPerformancePanel} from './ActivityPerformancePanel';
+import {uniqueExecutions,groupActivityPerformance,activityFacets} from '../../../utils/activityPerformance';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ArrowDown, ArrowRight, ArrowUp, BarChart3, Flame, Gauge, LayoutGrid,
@@ -781,9 +785,10 @@ function buOf(t: ScoredTemplate): string | null {
 }
 
 // ── ORQUESTRADOR ───────────────────────────────────────────────────────────
-type Scope = 'linked' | 'unlinked' | 'library';
+type Scope = 'all' | 'linked' | 'unlinked' | 'library';
 const SELECT_FACETS: FacetKey[] = ['frente', 'parceiro', 'segmento', 'subgrupo', 'oferta', 'promocional', 'momento'];
 const SCOPE_HINT: Record<Scope, string> = {
+  all: 'Todas as atividades com registros no período, com ou sem template. O vínculo identifica o conteúdo; os resultados pertencem às execuções.',
   linked: 'Templates com execuções vinculadas no período. Métricas reais das execuções; a prévia não certifica a versão enviada.',
   unlinked: 'Grupos de execuções do período sem template, com as sugestões do motor de reconciliação. Vínculo só após revisão.',
   library: 'Comunicações aprovadas (versão aprovada no pack ou cadastro ativo/pausado no catálogo). Sem execução, não há métrica nem ranking.',
@@ -794,10 +799,12 @@ export const PerformanceView: React.FC = () => {
   const { startDate, endDate } = usePeriod();
   const perfDeepLink = useAppStore((s) => s.perfDeepLink);
   const setPerfDeepLink = useAppStore((s) => s.setPerfDeepLink);
-  const [view, setView] = useState<ViewMode>('gallery');
-  const [scope, setScope] = useState<Scope>('linked');
-  const [filters, setFilters] = useState<FacetFilters>({});
-  const [query, setQuery] = useState('');
+  const remembered=useAppStore.getState().performanceUiState;
+  const [view, setView] = useState<ViewMode>(remembered?.view??'gallery');
+  const [scope, setScope] = useState<Scope>(remembered?.scope??'all');
+  const [filters, setFilters] = useState<FacetFilters>(remembered?.filters??{});
+  const [query, setQuery] = useState(remembered?.query??'');
+  useEffect(()=>{useAppStore.getState().setPerformanceUiState({view,scope,filters,query});},[view,scope,filters,query]);
   const [includeDrafts, setIncludeDrafts] = useState(false);
   const [sort, setSort] = useState<SortState>({ key: 'score', dir: -1 });
   const [unlinkedSort, setUnlinkedSort] = useState<{ key: UnlinkedSort; dir: 1 | -1 }>({ key: 'priority', dir: -1 });
@@ -822,6 +829,9 @@ export const PerformanceView: React.FC = () => {
   // Página volta ao início sempre que o recorte muda (escopo, filtros, busca, ordenação, rascunhos).
   useEffect(() => { setPage(1); }, [scope, filters, query, includeDrafts, sort, unlinkedSort, librarySort, view]);
 
+  const allRecords = useMemo(()=>uniqueExecutions(perf.executions),[perf.executions]);
+  const activityGroups = useMemo(()=>groupActivityPerformance(allRecords),[allRecords]);
+  const allFiltered = useMemo(()=>allRecords.filter(r=>matchesFacets(activityFacets([r]),filters)&&searchMatches([r.jornada,r['Activity name / Taxonomia'],r.template_id,r.Canal,r.BU,r.Segmento,r.Parceiro,r.Subgrupos,r.Oferta,r.Promocional].join(' '),query)),[allRecords,filters,query]);
   // ── visão 1: templates com execução vinculada ──
   const scored = useMemo<ScoredTemplate[]>(() => perf.linked.map(scoreTemplate), [perf.linked]);
   const assetNamesById = useMemo(() => new Map(perf.library.map((i) => [i.template.template_id, i.assetNames])), [perf.library]);
@@ -838,7 +848,7 @@ export const PerformanceView: React.FC = () => {
   const libraryAll = useMemo(() => libraryVisible(perf.library, includeDrafts).filter(i=>!libraryPeriodOnly||i.periodExecutions.length>0), [perf.library, includeDrafts,libraryPeriodOnly]);
   const libraryFiltered = useMemo(() => sortLibrary(libraryAll.filter((i) => matchesFacets(i.facets, filters) && searchMatches(i.searchText, query)), librarySort.key, librarySort.dir), [libraryAll, filters, query, librarySort]);
 
-  const scopeFacets: ScopeFacets[] = useMemo(() => scope === 'linked' ? scored.map(facetsOf) : scope === 'unlinked' ? unlinkedAll.map((i) => i.facets) : libraryAll.map((i) => i.facets), [scope, scored, unlinkedAll, libraryAll]);
+  const scopeFacets: ScopeFacets[] = useMemo(() => scope === 'all' ? activityGroups.map(g=>g.facets) : scope === 'linked' ? scored.map(facetsOf) : scope === 'unlinked' ? unlinkedAll.map((i) => i.facets) : libraryAll.map((i) => i.facets), [scope, activityGroups, scored, unlinkedAll, libraryAll]);
   const segmentChips = useMemo(() => facetOptions(scopeFacets, 'segmento'), [scopeFacets]);
   const setFacet = (key: FacetKey, value: string) => setFilters((cur) => { const next = { ...cur }; if (!value || value === 'all') delete next[key]; else next[key] = value; return next; });
   const activeFilters = Object.keys(filters).length + (query.trim() ? 1 : 0);
@@ -846,6 +856,7 @@ export const PerformanceView: React.FC = () => {
   const linkedExecutions = scored.reduce((n, t) => n + t.executions, 0);
   const unlinkedExecutions = perf.orphans.reduce((n, o) => n + o.executionRecords.length, 0);
   const scopeOptions = [
+    { id: 'all' as const, label: 'Todos', count: activityGroups.length, unit: 'atividades', sub: `${allRecords.length} execuções no período · com ou sem template` },
     { id: 'linked' as const, label: 'Com template vinculado', count: scored.length, unit: 'templates', sub: `${linkedExecutions.toLocaleString('pt-BR')} execuções vinculadas no período` },
     { id: 'unlinked' as const, label: 'Vínculos pendentes', count: perf.orphans.length, unit: 'grupos de execuções', sub: `${unlinkedExecutions.toLocaleString('pt-BR')} execuções aguardando vínculo` },
     { id: 'library' as const, label: 'Comunicações aprovadas', count: libCounts.approved + (includeDrafts ? libCounts.drafts + libCounts.inactive : 0), unit: 'templates', sub: `${libCounts.withExecution} com execução no período${includeDrafts && libCounts.drafts ? ` · inclui ${libCounts.drafts} rascunho(s)` : ''}` },
@@ -882,6 +893,7 @@ export const PerformanceView: React.FC = () => {
   return (
     <PreviewCtx.Provider value={{...previewCtx,onOpen:setDetailId}}>
     <div className="mx-auto max-w-[1480px] space-y-5">
+      <SfmcIngestionHistory alertsOnly/>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-500">
           Recorte: <b className="text-slate-700">{periodLabel}</b> (dias de São Paulo)
@@ -896,24 +908,9 @@ export const PerformanceView: React.FC = () => {
       {perf.error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{perf.error}</div>}
       {perf.contentsError && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">Não foi possível acessar as versões de conteúdo do pack ({perf.contentsError}). Prévias de WhatsApp/SMS/Push podem aparecer como indisponíveis.</div>}
 
-      {view === 'overview' ? (
-        <>
-          <p className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-600">
-            Resultados <b>somente das execuções vinculadas</b> no período: {scored.length} templates · {linkedExecutions.toLocaleString('pt-BR')} execuções.
-            {' '}{unlinkedExecutions > 0 ? `${unlinkedExecutions.toLocaleString('pt-BR')} execuções sem template e as peças sem execução não entram nestes indicadores.` : 'Peças sem execução não entram nestes indicadores.'}
-          </p>
-          {scored.length ? <Overview items={scored} prev={perf.previousTotals} onOpen={setSelected} /> : (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
-              <BarChart3 size={32} className="text-slate-300" />
-              <p className="max-w-md text-sm text-slate-500">Nenhuma execução vinculada a template no período. Revise em “Vínculos pendentes”, na Galeria ou Tabela.</p>
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="space-y-3">
+      <div className="space-y-3">
           <ScopeSelector<Scope> value={scope} options={scopeOptions} onChange={setScope} />
           <p className="px-1 text-xs text-slate-600">{SCOPE_HINT[scope]}</p>
-
           <section aria-labelledby="segment-filter-title" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div><h3 id="segment-filter-title" className="text-sm font-bold text-slate-800">Escolha o segmento</h3><p className="mt-0.5 text-xs text-slate-400">Compare primeiro peças do mesmo público e etapa de funil.</p></div>
@@ -921,11 +918,11 @@ export const PerformanceView: React.FC = () => {
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               <button type="button" onClick={() => setFacet('segmento', 'all')} aria-pressed={!filters.segmento} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${!filters.segmento ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
-                <span className="block text-xs font-bold text-slate-800">Todos os segmentos</span><span className="mt-0.5 block text-[10px] text-slate-400">{scopeFacets.length} {scope === 'unlinked' ? 'grupos' : 'templates'}</span>
+                <span className="block text-xs font-bold text-slate-800">Todos os segmentos</span><span className="mt-0.5 block text-[10px] text-slate-400">{scopeFacets.length} {scope === 'all' ? 'atividades' : scope === 'unlinked' ? 'grupos' : 'templates'}</span>
               </button>
               {segmentChips.map((option) => (
                 <button key={option.value} type="button" onClick={() => setFacet('segmento', option.value)} aria-pressed={filters.segmento === option.value} className={`min-w-fit rounded-xl border px-3 py-2 text-left transition-colors ${filters.segmento === option.value ? 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-500' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
-                  <span className="block text-xs font-bold text-slate-800">{segmentLabel(option.value)}</span><span className="mt-0.5 block text-[10px] text-slate-400">{stageLabel(option.value, [])} · {option.count} {scope === 'unlinked' ? 'grupos' : 'tmpl.'}</span>
+                  <span className="block text-xs font-bold text-slate-800">{segmentLabel(option.value)}</span><span className="mt-0.5 block text-[10px] text-slate-400">{stageLabel(option.value, [])} · {option.count} {scope === 'all' ? 'ativ.' : scope === 'unlinked' ? 'grupos' : 'tmpl.'}</span>
                 </button>
               ))}
             </div>
@@ -942,7 +939,7 @@ export const PerformanceView: React.FC = () => {
                 </button>
               );
             })}
-            <div className="ml-auto inline-flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600">
+            <div className={scope==='all'?'hidden':'ml-auto inline-flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600'}>
               <span className="border-r border-slate-200 px-2.5 py-2 text-slate-400">Ordenar</span>
               <select value={sortSelect.value} onChange={(e) => sortSelect.onChange(e.target.value)} className="bg-white px-2.5 py-2 outline-none" aria-label="Ordenar por">
                 {sortSelect.options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
@@ -992,7 +989,9 @@ export const PerformanceView: React.FC = () => {
             </aside>
           )}
 
-          {scope === 'linked' && (linkedFiltered.length === 0 ? (
+          {scope === 'all' && <ActivityPerformancePanel rows={allFiltered} view={view} catalog={perf.catalogRaw} contents={perf.contents} onOpenTemplate={setDetailId}/>}
+          {scope === 'linked' && view === 'overview' && <ExecutionResults rows={linkedFiltered.flatMap(t=>t.timeline.flatMap(p=>p.activities)) as unknown as FrameworkActivity[]}/>}
+          {scope === 'linked' && view !== 'overview' && (linkedFiltered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
               <Search size={28} className="text-slate-300" /><p className="text-sm text-slate-400">{scored.length ? 'Nenhuma peça neste filtro.' : 'Nenhum template com execução vinculada no período.'}</p>
             </div>
@@ -1006,17 +1005,18 @@ export const PerformanceView: React.FC = () => {
           ) : (
             <TableView items={linkedFiltered} sort={sort} onSort={setSort} onOpen={setSelected} page={page} onPage={setPage} />
           ))}
-          {scope === 'unlinked' && (
+          {scope === 'unlinked' && view === 'overview' && <ExecutionResults rows={unlinkedFiltered.flatMap(i=>i.row.executionRecords)}/>}
+          {scope === 'unlinked' && view !== 'overview' && (
             <UnlinkedExecutionsPanel items={unlinkedFiltered} linked={perf.linked} total={unlinkedAll.length} view={mode} catalog={perf.catalog} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage} onChanged={perf.refetch} busy={perf.refreshing} />
           )}
           {scope==='library'&&<label className="mb-3 flex items-center gap-2 text-sm">Acervo<select value={libraryPeriodOnly?'period':'all'} onChange={e=>{setLibraryPeriodOnly(e.target.value==='period');setPage(1);}} className="rounded-lg border px-3 py-2"><option value="period">Com uso no período</option><option value="all">Todas as aprovadas deste público</option></select></label>}
-          {scope === 'library' && (
+          {scope === 'library' && view==='overview' && <ExecutionResults rows={libraryFiltered.flatMap(i=>i.periodExecutions)}/>}
+          {scope === 'library' && view!=='overview' && (
             <ApprovedLibraryPanel items={libraryFiltered} total={libraryAll.length} view={mode} catalogRaw={perf.catalogRaw} contents={perf.contents} page={page} onPage={setPage}
               onOpenDetail={setDetailId} onOpenPerformance={setDetailId}
               onReviewCompatible={(id) => { setScope('unlinked'); setFilters({}); setQuery(id); }} />
           )}
         </div>
-      )}
 
       {(selected||detailId)&&(()=>{const id=selected?.template.template_id||detailId;const item=perf.library.find(i=>i.template.template_id===id);const t=scored.find(i=>i.template.template_id===id);return item?<LibraryDetail item={item} res={resolvePreview({channel:item.template.channel,catalog:perf.catalogRaw,contents:perf.contents,templateId:id!})} performance={t?<><ScoreRing score={t.score} size={52}/><PerformanceDetails t={t}/><div className="flex gap-2"><button className="rounded border px-3 py-2" onClick={()=>{setEditing(t);setSelected(null);setDetailId(null);}}>Editar peça</button><button className="rounded border px-3 py-2" onClick={()=>setAuditing(t)}>Jornadas / activity_names</button></div></>:undefined} onClose={()=>{setSelected(null);setDetailId(null);}} onOpenPerformance={setDetailId} onReviewCompatible={id=>{setSelected(null);setDetailId(null);setScope('unlinked');setQuery(id);}}/>:null;})()}
       {auditing && <AuditModal t={auditing} onClose={() => setAuditing(null)} />}

@@ -7,6 +7,7 @@ import {join} from 'node:path';
 import assert from 'node:assert/strict';
 const temp=mkdtempSync(join(tmpdir(),'journey-workspace-'));
 const mocks={
+ sfmcIngestionService:`export const readSfmcHistory=async()=>({imports:[],alerts:[],automatic_links:0});`,
  PeriodContext:`import React from 'react';export const usePeriod=()=>{const[period,set]=React.useState({startDate:new Date(2026,9,1),endDate:new Date(2026,9,31)});window.fixturePeriod=(s,e)=>set({startDate:new Date(s+'T12:00:00'),endDate:new Date(e+'T12:00:00')});return period;};`,
  BUContext:`import React from 'react';export const useBU=()=>{const[selectedBUs,set]=React.useState(['B2C','B2B2C','Plurix']);window.fixtureBUs=set;return {selectedBUs};};`,
  AuthContext:`export const useAuth=()=>({user:{id:'fixture'}});`,
@@ -33,10 +34,10 @@ const mocks={
  export const resetJourneyCache=()=>{};`
 };
 let browser,server;
-const stylesheet=existsSync('tmp/journey-workspace.css')?readFileSync('tmp/journey-workspace.css'):'';
+const stylesheet=readFileSync('dist/assets/'+(await import('node:fs')).readdirSync('dist/assets').find(n=>n.endsWith('.css')));
 const shot=async(page,name)=>{if(!process.env.JOURNEY_QA_DIR)return;mkdirSync(process.env.JOURNEY_QA_DIR,{recursive:true});await page.screenshot({path:join(process.env.JOURNEY_QA_DIR,name+'.png'),fullPage:true});};
 try{
- await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{JourneyFlowView}from'./src/components/communications/journeys/JourneyFlowView';createRoot(document.getElementById('root')).render(<><header style={{height:100,background:'#effcfb',padding:24}}>Afinz | Growth as a Service</header><JourneyFlowView/></>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,outfile:join(temp,'app.js'),format:'iife',jsx:'automatic',plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/PeriodContext$|BUContext$|AuthContext$|useAppStore$|journeyReadService$|CommunicationInspector$|journeyRenditions$/},a=>({path:a.path.split('/').pop(),namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:mocks[a.path],loader:'js',resolveDir:process.cwd()}));}}]});
+ await build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import{JourneyFlowView}from'./src/components/communications/journeys/JourneyFlowView';createRoot(document.getElementById('root')).render(<><header style={{height:100,background:'#effcfb',padding:24}}>Afinz | Growth as a Service</header><JourneyFlowView/></>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,outfile:join(temp,'app.js'),format:'iife',jsx:'automatic',plugins:[{name:'fixtures',setup(b){b.onResolve({filter:/PeriodContext$|BUContext$|AuthContext$|useAppStore$|journeyReadService$|CommunicationInspector$|journeyRenditions$|sfmcIngestionService$/},a=>({path:a.path.split('/').pop(),namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},a=>({contents:mocks[a.path],loader:'js',resolveDir:process.cwd()}));}}]});
  server=createServer((req,res)=>{if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(stylesheet);return;}res.setHeader('Content-Type',req.url==='/app.js'?'text/javascript; charset=utf-8':'text/html; charset=utf-8');res.end(req.url==='/app.js'?readFileSync(join(temp,'app.js')):'<link rel="stylesheet" href="/style.css"><style>:root{--ui-scale:.8}</style><div id="root"></div><script src="/app.js"></script>');});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:1440,height:1000},timezoneId:'America/Sao_Paulo'});page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});
@@ -54,9 +55,9 @@ try{
  console.log('Checking secondary facets');await choose('Canal','SMS');assert.equal(await page.locator('[data-catalog-group]').count(),tableGroups);
  assert.equal((await page.evaluate(()=>window.calls)).length,1);
  await page.getByRole('button',{name:'Subgrupo',exact:true}).click();assert.equal(await page.getByRole('listbox',{name:'Subgrupo',exact:true}).getByRole('option').filter({hasText:'Sábado'}).count(),0);await page.keyboard.press('Escape');await page.evaluate(()=>window.fixtureGlobal({subgrupos:['Sábado']}));await page.waitForFunction(()=>document.querySelector('[aria-label="Subgrupo"]').textContent.includes('Sábado'));assert.ok((await page.getByRole('heading',{name:/Jornadas extraídas dos packs/}).textContent()).includes('0 de 5'));
- await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+ await page.getByRole('button',{name:'Limpar',exact:true}).click();
  await choose('BU','Plurix');assert.equal(await page.getByLabel('Parceiro / público',{exact:true}).textContent(),'N/A');assert.equal(await page.locator('button[aria-label="Parceiro / público"]').count(),0);
- await shot(page,'02-plurix');await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+ await shot(page,'02-plurix');await page.getByRole('button',{name:'Limpar',exact:true}).click();
  await page.getByRole('button',{name:'Abrir jornada JOR_AQS_B2C_PROPRI_ABD_SHARED',exact:true}).first().click();
  console.log('Opening flow');await page.locator('[data-journey-viewport]').waitFor();assert.equal(await page.getByLabel('Versão do pack',{exact:true}).inputValue(),'v2');
  assert.deepEqual((await page.evaluate(()=>window.calls)).filter(c=>c.startsWith('detail:')),['detail:v2']);
@@ -67,7 +68,7 @@ try{
  await page.getByRole('button',{name:'Tela cheia',exact:true}).click();await page.waitForFunction(()=>!!document.fullscreenElement);
  await page.getByRole('button',{name:'Performance',exact:true}).click();
  const panel=page.getByRole('region',{name:'Performance da jornada'});await shot(page,'04-performance-drawer');await panel.getByText('14/10/2026',{exact:false}).waitFor();
- await panel.getByRole('button',{name:'Carregar próximos disparos'}).click();await panel.getByText('12/10/2026',{exact:false}).waitFor();
+ await panel.getByText('12/10/2026',{exact:false}).waitFor();assert.equal(await panel.getByRole('button',{name:'Carregar próximos disparos'}).count(),0);
  const transformBefore=await page.locator('[data-journey-viewport] .will-change-transform').getAttribute('style');
  await panel.getByRole('button',{name:'Expandir performance'}).click();await panel.getByRole('button',{name:'Voltar à jornada',exact:true}).waitFor();
  const region=await panel.boundingBox(),root=await page.locator('[data-journey-flow]').boundingBox();assert.ok(region.height>=root.height-5);
@@ -78,7 +79,7 @@ try{
  await page.getByRole('button',{name:'Sair da tela cheia',exact:true}).click();await page.waitForFunction(()=>!document.fullscreenElement);
  await page.getByRole('button',{name:'Catálogo',exact:true}).click();
  await page.getByRole('button',{name:/Classificação pendente/}).click();await page.getByRole('button',{name:'Abrir jornada PACK_PENDENTE',exact:true}).waitFor();
- await page.getByRole('button',{name:'Limpar filtros',exact:true}).click();
+ await page.getByRole('button',{name:'Limpar',exact:true}).click();
  await page.evaluate(()=>window.fixtureBUs(['B2C']));await page.getByRole('button',{name:'BU',exact:true}).click();assert.equal(await page.getByRole('option').filter({hasText:'Plurix'}).count(),0);await page.keyboard.press('Escape');
  await page.evaluate(()=>{window.failCatalog();window.fixturePeriod('2026-09-01','2026-09-30');});await page.getByRole('alert').filter({hasText:'catalog timeout'}).waitFor();assert.equal(await page.getByRole('button',{name:'Abrir jornada JOR_AQS_B2C_PROPRI_ABD_SHARED',exact:true}).count(),0);await page.getByRole('button',{name:'Tentar novamente',exact:true}).click();await page.getByRole('button',{name:'Abrir jornada JOR_AQS_B2C_PROPRI_ABD_SHARED',exact:true}).first().waitFor();await page.waitForFunction(()=>window.calls.includes('catalog:2026-09-01:2026-09-30'));
  await page.setViewportSize({width:390,height:844});await shot(page,'05-mobile-catalog');assert.ok(await page.evaluate(()=>document.querySelector('[data-journey-flow]').getBoundingClientRect().right<=innerWidth+1));

@@ -486,6 +486,7 @@ export function useReconciliation() {
   }, [filterKey]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(()=>{const refresh=()=>void fetchData();let last=Date.now();const focused=()=>{if(Date.now()-last>60000){last=Date.now();refresh();}};window.addEventListener('focus',focused);window.addEventListener('communication-links-changed',refresh);window.addEventListener('sfmc-package-changed',refresh);return()=>{window.removeEventListener('focus',focused);window.removeEventListener('communication-links-changed',refresh);window.removeEventListener('sfmc-package-changed',refresh);};},[fetchData]);
 
   const coverage = useMemo<CoverageStats>(() => {
     const orphanNames = new Set(orphans.map((o) => o.name));

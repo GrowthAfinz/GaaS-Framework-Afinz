@@ -62,15 +62,16 @@ export function buildTemplatePerformance(records:FrameworkActivity[],templates:C
   if(rec['Activity name / Taxonomia'])a.names.add(rec['Activity name / Taxonomia']);
   const key=dayKey(r['Data de Disparo']);const d=a.timeline.get(key)??emptyPoint(key);
   d.executions+=1;d.baseEnviada+=base;d.aberturas+=ab;d.cliques+=cl;d.cartoes+=ca;d.propostas+=pr;d.custoTotal+=custo;
-  d.custoEfetivo+=custo>0?custo:base*channelUnitCost(template.channel);d.activities.push(rec as unknown as ActivityRow);a.timeline.set(key,d);
+  d.custoEfetivo+=has(r['Custo Total Campanha'])?custo:base*channelUnitCost(template.channel);d.activities.push(rec as unknown as ActivityRow);a.timeline.set(key,d);
  }
  const out:TemplatePerformance[]=[];
  for(const {p,names,timeline} of acc.values()){
   p.activityNames=[...names];
   p.ctr=p.baseEnviada>0?p.cliques/p.baseEnviada:0;p.taxaConversao=p.baseEnviada>0?p.cartoes/p.baseEnviada:0;
   p.cac=p.cartoes>0?p.custoTotal/p.cartoes:0;p.custoCanalEstimado=p.baseEnviada*channelUnitCost(p.template.channel);
-  p.cacEstimado=p.cartoes>0?p.custoCanalEstimado/p.cartoes:0;p.custoEstimado=p.custoTotal<=0;
-  p.custoEfetivo=p.custoEstimado?p.custoCanalEstimado:p.custoTotal;p.cacEfetivo=p.cartoes>0?p.custoEfetivo/p.cartoes:0;
+  p.cacEstimado=p.cartoes>0?p.custoCanalEstimado/p.cartoes:0;const costRows=[...timeline.values()].flatMap(d=>d.activities) as unknown as Row[];
+  p.custoEstimado=costRows.some(r=>!has(r['Custo Total Campanha']));
+  p.custoEfetivo=costRows.reduce((sum,r)=>sum+(has(r['Custo Total Campanha'])?num(r['Custo Total Campanha']):num(r['Base Total'])*channelUnitCost(p.template.channel)),0);p.cacEfetivo=p.cartoes>0?p.custoEfetivo/p.cartoes:0;
   p.timeline=[...timeline.values()].map(x=>({...x,ctr:x.baseEnviada>0?x.cliques/x.baseEnviada:0,taxaAbertura:x.baseEnviada>0?x.aberturas/x.baseEnviada:0,taxaConversao:x.baseEnviada>0?x.cartoes/x.baseEnviada:0,cacEfetivo:x.cartoes>0?x.custoEfetivo/x.cartoes:0})).sort((x,y)=>x.date.localeCompare(y.date));
   out.push(p);
  }

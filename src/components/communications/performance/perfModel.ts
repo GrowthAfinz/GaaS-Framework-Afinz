@@ -131,10 +131,13 @@ interface RealMetrics {
 
 function realMetrics(item: TemplatePerformance): RealMetrics {
   const ch = channelKeyOf(item.template.channel);
-  const aberturasMedidas = item.aberturas > 0;
+  const rows=item.timeline.flatMap(p=>p.activities) as unknown as Record<string,unknown>[];
+  const aberturasMedidas = rows.length>0&&rows.every(r=>r.Abertura!=null);
   const abPct = item.baseEnviada > 0 && aberturasMedidas ? (item.aberturas / item.baseEnviada) * 100 : null;
-  const ctrPct = item.baseEnviada > 0 ? item.ctr * 100 : null;
-  const convPct = item.baseEnviada > 0 ? item.taxaConversao * 100 : null;
+  const clicksMeasured=rows.length>0&&rows.every(r=>r.Cliques!=null&&Number.isFinite(Number(r.Cliques)));
+  const cardsMeasured=rows.length>0&&rows.every(r=>r['Cartões Gerados']!=null&&Number.isFinite(Number(r['Cartões Gerados'])));
+  const ctrPct = item.baseEnviada > 0 && clicksMeasured ? item.ctr * 100 : null;
+  const convPct = item.baseEnviada > 0 && cardsMeasured ? item.taxaConversao * 100 : null;
   const cac = item.cacEfetivo > 0 ? item.cacEfetivo : null;
   return { channel: ch, aberturasMedidas, abPct, ctrPct, convPct, cac };
 }
@@ -187,8 +190,8 @@ export function computeScore(item: TemplatePerformance): number | null {
 export interface DiagDef { label: string; tone: Exclude<Tone, 'na'> | 'info'; hint: string; }
 
 export const DIAG: Record<string, DiagDef> = {
-  escalar:        { label: 'Escalar',                 tone: 'good', hint: 'Eficiência muito acima da média do canal. Aumente a base e a frequência.' },
-  revisar_cta:    { label: 'Revisar CTA',             tone: 'warn', hint: 'Abre bem, mas não clica/converte. O gargalo está no conteúdo e no botão.' },
+  escalar:        { label: 'Candidata a teste',                 tone: 'good', hint: 'Sinal favorável frente aos alvos configurados do canal. Compare públicos equivalentes e valide em teste.' },
+  revisar_cta:    { label: 'Revisar CTA',             tone: 'warn', hint: 'Abre bem, mas não clica/converte. Investigue conteúdo, público, CTA e rastreamento.' },
   revisar_oferta: { label: 'Revisar oferta',          tone: 'warn', hint: 'Bom clique, baixa conversão. A oferta ou a página de destino não sustentam o interesse.' },
   baixa_conv:     { label: 'Bom alcance, baixa conv', tone: 'warn', hint: 'Alcance e abertura saudáveis, mas a conversão para cartão fica abaixo da média.' },
   baixa_abertura: { label: 'Baixa abertura',          tone: 'bad',  hint: 'Abertura muito abaixo do canal. Revisar assunto, remetente e horário de disparo.' },
@@ -205,7 +208,7 @@ export function deriveDiagnoses(item: TemplatePerformance, score: number | null)
   const tgtConv = cfg.targets.conversao;
   const out: string[] = [];
 
-  if (score != null && score >= 80) out.push('escalar');
+  if (score != null && score >= 80 && item.executions>=3 && item.baseEnviada>=5000 && !item.custoEstimado) out.push('escalar');
 
   if (tgtAb && m.aberturasMedidas && m.abPct != null && m.abPct < tgtAb * 0.45) out.push('baixa_abertura');
 
@@ -283,7 +286,7 @@ export interface ScoredTemplate extends TemplatePerformance {
 export function scoreTemplate(item: TemplatePerformance): ScoredTemplate {
   const breakdown = scoreBreakdown(item);
   // Execuções sem nenhum resultado registrado ainda não têm score: ausência não vira zero.
-  const measured = item.resultsMeasured > 0;
+  const measured = item.resultsMeasured === item.executions && item.executions > 0;
   const score = measured ? computeScore(item) : null;
   return {
     ...item,
@@ -394,11 +397,11 @@ export function suggestedActions(items: ScoredTemplate[]): SuggestedAction[] {
 
   const byScore = [...items].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
   const best = byScore[0];
-  if (best && (best.score ?? 0) >= 60) {
+  if (best && (best.score ?? 0) >= 80 && best.executions >= 3 && best.baseEnviada >= 5000 && !best.custoEstimado) {
     push({
       tone: 'good',
-      title: `Escalar ${labelOf(best)}`,
-      text: `Score ${best.score} e ${fmt.pctFrac(best.taxaAbertura, best.taxaAbertura < 0.1 ? 1 : 0)} de abertura. Amplie base e frequência desta peça.`,
+      title: `Testar expansão de ${labelOf(best)}`,
+      text: `Score ${best.score} e ${fmt.pctFrac(best.taxaAbertura, best.taxaAbertura < 0.1 ? 1 : 0)} de abertura. Compare peças equivalentes antes de testar expansão.`,
       item: best,
     });
   }
@@ -431,7 +434,7 @@ export function suggestedActions(items: ScoredTemplate[]): SuggestedAction[] {
     push({
       tone: 'warn',
       title: `Revisar CTA de ${labelOf(ctaIssue)}`,
-      text: `Boa abertura (${fmt.pctFrac(ctaIssue.taxaAbertura, 1)}) mas conversão baixa. O gargalo está no botão e na oferta.`,
+      text: `Boa abertura (${fmt.pctFrac(ctaIssue.taxaAbertura, 1)}) mas conversão baixa. Investigue botão, oferta, público e rastreamento.`,
       item: ctaIssue,
     });
   }

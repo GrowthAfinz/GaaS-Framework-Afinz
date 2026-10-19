@@ -66,6 +66,10 @@ interface AppState {
     setTransitioning: (val: boolean) => void;
 
     // Deep-link transitório entre abas de Comunicações (Cadastro → Performance do Conteúdo)
+    performanceUiState: {view:'overview'|'gallery'|'table';scope:'all'|'linked'|'unlinked'|'library';filters:Record<string,string>;query:string}|null;
+    setPerformanceUiState: (value:{view:'overview'|'gallery'|'table';scope:'all'|'linked'|'unlinked'|'library';filters:Record<string,string>;query:string})=>void;
+    communicationLinkTarget: {journey:string;activity:string;channel:string;ids:string[]} | null;
+    setCommunicationLinkTarget: (target:{journey:string;activity:string;channel:string;ids:string[]}|null)=>void;
     perfDeepLink: { view: 'overview' | 'gallery' | 'table'; query: string } | null;
     setPerfDeepLink: (dl: { view: 'overview' | 'gallery' | 'table'; query: string } | null) => void;
 
@@ -167,6 +171,10 @@ export const useAppStore = create<AppState>()(
                 viewSettings: { ...state.viewSettings, periodo: { inicio, fim } }
             })),
 
+            performanceUiState: null,
+            setPerformanceUiState: (value)=>set({performanceUiState:value}),
+            communicationLinkTarget: null,
+            setCommunicationLinkTarget: (target) => set({communicationLinkTarget:target}),
             perfDeepLink: null,
             setPerfDeepLink: (dl) => set({ perfDeepLink: dl }),
             reportDeepLink: null,

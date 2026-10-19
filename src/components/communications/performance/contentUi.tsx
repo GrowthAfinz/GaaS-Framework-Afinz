@@ -61,7 +61,7 @@ export const Covered: React.FC<{ v: CoveredValue; strong?: boolean; k?: boolean 
 export interface ScopeOption<T extends string> { id: T; label: string; count: number; unit: string; sub: string }
 
 export const ScopeSelector = <T extends string,>({ value, options, onChange }: { value: T; options: ScopeOption<T>[]; onChange: (v: T) => void }) => (
-  <div role="tablist" aria-label="Escopo da Performance por conteúdo" className="grid gap-2 md:grid-cols-3">
+  <div role="tablist" aria-label="Escopo da Performance por conteúdo" className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
     {options.map((o) => {
       const active = o.id === value;
       return (

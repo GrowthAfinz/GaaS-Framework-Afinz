@@ -1,3 +1,4 @@
+import {SfmcIngestionHistory} from './communications/SfmcIngestionHistory';
 import React, { useState, useEffect } from 'react';
 import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck, Users, Wand2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -423,7 +424,8 @@ export const ConfiguracoesView: React.FC = () => {
     const [isSending, setIsSending] = useState(false);
     const [sent, setSent] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users'>(() => {
+    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users' | 'sfmc'>(() => {
+        if(sessionStorage.getItem('gaas-settings-tab')==='sfmc'){sessionStorage.removeItem('gaas-settings-tab');return 'sfmc';}
         // Atalho vindo do aviso de metas herdadas no Launch Planner.
         try {
             if (sessionStorage.getItem('gaas.configuracoes.tab') === 'goals') {
@@ -542,7 +544,7 @@ export const ConfiguracoesView: React.FC = () => {
                     {/* Right Column: Content Area (Spans 2 cols) */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Tabs Navigation */}
-                        <div className="flex items-center gap-2 border-b border-slate-200">
+                        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200"><button onClick={()=>setActiveTab('sfmc')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab==='sfmc'?'border-blue-500 text-blue-500':'border-transparent text-slate-500'}`}>Packs SFMC</button>
                             <button
                                 onClick={() => setActiveTab('goals')}
                                 className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'goals'
@@ -586,6 +588,7 @@ export const ConfiguracoesView: React.FC = () => {
                         </div>
 
                         {/* Tab Content */}
+                        {activeTab==='sfmc'&&<SfmcIngestionHistory/>}
                         <div className="animate-fade-in">
                             {activeTab === 'goals' && (
                                 <GoalsManager />

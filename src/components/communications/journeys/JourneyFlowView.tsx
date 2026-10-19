@@ -1,3 +1,5 @@
+import {SfmcIngestionHistory} from '../SfmcIngestionHistory';
+import {readSfmcHistory,type SfmcHistory} from '../../../services/sfmcIngestionService';
 import {createPortal} from 'react-dom';
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {GitBranch,RefreshCw,Image,FileText,LockKeyhole,SlidersHorizontal,List,Network,PanelRight,ArrowLeft,Loader2} from 'lucide-react';
@@ -26,6 +28,10 @@ const LABEL='mb-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-
 const FIELD='h-[34px] w-full rounded-lg border border-slate-200 bg-white text-xs shadow-sm';
 const LOCKED='flex h-[34px] items-center rounded-lg border border-slate-200 bg-slate-100 px-2.5 text-xs text-slate-500';
 export function JourneyFlowView(){
+ const [ingestions,setIngestions]=useState<SfmcHistory|null>(null);
+ useEffect(()=>{let alive=true;const load=()=>readSfmcHistory().then(v=>{if(alive)setIngestions(v);}).catch(()=>{});void load();window.addEventListener('sfmc-package-changed',load);return()=>{alive=false;window.removeEventListener('sfmc-package-changed',load);};},[]);
+ const received=(importId:string)=>ingestions?.imports.find(i=>i.id===importId)?.uploaded_at;
+
  const {user}=useAuth(),period=usePeriod(),{selectedBUs}=useBU(),global=useAppStore(s=>s.viewSettings.filtrosGlobais),setGlobalFilters=useAppStore(s=>s.setGlobalFilters);
  const start=format(period.startDate,'yyyy-MM-dd'),end=format(period.endDate,'yyyy-MM-dd');
  const [catalog,setCatalog]=useState<{identity:string;rows:JourneyDirectoryItem[]}>({identity:'',rows:[]}),[entry,setEntry]=useState<JourneyIndexItem|null>(null),[manifest,setManifest]=useState<JourneyManifest|null>(null);
@@ -78,7 +84,7 @@ export function JourneyFlowView(){
  const nodeOpen=(key:string)=>{if(performance){setPerformanceKey(key);viewport.current?.focus(key);}else inspect(key);};
  const onReuse=async(r:JourneyReuse)=>{const token=++reuseRequest.current;try{const e=await readJourneyDetail(r.snapshot_id);if(token!==reuseRequest.current)return;const m=e.messages.find(m=>m.activity_key===r.activity_key);if(!m)return;setFilters({...EMPTY_CATALOG_FILTERS,context:messageContextKeys(m)[0]});setGlobalFilters({canais:[],parceiros:[],segmentos:[],subgrupos:[],jornadas:[]});setView('flow');setSecondaryOpen(false);if(e.id===id)setSelected(r.activity_key);else{pendingReuse.current=r.activity_key;setId(e.id);}}catch(e){if(token===reuseRequest.current)setError((e as Error).message);}};
  const exportJourney=async(kind:'png'|'pdf')=>{if(!entry||!manifest||!layout.value)return;exportAbort.current=new AbortController();setExporting('Preparando recursos…');try{const module=await import('./journeyExport');await module.exportJourney({entry,manifest,layout:layout.value,compact,scope:exportScope,highlight:path,period:{start,end},context:filters.context,segment:filters.segment,kind,onProgress:setExporting,signal:exportAbort.current.signal});}catch(e){setError((e as Error).name==='AbortError'?'Exportação cancelada.':(e as Error).message);}finally{setExporting('');}};
- const journeyOptions:CountOption[]=rows.map(r=>({value:r.name,label:`${r.name} · ${dateLabel(r.lastActivity)}`,count:1}));
+ const journeyOptions:CountOption[]=rows.map(r=>({value:r.name,label:`${r.name} · execução ${dateLabel(r.lastActivity)} · pack ${received(r.latest.import_id)?new Date(received(r.latest.import_id)!).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}):'não informado'}`,count:1}));
  const allCounts=rows.length,filterCount=Object.values(filters.facets).filter(v=>v&&v!=='all').length+(filters.status!=='all'?1:0)+(filters.onlyActive?1:0);
  const reader=selected&&entry&&manifest&&entry.messages.find(m=>m.activity_key===selected)?<CommunicationInspector entry={entry} manifest={manifest} meta={entry.messages.find(m=>m.activity_key===selected)!} node={layout.value?.nodes.find(n=>n.key===selected)} context={filters.context} segment={filters.segment} onClose={close} onSelect={inspect} onReuse={onReuse}/>:null;
  const workspace=<section ref={root} data-journey-flow className={`relative flex shrink-0 flex-col bg-slate-50 ${expanded?'fixed inset-0 z-[95]':''} ${isFull?'overflow-auto':'overflow-visible'}`} style={{height:flow?size.height:isFull?'var(--screen-h,100vh)':'auto',minHeight:flow?size.height:500}}>
@@ -96,7 +102,7 @@ export function JourneyFlowView(){
  {bu==='Plurix'||pending?<div><p className={LABEL}>Parceiro / público</p><div aria-label="Parceiro / público" aria-disabled="true" className={LOCKED}>{pending?'A revisar':'N/A'}</div></div>:<JourneyCountSelect label={bu==='B2C'?'Público / origem':'Parceiro / público'} value={audience===ALL_AUDIENCES?'':audience} onChange={selectAudience} options={counts('parceiro')} total={allCounts} allLabel={global.parceiros?.length>1?'Públicos selecionados':bu==='B2C'?'Todos os públicos':'Todos os parceiros'} disabled={directoryLoading}/>}
  <JourneyCountSelect label="Segmento" value={filters.segment} onChange={selectSegment} options={counts('segmento')} total={allCounts} allLabel={global.segmentos?.length>1?'Segmentos selecionados':'Todos os segmentos'} disabled={directoryLoading}/>
  <JourneyCountSelect label="Jornada" value={journeyName} onChange={name=>{if(!name){backToCatalog();setId('');return;}const r=rows.find(r=>r.name===name);if(r)openJourney(r);}} options={journeyOptions} total={allCounts} allLabel="Buscar no catálogo" disabled={directoryLoading} wide/>
- <label className="min-w-0"><p className={LABEL}>Versão do pack</p><select aria-label="Versão do pack" value={id} disabled={!journeyName} onChange={e=>{setId(e.target.value);setView('flow');}} className={`${FIELD} px-2 text-slate-700 disabled:bg-slate-100`}><option value="" disabled>Automática</option>{versions.map(j=><option key={j.id} value={j.id}>v{j.journey_version} · {new Date(j.created_at).toLocaleDateString('pt-BR')}</option>)}</select></label>
+ <label className="min-w-0"><p className={LABEL}>Versão da jornada / ingestão</p><select aria-label="Versão do pack" value={id} disabled={!journeyName} onChange={e=>{setId(e.target.value);setView('flow');}} className={`${FIELD} px-2 text-slate-700 disabled:bg-slate-100`}><option value="" disabled>Automática</option>{versions.map(j=><option key={j.id} value={j.id}>v{j.journey_version} · pack {received(j.import_id)?new Date(received(j.import_id)!).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}):'data não informada'}</option>)}</select></label>
  </div>
  {secondaryOpen&&<div className="mt-2 grid grid-cols-2 items-end gap-2 border-t border-dashed border-slate-200 pt-2 md:grid-cols-4 xl:grid-cols-7">
  <label className="col-span-2 min-w-0 md:col-span-1"><p className={LABEL}>Busca</p><input aria-label="Buscar jornada ou comunicação" value={filters.search} onChange={e=>update({search:e.target.value})} placeholder="Jornada, Activity Name ou ID" className={`${FIELD} px-2.5 outline-cyan-600`}/></label>

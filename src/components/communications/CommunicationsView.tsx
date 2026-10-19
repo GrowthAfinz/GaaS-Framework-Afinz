@@ -1,3 +1,5 @@
+import {SfmcIngestionHistory} from './SfmcIngestionHistory';
+import {useAppStore} from '../../store/useAppStore';
 import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardCheck, Inbox, LayoutTemplate, Loader2, Upload, type LucideIcon } from 'lucide-react';
 import { useReconciliation, type OrphanRow } from '../../hooks/useReconciliation';
@@ -33,6 +35,8 @@ export const CommunicationsView: React.FC<CommunicationsViewProps> = ({ mode }) 
 };
 
 const CadastroTemplates: React.FC = () => {
+  const linkTarget=useAppStore(s=>s.communicationLinkTarget);
+  const clearLinkTarget=useAppStore(s=>s.setCommunicationLinkTarget);
   const [packageOpen, setPackageOpen] = useState(false);
   const [catalogRevision, setCatalogRevision] = useState(0);
   const [tab, setTab] = useState<SubTab>('fila');
@@ -81,10 +85,12 @@ const CadastroTemplates: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
+        <SfmcIngestionHistory alertsOnly/>
         {error && <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
 
         {loading && <p role="status" className="mb-3 flex items-center gap-2 text-sm text-slate-600"><Loader2 size={14} className="animate-spin" aria-hidden="true"/>Atualizando os disparos do período…</p>}
         <>
+            {linkTarget&&<div className="mb-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm"><p className="font-semibold">Vincular atividade da Performance</p><p className="mt-1 break-all text-xs">{linkTarget.journey} · {linkTarget.activity} · {linkTarget.channel}</p><p className="mt-1 text-xs">{linkTarget.ids.length} execuções selecionadas. O período global foi preservado.</p><button className="mt-2 text-xs text-cyan-800 underline" onClick={()=>{clearLinkTarget(null);useAppStore.getState().setTab('comunicacoes-performance');}}>Voltar à Performance</button><button className="ml-4 text-xs underline" onClick={()=>clearLinkTarget(null)}>Limpar seleção</button></div>}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl bg-gradient-to-r from-teal-950 to-cyan-800 px-5 py-4 text-sm text-white" aria-label="Resumo da fila no período">
               <span className="text-xs font-semibold uppercase tracking-wide text-white/80">No período</span>
               <span><strong className="text-lg">{summary?.pending ?? '…'}</strong> a revisar</span>
