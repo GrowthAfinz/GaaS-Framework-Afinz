@@ -1,3 +1,4 @@
+import { buildSfmcExport, type SfmcExportOptions } from '../domain/sfmcExport';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { createPortal } from 'react-dom';
 import { SfmcEnvelopeGuide } from './SfmcEnvelopeGuide';
@@ -45,7 +46,6 @@ import { blockSentinel, injectBlockAnchors, type AnchorBlockSpec } from '../amps
 import {
   applyFix,
   emptyBriefingRow,
-  exportBriefingCsv,
   parseBriefingCsv,
   parseBriefingDate,
   templateActiveColumns,
@@ -590,8 +590,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
       segment: group.representative.__meta.segment,
       weekKey: group.representative.__meta.weekKey,
       rowCount: group.visibleRows.length,
+      dynamicHeaderRows: group.visibleRows.filter(row => row.HEADER_TITULO?.trim()).length,
+      usesDynamicHeader: group.visibleRows.some(row => {
+        const source = templateSlots.find(slot => slot.id === (row.__meta.templateSlotId || effectivePrincipalId))?.source ?? savedTemplate;
+        return /Field\s*\(\s*@Row\s*,\s*["']HEADER_TITULO["']\s*\)/i.test(source);
+      }),
+      incompleteHeaderRows: group.visibleRows.filter(row => !row.HEADER_TITULO?.trim() || !row.HEADER_IMAGEM_CARTAO?.trim()).length,
       hasErrors: group.hasErrors,
-    })), [editorialGroups]);
+    })), [editorialGroups, templateSlots, effectivePrincipalId, savedTemplate]);
   const exportableWeekCount = useMemo(() => new Set(exportGroups.filter((group) => !group.hasErrors)
     .map((group) => weekKeyFor(group.partner, group.segment, group.weekKey))).size, [exportGroups]);
   const exportBlockReason = !rows.length
@@ -626,7 +632,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     if (!activeRows.length) { setAnnouncement(exportBlockReason || 'Nada para exportar.'); return; }
     setExportOpen(true);
   };
-  const confirmExport = (weekKeys: Set<string>, filename: string) => {
+  const confirmExport = (weekKeys: Set<string>, filename: string, options: SfmcExportOptions) => {
     const exportRows = rows.filter((row) => row.__meta.status !== 'archived'
       && weekKeys.has(weekKeyFor(row.__meta.partner, row.__meta.segment, row.__meta.weekKey)));
     if (!exportRows.length) { setAnnouncement('Selecione ao menos uma semana sem pendências para exportar.'); return; }
@@ -641,9 +647,19 @@ export const DynamicEmailWorkspace: React.FC = () => {
       setAnnouncement(`Exporte uma régua por vez: ${[...collisions[0][1]].join(' e ')} usam a mesma chave do SFMC (${collisions[0][0]}${collisions.length > 1 ? ` e mais ${collisions.length - 1}` : ''}).`);
       return;
     }
-    downloadText(filename, exportBriefingCsv(onlyCsvRows(exportRows)));
+    let csv: string;
+    try {
+      csv = buildSfmcExport(onlyCsvRows(exportRows), options);
+    } catch (error) {
+      setAnnouncement(error instanceof Error ? error.message : 'Não foi possível preparar o CSV.');
+      return;
+    }
+    downloadText(filename, csv);
     setAnnouncement(`${filename} gerado com ${exportRows.length} ${exportRows.length === 1 ? 'linha' : 'linhas'} de ${weekKeys.size} ${weekKeys.size === 1 ? 'semana' : 'semanas'}.`);
-    void recordExport(filename, exportRows, []);
+    void recordExport(filename, exportRows, [
+      ...(options.campaignType.trim() ? [`TP_CAMPANHA no CSV: ${options.campaignType.trim()}`] : []),
+      ...(options.requireDynamicHeader ? ['Header dinâmico V13 conferido.'] : []),
+    ]);
     setExportOpen(false);
   };
   const onFile = async (file?: File) => {

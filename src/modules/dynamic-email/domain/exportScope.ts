@@ -20,6 +20,9 @@ export type ExportGroupInput = {
   /** Linhas que entram no CSV (assinaturas incluídas). */
   rowCount: number;
   hasErrors: boolean;
+  dynamicHeaderRows?: number;
+  usesDynamicHeader?: boolean;
+  incompleteHeaderRows?: number;
 };
 
 type Totals = { emails: number; rows: number; blockedEmails: number };

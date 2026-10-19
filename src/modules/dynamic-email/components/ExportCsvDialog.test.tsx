@@ -78,3 +78,16 @@ describe('ExportCsvDialog', () => {
     expect(html).toContain('Nenhuma régua ativa para exportar.');
   });
 });
+
+it('explicita cobertura do header e a campanha sem preencher conteúdo ausente', () => {
+  const html = render({ groups: [group('Plurix', 1, { rowCount: 6, dynamicHeaderRows: 2, incompleteHeaderRows: 4 })] });
+  expect(html).toContain('2 de 6 linhas com título do header dinâmico');
+  expect(html).toContain('Exigir header dinâmico V13');
+  expect(html).toContain('Tipo de campanha no arquivo');
+});
+
+it('bloqueia baixar quando o template V13 exige header e as linhas estão vazias', () => {
+  const html = render({ groups: [group('Plurix', 1, { rowCount: 6, usesDynamicHeader: true, dynamicHeaderRows: 0, incompleteHeaderRows: 6 })] });
+  expect(html).toContain('6 linhas sem título ou imagem do cartão');
+  expect(html).toMatch(/disabled=""[^>]*>.*?Baixar CSV/);
+});

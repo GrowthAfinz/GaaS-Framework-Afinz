@@ -1,3 +1,4 @@
+import type { SfmcExportOptions } from '../domain/sfmcExport';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, Download, RotateCcw, ShieldAlert, TriangleAlert } from 'lucide-react';
 import {
@@ -11,7 +12,7 @@ type Props = {
   today: string;
   segmentLabel?: (segment: string) => string;
   onClose: () => void;
-  onConfirm: (weekKeys: Set<string>, filename: string) => void;
+  onConfirm: (weekKeys: Set<string>, filename: string, options: SfmcExportOptions) => void;
 };
 
 /** Checkbox com o estado indeterminado real do DOM (não dá para expressar em JSX). */
@@ -55,6 +56,12 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
   // Inicializa já com a sugestão: esperar o efeito faria o campo piscar vazio.
   const [filename, setFilename] = useState(suggested);
   const [renamed, setRenamed] = useState(false);
+  const [campaignType, setCampaignType] = useState('');
+  const [requireDynamicHeader, setRequireDynamicHeader] = useState(() => groups.some(group => group.usesDynamicHeader || (group.dynamicHeaderRows ?? 0) > 0));
+  const selectedGroups = groups.filter(group => selection.has([group.partner || 'Sem parceiro', group.segment || 'Sem segmento', group.weekKey || 'Sem semana'].join('|||')));
+  const dynamicHeaders = selectedGroups.reduce((sum, group) => sum + (group.dynamicHeaderRows ?? 0), 0);
+  const incompleteHeaders = selectedGroups.reduce((sum, group) => sum + (group.incompleteHeaderRows ?? group.rowCount), 0);
+  const headerBlocked = requireDynamicHeader && incompleteHeaders > 0;
   // Aviso antes do download: o wizard do SFMC esquece essas opções a cada importação.
   const [importTipsOpen, setImportTipsOpen] = useState(false);
   useEffect(() => { if (!renamed) setFilename(suggested); }, [suggested, renamed]);
@@ -200,10 +207,21 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
           {blockedWeeks.length} {blockedWeeks.length === 1 ? 'semana está travada' : 'semanas estão travadas'} por pendência bloqueante e {blockedWeeks.length === 1 ? 'não entra' : 'não entram'} no arquivo.
         </p>}
 
+        <div className="mt-3 space-y-2 rounded-lg border border-slate-200 p-3 text-xs">
+          <label className="block font-semibold">Tipo de campanha no arquivo (TP_CAMPANHA)
+            <input aria-label="Tipo de campanha no arquivo" value={campaignType} onChange={event => setCampaignType(event.target.value)} placeholder="Manter o valor de cada briefing" className="mt-1 block w-full rounded border border-slate-300 px-2 py-1.5" />
+          </label>
+          <p>Use o tipo de campanha configurado no motor do SFMC, por exemplo CRM. A escolha vale apenas para o CSV.</p>
+          <p>{dynamicHeaders} de {totals.rows} linhas com título do header dinâmico. Sem título, o template usa a imagem antiga de HEADER.</p>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={requireDynamicHeader} onChange={event => setRequireDynamicHeader(event.target.checked)} />Exigir header dinâmico V13</label>
+          <p>V13: título e imagem do cartão obrigatórios neste export; subtítulo e logo do parceiro opcionais. As 41 colunas são incluídas no CSV.</p>
+          {headerBlocked && <p role="alert" className="text-red-700">{incompleteHeaders} linhas sem título ou imagem do cartão. Preencha o briefing antes de baixar.</p>}
+        </div>
+
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button>
           <button
-            type="button" disabled={!totals.weeks}
+            type="button" disabled={!totals.weeks || headerBlocked}
             onClick={() => setImportTipsOpen(true)}
             className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white outline-none transition hover:bg-[#064446] focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
           ><Download size={15}/>Baixar CSV</button>
@@ -246,8 +264,8 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={() => setImportTipsOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Voltar</button>
             <button
-              type="button" autoFocus
-              onClick={() => { setImportTipsOpen(false); onConfirm(new Set(selection), finalName); }}
+              type="button" autoFocus disabled={!totals.weeks || headerBlocked}
+              onClick={() => { setImportTipsOpen(false); onConfirm(new Set(selection), finalName, { campaignType, requireDynamicHeader }); }}
               className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white outline-none transition hover:bg-[#064446] focus-visible:ring-2 focus-visible:ring-cyan-500"
             ><Download size={15}/>Entendi, baixar CSV</button>
           </div>
