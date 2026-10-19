@@ -22,6 +22,7 @@ const sql = readFileSync(
   "utf8",
 );
 await db.exec(sql);
+await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_approved_proposal_auto_attribution.sql')),'utf8'));
 const origin = (
   await db.query(
     "insert into sfmc_package_imports(source_scope,sfmc_bu) values('Afinz','Afinz') returning id",
@@ -73,6 +74,11 @@ await db.exec(
   "update communication_templates set status='active' where template_id='new_piece'",
 );
 assert.equal(await linked(pending), "new_piece");
+// Approving a newly governed ID without af_sub3 resolves existing usages immediately.
+const noId=(await db.query('insert into sfmc_package_messages(import_id,payload) values($1,$2) returning id',[origin,JSON.stringify({journey_name:'JOR_AQS_TEST',activity_name:'no_id',content:{channel:'E-mail'},utm:{},is_optout:false})])).rows[0].id;
+await db.query("insert into communications_reconciliation_proposals(message_id,status,proposed_template_id) values($1,'ready','piece')",[noId]);
+const beforeApproval=await activity('no_id');assert.equal(await linked(beforeApproval),null);
+await db.query("update communications_reconciliation_proposals set status='applied' where message_id=$1",[noId]);assert.equal(await linked(beforeApproval),'piece');
 // A new conflicting pack suspends future matching and preserves old links.
 await message("known", "other");
 const blocked = await activity("known");
