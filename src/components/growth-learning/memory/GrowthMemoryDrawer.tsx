@@ -1,3 +1,4 @@
+import { openGrowthAiContext } from '../growthLearningNavigation';
 import React, { useEffect, useState } from 'react';
 import { BookMarked, CalendarClock, Database, GitBranch, ShieldCheck, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -77,7 +78,7 @@ export const GrowthMemoryDrawer: React.FC<GrowthMemoryDrawerProps> = ({ learning
             </div>
             <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
           </div>
-        </header>
+        <button type="button" onClick={()=>openGrowthAiContext('Avaliar aplicabilidade e fontes deste registro: '+learning.source_title)} className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">Consultar contexto e trabalhar com IA</button></header>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
           <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5">

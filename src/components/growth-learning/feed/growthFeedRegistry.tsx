@@ -103,7 +103,7 @@ export const GROWTH_FEED_CARD_REGISTRY: Record<GrowthFeedEventType, GrowthFeedCa
     iconBackground: 'bg-violet-100 text-violet-700',
   },
   learning_revised: {
-    label: 'Memória revisada',
+    label: 'Registro revisado',
     icon: History,
     accent: 'border-l-blue-500',
     badge: 'bg-blue-50 text-blue-700 border-blue-200',

@@ -44,6 +44,7 @@ export function isGrowthLearningView(search: string): boolean {
 
 export function readGrowthLearningSection(search: string): GrowthLearningSection {
   const section = new URLSearchParams(search).get('section');
+  if (section === 'records') return 'memory';
   if (section === 'results') return 'vault';
   return section && SECTION_SET.has(section) ? section as GrowthLearningSection : 'feed';
 }
@@ -63,6 +64,7 @@ export function buildGrowthLearningSearch(
 ): string {
   const params = new URLSearchParams(currentSearch);
   params.set('view', 'learning');
+  if(section !== 'vault'){params.delete('wiki_ai');params.delete('ai_objective');}
   params.set('section', section);
   params.delete('item');
   clearContextParams(params);
@@ -100,6 +102,7 @@ export function readGrowthLearningItem(search: string): string | null {
 export function buildGrowthLearningItemSearch(itemId: string | null, currentSearch: string): string {
   const params = new URLSearchParams(currentSearch);
   params.set('view', 'learning');
+  params.delete('wiki_ai');params.delete('ai_objective');
   params.set('section', 'feed');
   if (itemId) params.set('item', itemId);
   else params.delete('item');
@@ -115,6 +118,7 @@ export function buildGrowthLearningSectionItemSearch(
 ): string {
   const params = new URLSearchParams(currentSearch);
   params.set('view', 'learning');
+  if(section !== 'vault'){params.delete('wiki_ai');params.delete('ai_objective');}
   params.set('section', section);
   if (itemId) params.set('item', itemId);
   else params.delete('item');
@@ -220,6 +224,7 @@ export function buildGrowthBetSourceContextSearch(
 ): string {
   const params = new URLSearchParams(currentSearch);
   params.set('view', 'learning');
+  params.delete('wiki_ai');params.delete('ai_objective');
   params.set('section', 'bets');
   params.delete('item');
   params.set('create', CONTEXT_ACTION);
@@ -258,6 +263,7 @@ export function completeGrowthBetSourceContext(betId: string): void {
   const params = new URLSearchParams(window.location.search);
   clearContextParams(params);
   params.set('view', 'learning');
+  params.delete('wiki_ai');params.delete('ai_objective');
   params.set('section', 'bets');
   params.set('item', betId);
   const nextUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
@@ -269,4 +275,11 @@ export function openReportsOutput(): void {
   if (typeof window === 'undefined') return;
   if (!hasGrowthLearningRouteContext(window.location.search)) return;
   updateBrowserSearch(buildReportsOutputSearch(window.location.search));
+}
+
+/** Opens the existing Wiki collaboration surface; stable section IDs preserve old links. */
+export function openGrowthAiContext(objective: string) {
+  const params=new URLSearchParams(window.location.search);
+  params.set('view','learning');params.set('section','vault');params.set('wiki_ai','1');params.set('ai_objective',objective.slice(0,4000));params.delete('item');
+  window.history.pushState({},'',window.location.pathname+'?'+params);window.dispatchEvent(new PopStateEvent('popstate'));
 }
