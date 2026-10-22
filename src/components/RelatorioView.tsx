@@ -42,7 +42,9 @@ import { ColumnsCustomizer } from './relatorio/ColumnsCustomizer';
 import { GroupBySelector } from './relatorio/GroupBySelector';
 import { fmtN, fmtPct, fmtPct4, fmtBRL, formatMetric } from './relatorio/reportFormatters';
 import { AggregateTable } from './relatorio/AggregateTable';
-import { DetailTable } from './relatorio/DetailTable';
+import { DetailTable, type DetailTableRow } from './relatorio/DetailTable';
+import { ActivityCommunicationPreview } from './communications/previews/ActivityCommunicationPreview';
+import { rowCommunicationContext, toActivityRow } from '../utils/activityCommunicationContext';
 import { activityMatchesFrente } from '../utils/activityFrente';
 
 interface RelatorioViewProps {
@@ -55,6 +57,7 @@ interface RelatorioViewProps {
 }
 
 interface DetailRow {
+  sourceActivity: Activity;
   date: Date;
   jornada: string;
   activityName: string;
@@ -137,45 +140,6 @@ function downloadBlob(blob: Blob, filename: string): void {
 
 const HIGHLIGHT_COLS_HEADER = `font-bold whitespace-nowrap text-slate-900`;
 const HIGHLIGHT_CELL = `font-semibold text-slate-800`;
-
-// Mapeia Activity → ActivityRow para o detalhe do disparo (função pura).
-const toActivityRow = (a: Activity): ActivityRow => ({
-  id: a.id,
-  prog_gaas: false,
-  status: (a.status as ActivityRow['status']) ?? 'Enviado',
-  created_at: '',
-  updated_at: '',
-  BU: a.bu as ActivityRow['BU'],
-  jornada: a.jornada ?? '',
-  'Activity name / Taxonomia': a.id,
-  Canal: a.canal,
-  'Data de Disparo': a.dataDisparo ? format(a.dataDisparo, 'yyyy-MM-dd') : '',
-  'Data Fim': '',
-  Segmento: a.segmento ?? '',
-  Parceiro: a.parceiro,
-  Oferta: a.oferta,
-  Promocional: a.promocional,
-  Produto: (a.raw as Record<string, unknown>)?.['Produto'] as string | undefined,
-  'Oferta 2': (a.raw as Record<string, unknown>)?.['Oferta 2'] as string | undefined,
-  'Promocional 2': (a.raw as Record<string, unknown>)?.['Promocional 2'] as string | undefined,
-  'Etapa de aquisição': (a.raw as Record<string, unknown>)?.['Etapa de aquisição'] as string | undefined,
-  'Perfil de Crédito': (a.raw as Record<string, unknown>)?.['Perfil de Crédito'] as string | undefined,
-  'Ordem de disparo': a.ordemDisparo,
-  'Horário de Disparo': (a.raw as Record<string, unknown>)?.['Horário de Disparo'] as string | undefined,
-  'Base Total': a.kpis.baseEnviada,
-  'Base Acionável': a.kpis.baseEntregue,
-  'Taxa de Entrega': a.kpis.taxaEntrega,
-  'Taxa de Proposta': a.kpis.taxaPropostas,
-  'Taxa de Aprovação': a.kpis.taxaAprovacao,
-  'Taxa de Finalização': a.kpis.taxaFinalizacao,
-  'Taxa de Conversão': a.kpis.taxaConversao,
-  'Taxa de Abertura': a.kpis.taxaAbertura,
-  Propostas: a.kpis.propostas,
-  Aprovados: a.kpis.aprovados,
-  'Cartões Gerados': a.kpis.cartoes ?? a.kpis.emissoes,
-  CAC: a.kpis.cac,
-  'Custo Total Campanha': a.kpis.custoTotal,
-});
 
 const CANAL_COLORS: Record<string, string> = {
   'WhatsApp': 'bg-emerald-50 text-emerald-600 border-emerald-100',
@@ -389,6 +353,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
         dispDate.setHours(0, 0, 0, 0);
         const aguardando = baseEnviada === 0 && dispDate >= d3Cutoff;
         return {
+          sourceActivity: a,
           date: a.dataDisparo,
           jornada: a.jornada || '',
           activityName: a.id,
@@ -559,12 +524,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     handleSort(key as keyof DetailRow);
   }, [handleSort]);
 
-  const handleDetailRowClick = useCallback((activityName: string) => {
-    const act = allActivities.find((a: Activity) => a.id === activityName);
-    if (act) {
-      setSelectedActivityRow(toActivityRow(act));
-    }
-  }, [allActivities]);
+  const handleDetailRowClick = useCallback((row: DetailTableRow) => {
+    setSelectedActivityRow(toActivityRow(row.sourceActivity));
+    setShowFullTable(false);
+  }, []);
 
   const segmentColorMap = useMemo(() => {
     const map = new Map<string, (typeof SEGMENT_PALETTE)[0]>();
@@ -1256,6 +1219,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 </div>
                 <p className="text-sm font-mono text-slate-700 break-all">{a['Activity name / Taxonomia']}</p>
                 {a.jornada && <p className="text-xs text-slate-400 mt-0.5">{a.jornada}</p>}
+              </div>
+
+              <div className="border-b border-slate-100 px-5 py-3">
+                <ActivityCommunicationPreview context={rowCommunicationContext(a)} />
               </div>
 
               {/* KPI summary */}

@@ -7,9 +7,10 @@ import {getSignedUrl} from '../../../services/communicationService';
 // das imagens, então a prévia fiel é a do template; ela não certifica o que foi enviado.
 const cache=new Map<string,Promise<string>>();
 export const isHtmlTemplate=(t?:CommunicationTemplate|null)=>!!t?.original_path&&(t.mime_type==='text/html'||/\.html?$/i.test(t.original_path));
-const loadHtml=(path:string)=>{
- if(!cache.has(path))cache.set(path,getSignedUrl(path).then(u=>fetch(u)).then(r=>{if(!r.ok)throw Error(String(r.status));return r.text();}).catch(e=>{cache.delete(path);throw e;}));
- return cache.get(path)!;
+const loadHtml=(path:string,version:string)=>{
+ const key=JSON.stringify([path,version]);
+ if(!cache.has(key))cache.set(key,getSignedUrl(path).then(u=>fetch(u,{cache:'no-store'})).then(r=>{if(!r.ok)throw Error(String(r.status));return r.text();}).catch(e=>{cache.delete(key);throw e;}));
+ return cache.get(key)!;
 };
 const reset='<style>html,body{margin:0!important;background:#fff;}</style>';
 const withReset=(html:string)=>/<head[^>]*>/i.test(html)?html.replace(/<head([^>]*)>/i,`<head$1>${reset}`):reset+html;
@@ -17,7 +18,8 @@ const withReset=(html:string)=>/<head[^>]*>/i.test(html)?html.replace(/<head([^>
 export function useTemplateHtml(template?:CommunicationTemplate|null) {
  const [html,setHtml]=useState<string|null>(null),[failed,setFailed]=useState(false);
  const path=isHtmlTemplate(template)?template!.original_path!:null;
- useEffect(()=>{let active=true;setHtml(null);setFailed(false);if(path)loadHtml(path).then(h=>{if(active)setHtml(withReset(h));}).catch(()=>{if(active)setFailed(true);});return()=>{active=false;};},[path]);
+ const version=template?.content_hash||template?.updated_at||'';
+ useEffect(()=>{let active=true;setHtml(null);setFailed(false);if(path)loadHtml(path,version).then(h=>{if(active)setHtml(withReset(h));}).catch(()=>{if(active)setFailed(true);});return()=>{active=false;};},[path,version]);
  return {html,failed,loading:!!path&&!html&&!failed};
 }
 

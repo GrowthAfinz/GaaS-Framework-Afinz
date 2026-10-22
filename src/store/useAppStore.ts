@@ -68,8 +68,8 @@ interface AppState {
     // Deep-link transitório entre abas de Comunicações (Cadastro → Performance do Conteúdo)
     performanceUiState: {view:'overview'|'gallery'|'table';scope:'all'|'linked'|'unlinked'|'library';filters:Record<string,string>;query:string}|null;
     setPerformanceUiState: (value:{view:'overview'|'gallery'|'table';scope:'all'|'linked'|'unlinked'|'library';filters:Record<string,string>;query:string})=>void;
-    communicationLinkTarget: {journey:string;activity:string;channel:string;ids:string[]} | null;
-    setCommunicationLinkTarget: (target:{journey:string;activity:string;channel:string;ids:string[]}|null)=>void;
+    communicationLinkTarget: {journey:string;activity:string;channel:string;ids:string[];returnTab?:ViewSettings['abaAtual']} | null;
+    setCommunicationLinkTarget: (target:{journey:string;activity:string;channel:string;ids:string[];returnTab?:ViewSettings['abaAtual']}|null)=>void;
     perfDeepLink: { view: 'overview' | 'gallery' | 'table'; query: string } | null;
     setPerfDeepLink: (dl: { view: 'overview' | 'gallery' | 'table'; query: string } | null) => void;
 

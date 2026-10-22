@@ -5,6 +5,8 @@ import { deriveActivityMetrics, aggregateMetrics } from '../../utils/activityMet
 import { useAppStore } from '../../store/useAppStore';
 import { useExplorerStore } from '../../store/explorerStore';
 import { getDailyFunnelSteps, isRentabilizacao } from '../../constants/funnelConfig';
+import { ActivityCommunicationPreview } from '../communications/previews/ActivityCommunicationPreview';
+import { activityCommunicationContext, communicationContextKey } from '../../utils/activityCommunicationContext';
 
 interface DailyDetailsModalProps {
     date: Date | null;
@@ -258,7 +260,7 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
 
                         return (
                             <div
-                                key={activity.id}
+                                key={communicationContextKey(activityCommunicationContext(activity))}
                                 className={`bg-white border border-slate-200 border-l-4 ${style.ring} rounded-xl p-4 transition hover:shadow-md`}
                             >
                                 {/* Linha 1: título + dimensões + ações */}
@@ -308,6 +310,10 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
                                             </button>
                                         )}
                                     </div>
+                                </div>
+
+                                <div className="mb-3">
+                                    <ActivityCommunicationPreview context={activityCommunicationContext(activity)} />
                                 </div>
 
                                 {/* Linha 2: funil (por frente) */}
