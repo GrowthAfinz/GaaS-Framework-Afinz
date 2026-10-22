@@ -384,7 +384,7 @@ function App() {
         onContentMouseEnter={scheduleCloseFilterDrop}
         isFilterDropOpen={isFilterDropOpen}
       >
-      {hasData && (
+      {hasData && activeTab !== 'aprendizado-growth' && (
         <div className="sticky top-0 z-30" ref={filterShellRef}>
           <div
             className={`

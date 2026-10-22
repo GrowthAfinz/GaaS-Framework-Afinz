@@ -1,3 +1,4 @@
+import { openGrowthAiContext } from '../growthLearningNavigation';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowLeft, BookMarked, CalendarDays, Check, Circle, Database, History, Loader2, MessageSquarePlus, Plus, ShieldCheck, Target, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -164,7 +165,7 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
               <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
             </div>
           </div>
-        </header>
+        <button type="button" onClick={()=>openGrowthAiContext('Revisar esta aposta, suas evidências e conhecimento relacionado: '+bet.hypothesis)} className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">Consultar contexto e trabalhar com IA</button></header>
 
         <div className="flex-1 space-y-7 overflow-y-auto px-5 py-6 sm:px-6">
           <section>
@@ -186,9 +187,9 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
           </section>
 
           <section>
-            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500"><BookMarked size={15} /> Memória consultada</h3>
+            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500"><BookMarked size={15} /> Registros consultados</h3>
             <div className="mt-3 space-y-3">
-              {learningApplications.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Nenhuma memória específica foi aplicável no momento desta aposta.</p> : learningApplications.map((application) => (
+              {learningApplications.length === 0 ? <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Nenhum registro específico foi aplicável no momento desta aposta.</p> : learningApplications.map((application) => (
                 <article key={application.id} className={`rounded-2xl border p-4 ${application.decision === 'reused' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs font-black text-slate-900">{application.source_title}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${application.decision === 'reused' ? 'bg-emerald-700 text-white' : 'bg-slate-700 text-white'}`}>{application.decision === 'reused' ? 'Reutilizada' : 'Descartada'}</span></div>
                   <p className="mt-2 text-sm leading-6 text-slate-700">{application.statement}</p>

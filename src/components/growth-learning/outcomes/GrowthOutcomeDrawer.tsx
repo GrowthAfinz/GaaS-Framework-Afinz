@@ -1,3 +1,4 @@
+import { openGrowthAiContext } from '../growthLearningNavigation';
 import React, { useEffect, useState } from "react";
 import {
   AlertCircle,
@@ -150,7 +151,7 @@ export const GrowthOutcomeDrawer: React.FC<Props> = ({
               <X size={20} />
             </button>
           </div>
-        </header>
+        <button type="button" onClick={()=>openGrowthAiContext('Revisar esta verificação de resultado e suas limitações: '+outcome.hypothesis)} className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">Consultar contexto e trabalhar com IA</button></header>
 
         <div className="flex-1 space-y-7 overflow-y-auto px-5 py-6 sm:px-6">
           <section>

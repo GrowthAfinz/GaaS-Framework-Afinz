@@ -35,8 +35,8 @@ export const GrowthMemoryView: React.FC<GrowthMemoryViewProps> = ({ onCountChang
       setLearnings(data); onCountChange?.(data.length);
     } catch (loadError) {
       console.error('Growth memory could not be loaded', loadError);
-      setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a memória.');
-      onCountChange?.(0);
+      setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os registros.');
+
     } finally { setLoading(false); }
   }, [onCountChange]);
 
@@ -58,25 +58,25 @@ export const GrowthMemoryView: React.FC<GrowthMemoryViewProps> = ({ onCountChang
   const visible = useMemo(() => filterGrowthMemory(learnings, filters), [filters, learnings]);
   const summary = useMemo(() => summarizeGrowthMemory(learnings), [learnings]);
 
-  if (loading) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-slate-200 bg-white"><span className="flex items-center gap-2 text-sm font-semibold text-slate-500"><Loader2 size={18} className="animate-spin" /> Lendo memória versionada…</span></div>;
-  if (error) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-rose-200 bg-rose-50 px-6 text-center"><div><AlertCircle size={30} className="mx-auto text-rose-600" /><h3 className="mt-3 font-black text-rose-900">A memória não pôde ser carregada</h3><p className="mt-2 text-sm text-rose-800">{error}</p><button type="button" onClick={() => void load()} className="mx-auto mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-900 px-4 py-2 text-xs font-bold text-white"><RefreshCw size={14} /> Tentar novamente</button></div></div>;
+  if (loading) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-slate-200 bg-white"><span className="flex items-center gap-2 text-sm font-semibold text-slate-500"><Loader2 size={18} className="animate-spin" /> Lendo registros…</span></div>;
+  if (error) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-rose-200 bg-rose-50 px-6 text-center"><div><AlertCircle size={30} className="mx-auto text-rose-600" /><h3 className="mt-3 font-black text-rose-900">Os registros não puderam ser carregados</h3><p className="mt-2 text-sm text-rose-800">{error}</p><button type="button" onClick={() => void load()} className="mx-auto mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-900 px-4 py-2 text-xs font-bold text-white"><RefreshCw size={14} /> Tentar novamente</button></div></div>;
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-col gap-4 border border-slate-200 bg-white px-4 py-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
-        <div><div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-700"><BookMarked size={15} /> Memória reutilizável</div><p className="mt-1 text-xs text-slate-500">{visible.length} de {learnings.length} aprendizados neste recorte</p></div>
-        <div className="flex flex-1 flex-col gap-2 xl:max-w-4xl xl:flex-row xl:items-center">
-        <label className="relative min-w-0 flex-1">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div><div className="flex items-center gap-2 text-sm font-semibold text-slate-800"><BookMarked size={15} /> Registros reutilizáveis</div><p className="mt-1 text-xs text-slate-500">{visible.length} de {learnings.length} registros nos filtros locais</p></div>
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-3 lg:max-w-4xl">
+        <label className="relative min-w-0 md:col-span-3 lg:col-span-3">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Buscar afirmação, escopo, regime ou fonte" className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100" />
+          <input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} aria-label="Buscar registros" placeholder="Buscar afirmação, escopo, regime ou fonte" className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100" />
         </label>
-        <select aria-label="Filtrar origem da memória" value={filters.source} onChange={(event) => setFilters((current) => ({ ...current, source: event.target.value as GrowthMemoryFilters['source'] }))} className={selectClass}>
-          <option value="all">Todas as origens</option><option value="outcome">Validadas pelo loop</option><option value="vault_curated">Curadas do vault</option>
+        <select aria-label="Filtrar origem dos registros" value={filters.source} onChange={(event) => setFilters((current) => ({ ...current, source: event.target.value as GrowthMemoryFilters['source'] }))} className={selectClass}>
+          <option value="all">Todas as origens</option><option value="outcome">Validadas por resultado</option><option value="vault_curated">Curadas do vault</option>
         </select>
-        <select aria-label="Filtrar frente da memória" value={filters.front} onChange={(event) => setFilters((current) => ({ ...current, front: event.target.value as GrowthMemoryFilters['front'] }))} className={selectClass}>
+        <select aria-label="Filtrar frente dos registros" value={filters.front} onChange={(event) => setFilters((current) => ({ ...current, front: event.target.value as GrowthMemoryFilters['front'] }))} className={selectClass}>
           <option value="all">Todas as frentes</option>{Object.entries(MEMORY_FRONT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <select aria-label="Filtrar classificação da memória" value={filters.classification} onChange={(event) => setFilters((current) => ({ ...current, classification: event.target.value as GrowthMemoryFilters['classification'] }))} className={selectClass}>
+        <select aria-label="Filtrar classificação dos registros" value={filters.classification} onChange={(event) => setFilters((current) => ({ ...current, classification: event.target.value as GrowthMemoryFilters['classification'] }))} className={selectClass}>
           <option value="all">Todas as classificações</option>{Object.entries(MEMORY_CLASSIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         </div>
@@ -85,15 +85,15 @@ export const GrowthMemoryView: React.FC<GrowthMemoryViewProps> = ({ onCountChang
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
         <span className="mr-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Base de conhecimento</span>
         <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"><BookMarked size={13} /> {summary.total} ativas</span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><ShieldCheck size={13} /> {summary.validated} validadas pelo loop</span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><ShieldCheck size={13} /> {summary.validated} validadas por resultado</span>
         <span className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700"><DatabaseZap size={13} /> {summary.curated} curadas do vault</span>
         <span className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold ${summary.reviewDue ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-500'}`}><History size={13} /> {summary.reviewDue} revisões vencidas</span>
       </div>
 
       {visible.length === 0 ? (
-        <div className="grid min-h-[300px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center"><div><BookMarked size={32} className="mx-auto text-slate-300" /><h3 className="mt-3 font-black text-slate-800">Nenhuma memória nesse recorte</h3><p className="mt-2 text-sm text-slate-500">Ajuste a busca ou os filtros. O sistema não cria aprendizados fictícios para preencher a tela.</p></div></div>
+        <div className="grid min-h-[300px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center"><div><BookMarked size={32} className="mx-auto text-slate-300" /><h3 className="mt-3 font-black text-slate-800">Nenhum registro encontrado</h3><p className="mt-2 text-sm text-slate-500">Ajuste a busca ou os filtros. O sistema não cria aprendizados fictícios para preencher a tela.</p></div></div>
       ) : (
-        <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="hidden grid-cols-[1.45fr_.55fr_.7fr_.45fr_.35fr_.45fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 lg:grid">
             <span>Aprendizado</span><span>Origem</span><span>Escopo</span><span>Validade</span><span>Reuso</span><span>Revisão</span>
           </div>

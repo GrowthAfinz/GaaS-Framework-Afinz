@@ -52,7 +52,7 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
     } catch (loadError) {
       console.error('Growth feed could not be loaded', loadError);
       setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a fila.');
-      onCountChange?.(0);
+
     } finally {
       setLoading(false);
     }
@@ -173,10 +173,10 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-col gap-4 border border-slate-200 bg-white px-4 py-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-700">
-            <Inbox size={15} /> Fila sistêmica
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <Inbox size={15} /> O que precisa de atenção
           </div>
           <p className="mt-1 text-xs text-slate-500">
             {format(periodStart, 'dd MMM', { locale: ptBR })} — {format(periodEnd, 'dd MMM yyyy', { locale: ptBR })} · {visibleGroups.length} de {groups.length} sinais agrupados
@@ -308,7 +308,7 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
         </div>
       ) : (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(390px,.75fr)] lg:items-start">
-          <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="hidden grid-cols-[minmax(0,1.7fr)_minmax(150px,.9fr)_110px_92px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-slate-400 md:grid"><span>Sinal</span><span>Impacto</span><span>Confiança</span><span className="text-right">Tempo</span></div>
             <div>
               {visibleGroups.map((group) => (

@@ -71,7 +71,7 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
           ? loadError.message
           : "Não foi possível carregar outcomes.",
       );
-      onCountChange?.(0);
+
     } finally {
       setLoading(false);
     }
@@ -131,10 +131,10 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-col gap-4 border border-slate-200 bg-white px-4 py-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-cyan-700">
-            <CircleGauge size={15} /> Agenda de outcomes
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <CircleGauge size={15} /> Verificação de resultados
           </div>
           <p className="mt-1 text-xs text-slate-500">
             {filtered.length} de {outcomes.length} verificações nesta leitura
@@ -147,13 +147,13 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               className="h-10 min-w-0 flex-1 text-xs outline-none"
-              placeholder="Buscar hipótese, métrica ou time"
+              aria-label="Buscar hipótese, métrica ou time" placeholder="Buscar hipótese, métrica ou time"
             />
           </label>
           <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">
             <Filter size={13} /> Filtros
           </span>
-          <select
+          <select aria-label="Frente"
             value={front}
             onChange={(event) => setFront(event.target.value)}
             className={selectClass}
@@ -163,7 +163,7 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
             <option value="paid_media">Mídia Paga</option>
             <option value="b2c_origin">Originação B2C</option>
           </select>
-          <select
+          <select aria-label="Estado da verificação"
             value={bucket}
             onChange={(event) => setBucket(event.target.value as typeof bucket)}
             className={selectClass}
@@ -225,7 +225,7 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1050px] text-left">
               <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">

@@ -1,7 +1,7 @@
 import { GrowthLearning, GrowthMemoryFilters } from './growthMemory.types';
 
 export const MEMORY_SOURCE_LABELS = {
-  outcome: 'Validado pelo loop',
+  outcome: 'Validado por resultado',
   vault_curated: 'Curado do vault',
 } as const;
 
