@@ -10,7 +10,7 @@ import { GrowthLearning, GrowthMemoryFilters } from './growthMemory.types';
 
 interface GrowthMemoryViewProps { onCountChange?: (count: number) => void; }
 
-const selectClass = 'rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 shadow-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100';
+const selectClass = 'rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-medium text-slate-700 shadow-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100';
 
 function formatDate(value: string) {
   try { return format(parseISO(value), 'dd MMM yyyy', { locale: ptBR }); } catch { return value; }
@@ -58,13 +58,13 @@ export const GrowthMemoryView: React.FC<GrowthMemoryViewProps> = ({ onCountChang
   const visible = useMemo(() => filterGrowthMemory(learnings, filters), [filters, learnings]);
   const summary = useMemo(() => summarizeGrowthMemory(learnings), [learnings]);
 
-  if (loading) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-slate-200 bg-white"><span className="flex items-center gap-2 text-sm font-semibold text-slate-500"><Loader2 size={18} className="animate-spin" /> Lendo registros…</span></div>;
-  if (error) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-rose-200 bg-rose-50 px-6 text-center"><div><AlertCircle size={30} className="mx-auto text-rose-600" /><h3 className="mt-3 font-black text-rose-900">Os registros não puderam ser carregados</h3><p className="mt-2 text-sm text-rose-800">{error}</p><button type="button" onClick={() => void load()} className="mx-auto mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-900 px-4 py-2 text-xs font-bold text-white"><RefreshCw size={14} /> Tentar novamente</button></div></div>;
+  if (loading) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-slate-200 bg-white"><span className="flex items-center gap-2 text-sm font-medium text-slate-500"><Loader2 size={18} className="animate-spin" /> Lendo registros…</span></div>;
+  if (error) return <div className="grid min-h-[420px] place-items-center rounded-2xl border border-rose-200 bg-rose-50 px-6 text-center"><div><AlertCircle size={30} className="mx-auto text-rose-600" /><h3 className="mt-3 font-medium text-rose-900">Os registros não puderam ser carregados</h3><p className="mt-2 text-sm text-rose-800">{error}</p><button type="button" onClick={() => void load()} className="mx-auto mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-900 px-4 py-2 text-xs font-medium text-white"><RefreshCw size={14} /> Tentar novamente</button></div></div>;
 
   return (
     <section className="space-y-3">
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div><div className="flex items-center gap-2 text-sm font-semibold text-slate-800"><BookMarked size={15} /> Registros reutilizáveis</div><p className="mt-1 text-xs text-slate-500">{visible.length} de {learnings.length} registros nos filtros locais</p></div>
+        <div><div className="flex items-center gap-2 text-sm font-medium text-slate-800"><BookMarked size={15} /> Registros reutilizáveis</div><p className="mt-1 text-xs text-slate-500">{visible.length} de {learnings.length} registros nos filtros locais</p></div>
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 md:grid-cols-3 lg:max-w-4xl">
         <label className="relative min-w-0 md:col-span-3 lg:col-span-3">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -83,29 +83,29 @@ export const GrowthMemoryView: React.FC<GrowthMemoryViewProps> = ({ onCountChang
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
-        <span className="mr-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Base de conhecimento</span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"><BookMarked size={13} /> {summary.total} ativas</span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700"><ShieldCheck size={13} /> {summary.validated} validadas por resultado</span>
-        <span className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700"><DatabaseZap size={13} /> {summary.curated} curadas do vault</span>
-        <span className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold ${summary.reviewDue ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-500'}`}><History size={13} /> {summary.reviewDue} revisões vencidas</span>
+        <span className="mr-1 text-[10px] font-medium uppercase tracking-[0.06em] text-slate-400">Base de conhecimento</span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700"><BookMarked size={13} /> {summary.total} ativas</span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700"><ShieldCheck size={13} /> {summary.validated} validadas por resultado</span>
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700"><DatabaseZap size={13} /> {summary.curated} curadas do vault</span>
+        <span className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium ${summary.reviewDue ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-500'}`}><History size={13} /> {summary.reviewDue} revisões vencidas</span>
       </div>
 
       {visible.length === 0 ? (
-        <div className="grid min-h-[300px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center"><div><BookMarked size={32} className="mx-auto text-slate-300" /><h3 className="mt-3 font-black text-slate-800">Nenhum registro encontrado</h3><p className="mt-2 text-sm text-slate-500">Ajuste a busca ou os filtros. O sistema não cria aprendizados fictícios para preencher a tela.</p></div></div>
+        <div className="grid min-h-[300px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center"><div><BookMarked size={32} className="mx-auto text-slate-300" /><h3 className="mt-3 font-medium text-slate-800">Nenhum registro encontrado</h3><p className="mt-2 text-sm text-slate-500">Ajuste a busca ou os filtros. O sistema não cria aprendizados fictícios para preencher a tela.</p></div></div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="hidden grid-cols-[1.45fr_.55fr_.7fr_.45fr_.35fr_.45fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 lg:grid">
+          <div className="hidden grid-cols-[1.45fr_.55fr_.7fr_.45fr_.35fr_.45fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-[10px] font-medium uppercase tracking-[0.06em] text-slate-400 lg:grid">
             <span>Aprendizado</span><span>Origem</span><span>Escopo</span><span>Validade</span><span>Reuso</span><span>Revisão</span>
           </div>
           <div className="divide-y divide-slate-100">
             {visible.map((learning) => (
               <button key={learning.id} type="button" onClick={() => { setSelected(learning); openGrowthLearningItem(learning.id); }} className={`grid w-full gap-3 px-5 py-3 text-left transition-colors hover:bg-cyan-50/50 lg:grid-cols-[1.45fr_.55fr_.7fr_.45fr_.35fr_.45fr] lg:items-center lg:gap-4 ${selected?.id === learning.id ? 'bg-cyan-50/70' : ''}`}>
-                <div><div className="text-sm font-black text-slate-900">{learning.source_title}</div><p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{learning.statement}</p><span className="mt-2 inline-block text-[10px] font-bold uppercase tracking-[0.1em] text-cyan-700">{MEMORY_FRONT_LABELS[learning.front]}</span></div>
-                <span className={`w-fit rounded-full border px-2.5 py-1 text-[10px] font-black ${learning.source_kind === 'outcome' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-violet-200 bg-violet-50 text-violet-700'}`}>{MEMORY_SOURCE_LABELS[learning.source_kind]}</span>
-                <span className="text-xs text-slate-600"><strong className="block text-slate-700">{scopeLabel(learning.scope)}</strong>{learning.regime && <span className="mt-1 block text-[10px] text-slate-400">{learning.regime}</span>}</span>
-                <span className="text-xs font-bold text-slate-700">{learning.valid_until ? formatDate(learning.valid_until) : 'Vigente'}</span>
-                <span className="text-xs font-bold text-slate-700">{learning.reused_count}×</span>
-                <span className={`text-xs font-semibold ${learning.review_due ? 'text-amber-700' : 'text-slate-500'}`}>{formatDate(learning.review_at)}</span>
+                <div><div className="text-sm font-medium text-slate-900">{learning.source_title}</div><p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{learning.statement}</p><span className="mt-2 inline-block text-[10px] font-medium uppercase tracking-[0.05em] text-cyan-700">{MEMORY_FRONT_LABELS[learning.front]}</span></div>
+                <span className={`w-fit rounded-full border px-2.5 py-1 text-[10px] font-medium ${learning.source_kind === 'outcome' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-violet-200 bg-violet-50 text-violet-700'}`}>{MEMORY_SOURCE_LABELS[learning.source_kind]}</span>
+                <span className="text-xs text-slate-600"><span className="block font-normal text-slate-700">{scopeLabel(learning.scope)}</span>{learning.regime && <span className="mt-1 block text-[10px] text-slate-400">{learning.regime}</span>}</span>
+                <span className="text-xs font-medium text-slate-700">{learning.valid_until ? formatDate(learning.valid_until) : 'Vigente'}</span>
+                <span className="text-xs font-medium text-slate-700">{learning.reused_count}×</span>
+                <span className={`text-xs font-medium ${learning.review_due ? 'text-amber-700' : 'text-slate-500'}`}>{formatDate(learning.review_at)}</span>
               </button>
             ))}
           </div>

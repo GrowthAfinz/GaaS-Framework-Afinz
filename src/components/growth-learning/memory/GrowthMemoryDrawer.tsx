@@ -32,11 +32,11 @@ const Facts: React.FC<{ title: string; value: Record<string, unknown> }> = ({ ti
   if (items.length === 0) return null;
   return (
     <section>
-      <h3 className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{title}</h3>
+      <h3 className="text-xs font-medium uppercase tracking-[0.06em] text-slate-500">{title}</h3>
       <dl className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
         {items.map(([key, item]) => (
           <div key={key}>
-            <dt className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">{key.split('_').join(' ')}</dt>
+            <dt className="text-[10px] font-medium uppercase tracking-[0.05em] text-slate-400">{key.split('_').join(' ')}</dt>
             <dd className="mt-1 break-words text-sm leading-5 text-slate-700">{renderValue(item)}</dd>
           </div>
         ))}
@@ -70,15 +70,15 @@ export const GrowthMemoryDrawer: React.FC<GrowthMemoryDrawerProps> = ({ learning
             <div className="flex min-w-0 items-start gap-3">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><BookMarked size={20} /></span>
               <div>
-                <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-500">
+                <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-500">
                   <span>{MEMORY_SOURCE_LABELS[learning.source_kind]}</span><span>·</span><span>{MEMORY_FRONT_LABELS[learning.front]}</span>
                 </div>
-                <h2 className="mt-1 text-xl font-black leading-snug text-slate-900">{learning.source_title}</h2>
+                <h2 className="mt-1 text-xl font-medium leading-snug text-slate-900">{learning.source_title}</h2>
               </div>
             </div>
             <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button>
           </div>
-        <button type="button" onClick={()=>openGrowthAiContext('Avaliar aplicabilidade e fontes deste registro: '+learning.source_title)} className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">Consultar contexto e trabalhar com IA</button></header>
+        <button type="button" onClick={()=>openGrowthAiContext('Avaliar aplicabilidade e fontes deste registro: '+learning.source_title)} className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-medium text-cyan-800">Consultar contexto e trabalhar com IA</button></header>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
           <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5">
@@ -86,16 +86,16 @@ export const GrowthMemoryDrawer: React.FC<GrowthMemoryDrawerProps> = ({ learning
           </section>
 
           <section>
-            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500"><ShieldCheck size={15} /> Vigência e confiança</h3>
+            <h3 className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.06em] text-slate-500"><ShieldCheck size={15} /> Vigência e confiança</h3>
             <dl className="mt-3 grid gap-4 rounded-2xl border border-slate-200 p-4 sm:grid-cols-2">
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Classificação</dt><dd className="mt-1 text-sm font-bold text-slate-800">{MEMORY_CLASSIFICATION_LABELS[learning.classification]}</dd></div>
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Confiança</dt><dd className="mt-1 text-sm text-slate-700">{learning.confidence_status}</dd></div>
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Válido desde</dt><dd className="mt-1 text-sm text-slate-700">{formatDate(learning.valid_from)}</dd></div>
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Revisar em</dt><dd className={`mt-1 text-sm font-bold ${learning.review_due ? 'text-amber-700' : 'text-slate-700'}`}>{formatDate(learning.review_at)}{learning.review_due ? ' · revisão vencida' : ''}</dd></div>
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Regime</dt><dd className="mt-1 text-sm text-slate-700">{learning.regime || 'Não especificado'}</dd></div>
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Revisão atual</dt><dd className="mt-1 text-sm text-slate-700">v{learning.current_revision}</dd></div>
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Decisões de reuso</dt><dd className="mt-1 text-sm text-slate-700">{learning.reused_count} reutilizada(s) · {learning.discarded_count} descartada(s)</dd></div>
-              <div><dt className="text-[10px] font-black uppercase text-slate-400">Taxa de reuso</dt><dd className="mt-1 text-sm text-slate-700">{learning.reuse_rate === null ? 'Ainda sem decisões' : `${Math.round(learning.reuse_rate * 100)}%`}</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Classificação</dt><dd className="mt-1 text-sm font-medium text-slate-800">{MEMORY_CLASSIFICATION_LABELS[learning.classification]}</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Confiança</dt><dd className="mt-1 text-sm text-slate-700">{learning.confidence_status}</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Válido desde</dt><dd className="mt-1 text-sm text-slate-700">{formatDate(learning.valid_from)}</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Revisar em</dt><dd className={`mt-1 text-sm font-medium ${learning.review_due ? 'text-amber-700' : 'text-slate-700'}`}>{formatDate(learning.review_at)}{learning.review_due ? ' · revisão vencida' : ''}</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Regime</dt><dd className="mt-1 text-sm text-slate-700">{learning.regime || 'Não especificado'}</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Revisão atual</dt><dd className="mt-1 text-sm text-slate-700">v{learning.current_revision}</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Decisões de reuso</dt><dd className="mt-1 text-sm text-slate-700">{learning.reused_count} reutilizada(s) · {learning.discarded_count} descartada(s)</dd></div>
+              <div><dt className="text-[10px] font-medium uppercase text-slate-400">Taxa de reuso</dt><dd className="mt-1 text-sm text-slate-700">{learning.reuse_rate === null ? 'Ainda sem decisões' : `${Math.round(learning.reuse_rate * 100)}%`}</dd></div>
             </dl>
           </section>
 
@@ -104,21 +104,21 @@ export const GrowthMemoryDrawer: React.FC<GrowthMemoryDrawerProps> = ({ learning
           <Facts title="Limitações" value={learning.limitations} />
 
           <section>
-            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500"><Database size={15} /> Procedência</h3>
+            <h3 className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.06em] text-slate-500"><Database size={15} /> Procedência</h3>
             <div className="mt-3 rounded-2xl border border-slate-200 p-4">
-              <p className="text-sm font-bold text-slate-800">{learning.source_title}</p>
+              <p className="text-sm font-medium text-slate-800">{learning.source_title}</p>
               <p className="mt-2 break-all font-mono text-[11px] leading-5 text-slate-500">{learning.source_ref}</p>
               <p className="mt-2 text-xs text-slate-500">Origem: {MEMORY_SOURCE_LABELS[learning.source_kind]} · Chave: {learning.source_key}</p>
             </div>
           </section>
 
           <section>
-            <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-slate-500"><GitBranch size={15} /> Histórico de revisões</h3>
+            <h3 className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.06em] text-slate-500"><GitBranch size={15} /> Histórico de revisões</h3>
             <div className="mt-3 space-y-3">
               {revisions.map((revision) => (
                 <article key={revision.id} className="rounded-2xl border border-slate-200 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-black text-slate-800">Revisão {revision.revision}</span>
+                    <span className="text-xs font-medium text-slate-800">Revisão {revision.revision}</span>
                     <span className="text-[11px] text-slate-400">{formatDate(revision.created_at)}</span>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-700">{revision.change_reason}</p>
@@ -131,7 +131,7 @@ export const GrowthMemoryDrawer: React.FC<GrowthMemoryDrawerProps> = ({ learning
 
         <footer className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-4 text-xs text-slate-500">
           <span className="inline-flex items-center gap-2"><CalendarClock size={14} /> Alterações são versionadas fora do editor do GaaS.</span>
-          <button type="button" onClick={onClose} className="rounded-xl bg-slate-900 px-4 py-2.5 font-bold text-white">Concluir leitura</button>
+          <button type="button" onClick={onClose} className="rounded-xl bg-slate-900 px-4 py-2.5 font-medium text-white">Concluir leitura</button>
         </footer>
       </aside>
     </div>
