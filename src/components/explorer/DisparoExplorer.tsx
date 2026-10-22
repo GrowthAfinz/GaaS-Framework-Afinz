@@ -24,6 +24,7 @@ import { DetailsPane } from './details/DetailsPane';
 import { QuickSearch } from './search/QuickSearch';
 import { DisparoDetailModal } from './disparo/DisparoDetailModal';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
+import { activityCommunicationContext } from '../../utils/activityCommunicationContext';
 
 interface DisparoExplorerProps {
   onNavigateToFramework?: (filters?: { bu?: string; segmento?: string; jornada?: string }) => void;
@@ -71,6 +72,8 @@ export const DisparoExplorer: React.FC<DisparoExplorerProps> = ({ onNavigateToFr
       return {
         id: a.id,
         ...a.raw,
+        template_id: activityCommunicationContext(a).templateId,
+        'Activity name / Taxonomia': activityCommunicationContext(a).activityName,
         BU: a.bu || a.raw.BU,
         Segmento: a.segmento || a.raw.Segmento,
         jornada: a.jornada || a.raw.jornada || a.raw.Jornada,

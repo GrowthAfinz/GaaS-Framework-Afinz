@@ -1,6 +1,8 @@
 import React from 'react';
 import { X, FileText } from 'lucide-react';
 import { FrameworkRow } from '../../types/framework';
+import { ActivityCommunicationPreview } from '../communications/previews/ActivityCommunicationPreview';
+import { rowCommunicationContext } from '../../utils/activityCommunicationContext';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -98,6 +100,7 @@ export const DetailPanel: React.FC<DetailPanelProps> = ({ row, allColumns, onClo
 
             {/* Panel Content */}
             <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+                <ActivityCommunicationPreview context={rowCommunicationContext(row)} />
                 {METRIC_SECTIONS.map(section => {
                     const entries = section.keys.map(k => ({ key: k, val: (row as Record<string, unknown>)[k] }));
                     const hasValues = entries.some(e => {

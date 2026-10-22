@@ -8,6 +8,8 @@ import {
 } from './reportColumnsConfig';
 import { formatMetric } from './reportFormatters';
 import { SegmentLabel } from './segmentLabels';
+import type { Activity } from '../../types/framework';
+import { activityCommunicationContext, communicationContextKey } from '../../utils/activityCommunicationContext';
 
 const HIGHLIGHT_BORDER = '#7CD7DD';
 const HIGHLIGHT_BG = '#F4FBFC';
@@ -31,6 +33,7 @@ const PARCEIRO_COLORS: Record<string, string> = {
 type SegmentColor = { bg: string; border: string; text: string };
 
 export interface DetailTableRow {
+  sourceActivity: Activity;
   date: Date;
   jornada: string;
   activityName: string;
@@ -101,7 +104,7 @@ interface DetailTableProps {
   onSaveDescription: (activityName: string) => void;
   applyGlobalSegmentFilter: (segmento: string) => void;
   applyGlobalCanalFilter: (canal: string) => void;
-  onRowClick: (activityName: string) => void;
+  onRowClick: (row: DetailTableRow) => void;
   summary: DetailSummary;
   destaqueFilter: string | null;
   /** Renderização janelada para listas grandes — exige container com altura definida. */
@@ -160,7 +163,7 @@ interface DetailRowProps {
   onSaveDescription: (activityName: string) => void;
   applyGlobalSegmentFilter: (segmento: string) => void;
   applyGlobalCanalFilter: (canal: string) => void;
-  onRowClick: (activityName: string) => void;
+  onRowClick: (row: DetailTableRow) => void;
   /** Altura fixa da linha — mantém o cálculo de virtualização preciso. */
   rowHeight: number;
 }
@@ -263,7 +266,7 @@ const DetailRowComponent: React.FC<DetailRowProps> = ({
     <tr
       className={`border-t border-slate-100 hover:bg-slate-50 cursor-pointer ${isBanded ? 'bg-slate-50/40' : 'bg-white'}`}
       style={{ height: rowHeight }}
-      onClick={() => onRowClick(row.activityName)}
+      onClick={() => onRowClick(row)}
       title="Clique para ver detalhes do disparo"
     >
       <td className={`px-2 py-1.5 font-semibold whitespace-nowrap tabular-nums text-xs ${leadBg} ${leadText} ${color?.border ?? ''}`}>
@@ -471,7 +474,7 @@ const DetailTableComponent: React.FC<DetailTableProps> = ({
             const idx = startIndex + i;
             return (
               <DetailRow
-                key={`${row.date.toISOString()}-${row.activityName}`}
+                key={communicationContextKey(activityCommunicationContext(row.sourceActivity))}
                 row={row}
                 isBanded={idx % 2 !== 0}
                 color={segmentColorMap.get(row.segmento)}

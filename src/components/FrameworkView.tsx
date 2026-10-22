@@ -13,6 +13,7 @@ import { useVersionManager } from '../hooks/useVersionManager';
 import { SaveVersionModal } from './SaveVersionModal';
 import { VersionHistoryDrawer } from './VersionHistoryDrawer';
 import { BU_CONFIG, CANAL_EMOJI, METRIC_SECTIONS, KNOWN_KEYS, DetailPanel } from './framework/FrameworkDetailPanel';
+import { activityCommunicationContext } from '../utils/activityCommunicationContext';
 
 const DISPLAY_COLS: { key: string; label: string; cls: string }[] = [
     { key: 'Jornada', label: 'Jornada', cls: 'min-w-[200px]' },
@@ -108,6 +109,7 @@ export const FrameworkView: React.FC = () => {
             return (activities as Activity[]).map(a => {
                 const row: any = { 
                     ...a.raw,
+                    template_id: activityCommunicationContext(a).templateId,
                     'Activity name / Taxonomia': a.id,
                     'Data de Disparo': format(a.dataDisparo, 'yyyy-MM-dd'),
                     'BU': a.bu,

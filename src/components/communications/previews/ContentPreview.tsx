@@ -19,13 +19,18 @@ export function useResolvedAsset(res: PreviewResolution): AssetState {
   useEffect(()=>{let alive=true;setRecovered({state:res.visualOrigin?'loading':'none',key:originKey});if(res.visualOrigin)readJourneyMessage(res.visualOrigin.snapshot_id,res.visualOrigin.occurrence_key).then(m=>{if(alive)setRecovered({state:'ready',content:m.content,key:originKey});}).catch(()=>{if(alive)setRecovered({state:'error',key:originKey});});return()=>{alive=false;};},[originKey]);
   const [image, setImage] = useState<AssetState>({ state: 'none' });
   const isImage = res.kind === 'catalog_image' && !!res.assetPath;
+  const imageVersion = res.template?.content_hash || res.template?.updated_at || '';
   useEffect(() => {
     let alive = true;
     if (!isImage) { setImage({ state: 'none' }); return () => { alive = false; }; }
     setImage({ state: 'loading' });
-    cachedSignedUrl(res.assetPath!).then((url) => { if (alive) setImage({ state: 'ready', url }); }).catch(() => { if (alive) setImage({ state: 'error' }); });
+    cachedSignedUrl(res.assetPath!).then((signedUrl) => {
+      const url = new URL(signedUrl);
+      if (imageVersion) url.searchParams.set('preview_version', imageVersion);
+      if (alive) setImage({ state: 'ready', url: url.toString() });
+    }).catch(() => { if (alive) setImage({ state: 'error' }); });
     return () => { alive = false; };
-  }, [isImage, res.assetPath]);
+  }, [isImage, res.assetPath, imageVersion]);
   const email = useTemplateHtml(res.kind === 'catalog_html' ? res.template : null);
   if(res.visualOrigin)return recovered.key===originKey?recovered:{state:'loading'};
   if (res.kind === 'catalog_html') return email.html ? { state: 'ready', html: email.html } : email.failed ? { state: 'error' } : { state: 'loading' };

@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { ActivityRow, ActivityStatus } from '../../../types/activity';
 import { activityService } from '../../../services/activityService';
+import { ActivityCommunicationPreview } from '../../communications/previews/ActivityCommunicationPreview';
+import { rowCommunicationContext } from '../../../utils/activityCommunicationContext';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const TEAL = '#00C6CC';
@@ -530,6 +532,7 @@ export const DisparoDetailModal: React.FC<DisparoDetailModalProps> = ({ activity
         >
           {/* Coluna 1 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <ActivityCommunicationPreview context={rowCommunicationContext(a)} />
             <Section icon={Calendar} title="Identificação & Agendamento" accentColor="#3B82F6">
               {renderFields(F_IDENT)}
             </Section>
