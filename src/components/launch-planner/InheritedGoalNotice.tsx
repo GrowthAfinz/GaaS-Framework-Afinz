@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
-import { ArrowRight, Check, History, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, Check, Clock3, History, Loader2, X } from 'lucide-react';
 import { Goal } from '../../types/framework';
 import { useAppStore } from '../../store/useAppStore';
 import { formatMonthKey } from '../../utils/goalCarryForward';
 import { BU_ANALYTICS_PROFILES } from './buAnalyticsProfiles';
+import { useAuth } from '../../context/AuthContext';
+import {
+    GOAL_NOTICE_SNOOZE_MS, inheritedGoalNoticeKey, isGoalNoticeHidden,
+    readGoalNoticePreference, saveGoalNoticePreference, type GoalNoticePreference,
+} from '../../utils/inheritedGoalNoticePreference';
 
 interface InheritedGoalNoticeProps {
     goal: Goal;
@@ -12,13 +17,58 @@ interface InheritedGoalNoticeProps {
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export const InheritedGoalNotice: React.FC<InheritedGoalNoticeProps> = ({ goal }) => {
+    const { user } = useAuth();
+    const preferenceKey = inheritedGoalNoticeKey(goal, user?.id ?? null);
+    return <ScopedInheritedGoalNotice key={preferenceKey} goal={goal} preferenceKey={preferenceKey} persist={!!user} />;
+};
+
+const noticeStorage = (): Storage | null => {
+    try { return window.localStorage; } catch { return null; }
+};
+
+const ScopedInheritedGoalNotice: React.FC<InheritedGoalNoticeProps & { preferenceKey: string; persist: boolean }> = ({ goal, preferenceKey, persist }) => {
     const goals = useAppStore((state) => state.goals);
     const setGoals = useAppStore((state) => state.setGoals);
     const setTab = useAppStore((state) => state.setTab);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [preference, setPreference] = useState<GoalNoticePreference | null>(() =>
+        readGoalNoticePreference(persist ? noticeStorage() : null, preferenceKey));
+    const [now, setNow] = useState(Date.now);
 
-    if (!goal.herdada_de) return null;
+    useEffect(() => {
+        const refresh = () => {
+            setNow(Date.now());
+            if (persist) setPreference(readGoalNoticePreference(noticeStorage(), preferenceKey));
+        };
+        const storageChanged = (event: StorageEvent) => {
+            if (event.key === preferenceKey || event.key === null) refresh();
+        };
+        window.addEventListener('focus', refresh);
+        window.addEventListener('storage', storageChanged);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            window.removeEventListener('focus', refresh);
+            window.removeEventListener('storage', storageChanged);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, [persist, preferenceKey]);
+
+    useEffect(() => {
+        if (preference?.kind !== 'snoozed') return;
+        const remaining = preference.until - Date.now();
+        if (remaining <= 0) return;
+        const timer = window.setTimeout(() => setNow(Date.now()), Math.min(remaining, GOAL_NOTICE_SNOOZE_MS));
+        return () => window.clearTimeout(timer);
+    }, [preference, now]);
+
+    const hideNotice = (next: GoalNoticePreference) => {
+        saveGoalNoticePreference(persist ? noticeStorage() : null, preferenceKey, next);
+        setPreference(next);
+        setNow(Date.now());
+    };
+
+    if (!goal.herdada_de || isGoalNoticeHidden(preference, now)) return null;
 
     const targetLabel = capitalize(formatMonthKey(goal.mes));
     const sourceLabel = formatMonthKey(goal.herdada_de);
@@ -68,8 +118,18 @@ export const InheritedGoalNotice: React.FC<InheritedGoalNoticeProps> = ({ goal }
             className="relative overflow-hidden rounded-lg border border-amber-200/80 bg-gradient-to-br from-white via-amber-50/40 to-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)]"
         >
             <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-400 to-amber-500" />
+            <button
+                type="button"
+                aria-label="Fechar aviso de meta herdada"
+                title="Fechar aviso para estas metas"
+                disabled={saving}
+                onClick={() => hideNotice({ kind: 'dismissed' })}
+                className="absolute right-2 top-2 rounded-md p-1.5 text-slate-400 hover:bg-amber-100 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 disabled:opacity-60"
+            >
+                <X size={15} aria-hidden="true" />
+            </button>
 
-            <div className="flex items-start gap-3 pl-1">
+            <div className="flex items-start gap-3 pl-1 pr-6">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-4 ring-amber-50">
                     <History size={15} />
                 </div>
@@ -115,6 +175,15 @@ export const InheritedGoalNotice: React.FC<InheritedGoalNoticeProps> = ({ goal }
                         >
                             {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                             Confirmar metas
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => hideNotice({ kind: 'snoozed', until: Date.now() + GOAL_NOTICE_SNOOZE_MS })}
+                            disabled={saving}
+                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-amber-50 hover:text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600 disabled:opacity-60"
+                        >
+                            <Clock3 size={12} aria-hidden="true" />
+                            Lembrar mais tarde <span className="font-normal text-slate-400">(24h)</span>
                         </button>
                         <button
                             type="button"
