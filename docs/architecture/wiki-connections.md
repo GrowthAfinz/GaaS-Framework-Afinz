@@ -8,6 +8,8 @@ Cada aresta representa uma referencia dirigida entre duas notas ativas. Referenc
 
 A visualizacao local mostra um ou dois niveis de vizinhanca em ambas as direcoes. O acervo completo inclui notas isoladas. Busca e assunto filtram os pontos e suas arestas, preservando a metrica global de tamanho. Selecao exibe metadados e referencias recebidas/emitidas antes de abrir o leitor. Os parametros `wiki_graph_*` preservam o recorte ao alternar entre mapa e leitura e permitem compartilhar a URL.
 
-O layout deterministico e calculado ao mudar o recorte, sem animacao continua. Zoom, arraste e navegacao por teclado oferecem exploracao; uma lista alternativa permite selecionar notas sem depender do SVG. Atualizar mapa refaz a leitura dos vinculos.
+O renderizador Sigma.js usa WebGL e e carregado sob demanda. O layout ForceAtlas2 usa Barnes-Hut e roda em um Web Worker com 220 iteracoes finitas; a interface nao executa a simulacao. Os ultimos oito layouts ficam em cache na sessao. Selecao e movimento de camera nao recriam o grafo nem recalculam suas posicoes. O worker e o renderizador sao encerrados ao sair ou trocar o recorte.
+
+O acesso e um botao discreto Conexoes no cabecalho. Busca e filtros ocupam uma unica faixa. O mapa tem altura entre 300 e 480px e enquadramento automatico. Os detalhes aparecem apenas na selecao; legenda e lista alternativa sao expansiveis. A paleta por assunto usa jade, azul, ametista, verde, ambar, rosa e azul acinzentado. Labels sao regulados por densidade e zoom para evitar sobreposicao. Na ausencia de WebGL, a lista continua disponivel. Atualizar mapa refaz a leitura dos vinculos.
 
 Validacao: testes de deduplicacao, referencias invalidas, vizinhanca, filtros, URL, layout, paginacao e consistencia de sincronizacao em `src/components/vault/graph/*.test.ts`.
