@@ -1,3 +1,4 @@
+import { WikiConnections } from './graph/WikiConnections';
 import { KnowledgeWorkspace } from './knowledge/KnowledgeWorkspace';
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronLeft, ChevronRight, Copy, ExternalLink, FileText, FolderOpen, Home, Link2, LoaderCircle, Menu, RefreshCw, Search, X } from 'lucide-react';
@@ -46,6 +47,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const [choices, setChoices] = useState<VaultNoteSummary[]>([]);
   const [retry, setRetry] = useState(0);
   const [routeVersion, setRouteVersion] = useState(0);
+  const graphMode=new URLSearchParams(window.location.search).get('wiki_view')==='connections';
   const folderInput = useRef<HTMLInputElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const reader = useRef<HTMLElement>(null);
@@ -76,6 +78,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     const destination=catalog.find(note=>note.id===id);
     if(catalogContext)writeCatalogRoute(params,catalogContext);
     else if(destination?.tags.includes('growth-assunto'))writeCatalogRoute(params,subjectRoute(destination));
+    params.delete('wiki_view');
     const search = buildGrowthLearningSectionItemSearch('vault', id, params.toString());
     window.history.pushState({}, '', `${window.location.pathname}${search}${fragment ? `#${encodeURIComponent(fragment)}` : ''}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
@@ -174,6 +177,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   };
 
   useEffect(() => {
+    if(graphMode){setReaderLoading(false);return;}
     if (!selectedId) { setSelected(null); setBacklinks([]); setReaderError(null); setReaderLoading(false); readerPage.current = null; return; }
     let active = true;
     setReaderLoading(true); setReaderError(null);
@@ -191,10 +195,10 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
         else { setBacklinks([]); setNotice('A nota abriu, mas as referências relacionadas não puderam ser carregadas.'); }
       }).finally(() => { if (active) setReaderLoading(false); });
     return () => { active = false; };
-  }, [selectedId, retry]);
+  }, [selectedId, retry, graphMode]);
 
   useEffect(() => {
-    if (!selected || readerLoading) return;
+    if (graphMode || !selected || readerLoading) return;
     const frame = window.requestAnimationFrame(() => {
       const fragment = decodeURIComponent(window.location.hash.slice(1));
       if (fragment) {
@@ -205,7 +209,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
       readerPage.current = selected.id;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [selected, readerLoading, selectedId, routeVersion]);
+  }, [selected, readerLoading, selectedId, routeVersion, graphMode]);
 
   const openTarget = (target: string) => {
     const [path, ...fragments] = target.split('#');
@@ -283,24 +287,26 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
               return <a href={realHref} target={meta.internal ? undefined : '_blank'} rel={meta.internal ? undefined : 'noopener noreferrer'} className="font-medium text-cyan-700 underline decoration-cyan-300 underline-offset-2 hover:text-cyan-900" onClick={event => { if (meta.internal) { event.preventDefault(); openTarget(meta.target); } }}>{label}{!meta.internal && <ExternalLink size={11} className="ml-1 inline" aria-label="Link externo" />}</a>;
             },
           }}>{content}</ReactMarkdown>;
+  const toggleWikiView=(connections:boolean)=>{const params=new URLSearchParams(window.location.search);if(connections){params.set('wiki_view','connections');if(!params.has('wiki_graph_root')&&selectedId){params.set('wiki_graph_root',selectedId);params.set('wiki_graph_node',selectedId);}}else params.delete('wiki_view');window.history.pushState({},'',window.location.pathname+'?'+params+window.location.hash);window.dispatchEvent(new PopStateEvent('popstate'));};
   const openKnowledge=()=>{const params=new URLSearchParams(window.location.search);params.set('wiki_ai','1');if(selected)params.set('ai_objective',`Consultar e melhorar o assunto: ${selected.title} (fonte: ${selected.relative_path})`);window.history.pushState({},'',window.location.pathname+'?'+params);window.dispatchEvent(new PopStateEvent('popstate'));};
   if(new URLSearchParams(window.location.search).get('wiki_ai')==='1')return <KnowledgeWorkspace initialObjective={new URLSearchParams(window.location.search).get('ai_objective')||''} onBack={()=>{const params=new URLSearchParams(window.location.search);params.delete('wiki_ai');params.delete('ai_objective');window.history.pushState({},'',window.location.pathname+'?'+params);window.dispatchEvent(new PopStateEvent('popstate'));}}/>;
   return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-3" style={{fontFamily: "Segoe UI, Arial, sans-serif"}}>
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="flex items-center gap-3"><button type="button" aria-label={sidebar ? 'Recolher navegação' : 'Mostrar navegação'} aria-expanded={sidebar} onClick={() => setSidebar(value => !value)} className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"><Menu size={19} /></button><BookOpen size={21} className="text-cyan-700" /><div><h2 className="text-lg font-semibold tracking-normal text-slate-900">Wiki de Growth</h2><p className="text-xs text-slate-500">Serviços, produtos e contexto da operação</p></div></div>
-      <div className="flex items-center gap-3 text-xs text-slate-500"><button type="button" onClick={openKnowledge} className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 font-semibold text-cyan-800 hover:bg-cyan-100">Trabalhar com IA</button><span>Índice atualizado: {dateLabel(syncRun?.completed_at)}</span>{isAdmin && <details className="relative"><summary className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600">Administrar</summary><div className="absolute right-0 z-20 mt-2 w-60 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"><p className="mb-3 text-xs leading-5">Atualize a projeção a partir da pasta de origem.</p><input ref={folderInput} className="hidden" type="file" multiple {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={handleFiles} /><button type="button" disabled={syncing} onClick={() => folderInput.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60"><RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />{syncing ? progress : 'Sincronizar pasta'}</button></div></details>}</div>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500"><div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Visualização da Wiki"><button type="button" aria-pressed={!graphMode} onClick={()=>toggleWikiView(false)} className={`rounded-md px-3 py-1.5 font-medium ${!graphMode?'bg-white text-slate-900 shadow-sm':'text-slate-500'}`}>Leitura</button><button type="button" aria-pressed={graphMode} onClick={()=>toggleWikiView(true)} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium ${graphMode?'bg-white text-cyan-900 shadow-sm':'text-slate-500'}`}><Link2 size={14}/>Mapa de conexões</button></div><button type="button" onClick={openKnowledge} className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 font-semibold text-cyan-800 hover:bg-cyan-100">Trabalhar com IA</button><span>Índice atualizado: {dateLabel(syncRun?.completed_at)}</span>{isAdmin && <details className="relative"><summary className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-600">Administrar</summary><div className="absolute right-0 z-20 mt-2 w-60 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"><p className="mb-3 text-xs leading-5">Atualize a projeção a partir da pasta de origem.</p><input ref={folderInput} className="hidden" type="file" multiple {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={handleFiles} /><button type="button" disabled={syncing} onClick={() => folderInput.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60"><RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />{syncing ? progress : 'Sincronizar pasta'}</button></div></details>}</div>
     </div>
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error} <button type="button" onClick={() => { void loadContext(); if (browse) void loadIndex(query, folder); }} className="font-bold underline">Tentar novamente</button></div>}
     {notice && <div role="status" className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div>{notice}{choices.map(note => <button key={note.id} type="button" onClick={() => navigate(note.id)} className="mt-2 block text-left font-semibold underline">{note.title} · {note.relative_path}</button>)}</div><button aria-label="Fechar aviso" type="button" onClick={() => { setNotice(null); setChoices([]); }}><X size={16} /></button></div>}
-    <div className={`grid min-h-[560px] rounded-lg border border-slate-200 bg-white shadow-sm ${sidebar ? 'lg:grid-cols-[300px_minmax(0,1fr)]' : ''}`}>
-      {sidebar && <aside className="rounded-t-2xl border-b border-slate-200 bg-slate-50/60 p-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:rounded-l-2xl lg:rounded-tr-none lg:border-b-0 lg:border-r" aria-label="Explorar a Wiki">
+    <div hidden={!graphMode}><WikiConnections notes={catalog} currentNote={selectedId} active={graphMode&&!catalogLoading} syncKey={syncRun?.id||''} onOpen={id=>navigate(id)} onRefresh={()=>{void loadContext();}}/></div>
+    <div style={{display:graphMode?'none':undefined}} className={`grid min-h-[560px] rounded-lg border border-slate-200 bg-white shadow-sm ${sidebar ? 'lg:grid-cols-[300px_minmax(0,1fr)]' : ''}`}>
+      {sidebar && <aside className="rounded-t-2xl border-b border-slate-200 bg-slate-50/60 p-4 lg:self-start lg:rounded-l-2xl lg:rounded-tr-none lg:border-b-0 lg:border-r" aria-label="Explorar a Wiki">
         <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 focus-within:border-cyan-500"><Search size={16} className="shrink-0 text-slate-500" /><span className="sr-only">Buscar na Wiki</span><input ref={searchInput} value={query} onChange={event => filter(event.target.value, folder)} className="min-w-0 w-full bg-transparent text-sm outline-none" placeholder="Buscar na Wiki…" />{query && <button type="button" aria-label="Limpar busca" onClick={() => filter('', folder)}><X size={14} /></button>}</label>
         <p className="mt-2 text-xs text-slate-500">Atalho para buscar: Ctrl + K</p>
         <div className="my-4 flex gap-2"><button type="button" onClick={() => { filter('', null, false); navigate(null); }} className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"><Home size={14} />Início</button><button type="button" onClick={() => filter('', null)} className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">Todas ({allCount})</button></div>
         {browse ? <div aria-busy={listLoading}>
           <div className="mb-3 flex items-center justify-between gap-2"><p className="text-xs text-slate-500" aria-live="polite">{listLoading ? 'Buscando…' : `${total} notas encontradas`}</p><button type="button" onClick={() => filter('', null, false)} className="text-xs font-bold text-cyan-700">Assuntos</button></div>
           {folder && <p className="mb-2 break-words text-xs text-slate-500">Pasta: {folder}</p>}
-          <div className="max-h-[65vh] space-y-1 overflow-y-auto">
+          <div className="space-y-1">
             {summaries.map(note => <button key={note.id} type="button" aria-current={selectedId === note.id ? 'page' : undefined} onClick={() => navigate(note.id)} className={`w-full rounded-xl border px-3 py-3 text-left ${selectedId === note.id ? 'border-cyan-200 bg-cyan-50' : 'border-transparent hover:border-slate-200 hover:bg-white'}`}><div className="flex items-start gap-2"><FileText size={15} className="mt-1 shrink-0 text-slate-500" /><span className="text-sm font-semibold leading-5 text-slate-800">{note.title}</span></div><p className="mt-1 text-xs text-slate-500">{note.folder || 'Geral'}</p></button>)}
             {!listLoading && !total && <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">Nenhuma nota encontrada. Ajuste a busca ou remova o filtro.</p>}
             {summaries.length < total && <button disabled={listLoading} type="button" onClick={() => void loadIndex(query, folder, summaries.length, true)} className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-bold text-slate-700 disabled:opacity-60">{listLoading ? 'Carregando…' : 'Carregar mais'}</button>}
