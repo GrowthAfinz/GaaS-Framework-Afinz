@@ -237,7 +237,7 @@ export function layoutWikiGraph(
   }
   const width = Math.max(1, ...positions.map((p) => Math.abs(p.x))),
     height = Math.max(1, ...positions.map((p) => Math.abs(p.y)));
-  const scale = Math.min(1, 450 / width, 285 / height);
+  const scale = Math.min(3, 450 / width, 285 / height);
   return new Map(
     nodes.map((n, i) => [
       n.id,
