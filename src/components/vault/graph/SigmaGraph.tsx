@@ -1,23 +1,51 @@
 import { useEffect, useRef, useState } from "react";
 import Graph from "graphology";
 import Sigma from "sigma";
-import { drawDiscNodeLabel } from "sigma/rendering";
+import {
+  EdgeArrowProgram,
+  type NodeLabelDrawingFunction,
+} from "sigma/rendering";
 import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { TOPIC_COLORS, type WikiGraph } from "./wikiGraph";
 
+const drawReadableLabel: NodeLabelDrawingFunction = (
+  context,
+  data,
+  settings,
+) => {
+  if (!data.label) return;
+  const label =
+    data.label.length > 76 ? data.label.slice(0, 74) + "…" : data.label;
+  const x = data.x + data.size + 5,
+    y = data.y;
+  context.save();
+  context.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`;
+  context.textBaseline = "middle";
+  context.lineJoin = "round";
+  context.strokeStyle = "#bac6d6";
+  context.lineWidth = 3.5;
+  context.strokeText(label, x, y);
+  context.fillStyle = "#172334";
+  context.fillText(label, x, y);
+  context.restore();
+};
 type Position = { id: string; x: number; y: number };
 const cache = new Map<string, Position[]>();
 export default function SigmaGraph({
   graph,
   focus,
   onSelect,
+  detailed,
 }: {
   graph: WikiGraph;
   focus: string;
+  detailed: boolean;
   onSelect: (id: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null),
     renderer = useRef<Sigma | null>(null);
+  const detail = useRef(detailed);
+  detail.current = detailed;
   const select = useRef(onSelect),
     focused = useRef(focus);
   select.current = onSelect;
@@ -39,48 +67,49 @@ export default function SigmaGraph({
       try {
         const model = new Graph();
         const coords = new Map(positions.map((p) => [p.id, p]));
-        const aspect = Math.max(
-          1,
-          Math.min(
-            3,
-            (container.current!.clientWidth /
-              Math.max(1, container.current!.clientHeight)) *
-              0.8,
-          ),
-        );
         graph.nodes.forEach((n) => {
           const p = coords.get(n.id)!;
           model.addNode(n.id, {
-            x: p.x * aspect,
+            x: p.x,
             y: p.y,
-            label: n.title.length > 52 ? n.title.slice(0, 50) + "…" : n.title,
+            label: n.title,
             size: n.radius,
             color: TOPIC_COLORS[n.topic] || "#7084ad",
           });
         });
         graph.edges.forEach((e) =>
           model.addDirectedEdge(e.source, e.target, {
-            size: 0.45,
-            color: "#d6dfe9",
+            size: 0.6,
+            color: "rgba(0,0,0,0.20)",
           }),
         );
         const instance = new Sigma(model, container.current!, {
           stagePadding: 24,
           allowInvalidContainer: true,
           labelFont: "Segoe UI, Arial, sans-serif",
-          labelSize: 11,
+          labelSize: 12,
           labelWeight: "400",
-          labelColor: { color: "#475569" },
-          labelDensity: graph.nodes.length <= 35 ? 0.8 : 0.35,
+          labelColor: { color: "#172334" },
+          labelDensity: detail.current
+            ? graph.nodes.length <= 35
+              ? 1
+              : 0.55
+            : 0.2,
           labelGridCellSize: graph.nodes.length <= 35 ? 80 : 100,
-          labelRenderedSizeThreshold: graph.nodes.length <= 35 ? 0 : 7,
+          labelRenderedSizeThreshold: detail.current
+            ? graph.nodes.length <= 35
+              ? 0
+              : 4
+            : 8,
+          defaultDrawNodeLabel: drawReadableLabel,
+          edgeProgramClasses: { arrow: EdgeArrowProgram },
           defaultDrawNodeHover: (context, data, settings) => {
             context.beginPath();
             context.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2);
             context.strokeStyle = data.color;
             context.lineWidth = 1.5;
             context.stroke();
-            drawDiscNodeLabel(context, data, settings);
+            drawReadableLabel(context, data, settings);
           },
           hideLabelsOnMove: true,
           enableCameraRotation: false,
@@ -93,7 +122,7 @@ export default function SigmaGraph({
             const nearby = id === f || model.areNeighbors(id, f);
             return {
               ...data,
-              color: nearby ? data.color : "#e0e5ee",
+              color: nearby ? data.color : "#9cabc0",
               zIndex: id === f ? 2 : nearby ? 1 : 0,
               highlighted: id === f,
               forceLabel: id === f,
@@ -107,8 +136,9 @@ export default function SigmaGraph({
             return {
               ...data,
               hidden: !out && !incoming,
-              color: out ? "#159c9a" : "#a477d1",
-              size: out || incoming ? 1 : 0.45,
+              color: "rgba(0,0,0,0.72)",
+              type: "arrow",
+              size: 1.2,
             };
           },
         });
@@ -118,7 +148,7 @@ export default function SigmaGraph({
         setBusy(false);
       } catch {
         setError(
-          "A visualização requer WebGL. Você pode navegar pelas notas na lista abaixo.",
+          "A visualização requer WebGL. Você pode navegar pelo painel de notas à direita.",
         );
         setBusy(false);
       }
@@ -160,13 +190,19 @@ export default function SigmaGraph({
   useEffect(() => {
     renderer.current?.scheduleRefresh();
   }, [focus]);
+  useEffect(() => {
+    const instance = renderer.current;
+    if (!instance) return;
+    instance.setSetting("labelDensity", detailed ? 0.65 : 0.2);
+    instance.setSetting(
+      "labelRenderedSizeThreshold",
+      detailed ? (graph.nodes.length <= 35 ? 0 : 4) : 8,
+    );
+  }, [detailed, graph]);
   const button =
     "rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-slate-900 focus-visible:outline-cyan-600";
   return (
-    <div
-      className="relative min-w-0 bg-[#f9fbfd]"
-      style={{ height: "clamp(300px, 55vh, 480px)" }}
-    >
+    <div className="relative h-full min-h-0 min-w-0 bg-[#bac6d6]">
       <div
         ref={container}
         className="absolute inset-0"
