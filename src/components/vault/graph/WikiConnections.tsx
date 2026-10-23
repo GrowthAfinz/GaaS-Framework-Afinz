@@ -63,22 +63,28 @@ export function WikiConnections({
     const measure = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        if (workspace.current)
+        if (workspace.current) {
+          const element = workspace.current,
+            rect = element.getBoundingClientRect();
+          // GaaS applies CSS zoom globally. Convert viewport pixels to layout pixels.
+          const scale = rect.width / Math.max(1, element.offsetWidth) || 1;
           setHeight(
             Math.max(
               320,
-              window.innerHeight -
-                Math.max(0, workspace.current.getBoundingClientRect().top) -
-                16,
+              (window.innerHeight - Math.max(0, rect.top) - 16) / scale,
             ),
           );
+        }
       });
     };
     measure();
+    const observer = new ResizeObserver(measure);
+    if (workspace.current) observer.observe(workspace.current);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, { passive: true });
     return () => {
       cancelAnimationFrame(frame);
+      observer.disconnect();
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure);
     };
