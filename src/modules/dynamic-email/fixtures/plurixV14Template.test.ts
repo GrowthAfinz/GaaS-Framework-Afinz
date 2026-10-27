@@ -41,7 +41,7 @@ describe('PLURIX V14 candidata', () => {
   });
 
   it('publica exatamente a fonte testada e mantém links e assets dinâmicos', () => {
-    const migration=readFileSync('supabase/migrations/20261027155015_dynamic_email_plurix_v14_dark_mode.sql','utf8');
+    const migration=readFileSync('supabase/migrations/20261027161205_dynamic_email_plurix_v14_dark_mode.sql','utf8');
     expect(migration.split('$v14$')[1]).toBe(PLURIX_V14_TEMPLATE);
     const links=(s:string)=>[...s.matchAll(/href="([^"]+)"/g)].map(m=>m[1]);
     expect(links(PLURIX_V14_TEMPLATE)).toEqual(links(PLURIX_V13_TEMPLATE));

@@ -21,7 +21,7 @@ insert into public.dynamic_email_assets (name,external_url,slot,bu,partner,produ
 values ('Logo +amigo branco: topo V14', 'https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c460d98e-264a-4f75-940f-d62d6b40dabf.png', 'header_logo', 'Plurix', 'Plurix', '+amigo', '+amigo', array['header-dinamico','logo','v14'], 'ready', 1)
 on conflict (external_url) do nothing;
 `;
-const path='supabase/migrations/20261027155015_dynamic_email_plurix_v14_dark_mode.sql';
+const path='supabase/migrations/20261027161205_dynamic_email_plurix_v14_dark_mode.sql';
 if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==sql)throw new Error('Migration diverge da fixture');}
 else writeFileSync(path,sql);
 console.log(JSON.stringify({id:PLURIX_V14_TEMPLATE_ID,md5:md5(PLURIX_V14_TEMPLATE),length:PLURIX_V14_TEMPLATE.length,path}));

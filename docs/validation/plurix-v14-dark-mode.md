@@ -47,7 +47,7 @@ V13 em cima, V14 embaixo; modos lado a lado.
 - [Ensaio de blend](C:/Users/Pablo Prado/OneDrive/Área de Trabalho/PROJETOS IA/ACALENDARIO APP/artifacts/dynamic-email-dark-mode/2026-10-27_v14/blend-probe-results.json)
 
 ## Publicação e verificação
-Migration aplicada: 20261027155015_dynamic_email_plurix_v14_dark_mode.sql.
+Migration aplicada: 20261027161205_dynamic_email_plurix_v14_dark_mode.sql.
 Slot builtin-plurix-v14: active, versão 1, is_principal false, 37.358 caracteres, MD5 be4c15d7e76d6befe55507d4271556f2.
 V13 segue active, versão 4, 34.887 caracteres e mesmo MD5. Principal segue builtin-plurix-v9.
 Fingerprints de todos os briefings e réguas permaneceram iguais antes/depois:
