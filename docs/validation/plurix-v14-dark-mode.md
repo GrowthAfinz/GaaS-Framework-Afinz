@@ -1,4 +1,5 @@
 # PLURIX V14: candidata para teste
+Revisão atual: [V14 revisão 2, tema claro preservado](plurix-v14-light-only.md). O conteúdo abaixo é o registro histórico da revisão 1.
 Data: 27/10/2026. Status: needs_review.
 
 Publicada no Supabase de produção e selecionável na Fábrica. O aceite integral de contraste ainda não foi atingido no corpo. A publicação como candidata segue a exceção expressa da especificação.

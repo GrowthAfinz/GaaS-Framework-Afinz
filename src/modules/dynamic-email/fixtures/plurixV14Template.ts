@@ -1,7 +1,7 @@
 import { PLURIX_V13_TEMPLATE, V13_HEADER_BRAND_LOGO } from './plurixV13Template';
 
 export const PLURIX_V14_TEMPLATE_ID = 'builtin-plurix-v14';
-export const PLURIX_V14_TEMPLATE_NAME = 'PLURIX V14 · topo dinâmico blindado para tema escuro (candidata)';
+export const PLURIX_V14_TEMPLATE_NAME = 'PLURIX V14 · tema claro preservado (candidata)';
 
 function once(source: string, anchor: string, replacement: string): string {
   const parts = source.split(anchor);
@@ -10,6 +10,23 @@ function once(source: string, anchor: string, replacement: string): string {
 }
 
 const blend = (text: string) => `<span class="gmail-blend-screen"><span class="gmail-blend-difference">${text}</span></span>`;
+
+// Estilos da grade governada, aplicados na saída sem alterar o briefing ou o preparo.
+// Replace é nativo do AMPscript; o preview interpreta a mesma expressão.
+function lightFragment(variable: string): string {
+  let value = `@${variable}`;
+  for (const color of ['#F4F5FB', '#E7A921', '#ffffff', '#F6F6FB']) {
+    for (const property of ['background-color', 'background']) {
+      const from = `${property}:${color};`;
+      const to = `${from}background-image:linear-gradient(${color},${color});`;
+      value = `Replace(${value}, "${from}", "${to}")`;
+    }
+  }
+  for (const color of ['#242424', '#2C3490', '#4A4F6A']) {
+    value = `Replace(${value}, "color:${color};", "color:${color};-webkit-text-fill-color:${color};")`;
+  }
+  return `%%=TreatAsContent(${value})=%%`;
+}
 
 function buildPlurixV14(): string {
   let source = PLURIX_V13_TEMPLATE.split('\r\n').join('\n');
@@ -64,6 +81,27 @@ function buildPlurixV14(): string {
     const updated = attrs.includes('class="') ? attrs.replace('class="', 'class="brand-text brand-odd ') : ` class="brand-text brand-odd"${attrs}`;
     return `<a${updated.replace('background-color:#2C3490;', 'background-color:#2C3490; background-image:linear-gradient(#2C3490,#2C3490);')}>${blend(text)}</a>`;
   });
+  html = once(html, '<meta name="color-scheme" content="light">', '<meta name="color-scheme" content="light only">');
+  html = html.replace(/<span class="gmail-blend-screen"><span class="gmail-blend-difference">([\s\S]*?)<\/span><\/span>/g, '$1');
+  html = html.replace(/    u \+ \.body \.gmail-blend-(?:screen|difference) \{[^}]*\}\n/g, '');
+  html = once(html, '<body class="body" style="', '<body class="body" style="color-scheme:light only; ');
+  // Cada superfície mantém o seu fundo claro original, inclusive fora da media query.
+  html = html.replace(/background-color:(#[0-9a-fA-F]{3,6});(?!\s*background-image:)/g,
+    (_, color: string) => `background-color:${color}; background-image:linear-gradient(${color},${color});`);
+  // Fill separado de color para reduzir a recoloração forçada de texto no WebKit.
+  html = html.replace(/(?<![-\w])color:([^;"\n]+);/g,
+    (_, color: string) => `color:${color}; -webkit-text-fill-color:${color};`);
+  for (const variable of ['TituloCopy1', 'Copy1Preto', 'TituloCopy2', 'Copy2Preto', 'NotaLegal', 'Rodape']) {
+    html = html.split(`%%=TreatAsContent(@${variable})=%%`).join(lightFragment(variable));
+  }
+  // Outlook: os estilos originais têm prioridade nos elementos que ele recolore.
+  const backgrounds = ['#ffffff', '#F6F6FB', '#F4F5FB', '#f2f4f7', '#eef1f5', '#E7A921'];
+  const foregrounds = ['#242424', '#2C3490', '#4A4F6A', '#454A64', '#5A607F', '#6b7280', '#8A8FA8'];
+  const rules = [
+    ...backgrounds.map(c => `[data-ogsb] [bgcolor="${c}"], [data-ogsb] [style*="background-color:${c}"] { background-color:${c} !important; background-image:linear-gradient(${c},${c}) !important; }`),
+    ...foregrounds.map(c => `[data-ogsc] [style*="color:${c};"] { color:${c} !important; -webkit-text-fill-color:${c} !important; }`),
+  ].join('\n    ');
+  html = once(html, '</style>', `    ${rules}\n  </style>`);
   return setup + html;
 }
 

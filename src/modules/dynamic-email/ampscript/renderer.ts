@@ -155,6 +155,33 @@ function renderConditionals(source: string, vars: Vars): string {
 function interpolate(value: string, vars: Vars, depth = 0): string {
   if (depth > MAX_RECURSION) return '[erro: limite de recursão TreatAsContent]';
   let output = value;
+  // A V14 aplica Replace somente na saída visual de campos HTML governados.
+  // Parser restrito, sem eval e sem executar lookups ou código do assinante.
+  const visualValue = (expression: string, nesting = 0): string => {
+    if (nesting > 32) throw new Error('Limite de Replace visual excedido.');
+    const input = expression.trim();
+    if (/^@\w+$/.test(input)) return String(vars[input.slice(1)] ?? '');
+    if (/^"[^"]*"$/.test(input)) return input.slice(1, -1);
+    if (!input.startsWith('Replace(') || !input.endsWith(')')) throw new Error('Expressão visual não suportada.');
+    const args: string[] = []; let quoted = false; let level = 0; let start = 8;
+    for (let i = 8; i < input.length - 1; i++) {
+      const char = input[i];
+      if (char === '"') quoted = !quoted;
+      if (quoted) continue;
+      if (char === '(') level++; else if (char === ')') level--;
+      if (char === ',' && level === 0) { args.push(input.slice(start, i)); start = i + 1; }
+    }
+    args.push(input.slice(start, -1));
+    if (args.length !== 3) throw new Error('Replace visual exige três argumentos.');
+    const from = visualValue(args[1], nesting + 1);
+    if (!from) throw new Error('Replace visual exige uma âncora preenchida.');
+    return visualValue(args[0], nesting + 1).split(from).join(visualValue(args[2], nesting + 1));
+  };
+  output = output.replace(/%%=\s*TreatAsContent\((Replace\([\s\S]*?\))\)\s*=%%/g,
+    (original: string, expression: string) => {
+      try { return interpolate(visualValue(expression), vars, depth + 1); }
+      catch { return original; } // A checagem de expressões pendentes devolve diagnóstico.
+    });
   output = output.replace(/%%=\s*v\s*\(\s*@(\w+)\s*\)\s*=%%/gi, (_, name) => String(vars[name] ?? ''));
   output = output.replace(/%%=\s*TreatAsContent\s*\(\s*@(\w+)\s*\)\s*=%%/gi, (_, name) => interpolate(String(vars[name] ?? ''), vars, depth + 1));
   output = output.replace(/%%=\s*RedirectTo\s*\(\s*TreatAsContent\s*\(\s*@(\w+)\s*\)\s*\)\s*=%%/gi, (_, name) => interpolate(String(vars[name] ?? ''), vars, depth + 1));

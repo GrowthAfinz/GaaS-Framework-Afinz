@@ -14,7 +14,11 @@ const out = resolve(output);
 mkdirSync(out,{recursive:true});
 const { briefings } = JSON.parse(readFileSync(dataFile,'utf8'));
 if (briefings.length !== 24) throw new Error('Esperadas 24 combinações reais');
-const modes = ['claro','apple-escuro','parcial','total','sem-style'];
+const modes = ['claro','apple-escuro','parcial','total','sem-style','parcial-sem-style','total-sem-style'];
+const baselineVersion=process.argv.includes('--previous-v14')?'v14-r1':'v13';
+const baselineSource=baselineVersion==='v14-r1'
+  ? readFileSync('supabase/migrations/20261027161205_dynamic_email_plurix_v14_dark_mode.sql','utf8').split('$v14$')[1]
+  : PLURIX_V13_TEMPLATE;
 const browser = await chromium.launch({headless:true});
 const assetCache = new Map<string, {body:Buffer;contentType:string}>();
 const context = await browser.newContext({deviceScaleFactor:1,ignoreHTTPSErrors:true});
@@ -67,26 +71,32 @@ async function worker(){
     const seq=b.briefing_data.SEQUENCIA.replace('E-mail ','e');
     const key=`${product}-${seq}-${width}`;
     const records:any[]=[];
-    for(const [version,source] of [['v13',PLURIX_V13_TEMPLATE],['v14',PLURIX_V14_TEMPLATE]]){
+    for(const [version,source] of [[baselineVersion,baselineSource],['v14',PLURIX_V14_TEMPLATE]]){
       const row=Object.assign(emptyBriefingRow(b.id),b.briefing_data);
       const rendered=renderDynamicEmail(source,row,{CPF:'00000000000',PRI_NOME:'MARIA',LIMITE:'3500',PRODUTO:row.NM_PRODUTO_INTERNO,SEQUENCIA:row.SEQUENCIA,TP_CAMPANHA:row.TP_CAMPANHA},{pendingAssets:'hidden'});
       if(rendered.diagnostics.length)throw new Error(rendered.diagnostics.join(';'));
       writeFileSync(join(out,`${product}-${seq}-${version}.html`),rendered.html);
       for(const mode of modes){
         const prefix=`${key}-${version}-${mode}`;
-        const signature=createHash('sha256').update(rendered.html+mode+width+'sim-v1').digest('hex');
+        const signature=createHash('sha256').update(rendered.html+mode+width+'sim-v2-light').digest('hex');
         if(existsSync(join(out,`${prefix}-nodes.json`))){
           const prior=JSON.parse(readFileSync(join(out,`${prefix}-nodes.json`),'utf8'));
           if(prior.signature===signature){records.push({version,mode,prefix,...prior,texts:undefined});continue;}
         }
         await page.setViewportSize({width,height:1000});
         await page.emulateMedia({colorScheme:mode==='claro'?'light':'dark'});
-        const html=mode==='sem-style'?rendered.html.replace(/<style>[\s\S]*?<\/style>/gi,''):rendered.html;
+        const html=mode.includes('sem-style')?rendered.html.replace(/<style>[\s\S]*?<\/style>/gi,''):rendered.html;
         await page.setContent(html,{waitUntil:'networkidle'});
         await page.evaluate(async()=>{await Promise.all([...document.images].map(im=>im.decode().catch(()=>{})));await document.fonts.ready;});
         // Gmail transforma body em um contêiner precedido por u. Reproduzir essa estrutura.
-        if(mode==='total')await page.evaluate(()=>{const wrapper=document.createElement('div');wrapper.className='body';wrapper.append(...document.body.childNodes);document.body.append(document.createElement('u'),wrapper);});
-        if(mode==='parcial'||mode==='total')await page.evaluate(invert,mode);
+        if(mode.startsWith('total'))await page.evaluate(()=>{const wrapper=document.createElement('div');wrapper.className='body';wrapper.append(...document.body.childNodes);document.body.append(document.createElement('u'),wrapper);});
+        const surfacesBefore=await page.evaluate(()=>[...document.querySelectorAll<HTMLElement>('*')].map(el=>{const cs=getComputedStyle(el);return {bg:cs.backgroundColor,image:cs.backgroundImage};}));
+        if(mode.startsWith('parcial')||mode.startsWith('total'))await page.evaluate(invert,mode.startsWith('total')?'total':'parcial');
+        const changedSurfaces=await page.evaluate((before)=>[...document.querySelectorAll<HTMLElement>('*')].flatMap((el,index)=>{
+          const cs=getComputedStyle(el);const old=before[index];
+          if(!old || old.bg==='rgba(0, 0, 0, 0)' || old.image!=='none' || cs.backgroundColor===old.bg)return [];
+          const r=el.getBoundingClientRect();return r.width&&r.height?[{element:el.tagName,class:el.className,before:old.bg,after:cs.backgroundColor}]:[];
+        }),surfacesBefore);
         const measurements=await page.evaluate(()=>{
           const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const texts:any[]=[];let node;
           while(node=walker.nextNode()){
@@ -104,12 +114,12 @@ async function worker(){
         await page.screenshot({path:join(out,`${prefix}.png`),fullPage:true});
         await page.addStyleTag({content:'*{-webkit-text-fill-color:transparent!important;text-shadow:none!important}'});
         await page.screenshot({path:join(out,`${prefix}-background.png`),fullPage:true});
-        writeFileSync(join(out,`${prefix}-nodes.json`),JSON.stringify({signature,...measurements}));
+        writeFileSync(join(out,`${prefix}-nodes.json`),JSON.stringify({signature,changedSurfaces,...measurements}));
         records.push({version,mode,prefix,...measurements,texts:undefined});
       }
     }
     const cols=(version:string)=>records.filter(r=>r.version===version).map(r=>`<figure><figcaption>${version.toUpperCase()} · ${r.mode}</figcaption><img src="${r.prefix}.png"></figure>`).join('');
-    const panel=`<!doctype html><meta charset="utf-8"><style>body{font:14px Arial;background:#e9ecf1;margin:20px}.grid{display:grid;grid-template-columns:repeat(5,${width}px);gap:12px;align-items:start}figure{margin:0}img{width:${width}px}figcaption{padding:8px}</style><h1>${product} · ${seq} · ${width}px</h1><div class="grid">${cols('v13')}${cols('v14')}</div>`;
+    const panel=`<!doctype html><meta charset="utf-8"><style>body{font:14px Arial;background:#e9ecf1;margin:20px}.grid{display:grid;grid-template-columns:repeat(${modes.length},${width}px);gap:12px;align-items:start}figure{margin:0}img{width:${width}px}figcaption{padding:8px}</style><h1>${product} · ${seq} · ${width}px</h1><div class="grid">${cols(baselineVersion)}${cols('v14')}</div>`;
     writeFileSync(join(out,`${key}-painel.html`),panel);
     // O checker Python compõe o PNG dos dez screenshots sem uma página gigante em memória.
     manifest.push({key,briefingId:b.id,records});
