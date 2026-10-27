@@ -77,7 +77,7 @@ async function worker(){
         const signature=createHash('sha256').update(rendered.html+mode+width+'sim-v1').digest('hex');
         if(existsSync(join(out,`${prefix}-nodes.json`))){
           const prior=JSON.parse(readFileSync(join(out,`${prefix}-nodes.json`),'utf8'));
-          if(version==='v13'||prior.signature===signature){records.push({version,mode,prefix,...prior,texts:undefined});continue;}
+          if(prior.signature===signature){records.push({version,mode,prefix,...prior,texts:undefined});continue;}
         }
         await page.setViewportSize({width,height:1000});
         await page.emulateMedia({colorScheme:mode==='claro'?'light':'dark'});
