@@ -1,4 +1,5 @@
 # PLURIX V14 revisão 2: tema claro preservado
+Atualização: [revisão 3 com header proporcional e faixa superior branca](plurix-v14-header-proportional.md). Este documento registra a revisão 2.
 
 Atualização de 27/10/2026. Substitui o objetivo anterior de apenas proteger blocos de marca. Agora o corpo, os cards, a nota legal e o fundo externo também devem conservar a aparência clara.
 

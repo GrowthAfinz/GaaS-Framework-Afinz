@@ -39,11 +39,18 @@ describe('PLURIX V14 candidata', () => {
     expect(PLURIX_V14_TEMPLATE).not.toContain('mix-blend-mode:');
     for (const color of ['#ffffff','#F6F6FB','#f2f4f7']) expect(PLURIX_V14_TEMPLATE).toContain(`linear-gradient(${color},${color})`);
     expect(PLURIX_V14_TEMPLATE).not.toContain('#E6A813');
-    for (const cls of ['hdr-copy','hdr-title','hdr-card']) expect(PLURIX_V14_TEMPLATE.match(new RegExp(`\\.${cls} \\{`, 'g'))).toHaveLength(1);
+    for (const cls of ['hdr-copy','hdr-title','hdr-sub','hdr-card']) expect(PLURIX_V14_TEMPLATE).not.toMatch(new RegExp(`\\.${cls} \\{`));
+    expect(PLURIX_V14_TEMPLATE).not.toContain('class="stack-column hdr-copy"');
+    expect(PLURIX_V14_TEMPLATE).not.toContain('class="stack-column hdr-card"');
+    expect(PLURIX_V14_TEMPLATE).toContain('font-size:min(28px,calc(4.6666666667vw - 0.9333333333px));');
+    expect(PLURIX_V14_TEMPLATE).toContain('font-size:1em; line-height:1.25;');
+    expect(PLURIX_V14_TEMPLATE).toContain('class="brand-pad brand-top" bgcolor="#ffffff"');
+    expect(PLURIX_V14_TEMPLATE).toContain('[data-ogsb] .brand-top { background-color:#ffffff !important; }');
+    expect(PLURIX_V14_TEMPLATE).toContain('class="brand-logo" src="https://stoplxmkt.blob.core.windows.net/');
   });
 
   it('publica exatamente a fonte testada e mantém links e assets dinâmicos', () => {
-    const migration=readFileSync('supabase/migrations/20261027184742_dynamic_email_plurix_v14_light_only.sql','utf8');
+    const migration=readFileSync('supabase/migrations/20261027190509_dynamic_email_plurix_v14_header_proportional.sql','utf8');
     expect(migration.split('$v14$')[1]).toBe(PLURIX_V14_TEMPLATE);
     const links=(s:string)=>[...s.matchAll(/href="([^"]+)"/g)].map(m=>m[1]);
     expect(links(PLURIX_V14_TEMPLATE)).toEqual(links(PLURIX_V13_TEMPLATE));

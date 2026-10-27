@@ -102,6 +102,40 @@ function buildPlurixV14(): string {
     ...foregrounds.map(c => `[data-ogsc] [style*="color:${c};"] { color:${c} !important; -webkit-text-fill-color:${c} !important; }`),
   ].join('\n    ');
   html = once(html, '</style>', `    ${rules}\n  </style>`);
+  // O header conserva a geometria de 600 px. Só a escala muda no celular.
+  // As medidas em em usam a mesma base e continuam proporcionais sem <style>.
+  const headerFont = 'font-size:28px; font-size:min(28px,calc(4.6666666667vw - 0.9333333333px));';
+  html = html.replace(/      \.(?:hdr-copy|hdr-title|hdr-sub|hdr-card|hdr-logo|brand-pad|brand-logo) \{[^}]*\}\n/g, '');
+  const start = html.indexOf('          %%[ IF @HeaderModo == "html" THEN ]%%');
+  const end = html.indexOf('          %%[ IF NOT EMPTY(@FaixaLimite) THEN ]%%');
+  if (start < 0 || end <= start) throw new Error('PLURIX V14: limites do header ausentes.');
+  let header = html.slice(start, end);
+  header = once(header, 'style="padding:0;', `style="${headerFont} padding:0;`);
+  header = once(header, 'class="stack-column hdr-copy"', 'class="hdr-copy"');
+  header = once(header, 'class="stack-column hdr-card"', 'class="hdr-card"');
+  header = once(header, 'padding:30px 3px 24px 20px;', 'padding:1.0714285714em 0.1071428571em 0.8571428571em 0.7142857143em;');
+  header = once(header, 'font-size:28px; line-height:1.25;', 'font-size:1em; line-height:1.25;');
+  header = once(header, 'margin:18px 0 0 0;', 'margin:1em 0 0 0;');
+  header = once(header, 'font-size:18px; line-height:1.5;', 'font-size:0.6428571429em; line-height:1.5;');
+  header = once(header, 'margin:22px 0 0 0; line-height:0; font-size:0;', 'margin:0.7857142857em 0 0 0; line-height:0; font-size:inherit;');
+  header = once(header, 'width:80px; height:21px;', 'width:2.8571428571em; height:0.75em;');
+  header = once(header, 'width:80px; height:auto; max-height:21px; margin-left:8px;', 'width:2.8571428571em; height:auto; max-height:0.75em; margin-left:0.2857142857em;');
+  header = once(header, 'padding:0 0 0 3px;', 'padding:0 0 0 0.1071428571em;');
+  html = html.slice(0, start) + header + html.slice(end);
+  html = once(html, 'class="brand-pad brand-top" bgcolor="#4A5BA6" style="padding:24px 20px;',
+    `class="brand-pad brand-top" bgcolor="#4A5BA6" style="${headerFont} padding:0.8571428571em 0.7142857143em;`);
+  html = once(html, 'style="display:block; width:190px; max-width:100%; height:auto; border:0;"',
+    'style="display:block; width:6.7857142857em; max-width:100%; height:auto; border:0;"');
+  // Faixa superior branca com logo azul. O PNG é transparente e não muda de cor.
+  html = once(html,
+    'class="brand-pad brand-top" bgcolor="#4A5BA6"',
+    'class="brand-pad brand-top" bgcolor="#ffffff"');
+  html = once(html,
+    `${headerFont} padding:0.8571428571em 0.7142857143em; background-color:#4A5BA6; background-image:linear-gradient(#4A5BA6,#4A5BA6);`,
+    `${headerFont} padding:0.8571428571em 0.7142857143em; background-color:#ffffff; background-image:linear-gradient(#ffffff,#ffffff);`);
+  html = once(html, '[data-ogsb] .brand-top { background-color:#4A5BA6 !important; }', '[data-ogsb] .brand-top { background-color:#ffffff !important; }');
+  html = once(html, `class="brand-logo" src="${V13_HEADER_BRAND_LOGO}"`,
+    'class="brand-logo" src="https://stoplxmkt.blob.core.windows.net/plxmkt/20240513-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ/logo-mais-amigo.png"');
   return setup + html;
 }
 
