@@ -83,4 +83,3 @@ python scripts/email-factory/check-plurix-v14-contrast.py <pasta-de-saida>
 node node_modules/vite-node/vite-node.mjs scripts/email-factory/render-plurix-v14.ts scripts/plurix-v14-qa-data.json <pasta-de-saida> --probe-only
 python scripts/email-factory/check-plurix-blend-probe.py <pasta-de-saida>
 ```
-
