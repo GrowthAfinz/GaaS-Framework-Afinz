@@ -41,7 +41,7 @@ export function GrowthObservationStatus({period}:{period:string}){
       <div className="flex gap-2"><button type="button" onClick={()=>void load()} className="rounded-lg border bg-white px-3 py-2 text-xs">Atualizar</button>
         {state&&['analyst','publisher','admin'].includes(state.role)&&<button type="button" onClick={()=>void rerun()} disabled={busy||!state.enabled} className="rounded-lg bg-slate-900 px-3 py-2 text-xs text-white disabled:opacity-50">{busy?'Avaliando…':'Reavaliar observação'}</button>}</div>
     </div>
-    <p className="mt-2 text-xs text-slate-600">Observações determinísticas dos dois recortes. A análise é feita por agente na fila de investigações; apostas exigem decisão humana.</p>
+    <p className="mt-2 text-xs text-slate-600">Observações determinísticas dos dois recortes. A análise é feita por agente na fila de tarefas; apostas exigem decisão humana.</p>
     {error&&<p role="status" className="mt-2 text-xs text-amber-800">{error}</p>}
     {state?.run&&<details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Ver avaliações e frescor</summary>
       <p className="my-2 text-xs text-slate-500">Dados consultados em {new Date(state.run.data_read_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}. Período avaliado: {period}.</p>
@@ -50,6 +50,6 @@ export function GrowthObservationStatus({period}:{period:string}){
       <ul className="mt-3 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">{state.run.output.freshness.map(row=><li key={row.source}>{sources[row.source]??row.source}: {row.latest??'sem data observada'} · {row.state==='triggered'?'atraso acima da tolerância':observationStateLabel(row.state)}</li>)}</ul>
       <p className="mt-2 text-xs text-slate-500">Revisão do certificado: {state.run.output.revision_status==='verified_partner_grain'?'verificada no grão de parceiro':'snapshot não verificável nesta execução'}.</p>
     </details>}
-    <button className="mt-3 text-sm text-cyan-800 underline" onClick={()=>openGrowthLearningSection('investigations')}>Abrir fila de investigações</button>
+    <button className="mt-3 text-sm text-cyan-800 underline" onClick={()=>openGrowthLearningSection('investigations')}>Abrir fila de tarefas</button>
   </details>;
 }

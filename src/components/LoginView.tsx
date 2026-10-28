@@ -58,7 +58,7 @@ export const LoginView: React.FC = () => {
                 <div className="text-center">
                     {/* Afinz Brand */}
                     <div className="mb-8 flex flex-col items-center gap-4 select-none">
-                        <div className="flex items-center gap-4" style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}>
+                        <div className="flex items-center gap-4" style={{ fontFamily: "var(--font-ui)" }}>
                             <AfinzLogo height={48} />
                             <div className="flex items-center gap-3">
                                 <div className="h-8 w-1 rounded-full bg-[#00C6CC]" />
