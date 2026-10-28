@@ -246,6 +246,40 @@ export default function SigmaGraph({
   useEffect(() => {
     renderer.current?.scheduleRefresh();
   }, [focus]);
+  // GaaS applies CSS zoom to the page. Sigma reads the pointer in viewport
+  // pixels (clientX - bbox.left) but lays the graph out in CSS pixels
+  // (offsetWidth), so hit-testing drifts toward the top-left by the zoom
+  // factor. Rewrite pointer coordinates into the container's own pixels
+  // before sigma's listeners (container and window) see them.
+  useEffect(() => {
+    const host = container.current;
+    if (!host) return;
+    let dragging = false;
+    const adjust = (event: Event) => {
+      const e = event as MouseEvent;
+      const inside = e.target instanceof Node && host.contains(e.target);
+      if (e.type === "mousedown" && inside) dragging = true;
+      if (!inside && !dragging) return;
+      if (e.type === "mouseup") dragging = false;
+      const rect = host.getBoundingClientRect(),
+        scale = rect.width / Math.max(1, host.offsetWidth) || 1;
+      if (Math.abs(scale - 1) < 0.001) return;
+      Object.defineProperty(e, "clientX", {
+        value: rect.left + (e.clientX - rect.left) / scale,
+      });
+      Object.defineProperty(e, "clientY", {
+        value: rect.top + (e.clientY - rect.top) / scale,
+      });
+    };
+    const types = ["mousedown", "mousemove", "mouseup", "click", "wheel"];
+    types.forEach((type) =>
+      window.addEventListener(type, adjust, { capture: true }),
+    );
+    return () =>
+      types.forEach((type) =>
+        window.removeEventListener(type, adjust, { capture: true }),
+      );
+  }, []);
   // The panel and page layout change the map's size without a window resize.
   useEffect(() => {
     if (!container.current) return;
