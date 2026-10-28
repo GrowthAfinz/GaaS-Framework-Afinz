@@ -45,6 +45,21 @@ ELSEIF @Rede == "SUPERPAO" OR @Rede == "SUPERPÃO" THEN
 ELSE
   RaiseError("PLX_NETWORK_UNKNOWN: PRODUTO sem mapeamento aprovado.", true)
 ENDIF
+/* V15 R3: nome de exibicao da investida; PRODUTO segue como chave tecnica. */
+SET @NomeInvestida = ""
+IF @Produto == "AMIGAO" THEN
+  SET @NomeInvestida = "Amigão"
+ELSEIF @Produto == "BOA" THEN
+  SET @NomeInvestida = "Boa"
+ELSEIF @Produto == "AVENIDA" THEN
+  SET @NomeInvestida = "Avenida"
+ELSEIF @Produto == "COMPRE MAIS" THEN
+  SET @NomeInvestida = "Compre Mais"
+ELSEIF @Produto == "PARANA" THEN
+  SET @NomeInvestida = "Paraná"
+ELSEIF @Produto == "SUPERPAO" THEN
+  SET @NomeInvestida = "Superpão"
+ENDIF
 SET @TpCampanha = "CRM"
 /* Consultar a posicao atual na DE separada, nunca na audiencia/entrada. */
 SET @EstadoRows = LookupRows(@DE_ESTADO, "CPF", @Chave)

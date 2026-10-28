@@ -4,11 +4,21 @@ import {renderDynamicEmail} from '../ampscript/renderer';
 import {emptyBriefingRow} from '../domain/briefing';
 import {plurixEnvelope} from '../domain/sfmcEnvelope';
 import {readFileSync} from 'node:fs';
+import {PLURIX_INVESTIDA_NAMES} from '../domain/plurixInvestida';
 
 describe('V15 CRM com header rasterizado',()=>{
+ it('resolve o nome pela audiencia em HTML e espelha o mapeamento AMPscript das seis investidas',()=>{
+  for(const [product,name] of Object.entries(PLURIX_INVESTIDA_NAMES)){
+   expect(PLURIX_V15_TEMPLATE).toContain(`@Produto == "${product}" THEN\n  SET @NomeInvestida = "${name}"`);
+   const row=Object.assign(emptyBriefingRow(),{HEADER:'https://example.com/hero.png',COPY_1_PRETO:'<b>dentro e fora do %%=v(@NomeInvestida)=%%</b>',NM_PRODUTO_INTERNO:'OUTRA_REDE',SEQUENCIA:'E-mail 1'});
+   const r=renderDynamicEmail(PLURIX_V15_TEMPLATE,row,{CPF:'00000000000',PRI_NOME:'MARIA',LIMITE:'3500',PRODUTO:product,SEQUENCIA:'E-mail 1',TP_CAMPANHA:'CRM'});
+   expect(r.diagnostics).toEqual([]);expect(r.html).toContain(`<b>dentro e fora do ${name}</b>`);expect(r.html).not.toContain('@NomeInvestida');
+  }
+ });
  it('preserva preparo e destinos da revisao publicada antes da correcao de cores',()=>{
   const previous=readFileSync('supabase/migrations/20261028151825_dynamic_email_plurix_v15_v3.sql','utf8').split('$v15$')[1];
-  expect(PLURIX_V15_TEMPLATE.split('<!DOCTYPE html>')[0]).toBe(previous.split('<!DOCTYPE html>')[0]);
+  const setup=PLURIX_V15_TEMPLATE.split('<!DOCTYPE html>')[0].replace(/\/\* V15 R3:[\s\S]*?ENDIF\n/, '');
+  expect(setup).toBe(previous.split('<!DOCTYPE html>')[0]);
   const destinations=(s:string)=>[...s.matchAll(/(?:href|src)="([^"]+)"/g)].map(m=>m[1]);
   expect(destinations(PLURIX_V15_TEMPLATE)).toEqual(destinations(previous));
  });

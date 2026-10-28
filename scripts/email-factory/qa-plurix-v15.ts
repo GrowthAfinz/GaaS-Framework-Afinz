@@ -6,9 +6,10 @@ import {renderDynamicEmail} from '../../src/modules/dynamic-email/ampscript/rend
 import {emptyBriefingRow,validateRows} from '../../src/modules/dynamic-email/domain/briefing';
 import {buildSfmcExport} from '../../src/modules/dynamic-email/domain/sfmcExport';
 import {plurixEnvelope} from '../../src/modules/dynamic-email/domain/sfmcEnvelope';
+import {plurixInvestidaName} from '../../src/modules/dynamic-email/domain/plurixInvestida';
 const out=resolve(process.argv[2]);mkdirSync(out,{recursive:true});
 const outlookProfile=process.argv.includes('--outlook-profile');
-const source=JSON.parse(readFileSync(join(out,'v2-source-snapshot.json'),'utf8'));
+const source=JSON.parse(readFileSync(join(out,process.argv.includes('--source-v3')?'v3-after-preview.json':'v2-source-snapshot.json'),'utf8'));
 const ids=['9a632d10-85e2-4a4e-b9c9-8b56eb0aa569','444740ce-dc51-4156-bdfa-ad0ab09a06b4','40c3316a-f124-4884-979e-9350fdb32987','32e872d2-1566-4c30-952b-4cbf9505270c'];
 const rows=source.map((b:any)=>Object.assign(emptyBriefingRow(b.id),b.briefing_data,{HEADER:'https://image.contato.clubemaisamigo.com.br/lib/fe3011747364047e721773/m/1/'+ids[Number(b.briefing_data.SEQUENCIA.slice(-1))-1]+'.png',TP_CAMPANHA:'CRM',DT_INICIO:'2026-10-28T00:00',DT_FIM:'2026-11-30T23:59'}));
 for(const row of rows){const errors=(validateRows(rows).get(row.__id) ?? []).filter(i=>i.severity==='error');if(errors.length)throw Error(JSON.stringify(errors));}
@@ -22,6 +23,7 @@ const report:any[]=[];const queue=[...rows];
 async function worker(){const page=await context.newPage();while(queue.length){const row=queue.shift();for(const [width,limit] of [[720,'3500'],[390,'3500'],[320,'3500'],[390,'']] as const){
  const result=renderDynamicEmail(PLURIX_V15_TEMPLATE,row,{CPF:'00000000000',PRI_NOME:'MARIA',LIMITE:limit,PRODUTO:row.NM_PRODUTO_INTERNO,SEQUENCIA:row.SEQUENCIA,TP_CAMPANHA:'CRM'},{pendingAssets:'hidden'});
  if(result.diagnostics.length)throw Error(result.diagnostics.join(';'));
+ if(row.COPY_1_PRETO.includes('@NomeInvestida')&&(!result.html.includes(plurixInvestidaName(row.NM_PRODUTO_INTERNO))||result.html.includes('@NomeInvestida')))throw Error('Nome da investida nao resolvido');
  await page.setViewportSize({width,height:900});await page.setContent(result.html,{waitUntil:'networkidle'});
  await page.emulateMedia({colorScheme:outlookProfile?'dark':'light'});
  if(outlookProfile)await page.evaluate(()=>{

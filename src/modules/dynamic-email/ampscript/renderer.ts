@@ -1,6 +1,7 @@
 import type { BriefingRow } from '../domain/briefing';
 import { formatLimite } from '../domain/topoPlurixV10';
 import { renderLimitMessage } from '../domain/limitMessage';
+import { plurixInvestidaName } from '../domain/plurixInvestida';
 
 export interface SubscriberSample { CPF: string; PRI_NOME: string; LIMITE: string; PRODUTO: string; SEQUENCIA: string; TP_CAMPANHA: string }
 export interface RenderResult { html: string; diagnostics: string[] }
@@ -75,6 +76,7 @@ function readVars(source: string, row: BriefingRow, subscriber: SubscriberSample
   if (/Field\s*\(\s*@Row\s*,\s*"MENSAGEM_LIMITE"\s*\)/.test(source)) {
     vars.FaixaLimite = renderLimitMessage(row.MENSAGEM_LIMITE ?? '', String(vars.FirstName ?? ''), subscriber.LIMITE);
   }
+  if(source.includes('SET @NomeInvestida'))vars.NomeInvestida=plurixInvestidaName(subscriber.PRODUTO);
   return vars;
 }
 
