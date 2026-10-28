@@ -2131,7 +2131,7 @@ function deterministicNarrative(
           : " Segmentação indisponível neste snapshot.";
         const actionContext = partnerActions.length
           ? ` ${partnerActions.length} ação(ões) do parceiro estão consolidadas em C8.`
-          : " Sem ação candidata do parceiro; manter curso e monitorar o próximo cutoff.";
+          : " Sem ação candidata do parceiro neste snapshot; cobertura e amostra devem ser verificadas antes de concluir estabilidade.";
         body = rulers.length
           ? `${slide.partner}: ${rulers.map((row) =>
             `${row.metric_label} ${row.value_text}${row.delta_text ? ` (${row.delta_text})` : ""} · ${row.verdict_text}`
