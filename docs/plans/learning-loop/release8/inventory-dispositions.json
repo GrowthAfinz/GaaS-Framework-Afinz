@@ -1,0 +1,1317 @@
+{
+  "inventory_sha256": "e2583c4ed331bee49cc68e4520bb98f54a0be007e1568ce9511325e0d9a70a87",
+  "entries": [
+    {
+      "inventory_id": "448af753-1fd9-48b9-b5cc-147edafa2b4d",
+      "source": "dynamic_email_ruler_strategies",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "603a21e6-0164-41d1-9cab-3d9b4421682e",
+      "source": "dynamic_email_ruler_strategies",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "B2C-4afee99546",
+      "source": "b2c_daily_metrics",
+      "disposition": "operation",
+      "operation_id": "B2C-4afee99546",
+      "front": "originacao_b2c",
+      "reason": "Population preserved; never add total to its components"
+    },
+    {
+      "inventory_id": "B2C-5be9323f8c",
+      "source": "b2c_daily_metrics",
+      "disposition": "operation",
+      "operation_id": "B2C-5be9323f8c",
+      "front": "originacao_b2c",
+      "reason": "Population preserved; never add total to its components"
+    },
+    {
+      "inventory_id": "B2C-714bdb4ba7",
+      "source": "b2c_daily_metrics",
+      "disposition": "operation",
+      "operation_id": "B2C-714bdb4ba7",
+      "front": "originacao_b2c",
+      "reason": "Population preserved; never add total to its components"
+    },
+    {
+      "inventory_id": "COP-19c7aabc26",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-26c4728876",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-304ced246a",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-4b3ed3a9f6",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-537ddb3562",
+      "source": "copa_visa_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-847a397519",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-9b34c8fcbc",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-9e984ee1f5",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-d604465632",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-d7ed98a0d3",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-d8718b3973",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "COP-ddb36d70fa",
+      "source": "copa_lp_daily",
+      "disposition": "out_of_scope",
+      "operation_id": null,
+      "front": null,
+      "reason": "Copa measurement slice, not an acquisition operation or campaign alias"
+    },
+    {
+      "inventory_id": "CRM-0104a32e90",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-0104a32e90",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-015928e5ba",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-015928e5ba",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-073dcbe686",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-073dcbe686",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-24693c62ef",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-24693c62ef",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-2cc364c6bd",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-2cc364c6bd",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-3bd920ad5c",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-3bd920ad5c",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-4b4cf35f73",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-4b4cf35f73",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-5eaebf1046",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-5eaebf1046",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-6714bb10d7",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-6714bb10d7",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-6d4dfb4e59",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-6d4dfb4e59",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-6e7d329c84",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-6e7d329c84",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-798bf8f3a7",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-798bf8f3a7",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-85fefd8ebc",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-85fefd8ebc",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-86b77dd1bc",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-86b77dd1bc",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-89856bcf7b",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-89856bcf7b",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-91f6d115db",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-91f6d115db",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-92fbd40403",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-92fbd40403",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-9475544ed5",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-9475544ed5",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-a695575900",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-a695575900",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-ac74764beb",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-ac74764beb",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-b34ee27854",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-b34ee27854",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-b9d196a55b",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-b9d196a55b",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-bcaf001164",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-bcaf001164",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-bdc57e480d",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-bdc57e480d",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-beb36081a4",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-beb36081a4",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-c063e536a7",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-c063e536a7",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-cc03a5f98d",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-cc03a5f98d",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-e2dbd0d4bf",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-e2dbd0d4bf",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-e3353b859a",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-e3353b859a",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-e3372078aa",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-e3372078aa",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-e63826e827",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-e63826e827",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-f5ee848cf4",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-f5ee848cf4",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "CRM-f9b25b84df",
+      "source": "activities",
+      "disposition": "operation",
+      "operation_id": "CRM-f9b25b84df",
+      "front": "crm_aquisicao",
+      "reason": "Exact inventory scope; business confirmation pending"
+    },
+    {
+      "inventory_id": "DOC-51b3cef914",
+      "source": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "DOC-630a24b417",
+      "source": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "DOC-666bf90687",
+      "source": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "DOC-73261c7af2",
+      "source": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "DOC-81a09f4b24",
+      "source": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "DOC-ee94b3fe07",
+      "source": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "DOC-fb7dca22d0",
+      "source": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "FUN-0badd49a28",
+      "source": "app_afinz_funnel_daily_raw",
+      "disposition": "operation",
+      "operation_id": "FUN-0badd49a28",
+      "front": "originacao_b2c",
+      "reason": "Exact source and measurement partition; no population equivalence inferred"
+    },
+    {
+      "inventory_id": "FUN-1bec633c12",
+      "source": "app_afinz_funnel_daily_raw",
+      "disposition": "operation",
+      "operation_id": "FUN-1bec633c12",
+      "front": "originacao_b2c",
+      "reason": "Exact source and measurement partition; no population equivalence inferred"
+    },
+    {
+      "inventory_id": "FUN-2a5d2238d6",
+      "source": "serasa_marketplace_daily_funnel",
+      "disposition": "operation",
+      "operation_id": "FUN-2a5d2238d6",
+      "front": "originacao_b2c",
+      "reason": "Exact source and measurement partition; no population equivalence inferred"
+    },
+    {
+      "inventory_id": "FUN-639564c9b1",
+      "source": "app_afinz_funnel_daily_raw",
+      "disposition": "operation",
+      "operation_id": "FUN-639564c9b1",
+      "front": "originacao_b2c",
+      "reason": "Exact source and measurement partition; no population equivalence inferred"
+    },
+    {
+      "inventory_id": "FUN-d0ea18ef02",
+      "source": "serasa_bi_neurotech_daily_funnel",
+      "disposition": "operation",
+      "operation_id": "FUN-d0ea18ef02",
+      "front": "originacao_b2c",
+      "reason": "Exact source and measurement partition; no population equivalence inferred"
+    },
+    {
+      "inventory_id": "FUN-d7584129d8",
+      "source": "serasa_bi_daily_funnel",
+      "disposition": "operation",
+      "operation_id": "FUN-d7584129d8",
+      "front": "originacao_b2c",
+      "reason": "Exact source and measurement partition; no population equivalence inferred"
+    },
+    {
+      "inventory_id": "MAP-08ed46706f",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-0ee73fb55c",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-1f0e38c2ce",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-29e899b793",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-2f93a84e04",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-35c8b54f21",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-475220bcf5",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-540eef7f13",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-5ab7fdc52e",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-99fa712f05",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-9bf942ef44",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-a3ebf599c4",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-cacb3c4ddf",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-ce794875a5",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-dafb201b6b",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-db53ce3e3e",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-e104cd20c5",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MAP-fc64408131",
+      "source": "paid_media_campaign_mappings",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "MID-1504cb124b",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-1504cb124b",
+      "front": "midia_aquisicao",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-177efec6eb",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-177efec6eb",
+      "front": "midia_aquisicao",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-17ac6dcad3",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-17ac6dcad3",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-1a8e5ee6f6",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-1a8e5ee6f6",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-22e003e36c",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-22e003e36c",
+      "front": "midia_aquisicao",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-2612783a0e",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-2612783a0e",
+      "front": "midia_aquisicao",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-2aeaceede0",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-2aeaceede0",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-38c6bd165e",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-38c6bd165e",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-4e9d64cee0",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-4e9d64cee0",
+      "front": "cross_sell_seguros",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-4fc930fa38",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Missing or ambiguous canonical identity; no name similarity matching"
+    },
+    {
+      "inventory_id": "MID-541e83fe93",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-541e83fe93",
+      "front": "cross_sell_seguros",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-56e21e834a",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Missing or ambiguous canonical identity; no name similarity matching"
+    },
+    {
+      "inventory_id": "MID-5730915745",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Canonical identity known, business front ambiguous; B2C alone does not prove acquisition"
+    },
+    {
+      "inventory_id": "MID-5b97c12f44",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Missing or ambiguous canonical identity; no name similarity matching"
+    },
+    {
+      "inventory_id": "MID-63d353d227",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-63d353d227",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-7edc7f7c5f",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Missing or ambiguous canonical identity; no name similarity matching"
+    },
+    {
+      "inventory_id": "MID-837592a9f9",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-837592a9f9",
+      "front": "midia_aquisicao",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-84a1c17afc",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-84a1c17afc",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-86be5fb0f2",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-86be5fb0f2",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-8c57a3dfcd",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-8c57a3dfcd",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-909cf08aeb",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Canonical identity known, business front ambiguous; B2C alone does not prove acquisition"
+    },
+    {
+      "inventory_id": "MID-94e2f30f00",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Missing or ambiguous canonical identity; no name similarity matching"
+    },
+    {
+      "inventory_id": "MID-9f682ce6e5",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-9f682ce6e5",
+      "front": "midia_aquisicao",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-aa8e600ba0",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Canonical identity known, business front ambiguous; B2C alone does not prove acquisition"
+    },
+    {
+      "inventory_id": "MID-aed91ae096",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Canonical identity known, business front ambiguous; B2C alone does not prove acquisition"
+    },
+    {
+      "inventory_id": "MID-af1a701f20",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-af1a701f20",
+      "front": "midia_aquisicao",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "MID-c3f9d50f7c",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Canonical identity known, business front ambiguous; B2C alone does not prove acquisition"
+    },
+    {
+      "inventory_id": "MID-d4b68873cd",
+      "source": "paid_media_metrics",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Canonical identity known, business front ambiguous; B2C alone does not prove acquisition"
+    },
+    {
+      "inventory_id": "MID-e37eedc954",
+      "source": "paid_media_metrics",
+      "disposition": "operation",
+      "operation_id": "MID-e37eedc954",
+      "front": "fora_de_escopo",
+      "reason": "Unique exact canonical identity from inventory; classification remains candidate"
+    },
+    {
+      "inventory_id": "RENT-0500aab9d6",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-0500aab9d6",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-093062a4b8",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-093062a4b8",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-09a331cabd",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-09a331cabd",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-0a46d97819",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-0a46d97819",
+      "front": "cross_sell_seguros",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-1565b28c8f",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-1565b28c8f",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-16761c8a3a",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-16761c8a3a",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-1752944e1c",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-1752944e1c",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-2cbba934fa",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-2cbba934fa",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-2f0e84a868",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-2f0e84a868",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-328952fe4d",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-328952fe4d",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-339eff5a34",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-339eff5a34",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-392d973d79",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-392d973d79",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-3d51d00ed6",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-3d51d00ed6",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-5051e37f02",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-5051e37f02",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-55b43e6e2a",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-55b43e6e2a",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-613bd68a2c",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-613bd68a2c",
+      "front": "cross_sell_seguros",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-63c4e611b8",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-63c4e611b8",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-68eae484cf",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-68eae484cf",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-6afea2d2e0",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-6afea2d2e0",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-6ca0baf5f3",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-6ca0baf5f3",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-77f8f33e8f",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-77f8f33e8f",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-7ab8558f4b",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-7ab8558f4b",
+      "front": "cross_sell_seguros",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-7b62e804a9",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-7b62e804a9",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-7cfb8b35bf",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-7cfb8b35bf",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-7f04768511",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-7f04768511",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-839315987f",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-839315987f",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-8cc1b6d474",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-8cc1b6d474",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-929cf587a1",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-929cf587a1",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-96f7a0892e",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-96f7a0892e",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-9bbaebd866",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-9bbaebd866",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-a9cebf447f",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-a9cebf447f",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-aede134f3d",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-aede134f3d",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-bc1d462c4c",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-bc1d462c4c",
+      "front": "cross_sell_seguros",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-bda382d827",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-bda382d827",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-bfa7c5c65b",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-bfa7c5c65b",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-cafe598fb3",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-cafe598fb3",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-cd4c748d2b",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-cd4c748d2b",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-de7adb7cce",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-de7adb7cce",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-deaef88d25",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-deaef88d25",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-e26f566672",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-e26f566672",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-e833be777d",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-e833be777d",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-f73bceeb96",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-f73bceeb96",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "RENT-fcb2005be4",
+      "source": "rentabilizacao_activities",
+      "disposition": "operation",
+      "operation_id": "RENT-fcb2005be4",
+      "front": "fora_de_escopo",
+      "reason": "Explicit inventory family; no certified sale metric"
+    },
+    {
+      "inventory_id": "f226c6fb-c322-4b40-ac30-7e8f1731cca8",
+      "source": "dynamic_email_ruler_strategies",
+      "disposition": "document",
+      "operation_id": null,
+      "front": null,
+      "reason": "Editorial/documentary entity; operation link requires reconciliation"
+    },
+    {
+      "inventory_id": "meta:name:024476253fd8",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:09afa7db922a",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:0bb04cf1b4dc",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:0c86e5eb4ace",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:163f687a4476",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:40b44271ae6b",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:5c9b7f87ad8d",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:8c84d7594bc5",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:bd12f62ae14b",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    },
+    {
+      "inventory_id": "meta:name:e299f03e8f65",
+      "source": "canonical_paid_media_campaigns",
+      "disposition": "pending",
+      "operation_id": null,
+      "front": null,
+      "reason": "Unobserved mapping/canonical identity; alias target not proven"
+    }
+  ]
+}
