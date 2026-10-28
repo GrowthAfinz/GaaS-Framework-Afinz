@@ -1,0 +1,233 @@
+{
+  "operation_ids": [
+    "CRM-92fbd40403",
+    "CRM-a695575900"
+  ],
+  "operations": [
+    {
+      "operation_id": "CRM-92fbd40403",
+      "front": "crm_aquisicao",
+      "domain": "CRM",
+      "scope": {
+        "bu": "Plurix",
+        "segment": "Negados",
+        "partner": "Plurix"
+      },
+      "display_name": "Repescagem candidata — Plurix — Plurix",
+      "lifecycle": "confirmada",
+      "aliases": [],
+      "vault_note_path": "07-Evolucao/Assunto-CRM-92fbd40403.md",
+      "confirmed_by": "Pablo Prado",
+      "valid_from": "2025-09-01",
+      "valid_to": null,
+      "regime_start": null,
+      "scope_schema_version": 1,
+      "provenance": {
+        "inventory_id": "CRM-92fbd40403",
+        "inventory_date": "2026-10-03",
+        "registry_sha256": "e2583c4ed331bee49cc68e4520bb98f54a0be007e1568ce9511325e0d9a70a87",
+        "source": "activities",
+        "classification_reason": "Exact inventory scope; business confirmation pending",
+        "validity_basis": "first observed calendar month; not a certified business start",
+        "approval_ref": "docs/plans/learning-loop/RELEASE_8_A0_ACCEPTANCE_2026-10-28.md"
+      }
+    },
+    {
+      "operation_id": "CRM-a695575900",
+      "front": "crm_aquisicao",
+      "domain": "CRM",
+      "scope": {
+        "bu": "B2C",
+        "segment": "Aprovados_nao_convertidos",
+        "partner": "Proprietaria"
+      },
+      "display_name": "Finalização de proposta e Upgrade candidato — Proprietaria — B2C",
+      "lifecycle": "confirmada",
+      "aliases": [],
+      "vault_note_path": "07-Evolucao/Assunto-CRM-a695575900.md",
+      "confirmed_by": "Pablo Prado",
+      "valid_from": "2025-04-01",
+      "valid_to": null,
+      "regime_start": null,
+      "scope_schema_version": 1,
+      "provenance": {
+        "inventory_id": "CRM-a695575900",
+        "inventory_date": "2026-10-03",
+        "registry_sha256": "e2583c4ed331bee49cc68e4520bb98f54a0be007e1568ce9511325e0d9a70a87",
+        "source": "activities",
+        "classification_reason": "Exact inventory scope; business confirmation pending",
+        "validity_basis": "first observed calendar month; not a certified business start",
+        "approval_ref": "docs/plans/learning-loop/RELEASE_8_A0_ACCEPTANCE_2026-10-28.md"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "T1_crm_moderado_v1",
+      "front": "crm_aquisicao",
+      "family": "T1",
+      "metric": "cards",
+      "params": {
+        "window_months": 6,
+        "minimum_months": 4,
+        "relative_threshold": "0.30",
+        "materiality": "50"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T2_crm_moderado_v1",
+      "front": "crm_aquisicao",
+      "family": "T2",
+      "metric": "cac_brl_per_card",
+      "params": {
+        "window_months": 6,
+        "minimum_months": 4,
+        "relative_threshold": "0.30",
+        "materiality": "1000",
+        "minimum_cards": "30"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T5_frescor_activities_v1",
+      "front": "source_quality",
+      "family": "T5",
+      "metric": "activities",
+      "params": {
+        "tolerance_days": 7,
+        "provisional": false,
+        "source_partition": "activities"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T5_frescor_paid_media_metrics_meta_v1",
+      "front": "source_quality",
+      "family": "T5",
+      "metric": "paid_media_metrics:meta",
+      "params": {
+        "tolerance_days": 3,
+        "provisional": false,
+        "source_partition": "paid_media_metrics:meta"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T5_frescor_paid_media_metrics_google_v1",
+      "front": "source_quality",
+      "family": "T5",
+      "metric": "paid_media_metrics:google",
+      "params": {
+        "tolerance_days": 3,
+        "provisional": false,
+        "source_partition": "paid_media_metrics:google"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T5_frescor_b2c_daily_metrics_v1",
+      "front": "source_quality",
+      "family": "T5",
+      "metric": "b2c_daily_metrics",
+      "params": {
+        "tolerance_days": 7,
+        "provisional": false,
+        "source_partition": "b2c_daily_metrics"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T5_frescor_app_afinz_funnel_daily_raw_v1",
+      "front": "source_quality",
+      "family": "T5",
+      "metric": "app_afinz_funnel_daily_raw",
+      "params": {
+        "tolerance_days": 7,
+        "provisional": false,
+        "source_partition": "app_afinz_funnel_daily_raw"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T5_frescor_serasa_bi_daily_funnel_v1",
+      "front": "source_quality",
+      "family": "T5",
+      "metric": "serasa_bi_daily_funnel",
+      "params": {
+        "tolerance_days": 7,
+        "provisional": false,
+        "source_partition": "serasa_bi_daily_funnel"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    },
+    {
+      "rule_id": "T6_revisao_certificado_v1",
+      "front": "crm_aquisicao",
+      "family": "T6",
+      "metric": "cards",
+      "params": {
+        "absolute_threshold": "20",
+        "relative_threshold": "0.02"
+      },
+      "enabled": true,
+      "mode": "observacao",
+      "version": 1,
+      "valid_from": "2026-10-27",
+      "valid_to": null,
+      "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+      "created_by": "release8-reviewed-spec-v3"
+    }
+  ],
+  "responsible_label": "Pablo Prado",
+  "mode": "observacao",
+  "approval_ref": "docs/plans/learning-loop/RELEASE_8_A0_ACCEPTANCE_2026-10-28.md"
+}
