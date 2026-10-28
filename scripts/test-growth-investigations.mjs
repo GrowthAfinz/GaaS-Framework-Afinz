@@ -10,7 +10,7 @@ async function fixture(){
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
  create schema auth;create table auth.users(id uuid primary key);insert into auth.users values('${actor}');
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
- create table public.profiles(id uuid primary key,role text);insert into profiles values('${actor}','admin');
+ create table public.profiles(id uuid primary key,role text);insert into profiles values('${actor}','user');
  create table public.report_live_memberships(user_id uuid,role text,active boolean);insert into report_live_memberships values('${actor}','admin',true);
  create table public.growth_operations(operation_id text primary key,scope jsonb,lifecycle text,registry_revision integer);
  insert into growth_operations values('synthetic','{"bu":"Synthetic","segment":"Synthetic","partner":"Synthetic"}','confirmada',1);
@@ -33,6 +33,7 @@ async function fixture(){
  await db.exec(migration);
  await db.exec(sql('_growth_investigation_reads.sql'));
  await db.exec(sql('_growth_investigation_visibility.sql'));
+ await db.exec(sql('_growth_investigation_admin_grants.sql'));
  await db.exec(`insert into growth_investigation_settings values(true,true,true,'1.0.0','${'a'.repeat(64)}');
  select set_config('request.jwt.claim.sub','${actor}',false);`);
  const period=(await db.query("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')-interval '1 month')::date::text p")).rows[0].p;
