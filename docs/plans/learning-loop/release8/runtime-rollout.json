@@ -1,0 +1,50 @@
+{
+  "approval": "RELEASE_8_A0_ACCEPTANCE_2026-10-28.md",
+  "tested_commit": "6d5f054cdbe6415d5db5e7300527fb8deb46b106",
+  "edge": {
+    "name": "growth-trigger-observer",
+    "version": 1,
+    "bundle_sha256": "d9c50f48d3f54fea96081bccd5481241851b697e1df7d917e08ddfd5c3bacb73"
+  },
+  "migration_filename_mapping": {
+    "20261028022014_growth_trigger_observation_release_8.sql": "20261028034011_growth_trigger_observation_release_8.sql",
+    "20261028031513_growth_trigger_observation_runtime.sql": "20261028034018_growth_trigger_observation_runtime.sql",
+    "20261028031854_growth_trigger_observation_dispatch.sql": "20261028034022_growth_trigger_observation_dispatch.sql",
+    "20261028034144_growth_trigger_pilot_a0_seed.sql": "20261028034027_growth_trigger_pilot_a0_seed.sql"
+  },
+  "scope": "two confirmed CRM operations; observation only",
+  "initial_run_id": "1e6c2465-970f-4e06-9cf6-b66d84f0202e",
+  "observation_enabled": true,
+  "candidate_production_enabled": false,
+  "cron": {
+    "name": "growth-trigger-observation",
+    "schedule": "*/5 * * * *",
+    "active": true,
+    "verified_tick_utc": "2026-10-28T03:45:00.040079+00:00"
+  },
+  "smoke": {
+    "authenticated_september_http": 200,
+    "repeated_run_reused": true,
+    "september_run_id": "1e6c2465-970f-4e06-9cf6-b66d84f0202e",
+    "october_run_id": "451e323a-dccb-473f-9f91-a9ea323fbb6f",
+    "october_performance_state": "open_period",
+    "snapshot_status": "verified_partner_grain",
+    "anonymous_http": 401,
+    "invalid_jwt_http": 401,
+    "queue_state": "completed",
+    "queue_revision": 1,
+    "processed_revision": 1
+  },
+  "preserved": {
+    "candidates": 48,
+    "bets": 1,
+    "live_run": "9bb55892-4b17-4f76-825a-0ac97c92b525",
+    "live_publication_version": 8
+  },
+  "migration_sha256": {
+    "20261028034011_growth_trigger_observation_release_8.sql": "6a4dce7deadc1a42e6af5a56559a16aa5a7037f03db45f80467620875e2c056b",
+    "20261028034018_growth_trigger_observation_runtime.sql": "8876d6df96a8b803bad0893890f0ad1a60bd0e6264d5c3b695e924562a97767a",
+    "20261028034022_growth_trigger_observation_dispatch.sql": "97421f20c4bad7f696edf1157213555a9480c7e40fe67ce82974c924aa939ce4",
+    "20261028034027_growth_trigger_pilot_a0_seed.sql": "21ff785d47e660987abb3d6946f6811143141e4ea03096d5fa929d081551bbec"
+  }
+}

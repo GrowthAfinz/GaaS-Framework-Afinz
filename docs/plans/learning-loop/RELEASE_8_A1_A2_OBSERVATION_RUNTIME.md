@@ -39,3 +39,9 @@ Testes do motor mais os testes sintéticos de runtime cobrem autenticação/role
 Para pausar, desabilitar `observation_enabled` e o cron específico; manter runs/configurações/histórico. Não apagar tabelas, alterar fontes ou restaurar Google como tentativa de rollback deste componente. O smoke verifica dois runs (mês fechado e aberto), idempotência, erro 401/403 sem credencial, leitura por membership e preservação de candidatas/apostas/ponteiro.
 
 Status de código, CI, implantação e smoke deve ser registrado no PR e na evidência da release; merge sozinho não equivale à implantação deste runtime.
+
+## Implantação observada em 28/10/2026
+
+Executor growth-trigger-observer v1 publicado, somente duas operações confirmadas e nove regras em observação. Smoke autenticado de setembro respondeu HTTP 200, repetição reutilizou o mesmo run, outubro foi classificado como mês aberto, snapshot passou no grão de parceiro e chamadas anônimas/JWT inválido retornaram 401. Fila transacional consumida com revisão=processed_revision=1; primeiro tick do cron próprio registrado como succeeded. Candidatas=48, apostas=1 e ponteiro vivo v8 preservados.
+
+As migrations foram registradas pelo MCP e os nomes locais foram alinhados às versões efetivas de schema_migrations, preservando integralmente seu SQL. O mapeamento, hashes e IDs de prova estão em release8/runtime-rollout.json. Não há segunda aplicação pendente da migration preparada anteriormente. O seed amplo segue fora do rollout.
