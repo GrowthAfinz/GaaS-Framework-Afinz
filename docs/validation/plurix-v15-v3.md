@@ -21,7 +21,7 @@ O corpo, mensagens de limite, links, CTAs e legal foram copiados sem edicao. Som
 ## Validacao
 
 - Simulacao transacional completa com rollback antes da aplicacao.
-- 271 testes do modulo, incluindo 64 combinacoes de sequencia/limite/logo para a V15.
+- 271 testes do modulo, incluindo 32 combinacoes de sequencia/limite/logo para a V15.
 - 96 renders Chromium: 24 briefings em 720/390/320 px com limite e em 390 px sem limite; sem overflow, imagens quebradas ou distorcao da arte.
 - PNGs Amigao E1 a E4 e Avenida E1 para revisao; fonte de assinante ficticia.
 - Auditoria AMPscript sem bloqueios; revisao de TreatAsContent herdado, restrito aos campos governados.
