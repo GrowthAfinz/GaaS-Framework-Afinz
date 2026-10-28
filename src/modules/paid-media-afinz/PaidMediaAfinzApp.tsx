@@ -110,7 +110,7 @@ const DashboardContent: React.FC<PaidMediaAfinzAppProps> = ({ onBack }) => {
 
   return (
     // ── Dashboard (light) ──────────────────────────────────────────────
-    <div className="fixed inset-0 z-50 bg-slate-50 text-slate-900 flex flex-col overflow-hidden" style={{ fontFamily: "var(--font-ui)" }}>
+    <div className="fixed inset-0 z-50 bg-slate-50 text-slate-900 flex flex-col overflow-hidden" style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}>
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-[60] shadow-sm">
         <div className="px-6 h-16 flex items-center justify-between">

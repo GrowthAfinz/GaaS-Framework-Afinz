@@ -11,7 +11,7 @@ import { rowCommunicationContext } from '../../../utils/activityCommunicationCon
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const TEAL = '#00C6CC';
 const TEAL_DARK = '#00A3A8';
-const FONT = "var(--font-ui)";
+const FONT = "Calibri, 'Trebuchet MS', sans-serif";
 
 // ── Field metadata (single source for render + save) ─────────────────────────────
 type Kind = 'text' | 'number' | 'currency' | 'percent' | 'date' | 'time' | 'integer';

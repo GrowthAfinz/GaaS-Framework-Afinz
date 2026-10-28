@@ -21,7 +21,6 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["Segoe UI", "Arial", "sans-serif"],
         // Lembra font family (Afinz brand) com fallbacks
         lembra: ['Lembra', 'Arial', 'sans-serif'],
       },

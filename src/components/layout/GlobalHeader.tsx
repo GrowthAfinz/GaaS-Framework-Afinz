@@ -179,7 +179,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             <button
                 onClick={() => navigateToTab('launch')}
                 className="shrink-0 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                style={{ fontFamily: "var(--font-ui)" }}
+                style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}
                 title="Voltar para Launch Planner"
             >
                 <AfinzLogo height={28} />
@@ -187,7 +187,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                     <div className="h-4 w-0.5 rounded-full bg-[#00C6CC]" />
                     <h1
                         className="font-black text-xl text-slate-800 tracking-tight leading-none"
-                        style={{ fontFamily: "var(--font-ui)" }}
+                        style={{ fontFamily: "'Trebuchet MS', Calibri, sans-serif" }}
                     >
                         Growth as a Service
                     </h1>
@@ -198,7 +198,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             <div className="flex-1 flex justify-center">
                 <nav
                     className="hidden lg:flex items-center gap-6"
-                    style={{ fontFamily: "var(--font-ui)" }}
+                    style={{ fontFamily: "'Trebuchet MS', Calibri, sans-serif" }}
                 >
                     {navGroups.map((group) => {
                         if (group.direct || group.items.length === 1) {

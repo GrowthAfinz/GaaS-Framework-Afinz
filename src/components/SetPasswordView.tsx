@@ -76,7 +76,7 @@ export const SetPasswordView: React.FC<{ onPasswordSet?: () => void }> = ({ onPa
         <div className="text-center">
           {/* Afinz Brand */}
           <div className="mb-8 flex flex-col items-center gap-3 select-none">
-            <div className="flex items-center gap-3" style={{ fontFamily: "var(--font-ui)" }}>
+            <div className="flex items-center gap-3" style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}>
               <AfinzLogo height={32} />
               <div className="flex items-center gap-2">
                 <div className="h-5 w-0.5 rounded-full bg-[#00C6CC]" />

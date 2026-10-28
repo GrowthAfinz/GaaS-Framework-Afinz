@@ -29,19 +29,12 @@
    (px, rem, SVG, graficos) e refaz o layout, sem quebrar position: fixed.
    ────────────────────────────────────────────────────────────── */
 :root {
-  --font-ui: "Segoe UI", Arial, sans-serif;
   --ui-scale: 1;
   /* Tela cheia ja compensada. Use estes tokens em vez de 100vh/100vw dentro de
      calc() — ex.: h-[calc(var(--screen-h)-80px)]. Sem eles, `calc(100vh - 80px)`
      rende apenas 67% da tela nos notebooks e o conteudo e cortado. */
   --screen-h: calc(100vh / var(--ui-scale));
   --screen-w: calc(100vw / var(--ui-scale));
-}
-
-/* One UI family across pages, form controls and portaled dialogs. */
-@layer base {
-  html { font-family: var(--font-ui); }
-  button, input, select, textarea { font-family: inherit; }
 }
 
 html {
@@ -57,7 +50,9 @@ body,
 
 body {
   overflow-y: auto;
-  font-family: var(--font-ui);
+  font-family: 'Calibri', 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8fafc;

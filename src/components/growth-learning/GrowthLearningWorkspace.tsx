@@ -122,7 +122,7 @@ export const GrowthLearningWorkspace: React.FC<
     <div className="min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 py-4 sm:px-5">
       <div
         className="learning-workspace mx-auto max-w-[1680px] space-y-4"
-        style={{ fontFamily: "var(--font-ui)" }}
+        style={{ fontFamily: "Segoe UI, Arial, sans-serif" }}
       >
         <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
