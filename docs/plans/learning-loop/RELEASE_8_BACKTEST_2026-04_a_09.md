@@ -25,6 +25,8 @@ Consulta única de agregados em `release8/read-aggregates.sql`; snapshot consist
 
 O registro mantém os 33 escopos CRM do inventário de 03/10. Vigência inicial = primeiro mês observado no inventário, sem afirmar início comercial. N/A fica inventariado e não avaliável. Serasa tem corte em fevereiro/2026. T1/T2 usam somente os seis meses calendários anteriores e mínimo de quatro elegíveis. Cobertura histórica incompleta bloqueia veredito; sem atividade não é zero; zero explicitamente observado é elegível em T1.
 
+A cobertura avaliada é dos campos nas linhas disponíveis. Não comprova ingestão completa de toda a população esperada: o inventário e o calendário de chegada ainda não fornecem esse certificado. O resultado permanece em observação.
+
 ## Comparação mensal
 
 Cada célula usa a ordem **T1 / T2 / operações / operações favoráveis / parceiros**.

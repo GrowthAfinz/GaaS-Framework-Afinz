@@ -8,7 +8,15 @@ const read=name=>JSON.parse(readFileSync(base+name,'utf8'));
 const operations=read('operations.json'),rules=read('rules.json'),snapshot=read('observed-aggregates.json');
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,canonical(v)])):value;
 const hash=value=>createHash('sha256').update(typeof value==='string'?value:JSON.stringify(canonical(value))).digest('hex');
-const write=(name,value)=>writeFileSync(base+name,JSON.stringify(value,null,2)+'\n');
+const write=(name,value)=>{
+  // One evaluation per line keeps the complete audit matrix reviewable in Git.
+  const text=name==='backtest-results.json'
+    ? '{\n'+Object.entries(value).map(([key,v])=>'  '+JSON.stringify(key)+': '+(Array.isArray(v)
+      ? '[\n'+v.map(row=>'    '+JSON.stringify(row)).join(',\n')+'\n  ]'
+      : JSON.stringify(v,null,2).replaceAll('\n','\n  '))).join(',\n')+'\n}'
+    : JSON.stringify(value,null,2);
+  writeFileSync(base+name,text+'\n');
+};
 const asOf=snapshot.evaluation_as_of;
 const crm=operations.filter(o=>o.domain==='CRM');
 const performanceRules=rules.filter(r=>['T1','T2'].includes(r.family));
@@ -74,8 +82,8 @@ const revisions=certifiedEvidence.partners.map(p=>{
 });
 const metadata={engine_version:ENGINE_VERSION,evaluation_as_of:asOf,data_read_at:snapshot.data_read_at,
   timezone:snapshot.timezone,transaction_snapshot:snapshot.transaction_snapshot,
-  operation_registry_hash:hash(operations),rules_hash:hash(rules),aggregate_hash:hash(snapshot),query_sha256:hash(readFileSync(base+'read-aggregates.sql','utf8')),
-  engine_sha256:hash(readFileSync('supabase/functions/_shared/growth-trigger-engine.ts','utf8')),
+  operation_registry_hash:hash(operations),rules_hash:hash(rules),aggregate_hash:hash(snapshot),query_sha256:hash(readFileSync(base+'read-aggregates.sql','utf8').replaceAll('\r\n','\n')),
+  engine_sha256:hash(readFileSync('supabase/functions/_shared/growth-trigger-engine.ts','utf8').replaceAll('\r\n','\n')),
   mode:'observacao',input_grain:'BU x segment x canonical partner x calendar month'};
 write('backtest-results.json',{metadata,matrix,goldenComparisons,freshness,revisions,partialDiagnosticsLabel:'Ignoring missing flags is invalid for acceptance; diagnosis only',partialDiagnostics});
 const fmt=x=>x===null?'—':Number(x).toLocaleString('pt-BR',{maximumFractionDigits:4});
@@ -87,6 +95,7 @@ md+='Status: observação, sem escrita em produção. **Não pronto para ativaç
 md+='## Procedência e contrato\n\n```json\n'+JSON.stringify(metadata,null,2)+'\n```\n\n';
 md+='Consulta única de agregados em `release8/read-aggregates.sql`; snapshot consistente da instrução SQL. Entradas em `observed-aggregates.json`, sem linha individual ou CPF. O backtest usa a base atual revisada, não o conhecimento disponível em cada mês histórico. `Realizado` e `Enviado` provam execução; resultado ausente permanece desconhecido. Custo = soma de `Custo Total Campanha`; CAC = soma de custo / soma de cartões. Nenhuma média de CAC de linha. Datas de disparo são convertidas para America/Sao_Paulo antes do mês.\n\n';
 md+='O registro mantém os 33 escopos CRM do inventário de 03/10. Vigência inicial = primeiro mês observado no inventário, sem afirmar início comercial. N/A fica inventariado e não avaliável. Serasa tem corte em fevereiro/2026. T1/T2 usam somente os seis meses calendários anteriores e mínimo de quatro elegíveis. Cobertura histórica incompleta bloqueia veredito; sem atividade não é zero; zero explicitamente observado é elegível em T1.\n\n';
+md+='A cobertura avaliada é dos campos nas linhas disponíveis. Não comprova ingestão completa de toda a população esperada: o inventário e o calendário de chegada ainda não fornecem esse certificado. O resultado permanece em observação.\n\n';
 md+='## Comparação mensal\n\nCada célula usa a ordem **T1 / T2 / operações / operações favoráveis / parceiros**.\n\n';
 md+=table(['Mês','Spec §5.1','Motor com cobertura','Diagnóstico ignorando faltas (não aceito)'],expected.map((e,i)=>{const m='2026-0'+(i+4);return [m,e.join(' / '),summarize(matrix.filter(r=>r.period===m)).join(' / '),summarize(partialDiagnostics.filter(r=>r.period===m)).join(' / ')];}));
 md+='\nO diagnóstico mantém os valores dos subtotais, mas ignora os contadores de cartões ausentes. Não é um resultado válido: serve para distinguir mudança de limiar de mudança de completude. O JSON registra toda avaliação, meses elegíveis, exclusões, valores, faixas, materialidade e frações exatas. A spec fornece apenas totais para abr–ago; não há lista nominal original desses meses para atestar correspondência histórica individual.\n\n';
