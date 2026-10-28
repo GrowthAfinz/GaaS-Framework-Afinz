@@ -1,0 +1,166 @@
+[
+  {
+    "rule_id": "T1_crm_moderado_v1",
+    "front": "crm_aquisicao",
+    "family": "T1",
+    "metric": "cards",
+    "params": {
+      "window_months": 6,
+      "minimum_months": 4,
+      "relative_threshold": "0.30",
+      "materiality": "50"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T2_crm_moderado_v1",
+    "front": "crm_aquisicao",
+    "family": "T2",
+    "metric": "cac_brl_per_card",
+    "params": {
+      "window_months": 6,
+      "minimum_months": 4,
+      "relative_threshold": "0.30",
+      "materiality": "1000",
+      "minimum_cards": "30"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T5_frescor_activities_v1",
+    "front": "source_quality",
+    "family": "T5",
+    "metric": "activities",
+    "params": {
+      "tolerance_days": 7,
+      "provisional": true,
+      "source_partition": "activities"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T5_frescor_paid_media_metrics_meta_v1",
+    "front": "source_quality",
+    "family": "T5",
+    "metric": "paid_media_metrics:meta",
+    "params": {
+      "tolerance_days": 3,
+      "provisional": true,
+      "source_partition": "paid_media_metrics:meta"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T5_frescor_paid_media_metrics_google_v1",
+    "front": "source_quality",
+    "family": "T5",
+    "metric": "paid_media_metrics:google",
+    "params": {
+      "tolerance_days": 3,
+      "provisional": true,
+      "source_partition": "paid_media_metrics:google"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T5_frescor_b2c_daily_metrics_v1",
+    "front": "source_quality",
+    "family": "T5",
+    "metric": "b2c_daily_metrics",
+    "params": {
+      "tolerance_days": 7,
+      "provisional": true,
+      "source_partition": "b2c_daily_metrics"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T5_frescor_app_afinz_funnel_daily_raw_v1",
+    "front": "source_quality",
+    "family": "T5",
+    "metric": "app_afinz_funnel_daily_raw",
+    "params": {
+      "tolerance_days": 7,
+      "provisional": true,
+      "source_partition": "app_afinz_funnel_daily_raw"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T5_frescor_serasa_bi_daily_funnel_v1",
+    "front": "source_quality",
+    "family": "T5",
+    "metric": "serasa_bi_daily_funnel",
+    "params": {
+      "tolerance_days": 7,
+      "provisional": true,
+      "source_partition": "serasa_bi_daily_funnel"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  },
+  {
+    "rule_id": "T6_revisao_certificado_v1",
+    "front": "crm_aquisicao",
+    "family": "T6",
+    "metric": "cards",
+    "params": {
+      "absolute_threshold": "20",
+      "relative_threshold": "0.02"
+    },
+    "enabled": true,
+    "mode": "observacao",
+    "version": 1,
+    "valid_from": "2026-10-27",
+    "valid_to": null,
+    "backtest_ref": "docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md",
+    "created_by": "release8-reviewed-spec-v3"
+  }
+]

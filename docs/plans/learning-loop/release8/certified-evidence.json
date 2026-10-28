@@ -1,0 +1,47 @@
+{
+  "run_id": "9bb55892-4b17-4f76-825a-0ac97c92b525",
+  "content_hash": "0033ccb3d907a383e47e725c2a1b8f0e263e40f4b9279a451450f29edf5f213a",
+  "period_start": "2026-08-01",
+  "period_end": "2026-08-31",
+  "artifact_path": "runs/9bb55892-4b17-4f76-825a-0ac97c92b525/blueprints/report-build.json",
+  "checks": {
+    "content": true,
+    "tabs": true,
+    "narrative": true,
+    "blueprints": true
+  },
+  "grain": "partner",
+  "partners": [
+    {
+      "view": "VP_DIA_RESULT",
+      "partner": "Dia",
+      "cards": "93",
+      "state": "valor_observado"
+    },
+    {
+      "view": "VP_PLURIX_RESULT",
+      "partner": "Plurix",
+      "cards": "698",
+      "state": "valor_observado"
+    },
+    {
+      "view": "VP_SERASA_RESULT",
+      "partner": "Serasa",
+      "cards": "988",
+      "state": "valor_observado"
+    },
+    {
+      "view": "VP_BEM_BARATO_RESULT",
+      "partner": "Bem Barato",
+      "cards": "158",
+      "state": "valor_observado"
+    },
+    {
+      "view": "VP_PROPRIETARIA_RESULT",
+      "partner": "Proprietaria",
+      "cards": "912",
+      "state": "valor_observado"
+    }
+  ],
+  "limitation": "Certified result tabs do not expose BU. No allocation to CRM operation; source chunks must be hydrated and validated for operation-level T6."
+}
