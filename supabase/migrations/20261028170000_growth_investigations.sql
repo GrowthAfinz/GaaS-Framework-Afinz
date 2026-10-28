@@ -190,20 +190,23 @@ begin
  perform public.growth_investigation_refresh(i); return i;
 end;$$;
 
-create function public.growth_investigation_from_observation() returns trigger
+create function public.growth_enqueue_observation_investigations(p_run uuid) returns void
 language plpgsql security definer set search_path='' as $$
-declare r record; i uuid; op text;
+declare r record; i uuid; op text; source public.growth_trigger_observation_runs;
 begin
- if not exists(select 1 from public.growth_investigation_settings where intake_enabled) then return new; end if;
+ select * into strict source from public.growth_trigger_observation_runs where id=p_run;
+ if not exists(select 1 from public.growth_investigation_settings where intake_enabled) then return; end if;
  -- T5 is global source health, never fan-out into per-operation analysis jobs.
- for op in select distinct item->>'operation_id' from jsonb_array_elements(new.output->'performance') item where item->>'state'='triggered'
+ for op in select distinct item->>'operation_id' from jsonb_array_elements(source.output->'performance') item where item->>'state'='triggered'
  loop
-  insert into public.growth_investigations(operation_id,period,question_type) values(op,new.period,'result_change')
+  insert into public.growth_investigations(operation_id,period,question_type) values(op,source.period,'result_change')
   on conflict(operation_id,period,question_type,filters) do nothing;
  end loop;
- for r in select id from public.growth_investigations where period=new.period loop perform public.growth_investigation_refresh(r.id); end loop;
- return new;
+ for r in select id from public.growth_investigations where period=source.period loop perform public.growth_investigation_refresh(r.id); end loop;
 end;$$;
+create function public.growth_investigation_from_observation() returns trigger
+language plpgsql security definer set search_path='' as $$
+begin perform public.growth_enqueue_observation_investigations(new.id);return new;end;$$;
 create trigger growth_observation_investigation after insert on public.growth_trigger_observation_runs
 for each row execute function public.growth_investigation_from_observation();
 
