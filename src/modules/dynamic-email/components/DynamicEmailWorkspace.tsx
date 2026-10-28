@@ -481,7 +481,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const usesTopoV10 = previewTemplate.includes('TB_HEADER_VARIACOES');
   // V13: o bloco 3 vem do pool e o header dinâmico vem do próprio briefing.
   const usesPool = usesTopoV10 || previewTemplate.includes('DE_POOL_OFERTAS_PLURIX');
-  const usesBriefingHeader = /Field\s*\(\s*@Row\s*,\s*"HEADER_TITULO"\s*\)/.test(previewTemplate);
+  const usesBriefingHeader = !previewTemplate.includes('@PLXV15Inicializado') && /Field\s*\(\s*@Row\s*,\s*"HEADER_TITULO"\s*\)/.test(previewTemplate);
   const usesLimitMessage = /Field\s*\(\s*@Row\s*,\s*"MENSAGEM_LIMITE"\s*\)/.test(previewTemplate);
   const limitBandText = useMemo(() => usesLimitMessage && previewRow
     ? renderLimitMessage(previewRow.MENSAGEM_LIMITE, subscriber.PRI_NOME.trim().toLocaleLowerCase('pt-BR').replace(/(^|\s)(\S)/g, (_, space: string, letter: string) => space + letter.toLocaleUpperCase('pt-BR')), subscriber.LIMITE)
@@ -590,13 +590,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
       segment: group.representative.__meta.segment,
       weekKey: group.representative.__meta.weekKey,
       rowCount: group.visibleRows.length,
-      dynamicHeaderRows: group.visibleRows.filter(row => row.HEADER_TITULO?.trim()).length,
+      dynamicHeaderRows: group.visibleRows.filter(row => {
+        const source = templateSlots.find(slot => slot.id === (row.__meta.templateSlotId || effectivePrincipalId))?.source ?? savedTemplate;
+        return !source.includes('@PLXV15Inicializado') && row.HEADER_TITULO?.trim();
+      }).length,
       usesDynamicHeader: group.visibleRows.some(row => {
         const source = templateSlots.find(slot => slot.id === (row.__meta.templateSlotId || effectivePrincipalId))?.source ?? savedTemplate;
-        return /Field\s*\(\s*@Row\s*,\s*["']HEADER_TITULO["']\s*\)/i.test(source);
+        return !source.includes('@PLXV15Inicializado') && /Field\s*\(\s*@Row\s*,\s*["']HEADER_TITULO["']\s*\)/i.test(source);
       }),
       incompleteHeaderRows: group.visibleRows.filter(row => !row.HEADER_TITULO?.trim() || !row.HEADER_IMAGEM_CARTAO?.trim()).length,
-      hasErrors: group.hasErrors,
+      hasErrors: group.hasErrors || group.visibleRows.some(row => row.__meta.templateSlotId === 'builtin-plurix-v15' && !/^https:\/\//i.test(row.HEADER.trim())),
     })), [editorialGroups, templateSlots, effectivePrincipalId, savedTemplate]);
   const exportableWeekCount = useMemo(() => new Set(exportGroups.filter((group) => !group.hasErrors)
     .map((group) => weekKeyFor(group.partner, group.segment, group.weekKey))).size, [exportGroups]);
