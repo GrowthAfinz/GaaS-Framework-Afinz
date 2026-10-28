@@ -72,6 +72,8 @@ jobs:
         run: node --test scripts/test-growth-results-dossiers.mjs
       - name: Growth trigger observation contracts (synthetic only)
         run: npm run test:growth-triggers
+      - name: Approved pilot configuration is reproducible
+        run: npm run check:growth-trigger-pilot
       - name: TypeScript regression gate (documented main debt)
         run: npm run typecheck:release
       - name: Edge Function type checks

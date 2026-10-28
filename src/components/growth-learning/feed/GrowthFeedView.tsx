@@ -12,6 +12,7 @@ import { GrowthFeedInspector } from './GrowthFeedInspector';
 import { GrowthSignalDecisionDialog } from '../bets/GrowthSignalDecisionDialog';
 import { fetchGrowthSignalDecisions } from '../bets/growthBetService';
 import { GrowthSignalDecision } from '../bets/growthBet.types';
+import { GrowthObservationStatus } from './GrowthObservationStatus';
 
 interface GrowthFeedViewProps {
   periodStart: Date;
@@ -173,6 +174,7 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
 
   return (
     <section className="space-y-3">
+      {['all','crm_acquisition'].includes(filters.front) && <GrowthObservationStatus period={format(periodEnd,'yyyy-MM')} />}
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
