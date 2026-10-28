@@ -168,6 +168,7 @@ export const GrowthLearningWorkspace: React.FC<
                 {
                   {
                     feed: "Identifique o que precisa de atenção e consulte a evidência antes de agir.",
+                    investigations: "Investigue mudanças, revise as evidências e registre a próxima decisão.",
                     bets: "Acompanhe hipóteses, responsáveis, execução e próximos compromissos.",
                     outcomes:
                       "Verifique resultados, registre limitações e decida o que pode ser reutilizado.",

@@ -26,7 +26,7 @@ export function GrowthInvestigations({initialMonth}:{initialMonth:string}){
  const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);try{await fn();await load();}catch(e){setError(e instanceof Error?e.message:'Não foi possível concluir. Atualize a evidência antes de tentar novamente.');}finally{setBusy(false);}};
  const current=items.find(i=>i.id===selected);const a=current?.analysis;
  return <div className="space-y-4">
- <section className="rounded-xl border bg-white p-5"><h2 className="text-lg font-bold">Investigações CRM</h2><p className="mt-1 text-sm text-slate-600">Transforme uma mudança em evidências, análise e decisão. A fila é consumida por um agente quando você solicitar; o app não chama IA.</p>
+ <section className="rounded-xl border bg-white p-5"><h2 className="text-lg font-bold">Investigações CRM</h2><p className="mt-1 text-sm text-slate-600">Transforme uma mudança em evidências, análise e decisão. O processamento começa quando você pedir a análise ao agente conectado ao projeto.</p>
  <form className="mt-4 flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();void run(async()=>open(await requestInvestigation(operation,month,question)));}}>
  <label className="text-xs">Operação<select required className={'block '+control} value={operation} onChange={e=>setOperation(e.target.value)}>{operations.map(o=><option key={o.operation_id} value={o.operation_id}>{o.scope.bu} · {o.scope.segment} · {o.scope.partner}</option>)}</select></label>
  <label className="text-xs">Período<input required type="month" className={'block '+control} value={month} onChange={e=>setMonth(e.target.value)}/></label>
