@@ -1,3 +1,4 @@
+import { GrowthInvestigations } from './investigations/GrowthInvestigations';
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import {
   BookMarked,
@@ -38,6 +39,7 @@ const SECTION_META: Record<
     icon: LucideIcon;
   }
 > = {
+  investigations: { label: "Investigações", icon: ListChecks },
   feed: { label: "Fila", icon: Inbox },
   "report-live": { label: "Report Live", icon: Presentation },
   bets: { label: "Apostas", icon: ListChecks },
@@ -207,7 +209,7 @@ export const GrowthLearningWorkspace: React.FC<
             )}
           </div>
         )}
-        {section === "feed" ? (
+        {section === "investigations" ? <GrowthInvestigations initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "feed" ? (
           <GrowthFeedView
             periodStart={periodStart}
             periodEnd={periodEnd}

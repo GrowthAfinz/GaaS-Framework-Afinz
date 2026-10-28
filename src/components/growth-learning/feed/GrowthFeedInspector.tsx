@@ -1,3 +1,4 @@
+import {openGrowthLearningSectionItem} from '../growthLearningNavigation';
 import React from 'react';
 import { Activity, Database, ExternalLink, Search, ShieldCheck } from 'lucide-react';
 import { formatDistanceToNowStrict, parseISO } from 'date-fns';
@@ -66,6 +67,7 @@ export const GrowthFeedInspector: React.FC<GrowthFeedInspectorProps> = ({ event,
           <div className="shrink-0 rounded-xl bg-rose-50 px-3 py-2 text-center text-rose-700"><span className="block text-[9px] font-black uppercase">Prioridade</span><strong className="text-lg">{Number(event.priority_score).toFixed(0)}</strong></div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
+          {typeof snapshot.investigation_id==='string'&&<button type="button" onClick={()=>openGrowthLearningSectionItem('investigations',snapshot.investigation_id as string)} className="rounded-lg border border-cyan-300 px-4 py-2.5 text-xs font-bold text-cyan-900">Abrir investigação</button>}
           <button type="button" onClick={() => onPrimaryAction(event)} className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">{actionLabel}<ExternalLink size={13} /></button>
           <button type="button" onClick={() => onOpenProvenance(event)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Ver procedência</button>
         </div>

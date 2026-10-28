@@ -1,3 +1,4 @@
+import { openGrowthLearningSection } from '../growthLearningNavigation';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {supabase} from '../../../services/supabaseClient';
 import {observationHealth,observationStateLabel,type ObservationRun,type ObservationJob} from './growthObservation.logic';
@@ -32,14 +33,15 @@ export function GrowthObservationStatus({period}:{period:string}){
   };
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const health=state?observationHealth(state.enabled,state.run,state.job,today):'Carregando observação';
-  return <section aria-label="Piloto de gatilhos" className="rounded-xl border border-cyan-200 bg-cyan-50/40 p-4">
-    <div className="flex flex-wrap items-center justify-between gap-3">
+  return <details aria-label="Piloto de gatilhos" className="rounded-xl border border-cyan-200 bg-cyan-50/40 p-4">
+    <summary className="cursor-pointer text-sm font-semibold text-slate-600">Diagnóstico do piloto de gatilhos · {period}</summary>
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
       <div><h3 className="text-sm font-bold text-slate-900">Piloto de gatilhos · {period}</h3>
         <p className="mt-1 text-xs text-slate-600">{error&&!state?'Monitor indisponível':health} · modo observação</p></div>
       <div className="flex gap-2"><button type="button" onClick={()=>void load()} className="rounded-lg border bg-white px-3 py-2 text-xs">Atualizar</button>
         {state&&['analyst','publisher','admin'].includes(state.role)&&<button type="button" onClick={()=>void rerun()} disabled={busy||!state.enabled} className="rounded-lg bg-slate-900 px-3 py-2 text-xs text-white disabled:opacity-50">{busy?'Avaliando…':'Reavaliar observação'}</button>}</div>
     </div>
-    <p className="mt-2 text-xs text-slate-600">Dois recortes CRM acompanhados por Pablo. Os resultados abaixo ainda não criam candidatas na Fila ou apostas.</p>
+    <p className="mt-2 text-xs text-slate-600">Observações determinísticas dos dois recortes. A análise é feita por agente na fila de investigações; apostas exigem decisão humana.</p>
     {error&&<p role="status" className="mt-2 text-xs text-amber-800">{error}</p>}
     {state?.run&&<details className="mt-3"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Ver avaliações e frescor</summary>
       <p className="my-2 text-xs text-slate-500">Dados consultados em {new Date(state.run.data_read_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}. Período avaliado: {period}.</p>
@@ -48,5 +50,6 @@ export function GrowthObservationStatus({period}:{period:string}){
       <ul className="mt-3 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">{state.run.output.freshness.map(row=><li key={row.source}>{sources[row.source]??row.source}: {row.latest??'sem data observada'} · {row.state==='triggered'?'atraso acima da tolerância':observationStateLabel(row.state)}</li>)}</ul>
       <p className="mt-2 text-xs text-slate-500">Revisão do certificado: {state.run.output.revision_status==='verified_partner_grain'?'verificada no grão de parceiro':'snapshot não verificável nesta execução'}.</p>
     </details>}
-  </section>;
+    <button className="mt-3 text-sm text-cyan-800 underline" onClick={()=>openGrowthLearningSection('investigations')}>Abrir fila de investigações</button>
+  </details>;
 }

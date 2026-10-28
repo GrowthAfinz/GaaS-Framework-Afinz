@@ -38,7 +38,8 @@
     "test:sfmc-package-sql": "node --test scripts/test-sfmc-package-sql.mjs scripts/test-execution-review-sql.mjs scripts/test-scoped-communication-links.mjs",
     "test:growth-triggers": "node --test scripts/test-growth-triggers-release8.mjs scripts/test-growth-trigger-schema-release8.mjs scripts/test-growth-trigger-runtime.mjs scripts/test-growth-trigger-runtime-sql.mjs",
     "check:growth-triggers": "npx --yes deno@2.9.6 check supabase/functions/_shared/growth-trigger-engine.ts",
-    "check:growth-trigger-pilot": "node scripts/build-growth-trigger-pilot-seed.mjs --check"
+    "check:growth-trigger-pilot": "node scripts/build-growth-trigger-pilot-seed.mjs --check",
+    "test:growth-investigations": "node --test scripts/test-growth-investigations.mjs scripts/test-growth-investigation-agent.mjs scripts/test-growth-investigation-loop.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
