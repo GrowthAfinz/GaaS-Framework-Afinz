@@ -16,7 +16,7 @@ import {
   OUTCOME_VERDICT_LABELS,
 } from "./growthOutcome.logic";
 import { GrowthOutcome } from "./growthOutcome.types";
-import { reviewGrowthOutcome } from "./growthOutcomeService";
+import { reviewGrowthOutcome, evaluateInvestigationOutcome } from "./growthOutcomeService";
 
 interface Props {
   outcome: GrowthOutcome;
@@ -151,6 +151,7 @@ export const GrowthOutcomeDrawer: React.FC<Props> = ({
               <X size={20} />
             </button>
           </div>
+        {outcome.verification_view.includes('section=investigations')&&<button type="button" disabled={saving||['confirmed_by_user','resolved','contested'].includes(outcome.review_status||'')} onClick={()=>{setSaving(true);void evaluateInvestigationOutcome(outcome.bet_id).then(()=>onChanged()).catch(e=>setError(e instanceof Error?e.message:'Não foi possível verificar.')).finally(()=>setSaving(false));}} className="mt-3 rounded border px-3 py-2 text-xs">Verificar resultado nas evidências CRM</button>}
         <button type="button" onClick={()=>openGrowthAiContext('Revisar esta verificação de resultado e suas limitações: '+outcome.hypothesis)} className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800">Consultar contexto e trabalhar com IA</button></header>
 
         <div className="flex-1 space-y-7 overflow-y-auto px-5 py-6 sm:px-6">

@@ -1,3 +1,4 @@
+import { openGrowthLearningSection as openInvestigationsSection } from '../growthLearningNavigation';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Filter, Inbox, Loader2, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { format } from 'date-fns';
@@ -174,6 +175,7 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
 
   return (
     <section className="space-y-3">
+      {['all','crm_acquisition'].includes(filters.front) && <div className="rounded-xl border bg-white p-4"><strong className="text-sm">Da evidência à decisão</strong><p className="my-2 text-sm text-slate-600">Solicite uma investigação ou consulte análises produzidas pelos agentes conectados.</p><button className="text-sm font-semibold text-cyan-800 underline" onClick={()=>openInvestigationsSection('investigations')}>Abrir investigações CRM</button></div>}
       {['all','crm_acquisition'].includes(filters.front) && <GrowthObservationStatus period={format(periodEnd,'yyyy-MM')} />}
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>

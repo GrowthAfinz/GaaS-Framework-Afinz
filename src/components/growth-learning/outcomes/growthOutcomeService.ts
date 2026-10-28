@@ -51,3 +51,5 @@ export async function reviewGrowthOutcome(input: {
   if (error) throw error;
   return oneRow(data);
 }
+
+export async function evaluateInvestigationOutcome(betId:string){const {data,error}=await supabase.rpc("growth_evaluate_investigation_bet",{p_bet:betId});if(error)throw error;return data;}

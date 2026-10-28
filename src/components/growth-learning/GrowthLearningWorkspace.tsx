@@ -1,3 +1,4 @@
+import { GrowthInvestigations } from './investigations/GrowthInvestigations';
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import {
   BookMarked,
@@ -38,6 +39,7 @@ const SECTION_META: Record<
     icon: LucideIcon;
   }
 > = {
+  investigations: { label: "Investigações", icon: ListChecks },
   feed: { label: "Fila", icon: Inbox },
   "report-live": { label: "Report Live", icon: Presentation },
   bets: { label: "Apostas", icon: ListChecks },
@@ -166,6 +168,7 @@ export const GrowthLearningWorkspace: React.FC<
                 {
                   {
                     feed: "Identifique o que precisa de atenção e consulte a evidência antes de agir.",
+                    investigations: "Investigue mudanças, revise as evidências e registre a próxima decisão.",
                     bets: "Acompanhe hipóteses, responsáveis, execução e próximos compromissos.",
                     outcomes:
                       "Verifique resultados, registre limitações e decida o que pode ser reutilizado.",
@@ -207,7 +210,7 @@ export const GrowthLearningWorkspace: React.FC<
             )}
           </div>
         )}
-        {section === "feed" ? (
+        {section === "investigations" ? <GrowthInvestigations initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "feed" ? (
           <GrowthFeedView
             periodStart={periodStart}
             periodEnd={periodEnd}
