@@ -25,7 +25,7 @@ const stableJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
 async function persist(targetPath, value) {
   const next = stableJson(value);
   if (CHECK) {
-    const current = await readFile(targetPath, 'utf8');
+    const current = (await readFile(targetPath, 'utf8')).replaceAll('\r\n', '\n');
     assert.equal(current, next, `${path.relative(ROOT, targetPath)} está desatualizado; rode o gerador.`);
     return;
   }
