@@ -7,11 +7,13 @@
 ## Ordem de leitura
 
 1. [`CLAUDE_COWORK_HANDOFF.md`](CLAUDE_COWORK_HANDOFF.md) — ponto de entrada autossuficiente e passo 0 de cobertura dos 57 slides.
-2. [`CLAUDE_COWORK_RENDERER_SPEC.md`](CLAUDE_COWORK_RENDERER_SPEC.md) — contrato completo para o Claude implementar o renderer PPTX/PDF.
-3. [`report-render-package.schema.json`](report-render-package.schema.json) — contrato normativo engine → renderer.
-4. [`fixtures/august-2026-baseline-57.coverage.json`](fixtures/august-2026-baseline-57.coverage.json) — golden estrutural, não renderizável, das 57 páginas.
-5. `fixtures/archetypes-*.fixture.json` — pacotes sintéticos que cobrem os 12 arquétipos.
-6. [`SUPABASE_ASYNC_PUBLISHING_PLAN.md`](SUPABASE_ASYNC_PUBLISHING_PLAN.md) — fila, artefatos, certificação, Storage e integração com o GaaS.
+2. [`SLIDE_COVERAGE_REVIEW.md`](SLIDE_COVERAGE_REVIEW.md) e [`SLIDE_COVERAGE_MAP.csv`](SLIDE_COVERAGE_MAP.csv) — auditoria página a página entregue no passo 0.
+3. [`PRODUCT_DECISIONS_2026-09-25.md`](PRODUCT_DECISIONS_2026-09-25.md) — aceite das fusões, perfil mensal completo e gates.
+4. [`CLAUDE_COWORK_RENDERER_SPEC.md`](CLAUDE_COWORK_RENDERER_SPEC.md) — contrato completo para o Claude implementar o renderer PPTX/PDF.
+5. [`report-render-package.schema.json`](report-render-package.schema.json) — contrato normativo engine → renderer.
+6. [`fixtures/august-2026-baseline-57.coverage.json`](fixtures/august-2026-baseline-57.coverage.json) — golden estrutural, não renderizável, das 57 páginas.
+7. `fixtures/archetypes-*.fixture.json` — pacotes sintéticos que cobrem os 12 arquétipos.
+8. [`SUPABASE_ASYNC_PUBLISHING_PLAN.md`](SUPABASE_ASYNC_PUBLISHING_PLAN.md) — fila, artefatos, certificação, Storage e integração com o GaaS.
 
 ## Implementação de apoio
 

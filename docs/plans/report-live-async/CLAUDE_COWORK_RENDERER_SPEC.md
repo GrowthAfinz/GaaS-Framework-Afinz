@@ -1,6 +1,6 @@
 # Especificação para Claude Cowork — renderer PPTX/PDF do Report Live
 
-**Status:** contrato de implementação para revisão  
+**Status:** contrato aceito; implementação liberada após o passo 0
 **Público visual:** institucional Afinz  
 **Output:** PPTX editável, PDF equivalente, thumbnails e relatório de QA  
 **Fora do escopo:** Supabase, scheduler, banco, engine analítico, escolha de slides, publicação e interface do GaaS
@@ -166,11 +166,13 @@ type RenderSlide = {
 
 `visual.dataset` preserva as linhas da view como `columns`, `rows` e `row_count`. Cada célula traz `value` e `state`, com os estados `valor_observado`, `zero_observado`, `missing` e `nao_aplicavel`. O renderer não pode converter `missing` em `0` nem inferir `nao_aplicavel` pelo texto `N/A`, porque `N/A` também é um valor canônico legítimo de parceiro não resolvido.
 
-O bloco `visual` também transporta `editorial_layout`, `editorial_rulers` e `chart_contract`. Esses campos vêm das tabelas já materializadas `VIEW_EDITORIAL_LAYOUTS`, `VIEW_EDITORIAL_RULERS`, `VIEW_EDITORIAL_CHART_REGISTRY` e das famílias de dados apontadas pelo registry. Assim, o renderer recebe tipo, séries, eixo, cor, formato, range e dados do gráfico; não os reconstrói por convenção própria. Se `editorial_layout.expected_chart=true` e `chart_contract` estiver ausente, o pacote é inválido.
+O bloco `visual` também transporta `editorial_layout`, `editorial_rulers` e `chart_contract`. Esses campos vêm das tabelas já materializadas `VIEW_EDITORIAL_LAYOUTS`, `VIEW_EDITORIAL_RULERS`, `VIEW_EDITORIAL_CHART_REGISTRY` e das famílias de dados apontadas pelo registry. Assim, o renderer recebe tipo, séries, eixo, cor, formato, range e dados do gráfico; não os reconstrói por convenção própria. Se `editorial_layout.expected_chart=true` e `chart_contract` estiver ausente, o pacote é inválido. Em pacote de produção, os arquétipos `time_series_pacing`, `router_ranking`, `driver_scatter`, `funnel` e `heatmap` sempre exigem `chart_contract`, mesmo quando um artefato histórico ainda não possui `expected_chart` materializado.
+
+Todo slide de produção também exige `narrative.evidence[]` não vazio e `narrative.limitation` explícito. A frase genérica “N linhas observadas” não satisfaz esse contrato.
 
 O array `slides[]` já chega projetado e ordenado. O renderer deve produzir exatamente uma página para cada item, sem reordenar, promover, omitir ou criar slides.
 
-A publicação de agosto com 57 páginas é a baseline de cobertura. Os perfis de 12 e 31 slides existem como implementação candidata, mas ainda não foram homologados e não constituem cardinalidade obrigatória do novo renderer. Até a auditoria de equivalência terminar, qualquer cardinalidade declarada no pacote é aceita se:
+A publicação de agosto com 57 páginas é a baseline de cobertura. A auditoria foi aceita em 2026-09-25 e está normatizada em `PRODUCT_DECISIONS_2026-09-25.md`. `monthly_full`/`monthly_report` é o output operacional de cardinalidade dinâmica; 12 e 31 são derivados opcionais. Qualquer cardinalidade declarada no pacote é aceita se:
 
 - `slides.length` corresponder ao `expected_slide_count` do manifesto;
 - cada `slide_instance_id` tiver procedência;
