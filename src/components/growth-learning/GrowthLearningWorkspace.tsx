@@ -39,7 +39,7 @@ const SECTION_META: Record<
     icon: LucideIcon;
   }
 > = {
-  investigations: { label: "Investigações", icon: ListChecks },
+  investigations: { label: "Tarefas", icon: ListChecks },
   feed: { label: "Fila", icon: Inbox },
   "report-live": { label: "Report Live", icon: Presentation },
   bets: { label: "Apostas", icon: ListChecks },
@@ -122,7 +122,7 @@ export const GrowthLearningWorkspace: React.FC<
     <div className="min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 py-4 sm:px-5">
       <div
         className="learning-workspace mx-auto max-w-[1680px] space-y-4"
-        style={{ fontFamily: "Segoe UI, Arial, sans-serif" }}
+        style={{ fontFamily: "var(--font-ui)" }}
       >
         <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
