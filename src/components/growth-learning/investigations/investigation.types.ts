@@ -8,6 +8,7 @@ export interface InvestigationPacket {
  period:string;period_state:'open'|'closed';evidence:InvestigationMetric[];
  monthly:Array<{month:string;rows:number;ambiguous_rows:number;template_linked:number;cards_exclusion_policy:number|null}>;
  cuts:Array<{channel:string;journey:string;rows:number;recorded_row_sum:number|null;ambiguous_rows:number}>;
+ source_rows:Array<{id:string;month:string;activity_name:string;execution_at:string;channel:string;journey:string|null;key_count:number;template_id:string|null}>;
  communications:Array<{template_id:string;title:string;version_label:string|null;historical_version_verified:boolean}>;
  memory_context:Array<{id:string;statement:string;source_ref:string;source_kind:string;review_due:boolean}>;
  limitations:string[];

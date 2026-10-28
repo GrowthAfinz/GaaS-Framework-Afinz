@@ -32,6 +32,7 @@ async function fixture(){
  grant select on profiles,growth_operations,report_live_memberships to authenticated,service_role;`);
  await db.exec(migration);
  await db.exec(sql('_growth_investigation_reads.sql'));
+ await db.exec(sql('_growth_investigation_visibility.sql'));
  await db.exec(`insert into growth_investigation_settings values(true,true,true,'1.0.0','${'a'.repeat(64)}');
  select set_config('request.jwt.claim.sub','${actor}',false);`);
  const period=(await db.query("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')-interval '1 month')::date::text p")).rows[0].p;
@@ -104,7 +105,7 @@ test('open months, missing costs, scopes and lease exhaustion remain explicit',a
  const p=(await f.db.query("select growth_investigation_packet('synthetic',$1) p",[current])).rows[0].p;
  assert.equal(p.evidence.find(x=>x.id===current+':cost_per_card').value,null);
  assert.equal(p.evidence.find(x=>x.id===current+':cards').value,10);
- await f.db.exec("update profiles set role='analista_plurix';set role authenticated");
+ await f.db.exec("delete from growth_investigation_access;update profiles set role='admin';set role authenticated");
  assert.deepEqual((await f.db.query('select growth_list_investigations() result')).rows[0].result,[]);
  await assert.rejects(f.db.query("select growth_request_investigation('synthetic',$1)",[current]),/investigation_access_denied/);
  await f.db.exec('reset role;set role anon');

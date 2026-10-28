@@ -25,7 +25,7 @@ test('real contracts: investigation candidate -> human bet -> reviewed outcome -
  "Activity name / Taxonomia" text,"Canal" text,jornada text,"Etapa de aquisição" text,"Subgrupos" text,"Safra" text,"Oferta" text,"Oferta 2" text,"Ordem de disparo" int,template_id text,
  "Cartões Gerados" numeric,"Custo Total Campanha" numeric,"Propostas" numeric,"Aprovados" numeric,"Base Acionável" numeric,"Cliques" numeric);
  create function growth_reject_definition_mutation() returns trigger language plpgsql as $$begin raise exception 'immutable';end;$$;`);
- for(const suffix of ['_growth_investigations.sql','_growth_investigation_compatibility.sql','_growth_investigation_reads.sql','_growth_investigation_scope_guards.sql'])await db.exec(migration(suffix));
+ for(const suffix of ['_growth_investigations.sql','_growth_investigation_compatibility.sql','_growth_investigation_reads.sql','_growth_investigation_scope_guards.sql','_growth_investigation_visibility.sql','_growth_investigation_outcome_evaluator.sql'])await db.exec(migration(suffix));
  await db.exec(`insert into growth_investigation_settings values(true,true,true,'1.0.0','${'a'.repeat(64)}');select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);`);
  const period=(await db.query("select (date_trunc('month',now() at time zone 'America/Sao_Paulo')-interval '1 month')::date::text p")).rows[0].p;
  await db.exec(`insert into activities("BU","Segmento",parceiro_canonico,"Data de Disparo",status,"Activity name / Taxonomia","Canal",jornada,"Cartões Gerados","Custo Total Campanha","Propostas","Aprovados") values('Synthetic','Synthetic','Synthetic','${period} 12:00:00-03','Realizado','Synthetic','SMS','Synthetic',10,100,20,15)`);
@@ -42,9 +42,10 @@ test('real contracts: investigation candidate -> human bet -> reviewed outcome -
  const snapshot=(await db.query('select * from growth_evidence_snapshots where id=$1',[bet.evidence_snapshot_id])).rows[0];
  assert.equal(snapshot.source_run_id,null);assert.equal(snapshot.filters.investigation_id,j.investigation_id);
  assert.equal((await db.query('select count(*)::int n from report_runs')).rows[0].n,0);
- await db.query(`insert into report_action_outcomes(action_candidate_id,bet_id,metric_name,baseline_value,expected_value,observed_value,window_start,window_end,evidence_snapshot_id,execution_status,outcome_status,conclusion)
- values($1,$2,'cards',10,20,22,$3,$3,$4,'completed','positive','Synthetic observed result')`,[done.candidate_id,bet.id,period,bet.evidence_snapshot_id]);
- const out=(await db.query('select id from report_action_outcomes where bet_id=$1',[bet.id])).rows[0];
+ await db.query("select growth_append_bet_update($1,'execution','Synthetic completed execution','completed',null)",[bet.id]);
+ const out=(await db.query('select growth_evaluate_investigation_bet($1) id',[bet.id])).rows[0];
+ assert.equal((await db.query('select observed_value from report_action_outcomes where id=$1',[out.id])).rows[0].observed_value,'10');
+ assert.equal((await db.query('select growth_evaluate_investigation_bet($1) id',[bet.id])).rows[0].id,out.id);
  await db.query("select growth_review_outcome($1,'confirm')",[out.id]);
  assert.equal((await db.query('select count(*)::int n from growth_learnings where source_outcome_id=$1',[out.id])).rows[0].n,1);
  // A legacy report candidate still accepts through its original report context.

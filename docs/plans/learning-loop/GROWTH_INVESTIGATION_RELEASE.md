@@ -17,7 +17,7 @@ O usuário consulta fatos, cobertura, cortes, hipóteses, próximas verificaçõ
 - Novos dados invalidam análises anteriores. Conclusão revalida hash/revisão; trabalho antigo fica superseded em vez de publicar sobre dados novos.
 - Publicação de análise e candidata é transacional. Uma candidata por investigação; revisões não reabrem decisões anteriores.
 - Novas candidatas têm investigation_id/analysis_id e run_id nulo. Candidatas antigas mantêm o contrato de relatório; nenhuma investigação cria um report_run artificial.
-- Guardas de escopo valem na leitura e nos comandos antigos de aposta/decisão. Perfis Plurix não ganham acesso ao recorte B2C pela nova interface.
+- Concessões de operação são registros administrativos em growth_investigation_access, inicializados a partir dos acessos existentes; alteração posterior do perfil não concede novos escopos. Guardas de escopo valem na leitura e nos comandos antigos de aposta/decisão. Perfis Plurix não ganham acesso ao recorte B2C pela nova interface.
 - Hash da skill cobre instruções, contrato de saída e script de validação, normalizados para LF; não depende do modelo utilizado.
 
 ## APIs
@@ -27,6 +27,10 @@ App autenticado: `growth_investigation_operations`, `growth_list_investigations`
 Agente autorizado: `growth_claim_investigation`, `growth_renew_investigation`, `growth_fail_investigation`, `growth_complete_investigation`, `growth_publish_investigation_analysis`.
 
 Rotinas internas não ficam executáveis por anon/authenticated. Leitura respeita operação, perfil e membership ativo. A identidade do agente é declarada e auditada; não é prova criptográfica de qual LLM executou a tarefa. Validação de referências/valores não certifica semanticamente prosa livre.
+
+## Verificação de resultado
+
+O avaliador determinístico das novas apostas mede a janela e os filtros aprovados, bloqueia grão/métricas incompletas e preserva um snapshot da medição. Pode ser acionado em Outcomes ou pela rotina de observação existente após fechamento da janela. A métrica da aposta deve corresponder à candidata; resultado revisado não é sobrescrito automaticamente. A decisão sobre execução e a revisão do outcome continuam humanas.
 
 ## Operação e falhas
 
@@ -60,3 +64,9 @@ Preservar schema, evidências, análises, candidatas e decisões para auditoria.
 `npm run test:growth-investigations` cobre fila e contratos reais candidata → aposta → outcome revisado → memória, além de candidata antiga. Frontend cobre semântica de referência histórica, ausência/zero e precedência de desatualização. CI mantém os contratos anteriores e o gate de dívida TypeScript.
 
 Os detalhes finais da implantação, hashes e IDs de evidências reais serão registrados no fechamento desta entrega. Dados operacionais detalhados continuam fora do Git.
+
+## Backend implantado
+
+Migrations registradas no Supabase em 28/10/2026, com intake e publicação inicialmente pausados. Histórico local alinhado às versões do servidor. Um conflito de timestamp no registro da quinta migration foi reparado com aplicação idempotente; nenhuma regra de negócio foi alterada por esse reparo.
+
+As funções autenticadas de aplicação são SECURITY DEFINER com autorização explícita; o advisor lista esses endpoints como avisos de revisão de superfície. Não são chamadas anônimas. O pacote de rollout registra permissões testadas e comparação com o baseline de avisos preexistentes.
