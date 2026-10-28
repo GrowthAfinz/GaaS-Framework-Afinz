@@ -78,153 +78,193 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
     return next;
   });
 
+  const coverage = totals.rows ? Math.min(100, Math.round((dynamicHeaders / totals.rows) * 100)) : 0;
+  const downloadDisabled = !totals.weeks || headerBlocked;
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4"
       role="dialog" aria-modal="true" aria-labelledby="export-csv-title"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
-      <div className="flex max-h-[92vh] w-full max-w-xl flex-col rounded-2xl bg-white p-5 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cyan-50 text-cyan-700"><Download size={18}/></span>
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl lg:h-[min(680px,92vh)]">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-3.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cyan-50 text-cyan-700"><Download size={17}/></span>
           <div className="min-w-0">
             <h2 id="export-csv-title" className="font-bold text-slate-900">Exportar CSV para o SFMC</h2>
-            <p className="mt-1 text-sm leading-5 text-slate-600">
-              Escolha parceiro, régua e semana que entram no arquivo <code className="rounded bg-slate-100 px-1 text-[11px]">TB_BRIEFING_CAMPANHA_AQUISICAO</code>.
+            <p className="text-xs leading-4 text-slate-500">
+              Escolha parceiro, régua e semana que entram no arquivo <code className="rounded bg-slate-100 px-1 text-[10px]">TB_BRIEFING_CAMPANHA_AQUISICAO</code>.
               Semana com pendência bloqueante não pode ser exportada.
             </p>
           </div>
         </div>
 
-        <div className="mt-4 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
-          {tree.map((partner) => {
-            const open = !collapsed.has(partner.key);
-            return (
-              <div key={partner.key} className="rounded-xl border border-slate-200">
-                <div className="flex items-start gap-2 px-3 py-2.5">
-                  <TriCheckbox state={nodeState(partner, selection)} label={`Selecionar ${partner.label}`} onChange={(checked) => toggle(partner, checked)}/>
-                  <button
-                    type="button" onClick={() => toggleCollapse(partner.key)}
-                    aria-expanded={open}
-                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-                  >
-                    {open ? <ChevronDown size={14} className="shrink-0 text-slate-400"/> : <ChevronRight size={14} className="shrink-0 text-slate-400"/>}
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-slate-900">{partner.label}</span>
-                      <Counts emails={partner.emails} rows={partner.rows}/>
-                    </span>
-                  </button>
-                </div>
+        <div className="min-h-0 flex-1 overflow-y-auto lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+          <section className="flex flex-col px-5 py-3 lg:min-h-0">
+            <div className="flex items-center justify-between gap-2 pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Escopo do arquivo</span>
+              <button
+                type="button" onClick={() => setSelection(allSelectableKeys(tree))}
+                className="text-xs font-bold text-cyan-700 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-cyan-500"
+              >Selecionar tudo que está pronto</button>
+            </div>
 
-                {open && <div className="border-t border-slate-100 px-3 py-2">
-                  {partner.rulers.map((ruler) => {
-                    const rulerOpen = openRulers.has(ruler.key);
-                    const blockedInRuler = ruler.weeks.filter((week) => week.blocked).length;
-                    return (
-                    <div key={ruler.key} className="mb-1.5 last:mb-0">
-                      <div className="flex items-start gap-2 rounded-lg px-1 py-1 hover:bg-slate-50">
-                        <TriCheckbox state={nodeState(ruler, selection)} label={`Selecionar régua ${ruler.label}`} onChange={(checked) => toggle(ruler, checked)}/>
-                        <button
-                          type="button" onClick={() => toggleRuler(ruler.key)}
-                          aria-expanded={rulerOpen}
-                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-                        >
-                          {rulerOpen ? <ChevronDown size={13} className="shrink-0 text-slate-400"/> : <ChevronRight size={13} className="shrink-0 text-slate-400"/>}
-                          <span className="min-w-0">
-                            <span className="block truncate text-xs font-bold text-slate-700">{segmentLabel(ruler.label)}</span>
-                            <span className="text-[11px] text-slate-500">
-                              {ruler.weeks.length} {ruler.weeks.length === 1 ? 'semana' : 'semanas'} · {ruler.emails} {ruler.emails === 1 ? 'e-mail' : 'e-mails'} · {ruler.rows} {ruler.rows === 1 ? 'linha' : 'linhas'}
-                              {blockedInRuler ? <span className="text-red-600"> · {blockedInRuler} travada{blockedInRuler === 1 ? '' : 's'}</span> : null}
-                            </span>
-                          </span>
-                        </button>
-                      </div>
-                      {rulerOpen && <div className="ml-5 mt-0.5 space-y-0.5">
-                        {ruler.weeks.map((week) => (
-                          <label
-                            key={week.key}
-                            className={`flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm ${week.blocked ? 'cursor-not-allowed bg-red-50/50 opacity-80' : 'cursor-pointer hover:bg-cyan-50/60'}`}
-                          >
-                            <TriCheckbox
-                              state={nodeState(week, selection)} disabled={week.blocked}
-                              label={`Selecionar ${week.label} de ${partner.label}`}
-                              onChange={(checked) => toggle(week, checked)}
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-xs font-semibold text-slate-800">{week.label}</span>
-                              <span className="text-[11px] text-slate-500">
-                                {week.emails} {week.emails === 1 ? 'e-mail' : 'e-mails'} · {week.rows} {week.rows === 1 ? 'linha' : 'linhas'}
-                                {week.blocked ? ` · ${week.blockedEmails} com pendência bloqueante` : ''}
-                              </span>
-                            </span>
-                            {week.blocked
-                              ? <ShieldAlert size={14} className="mt-0.5 shrink-0 text-red-500"/>
-                              : <CheckCircle2 size={14} className={`mt-0.5 shrink-0 ${nodeState(week, selection) === 'checked' ? 'text-cyan-600' : 'text-slate-300'}`}/>}
-                          </label>
-                        ))}
-                      </div>}
+            <div className="space-y-1.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+              {tree.map((partner) => {
+                const open = !collapsed.has(partner.key);
+                const partnerState = nodeState(partner, selection);
+                return (
+                  <div key={partner.key} className={`rounded-xl border ${partnerState === 'unchecked' ? 'border-slate-200' : 'border-cyan-200 bg-cyan-50/30'}`}>
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <TriCheckbox state={partnerState} label={`Selecionar ${partner.label}`} onChange={(checked) => toggle(partner, checked)}/>
+                      <button
+                        type="button" onClick={() => toggleCollapse(partner.key)}
+                        aria-expanded={open}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+                      >
+                        {open ? <ChevronDown size={14} className="shrink-0 text-slate-400"/> : <ChevronRight size={14} className="shrink-0 text-slate-400"/>}
+                        <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">{partner.label}</span>
+                        <Counts emails={partner.emails} rows={partner.rows}/>
+                      </button>
                     </div>
-                    );
-                  })}
-                </div>}
+
+                    {open && <div className="border-t border-slate-100 px-2 py-1.5">
+                      {partner.rulers.map((ruler) => {
+                        const rulerOpen = openRulers.has(ruler.key);
+                        const blockedInRuler = ruler.weeks.filter((week) => week.blocked).length;
+                        return (
+                        <div key={ruler.key} className="mb-1 last:mb-0">
+                          <div className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-white">
+                            <TriCheckbox state={nodeState(ruler, selection)} label={`Selecionar régua ${ruler.label}`} onChange={(checked) => toggle(ruler, checked)}/>
+                            <button
+                              type="button" onClick={() => toggleRuler(ruler.key)}
+                              aria-expanded={rulerOpen}
+                              className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+                            >
+                              {rulerOpen ? <ChevronDown size={13} className="shrink-0 text-slate-400"/> : <ChevronRight size={13} className="shrink-0 text-slate-400"/>}
+                              <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{segmentLabel(ruler.label)}</span>
+                              <span className="shrink-0 text-[11px] text-slate-500">
+                                {ruler.weeks.length} {ruler.weeks.length === 1 ? 'semana' : 'semanas'} · {ruler.emails} {ruler.emails === 1 ? 'e-mail' : 'e-mails'} · {ruler.rows} {ruler.rows === 1 ? 'linha' : 'linhas'}
+                                {blockedInRuler ? <span className="text-red-600"> · {blockedInRuler} travada{blockedInRuler === 1 ? '' : 's'}</span> : null}
+                              </span>
+                            </button>
+                          </div>
+                          {rulerOpen && <div className="ml-6 mt-1 grid grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-3">
+                            {ruler.weeks.map((week) => {
+                              const weekState = nodeState(week, selection);
+                              return (
+                              <label
+                                key={week.key}
+                                className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 ${week.blocked ? 'cursor-not-allowed border-red-100 bg-red-50/60' : weekState === 'checked' ? 'cursor-pointer border-cyan-200 bg-white' : 'cursor-pointer border-slate-200 bg-white hover:border-cyan-200'}`}
+                              >
+                                <TriCheckbox
+                                  state={weekState} disabled={week.blocked}
+                                  label={`Selecionar ${week.label} de ${partner.label}`}
+                                  onChange={(checked) => toggle(week, checked)}
+                                />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-xs font-semibold text-slate-800">{week.label}</span>
+                                  <span className="block text-[11px] leading-4 text-slate-500">
+                                    {week.emails} {week.emails === 1 ? 'e-mail' : 'e-mails'} · {week.rows} {week.rows === 1 ? 'linha' : 'linhas'}
+                                    {week.blocked ? ` · ${week.blockedEmails} com pendência bloqueante` : ''}
+                                  </span>
+                                </span>
+                                {week.blocked
+                                  ? <ShieldAlert size={14} className="mt-0.5 shrink-0 text-red-500"/>
+                                  : <CheckCircle2 size={14} className={`mt-0.5 shrink-0 ${weekState === 'checked' ? 'text-cyan-600' : 'text-slate-300'}`}/>}
+                              </label>
+                              );
+                            })}
+                          </div>}
+                        </div>
+                        );
+                      })}
+                    </div>}
+                  </div>
+                );
+              })}
+              {!tree.length && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Nenhuma régua ativa para exportar.</p>}
+            </div>
+          </section>
+
+          <aside className="space-y-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3 text-xs lg:min-h-0 lg:overflow-y-auto lg:border-l lg:border-t-0">
+            <div className="grid grid-cols-3 gap-1.5">
+              {([['Semanas', totals.weeks], ['E-mails', totals.emails], ['Linhas', totals.rows]] as const).map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center">
+                  <p className="text-lg font-bold leading-6 text-slate-900">{value}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="export-filename" className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Nome do arquivo</label>
+                {renamed && <button
+                  type="button" onClick={() => { setRenamed(false); setFilename(suggested); }}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-700 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-cyan-500"
+                ><RotateCcw size={11}/>Restaurar sugestão</button>}
               </div>
-            );
-          })}
-          {!tree.length && <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">Nenhuma régua ativa para exportar.</p>}
+              <input
+                id="export-filename" type="text" value={filename}
+                onChange={(event) => { setRenamed(true); setFilename(event.target.value); }}
+                spellCheck={false}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-mono text-[11px] text-slate-800 outline-none focus-visible:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-500"
+              />
+              {finalName !== filename && <p className="mt-1 text-[10px] text-slate-500">Será salvo como <code className="rounded bg-slate-100 px-1">{finalName}</code></p>}
+            </div>
+
+            <div>
+              <label htmlFor="export-campaign-type" className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Tipo de campanha (TP_CAMPANHA)</label>
+              <input
+                id="export-campaign-type" aria-label="Tipo de campanha no arquivo" value={campaignType}
+                onChange={event => setCampaignType(event.target.value)} placeholder="Manter o valor de cada briefing"
+                className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs outline-none focus-visible:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-500"
+              />
+              <p className="mt-1 text-[11px] leading-4 text-slate-500">Use o tipo configurado no motor do SFMC, por exemplo CRM. Vale só para o CSV.</p>
+            </div>
+
+            <div className={`rounded-lg border bg-white p-2.5 ${headerBlocked ? 'border-red-200' : 'border-slate-200'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Header dinâmico</span>
+                <span className={`text-xs font-bold ${coverage === 100 ? 'text-emerald-700' : 'text-slate-700'}`}>{coverage}%</span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+                <div className={`h-full rounded-full ${coverage === 100 ? 'bg-emerald-500' : headerBlocked ? 'bg-red-400' : 'bg-cyan-500'}`} style={{ width: `${coverage}%` }}/>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-4 text-slate-600">{dynamicHeaders} de {totals.rows} linhas com título do header dinâmico. Sem título, o template usa a imagem antiga de HEADER.</p>
+              <label className="mt-2 flex cursor-pointer items-start gap-2 border-t border-slate-100 pt-2">
+                <input type="checkbox" checked={requireDynamicHeader} onChange={event => setRequireDynamicHeader(event.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-cyan-600"/>
+                <span>
+                  <span className="block font-semibold text-slate-800">Exigir header dinâmico V13</span>
+                  <span className="block text-[11px] leading-4 text-slate-500">Título e imagem do cartão obrigatórios; subtítulo e logo do parceiro opcionais. As 41 colunas vão no CSV.</span>
+                </span>
+              </label>
+              {headerBlocked && <p role="alert" className="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[11px] leading-4 text-red-700">{incompleteHeaders} linhas sem título ou imagem do cartão. Preencha o briefing antes de baixar.</p>}
+            </div>
+
+            {partial && <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-4 text-amber-900">
+              <TriangleAlert size={14} className="mt-0.5 shrink-0"/>
+              <span><b>Seleção parcial.</b> Importe com <b>Adicionar e Atualizar</b>. Em modo Overwrite, este arquivo apagaria da Data Extension as semanas que ficaram de fora.</span>
+            </p>}
+
+            {blockedWeeks.length > 0 && <p className="flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-2.5 py-2 text-[11px] leading-4 text-red-700">
+              <ShieldAlert size={14} className="mt-0.5 shrink-0"/>
+              <span>{blockedWeeks.length} {blockedWeeks.length === 1 ? 'semana está travada' : 'semanas estão travadas'} por pendência bloqueante e {blockedWeeks.length === 1 ? 'não entra' : 'não entram'} no arquivo.</span>
+            </p>}
+          </aside>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
-          <button
-            type="button" onClick={() => setSelection(allSelectableKeys(tree))}
-            className="text-xs font-bold text-cyan-700 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-cyan-500"
-          >Selecionar tudo que está pronto</button>
-          <span className="text-xs text-slate-500">{totals.emails} e-mails · <b className="text-slate-700">{totals.rows} linhas</b> no CSV</span>
-        </div>
-
-        <div className="mt-3">
-          <div className="flex items-center justify-between gap-2">
-            <label htmlFor="export-filename" className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Nome do arquivo</label>
-            {renamed && <button
-              type="button" onClick={() => { setRenamed(false); setFilename(suggested); }}
-              className="inline-flex items-center gap-1 text-[10px] font-bold text-cyan-700 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-cyan-500"
-            ><RotateCcw size={11}/>Restaurar sugestão</button>}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3">
+          <span className="min-w-0 truncate text-xs text-slate-500">{totals.emails} e-mails · <b className="text-slate-700">{totals.rows} linhas</b> no CSV</span>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button>
+            <button
+              type="button" disabled={downloadDisabled}
+              onClick={() => setImportTipsOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-5 py-2 text-sm font-bold text-white outline-none transition hover:bg-[#064446] focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+            ><Download size={15}/>Baixar CSV</button>
           </div>
-          <input
-            id="export-filename" type="text" value={filename}
-            onChange={(event) => { setRenamed(true); setFilename(event.target.value); }}
-            spellCheck={false}
-            className="mt-1 w-full rounded-lg border border-slate-200 px-2.5 py-2 font-mono text-xs text-slate-800 outline-none focus-visible:border-cyan-400 focus-visible:ring-2 focus-visible:ring-cyan-500"
-          />
-          {finalName !== filename && <p className="mt-1 text-[10px] text-slate-500">Será salvo como <code className="rounded bg-slate-100 px-1">{finalName}</code></p>}
-        </div>
-
-        {partial && <p className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900">
-          <TriangleAlert size={14} className="mt-0.5 shrink-0"/>
-          <span><b>Seleção parcial.</b> Importe com <b>Adicionar e Atualizar</b>. Em modo Overwrite, este arquivo apagaria da Data Extension as semanas que ficaram de fora.</span>
-        </p>}
-
-        {blockedWeeks.length > 0 && <p className="mt-2 text-[11px] text-red-700">
-          {blockedWeeks.length} {blockedWeeks.length === 1 ? 'semana está travada' : 'semanas estão travadas'} por pendência bloqueante e {blockedWeeks.length === 1 ? 'não entra' : 'não entram'} no arquivo.
-        </p>}
-
-        <div className="mt-3 space-y-2 rounded-lg border border-slate-200 p-3 text-xs">
-          <label className="block font-semibold">Tipo de campanha no arquivo (TP_CAMPANHA)
-            <input aria-label="Tipo de campanha no arquivo" value={campaignType} onChange={event => setCampaignType(event.target.value)} placeholder="Manter o valor de cada briefing" className="mt-1 block w-full rounded border border-slate-300 px-2 py-1.5" />
-          </label>
-          <p>Use o tipo de campanha configurado no motor do SFMC, por exemplo CRM. A escolha vale apenas para o CSV.</p>
-          <p>{dynamicHeaders} de {totals.rows} linhas com título do header dinâmico. Sem título, o template usa a imagem antiga de HEADER.</p>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={requireDynamicHeader} onChange={event => setRequireDynamicHeader(event.target.checked)} />Exigir header dinâmico V13</label>
-          <p>V13: título e imagem do cartão obrigatórios neste export; subtítulo e logo do parceiro opcionais. As 41 colunas são incluídas no CSV.</p>
-          {headerBlocked && <p role="alert" className="text-red-700">{incompleteHeaders} linhas sem título ou imagem do cartão. Preencha o briefing antes de baixar.</p>}
-        </div>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Cancelar</button>
-          <button
-            type="button" disabled={!totals.weeks || headerBlocked}
-            onClick={() => setImportTipsOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white outline-none transition hover:bg-[#064446] focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-          ><Download size={15}/>Baixar CSV</button>
         </div>
       </div>
 
@@ -264,7 +304,7 @@ export const ExportCsvDialog = ({ groups, today, segmentLabel = (value) => value
           <div className="mt-4 flex justify-end gap-2">
             <button type="button" onClick={() => setImportTipsOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500">Voltar</button>
             <button
-              type="button" autoFocus disabled={!totals.weeks || headerBlocked}
+              type="button" autoFocus disabled={downloadDisabled}
               onClick={() => { setImportTipsOpen(false); onConfirm(new Set(selection), finalName, { campaignType, requireDynamicHeader }); }}
               className="inline-flex items-center gap-2 rounded-lg bg-[#07595b] px-4 py-2 text-sm font-bold text-white outline-none transition hover:bg-[#064446] focus-visible:ring-2 focus-visible:ring-cyan-500"
             ><Download size={15}/>Entendi, baixar CSV</button>
