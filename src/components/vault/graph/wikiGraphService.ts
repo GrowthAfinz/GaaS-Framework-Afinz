@@ -2,6 +2,17 @@ import { supabase } from "../../../services/supabaseClient";
 import { latestVaultSync } from "../vaultService";
 import type { VaultGraphLink } from "./wikiGraph";
 
+// A stalled request (network or auth client) must surface as an error the
+// user can retry, never as an endless loading state.
+export function withTimeout<T>(work: Promise<T>, ms: number, message: string) {
+  let timer = 0;
+  return Promise.race([
+    work,
+    new Promise<never>((_, reject) => {
+      timer = window.setTimeout(() => reject(new Error(message)), ms);
+    }),
+  ]).finally(() => window.clearTimeout(timer));
+}
 async function assertIdle() {
   const { count, error } = await supabase
     .from("gaas_vault_sync_runs")

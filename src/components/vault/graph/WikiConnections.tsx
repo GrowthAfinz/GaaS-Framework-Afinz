@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import type { VaultNoteSummary } from "../vaultTypes";
-import { fetchWikiGraphLinks } from "./wikiGraphService";
+import { fetchWikiGraphLinks, withTimeout } from "./wikiGraphService";
 import {
   buildWikiGraph,
   graphRouteSearch,
@@ -37,6 +37,7 @@ export function WikiConnections({
   active,
   syncKey,
   onOpen,
+  onOpenNote,
   onRefresh,
 }: {
   notes: VaultNoteSummary[];
@@ -44,6 +45,7 @@ export function WikiConnections({
   active: boolean;
   syncKey: string;
   onOpen: (id: string) => void;
+  onOpenNote: (id: string) => void;
   onRefresh: () => void;
 }) {
   const [route, setRoute] = useState(() =>
@@ -120,7 +122,11 @@ export function WikiConnections({
     const token = ++request.current;
     setLoading(true);
     setError("");
-    void fetchWikiGraphLinks()
+    void withTimeout(
+      fetchWikiGraphLinks(),
+      30000,
+      "O carregamento dos vínculos demorou demais.",
+    )
       .then((data) => {
         if (token === request.current) {
           setLinks(data);
@@ -139,7 +145,10 @@ export function WikiConnections({
         if (token === request.current) setLoading(false);
       });
     return () => {
+      // The cancelled request will never clear its own loading flag. If the
+      // next run returns early (cached links), the map would stay "loading".
       request.current++;
+      setLoading(false);
     };
   }, [active, syncKey, refreshVersion]);
   const graph = useMemo(
@@ -294,7 +303,7 @@ export function WikiConnections({
         </p>
       ) : (
         <div className="relative flex min-h-0 flex-1">
-          <div className="relative min-h-0 min-w-0 flex-1 bg-[#bac6d6]">
+          <div className="relative min-h-0 min-w-0 flex-1 bg-slate-50">
             {view.nodes.length ? (
               active && (
                 <Suspense
@@ -310,6 +319,7 @@ export function WikiConnections({
                       update({ focus: id });
                       if (id) setPanelOpen(true);
                     }}
+                    onOpen={onOpenNote}
                   />
                 </Suspense>
               )
@@ -328,12 +338,13 @@ export function WikiConnections({
                 </div>
               </div>
             )}
-            <div className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-[#bac6d6]/90 px-2 py-1 text-[10px] text-slate-700">
+            <div className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-slate-200 bg-white/90 px-2 py-1 text-[10px] text-slate-600 shadow-sm">
               <p aria-live="polite">
                 {view.nodes.length} notas · {view.edges.length} vínculos
               </p>
-              <p className="mt-0.5 text-slate-600">
-                Arraste para mover · role para ampliar
+              <p className="mt-0.5 text-slate-500">
+                Clique numa nota para abrir · arraste para mover · role para
+                ampliar
               </p>
             </div>
           </div>

@@ -22,33 +22,76 @@ const drawReadableLabel: NodeLabelDrawingFunction = (
   context.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`;
   context.textBaseline = "middle";
   context.lineJoin = "round";
-  context.strokeStyle = "#bac6d6";
-  context.lineWidth = 3.5;
+  context.strokeStyle = BACKGROUND;
+  context.lineWidth = 4;
   context.strokeText(label, x, y);
-  context.fillStyle = "#172334";
+  context.fillStyle = "#1e293b";
   context.fillText(label, x, y);
   context.restore();
 };
+// Hovered node: ring in its own color plus the label on a white pill, so it
+// stays legible over dense areas of the map.
+const drawHover: NodeLabelDrawingFunction = (context, data, settings) => {
+  context.save();
+  context.beginPath();
+  context.arc(data.x, data.y, data.size + 4, 0, Math.PI * 2);
+  context.fillStyle = "#ffffff";
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = data.color;
+  context.stroke();
+  context.beginPath();
+  context.arc(data.x, data.y, data.size, 0, Math.PI * 2);
+  context.fillStyle = data.color;
+  context.fill();
+  if (data.label) {
+    const label =
+      data.label.length > 90 ? data.label.slice(0, 88) + "…" : data.label;
+    context.font = `600 ${settings.labelSize}px ${settings.labelFont}`;
+    const width = context.measureText(label).width,
+      x = data.x + data.size + 8,
+      h = settings.labelSize + 10;
+    context.shadowColor = "rgba(15,23,42,0.18)";
+    context.shadowBlur = 8;
+    context.fillStyle = "#ffffff";
+    context.beginPath();
+    context.roundRect(x - 6, data.y - h / 2, width + 12, h, 6);
+    context.fill();
+    context.shadowBlur = 0;
+    context.fillStyle = "#0f172a";
+    context.textBaseline = "middle";
+    context.fillText(label, x, data.y);
+  }
+  context.restore();
+};
+const BACKGROUND = "#f8fafc",
+  DIMMED = "#e2e8f0",
+  EDGE = "rgba(100,116,139,0.3)";
 type Position = { id: string; x: number; y: number };
 const cache = new Map<string, Position[]>();
 export default function SigmaGraph({
   graph,
   focus,
   onSelect,
+  onOpen,
   detailed,
 }: {
   graph: WikiGraph;
   focus: string;
   detailed: boolean;
   onSelect: (id: string) => void;
+  onOpen: (id: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null),
     renderer = useRef<Sigma | null>(null);
   const detail = useRef(detailed);
   detail.current = detailed;
   const select = useRef(onSelect),
-    focused = useRef(focus);
+    open = useRef(onOpen),
+    focused = useRef(focus),
+    hovered = useRef("");
   select.current = onSelect;
+  open.current = onOpen;
   focused.current = focus;
   const [busy, setBusy] = useState(true),
     [error, setError] = useState("");
@@ -79,10 +122,16 @@ export default function SigmaGraph({
         });
         graph.edges.forEach((e) =>
           model.addDirectedEdge(e.source, e.target, {
-            size: 0.6,
-            color: "rgba(0,0,0,0.20)",
+            size: 0.5,
+            color: EDGE,
           }),
         );
+        // Hover previews a neighborhood; the selected note stays highlighted
+        // when the pointer leaves the map.
+        const active = () => {
+          const id = hovered.current || focused.current;
+          return id && model.hasNode(id) ? id : "";
+        };
         const instance = new Sigma(model, container.current!, {
           stagePadding: 24,
           allowInvalidContainer: true,
@@ -103,46 +152,53 @@ export default function SigmaGraph({
             : 8,
           defaultDrawNodeLabel: drawReadableLabel,
           edgeProgramClasses: { arrow: EdgeArrowProgram },
-          defaultDrawNodeHover: (context, data, settings) => {
-            context.beginPath();
-            context.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2);
-            context.strokeStyle = data.color;
-            context.lineWidth = 1.5;
-            context.stroke();
-            drawReadableLabel(context, data, settings);
-          },
+          defaultDrawNodeHover: drawHover,
           hideLabelsOnMove: true,
           enableCameraRotation: false,
           minCameraRatio: 0.04,
           maxCameraRatio: 3,
           zIndex: true,
           nodeReducer: (id, data) => {
-            const f = focused.current;
-            if (!f || !model.hasNode(f)) return data;
+            const f = active();
+            if (!f) return data;
             const nearby = id === f || model.areNeighbors(id, f);
             return {
               ...data,
-              color: nearby ? data.color : "#9cabc0",
+              color: nearby ? data.color : DIMMED,
+              label: nearby ? data.label : "",
               zIndex: id === f ? 2 : nearby ? 1 : 0,
               highlighted: id === f,
-              forceLabel: id === f,
+              forceLabel: id === f || (nearby && model.degree(f) <= 24),
             };
           },
           edgeReducer: (id, data) => {
-            const f = focused.current;
-            if (!f || !model.hasNode(f)) return data;
+            const f = active();
+            if (!f) return data;
             const out = model.source(id) === f,
               incoming = model.target(id) === f;
+            if (!out && !incoming) return { ...data, hidden: true };
             return {
               ...data,
-              hidden: !out && !incoming,
-              color: "rgba(0,0,0,0.72)",
+              color: out ? "rgba(8,145,178,0.75)" : "rgba(71,85,105,0.6)",
               type: "arrow",
-              size: 1.2,
+              size: 1.4,
             };
           },
         });
-        instance.on("clickNode", ({ node }) => select.current(node));
+        const cursor = (value: string) => {
+          if (container.current) container.current.style.cursor = value;
+        };
+        instance.on("enterNode", ({ node }) => {
+          hovered.current = node;
+          cursor("pointer");
+          instance.refresh({ skipIndexation: true });
+        });
+        instance.on("leaveNode", () => {
+          hovered.current = "";
+          cursor("");
+          instance.refresh({ skipIndexation: true });
+        });
+        instance.on("clickNode", ({ node }) => open.current(node));
         instance.on("clickStage", () => select.current(""));
         renderer.current = instance;
         setBusy(false);
@@ -190,6 +246,16 @@ export default function SigmaGraph({
   useEffect(() => {
     renderer.current?.scheduleRefresh();
   }, [focus]);
+  // The panel and page layout change the map's size without a window resize.
+  useEffect(() => {
+    if (!container.current) return;
+    const observer = new ResizeObserver(() => {
+      renderer.current?.resize();
+      renderer.current?.refresh();
+    });
+    observer.observe(container.current);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     const instance = renderer.current;
     if (!instance) return;
@@ -202,12 +268,20 @@ export default function SigmaGraph({
   const button =
     "rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-slate-900 focus-visible:outline-cyan-600";
   return (
-    <div className="relative h-full min-h-0 min-w-0 bg-[#bac6d6]">
+    <div
+      className="relative h-full min-h-0 min-w-0"
+      style={{
+        background: BACKGROUND,
+        backgroundImage:
+          "radial-gradient(circle, rgba(148,163,184,0.28) 1px, transparent 1px)",
+        backgroundSize: "22px 22px",
+      }}
+    >
       <div
         ref={container}
         className="absolute inset-0"
         role="img"
-        aria-label="Mapa interativo de conexões. Arraste para mover e use a rolagem para ampliar. Alternativa acessível na lista de notas."
+        aria-label="Mapa interativo de conexões. Clique numa nota para abri-la, arraste para mover e use a rolagem para ampliar. Alternativa acessível na lista de notas."
       />
       {(busy || error) && (
         <div
