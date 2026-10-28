@@ -3,8 +3,15 @@ import {PLURIX_V15_TEMPLATE} from './plurixV15Template';
 import {renderDynamicEmail} from '../ampscript/renderer';
 import {emptyBriefingRow} from '../domain/briefing';
 import {plurixEnvelope} from '../domain/sfmcEnvelope';
+import {readFileSync} from 'node:fs';
 
 describe('V15 CRM com header rasterizado',()=>{
+ it('preserva preparo e destinos da revisao publicada antes da correcao de cores',()=>{
+  const previous=readFileSync('supabase/migrations/20261028151825_dynamic_email_plurix_v15_v3.sql','utf8').split('$v15$')[1];
+  expect(PLURIX_V15_TEMPLATE.split('<!DOCTYPE html>')[0]).toBe(previous.split('<!DOCTYPE html>')[0]);
+  const destinations=(s:string)=>[...s.matchAll(/(?:href|src)="([^"]+)"/g)].map(m=>m[1]);
+  expect(destinations(PLURIX_V15_TEMPLATE)).toEqual(destinations(previous));
+ });
  it('mostra a arte inteira mesmo com titulo editorial preenchido e preserva a personalizacao',()=>{
   for(let sequence=1;sequence<=8;sequence++)for(const limit of ['', '3500'])for(const logo of ['', 'https://example.com/avenida.png']){
    const row=Object.assign(emptyBriefingRow(),{SEQUENCIA:`E-mail ${sequence}`,HEADER:'https://example.com/hero.png',HEADER_TITULO:'Titulo da arte',HEADER_SUBTITULO:'Subtitulo da arte',HEADER_IMAGEM_CARTAO:'https://example.com/old-card.png',HEADER_LOGO:logo,MENSAGEM_LIMITE:'Ola, {{nome}}: R$ {{limite}}.',TITULO_COPY_1_AZUL:'Oi, %%=v(@FirstName)=%%',TITULO_CTA_1:'Pedir',LINK_CTA_1:'https://example.com/cta'});

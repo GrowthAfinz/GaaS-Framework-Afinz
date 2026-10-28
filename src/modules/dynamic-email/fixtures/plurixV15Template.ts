@@ -1,8 +1,9 @@
+import {applyV15LightTheme} from './plurixV15LightTheme';
 export const PLURIX_V15_TEMPLATE_ID = 'builtin-plurix-v15';
 export const PLURIX_V15_TEMPLATE_NAME = 'PLURIX V15 CRM · header em imagem';
 
 // Fonte operacional CRM preservada; corpo dinamico e imagem completa do briefing.
-export const PLURIX_V15_TEMPLATE = String.raw`%%[
+export const PLURIX_V15_TEMPLATE = applyV15LightTheme(String.raw`%%[
 /* PLURIX V15 CRM: header completo em imagem HTTPS; sem pool de ofertas.
    Audiencia: TB_CAMPANHA_AQUISICAO (PRI_NOME, LIMITE, PRODUTO).
    Estado: ESTADO_SEQUENCIA_CRM; se ausente, usa E-mail 1 sem gravar na DE.
@@ -440,4 +441,4 @@ ENDIF
   </table>
   <custom name="opencounter" type="tracking"/>
 </body>
-</html>`;
+</html>`);
