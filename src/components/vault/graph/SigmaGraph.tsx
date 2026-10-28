@@ -66,7 +66,7 @@ const drawHover: NodeLabelDrawingFunction = (context, data, settings) => {
 };
 const BACKGROUND = "#f8fafc",
   DIMMED = "#e2e8f0",
-  EDGE = "rgba(100,116,139,0.3)";
+  EDGE = "#64748b";
 type Position = { id: string; x: number; y: number };
 const cache = new Map<string, Position[]>();
 export default function SigmaGraph({
@@ -122,7 +122,7 @@ export default function SigmaGraph({
         });
         graph.edges.forEach((e) =>
           model.addDirectedEdge(e.source, e.target, {
-            size: 0.5,
+            size: 1,
             color: EDGE,
           }),
         );
@@ -179,9 +179,9 @@ export default function SigmaGraph({
             if (!out && !incoming) return { ...data, hidden: true };
             return {
               ...data,
-              color: out ? "rgba(8,145,178,0.75)" : "rgba(71,85,105,0.6)",
+              color: out ? "#0369a1" : "#475569",
               type: "arrow",
-              size: 1.4,
+              size: 2,
             };
           },
         });
