@@ -14,6 +14,7 @@ import { GrowthSignalDecisionDialog } from '../bets/GrowthSignalDecisionDialog';
 import { fetchGrowthSignalDecisions } from '../bets/growthBetService';
 import { GrowthSignalDecision } from '../bets/growthBet.types';
 import { GrowthObservationStatus } from './GrowthObservationStatus';
+import { LoopAttention } from '../attention/LoopAttention';
 
 interface GrowthFeedViewProps {
   periodStart: Date;
@@ -175,6 +176,9 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
 
   return (
     <section className="space-y-3">
+      <LoopAttention />
+      <details open={Boolean(readGrowthLearningItem(window.location.search))} className="space-y-3 rounded-xl border border-slate-200 p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-600">Eventos e candidatas do período selecionado</summary>
       {['all','crm_acquisition'].includes(filters.front) && <div className="rounded-xl border bg-white p-4"><strong className="text-sm">Da evidência à decisão</strong><p className="my-2 text-sm text-slate-600">Crie uma tarefa ou consulte análises produzidas pelos agentes conectados.</p><button className="text-sm font-semibold text-cyan-800 underline" onClick={()=>openInvestigationsSection('investigations')}>Abrir tarefas CRM</button></div>}
       {['all','crm_acquisition'].includes(filters.front) && <GrowthObservationStatus period={format(periodEnd,'yyyy-MM')} />}
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
@@ -347,6 +351,7 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
         </div>
       )}
 
+      </details>
       {provenanceEvent && <GrowthFeedDrawer event={provenanceEvent} decision={decisions.get(provenanceEvent.subject_id)} onClose={() => setProvenanceEvent(null)} onPrimaryAction={primaryAction} />}
       {decisionEvent && (
         <GrowthSignalDecisionDialog

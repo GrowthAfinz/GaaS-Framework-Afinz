@@ -74,6 +74,8 @@ jobs:
         run: npm run test:growth-triggers
       - name: Agent investigation queue and evidence contracts
         run: npm run test:growth-investigations
+      - name: Loop notifications, source analysis and note proposal contracts
+        run: node --test scripts/test-growth-loop-attention.mjs
       - name: Approved pilot configuration is reproducible
         run: npm run check:growth-trigger-pilot
       - name: TypeScript regression gate (documented main debt)

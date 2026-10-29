@@ -1,5 +1,7 @@
 # CLAUDE.MD - Calendario Estrategico de Disparos Salesforce
 
+Fila, notificações e notas de resultado: seguir a skill compartilhada `.claude/skills/gaas-growth-loop-operator/SKILL.md`. Não iniciar uma LLM automaticamente. Contribuições são revisadas antes de aplicar no vault e verificar a sincronização.
+
 **Project:** Calendario Estrategico (Strategic Calendar Dashboard)
 **Owner:** Pabloooo (Growth Marketing)
 **Type:** React + TypeScript Dashboard
