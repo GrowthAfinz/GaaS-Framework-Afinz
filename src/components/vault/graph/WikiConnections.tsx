@@ -30,7 +30,11 @@ import {
 } from "./wikiGraph";
 const SigmaGraph = lazy(() => import("./SigmaGraph"));
 const control =
-  "rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 focus-visible:outline-cyan-600";
+  "rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-600";
+const segment = (on: boolean) =>
+  `rounded px-2.5 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-600 ${on ? "bg-white font-medium text-cyan-800 shadow-sm" : "text-slate-600 hover:text-slate-900"}`;
+const fieldLabel =
+  "inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500";
 export function WikiConnections({
   notes,
   currentNote,
@@ -193,6 +197,9 @@ export function WikiConnections({
       topic: "",
       query: "",
     });
+  const showAll = () => update({ scope: "all", topic: "", query: "" });
+  const filtered = route.scope === "local" || !!route.topic || !!route.query;
+  const rootNote = graph.nodes.find((n) => n.id === route.root);
   const refresh = () => {
     loadedSync.current = null;
     setRefreshVersion((v) => v + 1);
@@ -205,18 +212,24 @@ export function WikiConnections({
       aria-label="Mapa de conexões da Wiki"
       className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm"
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
-        <label className="flex min-w-40 flex-1 items-center gap-2 text-slate-400">
-          <Search size={14} />
+      <div
+        role="toolbar"
+        aria-label="Navegação do mapa de notas"
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-100 px-3 py-2"
+      >
+        <label className="flex min-w-48 flex-1 items-center gap-2 rounded-md border border-slate-200 px-2 py-1.5 text-slate-400 focus-within:border-cyan-600">
+          <Search size={14} aria-hidden="true" />
           <input
-            aria-label="Buscar nota no mapa"
+            type="search"
+            aria-label="Buscar nota no mapa pelo título"
             value={route.query}
             onChange={(e) => update({ query: e.target.value })}
-            placeholder="Encontrar nota…"
+            placeholder="Buscar nota pelo título…"
             className="min-w-0 w-full bg-transparent text-xs text-slate-700 outline-none"
           />
           {route.query && (
             <button
+              type="button"
               aria-label="Limpar busca no mapa"
               onClick={() => update({ query: "" })}
             >
@@ -224,71 +237,113 @@ export function WikiConnections({
             </button>
           )}
         </label>
-        <select
-          aria-label="Alcance do mapa"
-          className={control}
-          value={route.scope}
-          onChange={(e) =>
-            e.target.value === "local"
-              ? recenter(route.focus || currentNote || graph.nodes[0]?.id || "")
-              : update({ scope: "all" })
-          }
-        >
-          <option value="local">Nota e conexões</option>
-          <option value="all">Acervo completo</option>
-        </select>
-        {route.scope === "local" && (
-          <select
-            aria-label="Profundidade das conexões"
-            className={control}
-            value={route.depth}
-            onChange={(e) => update({ depth: Number(e.target.value) as 1 | 2 })}
+        <div className={fieldLabel}>
+          <span id="wiki-map-scope">Mostrar</span>
+          <div
+            role="group"
+            aria-labelledby="wiki-map-scope"
+            className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5"
           >
-            <option value={1}>1 nível</option>
-            <option value={2}>2 níveis</option>
-          </select>
+            <button
+              type="button"
+              aria-pressed={route.scope === "local"}
+              title="Mostra só a nota escolhida e as notas ligadas a ela"
+              onClick={() =>
+                recenter(route.focus || currentNote || graph.nodes[0]?.id || "")
+              }
+              className={segment(route.scope === "local")}
+            >
+              Conexões da nota
+            </button>
+            <button
+              type="button"
+              aria-pressed={route.scope === "all"}
+              title="Mostra todas as notas da Wiki no mapa"
+              onClick={showAll}
+              className={segment(route.scope === "all")}
+            >
+              Todas as notas
+            </button>
+          </div>
+        </div>
+        {route.scope === "local" && (
+          <div className={fieldLabel}>
+            <span id="wiki-map-depth">Alcance</span>
+            <div
+              role="group"
+              aria-labelledby="wiki-map-depth"
+              className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5"
+            >
+              {([1, 2] as const).map((depth) => (
+                <button
+                  key={depth}
+                  type="button"
+                  aria-pressed={route.depth === depth}
+                  title={
+                    depth === 1
+                      ? "Só as notas ligadas diretamente"
+                      : "Inclui também as conexões das conexões"
+                  }
+                  onClick={() => update({ depth })}
+                  className={segment(route.depth === depth)}
+                >
+                  {depth} {depth === 1 ? "nível" : "níveis"}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
-        <select
-          aria-label="Assunto do mapa"
-          className={`${control} max-w-48`}
-          value={route.topic}
-          onChange={(e) => update({ topic: e.target.value })}
-        >
-          <option value="">Todos os assuntos</option>
-          {Object.keys(TOPIC_COLORS).map((topic) => (
-            <option key={topic}>{topic}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Nível de detalhe do grafo"
-          className={control}
-          value={detailed ? "detailed" : "essential"}
-          onChange={(e) => setDetailed(e.target.value === "detailed")}
-        >
-          <option value="essential">Essencial</option>
-          <option value="detailed">Mais detalhes</option>
-        </select>
-        <button
-          aria-label={
-            panelOpen ? "Recolher painel de notas" : "Expandir painel de notas"
-          }
-          aria-expanded={panelOpen}
-          title="Painel de notas"
-          onClick={() => setPanelOpen((v) => !v)}
-          className={`${control} inline-flex items-center gap-1.5`}
-        >
-          <PanelRight size={14} />
-          Notas
-        </button>
-        <button
-          type="button"
-          aria-label="Atualizar mapa"
-          title="Atualizar mapa"
-          onClick={refresh}
-          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-        >
-          <RefreshCw size={14} />
-        </button>
+        <label className={fieldLabel}>
+          Assunto
+          <select
+            className={`${control} max-w-48`}
+            value={route.topic}
+            onChange={(e) => update({ topic: e.target.value })}
+          >
+            <option value="">Todos</option>
+            {Object.keys(TOPIC_COLORS).map((topic) => (
+              <option key={topic}>{topic}</option>
+            ))}
+          </select>
+        </label>
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            aria-pressed={detailed}
+            title={
+              detailed
+                ? "Mostrando o nome de mais notas no mapa"
+                : "Mostrando só o nome das notas principais"
+            }
+            onClick={() => setDetailed((v) => !v)}
+            className={`${control} ${detailed ? "border-cyan-200 bg-cyan-50 text-cyan-800" : ""}`}
+          >
+            Mais nomes no mapa
+          </button>
+          <button
+            type="button"
+            aria-label={
+              panelOpen ? "Recolher painel de notas" : "Expandir painel de notas"
+            }
+            aria-expanded={panelOpen}
+            aria-controls="wiki-map-panel"
+            title="Painel de notas"
+            onClick={() => setPanelOpen((v) => !v)}
+            className={`${control} inline-flex items-center gap-1.5`}
+          >
+            <PanelRight size={14} aria-hidden="true" />
+            Notas
+          </button>
+          <button
+            type="button"
+            aria-label="Atualizar mapa"
+            title="Atualizar mapa"
+            onClick={refresh}
+            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-50 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-600"
+          >
+            <RefreshCw size={14} />
+          </button>
+        </div>
       </div>
       {error ? (
         <div role="alert" className="p-5 text-xs text-rose-700">
@@ -328,12 +383,11 @@ export function WikiConnections({
                 <div>
                   Nenhuma nota neste recorte.
                   <button
+                    type="button"
                     className="mt-2 block w-full underline"
-                    onClick={() =>
-                      update({ scope: "all", topic: "", query: "" })
-                    }
+                    onClick={showAll}
                   >
-                    Mostrar o acervo completo
+                    Ver todas as notas
                   </button>
                 </div>
               </div>
@@ -350,6 +404,7 @@ export function WikiConnections({
           </div>
           {panelOpen && (
             <aside
+              id="wiki-map-panel"
               aria-label="Painel de notas do mapa"
               className="absolute inset-y-0 right-0 z-10 flex w-72 max-w-[85%] shrink-0 flex-col border-l border-slate-200 bg-white shadow-lg md:static md:max-w-none md:shadow-none"
             >
@@ -365,13 +420,45 @@ export function WikiConnections({
                   <X size={14} />
                 </button>
               </div>
+              <div className="shrink-0 border-b border-slate-100 bg-slate-50/70 px-3 py-2">
+                <p
+                  aria-live="polite"
+                  className="text-[11px] leading-4 text-slate-600"
+                >
+                  {route.scope === "local" && rootNote ? (
+                    <>
+                      Conexões de{" "}
+                      <strong className="font-medium text-slate-800">
+                        {rootNote.title}
+                      </strong>{" "}
+                      ({route.depth} {route.depth === 1 ? "nível" : "níveis"})
+                    </>
+                  ) : (
+                    "Todas as notas da Wiki"
+                  )}
+                  {route.topic && <> · assunto {route.topic}</>}
+                  {route.query && <> · busca “{route.query}”</>}
+                </p>
+                {filtered && (
+                  <button
+                    type="button"
+                    onClick={showAll}
+                    className={`${control} mt-2 w-full font-medium text-cyan-800`}
+                  >
+                    Ver todas as notas ({graph.nodes.length})
+                  </button>
+                )}
+              </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 {selected && (
-                  <details open className="mb-3 border-b border-slate-100 pb-3">
-                    <summary className="mb-3 cursor-pointer text-xs font-medium text-slate-600">
+                  <section
+                    aria-label="Nota selecionada no mapa"
+                    className="mb-3 border-b border-slate-100 pb-3"
+                  >
+                    <h4 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
                       Nota selecionada
-                    </summary>
-                    <div aria-label="Nota selecionada no mapa">
+                    </h4>
+                    <div>
                       <div className="flex items-start justify-between gap-2">
                         <p
                           className="text-[10px] font-medium"
@@ -394,8 +481,9 @@ export function WikiConnections({
                         {selected.path}
                       </p>
                       <p className="mt-2 text-[11px] text-slate-500">
-                        {selected.incoming} referências recebidas ·{" "}
-                        {selected.outgoing} enviadas
+                        Citada por {selected.incoming}{" "}
+                        {selected.incoming === 1 ? "nota" : "notas"} · cita{" "}
+                        {selected.outgoing}
                       </p>
                       {!view.nodes.some((n) => n.id === selected.id) && (
                         <p className="mt-2 text-xs text-amber-700">
@@ -404,18 +492,21 @@ export function WikiConnections({
                       )}
                       <div className="my-3 flex flex-wrap gap-1.5">
                         <button
+                          type="button"
                           className={`${control} inline-flex items-center gap-1 text-cyan-800`}
                           onClick={() => onOpen(selected.id)}
                         >
-                          <BookOpen size={12} />
+                          <BookOpen size={12} aria-hidden="true" />
                           Abrir nota
                         </button>
                         <button
+                          type="button"
+                          title="Centraliza o mapa nesta nota e nas notas ligadas a ela"
                           className={`${control} inline-flex items-center gap-1`}
                           onClick={() => recenter(selected.id)}
                         >
-                          <Focus size={12} />
-                          Conexões
+                          <Focus size={12} aria-hidden="true" />
+                          Ver conexões
                         </button>
                       </div>
                       {(
@@ -441,8 +532,9 @@ export function WikiConnections({
                               .map((n) => (
                                 <button
                                   key={n.id}
+                                  type="button"
                                   onClick={() => update({ focus: n.id })}
-                                  className="block w-full rounded px-1 py-1.5 text-left text-[11px] leading-4 text-slate-500 hover:bg-slate-50 hover:text-cyan-800"
+                                  className="block w-full rounded px-1 py-1.5 text-left text-[11px] leading-4 text-slate-500 hover:bg-slate-50 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-600"
                                 >
                                   {n.title}
                                 </button>
@@ -451,35 +543,47 @@ export function WikiConnections({
                         </details>
                       ))}
                     </div>
-                  </details>
+                  </section>
                 )}
-                <details open>
-                  <summary className="cursor-pointer text-xs font-medium text-slate-600">
-                    Lista de notas ({matchingNotes.length})
-                  </summary>
-                  <div className="mt-2 space-y-0.5">
-                    {matchingNotes.map((n) => (
+                <h4
+                  id="wiki-map-note-list"
+                  className="text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                >
+                  {filtered ? "Notas neste recorte" : "Todas as notas"} (
+                  {matchingNotes.length})
+                </h4>
+                <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                  Das mais citadas para as menos. Clique para destacar no mapa.
+                </p>
+                <ul
+                  aria-labelledby="wiki-map-note-list"
+                  className="mt-2 space-y-0.5"
+                >
+                  {matchingNotes.map((n) => (
+                    <li key={n.id}>
                       <button
-                        key={n.id}
+                        type="button"
+                        aria-current={route.focus === n.id ? "true" : undefined}
+                        aria-label={`${n.title}. Assunto ${n.topic}. Citada por ${n.incoming}, cita ${n.outgoing}.`}
                         onClick={() => update({ focus: n.id })}
-                        className={`flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-xs leading-4 ${route.focus === n.id ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}
+                        className={`flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-xs leading-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-600 ${route.focus === n.id ? "bg-cyan-50 text-slate-900 ring-1 ring-cyan-200" : "text-slate-600 hover:bg-slate-50"}`}
                       >
                         <span
+                          aria-hidden="true"
                           className="mt-1 h-2 w-2 shrink-0 rounded-full"
                           style={{ background: TOPIC_COLORS[n.topic] }}
                         />
                         <span className="min-w-0">
                           <span className="block">{n.title}</span>
-                          {detailed && (
-                            <span className="mt-0.5 block text-[10px] text-slate-400">
-                              {n.incoming} recebidas · {n.outgoing} enviadas
-                            </span>
-                          )}
+                          <span className="mt-0.5 block text-[10px] text-slate-500">
+                            {n.topic} · citada por {n.incoming} · cita{" "}
+                            {n.outgoing}
+                          </span>
                         </span>
                       </button>
-                    ))}
-                  </div>
-                </details>
+                    </li>
+                  ))}
+                </ul>
                 <details className="mt-3 border-t border-slate-100 pt-3">
                   <summary className="cursor-pointer text-xs text-slate-500">
                     Cores e leitura do mapa

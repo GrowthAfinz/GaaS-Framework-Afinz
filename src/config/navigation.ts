@@ -52,7 +52,7 @@ export const NAV_CONFIG: NavGroup[] = [
         title: 'FRAMEWORK',
         items: [
             { id: 'explorador', label: 'Aquisição', icon: undefined },
-            { id: 'aprendizado-growth', label: 'Aquisição e Loop de Memória', icon: undefined },
+            { id: 'aprendizado-growth', label: 'Loop de Memória', icon: undefined },
             { id: 'configuracoes', label: 'Configurações', icon: Settings2 },
         ]
     }

@@ -128,7 +128,7 @@ export const GrowthLearningWorkspace: React.FC<
         <header className="overflow-hidden border-x border-b border-slate-200 bg-white">
           <nav
             className="flex gap-1 overflow-x-auto px-3 sm:px-5"
-            aria-label="Áreas de Aquisição e Loop de Memória"
+            aria-label="Áreas do Loop de Memória"
           >
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <button
