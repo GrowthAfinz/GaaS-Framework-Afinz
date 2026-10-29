@@ -5,6 +5,12 @@ export function plurixInvestidaName(product:string):string {
  return PLURIX_INVESTIDA_NAMES[key]??'';
 }
 
+/** V16: the acquired networks communicate under the Amigao signature. */
+export function plurixSignatureName(product:string):string {
+ const name=plurixInvestidaName(product);
+ return name==='Compre Mais'||name==='Superpão'?'Amigão':name;
+}
+
 /** Only the existing network reference in COPY_1_PRETO; no broad edits to HTML or assets. */
 export function personalizeInvestidaCopy(copy:string,product:string):string {
  const name=plurixInvestidaName(product);if(!name)throw new Error('Investida sem nome aprovado: '+product);

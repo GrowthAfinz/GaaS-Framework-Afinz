@@ -1,7 +1,7 @@
 import type { BriefingRow } from '../domain/briefing';
 import { formatLimite } from '../domain/topoPlurixV10';
 import { renderLimitMessage } from '../domain/limitMessage';
-import { plurixInvestidaName } from '../domain/plurixInvestida';
+import { plurixInvestidaName, plurixSignatureName } from '../domain/plurixInvestida';
 
 export interface SubscriberSample { CPF: string; PRI_NOME: string; LIMITE: string; PRODUTO: string; SEQUENCIA: string; TP_CAMPANHA: string }
 export interface RenderResult { html: string; diagnostics: string[] }
@@ -69,14 +69,14 @@ function readVars(source: string, row: BriefingRow, subscriber: SubscriberSample
     vars.LimiteFmt = /^[0-9]+(\.[0-9]{1,2})?$/.test(limit) && Number(limit) > 0 ? formatLimite(limit) : '';
   }
   // V13: header dinâmico lido do briefing; com linha principal, o header é HTML.
-  if (!/@PLXV(?:15|16)Inicializado/.test(source) && /Field\s*\(\s*@Row\s*,\s*"HEADER_TITULO"\s*\)/.test(source) && (row.HEADER_TITULO ?? '').trim()) {
+  if (!/@PLXV(?:15|16|17)Inicializado/.test(source) && /Field\s*\(\s*@Row\s*,\s*"HEADER_TITULO"\s*\)/.test(source) && (row.HEADER_TITULO ?? '').trim()) {
     vars.HeaderModo = 'html';
   }
   // V12+: o texto da faixa vem do briefing; mesmo espelho usado na validação do GaaS.
   if (/Field\s*\(\s*@Row\s*,\s*"MENSAGEM_LIMITE"\s*\)/.test(source)) {
     vars.FaixaLimite = renderLimitMessage(row.MENSAGEM_LIMITE ?? '', String(vars.FirstName ?? ''), subscriber.LIMITE);
   }
-  if(source.includes('SET @NomeInvestida'))vars.NomeInvestida=plurixInvestidaName(subscriber.PRODUTO);
+  if(source.includes('SET @NomeInvestida'))vars.NomeInvestida=source.includes('/* V16: assinatura Amigao para redes adquiridas. */')?plurixSignatureName(subscriber.PRODUTO):plurixInvestidaName(subscriber.PRODUTO);
   return vars;
 }
 
