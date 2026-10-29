@@ -69,7 +69,7 @@ function readVars(source: string, row: BriefingRow, subscriber: SubscriberSample
     vars.LimiteFmt = /^[0-9]+(\.[0-9]{1,2})?$/.test(limit) && Number(limit) > 0 ? formatLimite(limit) : '';
   }
   // V13: header dinâmico lido do briefing; com linha principal, o header é HTML.
-  if (!source.includes('@PLXV15Inicializado') && /Field\s*\(\s*@Row\s*,\s*"HEADER_TITULO"\s*\)/.test(source) && (row.HEADER_TITULO ?? '').trim()) {
+  if (!/@PLXV(?:15|16)Inicializado/.test(source) && /Field\s*\(\s*@Row\s*,\s*"HEADER_TITULO"\s*\)/.test(source) && (row.HEADER_TITULO ?? '').trim()) {
     vars.HeaderModo = 'html';
   }
   // V12+: o texto da faixa vem do briefing; mesmo espelho usado na validação do GaaS.
