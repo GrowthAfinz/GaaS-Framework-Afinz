@@ -123,7 +123,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             direct: false,
             items: [
                 { id: 'explorador', label: 'Aquisição', icon: undefined, onClick: () => navigateToTab('explorador') },
-                { id: 'aprendizado-growth', label: 'Aprendizado e Memória', icon: undefined, onClick: () => { openGrowthLearningSection('vault'); navigateToTab('aprendizado-growth'); } },
+                { id: 'aprendizado-growth', label: 'Aquisição e Loop de Memória', icon: undefined, onClick: () => { openGrowthLearningSection('vault'); navigateToTab('aprendizado-growth'); } },
             ]
         },
         {

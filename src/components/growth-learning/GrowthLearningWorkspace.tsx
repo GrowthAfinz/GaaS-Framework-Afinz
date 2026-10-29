@@ -39,7 +39,7 @@ const SECTION_META: Record<
     icon: LucideIcon;
   }
 > = {
-  investigations: { label: "Tarefas", icon: ListChecks },
+  investigations: { label: "Testes e Tarefas", icon: ListChecks },
   feed: { label: "Fila", icon: Inbox },
   "report-live": { label: "Report Live", icon: Presentation },
   bets: { label: "Apostas", icon: ListChecks },
@@ -125,17 +125,9 @@ export const GrowthLearningWorkspace: React.FC<
         style={{ fontFamily: "Segoe UI, Arial, sans-serif" }}
       >
         <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-            <h1 className="text-sm font-bold text-slate-700">
-              Aprendizado e Memória
-            </h1>
-            <span className="text-xs text-slate-500">
-              Conhecimento, decisões e inteligência compartilhada
-            </span>
-          </div>
           <nav
-            className="flex gap-1 overflow-x-auto border-t border-slate-200 px-3 pt-1 sm:px-5"
-            aria-label="Áreas de Aprendizado e Memória"
+            className="flex gap-1 overflow-x-auto px-3 pt-1 sm:px-5"
+            aria-label="Áreas de Aquisição e Loop de Memória"
           >
             {SECTIONS.map(({ id, label, icon: Icon }) => (
               <button
