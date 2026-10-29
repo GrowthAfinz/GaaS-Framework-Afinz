@@ -15,7 +15,7 @@ async function fixture(){
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create function gaas_vault_is_admin() returns boolean language sql stable as $$select auth.uid()='${actor}'::uuid$$;
  create function growth_investigation_agent_required() returns void language plpgsql as $$begin if current_user not in ('postgres','service_role') then raise exception 'agent_required';end if;end$$;
- create function growth_investigation_can_access(text) returns boolean language sql stable as $$select false$$;
+ create function growth_investigation_can_access(text,boolean default false) returns boolean language sql stable as $$select false$$;
  create function growth_reject_definition_mutation() returns trigger language plpgsql as $$begin raise exception 'immutable';end$$;
  create table growth_operations(operation_id text,scope jsonb);
  create table growth_investigations(id uuid,operation_id text,period date,current_revision integer);
@@ -40,6 +40,8 @@ async function fixture(){
  select set_config('request.jwt.claim.sub','${actor}',false);`);
  const file=readdirSync('supabase/migrations').find(f=>f.endsWith('_growth_loop_attention.sql'));
  await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
+ const guards=readdirSync('supabase/migrations').find(f=>f.endsWith('_growth_loop_resolution_guards.sql'));
+ await db.exec(readFileSync('supabase/migrations/'+guards,'utf8'));
  await db.query('update growth_loop_settings set skill_hash=$1',[skillHash()]);
  const agent={name:'codex',skill_version:'1.0.0',skill_hash:skillHash(),commit:'a'.repeat(40)};
  const put=async(evidence={last_business_date:'2026-10-27',expected_cutoff:'2026-10-28'})=>(await db.query("select growth_loop_private.put('source:crm','source','crm','crm_acquisition',current_date,'Atualizar CRM','Conferir a atualização da fonte.','Conferir importação.','needs_data','?view=learning&section=feed',20,$1) id",[JSON.stringify(evidence)])).rows[0].id;
@@ -71,6 +73,7 @@ test('claim excludes another agent, validates references and completion is idemp
  await assert.rejects(f.complete(c,{...f.body,candidate:{}}),/invalid_loop_output/);
  await assert.rejects(f.complete(c,{...f.body,facts:[{text:'Uma referência inválida.',evidence_key:'missing'}]}),/invalid_loop_reference/);
  await assert.rejects(f.complete(c,{...f.body,facts:[{text:'Um valor incompatível.',evidence_key:'last_business_date',value:0}]}),/invalid_loop_value/);
+ await assert.rejects(f.db.query('select growth_loop_complete($1,$2,null,$3)',[c.analysis_id,c.lease_token,JSON.stringify(f.body)]),/loop_evidence_superseded/);
  const done=await f.complete(c,f.body);assert.equal(await f.complete(c,f.body),done);
  assert.equal((await f.db.query('select count(*)::int n from growth_loop_analyses')).rows[0].n,1);
  await f.db.exec('set role authenticated');await assert.rejects(f.claim(),/permission denied/);
@@ -90,7 +93,9 @@ test('reconciliation uses actual source contracts and deduplicates stable eviden
  const f=await fixture();try{
  await f.db.exec('update growth_loop_sources set due_hour_local=0');await f.db.exec('select growth_loop_reconcile()');const first=await f.list();assert.equal(first.length,7);
  await f.db.exec('select growth_loop_reconcile()');assert.deepEqual((await f.list()).map(i=>[i.id,i.revision]),first.map(i=>[i.id,i.revision]));
+ const meta=first.find(i=>i.source_id==='meta');await f.db.query('select growth_loop_request_analysis($1)',[meta.id]);
  await f.db.exec("insert into paid_media_metrics values((now() at time zone 'America/Sao_Paulo')::date-1,'meta');insert into paid_media_collection_runs values('meta','complete',now(),(now() at time zone 'America/Sao_Paulo')::date-1,10);select growth_loop_reconcile()");assert.equal((await f.list()).some(i=>i.source_id==='meta'),false);
+ assert.equal(await f.claim(),null);
  assert.match(first.find(i=>i.source_id==='renta').summary,/Confira se existem disparos/);
  }finally{await f.db.close();}
 });
