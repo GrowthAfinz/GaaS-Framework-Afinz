@@ -1,0 +1,33 @@
+import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
+import {join,resolve} from 'node:path';
+import {createHash} from 'node:crypto';
+import {PLURIX_V16_TEMPLATE} from '../../src/modules/dynamic-email/fixtures/plurixV16Template';
+import {PLURIX_V17_TEMPLATE,PLURIX_V17_TEMPLATE_ID,PLURIX_V17_TEMPLATE_NAME} from '../../src/modules/dynamic-email/fixtures/plurixV17Template';
+import {emptyBriefingRow} from '../../src/modules/dynamic-email/domain/briefing';
+import {buildSfmcExport} from '../../src/modules/dynamic-email/domain/sfmcExport';
+import {plurixEnvelope} from '../../src/modules/dynamic-email/domain/sfmcEnvelope';
+const out=resolve(process.argv[2]);const rows=JSON.parse(readFileSync(join(out,'v3-before.json'),'utf8'));
+if(rows.length!==24||rows.some((b:any)=>b.template_slot_id!=='builtin-plurix-v16'))throw Error('Expected 24 V16 briefings');
+const hash=(s:string)=>createHash('md5').update(s).digest('hex');
+const versions=rows.map((b:any)=>`('${b.id}'::uuid,${b.version})`).join(',');
+const scope="partner='Plurix' and segment='V3 TOPO DE FUNIL DINÂMICO'";
+const sql=`-- V17: audience contract only; briefing contents and V16 remain unchanged.
+do $guard$ begin
+ if (select count(*) from public.dynamic_email_briefings where ${scope})<>24 then raise exception 'V3 row count changed';end if;
+ if (select count(*) from public.dynamic_email_ruler_strategies where ${scope} and template_slot_id='builtin-plurix-v16')<>1 then raise exception 'V3 ruler changed';end if;
+ if (select md5(source) from public.dynamic_email_template_slots where id='builtin-plurix-v16') is distinct from '${hash(PLURIX_V16_TEMPLATE)}' then raise exception 'V16 changed';end if;
+ if exists(select 1 from public.dynamic_email_template_slots where id='${PLURIX_V17_TEMPLATE_ID}') then raise exception 'V17 already exists';end if;
+ if (select count(*) from public.dynamic_email_briefings b join (values ${versions}) as p(id,version) on p.id=b.id where b.version=p.version and b.template_slot_id='builtin-plurix-v16' and b.partner='Plurix' and b.segment='V3 TOPO DE FUNIL DINÂMICO')<>24 then raise exception 'V3 changed';end if;
+end $guard$;
+insert into public.dynamic_email_template_slots(id,name,source,is_principal,status,version,created_by,updated_by) values('${PLURIX_V17_TEMPLATE_ID}','${PLURIX_V17_TEMPLATE_NAME}',$v17$${PLURIX_V17_TEMPLATE}$v17$,false,'active',1,null,null);
+insert into public.dynamic_email_briefing_versions(briefing_id,version,snapshot,change_summary,warnings,saved_by) select b.id,b.version,to_jsonb(b),'Anterior a V17 COMUNICACAO_PLX','[]'::jsonb,null from public.dynamic_email_briefings b where ${scope} on conflict(briefing_id,version) do nothing;
+update public.dynamic_email_briefings set template_slot_id='${PLURIX_V17_TEMPLATE_ID}',version=version+1,updated_at=now(),updated_by=null where ${scope};
+insert into public.dynamic_email_briefing_versions(briefing_id,version,snapshot,change_summary,warnings,saved_by) select b.id,b.version,to_jsonb(b),'V17: audiencia COMUNICACAO_PLX; conteudo preservado','[]'::jsonb,null from public.dynamic_email_briefings b where ${scope};
+update public.dynamic_email_ruler_strategies set template_slot_id='${PLURIX_V17_TEMPLATE_ID}',version=version+1,updated_at=now() where ${scope} and template_slot_id='builtin-plurix-v16';
+`;
+const migration=readdirSync('supabase/migrations').find(f=>f.endsWith('_plurix_v17_comunicacao_plx_audience.sql'));if(!migration)throw Error('Create migration using CLI');writeFileSync(join('supabase/migrations',migration),sql);writeFileSync(join(out,'apply.sql'),sql);
+for(const ext of ['html','txt'])writeFileSync(join(out,'PLURIX_V17_CRM.'+ext),PLURIX_V17_TEMPLATE);
+const envelope=plurixEnvelope(PLURIX_V17_TEMPLATE)!;writeFileSync(join(out,'SFMC_ASSUNTO.txt'),envelope.subject);writeFileSync(join(out,'SFMC_PRE_CABECALHO.txt'),envelope.preheader);
+writeFileSync(join(out,'PLURIX_V3_CRM_V17_24_LINHAS.csv'),buildSfmcExport(rows.map((b:any)=>Object.assign(emptyBriefingRow(b.id),b.briefing_data)),{campaignType:'CRM',requireDynamicHeader:false}));
+const manifest={template:PLURIX_V17_TEMPLATE_ID,version:1,md5:hash(PLURIX_V17_TEMPLATE),chars:PLURIX_V17_TEMPLATE.length,htmlBodyIdentical:PLURIX_V16_TEMPLATE.slice(PLURIX_V16_TEMPLATE.indexOf('<!DOCTYPE html>'))===PLURIX_V17_TEMPLATE.slice(PLURIX_V17_TEMPLATE.indexOf('<!DOCTYPE html>')),audience:'COMUNICACAO_PLX',fields:{key:'CPF',name:'FIRST_NAME',limit:'LIMITE_CRD',network:'INVESTIDA'},state:'ESTADO_SEQUENCIA_CRM',briefing:'TB_BRIEFING_CAMPANHA_AQUISICAO',campaign:'CRM',rows:rows.length,sfmcCertified:false};
+writeFileSync(join(out,'manifest.json'),JSON.stringify(manifest,null,2));console.log(JSON.stringify(manifest));
