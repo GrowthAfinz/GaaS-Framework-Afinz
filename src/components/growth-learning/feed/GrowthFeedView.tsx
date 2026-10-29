@@ -51,7 +51,6 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
       const nextDecisions = await fetchGrowthSignalDecisions(candidateIds);
       setEvents(nextEvents);
       setDecisions(new Map(nextDecisions.map((decision) => [decision.action_candidate_id, decision])));
-      onCountChange?.(nextEvents.length);
     } catch (loadError) {
       console.error('Growth feed could not be loaded', loadError);
       setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a fila.');
@@ -176,7 +175,7 @@ export const GrowthFeedView: React.FC<GrowthFeedViewProps> = ({ periodStart, per
 
   return (
     <section className="space-y-3">
-      <LoopAttention />
+      <LoopAttention onCountChange={onCountChange} />
       <details open={Boolean(readGrowthLearningItem(window.location.search))} className="space-y-3 rounded-xl border border-slate-200 p-3">
       <summary className="cursor-pointer text-sm font-semibold text-slate-600">Eventos e candidatas do período selecionado</summary>
       {['all','crm_acquisition'].includes(filters.front) && <div className="rounded-xl border bg-white p-4"><strong className="text-sm">Da evidência à decisão</strong><p className="my-2 text-sm text-slate-600">Crie uma tarefa ou consulte análises produzidas pelos agentes conectados.</p><button className="text-sm font-semibold text-cyan-800 underline" onClick={()=>openInvestigationsSection('investigations')}>Abrir tarefas CRM</button></div>}

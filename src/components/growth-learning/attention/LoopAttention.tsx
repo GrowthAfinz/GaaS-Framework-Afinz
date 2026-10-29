@@ -8,7 +8,7 @@ import {attentionBody,defaultNoteAppend,listAttention,LoopItem,LOOP_COMMAND,pref
 const LABELS:Record<string,string>={needs_data:'Precisa de conferência',failed:'Erro de processamento',analysis_ready:'Análise disponível',running:'Em análise',awaiting_analysis:'Aguardando análise',needs_review:'Aguardando revisão',pending:'Aguardando análise',completed:'Concluída',blocked:'Pendência de dados'};
 const FRONTS:Record<string,string>={crm_acquisition:'CRM',paid_media:'Mídia paga',b2c_origin:'B2C',rentabilization:'Rentabilização',knowledge:'Wiki'};
 const control='rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 hover:border-cyan-500 disabled:opacity-50';
-export function LoopAttention({placement='feed',goalNotice}:{placement?:'feed'|'planner';goalNotice?:ReactNode}){
+export function LoopAttention({placement='feed',goalNotice,onCountChange}:{placement?:'feed'|'planner';goalNotice?:ReactNode;onCountChange?:(count:number)=>void}){
  const {user}=useAuth();const setView=useAppStore(s=>s.setTab);const [items,setItems]=useState<LoopItem[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true),[selected,setSelected]=useState<LoopItem|null>(null),[busy,setBusy]=useState(false),[showHidden,setShowHidden]=useState(false),[notice,setNotice]=useState('');
  const [notes,setNotes]=useState<KnowledgeNote[]>([]),[notePath,setNotePath]=useState(''),[markdown,setMarkdown]=useState(''),[baseHash,setBaseHash]=useState(''),[editing,setEditing]=useState(false),[snoozeDate,setSnoozeDate]=useState('');
  const handledLink=useRef('');
@@ -25,6 +25,7 @@ export function LoopAttention({placement='feed',goalNotice}:{placement?:'feed'|'
  const pickNote=(path:string)=>{const note=notes.find(n=>n.relative_path===path);setNotePath(path);setBaseHash(note?.content_hash||'');setMarkdown(note&&selected?note.content_markdown+defaultNoteAppend(selected):'');};
  const selectedBody=selected?attentionBody(selected):null;
  const visible=items.filter(i=>!i.hidden);const count=visible.length;
+ useEffect(()=>{if(!loading&&!error)onCountChange?.(count);},[count,error,loading,onCountChange]);
  return <section aria-label={placement==='planner'?'Notificações da Fila':'Blocos de acompanhamento'} className="space-y-3">
  <div className="flex flex-wrap items-center gap-3">{goalNotice&&<div className="min-w-0 flex-1">{goalNotice}</div>}<div className="flex items-center gap-2"><Bell size={17} className="text-cyan-800"/><h3 className="text-sm font-semibold">{placement==='planner'?'Notificações':'Acompanhamento da operação'}</h3><span aria-label="Quantidade de notificações" className="rounded bg-cyan-50 px-2 py-1 text-sm font-semibold text-cyan-900">{loading?'…':count}</span><button type="button" className={control} aria-label="Atualizar notificações" onClick={()=>void load()}><RefreshCw size={13}/></button></div></div>
  <p className="text-xs text-slate-500">Todos os períodos · avisos por contexto · atualizado a cada 30 segundos. Conferências de fonte são reavaliadas a cada cinco minutos.</p>

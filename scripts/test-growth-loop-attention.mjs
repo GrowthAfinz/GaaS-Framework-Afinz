@@ -22,7 +22,7 @@ async function fixture(){
  create table growth_investigation_evidence(id uuid,investigation_id uuid,revision integer,packet jsonb,content_hash text);
  create table growth_investigation_jobs(id uuid,evidence_id uuid,state text);
  create table growth_investigation_analyses(job_id uuid,body jsonb);
- create table growth_investigation_decisions(investigation_id uuid,evidence_id uuid,decision text);
+ create table growth_investigation_decisions(id uuid default gen_random_uuid(),investigation_id uuid,evidence_id uuid,decision text,created_at timestamptz default now());
  create table outcome_fixture(bet_id uuid,front text,outcome_window_end date,metric_name text,due_bucket text,review_status text);
  create view growth_outcomes_due_v as select * from outcome_fixture;
  create table paid_media_metrics(date date,channel text);
@@ -42,6 +42,8 @@ async function fixture(){
  await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
  const guards=readdirSync('supabase/migrations').find(f=>f.endsWith('_growth_loop_resolution_guards.sql'));
  await db.exec(readFileSync('supabase/migrations/'+guards,'utf8'));
+ const decision=readdirSync('supabase/migrations').find(f=>f.endsWith('_growth_loop_latest_decision.sql'));
+ await db.exec(readFileSync('supabase/migrations/'+decision,'utf8'));
  await db.query('update growth_loop_settings set skill_hash=$1',[skillHash()]);
  const agent={name:'codex',skill_version:'1.0.0',skill_hash:skillHash(),commit:'a'.repeat(40)};
  const put=async(evidence={last_business_date:'2026-10-27',expected_cutoff:'2026-10-28'})=>(await db.query("select growth_loop_private.put('source:crm','source','crm','crm_acquisition',current_date,'Atualizar CRM','Conferir a atualização da fonte.','Conferir importação.','needs_data','?view=learning&section=feed',20,$1) id",[JSON.stringify(evidence)])).rows[0].id;
@@ -106,7 +108,23 @@ test('note proposal rejects wrong front, stale hashes and revision; reuses same 
  await assert.rejects(submit('10-Resultados/CRM.md','old'),/knowledge_stale_base/);
  await assert.rejects(submit('10-Resultados/Media.md'),/note_outside_front/);
  await assert.rejects(submit('10-Resultados/CRM.md','base',2),/loop_evidence_superseded/);
+ await assert.rejects(submit('10-Resultados/CRM.md','base',null),/loop_evidence_superseded/);
  const a=await submit('10-Resultados/CRM.md');assert.deepEqual(await submit('10-Resultados/CRM.md'),a);
+ }finally{await f.db.close();}
+});
+test('latest human decision controls notification state while preserving decisions',async()=>{
+ const f=await fixture();try{
+ const investigation=crypto.randomUUID(),evidence=crypto.randomUUID(),job=crypto.randomUUID();
+ await f.db.query("insert into growth_investigations values($1,'synthetic','2026-09-01',1)",[investigation]);
+ await f.db.query("insert into growth_investigation_evidence values($1,$2,1,$3,'hash')",[evidence,investigation,JSON.stringify({scope:{partner:'Plurix',segment:'Negados'},evidence:[]})]);
+ await f.db.query("insert into growth_investigation_jobs values($1,$2,'completed')",[job,evidence]);await f.db.query('insert into growth_investigation_analyses values($1,$2)',[job,JSON.stringify(f.body)]);
+ await f.db.query("insert into growth_investigation_decisions(investigation_id,evidence_id,decision,created_at) values($1,$2,'no_action',now()-interval '2 minutes')",[investigation,evidence]);
+ await f.db.exec('select growth_loop_reconcile()');assert.equal((await f.list()).some(i=>i.kind==='investigation'),false);
+ await f.db.query("insert into growth_investigation_decisions(investigation_id,evidence_id,decision,created_at) values($1,$2,'request_data',now()-interval '1 minute')",[investigation,evidence]);
+ await f.db.exec('select growth_loop_reconcile()');assert.equal((await f.list()).find(i=>i.kind==='investigation').state,'needs_data');
+ await f.db.query("insert into growth_investigation_decisions(investigation_id,evidence_id,decision) values($1,$2,'investigate')",[investigation,evidence]);
+ await f.db.exec('select growth_loop_reconcile()');assert.equal((await f.list()).find(i=>i.kind==='investigation').state,'needs_review');
+ assert.equal((await f.db.query('select count(*)::int n from growth_investigation_decisions')).rows[0].n,3);
  }finally{await f.db.close();}
 });
 test('approved contribution helper validates every base before writing and rejects traversal',()=>{
