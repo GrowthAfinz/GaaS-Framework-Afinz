@@ -1,7 +1,7 @@
 import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {chromium} from 'playwright';
-import {PLURIX_V16_TEMPLATE,PLURIX_V16_BASE_TEMPLATE} from '../../src/modules/dynamic-email/fixtures/plurixV16Template';
+import {PLURIX_V16_R2_TEMPLATE as PLURIX_V16_TEMPLATE,PLURIX_V16_BASE_TEMPLATE} from '../../src/modules/dynamic-email/fixtures/plurixV16Template';
 import {renderDynamicEmail} from '../../src/modules/dynamic-email/ampscript/renderer';
 import {emptyBriefingRow} from '../../src/modules/dynamic-email/domain/briefing';
 const out=resolve(process.argv[2]);const before=JSON.parse(readFileSync(join(out,'v3-before.json'),'utf8'));const after=JSON.parse(readFileSync(join(out,'v3-after-preview.json'),'utf8'));

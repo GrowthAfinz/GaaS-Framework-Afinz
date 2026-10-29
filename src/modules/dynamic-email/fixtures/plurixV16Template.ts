@@ -24,4 +24,8 @@ const setup=source.slice(0,boundary)
  .replace('/* V15 R3: nome de exibicao da investida; PRODUTO segue como chave tecnica. */','/* V16: assinatura Amigao para redes adquiridas. */')
  .replace('SET @NomeInvestida = "Compre Mais"','SET @NomeInvestida = "Amigão"')
  .replace('SET @NomeInvestida = "Superpão"','SET @NomeInvestida = "Amigão"');
-export const PLURIX_V16_TEMPLATE=setup+html;
+export const PLURIX_V16_R2_TEMPLATE=setup+html;
+export const PLURIX_V16_TEMPLATE=PLURIX_V16_R2_TEMPLATE.replace(
+ '<br><br>'+sfmcTableButton('%%unsub_center_url%%', 'Cancelar inscrição', false, true),
+ '<br>'+preferences.replace('%%profile_center_url%%','%%unsub_center_url%%').replace('Central de Preferências','Cancelar inscrição').replace('Gerenciar preferências','Cancelar inscrição'),
+);

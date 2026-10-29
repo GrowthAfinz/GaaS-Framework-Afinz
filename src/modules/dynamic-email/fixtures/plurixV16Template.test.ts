@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {PLURIX_V15_TEMPLATE} from './plurixV15Template';
-import {PLURIX_V16_BASE_TEMPLATE,PLURIX_V16_TEMPLATE} from './plurixV16Template';
+import {PLURIX_V16_BASE_TEMPLATE,PLURIX_V16_R2_TEMPLATE,PLURIX_V16_TEMPLATE} from './plurixV16Template';
 import {renderDynamicEmail} from '../ampscript/renderer';
 import {emptyBriefingRow} from '../domain/briefing';
 import {plurixEnvelope} from '../domain/sfmcEnvelope';
@@ -17,8 +17,8 @@ describe('V16: fundos preenchidos na composicao da V15',()=>{
   expect(plurixEnvelope(PLURIX_V16_TEMPLATE)?.version).toBe('V16');
  });
  it('preserva os seis links rastreaveis e adiciona cancelamento independente das preferencias',()=>{
-  expect(readFileSync('supabase/migrations/20261029202155_plurix_v16_table_buttons_unsubscribe.sql','utf8').replace(/\r\n/g,'\n').split('$v16r2$')[1]).toBe(PLURIX_V16_TEMPLATE);
-  expect((PLURIX_V16_TEMPLATE.match(/class="sfmc-button"/g)||[])).toHaveLength(7);
+  expect(readFileSync('supabase/migrations/20261029202155_plurix_v16_table_buttons_unsubscribe.sql','utf8').replace(/\r\n/g,'\n').split('$v16r2$')[1]).toBe(PLURIX_V16_R2_TEMPLATE);
+  expect((PLURIX_V16_TEMPLATE.match(/class="sfmc-button"/g)||[])).toHaveLength(6);
   expect((PLURIX_V16_TEMPLATE.match(/href="%%=RedirectTo\(TreatAsContent\(@LinkCTA[12]\)\)=%%"/g)||[])).toHaveLength(6);
   expect(PLURIX_V16_TEMPLATE).toContain('href="%%unsub_center_url%%"');
   expect(PLURIX_V16_TEMPLATE).toContain('href="%%profile_center_url%%"');

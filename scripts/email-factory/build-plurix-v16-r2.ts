@@ -1,7 +1,7 @@
 import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {createHash} from 'node:crypto';
-import {PLURIX_V16_TEMPLATE,PLURIX_V16_BASE_TEMPLATE} from '../../src/modules/dynamic-email/fixtures/plurixV16Template';
+import {PLURIX_V16_R2_TEMPLATE as PLURIX_V16_TEMPLATE,PLURIX_V16_BASE_TEMPLATE} from '../../src/modules/dynamic-email/fixtures/plurixV16Template';
 import {emptyBriefingRow} from '../../src/modules/dynamic-email/domain/briefing';
 import {buildSfmcExport} from '../../src/modules/dynamic-email/domain/sfmcExport';
 import {plurixEnvelope} from '../../src/modules/dynamic-email/domain/sfmcEnvelope';
