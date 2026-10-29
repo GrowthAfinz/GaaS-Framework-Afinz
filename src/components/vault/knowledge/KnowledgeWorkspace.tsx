@@ -1,4 +1,5 @@
 import { summarizeCrmCompatible } from "../../growth-learning/results/crmAnalysis";
+import { LoopOperatorGuide } from "../../growth-learning/attention/LoopOperatorGuide";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -320,6 +321,7 @@ export function KnowledgeWorkspace({
         </div>
         <Users size={22} className="text-cyan-700" />
       </header>
+      <LoopOperatorGuide />
       <nav aria-label="Colaboração com IA" className="flex flex-wrap gap-2">
         {(
           [

@@ -25,6 +25,7 @@ import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 import { ChartTooltip } from '../ui/ChartTooltip';
 import { resolveGoalForMonth } from '../../utils/goalCarryForward';
 import { InheritedGoalNotice } from './InheritedGoalNotice';
+import { LoopAttention } from '../growth-learning/attention/LoopAttention';
 import {
     ACQUISITION_BUS,
     AcquisitionBU,
@@ -1201,7 +1202,7 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                         </div>
                     </div>
 
-                    {currentGoal?.herdada_de && <InheritedGoalNotice goal={currentGoal} />}
+                    <LoopAttention placement="planner" goalNotice={currentGoal?.herdada_de ? <InheritedGoalNotice goal={currentGoal} /> : undefined} />
                 </div>
             </div>
 
