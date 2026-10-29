@@ -1,4 +1,5 @@
 import { VaultNoteSummary } from './vaultTypes';
+import { wikiPageType } from './wikiPageTypes';
 
 export const WIKI_TOPICS = [
   { title: 'Comece aqui', description: 'Entenda a operação e encontre seu caminho.', target: '00-Indice/Enciclopedia-Servicos-Growth', folder: '00-Indice' },
@@ -12,12 +13,12 @@ export const WIKI_TOPICS = [
 
 export const normalizeWikiPath = (value: string) => value.replace(/\\/g, '/').replace(/\.md$/i, '').normalize('NFC').toLocaleLowerCase('pt-BR');
 
-export function wikiTopicForNote(note: Pick<VaultNoteSummary, 'relative_path' | 'folder' | 'tags'> | null) {
+export function wikiTopicForNote(note: (Pick<VaultNoteSummary, 'relative_path' | 'folder' | 'tags'> & { note_type?: string | null; frontmatter?: Record<string, unknown> }) | null) {
   if (!note) return null;
   const path = normalizeWikiPath(note.relative_path);
   const exact = WIKI_TOPICS.find(topic => path === normalizeWikiPath(topic.target) || path.split('/').pop() === normalizeWikiPath(topic.target));
   if (exact) return exact.title;
-  if (note.tags.includes('growth-assunto') || note.folder === '07-Evolucao') return 'Resultados';
+  if (note.tags.includes('growth-assunto') || wikiPageType(note) || note.folder === '07-Evolucao' || note.folder.startsWith('10-Resultados')) return 'Resultados';
   if (/produto|briefing-e-regua/i.test(path) || note.folder === '01-Conceitos') return 'Produtos e propostas de valor';
   if (/email|sfmc|comunicac|regua/i.test(path)) return 'CRM e e-mails dinâmicos';
   if (['02-Entidades-Dados', '03-Dimensoes', '06-Performance'].includes(note.folder)) return 'Dados e mensuração';

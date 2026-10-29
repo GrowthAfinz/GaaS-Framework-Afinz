@@ -8,9 +8,9 @@ import { supabase } from '../../../services/supabaseClient';
 import { openGrowthBetSourceContext, openGrowthLearningSection, openGrowthLearningSectionItem, GrowthBetSourceContext } from '../growthLearningNavigation';
 import { RelatedGrowthBets } from '../bets/RelatedGrowthBets';
 import { fetchResultsSnapshot } from './resultsService';
-import { cleanScope, comparisonWindow, duplicateIds, historyMonths, lastClosedDay, matchesScope, metricDelta, readResultsRoute, resultsSearch, summarize } from './results.logic';
-import { EMPTY_SCOPE, ResultRow, ResultsDomain, ResultsScope, ResultsSnapshot } from './results.types';
-import { matchesWikiAnalytics, WikiAnalytics, wikiResultsSearch } from '../../vault/wikiAnalytics';
+import { cleanScope, comparisonWindow, duplicateIds, historyMonths, lastClosedDay, matchesScope, metricDelta, applyRefinement, readResultsRoute, refinementOptions, resultsSearch, summarize } from './results.logic';
+import { EMPTY_SCOPE, ResultsDomain, ResultsScope, ResultsSnapshot } from './results.types';
+import { matchesWikiAnalytics, refineWithinNote, WikiAnalytics, wikiResultsSearch } from '../../vault/wikiAnalytics';
 import { ResultRetrospectivePanel } from './ResultRetrospectivePanel';
 import { CrmComparisons, CrmFunnel } from './CrmComparisons';
 import { crmSummary, summarizeCrmCompatible } from './crmAnalysis';
@@ -37,7 +37,7 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
   const domain:ResultsDomain=embedded?.domain || (isPlurixAnalyst&&route.domain==='b2c'?'crm':route.domain);
   useEffect(()=>setTrendMetric('primary'),[domain]);
   const fixedScope=useMemo(()=>Object.fromEntries(Object.entries(embedded?.scope||{}).filter(([,value])=>Boolean(value))) as Partial<ResultsScope>,[embedded]);
-  const scope=useMemo(()=>cleanScope(domain,{...(route.domain===domain?route.scope:EMPTY_SCOPE),...fixedScope,...(domain==='b2c'?{type:embedded?.scope.type||route.scope.type||'total'}:{}),...(isPlurixAnalyst&&domain==='crm'?{bu:'Plurix'}:{})}),[domain,route.scope,isPlurixAnalyst,embedded]);
+  const scope=useMemo(()=>{const routeScope=route.domain===domain?route.scope:EMPTY_SCOPE;return cleanScope(domain,{...(embedded?refineWithinNote(embedded,routeScope):routeScope),...fixedScope,...(domain==='b2c'?{type:embedded?.scope.type||route.scope.type||'total'}:{}),...(isPlurixAnalyst&&domain==='crm'?{bu:'Plurix'}:{})});},[domain,route.domain,route.scope,isPlurixAnalyst,embedded,fixedScope]);
   useEffect(()=>{const sync=()=>setRoute(readResultsRoute(window.location.search));window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync);},[]);
   useEffect(()=>{
     const id=++request.current;setSnapshot(null);setError('');setLoading(true);
@@ -67,7 +67,7 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
     const next=embedded?wikiResultsSearch(embedded.noteId,nextDomain,nextMonth,finalScope,window.location.search):resultsSearch(nextDomain,nextMonth,finalScope,window.location.search);
     window.history.pushState({},'',window.location.pathname+next);window.dispatchEvent(new PopStateEvent('popstate'));
   };
-  const setFilter=(key:keyof ResultsScope,value:string)=>navigate(domain,month,{...scope,[key]:value});
+  const setFilter=(key:keyof ResultsScope,value:string)=>navigate(domain,month,applyRefinement(sourceRows,scope,key,value,fixedScope));
   const fields: {key:keyof ResultsScope;label:string}[]=domain==='crm'||domain==='renta'?[{key:'bu',label:'BU'},{key:'segment',label:'Segmento'},{key:'partner',label:'Parceiro canônico'},{key:'channel',label:'Canal'},{key:'stage',label:'Etapa'},{key:'subgroup',label:'Subgrupo'},{key:'journey',label:'Jornada'},{key:'safra',label:'Safra'}]
     :domain==='media'?[{key:'channel',label:'Plataforma'},{key:'campaign',label:'Campanha'},{key:'objective',label:'Objetivo de plataforma'},{key:'grain',label:'Nível'}]:[{key:'type',label:'Recorte de originação'}];
   const effectiveScope=domain==='b2c'&&!scope.type?{...scope,type:'total'}:scope;
@@ -106,7 +106,7 @@ export function ResultsWorkspace({embedded}:{embedded?:WikiAnalytics & {noteId:s
       {!embedded && <nav aria-label="Domínio de resultados" className="mt-4 flex flex-wrap gap-2">{(['crm','renta','media','b2c'] as ResultsDomain[]).filter(d=>!isPlurixAnalyst||d!=='b2c').map(d=><button key={d} type="button" onClick={()=>navigate(d,'',EMPTY_SCOPE)} aria-current={d===domain?'page':undefined} className={d===domain?'rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white':input}>{META[d].title}</button>)}</nav>}
       <div className="mt-4 flex flex-wrap items-end gap-3"><label className="text-xs font-semibold text-slate-600">Mês<select aria-label="Mês de resultados" className={'mt-1 block '+input} value={month} onChange={e=>navigate(domain,e.target.value)}>{[...new Set([month,...months])].sort().reverse().map(m=><option key={m}>{m}</option>)}</select></label>
         {fields.map(({key,label})=><label key={key} className="text-xs font-semibold text-slate-600">{label}<select aria-label={label} disabled={Boolean(embedded?.scope[key]) || isPlurixAnalyst&&key==='bu'} className={'mt-1 block max-w-[300px] '+input} value={effectiveScope[key]||''} onChange={e=>setFilter(key,e.target.value)}>
-          {key!=='type'&&<option value="">Todos</option>}{[...new Set(sourceRows.map(r=>r[key as keyof ResultRow]) as string[])].filter(Boolean).sort().map(v=><option key={v} value={v}>{key==='campaign'?sourceRows.find(r=>r.campaign===v)?.campaignLabel||v:key==='type'?TYPE_LABELS[v]||v:v}</option>)}</select></label>)}
+          {key!=='type'&&<option value="">Todos</option>}{refinementOptions(sourceRows,effectiveScope,key).map(v=><option key={v} value={v}>{key==='campaign'?sourceRows.find(r=>r.campaign===v)?.campaignLabel||v:key==='type'?TYPE_LABELS[v]||v:v}</option>)}</select></label>)}
         <button className={input} type="button" onClick={()=>navigate(domain,month,EMPTY_SCOPE)}>Limpar filtros</button></div>
       {noteError&&<p role="status" className="mt-3 text-sm text-amber-800">{noteError}</p>}
     </header>

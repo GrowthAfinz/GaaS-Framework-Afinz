@@ -18,7 +18,24 @@ analytics:
     operation_id: stable-discovery-id
 ```
 
-The fixed scope cannot be cleared by the result filters. Additional stage, subgroup, journey and vintage filters refine it. An operation ID identifies retrospective ownership; it is not itself a physical row filter. `any_of` preserves the explicit discovery memberships for candidate rentabilization families.
+The fixed scope cannot be cleared by the result filters. Additional BU, partner (when not fixed), stage, subgroup, journey and vintage filters refine it. A refinement that no `any_of` rule admits is dropped instead of producing an empty page. BU and partner are coupled: when a new choice leaves no observed row, the other one is cleared if it is a reader refinement. Changing BU, partner or public clears a reader-selected `operation_id`, so a retrospective is never saved under another operation. An operation ID identifies retrospective ownership; it is not itself a physical row filter. `any_of` preserves the explicit discovery memberships for candidate rentabilization families.
+
+## Page families (results wiki, 2026-10-28)
+
+Pages that decide about one thing declare `tipo: dominio | publico | parceiro | mecanica | objetivo | iniciativa` (accents and case are ignored; `tipo` wins over `type`). They and every note under `10-Resultados/` belong to the Results topic. The catalog lists them by type beside the `growth-assunto` flow, which is unchanged. Notes without one of these types (including all `Assunto-*`) render exactly as before.
+
+```yaml
+tipo: publico
+analytics: {"domain": "crm", "scope": {"segment": "Abandonados"}}
+variantes: [{"operation_id": "CRM-bdc57e480d", "bu": "Plurix", "partner": "Plurix"}, ...]
+matriz: true            # default on for dominio, publico, parceiro; `false` turns it off
+listas_vivas: true      # default on for the six types; `false` turns it off
+```
+
+- `variantes` names the confirmed public × partner operations of the page. It does not filter rows; it orders the matrix columns and lets a matrix cell carry its `bu` and `operation_id` when every observed row of the cell belongs to that variant.
+- `matriz` (crm or renta only) reuses the `analytics` scope; an object `{scope: {...}}` may only narrow it. Without `analytics`, the object must carry `domain` and `scope`, and it also feeds the result block. Rows are segments, columns are canonical partners, cells show recorded cards (or clicks), dispatches used and the same ratio as the result block, with variation against the same calendar cut of the previous month. Only combinations observed in the records become cells; an absent combination is empty, never zero. Same reads, closed days, duplicate exclusion and pagination as `ResultsWorkspace`. The month follows `result_month`. Clicking a row, column or cell opens the page's result block filtered by public, partner or both.
+- `listas_vivas` lists bets (`growth_bet_source_links_v`), learnings (`growth_memory_active_v` plus `growth_learning_links` pointing to the page), retrospectives (latest revision per scope and period) and CRM investigations (`growth_list_investigations`) whose scope matches the page. Read-only through the authenticated client, so RLS applies. Relation tiers: tied to the page or one of its variants, same scope, related scope, front context (collapsed). Conflicting scopes are excluded. An object `{domain, scope}` can set the scope when the page has no `analytics`.
+- On these pages the live blocks are placed under the headings `Resultado ao vivo`, `Por parceiro` / `Por público` / `Público × parceiro` and `Decisões, apostas e aprendizados` / `O que já aprendemos` when present; blocks without a heading travel with the result block.
 
 ## Temporal and measurement contracts
 

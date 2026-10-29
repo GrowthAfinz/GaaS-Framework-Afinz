@@ -15,6 +15,27 @@ export function cleanScope(domain: ResultsDomain, value: Partial<ResultsScope>):
 export function matchesScope(row: ResultRow, scope: ResultsScope) {
   return (Object.keys(scope) as (keyof ResultsScope)[]).every(key => key==='operation_id' || !scope[key] || row[key as keyof ResultRow] === scope[key]);
 }
+// Options for one filter: every value observed in the page's rows (already inside its fixed scope and
+// any_of). Not cascaded, so choosing a BU never hides the partners of another BU; the current value stays selectable.
+export function refinementOptions(rows: ResultRow[], scope: ResultsScope, key: keyof ResultsScope) {
+  const values = new Set(rows.map(row => row[key as keyof ResultRow]).filter((v): v is string => typeof v === 'string' && Boolean(v)));
+  if (scope[key]) values.add(scope[key]!);
+  return [...values].sort();
+}
+// BU and partner are coupled (a partner usually runs in one BU). When a new choice leaves no observed row,
+// clear the other one, if it is a reader refinement, instead of landing on an empty page.
+export function applyRefinement(rows: ResultRow[], scope: ResultsScope, key: keyof ResultsScope, value: string, fixed: Partial<ResultsScope> = {}): ResultsScope {
+  const next = { ...scope, [key]: value };
+  // An operation id names one public × partner combination; it cannot survive a change of BU, partner or public.
+  if (['bu', 'partner', 'segment'].includes(key) && !fixed.operation_id) next.operation_id = '';
+  if (!value || rows.some(row => matchesScope(row, next))) return next;
+  for (const other of ['bu', 'partner'] as const) {
+    if (other === key || !next[other] || fixed[other]) continue;
+    const relaxed = { ...next, [other]: '' };
+    if (rows.some(row => matchesScope(row, relaxed))) return relaxed;
+  }
+  return next;
+}
 export function duplicateIds(rows: ResultRow[]) {
   const groups = new Map<string, ResultRow[]>();
   rows.filter(row => row.domain === 'crm' || row.domain === 'renta').forEach(row => {

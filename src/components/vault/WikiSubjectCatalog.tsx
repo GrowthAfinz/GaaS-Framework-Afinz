@@ -1,5 +1,6 @@
 import { VaultNoteSummary } from './vaultTypes';
-import { catalogLabel,catalogSelection,subjectGroup,subjectRoute,subjectSegment,tagValue,type CatalogRoute } from './wikiCatalogNavigation';
+import { catalogLabel,catalogSelection,resultPagesByType,subjectGroup,subjectRoute,subjectSegment,tagValue,type CatalogRoute } from './wikiCatalogNavigation';
+import { WIKI_PAGE_TYPES } from './wikiPageTypes';
 const normalize=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 export function WikiSubjectCatalog({notes,filters,route,onRouteChange,onOpen}:{notes:VaultNoteSummary[];filters:Record<string,unknown>;route:CatalogRoute;onRouteChange:(route:CatalogRoute,replace?:boolean)=>void;onOpen:(id:string,route:CatalogRoute)=>void}){
  const selection=catalogSelection(notes,filters,route);const active=selection.route;
@@ -11,6 +12,7 @@ export function WikiSubjectCatalog({notes,filters,route,onRouteChange,onOpen}:{n
  const groups=[...new Map(frontRows.map(note=>{const group=subjectGroup(note);return [group.key,group] as const;})).values()].sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
  const segments=[...new Set(groupRows.map(subjectSegment))].sort((a,b)=>catalogLabel(a).localeCompare(catalogLabel(b),'pt-BR'));
  const level=!active.front?'front':!active.group?'group':!active.segment?'segment':'notes';
+ const pages=level==='front'&&!filters.parceiro&&!filters.segmento&&!filters.dominio?resultPagesByType(notes,matches):[];
  const select='max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm';
  const card='rounded-md border border-slate-200 bg-slate-50/40 p-5 text-left transition-colors hover:border-cyan-400 hover:bg-cyan-50 focus-visible:outline-cyan-600';
  const go=(patch:Partial<CatalogRoute>)=>onRouteChange({...active,...patch});
@@ -22,6 +24,7 @@ export function WikiSubjectCatalog({notes,filters,route,onRouteChange,onOpen}:{n
  {active.front&&!filters.parceiro&&<select aria-label="Parceiro ou público do assunto" className={select} value={active.group} onChange={e=>go({group:e.target.value,segment:''})}><option value="">Escolher parceiro ou público</option>{groups.map(group=><option key={group.key} value={group.key}>{group.label}</option>)}</select>}
  {active.front&&active.group&&!filters.segmento&&<select aria-label="Segmento do assunto" className={select} value={active.segment} onChange={e=>go({segment:e.target.value})}><option value="">Escolher segmento</option>{segments.map(value=><option key={value} value={value}>{catalogLabel(value)}</option>)}</select>}
  </div>
+ {pages.length>0&&<div className="mt-5 space-y-4" aria-label="Páginas de resultados por tipo">{pages.map(group=><div key={group.type}><h5 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{WIKI_PAGE_TYPES[group.type].plural}</h5><div className="mt-2 flex flex-wrap gap-2">{group.notes.map(note=><button key={note.id} type="button" onClick={()=>onOpen(note.id,{...active,query:''})} className="rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-900 hover:bg-cyan-100">{note.title}</button>)}</div></div>)}</div>}
  <p className="my-3 text-xs text-slate-500" aria-live="polite">{rows.length} assuntos neste recorte</p>
  <div className="mb-4 flex flex-wrap gap-4 text-sm font-medium text-cyan-700">{active.front&&!filters.dominio&&<button onClick={()=>go({front:'',group:'',segment:''})}>← Todas as frentes</button>}{active.group&&!filters.parceiro&&<button onClick={()=>go({group:'',segment:''})}>← Todos os parceiros e públicos</button>}{active.segment&&!filters.segmento&&<button onClick={()=>go({segment:''})}>← Todos os segmentos</button>}</div>
  <div className="grid gap-3 sm:grid-cols-2">

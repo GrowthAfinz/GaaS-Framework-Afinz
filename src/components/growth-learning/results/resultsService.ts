@@ -5,6 +5,8 @@ import { CrmMeasure } from './results.types';
 import { ResultRetrospective, ResultRow, ResultsDomain, ResultsScope, ResultsSnapshot } from './results.types';
 
 const cache=new Map<string,{expires:number;snapshot:ResultsSnapshot}>();
+// A page can mount the result block and the matrix together; share one full read instead of paginating twice.
+const inflight=new Map<string,Promise<ResultsSnapshot>>();
 const fields = {
   crm: 'id,prog_gaas,status,created_at,updated_at,BU,jornada,Activity name / Taxonomia,Canal,Data de Disparo,Data Fim,Safra,Parceiro,SIGLA_Parceiro,Segmento,SIGLA_Segmento,Subgrupos,Etapa de aquisição,Perfil de Crédito,Produto,Oferta,Promocional,SIGLA_Oferta,Oferta 2,Promocional 2,Ordem de disparo,Base Total,Base Acionável,% Otimização de base,Custo Unitário Oferta,Custo Total da Oferta,Custo unitário do canal,Custo total canal,Custo Total Campanha,CAC,Taxa de Entrega,Taxa de Abertura,Taxa de Clique,Taxa de Proposta,Taxa de Aprovação,Taxa de Finalização,Taxa de Conversão,Cartões Gerados,Aprovados,Propostas,Emissões Independentes,Emissões Assistidas,Horário de Disparo,Abertura,Cliques,template_id,parceiro_canonico,parceiro_canonico_motivo,parceiro_canonico_confianca',
   renta: 'id,Data de Disparo,Activity name / Taxonomia,BU,Segmento,Parceiro,Canal,Base Acionável,Cliques,Custo Total Campanha,Etapa de aquisição,Subgrupos,jornada,Safra,Perfil de Crédito,Produto,Oferta,Promocional,Oferta 2,Promocional 2,Ordem de disparo',
@@ -30,9 +32,14 @@ export async function readAllRows(table:string,columns:string,primaryKey='id') {
   if(count!==rows.length || expected!==rows.length)throw new Error('A fonte mudou durante a leitura. Atualize para carregar o histórico completo.');
   return rows;
 }
-export async function fetchResultsSnapshot(domain:ResultsDomain,userId:string,refresh=false):Promise<ResultsSnapshot>{
+export function fetchResultsSnapshot(domain:ResultsDomain,userId:string,refresh=false):Promise<ResultsSnapshot>{
   const key=userId+':'+domain;
-  if(!refresh){const hit=cache.get(key);if(hit&&hit.expires>Date.now())return hit.snapshot;}
+  if(!refresh){const hit=cache.get(key);if(hit&&hit.expires>Date.now())return Promise.resolve(hit.snapshot);const pending=inflight.get(key);if(pending)return pending;}
+  const work=loadResultsSnapshot(domain,userId,key).finally(()=>{if(inflight.get(key)===work)inflight.delete(key);});
+  inflight.set(key,work);
+  return work;
+}
+async function loadResultsSnapshot(domain:ResultsDomain,userId:string,key:string):Promise<ResultsSnapshot>{
   const raw=await readAllRows(sources[domain],fields[domain]);
   let aliases:Record<string,unknown>[]=[],canonical:Record<string,unknown>[]=[];
   if(domain==='media'){

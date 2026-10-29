@@ -1,4 +1,5 @@
 import type { VaultNoteSummary } from './vaultTypes';
+import { WIKI_PAGE_TYPE_ORDER, wikiPageType, type WikiPageType } from './wikiPageTypes';
 type CatalogNote=Pick<VaultNoteSummary,'title'|'tags'>;
 export type CatalogRoute={front:string;group:string;segment:string;query:string};
 export const EMPTY_CATALOG:CatalogRoute={front:'',group:'',segment:'',query:''};
@@ -29,3 +30,9 @@ export function catalogSelection(notes:VaultNoteSummary[],filters:Record<string,
  return {candidates,frontRows,selected,route:{...route,front,group,segment}};
 }
 export function catalogGroupLabel(key:string){return key==='unclassified'?'Sem parceiro ou público definido':(key.startsWith('unit:')?'BU ':'')+catalogLabel(key.split(':').slice(1).join(':'));}
+// Pages of the new results families, grouped by type. They live beside the `growth-assunto` catalog, not inside it.
+export function resultPagesByType(notes:VaultNoteSummary[],matches:(note:VaultNoteSummary)=>boolean=()=>true){
+ const groups=new Map<WikiPageType,VaultNoteSummary[]>();
+ for(const note of notes){const type=wikiPageType(note);if(!type||note.tags.includes('growth-assunto')||!matches(note))continue;groups.set(type,[...(groups.get(type)||[]),note]);}
+ return WIKI_PAGE_TYPE_ORDER.filter(type=>groups.has(type)).map(type=>({type,notes:groups.get(type)!.sort((a,b)=>a.title.localeCompare(b.title,'pt-BR'))}));
+}

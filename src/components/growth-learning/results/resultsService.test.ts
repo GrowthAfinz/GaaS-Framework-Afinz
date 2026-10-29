@@ -58,5 +58,11 @@ describe('Complete source reads',()=>{
  it('does not normalize absent values to zero',()=>{
   expect(numberOrNull(null)).toBeNull();expect(numberOrNull('')).toBeNull();expect(numberOrNull('invalid')).toBeNull();expect(numberOrNull(0)).toBe(0);
  });
+ it('shares one complete read when the result block and the matrix mount together',async()=>{
+  source(1,[{data:[{id:'a','Data de Disparo':'2026-09-01T12:00:00Z'}]}]);
+  const [first,second]=await Promise.all([fetchResultsSnapshot('crm','shared-read'),fetchResultsSnapshot('crm','shared-read')]);
+  expect(first).toBe(second);
+  expect(mock.from.mock.calls.filter(([table])=>table==='activities')).toHaveLength(2);
+ });
 });
 
