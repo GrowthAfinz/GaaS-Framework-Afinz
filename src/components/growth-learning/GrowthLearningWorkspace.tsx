@@ -119,14 +119,15 @@ export const GrowthLearningWorkspace: React.FC<
   };
 
   return (
-    <div className="min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 py-4 sm:px-5">
+    <div className="min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 pb-4 sm:px-5">
       <div
         className="learning-workspace mx-auto max-w-[1680px] space-y-4"
         style={{ fontFamily: "Segoe UI, Arial, sans-serif" }}
       >
-        <header className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Submenu colado no topo e na barra logo abaixo, separados só por uma linha */}
+        <header className="overflow-hidden border-x border-b border-slate-200 bg-white">
           <nav
-            className="flex gap-1 overflow-x-auto px-3 pt-1 sm:px-5"
+            className="flex gap-1 overflow-x-auto px-3 sm:px-5"
             aria-label="Áreas de Aquisição e Loop de Memória"
           >
             {SECTIONS.map(({ id, label, icon: Icon }) => (
@@ -151,7 +152,7 @@ export const GrowthLearningWorkspace: React.FC<
         </header>
 
         {section !== "vault" && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <div className="!mt-0 flex flex-wrap items-center justify-between gap-3 rounded-b-xl border border-t-0 border-slate-200 bg-white px-4 py-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
                 {SECTION_META[section].label}
@@ -215,18 +216,20 @@ export const GrowthLearningWorkspace: React.FC<
         ) : section === "memory" ? (
           <GrowthMemoryView onCountChange={setMemoryCount} />
         ) : section === "vault" ? (
-          <Suspense
-            fallback={
-              <div
-                role="status"
-                className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
-              >
-                Carregando Wiki…
-              </div>
-            }
-          >
-            <VaultWorkspace onCountChange={setVaultCount} />
-          </Suspense>
+          <div className="!mt-0">
+            <Suspense
+              fallback={
+                <div
+                  role="status"
+                  className="rounded-b-xl border border-t-0 border-slate-200 bg-white p-6 text-sm text-slate-500"
+                >
+                  Carregando Wiki…
+                </div>
+              }
+            >
+              <VaultWorkspace onCountChange={setVaultCount} />
+            </Suspense>
+          </div>
         ) : section === "report-live" ? (
           <section className="space-y-4">
             <ReportLiveCard
