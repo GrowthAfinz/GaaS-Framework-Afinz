@@ -3,7 +3,7 @@ name: gaas-growth-loop-operator
 description: Atualizar a Fila, conferir fontes operacionais, analisar trabalhos de atualização e preparar ou aplicar contribuições aprovadas às notas de resultado do GaaS. Compartilhada por Codex e Claude; usar mediante comando explícito.
 ---
 
-# Operação do loop Growth · 1.0.0
+# Operação do loop Growth · 1.0.1
 
 Esta é a skill canônica para Codex e Claude. Não inicia uma LLM, agenda análises ou chama API de IA. Sem limite informado, processar até cinco trabalhos por comando e informar o saldo. O cron do banco apenas reconcilia estados e avisos.
 
@@ -23,6 +23,21 @@ Esta é a skill canônica para Codex e Claude. Não inicia uma LLM, agenda anál
 - Explicar em português direto: o que está registrado, o que falta confirmar e quem/qual ação pode desbloquear. Não atribuir causas a copy, público, oferta ou orçamento sem prova. Não transformar ausência em zero ou mês aberto em projeção.
 - Validar com `node scripts/growth-loop-agent.mjs validate claim.json analysis.json`. Publicar por `growth_loop_complete(id,token,content_hash,body::jsonb)`. Se revisão/hash mudaram, abandonar a conclusão antiga e pedir nova reserva. Conclusão idêntica é idempotente.
 - Falha técnica: `growth_loop_fail(id,token,codigo)`; até três tentativas. Falta de dado: publicar `blocked`, sem loop de retry. Ao terminar, reconciliar e informar blocos atualizados, limites e próximos passos.
+
+## Comunicação dos avisos e detalhes
+
+Aplicar esta orientação também ao produzir textos pela skill de investigação CRM. Preservar seus contratos, campos de evidência e regras de elegibilidade; esta orientação muda a escrita, não autoriza novos campos ou conclusões.
+
+- **Contexto primeiro:** Frente → **Parceiro** → **Segmento**, com nomes compreensíveis e sem sublinhados. Usar somente o escopo comprovado. “Todos os parceiros” e “Todos os segmentos” exigem alcance geral confirmado; falta de informação não significa “todos”. Em mídia, não chamar campanha de parceiro nem público de segmento CRM sem correspondência governada. Identificar campanha/público quando esse for o contexto disponível.
+- **Período separado do estado:** “Resultados de setembro/2026” e “Análise pronta”. Não confundir o período dos resultados com a data do aviso. Em apostas e outcomes, acrescentar o nome curto da ação ou teste acompanhado, quando registrado; não inventar um nome a partir da métrica.
+- **Preview:** título direto e uma única frase dizendo por que olhar. Como referência, título de até oito palavras e frase de até 25 palavras, sem repetir o contexto. Exemplo editorial, não conclusão sobre dados: “Análise pronta. Veja o que mudou nos resultados de setembro e o que precisamos decidir.” Os avisos de atualização de base mantêm sua comunicação específica já aprovada.
+- **Detalhes enxutos, nesta ordem:** **Por que olhar** (uma frase sobre a atenção ou decisão); **Causa** (uma frase); **Dados** (até três fatos relevantes); **Próximos passos** (até duas ações concretas). Preferir cerca de 90 palavras no conteúdo principal, sem transformar a meta em truncamento automático. Não repetir o preview em um parágrafo maior nem acrescentar introdução, conclusão ou explicação genérica sobre o processo de IA.
+- **Causa sem falsa certeza:** apresentar causa confirmada somente quando comprovada. Caso contrário, dizer “Ainda não sabemos o motivo”. Se existir hipótese útil, identificá-la como hipótese e indicar como verificar. Não inventar causa para preencher a seção; ausência de dados não comprova piora de performance.
+- **Dados para decidir:** citar o número relevante, o período e a comparação ou o limite que muda a leitura. Não despejar todas as métricas disponíveis. Uma limitação que impeça a decisão deve permanecer no texto principal; não escondê-la para encurtar a mensagem.
+- **Evidência completa, leitura progressiva:** manter referências, valores, datas, revisões e procedência nos campos estruturados exigidos. O detalhe técnico fica em “Ver evidências”, recolhido na apresentação. Não incluir nomes de tabela, IDs, hashes, reservas, SQL ou termos como “grão” e “aditividade” no texto principal. Traduzir, por exemplo, para “Precisamos confirmar se esses registros podem ser somados”. Os dados de auditoria não devem ser apagados ou alterados.
+- **Revisão antes de publicar:** o leitor consegue identificar a frente, o parceiro/segmento ou contexto disponível, o período, por que olhar e o próximo passo sem abrir a parte técnica? Retirar repetições e frases que não ajudem a decidir. Preservar o histórico: esta mudança não reescreve análises antigas automaticamente.
+
+Nos contratos atuais, usar `summary` para a explicação curta, `facts` para os dados e `next_checks` para os próximos passos; manter em `limitations` os limites necessários e em `hypotheses` apenas as hipóteses que o contrato CRM permitir. Não criar um campo obrigatório de causa nem inserir texto artificial para preencher seções. A skill orienta o conteúdo das próximas análises; não modifica sozinha o layout do aplicativo ou os avisos determinísticos.
 
 ## Notas atualizáveis
 

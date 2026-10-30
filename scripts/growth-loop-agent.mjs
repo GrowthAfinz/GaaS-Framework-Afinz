@@ -3,6 +3,7 @@ import {resolve,relative,isAbsolute,sep} from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 const skill='.claude/skills/gaas-growth-loop-operator/SKILL.md';
+export const SKILL_VERSION='1.0.1';
 const digest=s=>createHash('sha256').update(s).digest('hex');
 export const skillHash=()=>digest([skill,'scripts/growth-loop-agent.mjs'].map(p=>p+'\n'+readFileSync(p,'utf8').replaceAll('\r\n','\n')+'\n').join(''));
 export function validate(claim,body){
@@ -31,7 +32,7 @@ export function applyApproved(contribution,vault){
 }
 if(process.argv[1]?.replaceAll('\\','/').endsWith('/growth-loop-agent.mjs')){
  const [command,a,b]=process.argv.slice(2);
- if(command==='identity'){if(!['codex','claude'].includes(a))throw Error('Use codex ou claude');console.log(JSON.stringify({name:a,skill_version:'1.0.0',skill_hash:skillHash(),commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()}));}
+ if(command==='identity'){if(!['codex','claude'].includes(a))throw Error('Use codex ou claude');console.log(JSON.stringify({name:a,skill_version:SKILL_VERSION,skill_hash:skillHash(),commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()}));}
  else if(command==='validate'){const errors=validate(JSON.parse(readFileSync(a,'utf8')),JSON.parse(readFileSync(b,'utf8')));console.log(JSON.stringify({valid:!errors.length,errors}));if(errors.length)process.exitCode=1;}
  else if(command==='apply-approved')console.log(JSON.stringify(applyApproved(JSON.parse(readFileSync(a,'utf8')),b)));
  else throw Error('Use identity <codex|claude>, validate <claim.json> <analysis.json> ou apply-approved <registro-backend.json> <vault-absoluto>');
