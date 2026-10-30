@@ -66,7 +66,20 @@ const drawHover: NodeLabelDrawingFunction = (context, data, settings) => {
 };
 const BACKGROUND = "#f8fafc",
   DIMMED = "#e2e8f0",
-  EDGE = "#64748b";
+  EDGE = "#64748b",
+  FADED_EDGE = "rgba(100,116,139,0.16)";
+// Blends a node color into the background so it stays readable as context
+// behind the highlighted topic.
+const fade = (hex: string, amount: number) => {
+  const mix = (i: number) =>
+    Math.round(
+      parseInt(hex.slice(i, i + 2), 16) * amount +
+        parseInt(BACKGROUND.slice(i, i + 2), 16) * (1 - amount),
+    )
+      .toString(16)
+      .padStart(2, "0");
+  return /^#[0-9a-f]{6}$/i.test(hex) ? `#${mix(1)}${mix(3)}${mix(5)}` : DIMMED;
+};
 type Position = { id: string; x: number; y: number };
 const cache = new Map<string, Position[]>();
 export default function SigmaGraph({
@@ -170,14 +183,15 @@ export default function SigmaGraph({
               const topic = highlighted.current;
               if (!topic) return data;
               const own = topics.get(id) === topic;
-              // Notes of other colors linked to the topic keep their color as
-              // context, without a label.
+              // Other notes stay on the map as faded context; those linked to
+              // the topic a bit stronger than the rest.
               const linked =
-                own ||
+                !own &&
                 model.neighbors(id).some((n) => topics.get(n) === topic);
               return {
                 ...data,
-                color: linked ? data.color : DIMMED,
+                color: own ? data.color : fade(data.color, linked ? 0.45 : 0.28),
+                size: own ? data.size * 1.25 : data.size,
                 label: own ? data.label : "",
                 zIndex: own ? 2 : linked ? 1 : 0,
               };
@@ -199,7 +213,7 @@ export default function SigmaGraph({
               if (!topic) return data;
               const from = topics.get(model.source(id)) === topic,
                 to = topics.get(model.target(id)) === topic;
-              if (!from && !to) return { ...data, hidden: true };
+              if (!from && !to) return { ...data, color: FADED_EDGE };
               return {
                 ...data,
                 color: TOPIC_COLORS[topic] || EDGE,
