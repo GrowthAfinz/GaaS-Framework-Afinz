@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {skillHash,validate,applyApproved} from './growth-loop-agent.mjs';
+import {SKILL_VERSION,skillHash,validate,applyApproved} from './growth-loop-agent.mjs';
 const actor='11111111-1111-4111-8111-111111111111';
 const other='22222222-2222-4222-8222-222222222222';
 async function fixture(){
@@ -44,8 +44,12 @@ async function fixture(){
  await db.exec(readFileSync('supabase/migrations/'+guards,'utf8'));
  const decision=readdirSync('supabase/migrations').find(f=>f.endsWith('_growth_loop_latest_decision.sql'));
  await db.exec(readFileSync('supabase/migrations/'+decision,'utf8'));
- await db.query('update growth_loop_settings set skill_hash=$1',[skillHash()]);
- const agent={name:'codex',skill_version:'1.0.0',skill_hash:skillHash(),commit:'a'.repeat(40)};
+ const editorial=readdirSync('supabase/migrations').find(f=>f.endsWith('_growth_loop_editorial_skill.sql'));
+ await db.exec(readFileSync('supabase/migrations/'+editorial,'utf8'));
+ const registered=(await db.query('select skill_hash,skill_version from growth_loop_settings')).rows[0];
+ assert.equal(registered.skill_hash,skillHash());assert.equal(registered.skill_version,SKILL_VERSION);
+ await db.query('update growth_loop_settings set skill_hash=$1,skill_version=$2',[skillHash(),SKILL_VERSION]);
+ const agent={name:'codex',skill_version:SKILL_VERSION,skill_hash:skillHash(),commit:'a'.repeat(40)};
  const put=async(evidence={last_business_date:'2026-10-27',expected_cutoff:'2026-10-28'})=>(await db.query("select growth_loop_private.put('source:crm','source','crm','crm_acquisition',current_date,'Atualizar CRM','Conferir a atualização da fonte.','Conferir importação.','needs_data','?view=learning&section=feed',20,$1) id",[JSON.stringify(evidence)])).rows[0].id;
  const list=async(hidden=false)=>(await db.query('select growth_loop_list($1) v',[hidden])).rows[0].v;
  const claim=async()=>(await db.query('select growth_loop_claim($1) v',[JSON.stringify(agent)])).rows[0].v;
