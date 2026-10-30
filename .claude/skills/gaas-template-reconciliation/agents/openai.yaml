@@ -1,4 +1,4 @@
 interface:
-  display_name: "Reconciliação de templates GaaS"
-  short_description: "Governança, conteúdo e uso histórico de templates"
-  default_prompt: "Use $gaas-template-reconciliation para cruzar a governança XLSX, imagens, pacotes SFMC e disparos históricos e preparar decisões de vínculo com evidências."
+  display_name: "ReconciliaÃ§Ã£o de templates GaaS"
+  short_description: "GovernanÃ§a, conteÃºdo e uso histÃ³rico de templates"
+  default_prompt: "Use $gaas-template-reconciliation para cruzar a governanÃ§a XLSX, imagens, pacotes SFMC e disparos histÃ³ricos e preparar decisÃµes de vÃ­nculo com evidÃªncias."

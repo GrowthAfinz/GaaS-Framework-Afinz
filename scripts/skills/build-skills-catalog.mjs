@@ -13,9 +13,9 @@ const check = process.argv.includes('--check');
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const ignored = name => ['.git', 'node_modules', '__pycache__'].includes(name) || name.startsWith('.env') || /\.py[co]$/.test(name);
 export const normalizeFile = (bytes, name) => {
-  if (!/\.(md|txt|json|py|sql|csv|js|mjs|mts|ts|tsx|yaml|yml|toml|html|css|svg|xml|sh|ps1)$/i.test(name)) return bytes;
-  const text = Buffer.from(bytes).toString('utf8');
-  return text.includes('\uFFFD') ? bytes : Buffer.from(text.replaceAll('\r\n','\n'));
+  if (!/\.(md|txt|json|py|sql|csv|js|mjs|mts|ts|tsx|yaml|yml|toml|html|css|svg|xml|sh|ps1|ampscript)$/i.test(name)) return bytes;
+  // Normalize byte-level CRLF even in legacy encodings; never touch binary assets.
+  return Buffer.from(Buffer.from(bytes).toString('latin1').replaceAll('\r\n','\n'),'latin1');
 };
 export function assertNoSecrets(bytes, label) {
   const text = Buffer.from(bytes).toString('utf8');

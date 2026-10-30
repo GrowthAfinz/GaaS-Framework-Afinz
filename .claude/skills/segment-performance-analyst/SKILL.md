@@ -5,7 +5,7 @@ description: Diagnosticar aquisição CRM por segmento, decompondo volume, funil
   explicam produção, eficiência, queda, ganho, concentração ou oportunidade sem depender
   apenas de médias gerais.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: codex
   agents:
   - claude-code

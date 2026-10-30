@@ -1,4 +1,4 @@
 interface:
   display_name: "Growth Data Quality Monitor"
-  short_description: "Valida atualização, cobertura e integridade dos dados"
-  default_prompt: "Use $growth-data-quality-monitor para validar as fontes antes do relatório de growth."
+  short_description: "Valida atualizaÃ§Ã£o, cobertura e integridade dos dados"
+  default_prompt: "Use $growth-data-quality-monitor para validar as fontes antes do relatÃ³rio de growth."

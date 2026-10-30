@@ -6,7 +6,7 @@ description: Orquestrar e consolidar análises especializadas de qualidade de da
   registros, reconciliar conflitos, priorizar ações e criar o storytelling final ou
   rascunho de e-mail.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: codex
   agents:
   - claude-code

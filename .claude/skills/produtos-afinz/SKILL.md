@@ -6,7 +6,7 @@ description: Valida benefícios, condições e proposta de valor de produtos Afi
   desatualizados. O módulo atual cobre Plurix e o cartão +amigo; outros produtos devem
   ser adicionados como referências separadas.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: claude-projeto
   agents:
   - claude-code

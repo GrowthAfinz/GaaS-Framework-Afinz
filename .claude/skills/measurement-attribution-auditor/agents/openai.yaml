@@ -1,4 +1,4 @@
 interface:
   display_name: "Measurement Attribution Auditor"
-  short_description: "Audita tracking, conversıes e atribuiÁ„o"
-  default_prompt: "Use $measurement-attribution-auditor para auditar tracking e confiabilidade das conversıes."
+  short_description: "Audita tracking, convers√µes e atribui√ß√£o"
+  default_prompt: "Use $measurement-attribution-auditor para auditar tracking e confiabilidade das convers√µes."

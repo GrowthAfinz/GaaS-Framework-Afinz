@@ -5,7 +5,7 @@ description: Validar atualização, cobertura, completude, duplicidades e integr
   análise diária ou semanal de growth, especialmente com Supabase, activities, rentabilizacao_activities,
   b2c_daily_metrics, paid_media_metrics, metas e logs de coleta.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: codex
   agents:
   - claude-code

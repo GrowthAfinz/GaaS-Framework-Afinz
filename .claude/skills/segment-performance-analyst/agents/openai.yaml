@@ -1,4 +1,4 @@
 interface:
   display_name: "Segment Performance Analyst"
-  short_description: "Diagnostica performance e dispers„o por segmento"
-  default_prompt: "Use $segment-performance-analyst para diagnosticar a performance dos segmentos de aquisiÁ„o."
+  short_description: "Diagnostica performance e dispers√£o por segmento"
+  default_prompt: "Use $segment-performance-analyst para diagnosticar a performance dos segmentos de aquisi√ß√£o."

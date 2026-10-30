@@ -6,7 +6,7 @@ description: Reconciliar governança XLSX de links/templates Afinz, imagens, pac
   comunicação e uso histórico, ou especificar inteligência da aba Comunicações. Não
   executa mudanças no SFMC nem aplica vínculos por iniciativa própria.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: claude-projeto
   agents:
   - claude-code

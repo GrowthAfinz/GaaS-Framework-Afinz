@@ -1,4 +1,4 @@
 interface:
   display_name: "Produtos Afinz"
-  short_description: "Produto Afinz em estratégia e régua CRM"
-  default_prompt: "Analise o produto Afinz indicado, valide vigência e transforme o contexto em proposta de valor, briefing e régua CRM auditável."
+  short_description: "Produto Afinz em estratÃ©gia e rÃ©gua CRM"
+  default_prompt: "Analise o produto Afinz indicado, valide vigÃªncia e transforme o contexto em proposta de valor, briefing e rÃ©gua CRM auditÃ¡vel."

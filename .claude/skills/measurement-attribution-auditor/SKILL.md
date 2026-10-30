@@ -5,7 +5,7 @@ description: Auditar confiabilidade de tracking, eventos de conversão, janelas,
   plataformas divergirem, houver gasto sem resultado, coleta falhar ou uma análise
   depender de relacionar mídia a cartões.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: codex
   agents:
   - claude-code

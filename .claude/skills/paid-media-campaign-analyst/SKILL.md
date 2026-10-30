@@ -5,7 +5,7 @@ description: Analisar campanhas de mídia paga individualmente e, quando dispon�
   spend, impressões, alcance, frequência, cliques, CTR, CPC, CPM, conversões, CPA,
   pacing, campanhas sem resultado e ações por campanha.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: codex
   agents:
   - claude-code

@@ -1,4 +1,4 @@
 interface:
   display_name: "CRM Dispatch Intelligence"
-  short_description: "Analisa cada disparo CRM e seus compar·veis"
+  short_description: "Analisa cada disparo CRM e seus compar√°veis"
   default_prompt: "Use $crm-dispatch-intelligence para analisar disparos CRM individualmente."

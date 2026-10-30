@@ -14,6 +14,12 @@ test('publication blocks secrets without logging their value', () => {
   assert.doesNotThrow(() => assertNoSecrets(Buffer.from('SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")'), 'reference'));
 });
 
+test('archives normalize text across Windows and Linux without changing binary bytes',()=>{
+  assert.deepEqual(normalizeFile(Buffer.from([0xe1,13,10]),'agents/openai.yaml'),Buffer.from([0xe1,10]));
+  assert.equal(normalizeFile(Buffer.from('a\r\nb'),'template.ampscript').toString(),'a\nb');
+  assert.deepEqual(normalizeFile(Buffer.from([13,10,0,255]),'deck.pptx'),Buffer.from([13,10,0,255]));
+});
+
 test('all owned skills are downloadable, intact and safe to extract', async () => {
   const catalog = JSON.parse(await readFile('public/skills/catalog.json', 'utf8'));
   const owned = catalog.skills.filter(s => s.kind === 'owned');

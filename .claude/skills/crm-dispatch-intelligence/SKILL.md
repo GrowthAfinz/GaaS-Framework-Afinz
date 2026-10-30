@@ -5,7 +5,7 @@ description: Analisar granularmente cada disparo de aquisição CRM, comparando 
   Use para relatórios de produção CRM, diagnóstico de funil, CAC, propostas, aprovados,
   cartões e identificação de disparos que exigem ação.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   origin: codex
   agents:
   - claude-code

@@ -1,4 +1,4 @@
 interface:
   display_name: "Growth Report Operator"
-  short_description: "Totaliza análises e cria o report executivo"
-  default_prompt: "Use $growth-report-operator para consolidar análises de CRM e mídia em um relatório acionável."
+  short_description: "Totaliza anÃ¡lises e cria o report executivo"
+  default_prompt: "Use $growth-report-operator para consolidar anÃ¡lises de CRM e mÃ­dia em um relatÃ³rio acionÃ¡vel."
