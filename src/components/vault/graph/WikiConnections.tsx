@@ -449,6 +449,36 @@ export function WikiConnections({
                   </button>
                 )}
               </div>
+              <section
+                aria-labelledby="wiki-map-legend"
+                className="shrink-0 border-b border-slate-100 px-3 py-2"
+              >
+                <h4
+                  id="wiki-map-legend"
+                  className="text-[11px] font-medium uppercase tracking-wide text-slate-500"
+                >
+                  Cores e leitura do mapa
+                </h4>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  {Object.entries(TOPIC_COLORS).map(([topic, color]) => (
+                    <div
+                      key={topic}
+                      className="flex items-start gap-1.5 text-[11px] leading-4 text-slate-600"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: color }}
+                      />
+                      {topic}
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] leading-4 text-slate-400">
+                  Tamanho por referências recebidas, não confiança. Ao
+                  selecionar, as setas mostram a direção dos vínculos.
+                </p>
+              </section>
               <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 {selected && (
                   <section
@@ -584,32 +614,6 @@ export function WikiConnections({
                     </li>
                   ))}
                 </ul>
-                <details className="mt-3 border-t border-slate-100 pt-3">
-                  <summary className="cursor-pointer text-xs text-slate-500">
-                    Cores e leitura do mapa
-                  </summary>
-                  <div
-                    aria-label="Legenda de assuntos"
-                    className="mt-2 space-y-2"
-                  >
-                    {Object.entries(TOPIC_COLORS).map(([topic, color]) => (
-                      <div
-                        key={topic}
-                        className="flex items-center gap-2 text-xs text-slate-600"
-                      >
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ background: color }}
-                        />
-                        {topic}
-                      </div>
-                    ))}
-                    <p className="text-[10px] leading-4 text-slate-400">
-                      Tamanho por referências recebidas, não confiança. Ao
-                      selecionar, as setas mostram a direção dos vínculos.
-                    </p>
-                  </div>
-                </details>
               </div>
             </aside>
           )}
