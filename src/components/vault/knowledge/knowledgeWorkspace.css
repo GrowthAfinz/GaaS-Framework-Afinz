@@ -1,0 +1,20 @@
+.knowledge-workspace { padding: 0 0 16px; }
+.knowledge-workspace > header { background: linear-gradient(110deg, #f1f8f8, #f8f8fc); border-color: #e0eaed; }
+.knowledge-workspace > nav { padding: 6px; border: 1px solid #e5e9ef; border-radius: 12px; background: #f0f3f7; }
+.knowledge-workspace > nav button { border-color: transparent; background: transparent; }
+.knowledge-workspace > nav button[aria-current=page] { background: white; color: #0e7490; border-color: #d6e7ec; box-shadow: 0 1px 3px #0f172a08; }
+.knowledge-package-hero { display: grid; gap: 24px; padding: 26px; border: 1px solid #cfe7e6; border-radius: 14px; background: linear-gradient(115deg, #edf8f5, #f3f7fc 65%, #f7f4fa); }
+.knowledge-package-summary { display: flex; flex-direction: column; gap: 10px; padding: 18px; border: 1px solid #ffffffd9; border-radius: 10px; background: #ffffff80; }
+@media(min-width: 1000px) { .knowledge-package-hero { grid-template-columns: minmax(0, 1.7fr) minmax(240px, .8fr); align-items: center; } }
+.knowledge-cta, .knowledge-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.knowledge-cta { border: 1px solid #0e7490; background: #0e7490; color: white; }
+.knowledge-cta:hover { background: #155e75; }
+.knowledge-cta:disabled { cursor: wait; opacity: .5; }
+.knowledge-secondary { border: 1px solid #dce5ee; background: #ffffffb3; color: #475569; }
+.knowledge-secondary:hover { background: #f8fafc; border-color: #a5cfd8; }
+.knowledge-options { padding: 14px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc80; }
+.knowledge-options > summary { cursor: pointer; color: #475569; font-size: 13px; font-weight: 600; }
+.knowledge-prompt-option { display: block; width: 100%; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; text-align: left; background: #ffffffb3; }
+.knowledge-prompt-option:hover { border-color: #c4b5fd; }
+.knowledge-prompt-option--active { border-color: #c4b5fd; background: #f5f3ff; box-shadow: inset 3px 0 #a78bfa; }
+.knowledge-workspace button:focus-visible, .knowledge-workspace summary:focus-visible { outline: 2px solid #0e7490; outline-offset: 3px; }

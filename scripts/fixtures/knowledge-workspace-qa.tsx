@@ -1,0 +1,16 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import '../../src/App.css';
+import { AuthProvider } from '../../src/context/AuthContext';
+import { supabase } from '../../src/services/supabaseClient';
+import { KnowledgeWorkspace } from '../../src/components/vault/knowledge/KnowledgeWorkspace';
+import { sha256 } from '../../src/components/vault/knowledge/knowledgePack';
+const user = { id: '11111111-1111-4111-8111-111111111111', aud: 'authenticated', app_metadata: {}, user_metadata: {} };
+Object.assign(supabase.auth, { getSession: async () => ({ data: { session: { user } }, error: null }), getUser: async () => ({ data: { user }, error: null }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) });
+const content = '# Nota de demonstração\n\nAusência não é zero.';
+const note = { id: 'qa', relative_path: '01-Conceitos/Demo.md', title: 'Demonstração', folder: '01-Conceitos', content_markdown: content, content_hash: await sha256(content), last_sync_run_id: 'qa', aliases: [], frontmatter: { status: 'confirmado' }, tags: [], status: 'confirmado', source_modified_at: null };
+Object.assign(supabase, { rpc: async (name: string) => ({ data: name === 'gaas_knowledge_snapshot' ? { notes: [note], stable: true, sync: { completed_at: '2026-10-30T03:00:00Z' }, latest_attempt: { status: 'completed' } } : false, error: null }), from: () => { const chain = { select: () => chain, order: () => chain, limit: () => Promise.resolve({ data: [], error: null }), insert: () => Promise.resolve({ error: null }) }; return chain; } });
+Object.assign(supabase.storage, { from: () => ({ upload: async () => ({ error: null }), remove: async () => ({ error: null }) }) });
+const realFetch = window.fetch.bind(window);
+window.fetch = (input, init) => String(input instanceof Request ? input.url : input).includes('supabase.co') ? Promise.reject(new Error('Rede remota bloqueada nesta fixture')) : realFetch(input, init);
+createRoot(document.getElementById('root')!).render(<main className="bg-slate-50 p-5"><p className="mb-3 text-xs text-slate-400">Validação local · dados simulados · operações remotas bloqueadas</p><AuthProvider><KnowledgeWorkspace onBack={() => {}}/></AuthProvider></main>);

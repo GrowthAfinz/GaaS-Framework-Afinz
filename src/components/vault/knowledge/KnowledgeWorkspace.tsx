@@ -1,3 +1,5 @@
+import { PromptLibrary } from "./PromptLibrary";
+import "./knowledgeWorkspace.css";
 import { summarizeCrmCompatible } from "../../growth-learning/results/crmAnalysis";
 import { LoopOperatorGuide } from "../../growth-learning/attention/LoopOperatorGuide";
 import { useCallback, useEffect, useState } from "react";
@@ -69,8 +71,8 @@ export function KnowledgeWorkspace({
   initialObjective?: string;
 }) {
   const { user } = useAuth();
-  const [mode, setMode] = useState<"export" | "packs" | "contributions">(
-    "export",
+  const [mode, setMode] = useState<"export" | "packs" | "prompts" | "contributions">(
+    initialObjective ? "export" : "packs",
   );
   const [snapshot, setSnapshot] = useState<KnowledgeSnapshot | null>(null);
   const [packs, setPacks] = useState<KnowledgePack[]>([]);
@@ -302,7 +304,7 @@ export function KnowledgeWorkspace({
     );
   }
   return (
-    <section aria-label="Inteligência compartilhada" className="space-y-4">
+    <section aria-label="Inteligência compartilhada" className="knowledge-workspace space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-3">
           <button type="button" className={button} onClick={onBack}>
@@ -321,12 +323,12 @@ export function KnowledgeWorkspace({
         </div>
         <Users size={22} className="text-cyan-700" />
       </header>
-      <LoopOperatorGuide />
       <nav aria-label="Colaboração com IA" className="flex flex-wrap gap-2">
         {(
           [
-            ["export", "Preparar contexto"],
             ["packs", "Pacotes de contexto"],
+            ["prompts", "Prompts"],
+            ["export", "Preparar contexto"],
             ["contributions", "Contribuições"],
           ] as const
         ).map(([id, label]) => (
@@ -367,7 +369,8 @@ export function KnowledgeWorkspace({
           {notice}
         </p>
       )}
-      {loading ? (
+      {mode === "prompts" && <PromptLibrary />}
+      {loading && mode !== "prompts" ? (
         <p
           role="status"
           className="rounded-xl border border-slate-200 bg-white p-6 text-slate-600"
@@ -380,28 +383,36 @@ export function KnowledgeWorkspace({
             <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">
-                  Conhecimento completo da operação
+                  Prepare seu pacote
                 </p>
                 <h3 className="mt-2 text-xl font-semibold text-slate-900">
-                  Um contexto comum para todo o time
+                  Qual é o objetivo desta conversa?
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Regras de negócio, produtos, públicos, métricas, fontes,
-                  operação, resultados documentados, arquitetura e instruções.
-                  Todas as notas publicadas elegíveis são incluídas por padrão.
+                  O pacote já inclui todas as notas publicadas. Descreva o objetivo se quiser orientar a IA; as opções adicionais são opcionais.
                 </p>
               </div>
               <label className="block text-sm font-medium text-slate-700">
-                O que você quer fazer com a IA?
+                Objetivo (opcional)
                 <textarea
                   value={objective}
                   maxLength={4000}
                   onChange={(e) => setObjective(e.target.value)}
                   placeholder="Ex.: entender a operação, planejar uma régua, preparar uma apresentação ou investigar resultados."
-                  rows={3}
+                  rows={2}
                   className={`${input} mt-2`}
                 />
               </label>
+              <button
+                type="button"
+                disabled={busy || !snapshot.notes.length || !snapshot.stable}
+                className={`${button} border-cyan-700 bg-cyan-700 text-white hover:bg-cyan-800`}
+                onClick={() => void perform(exportPack)}
+              >
+                <Download size={16} />
+                {busy ? "Preparando pacote…" : "Baixar pacote completo"}
+              </button>
+              <details className="knowledge-options"><summary>Personalizar pacote <span className="font-normal text-slate-500">· opcional</span></summary><div className="mt-4 space-y-4">
               <details className="rounded-lg border border-slate-200 p-3">
                 <summary className="cursor-pointer text-sm font-semibold text-slate-700">
                   Comparar com o vault do computador
@@ -547,30 +558,20 @@ export function KnowledgeWorkspace({
                 Inclui versão, período e links. A referência não copia o PDF ou
                 os Slides.
               </p>
-              <button
-                type="button"
-                disabled={busy || !snapshot.notes.length || !snapshot.stable}
-                className={`${button} border-cyan-700 bg-cyan-700 text-white hover:bg-cyan-800`}
-                onClick={() => void perform(exportPack)}
-              >
-                <Download size={16} />
-                {busy ? "Preparando pacote…" : "Baixar pacote completo"}
-              </button>
+
+              </div></details>
             </div>
-            <aside className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+            <aside className="space-y-4 rounded-xl border border-cyan-100 bg-cyan-50/40 p-5">
               <Library size={24} className="text-cyan-700" />
               <h3 className="font-semibold text-slate-900">
                 O que acompanha o ZIP
               </h3>
-              <ul className="space-y-3 text-sm text-slate-600">
+              <ul className="grid gap-2 text-sm text-slate-600">
                 {[
-                  "Vault em Markdown com pastas e metadados",
-                  "Guia de entrada e índice por assunto",
-                  "Ontologia unificada e divisões por assunto",
-                  "Mapa de localização no GaaS",
-                  "Instruções de evidência e limites para a IA",
-                  "Manifesto de hashes, datas e exclusões",
-                  "Modelo de contribuição para devolver ao time",
+                  "Notas e regras da operação em Markdown",
+                  "Guia de leitura e índice por assunto",
+                  "Fontes, versões e limites de uso",
+                  "Modelo para devolver contribuições ao time",
                 ].map((t) => (
                   <li key={t}>• {t}</li>
                 ))}
@@ -580,7 +581,7 @@ export function KnowledgeWorkspace({
                 <p>
                   Último sync concluído: {date(snapshot.sync?.completed_at)}
                 </p>
-                {snapshot.latest_attempt?.status !== "completed" && (
+                {snapshot.latest_attempt && snapshot.latest_attempt.status !== "completed" && (
                   <p className="text-amber-800">
                     Existe sincronização{" "}
                     {snapshot.latest_attempt?.status === "running"
@@ -604,7 +605,23 @@ export function KnowledgeWorkspace({
         </>
       ) : null}
       {!loading && mode === "packs" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <section className="knowledge-package-hero" aria-label="Pacote de contexto da operação">
+            <div className="space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-cyan-800">Contexto compartilhado do time</span>
+              <h3 className="text-2xl font-semibold text-slate-900">O conhecimento da operação, pronto para sua IA</h3>
+              <p className="max-w-2xl text-sm leading-6 text-slate-600">Baixe as notas publicadas, os guias e as regras do GaaS em um único ZIP. Anexe à conversa e use um dos prompts do time.</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={busy || !snapshot?.notes.length || !snapshot.stable} className="knowledge-cta" onClick={() => void perform(exportPack)}><Download size={16}/>{busy ? "Preparando pacote…" : "Baixar contexto completo"}</button>
+                <button type="button" className={button} onClick={() => setMode("export")}>Personalizar contexto</button>
+                <button type="button" className={button} onClick={() => setMode("prompts")}>Explorar prompts</button>
+              </div>
+              {objective.trim() || domain !== "none" || includeReport || local ? <p className="text-xs text-cyan-900">Seu preparo atual será incluído. <button type="button" className="underline" onClick={() => setMode("export")}>Revisar opções</button></p> : null}
+            </div>
+            <aside className="knowledge-package-summary"><Library size={24} className="text-cyan-700"/><strong className="text-lg text-slate-800">{snapshot?.notes.length ?? "—"} notas publicadas</strong><span className="text-xs leading-5 text-slate-500">Notas e regras · índice por assunto · modelo de contribuição</span><span className="text-xs text-slate-500">Atualizado: {date(snapshot?.sync?.completed_at)}</span>{snapshot && !snapshot.stable && <span role="status" className="text-xs text-amber-800">Aguarde a sincronização do acervo para gerar um pacote.</span>}</aside>
+          </section>
+          <LoopOperatorGuide />
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2"><h3 className="font-semibold text-slate-800">Versões disponíveis</h3><span className="text-xs text-slate-500">Pacotes já preparados pela equipe</span></div>
           {!packs.length ? (
             <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
               Nenhum pacote registrado. Prepare o primeiro contexto para

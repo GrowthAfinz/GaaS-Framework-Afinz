@@ -3,7 +3,9 @@ import {LOOP_COMMAND} from './attentionService';
 
 export function LoopOperatorGuide(){
  const [message,setMessage]=useState('');
- return <section className="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50/40 p-5" aria-label="Como atualizar a operação com IA">
+ return <details className="group rounded-xl border border-slate-200 bg-slate-50/80 p-4" aria-label="Como atualizar a operação com IA">
+  <summary className="cursor-pointer text-sm font-semibold text-slate-700">Atualizar Fila e notificações <span className="ml-2 text-xs font-normal text-slate-500">Instruções e comando para o agente</span></summary>
+  <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
   <h3 className="font-semibold text-slate-900">Da Fila às notas de resultado</h3>
   <p className="text-sm leading-6 text-slate-700">Codex e Claude usam a mesma skill versionada: <code>gaas-growth-loop-operator</code>. Conecte o agente ao repositório e ao Supabase e envie o comando abaixo. O aplicativo não inicia uma IA automaticamente.</p>
   <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">
@@ -18,5 +20,5 @@ export function LoopOperatorGuide(){
   <button type="button" className="rounded-md border border-cyan-200 bg-white px-3 py-2 text-sm font-semibold text-cyan-900" onClick={()=>void navigator.clipboard.writeText(LOOP_COMMAND).then(()=>setMessage('Comando copiado. Cole no agente conectado.')).catch(()=>setMessage('Selecione e copie o comando acima.'))}>Copiar comando para o agente</button>
   {message&&<p role="status" className="text-xs text-cyan-900">{message}</p>}
   <p className="text-xs text-slate-600">Instruções completas: <code>.claude/skills/gaas-growth-loop-operator/SKILL.md</code>. A Wiki contém a nota <strong>Operação da Fila, Notificações e Notas de Resultado</strong>.</p>
- </section>;
+ </div></details>;
 }
