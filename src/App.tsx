@@ -8,7 +8,8 @@ import { SetPasswordView } from './components/SetPasswordView';
 import { ResultadosView } from './components/ResultadosView';
 import { RelatorioView } from './components/RelatorioView';
 import { GrowthLearningWorkspace } from './components/growth-learning/GrowthLearningWorkspace';
-import { isGrowthLearningView } from './components/growth-learning/growthLearningNavigation';
+import { readTabFromSearch } from './services/tabNavigation';
+import { useUserRole } from './context/UserRoleContext';
 import { ReportLiveOutputCard } from './components/relatorio/ReportLiveOutputCard';
 import { JornadaDisparosView } from './components/JornadaDisparosView';
 import { DiarioBordo } from './components/DiarioBordo';
@@ -166,24 +167,28 @@ function App() {
   const storeFilters = viewSettings.filtrosGlobais;
   const activeTab = viewSettings.abaAtual;
 
+  // A aba vem da URL (?view=): link aberto direto, nova aba do navegador e voltar/avançar.
+  // A hidratação do store volta a aba pro Launch, por isso sincroniza de novo depois dela.
   useEffect(() => {
-    const syncLearningRoute = () => {
-      const learningRoute = isGrowthLearningView(window.location.search);
-      const currentTab = useAppStore.getState().viewSettings.abaAtual;
-      if (learningRoute && currentTab !== 'aprendizado-growth') {
-        setTab('aprendizado-growth');
-      } else if (!learningRoute && currentTab === 'aprendizado-growth') {
-        setTab('relatorio');
-      }
+    const syncTabFromUrl = () => {
+      const urlTab = readTabFromSearch(window.location.search);
+      if (useAppStore.getState().viewSettings.abaAtual !== urlTab) setTab(urlTab);
     };
-    syncLearningRoute();
-    const unsubscribeHydration = useAppStore.persist.onFinishHydration(syncLearningRoute);
-    window.addEventListener('popstate', syncLearningRoute);
+    syncTabFromUrl();
+    const unsubscribeHydration = useAppStore.persist.onFinishHydration(syncTabFromUrl);
+    window.addEventListener('popstate', syncTabFromUrl);
     return () => {
       unsubscribeHydration();
-      window.removeEventListener('popstate', syncLearningRoute);
+      window.removeEventListener('popstate', syncTabFromUrl);
     };
   }, [setTab]);
+
+  // Link direto pra uma aba que o perfil não vê no menu cai no Launch.
+  const { canSeeTab, loadingProfile } = useUserRole();
+  const tabHiddenForRole = !loadingProfile && !canSeeTab(activeTab);
+  useEffect(() => {
+    if (tabHiddenForRole) setTab('launch');
+  }, [tabHiddenForRole, setTab]);
 
   const { startDate, endDate, compareEnabled, compareMode } = usePeriod();
   const { selectedBUs } = useBU();

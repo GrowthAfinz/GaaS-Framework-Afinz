@@ -29,7 +29,15 @@ import { useUserRole } from '../../context/UserRoleContext';
 import { FullscreenButton } from '../ui/FullscreenButton';
 import { useGlobalSearch, GlobalSearchResult, GlobalSearchResultType } from '../../hooks/useGlobalSearch';
 import { useExplorerStore, PendingNavigation } from '../../store/explorerStore';
-import { openGrowthLearningSection, openReportsOutput } from '../growth-learning/growthLearningNavigation';
+import { buildGrowthLearningSearch, openGrowthLearningSection } from '../growth-learning/growthLearningNavigation';
+import { onTabLinkClick, tabHref, TabId } from '../../services/tabNavigation';
+
+interface HeaderNavItem {
+    id: TabId;
+    label: string;
+    icon?: React.ElementType;
+    onClick: () => void;
+}
 
 interface GlobalHeaderProps {
     onMouseEnter?: () => void;
@@ -62,8 +70,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
     const { canSeeTab } = useUserRole();
     const setPendingNavigation = useExplorerStore((s) => s.setPendingNavigation);
 
-    const navigateToTab = useCallback((tab: Parameters<typeof setTab>[0]) => {
-        if (tab !== 'aprendizado-growth') openReportsOutput();
+    const navigateToTab = useCallback((tab: TabId) => {
         setTab(tab);
     }, [setTab]);
 
@@ -109,7 +116,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const allNavGroups = [
+    const allNavGroups: { title: string; direct: boolean; items: HeaderNavItem[] }[] = [
         {
             title: 'Planejamento',
             direct: false,
@@ -159,7 +166,15 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
 
     const navGroups = allNavGroups.map(group => ({
         ...group,
-        items: group.items.filter(item => canSeeTab(item.id))
+        items: group.items
+            .filter(item => canSeeTab(item.id))
+            .map(item => ({
+                ...item,
+                // O item do Loop abre na seção vault, então o link aponta pra ela também.
+                href: item.id === 'aprendizado-growth'
+                    ? tabHref(item.id, buildGrowthLearningSearch('vault', ''))
+                    : tabHref(item.id),
+            }))
     })).filter(group => group.items.length > 0);
 
     const isGroupActive = (items: { id: string }[]) => {
@@ -176,8 +191,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             onMouseEnter={onMouseEnter}
         >
             {/* ── LEFT: Brand ────────────────────────────────────────── */}
-            <button
-                onClick={() => navigateToTab('launch')}
+            <a
+                href={tabHref('launch')}
+                onClick={onTabLinkClick(() => navigateToTab('launch'))}
                 className="shrink-0 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                 style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}
                 title="Voltar para Launch Planner"
@@ -192,7 +208,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                         Growth as a Service
                     </h1>
                 </div>
-            </button>
+            </a>
 
             {/* ── CENTER: Navigation ─────────────────────────────────── */}
             <div className="flex-1 flex justify-center">
@@ -205,10 +221,10 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                             const item = group.items[0];
                             const isActive = activeTab === item.id;
                             return (
-                                <button
+                                <a
                                     key={group.title}
-                                    type="button"
-                                    onClick={item.onClick}
+                                    href={item.href}
+                                    onClick={onTabLinkClick(item.onClick)}
                                     className={[
                                         'flex items-center gap-2 py-1.5 text-[15px] tracking-tight border-b-2 transition-colors duration-200',
                                         isActive
@@ -217,7 +233,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                                     ].join(' ')}
                                 >
                                     {group.title}
-                                </button>
+                                </a>
                             );
                         }
 
@@ -347,13 +363,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                 <div className="h-6 w-px bg-slate-200" />
 
                 {/* Settings */}
-                <button
-                    onClick={() => navigateToTab('configuracoes')}
+                <a
+                    href={tabHref('configuracoes')}
+                    onClick={onTabLinkClick(() => navigateToTab('configuracoes'))}
                     className={`p-2 rounded-lg transition-all ${activeTab === 'configuracoes' ? 'text-slate-800 bg-slate-100' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
                     title="Configurações"
                 >
                     <Settings2 size={18} />
-                </button>
+                </a>
 
                 {/* Fullscreen */}
                 <FullscreenButton />

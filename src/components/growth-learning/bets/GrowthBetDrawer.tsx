@@ -12,7 +12,7 @@ import {
   setGrowthBetChecklistItem,
 } from './growthBetService';
 import { GrowthBet, GrowthBetChecklistItem, GrowthBetStatus, GrowthBetUpdate, GrowthExecutionStatus, GrowthLearningApplication } from './growthBet.types';
-import { readGrowthBetSourceContextFromBeliefSnapshot, openReportsOutput, buildResultsWikiSearch } from '../growthLearningNavigation';
+import { readGrowthBetSourceContextFromBeliefSnapshot, buildResultsWikiSearch } from '../growthLearningNavigation';
 import { growthSourceDestination } from './relatedGrowthBets.logic';
 import { useAppStore } from '../../../store/useAppStore';
 import { BU, useBU } from '../../../contexts/BUContext';
@@ -88,7 +88,7 @@ export const GrowthBetDrawer: React.FC<GrowthBetDrawerProps> = ({ bet, onClose, 
     } else {
       setFunnelDeepLink({ funnel: sourceDestination.funnel });
     }
-    openReportsOutput();
+    // setTab já troca a URL do Loop pela ?view= da aba de destino.
     setTab(sourceDestination.tab);
   };
 

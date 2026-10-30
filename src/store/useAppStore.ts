@@ -5,6 +5,7 @@ import { get, set, del } from 'idb-keyval'; // IndexedDB
 import { FrameworkRow, ViewSettings, Goal, JournalEntry, FilterState, Activity } from '../types/framework';
 import { B2CDataRow, AlertConfig } from '../types/b2c';
 import { DailyAdMetrics, Budget } from '../schemas/paid-media';
+import { pushTabUrl } from '../services/tabNavigation';
 
 // Custom Storage Adapter using IDB-Keyval
 const storage: StateStorage = {
@@ -163,9 +164,12 @@ export const useAppStore = create<AppState>()(
                 }
             })),
 
-            setTab: (tab) => set((state) => ({
-                viewSettings: { ...state.viewSettings, abaAtual: tab }
-            })),
+            setTab: (tab) => {
+                pushTabUrl(tab);
+                set((state) => ({
+                    viewSettings: { ...state.viewSettings, abaAtual: tab }
+                }));
+            },
 
             setPeriodo: (inicio, fim) => set((state) => ({
                 viewSettings: { ...state.viewSettings, periodo: { inicio, fim } }

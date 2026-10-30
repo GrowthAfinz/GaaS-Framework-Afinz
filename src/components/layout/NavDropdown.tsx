@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { onTabLinkClick } from '../../services/tabNavigation';
 
 interface NavItem {
     id: string;
     label: string;
     icon?: React.ElementType;
+    href: string;
     onClick: () => void;
     isActive?: boolean;
 }
@@ -58,12 +60,13 @@ export const NavDropdown: React.FC<NavDropdownProps> = ({ title, items, isActive
             >
                 <div className="bg-white border border-slate-200 rounded-lg shadow-xl p-1.5 z-50">
                     {items.map((item) => (
-                        <button
+                        <a
                             key={item.id}
-                            onClick={() => {
+                            href={item.href}
+                            onClick={onTabLinkClick(() => {
                                 item.onClick();
                                 setIsOpen(false);
-                            }}
+                            })}
                             className={`
                                 w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-all text-left
                                 ${item.isActive
@@ -74,7 +77,7 @@ export const NavDropdown: React.FC<NavDropdownProps> = ({ title, items, isActive
                         >
                             {item.icon && <item.icon size={16} />}
                             {item.label}
-                        </button>
+                        </a>
                     ))}
                 </div>
             </div>
