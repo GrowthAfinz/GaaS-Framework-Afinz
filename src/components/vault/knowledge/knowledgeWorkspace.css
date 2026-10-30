@@ -15,6 +15,6 @@
 .knowledge-options { padding: 14px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc80; }
 .knowledge-options > summary { cursor: pointer; color: #475569; font-size: 13px; font-weight: 600; }
 .knowledge-prompt-option { display: block; width: 100%; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; text-align: left; background: #ffffffb3; }
-.knowledge-prompt-option:hover { border-color: #c4b5fd; }
-.knowledge-prompt-option--active { border-color: #c4b5fd; background: #f5f3ff; box-shadow: inset 3px 0 #a78bfa; }
+.knowledge-prompt-option:hover { border-color: #a5cfd8; }
+.knowledge-prompt-option--active { border-color: #a5cfd8; background: #eef8f9; }
 .knowledge-workspace button:focus-visible, .knowledge-workspace summary:focus-visible { outline: 2px solid #0e7490; outline-offset: 3px; }
