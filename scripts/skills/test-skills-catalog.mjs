@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { unzipSync } from 'fflate';
 import { assertNoSecrets, normalizeFile } from './build-skills-catalog.mjs';
@@ -18,6 +21,25 @@ test('archives normalize text across Windows and Linux without changing binary b
   assert.deepEqual(normalizeFile(Buffer.from([0xe1,13,10]),'agents/openai.yaml'),Buffer.from([0xe1,10]));
   assert.equal(normalizeFile(Buffer.from('a\r\nb'),'template.ampscript').toString(),'a\nb');
   assert.deepEqual(normalizeFile(Buffer.from([13,10,0,255]),'deck.pptx'),Buffer.from([13,10,0,255]));
+});
+
+test('vault export removes generated third-party references and preserves authored notes',async()=>{
+  const vault = await mkdtemp(path.join(tmpdir(),'gaas-skills-export-'));
+  try {
+    const folder = path.join(vault,'09-Inteligencia-IA/Skills'); await mkdir(folder,{recursive:true});
+    const reference = '---\nfonte: catalogo-versionado-github\nskill_id: "OpenAI:example"\n---\n# Referência antiga\n';
+    await writeFile(path.join(folder,'Skill-OpenAI-example.md'),reference);
+    await writeFile(path.join(folder,'Nota-do-time.md'),'# Nota autoral\nPreservar.');
+    execFileSync(process.execPath,['scripts/skills/export-skills-vault.mjs','--vault',vault]);
+    const files = await readdir(folder);
+    assert.ok(!files.includes('Skill-OpenAI-example.md'));
+    assert.equal(await readFile(path.join(folder,'Nota-do-time.md'),'utf8'),'# Nota autoral\nPreservar.');
+    const index = await readFile(path.join(folder,'Catalogo-de-Skills.md'),'utf8');
+    assert.ok(!index.includes('fichas externas') && !index.includes('tipo de acervo'));
+  } finally {
+    if (path.dirname(path.resolve(vault)) !== path.resolve(tmpdir())) throw new Error('Destino de limpeza inválido');
+    await rm(vault,{recursive:true,force:true});
+  }
 });
 
 test('all owned skills are downloadable, intact and safe to extract', async () => {
@@ -43,5 +65,5 @@ test('all owned skills are downloadable, intact and safe to extract', async () =
     assert.ok(skill.entry_tokens > 0);
     assert.ok(skill.suggested_context_tokens >= skill.entry_tokens);
   }
-  for (const third of catalog.skills.filter(s => s.kind === 'external')) assert.equal(third.archive, undefined);
+  assert.ok(catalog.skills.every(s => s.kind === 'owned' && s.archive), 'O catálogo deve conter somente pacotes próprios.');
 });

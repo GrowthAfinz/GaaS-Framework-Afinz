@@ -77,23 +77,17 @@ export async function buildCatalog() {
       note: `${item.name}.md`, wiki_path: notePath, changelog, entry_tokens: entryTokens, reference_tokens: referenceTokens,
       suggested_context_tokens: entryTokens + referenceTokens, token_method: 'Estimativa: caracteres / 4; ler referências conforme a tarefa. Binários e scripts excluídos.' });
   }
-  const external = JSON.parse(await readFile(path.join(root, 'scripts/skills/third-party.json'), 'utf8'));
-  const ids = new Set(skills.map(s => s.id));
-  for (const s of external) {
-    if (ids.has(s.id) || s.kind !== 'external' || !s.source_url.startsWith('https://')) throw new Error(`Ficha externa inválida: ${s.id}`);
-    ids.add(s.id);
-  }
-  for (const skill of [...skills,...external]) {
+  for (const skill of skills) {
     skill.note = `${noteName(skill)}.md`;
     skill.wiki_path = `09-Inteligencia-IA/Skills/${noteName(skill)}.md`;
     if (!check) await writeFile(path.join(output,skill.note),skillNote(skill));
   }
-  const catalog = { schema: 'gaas-skills/1', published_at: '2026-10-30', skills: [...skills, ...external] };
+  const catalog = { schema: 'gaas-skills/1', published_at: '2026-10-30', skills };
   if (!check) {
     await writeFile(path.join(output, 'catalog.json'), JSON.stringify(catalog, null, 2) + '\n');
     await writeFile(path.join(output, 'Catalogo-de-Skills.md'),catalogNote(catalog));
   }
-  console.log(`${skills.length} pacotes próprios; ${external.length} fichas externas; ${Math.round(skills.reduce((n,s)=>n+s.bytes,0)/1024/1024)} MB de downloads. ${check ? 'Validação concluída.' : 'Catálogo gerado.'}`);
+  console.log(`${skills.length} pacotes próprios; ${Math.round(skills.reduce((n,s)=>n+s.bytes,0)/1024/1024)} MB de downloads. ${check ? 'Validação concluída.' : 'Catálogo gerado.'}`);
   return catalog;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await buildCatalog();

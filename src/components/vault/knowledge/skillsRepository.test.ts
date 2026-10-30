@@ -33,17 +33,6 @@ describe('repository mutations',()=>{
     expect(tree.tree.every((f:any)=>f.path.startsWith('.claude/skills/example/'))).toBe(true);
     expect(calls[calls.length-1].body).toEqual({sha:'next',force:false});
   });
-  it('removes only the selected external catalog entry',async()=>{
-    let updated='';
-    vi.stubGlobal('fetch',vi.fn(async(url:string,options:any)=>{
-      const body=options.body?JSON.parse(options.body):null;
-      if(url.endsWith('/git/blobs'))updated=atob(body.content);
-      const value=url.endsWith('/git/ref/heads/main')?{object:{sha:'head'}}:url.endsWith('/git/commits/head')?{tree:{sha:'base'}}:url.includes('recursive=1')?{tree:[]}:url.includes('/contents/')?{content:btoa(JSON.stringify([{id:'OpenAI:one'},{id:'OpenAI:two'}]))}:{sha:'next'};
-      return {ok:true,json:async()=>value};
-    }));
-    await changeSkillRepository('synthetic-test',{removeExternal:'OpenAI:one'},()=>{});
-    expect(JSON.parse(updated)).toEqual([{id:'OpenAI:two'}]);
-  });
   it('deletes all files of one skill atomically and never forces main',async()=>{
     const calls:{url:string;body:any}[]=[];
     vi.stubGlobal('fetch',vi.fn(async(url:string,options:any)=>{

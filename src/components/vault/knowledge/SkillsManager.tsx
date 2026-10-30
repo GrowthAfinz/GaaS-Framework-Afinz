@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Plus, X, Trash2 } from 'lucide-react';
 import { changeSkillRepository, readSkillZip } from './skillsRepository';
 
-type Target = {id:string;name:string;kind:'owned'|'external'};
+type Target = {id:string;name:string};
 export function SkillsManager({ target, onClose, onPublished }: {target:Target|null;onClose:()=>void;onPublished:(name:string,remove:boolean)=>void}) {
   const [token,setToken]=useState(''), [version,setVersion]=useState('1.0.0'), [process,setProcess]=useState('');
   const [file,setFile]=useState<File|null>(null), [confirm,setConfirm]=useState('');
@@ -22,7 +22,7 @@ export function SkillsManager({ target, onClose, onPublished }: {target:Target|n
       if (!target && !file) throw new Error('Selecione o ZIP da skill.');
       if (file && file.size > 95*1024*1024) throw new Error('Limite de 95 MB para o ZIP.');
       const addition = !target ? readSkillZip(new Uint8Array(await file!.arrayBuffer()),process,version) : null;
-      const operation = addition ? {add:addition} : target!.kind === 'external' ? {removeExternal:target!.id} : {remove:target!.id};
+      const operation = addition ? {add:addition} : {remove:target!.id};
       const result = await changeSkillRepository(token,operation,setProgress);
       setToken('');setCommit(result.sha);onPublished(target?.name || addition!.name,Boolean(target));
       setProgress('Alteração gravada na main. O GitHub está preparando a publicação do catálogo.');

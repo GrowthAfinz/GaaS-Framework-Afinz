@@ -58,7 +58,7 @@ export function readSkillZip(bytes: Uint8Array, process: string, version: string
   return { name, files };
 }
 
-export async function changeSkillRepository(token: string, operation: { add: ReturnType<typeof readSkillZip> } | { remove: string } | { removeExternal: string }, onProgress: (message: string) => void) {
+export async function changeSkillRepository(token: string, operation: { add: ReturnType<typeof readSkillZip> } | { remove: string }, onProgress: (message: string) => void) {
   if (!token.trim()) throw new Error('Conecte sua credencial do GitHub para editar o repositório.');
   async function request(endpoint: string, method = 'GET', body?: unknown): Promise<any> {
     const response = await fetch(`${api}${endpoint}`, { method, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token.trim()}`, 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -70,21 +70,14 @@ export async function changeSkillRepository(token: string, operation: { add: Ret
   const commit = await request(`/git/commits/${ref.object.sha}`);
   const tree = await request(`/git/trees/${commit.tree.sha}?recursive=1`);
   if (tree.truncated) throw new Error('Inventário do GitHub incompleto. Operação cancelada.');
-  const name = 'add' in operation ? operation.add.name : 'remove' in operation ? operation.remove : operation.removeExternal;
-  if (!('removeExternal' in operation) && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('Nome de skill inválido.');
+  const name = 'add' in operation ? operation.add.name : operation.remove;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) throw new Error('Nome de skill inválido.');
   if ('remove' in operation && ['gaas-growth-loop-operator','gaas-growth-investigation'].includes(name)) throw new Error('Esta skill integra o contrato do loop. Remova suas dependências em uma alteração de código antes de excluir o pacote.');
   const prefix = `.claude/skills/${name}/`;
   const existing = tree.tree.filter((f: {path: string; type: string}) => f.type === 'blob' && f.path.startsWith(prefix));
   if ('add' in operation && existing.length) throw new Error('Já existe uma skill com esse nome. Use outro nome para adicionar.');
   const changes: {path:string;mode:string;type:string;sha:string|null}[] = [];
-  if ('removeExternal' in operation) {
-    const file = await request('/contents/scripts/skills/third-party.json?ref=main');
-    const entries = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\s/g, '')), c => c.charCodeAt(0))));
-    const filtered = entries.filter((s: {id:string}) => s.id !== operation.removeExternal);
-    if (filtered.length === entries.length) throw new Error('A ficha já não existe na main.');
-    const blob = await request('/git/blobs', 'POST', { content: encode(new TextEncoder().encode(JSON.stringify(filtered, null, 2) + '\n')), encoding:'base64' });
-    changes.push({ path:'scripts/skills/third-party.json',mode:'100644',type:'blob',sha:blob.sha });
-  } else if ('add' in operation) {
+  if ('add' in operation) {
     let i = 0;
     for (const file of operation.add.files) {
       onProgress(`Enviando arquivo ${++i} de ${operation.add.files.length}…`);
