@@ -75,10 +75,13 @@ export default function SigmaGraph({
   onSelect,
   onOpen,
   detailed,
+  highlight,
 }: {
   graph: WikiGraph;
   focus: string;
   detailed: boolean;
+  /** Topic whose notes and links stand out while no note is hovered or selected. */
+  highlight: string;
   onSelect: (id: string) => void;
   onOpen: (id: string) => void;
 }) {
@@ -89,10 +92,12 @@ export default function SigmaGraph({
   const select = useRef(onSelect),
     open = useRef(onOpen),
     focused = useRef(focus),
-    hovered = useRef("");
+    hovered = useRef(""),
+    highlighted = useRef(highlight);
   select.current = onSelect;
   open.current = onOpen;
   focused.current = focus;
+  highlighted.current = highlight;
   const [busy, setBusy] = useState(true),
     [error, setError] = useState("");
   useEffect(() => {
@@ -109,6 +114,7 @@ export default function SigmaGraph({
       if (disposed) return;
       try {
         const model = new Graph();
+        const topics = new Map(graph.nodes.map((n) => [n.id, n.topic]));
         const coords = new Map(positions.map((p) => [p.id, p]));
         graph.nodes.forEach((n) => {
           const p = coords.get(n.id)!;
@@ -160,7 +166,22 @@ export default function SigmaGraph({
           zIndex: true,
           nodeReducer: (id, data) => {
             const f = active();
-            if (!f) return data;
+            if (!f) {
+              const topic = highlighted.current;
+              if (!topic) return data;
+              const own = topics.get(id) === topic;
+              // Notes of other colors linked to the topic keep their color as
+              // context, without a label.
+              const linked =
+                own ||
+                model.neighbors(id).some((n) => topics.get(n) === topic);
+              return {
+                ...data,
+                color: linked ? data.color : DIMMED,
+                label: own ? data.label : "",
+                zIndex: own ? 2 : linked ? 1 : 0,
+              };
+            }
             const nearby = id === f || model.areNeighbors(id, f);
             return {
               ...data,
@@ -173,7 +194,19 @@ export default function SigmaGraph({
           },
           edgeReducer: (id, data) => {
             const f = active();
-            if (!f) return data;
+            if (!f) {
+              const topic = highlighted.current;
+              if (!topic) return data;
+              const from = topics.get(model.source(id)) === topic,
+                to = topics.get(model.target(id)) === topic;
+              if (!from && !to) return { ...data, hidden: true };
+              return {
+                ...data,
+                color: TOPIC_COLORS[topic] || EDGE,
+                type: "arrow",
+                size: from && to ? 2 : 1,
+              };
+            }
             const out = model.source(id) === f,
               incoming = model.target(id) === f;
             if (!out && !incoming) return { ...data, hidden: true };
@@ -245,7 +278,7 @@ export default function SigmaGraph({
   }, [graph]);
   useEffect(() => {
     renderer.current?.scheduleRefresh();
-  }, [focus]);
+  }, [focus, highlight]);
   // GaaS applies CSS zoom to the page. Sigma reads the pointer in viewport
   // pixels (clientX - bbox.left) but lays the graph out in CSS pixels
   // (offsetWidth), so hit-testing drifts toward the top-left by the zoom

@@ -61,6 +61,7 @@ export function WikiConnections({
     [refreshVersion, setRefreshVersion] = useState(0);
   const [panelOpen, setPanelOpen] = useState(true);
   const [detailed, setDetailed] = useState(true);
+  const [highlight, setHighlight] = useState("");
   const workspace = useRef<HTMLElement>(null);
   const [height, setHeight] = useState(600);
   useEffect(() => {
@@ -173,6 +174,11 @@ export function WikiConnections({
       ),
     [view],
   );
+  const topicCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    view.nodes.forEach((n) => counts.set(n.topic, (counts.get(n.topic) || 0) + 1));
+    return counts;
+  }, [view]);
   const related = useMemo(
     () => ({
       incoming: new Set(
@@ -370,6 +376,7 @@ export function WikiConnections({
                     graph={view}
                     focus={route.focus}
                     detailed={detailed}
+                    highlight={highlight}
                     onSelect={(id) => {
                       update({ focus: id });
                       if (id) setPanelOpen(true);
@@ -459,21 +466,46 @@ export function WikiConnections({
                 >
                   Cores e leitura do mapa
                 </h4>
-                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5">
-                  {Object.entries(TOPIC_COLORS).map(([topic, color]) => (
-                    <div
-                      key={topic}
-                      className="flex items-start gap-1.5 text-[11px] leading-4 text-slate-600"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: color }}
-                      />
-                      {topic}
-                    </div>
-                  ))}
+                <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                  Clique numa cor para destacar as notas e conexões dela.
+                </p>
+                <div className="mt-1.5 space-y-0.5">
+                  {Object.entries(TOPIC_COLORS).map(([topic, color]) => {
+                    const on = highlight === topic;
+                    return (
+                      <button
+                        key={topic}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          setHighlight(on ? "" : topic);
+                          // A selected note would take over the map's highlight.
+                          if (!on && route.focus) update({ focus: "" });
+                        }}
+                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs leading-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-600 ${on ? "bg-cyan-50 font-medium text-slate-900 ring-1 ring-cyan-200" : highlight ? "text-slate-400 hover:bg-slate-50" : "text-slate-600 hover:bg-slate-50"}`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ background: color }}
+                        />
+                        <span className="min-w-0 flex-1">{topic}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {topicCounts.get(topic) || 0}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+                {highlight && (
+                  <button
+                    type="button"
+                    onClick={() => setHighlight("")}
+                    className={`${control} mt-1.5 w-full font-medium text-cyan-800`}
+                  >
+                    Limpar destaque
+                  </button>
+                )}
                 <p className="mt-2 text-[10px] leading-4 text-slate-400">
                   Tamanho por referências recebidas, não confiança. Ao
                   selecionar, as setas mostram a direção dos vínculos.
