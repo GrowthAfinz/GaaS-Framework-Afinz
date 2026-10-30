@@ -28,7 +28,8 @@ export function SkillsLibrary() {
       if (!response.ok) throw new Error('Catálogo indisponível. Tente novamente.');
       const data = await response.json();
       if (data.schema !== 'gaas-skills/1' || !Array.isArray(data.skills)) throw new Error('Formato de catálogo inválido.');
-      setSkills(data.skills.filter((s: Skill) => s.kind === 'owned'));
+      setSkills(data.skills.filter((s: Skill) => s.kind === 'owned').sort((a: Skill, b: Skill) =>
+        Number(b.id === 'gaas-activities-csv-ingest') - Number(a.id === 'gaas-activities-csv-ingest')));
     }).catch(e => { if (!abort.signal.aborted) setError(e instanceof Error ? e.message : 'Não foi possível carregar.'); })
       .finally(() => { if (!abort.signal.aborted) setLoading(false); });
     return () => abort.abort();

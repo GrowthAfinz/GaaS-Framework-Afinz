@@ -17,7 +17,7 @@ export const TEAM_PROMPTS: TeamPrompt[] = [
     inputs: 'CSV do Framework Growth Aquisição Cartão, exportado da Dinâmica BI.',
     output: 'XLSX com Resumo, WhatsApp, Email, SMS, Push e Performance.', cadence: 'A cada exportação do CSV',
     standalone: true,
-    body: `Crie um arquivo Excel (.xlsx) organizado a partir do CSV do Framework Growth Aquisição Cartão anexado.
+    body: `Crie um arquivo Excel (.xlsx) organizado a partir do CSV do Framework Growth Aquisição Cartão anexado. Este pedido gera somente a planilha: não execute importação nem atualize activities.
 
 Leitura do CSV
 Use um parser CSV com separador ponto e vírgula, encoding Windows-1252 e campos inicialmente como texto. Em Python/pandas:
