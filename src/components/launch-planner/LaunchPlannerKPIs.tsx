@@ -1201,9 +1201,11 @@ export const LaunchPlannerKPIs: React.FC<LaunchPlannerKPIsProps> = ({
                             </ResponsiveContainer>
                         </div>
                     </div>
-
-                    <LoopAttention placement="planner" goalNotice={currentGoal?.herdada_de ? <InheritedGoalNotice goal={currentGoal} /> : undefined} />
                 </div>
+            </div>
+
+            <div className="mt-5">
+                <LoopAttention placement="planner" goalNotice={currentGoal?.herdada_de ? onVisibilityChange => <InheritedGoalNotice goal={currentGoal} onVisibilityChange={onVisibilityChange} /> : undefined} />
             </div>
 
             <DailyDetailsModal

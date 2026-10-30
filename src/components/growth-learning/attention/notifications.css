@@ -1,0 +1,27 @@
+.notification-center { container: notifications / inline-size; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.notification-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; grid-auto-rows: 1fr; }
+@container notifications (min-width: 640px) { .notification-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.notification-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 260px; padding: 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: white; box-shadow: 0 1px 2px rgb(15 23 42 / 3%); }
+.notification-card--warning { border-top: 3px solid #f8a538; padding-top: 16px; }
+.notification-state { border-radius: 5px; background: #ecfeff; padding: 3px 7px; color: #155e75; font-size: 11px; font-weight: 600; }
+.notification-state--warning { background: #fffbeb; color: #92400e; }
+.notification-title { font-size: 14px; font-weight: 650; line-height: 1.5; color: #0f172a; overflow-wrap: anywhere; }
+.notification-summary { font-size: 13px; line-height: 1.65; color: #64748b; overflow-wrap: anywhere; }
+.notification-dismiss { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; color: #64748b; }
+.notification-dismiss:hover { background: #f1f5f9; color: #0f172a; }
+.notification-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+.notification-primary, .notification-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.notification-primary { background: #0f172a; color: white; }
+.notification-primary:hover { background: #334155; }
+.notification-secondary { color: #475569; }
+.notification-secondary:hover { background: #f1f5f9; color: #0f172a; }
+.notification-center button:focus-visible, .notification-card button:focus-visible, .notification-options summary:focus-visible { outline: 2px solid #007c80; outline-offset: 3px; }
+.notification-card button:disabled { opacity: .55; cursor: wait; }
+.notification-options { font-size: 12px; color: #64748b; }
+.notification-options[open] { flex-basis: 100%; }
+.notification-options summary { cursor: pointer; padding: 6px; border-radius: 4px; }
+.notification-goals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.notification-goals > div { min-width: 0; border-radius: 6px; background: #f8fafc; padding: 6px 8px; }
+.notification-goals dt { white-space: nowrap; font-size: 10px; font-weight: 600; color: #64748b; }
+.notification-goals dd { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; color: #1e293b; overflow-wrap: anywhere; }
+@media (max-width: 420px) { .notification-card { padding: 14px; } .notification-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

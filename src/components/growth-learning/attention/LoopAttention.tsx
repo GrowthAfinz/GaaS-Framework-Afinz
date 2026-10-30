@@ -1,17 +1,19 @@
 import {ReactNode,useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {Bell,ChevronRight,RefreshCw,X} from 'lucide-react';
+import {Bell,CheckCircle2,ChevronRight,Clock3,RefreshCw,Star,X} from 'lucide-react';
 import {useAuth} from '../../../context/AuthContext';
 import {useAppStore} from '../../../store/useAppStore';
 import {fetchKnowledgeSnapshot} from '../../vault/knowledge/knowledgeService';
 import type {KnowledgeNote} from '../../vault/knowledge/knowledge.types';
 import {attentionBody,defaultNoteAppend,listAttention,LoopItem,LOOP_COMMAND,preferAttention,proposeResultNote,requestSourceAnalysis} from './attentionService';
+import './notifications.css';
 const LABELS:Record<string,string>={needs_data:'Precisa de conferência',failed:'Erro de processamento',analysis_ready:'Análise disponível',running:'Em análise',awaiting_analysis:'Aguardando análise',needs_review:'Aguardando revisão',pending:'Aguardando análise',completed:'Concluída',blocked:'Pendência de dados'};
 const FRONTS:Record<string,string>={crm_acquisition:'CRM',paid_media:'Mídia paga',b2c_origin:'B2C',rentabilization:'Rentabilização',knowledge:'Wiki'};
 const control='rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 hover:border-cyan-500 disabled:opacity-50';
-export function LoopAttention({placement='feed',goalNotice,onCountChange}:{placement?:'feed'|'planner';goalNotice?:ReactNode;onCountChange?:(count:number)=>void}){
+export function LoopAttention({placement='feed',goalNotice,onCountChange}:{placement?:'feed'|'planner';goalNotice?:(onVisibilityChange:(visible:boolean)=>void)=>ReactNode;onCountChange?:(count:number)=>void}){
  const {user}=useAuth();const setView=useAppStore(s=>s.setTab);const [items,setItems]=useState<LoopItem[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true),[selected,setSelected]=useState<LoopItem|null>(null),[busy,setBusy]=useState(false),[showHidden,setShowHidden]=useState(false),[notice,setNotice]=useState('');
  const [notes,setNotes]=useState<KnowledgeNote[]>([]),[notePath,setNotePath]=useState(''),[markdown,setMarkdown]=useState(''),[baseHash,setBaseHash]=useState(''),[editing,setEditing]=useState(false),[snoozeDate,setSnoozeDate]=useState('');
+ const [goalVisible,setGoalVisible]=useState(false);
  const handledLink=useRef('');
  useEffect(()=>{if(placement!=='feed')return;const sync=()=>{const id=new URLSearchParams(location.search).get('attention');if(id&&handledLink.current!==id){const item=items.find(i=>i.id===id);if(item){setSelected(item);handledLink.current=id;}else if(!showHidden)setShowHidden(true);}};sync();window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync);},[items,placement,showHidden]);
  const load=useCallback(async()=>{try{const next=await listAttention(showHidden);setItems(next);setSelected(current=>current?next.find(n=>n.id===current.id)||null:null);setError('');}catch(e){setError(e instanceof Error?e.message:'Não foi possível ler os avisos. Tente atualizar.');}finally{setLoading(false);}},[showHidden]);
@@ -27,16 +29,35 @@ export function LoopAttention({placement='feed',goalNotice,onCountChange}:{place
  const selectedBody=selected?attentionBody(selected):null;
  const visible=items.filter(i=>!i.hidden);const count=visible.length;
  useEffect(()=>{if(!loading&&!error)onCountChange?.(count);},[count,error,loading,onCountChange]);
- return <section aria-label={placement==='planner'?'Notificações da Fila':'Blocos de acompanhamento'} className="space-y-3">
- <div className="flex flex-wrap items-center gap-3">{goalNotice&&<div className="min-w-0 flex-1">{goalNotice}</div>}<div className="flex items-center gap-2"><Bell size={17} className="text-cyan-800"/><h3 className="text-sm font-semibold">{placement==='planner'?'Notificações':'Acompanhamento da operação'}</h3><span aria-label="Quantidade de notificações" className="rounded bg-cyan-50 px-2 py-1 text-sm font-semibold text-cyan-900">{loading?'…':count}</span><button type="button" className={control} aria-label="Atualizar notificações" onClick={()=>void load()}><RefreshCw size={13}/></button></div></div>
- <p className="text-xs text-slate-500">Todos os períodos · avisos por contexto · atualizado a cada 30 segundos. Conferências de fonte são reavaliadas a cada cinco minutos.</p>
- <label className="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={showHidden} onChange={e=>setShowHidden(e.target.checked)}/>Mostrar também avisos adiados ou fechados por mim</label>
- {error&&<p role="alert" className="rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
- {!loading&&!items.length&&!error&&<p className="rounded border bg-white p-4 text-sm text-slate-500">Nenhuma notificação disponível no seu acesso.</p>}
- <div className="space-y-2">{items.map(i=><article key={i.id} className={'rounded-lg border bg-white p-4 '+(i.hidden?'border-slate-200 opacity-70':'border-slate-200')}>
- <div className="flex items-start justify-between gap-3"><button type="button" onClick={()=>open(i)} className="min-w-0 flex-1 text-left"><span className="text-xs text-slate-500">{FRONTS[i.front]||i.front} · {i.period.slice(0,7)} · {LABELS[i.state]||i.state}{i.following?' · Acompanhando':''}{i.hidden?' · Oculto no Planner':''}</span><strong className="mt-1 block text-sm text-slate-900">{i.title}</strong><p className="mt-1 text-sm text-slate-600">{i.summary}</p><span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-cyan-800">Ver resumo <ChevronRight size={13}/></span></button><button type="button" disabled={busy} aria-label={'Fechar aviso: '+i.title} title="Fechar até uma mudança relevante" className={control} onClick={()=>prefer(i,'dismiss')}><X size={14}/></button></div>
- <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy} className={control} onClick={()=>prefer(i,i.following?'unfollow':'follow')}>{i.following?'Deixar de acompanhar':'Acompanhando'}</button><button type="button" disabled={busy} className={control} onClick={()=>prefer(i,'snooze',new Date(Date.now()+86400000).toISOString())}>Mostrar amanhã</button><button type="button" className={control} onClick={()=>{setSelected(i);setSnoozeDate('');}}>Escolher outro dia</button>{i.hidden&&<button type="button" disabled={busy} className={control} onClick={()=>prefer(i,'restore')}>Restaurar aviso</button>}</div>
- </article>)}</div>
+ return <section aria-label={placement==='planner'?'Notificações da Fila':'Blocos de acompanhamento'} className="notification-center">
+ <header className="flex flex-wrap items-center justify-between gap-3">
+   <div className="flex items-center gap-2.5"><span className="rounded-lg bg-cyan-50 p-2 text-cyan-800"><Bell size={18}/></span><h3 className="text-base font-semibold text-slate-900">{placement==='planner'?'Notificações':'Acompanhamento da operação'}</h3><span aria-label="Quantidade de notificações" className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-slate-700">{loading?'…':count+(goalNotice&&goalVisible?1:0)}</span></div>
+   <button type="button" className={control+' inline-flex items-center gap-2'} aria-label="Atualizar notificações" onClick={()=>void load()}><RefreshCw size={13}/>Atualizar</button>
+ </header>
+ <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs text-slate-500">
+   <p>Todos os períodos · avisos por contexto</p>
+   <label className="flex cursor-pointer items-center gap-2 text-slate-600"><input type="checkbox" className="accent-cyan-700" checked={showHidden} onChange={e=>setShowHidden(e.target.checked)}/>Incluir adiados e fechados por mim</label>
+ </div>
+ {error&&<p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}<button type="button" className={control+' ml-2'} onClick={()=>void load()}>Tentar novamente</button></p>}
+ {!loading&&!items.length&&!error&&!(goalNotice&&goalVisible)&&<p className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600"><CheckCircle2 size={18} className="text-cyan-700"/>Nenhuma notificação disponível no seu acesso.</p>}
+ <div className="notification-grid" aria-busy={loading}>
+ {goalNotice?.(setGoalVisible)}
+ {loading&&items.length===0&&<p role="status" className="notification-card animate-pulse text-sm text-slate-500">Carregando notificações…</p>}
+ {items.map(i=><article key={i.id} className={'notification-card '+(['needs_data','failed','blocked'].includes(i.state)?'notification-card--warning ':'')+(i.hidden?'opacity-70':'')}>
+   <div className="flex items-start justify-between gap-3">
+     <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-500"><span className="font-semibold text-slate-700">{FRONTS[i.front]||i.front}</span><span>{i.period.slice(0,7)}</span><span className={'notification-state '+(['needs_data','failed','blocked'].includes(i.state)?'notification-state--warning':'')}>{LABELS[i.state]||i.state}</span>{i.following&&<span className="inline-flex items-center gap-1"><Star size={11}/>Acompanhando</span>}{i.hidden&&<span>Oculto no Planner</span>}</div>
+     <button type="button" disabled={busy} aria-label={'Fechar aviso: '+i.title} title="Fechar até uma mudança relevante" className="notification-dismiss" onClick={()=>prefer(i,'dismiss')}><X size={16}/></button>
+   </div>
+   <h4 className="notification-title">{i.title}</h4>
+   <p className="notification-summary">{i.summary}</p>
+   <footer className="notification-actions">
+     <button type="button" onClick={()=>open(i)} className="notification-primary">Ver resumo <ChevronRight size={14}/></button>
+     <button type="button" disabled={busy} className="notification-secondary" onClick={()=>prefer(i,'snooze',new Date(Date.now()+86400000).toISOString())}><Clock3 size={13}/>Mostrar amanhã</button>
+     <details className="notification-options"><summary>Mais opções</summary><div className="mt-2 flex flex-wrap gap-2"><button type="button" disabled={busy} className={control} onClick={()=>prefer(i,i.following?'unfollow':'follow')}>{i.following?'Deixar de acompanhar':'Acompanhar'}</button><button type="button" className={control} onClick={()=>{setSelected(i);setSnoozeDate('');}}>Escolher outro dia</button>{i.hidden&&<button type="button" disabled={busy} className={control} onClick={()=>prefer(i,'restore')}>Restaurar aviso</button>}</div></details>
+   </footer>
+ </article>)}
+ </div>
+ <p className="text-[11px] text-slate-500">Atualização automática a cada 30 s · fontes reavaliadas a cada 5 min. Fechar ou adiar oculta o aviso apenas para você.</p>
  {selected&&createPortal(<div className="fixed inset-0 z-[90] flex justify-end bg-slate-950/30" onClick={()=>setSelected(null)}><aside data-loop-drawer role="dialog" aria-modal="true" aria-label={'Resumo: '+selected.title} className="h-full w-full max-w-2xl overflow-y-auto bg-white p-5 shadow-xl" onClick={e=>e.stopPropagation()}>
  <div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold">{selected.title}</h2><button type="button" autoFocus className={control} aria-label="Fechar resumo" onClick={()=>setSelected(null)}><X size={16}/></button></div>
  <p className="mt-2 text-xs text-slate-500">{FRONTS[selected.front]} · {selected.period} · revisão {selected.revision}</p>
