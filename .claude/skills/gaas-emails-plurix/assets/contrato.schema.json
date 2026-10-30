@@ -1,0 +1,464 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "contract": {
+      "type": "string",
+      "const": "gaas-emails-input/1"
+    },
+    "status": {
+      "type": "string",
+      "const": "draft"
+    },
+    "generatedBy": {
+      "type": "object",
+      "properties": {
+        "tool": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "chatgpt",
+            "outro"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        }
+      },
+      "required": [
+        "tool",
+        "model",
+        "generatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "conversa",
+            "planilha"
+          ]
+        },
+        "file": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ruler": {
+      "type": "object",
+      "properties": {
+        "segment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "partner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tpCampanha": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateSlotId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "segment",
+        "partner",
+        "tpCampanha",
+        "templateSlotId"
+      ],
+      "additionalProperties": false
+    },
+    "emails": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sequence": {
+            "type": "string",
+            "pattern": "^E-mail [1-9]\\d*$"
+          },
+          "weekKey": {
+            "type": "string",
+            "pattern": "^Semana [1-9]\\d*$"
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "xlsx",
+                    "governed",
+                    "inferred",
+                    "missing",
+                    "ia"
+                  ]
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "justification": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "value",
+                "origin",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "secondBlock": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "lead"
+                    },
+                    "text": {
+                      "type": "string",
+                      "maxLength": 4000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "closing"
+                    },
+                    "text": {
+                      "type": "string",
+                      "maxLength": 4000
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "benefit_grid"
+                    },
+                    "items": {
+                      "minItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 4000
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "steps"
+                    },
+                    "items": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 4000
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "check_list"
+                    },
+                    "items": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 4000
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "stat_tiles"
+                    },
+                    "items": {
+                      "minItems": 2,
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "number": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 4000
+                          }
+                        },
+                        "required": [
+                          "number",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "networkOverrides": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": [
+                      "xlsx",
+                      "governed",
+                      "inferred",
+                      "missing",
+                      "ia"
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "justification": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value",
+                  "origin",
+                  "source"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "factsUsed": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "sequence",
+          "weekKey",
+          "fields",
+          "factsUsed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "pendencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "blocker",
+              "review"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "DT_INICIO",
+              "DT_FIM",
+              "UTM_CAMPANHA",
+              "TP_CAMPANHA",
+              "SEQUENCIA",
+              "ASSUNTO",
+              "PRE_CABECALHO",
+              "HEADER",
+              "CARTAO_NM_COMERCIAL",
+              "NM_PRODUTO_INTERNO",
+              "TITULO_COPY_1_AZUL",
+              "COR_COPY_1",
+              "TAMANHO_DA_FONTE_TITULO_COPY_1",
+              "TITULO_CTA_1",
+              "LINK_CTA_1",
+              "COPY_1_PRETO",
+              "COR_COPY_PRETO_1",
+              "TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1",
+              "TITULO_COPY_2",
+              "COR_TITULO_COPY_2",
+              "TAMANHO_DA_FONTE_TITULO_COPY_2",
+              "COPY_2_PRETO",
+              "COR_COPY_2",
+              "TAMANHO_DA_FONTE_COPY_2",
+              "TITULO_CTA_2",
+              "LINK_CTA_2",
+              "BANNER_1_CORPO",
+              "LINK_BANNER_1_CORPO",
+              "BANNER_2_CORPO",
+              "LINK_BANNER_2_CORPO",
+              "BANNER_3_CORPO",
+              "LINK_BANNER_3_CORPO",
+              "NOTA_LEGAL",
+              "COR_NOTA_LEGAL",
+              "TAMANHO_DA_FONTE_NOTA_LEGAL",
+              "RODAPE",
+              "MENSAGEM_LIMITE",
+              "HEADER_TITULO",
+              "HEADER_SUBTITULO",
+              "HEADER_IMAGEM_CARTAO",
+              "HEADER_LOGO"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "severity",
+          "scope",
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "contract",
+    "status",
+    "generatedBy",
+    "source",
+    "ruler",
+    "emails",
+    "pendencies"
+  ],
+  "additionalProperties": false
+}

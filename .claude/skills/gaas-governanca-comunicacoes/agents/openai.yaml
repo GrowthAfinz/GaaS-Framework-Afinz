@@ -1,0 +1,4 @@
+interface:
+  display_name: "GaaS Communication Governance"
+  short_description: "Govern CRM templates, links, and activities"
+  default_prompt: "Use $gaas-communication-governance to reconcile CRM template IDs, Activity Names, AppsFlyer links, and GaaS asset coverage."

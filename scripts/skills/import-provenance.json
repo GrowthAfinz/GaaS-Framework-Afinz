@@ -1,0 +1,177 @@
+[
+  {
+    "name": "afinz-copy-aquisicao",
+    "origin": "claude-projeto",
+    "source_hash": "857c2900995996528de95d3ac2fd242f435ff29c9dc56f3a21ae11a7d5b36acf"
+  },
+  {
+    "name": "afinz-crm-diarizado",
+    "origin": "claude-projeto",
+    "source_hash": "d2a1c72cb94bd7a0b5ba9a6fbcd163af8e775372bfcc73c0f23e61e5b4c1d37c"
+  },
+  {
+    "name": "afinz-pptx",
+    "origin": "cowork",
+    "source_hash": "b61dfd0c1c3a37147ca6d490909b6a0fd394bc128d46da615b365ba696cf543a"
+  },
+  {
+    "name": "afinz-pptx-campanha",
+    "origin": "cowork",
+    "source_hash": "dbf1bc082cb54046bf08cad6fa97cf1e7006732dbd6786381cc96c5a64b9bd13"
+  },
+  {
+    "name": "b2c-originacao-updater",
+    "origin": "cowork",
+    "source_hash": "ae83d54f3381eaf0cdd8480845acd33b2d25047586c7953e74e95ed0f56f22ca"
+  },
+  {
+    "name": "copa-crm-parser",
+    "origin": "claude-projeto",
+    "source_hash": "11af12816b9d60aab4034a8bfd28a7f470f2a2142661cd723efe8887193f8db6"
+  },
+  {
+    "name": "crm-communication-enricher",
+    "origin": "codex",
+    "source_hash": "c0067984988a860cfa94caf17eac5062c9de18531e53de1a6a339e003c7ada96"
+  },
+  {
+    "name": "crm-dispatch-intelligence",
+    "origin": "codex",
+    "source_hash": "0811a16863c4dcc00296095ddeebc5ce2e53373193ec1adda131b199adf8568b"
+  },
+  {
+    "name": "diarizado-pacing",
+    "origin": "cowork",
+    "source_hash": "ba20fccb67864ee6ea2c943d087f12c9a059f5b1bbcfdd06b4ff808021d221c7"
+  },
+  {
+    "name": "emails-dinamicos-sfmc",
+    "origin": "claude-projeto",
+    "source_hash": "da4fc52022371bcb892d4384761a37fc6962f50a5acc7c5b0b77154648c229df"
+  },
+  {
+    "name": "gaas-activities-csv-ingest",
+    "origin": "codex",
+    "source_hash": "ab18895dead2697015547b2bdbbf6904503b2e79f9657f21811af525e3fabca2"
+  },
+  {
+    "name": "gaas-emails-plurix",
+    "origin": "fabrica-emails",
+    "source_hash": "8dd5f6de1422a41fd80694d3405143d944342b8c160140094a6dbdf151962a3d"
+  },
+  {
+    "name": "gaas-funil-aquisicao-ingest",
+    "origin": "claude-projeto",
+    "source_hash": "db462d067d2214468170207f71b63fe15e51230adba26e5411ec01e08c34ac16"
+  },
+  {
+    "name": "gaas-governanca-comunicacoes",
+    "origin": "claude-projeto",
+    "source_hash": "1c43f34e2a7c0b7043bfbf7ac6da2158c66c606ce29c2c4aa8ac5a5a4d4a26f5"
+  },
+  {
+    "name": "gaas-growth-context",
+    "origin": "codex",
+    "source_hash": "f06cd9f838600594f683145bf278701314016614b36590ebfdd86e4df87dd933"
+  },
+  {
+    "name": "gaas-growth-investigation",
+    "origin": "repo-app",
+    "source_hash": "04c0fb8edf0ccd4393e6b4e09b526c85b7ed9a5dce39195056fe97f27c93b90c"
+  },
+  {
+    "name": "gaas-growth-loop-operator",
+    "origin": "repo-app",
+    "source_hash": "0872d19122ca722ceb0f719b6d5a65d8fb739773f5071e5a57aee14e2c81bbbe"
+  },
+  {
+    "name": "gaas-insight-engine",
+    "origin": "claude-projeto",
+    "source_hash": "79d82d5507874dc5bd743269ebeea78669cec8052a7d40c28fc53db7624e4090"
+  },
+  {
+    "name": "gaas-midia-report",
+    "origin": "claude-projeto",
+    "source_hash": "6aaaa68dc0b681149f87787eab94c78dc21fdd9bd04d9b3d5caf8113a89bf732"
+  },
+  {
+    "name": "gaas-momento-disparo",
+    "origin": "claude-projeto",
+    "source_hash": "439d59ef219f0b71d512e154b65035747a5f5e9b6948c02a74b9ff5e8ad29548"
+  },
+  {
+    "name": "gaas-relatorio-xlsx",
+    "origin": "claude-projeto",
+    "source_hash": "597a8bf8a8db2c1e5663d81ae3e263306cf62803c4964ccaf3f26690979e8b14"
+  },
+  {
+    "name": "gaas-template-reconciliation",
+    "origin": "claude-projeto",
+    "source_hash": "5044969d5822741044d7fba74d4dcf3009cd6079c550f4a41ef98727b21b280f"
+  },
+  {
+    "name": "growth-brain-intelligence-engine",
+    "origin": "cowork",
+    "source_hash": "2694f2d0c4dc99d499c7fda84f38d9fe87152518a4cb3c1acd2c247e175965a4"
+  },
+  {
+    "name": "growth-data-quality-monitor",
+    "origin": "codex",
+    "source_hash": "21c8e375608f39e487a1d077c88c753b0902a9e96b968403cf0066ce0f65fc94"
+  },
+  {
+    "name": "growth-report-operator",
+    "origin": "codex",
+    "source_hash": "0dacb937c17ab0c8f8441f9903b61afcb8fd866951bdbf01183a44149f5824b6"
+  },
+  {
+    "name": "growth-saas-marketing-cloud",
+    "origin": "codex",
+    "source_hash": "1ae10eec86f6bee745aaaa241a517e89b7a647a95fd75191aa0068f5540efc99"
+  },
+  {
+    "name": "measurement-attribution-auditor",
+    "origin": "codex",
+    "source_hash": "4007cb74a9e7ce0b51b269b7335942391883199caa7c6cbd8219a12c2ed64016"
+  },
+  {
+    "name": "meta-ads-remote",
+    "origin": "codex",
+    "source_hash": "ec45f2fbd718d56a8d125324b84a38d9584435457eee6b184b98a4f3c0840385"
+  },
+  {
+    "name": "paid-media-campaign-analyst",
+    "origin": "codex",
+    "source_hash": "9f2c3799a2ce5ffa93eafc32d59b599dee35e6b0dc2bbc623386a371b9a76c37"
+  },
+  {
+    "name": "produtos-afinz",
+    "origin": "claude-projeto",
+    "source_hash": "e053ec0f347d1d83267a5fbb3980838b344f41ee5b921533af7b4a86e141930a"
+  },
+  {
+    "name": "report-live-release-engineer",
+    "origin": "codex",
+    "source_hash": "c77b67fce7b1d40fbc5922a8af3c08aabe49409032869a8b7fe0e89fcb7c2abc"
+  },
+  {
+    "name": "segment-performance-analyst",
+    "origin": "codex",
+    "source_hash": "55e0e4122a583eb179e0653c7a20f91e087076c33a1a24bea53afbedab12cf9a"
+  },
+  {
+    "name": "sfmc-acquisition-email-designer",
+    "origin": "claude-projeto",
+    "source_hash": "f154e3e3505683e9d42a6867efd0766d6c46730f9b338921c158cb3ea2e5fb26"
+  },
+  {
+    "name": "sfmc-jornadas-pacote",
+    "origin": "claude-projeto",
+    "source_hash": "3f0d6ffab9137ccdb4b48e261231b83e3c6abbba45e472094e5ad6b9e5015627"
+  },
+  {
+    "name": "storytellingfiltergaas",
+    "origin": "cowork",
+    "source_hash": "3a5f2a358e430f94fb093ed704cbf0bdb90e76ba7bcde420135c41f97e400007"
+  }
+]

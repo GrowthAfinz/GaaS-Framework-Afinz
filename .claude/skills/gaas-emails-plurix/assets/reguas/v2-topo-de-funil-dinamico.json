@@ -1,0 +1,382 @@
+{
+  "contract": "gaas-emails-input/1",
+  "status": "draft",
+  "generatedBy": {
+    "tool": "outro",
+    "model": "GaaS (estado atual da régua)",
+    "generatedAt": "2026-10-15T21:46:19.383Z"
+  },
+  "source": {
+    "kind": "conversa"
+  },
+  "ruler": {
+    "segment": "V2 TOPO DE FUNIL DINÂMICO",
+    "partner": "Plurix",
+    "tpCampanha": "Topo de Funil",
+    "templateSlotId": "builtin-plurix-v13"
+  },
+  "emails": [
+    {
+      "sequence": "E-mail 1",
+      "weekKey": "Semana 1",
+      "fields": {
+        "ASSUNTO": {
+          "value": "Seu mercado pode render mais com o cartão +amigo",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "PRE_CABECALHO": {
+          "value": "Você já tem o Clube. Com o cartão, ganha desconto extra em produtos selecionados.",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Olá, %%=v(@FirstName)=%%!",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "TITULO_CTA_1": {
+          "value": "PEDIR CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "COPY_1_PRETO": {
+          "value": "Já pensou em aproveitar as melhores <b>vantagens e descontos dentro e fora do Supermercado</b>? Com o <b>cartão de crédito +amigo</b>, você pode <b>economizar em produtos selecionados</b> e ainda contar com benefícios que vão além das compras. Peça seu cartão e aproveite:",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "TITULO_COPY_2": {
+          "value": "Mais possibilidades para suas compras renderem",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "TITULO_CTA_2": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Boa notícia, {{nome}}: você tem R$ {{limite}} de limite pré-aprovado no cartão +amigo.",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "HEADER_TITULO": {
+          "value": "Seu mercado rende mais!",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "HEADER_SUBTITULO": {
+          "value": "+5% de desconto extra em produtos selecionados",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        },
+        "HEADER_IMAGEM_CARTAO": {
+          "value": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c6f51660-3c13-448e-aef3-5a68efaf2310.png",
+          "origin": "governed",
+          "source": "GaaS E-mail 1 / AMIGAO"
+        }
+      },
+      "secondBlock": [
+        {
+          "type": "lead",
+          "text": "E para aproveitar benefícios em diferentes momentos da rotina, conheça algumas das vantagens de ter seu <b>cartão +amigo</b>:"
+        },
+        {
+          "type": "benefit_grid",
+          "items": [
+            {
+              "title": "Descontos extras no mercado",
+              "text": "<b>A partir de 5%</b> em produtos selecionados, pagando com o cartão +amigo."
+            },
+            {
+              "title": "Mais prazo para pagar",
+              "text": "<b>Até 40 dias</b>, conforme a data da compra e o vencimento da fatura."
+            },
+            {
+              "title": "Benefícios com Visa",
+              "text": "Acesso a promoções, descontos, sorteios e <b>benefícios exclusivos</b>."
+            },
+            {
+              "title": "Vantagens para sua saúde",
+              "text": "<b>Até 70% de desconto</b> em consultas, exames e medicamentos pelo Programa Você Bem Saúde."
+            }
+          ]
+        },
+        {
+          "type": "closing",
+          "text": "Peça seu cartão +amigo e descubra essas vantagens!"
+        }
+      ],
+      "factsUsed": []
+    },
+    {
+      "sequence": "E-mail 2",
+      "weekKey": "Semana 1",
+      "fields": {
+        "ASSUNTO": {
+          "value": "+5% de desconto extra em produtos selecionados",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "PRE_CABECALHO": {
+          "value": "Você já tem o Clube. Peça seu cartão +amigo e aproveite ainda mais.",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Olá, %%=v(@FirstName)=%%!",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "TITULO_CTA_1": {
+          "value": "PEDIR CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "COPY_1_PRETO": {
+          "value": "Na hora de escolher como pagar suas compras, contar com <b>vantagens extras faz toda diferença.</b><br>O <b>cartão +amigo</b> foi feito para trazer mais possibilidades para sua rotina, com <b>DESCONTOS EXCLUSIVOS em produtos selecionados</b> no supermercado e benefícios para você aproveitar no dia a dia.",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "TITULO_COPY_2": {
+          "value": "Ganhe mais pagando com o cartão de crédito +amigo",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "TITULO_CTA_2": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "BANNER_2_CORPO": {
+          "value": "https://stoplxmkt.blob.core.windows.net/plxmkt/20250625-EM-JORNADA_DE_AQUISICAO_MAIS_AMIGO-AFINZ-V2/semana-02/imagem-cartoes.png",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Seu cartão está mais perto, {{nome}}: você tem R$ {{limite}} de limite pré-aprovado no cartão +amigo.",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "HEADER_TITULO": {
+          "value": "+5% de desconto extra!",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "HEADER_SUBTITULO": {
+          "value": "Vantagens exclusivas para você economizar",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        },
+        "HEADER_IMAGEM_CARTAO": {
+          "value": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/49b01a5b-dc3f-47a3-9ef5-afa14915626e.png",
+          "origin": "governed",
+          "source": "GaaS E-mail 2 / AMIGAO"
+        }
+      },
+      "secondBlock": [
+        {
+          "type": "lead",
+          "text": "No Clube você conta com ofertas, eventos e sorteios. Com o <b>cartão +amigo</b>, você tem tudo isso e mais <b>+5% de desconto extra em produtos selecionados</b> sempre que paga com ele."
+        },
+        {
+          "type": "stat_tiles",
+          "items": [
+            {
+              "number": "+5%",
+              "label": "OFF em produtos selecionados"
+            },
+            {
+              "number": "40 dias",
+              "label": "para pagar"
+            },
+            {
+              "number": "70%",
+              "label": "OFF em consultas e medicamentos"
+            }
+          ]
+        },
+        {
+          "type": "closing",
+          "text": "As melhores vantagens do mercado na palma da sua mão!"
+        }
+      ],
+      "factsUsed": []
+    },
+    {
+      "sequence": "E-mail 3",
+      "weekKey": "Semana 2",
+      "fields": {
+        "ASSUNTO": {
+          "value": "Mais economia no carrinho com o cartão +amigo",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "PRE_CABECALHO": {
+          "value": "Vantagens extras em produtos selecionados do supermercado.",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Olá, %%=v(@FirstName)=%%!",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "TITULO_CTA_1": {
+          "value": "PEDIR CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "COPY_1_PRETO": {
+          "value": "Na hora de fazer as compras, <b>cada desconto conta!</b><br>Com o <b>cartão de crédito +amigo</b>, você pode aproveitar <b>vantagens extras</b> em produtos selecionados {no_mercado}.",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "TITULO_COPY_2": {
+          "value": "Mais motivos para aproveitar as compras",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "TITULO_CTA_2": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Ainda dá tempo, {{nome}}: você tem R$ {{limite}} de limite pré-aprovado para pedir seu cartão +amigo.",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "HEADER_TITULO": {
+          "value": "Até 40 dias para pagar!",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "HEADER_SUBTITULO": {
+          "value": "Mais flexibilidade e economia para o seu bolso. Aproveite!",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        },
+        "HEADER_IMAGEM_CARTAO": {
+          "value": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/29a7dd93-cebf-47eb-9a7c-822ffcfc2be2.png",
+          "origin": "governed",
+          "source": "GaaS E-mail 3 / AMIGAO"
+        }
+      },
+      "secondBlock": [
+        {
+          "type": "lead",
+          "text": "Com o <b>cartão de crédito do Clube +amigo</b>, você paga suas compras com segurança e praticidade e ainda conta com <b>benefícios no dia a dia</b>:"
+        },
+        {
+          "type": "check_list",
+          "items": [
+            "<b>A partir de 5% de desconto</b> em produtos selecionados.",
+            "<b>Até 40 dias para pagar</b>: mais flexibilidade para você.",
+            "<b>Até 70% de desconto</b> em consultas, exames e medicamentos.",
+            "<b>Benefícios com Visa</b>: aceito no Brasil e no mundo, com acesso a promoções, descontos, sorteios e benefícios exclusivos."
+          ]
+        },
+        {
+          "type": "closing",
+          "text": "Peça seu cartão +amigo e aproveite os descontos disponíveis!"
+        }
+      ],
+      "factsUsed": []
+    },
+    {
+      "sequence": "E-mail 4",
+      "weekKey": "Semana 2",
+      "fields": {
+        "ASSUNTO": {
+          "value": "Até 40 dias para pagar suas compras!",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "PRE_CABECALHO": {
+          "value": "Peça o cartão +amigo e aproveite mais prazo, descontos extras e benefícios.",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Olá, %%=v(@FirstName)=%%!",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "TITULO_CTA_1": {
+          "value": "PEDIR CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "COPY_1_PRETO": {
+          "value": "O <b>cartão de crédito +amigo</b> pode acompanhar você em muito mais momentos do que as compras {no_mercado}.<br>Com a bandeira Visa, ele é aceito em estabelecimentos no Brasil e no exterior e ainda traz <b>benefícios extras para você economizar</b> e cuidar da sua rotina.",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "TITULO_COPY_2": {
+          "value": "Vantagens para as compras e para o dia a dia",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "TITULO_CTA_2": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Vale lembrar, {{nome}}: você tem R$ {{limite}} de limite pré-aprovado no cartão +amigo.",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "HEADER_TITULO": {
+          "value": "Use seu cartão dentro e fora do mercado!",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "HEADER_SUBTITULO": {
+          "value": "Peça seu cartão +amigo e aproveite os melhores descontos.",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        },
+        "HEADER_IMAGEM_CARTAO": {
+          "value": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c6f51660-3c13-448e-aef3-5a68efaf2310.png",
+          "origin": "governed",
+          "source": "GaaS E-mail 4 / AMIGAO"
+        }
+      },
+      "secondBlock": [
+        {
+          "type": "lead",
+          "text": "Com o <b>cartão de crédito +amigo</b>, você conta com:"
+        },
+        {
+          "type": "benefit_grid",
+          "items": [
+            {
+              "title": "Visa no Brasil e no mundo",
+              "text": "Mais possibilidades de uso e o <b>Programa Vai de Visa</b>, com promoções, descontos, sorteios e benefícios exclusivos."
+            },
+            {
+              "title": "Desconto extra no mercado",
+              "text": "<b>+5% de desconto extra</b> em produtos selecionados nas redes participantes."
+            },
+            {
+              "title": "Mais prazo para pagar",
+              "text": "<b>Até 40 dias</b>, conforme a data da compra e o vencimento da fatura."
+            },
+            {
+              "title": "Desconto em saúde",
+              "text": "<b>Até 70% de desconto</b> em consultas, exames e medicamentos pelo Programa Você Bem."
+            }
+          ]
+        },
+        {
+          "type": "closing",
+          "text": "Solicite seu cartão +amigo e descubra tudo o que ele pode oferecer!"
+        }
+      ],
+      "factsUsed": []
+    }
+  ],
+  "pendencies": []
+}

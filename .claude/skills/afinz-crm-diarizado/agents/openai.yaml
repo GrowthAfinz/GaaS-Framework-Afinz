@@ -1,0 +1,7 @@
+interface:
+  display_name: "AFINZ CRM Diarizado"
+  short_description: "Gera Excel CRM diarizado AFINZ"
+  default_prompt: "Use $afinz-crm-diarizado to update the AFINZ CRM diarized Excel from Supabase and validate Auditoria."
+
+policy:
+  allow_implicit_invocation: true

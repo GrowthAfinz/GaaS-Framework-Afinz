@@ -36,6 +36,8 @@ jobs:
           node-version-file: '.nvmrc'
           cache: npm
       - run: npm ci
+      - name: Skill catalog and publication safety
+        run: npm run test:skills
       - name: Frontend tests
         run: npm test
       - name: SFMC package ingestion SQL contracts

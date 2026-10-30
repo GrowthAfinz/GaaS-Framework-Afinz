@@ -1,0 +1,15 @@
+interface:
+  display_name: "Meta Ads Remote"
+  short_description: "Acessar Meta Ads via MCP oficial"
+  default_prompt: "Use $meta-ads-remote para consultar campanhas, contas e insights do Meta Ads."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "meta_ads"
+      description: "Meta Ads official MCP server"
+      transport: "streamable_http"
+      url: "https://mcp.facebook.com/ads"
+
+policy:
+  allow_implicit_invocation: true

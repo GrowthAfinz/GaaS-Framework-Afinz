@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Media Campaign Analyst"
+  short_description: "Analisa campanhas, adsets e anúncios de mídia"
+  default_prompt: "Use $paid-media-campaign-analyst para analisar campanhas de mídia paga em profundidade."

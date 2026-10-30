@@ -1,0 +1,4 @@
+interface:
+  display_name: "Segment Performance Analyst"
+  short_description: "Diagnostica performance e dispersão por segmento"
+  default_prompt: "Use $segment-performance-analyst para diagnosticar a performance dos segmentos de aquisição."

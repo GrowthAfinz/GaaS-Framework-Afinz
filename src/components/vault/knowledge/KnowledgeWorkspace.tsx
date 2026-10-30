@@ -1,3 +1,4 @@
+import { SkillsLibrary } from "./SkillsLibrary";
 import { PromptLibrary } from "./PromptLibrary";
 import "./knowledgeWorkspace.css";
 import { summarizeCrmCompatible } from "../../growth-learning/results/crmAnalysis";
@@ -71,8 +72,8 @@ export function KnowledgeWorkspace({
   initialObjective?: string;
 }) {
   const { user } = useAuth();
-  const [mode, setMode] = useState<"export" | "packs" | "prompts" | "contributions">(
-    initialObjective ? "export" : "packs",
+  const [mode, setMode] = useState<"export" | "packs" | "prompts" | "contributions" | "skills">(
+    () => initialObjective ? "export" : new URLSearchParams(window.location.search).get("ai_tab") === "skills" ? "skills" : "packs",
   );
   const [snapshot, setSnapshot] = useState<KnowledgeSnapshot | null>(null);
   const [packs, setPacks] = useState<KnowledgePack[]>([]);
@@ -330,6 +331,7 @@ export function KnowledgeWorkspace({
             ["prompts", "Prompts"],
             ["export", "Preparar contexto"],
             ["contributions", "Contribuições"],
+            ["skills", "Skills"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -339,6 +341,9 @@ export function KnowledgeWorkspace({
             onClick={() => {
               setMode(id);
               setSelected(null);
+              const params = new URLSearchParams(window.location.search);
+              params.set("ai_tab", id);
+              window.history.replaceState({}, "", window.location.pathname + "?" + params + window.location.hash);
             }}
             className={`${button} ${mode === id ? "border-cyan-300 bg-cyan-50 text-cyan-900" : ""}`}
           >
@@ -346,7 +351,7 @@ export function KnowledgeWorkspace({
           </button>
         ))}
       </nav>
-      {error && (
+      {error && mode !== "skills" && (
         <div
           role="alert"
           className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800"
@@ -370,7 +375,8 @@ export function KnowledgeWorkspace({
         </p>
       )}
       {mode === "prompts" && <PromptLibrary />}
-      {loading && mode !== "prompts" ? (
+      {mode === "skills" && <SkillsLibrary />}
+      {loading && mode !== "prompts" && mode !== "skills" ? (
         <p
           role="status"
           className="rounded-xl border border-slate-200 bg-white p-6 text-slate-600"

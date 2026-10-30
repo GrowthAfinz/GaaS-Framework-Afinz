@@ -1,7 +1,7 @@
 {
   "name": "calendar-estrategico",
   "version": "1.0.0",
-  "description": "Dashboard calendário estratégico de disparos Salesforce",
+  "description": "Dashboard calendÃ¡rio estratÃ©gico de disparos Salesforce",
   "homepage": "https://growthafinz.github.io/GaaS-Framework-Afinz",
   "type": "module",
   "engines": {
@@ -39,7 +39,12 @@
     "test:growth-triggers": "node --test scripts/test-growth-triggers-release8.mjs scripts/test-growth-trigger-schema-release8.mjs scripts/test-growth-trigger-runtime.mjs scripts/test-growth-trigger-runtime-sql.mjs",
     "check:growth-triggers": "npx --yes deno@2.9.6 check supabase/functions/_shared/growth-trigger-engine.ts",
     "check:growth-trigger-pilot": "node scripts/build-growth-trigger-pilot-seed.mjs --check",
-    "test:growth-investigations": "node --test scripts/test-growth-investigations.mjs scripts/test-growth-investigation-agent.mjs scripts/test-growth-investigation-loop.mjs"
+    "test:growth-investigations": "node --test scripts/test-growth-investigations.mjs scripts/test-growth-investigation-agent.mjs scripts/test-growth-investigation-loop.mjs",
+    "prebuild": "node scripts/skills/build-skills-catalog.mjs",
+    "predev": "node scripts/skills/build-skills-catalog.mjs",
+    "check:skills": "node scripts/skills/build-skills-catalog.mjs --check",
+    "test:skills": "node --test scripts/skills/test-skills-catalog.mjs",
+    "pretest:skills": "node scripts/skills/build-skills-catalog.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

@@ -1,0 +1,575 @@
+{
+  "read_at": "2026-10-07",
+  "scope": "All notes mentioning template_id/ID TEMPLATE/af_sub3 plus related ontology, taxonomy, authorship, governance, cadence and provenance",
+  "direct_notes": 23,
+  "total_notes": 61,
+  "sources": [
+    {
+      "path": "00-Indice/Changelog-do-Vault.md",
+      "sha256": "ee9d7b1f9a2b761daee7e913711fa6c666856205d43edd9a6723f68b6f8ee030",
+      "lines": 203,
+      "updated": "2026-10-02",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "00-Indice/MOC-Operacao.md",
+      "sha256": "aa9ce644bacc911c032ea5f4527125ff86cb3d52cbcfa98da857d1ca0f3ecc2b",
+      "lines": 52,
+      "updated": "2026-10-02",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Campanha.md",
+      "sha256": "3ed8edd0e6dab43c0cc6528d1bbef567e8680b9eed3f20923ddae9a2aa9c41e7",
+      "lines": 20,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Carrinho-Abandonado.md",
+      "sha256": "685cca1392f2e42652b8e0511b10d98ac391e4e5ba74f6c3ec8322db384abba0",
+      "lines": 31,
+      "updated": "2026-06-10",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Disparo.md",
+      "sha256": "bb0e9732de04be3ae9f641914047aa75f5c9f58d9f3d3ce6cb113cc46f4b401d",
+      "lines": 20,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Experimento.md",
+      "sha256": "0abcec120a450b1d5ec4befc8dadc196c4a37b9159fc6c3a908ec84fed2f9c90",
+      "lines": 18,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Jornada.md",
+      "sha256": "c08843e8a39161d6a93b28737dd061219e051f751a041f7c762aeb6181356bf9",
+      "lines": 22,
+      "updated": "2026-06-10",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Plataformas-de-Comunicação.md",
+      "sha256": "de295f0c3a2ac37484179ce36d7027fdfb6582da33c6b37582552b14929248ac",
+      "lines": 47,
+      "updated": "2026-06-10",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Repescagem.md",
+      "sha256": "25a10920a7ca34f166c5ae42cf4fd6a0af0df18f5e7ad5d534b8ffc3ec082b11",
+      "lines": 38,
+      "updated": "2026-08-20",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Régua.md",
+      "sha256": "0a2eeb3eec56cfa5543c807e1b13915c7125be52fb419261aeb6bdf83c712793",
+      "lines": 18,
+      "updated": "2026-06-08",
+      "status": "inferência",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Safra.md",
+      "sha256": "c82fa962c0bc3707d582df49d4742fb2e3bdc2c3f89c52cca809a1c7a69483a1",
+      "lines": 18,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Taxonomia-Activity-Name.md",
+      "sha256": "67025a8cb12d073505008d1fcc70614929f44898c3566859d56bbcb98061e799",
+      "lines": 22,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Template.md",
+      "sha256": "8f4bf155d3b526106be39f99211a6b869d796f07a46ecbb6342f29836a22e641",
+      "lines": 20,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "01-Conceitos/Upgrade.md",
+      "sha256": "a55b7748b9582dd799819b70833e08224b0bd5d2e8e2c8a8295215f406801dea",
+      "lines": 41,
+      "updated": "2026-08-20",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/activities.md",
+      "sha256": "35e0edbb41d265a86a79b9bd794e8892581e435454a2d1ec7bb4e439728bde20",
+      "lines": 22,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Amostras-Comunicacoes-Reais/Amostras-Comunicacoes-Reais.md",
+      "sha256": "169b75c217b0c7cc3661b7c70febf2fe7711a05b28f29b38f54a153906379359",
+      "lines": 36,
+      "updated": "2026-08-17",
+      "status": "confirmado",
+      "source": "analise-manual-llm",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Amostras-Comunicacoes-Reais/README.md",
+      "sha256": "169b75c217b0c7cc3661b7c70febf2fe7711a05b28f29b38f54a153906379359",
+      "lines": 36,
+      "updated": "2026-08-17",
+      "status": "confirmado",
+      "source": "analise-manual-llm",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/appsflyer_template_daily.md",
+      "sha256": "35feb19d6894c8bd3cba749236f7684c9923a892f15a9da0d05456f3958ac8e1",
+      "lines": 24,
+      "updated": "2026-07-28",
+      "status": "proposto",
+      "source": "investigacao-mcp-appsflyer",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/communication_slots.md",
+      "sha256": "84e1ac3982811b94d0e6dc88f5768e02174f24b36973e593f3cfa0679d20132b",
+      "lines": 24,
+      "updated": "2026-08-12",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/communication_templates.md",
+      "sha256": "d1a3d4ba3c8dca2b4c580fc1a5672185b8fb228432e7bd5c741068a82d14f16a",
+      "lines": 24,
+      "updated": "2026-08-12",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Dicionario-de-Produtos/Beneficios-e-Vigencia.md",
+      "sha256": "321130f3bbca1c8af419e655fbf91a90ac96b8833d7435a59597f74bc347f275",
+      "lines": 108,
+      "updated": "2026-10-02",
+      "status": "confirmado",
+      "source": "pesquisa-externa",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Dicionario-de-Produtos/Pode-Dizer-Nao-Pode-Dizer.md",
+      "sha256": "a13f550c22f093b5a4016d0fedcb3fa25db382bf321dbd2dec70be2fde076749",
+      "lines": 129,
+      "updated": "2026-10-02",
+      "status": "confirmado",
+      "source": "pesquisa-externa",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Dimensao-Canonica-de-Parceiro.md",
+      "sha256": "31b9ba3cc60fc3d6b4b5463157ece11a1bc22d9be8943718e109e470830515e2",
+      "lines": 112,
+      "updated": "2026-09-13",
+      "status": "confirmado",
+      "source": "codigo-gaas",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Templates-Vibe-Revisao-2026/README.md",
+      "sha256": "7e45e878b8fb4ab919da5365301a6709a1db9ec129d53e8d3c6371cc0f50a5e5",
+      "lines": 48,
+      "updated": "2026-08-17",
+      "status": "confirmado",
+      "source": "analise-manual-llm",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Templates-Vibe-Revisao-2026/Templates-Vibe-Revisao-2026.md",
+      "sha256": "8bd93cebc1cf5f5898e41e5d5d34af968b80df788b79c0624c3d21dcc9ec3636",
+      "lines": 27,
+      "updated": "2026-10-02",
+      "status": "confirmado",
+      "source": "codigo-gaas",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/03-Dimensoes/BUs.md",
+      "sha256": "fcc16f899b5d965d72b758e24359bed165fa3ca9315ddd412f638705efcd8d2d",
+      "lines": 28,
+      "updated": "2026-06-10",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/03-Dimensoes/Canais.md",
+      "sha256": "e24c0f3d06a7350c3276f9305fb504b56d15518c692b427d3aa3335f4279529f",
+      "lines": 28,
+      "updated": "2026-06-10",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/03-Dimensoes/Ofertas.md",
+      "sha256": "b560f43de870cef3befd9ce34694a0a2bdf3eebe0df4a4a65dc716038609613b",
+      "lines": 30,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/03-Dimensoes/Parceiros.md",
+      "sha256": "ed5c6b1aae1df7eb67a248598b8cd4309acf16e89cf8fc6c643282d3a9552f85",
+      "lines": 25,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/03-Dimensoes/Segmentos.md",
+      "sha256": "4be89c3f8c934dfbd8f437c0aa94e54b2dc895d7bb0dad7b68e27673b4ab9963",
+      "lines": 30,
+      "updated": "2026-06-10",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/03-Dimensoes/Subgrupos.md",
+      "sha256": "bf292c5515e2270f75b497bd55747c56df53f28e4b3ac0d3c9323cc02c027bb0",
+      "lines": 26,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "04-Operacao/AppsFlyer-Tracking-CRM.md",
+      "sha256": "5a09274d3967de5c22e42a8ae2fb9b72a9f26d1ac56b7b661283336992372011",
+      "lines": 60,
+      "updated": "2026-07-28",
+      "status": "confirmado",
+      "source": "planilha-governanca + validacao-mcp-appsflyer",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "04-Operacao/Comunicacoes-Pacote-SFMC-Catalogo.md",
+      "sha256": "f915ee56979ae04d17002af3838e8dcc8f09f9514784c7ffa60eee2a997e677b",
+      "lines": 71,
+      "updated": "2026-10-07",
+      "status": "parcialmente-implementado",
+      "source": "supabase-e-pacotes-package-manager",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "04-Operacao/Emails-Dinamicos-SFMC.md",
+      "sha256": "e3ddd03d61591c793c51f47d982a75e6d8593dfbf54983e21c4fd24492851ae5",
+      "lines": 233,
+      "updated": "2026-10-06",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "04-Operacao/Fabrica-de-Emails-GaaS.md",
+      "sha256": "ee5bc87f4328975eeeab9e110d0127195834c582b6fbfe888a3a171b76ac8d93",
+      "lines": 323,
+      "updated": "2026-10-06",
+      "status": "confirmado",
+      "source": "codigo-gaas",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "04-Operacao/Formatacao-WhatsApp-Variaveis-e-Espacamento.md",
+      "sha256": "4ecfb25e744b77c9afec6b7f03ffa360e473951bbe6ca46ca6825fb5095785c5",
+      "lines": 85,
+      "updated": "2026-08-19",
+      "status": "confirmado",
+      "source": "pesquisa-externa",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/04-Operacao/Ingestão-de-Dados.md",
+      "sha256": "0d175fcb273e295bdaa1980fd75d9b73f175628b3cb1284590e5b0cad53b15d3",
+      "lines": 21,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/04-Operacao/Jornada-Disparos.md",
+      "sha256": "bc2cf9359599c70d9864998863cdc35aa5ec76921b5fe39f915e4e2ada8f1a69",
+      "lines": 23,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/04-Operacao/Pilar-Automação-por-Histórico.md",
+      "sha256": "944cc0523aafec71cf34371ff836d80a8e8f9f818996c31c97c26e8cfd01d554",
+      "lines": 27,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "04-Operacao/SFMC-Package-Manager-e-Pacotes.md",
+      "sha256": "6051a6bc5995b48dbd3af28d034605a0a7d8e0e73a6db672d1e6ac974beee611",
+      "lines": 61,
+      "updated": "2026-10-07",
+      "status": "confirmado",
+      "source": "documentacao-salesforce-e-pacotes-reais",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Anti-Overlap-Pressão-de-Contato.md",
+      "sha256": "9ac859695e50030e506f3e3b91e1a091b786f0c477e64138fee3dc1720d458f6",
+      "lines": 21,
+      "updated": "2026-06-08",
+      "status": "a-validar",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Briefing-e-Regua-de-Aquisicao.md",
+      "sha256": "a19337ba116b3282459552692908bb3503947aabc3b34ca7483694c6f8ffe66a",
+      "lines": 67,
+      "updated": "2026-10-02",
+      "status": "confirmado",
+      "source": "codigo-gaas",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Motor-de-Briefing-Automatico.md",
+      "sha256": "3e47de0e5698a42f9122c215babd8b8eaf82e5c0b88fe634e51d51cced11be0a",
+      "lines": 116,
+      "updated": "2026-10-02",
+      "status": "inferência",
+      "source": "pesquisa-externa",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Ontologia-v2.md",
+      "sha256": "989b8be82743e236952bf5ab5492e9f3f50f47660501cb2fd2ebe24e6fe853c3",
+      "lines": 32,
+      "updated": "2026-08-04",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Orquestrador.md",
+      "sha256": "d44f5fc2fea6d705ae3b687e95475e90c8c4815676bdb392d763f5d3045c9f83",
+      "lines": 24,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "sha256": "6e4cd08874a7cc142d6b2742d9bef48e601de1ba0978c5677267496f7e82b002",
+      "lines": 65,
+      "updated": "2026-08-20",
+      "status": "confirmado",
+      "source": "pesquisa-externa",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Reguas-Inteligentes-Arquitetura.md",
+      "sha256": "343ddf4d6186867acf998e125fe4d14472275c364944774a1af5f4a935559eb3",
+      "lines": 60,
+      "updated": "2026-08-17",
+      "status": "proposto",
+      "source": "operador",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/SFMC-Integracao-API-Roadmap.md",
+      "sha256": "e11fc1ba660ea28abc2d5de74fe2f38ef075bbf297f27c5b2dd06d762cc7ea42",
+      "lines": 59,
+      "updated": "2026-10-07",
+      "status": "inferência",
+      "source": "conversa-pablo-claude-2026-10-06-e-pesquisa-publica",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "05-Estrategia/Sistema-de-Experimentacao-Referencias.md",
+      "sha256": "1a217c2190d271385d8e8690fd0f429d1ec0f68cbfb90350ea96383ac8617d31",
+      "lines": 56,
+      "updated": "2026-06-10",
+      "status": "confirmado",
+      "source": "pesquisa-externa",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "06-Performance/Eficiência-de-Criativo.md",
+      "sha256": "13b3c64c3a0a33d9959ce0505e74c40b549e816cc062a7e86675bc9370f9ed49",
+      "lines": 23,
+      "updated": "2026-06-08",
+      "status": "a-validar",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "07-Evolucao/Auditoria-Jornadas-SFMC-2026-10.md",
+      "sha256": "be0fa684017a6acfb8be8e0b4550a053f6d1f366a54b428376bf2b68096d2652",
+      "lines": 82,
+      "updated": "2026-10-07",
+      "status": "a-validar",
+      "source": "pacotes-package-manager-e-supabase-activities",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "07-Evolucao/Conflitos-de-Fonte-Produtos-2026-08.md",
+      "sha256": "591f85f10a1912982047928fae0b70b452501c4644959d14b49c87c6ee47f39f",
+      "lines": 133,
+      "updated": "2026-08-20",
+      "status": "confirmado",
+      "source": "pesquisa-externa",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "07-Evolucao/Decisões-Tomadas.md",
+      "sha256": "29bf75965c607ad0907597f1351e030e40d46c5d1097dcd97ca91c4a27baa676",
+      "lines": 46,
+      "updated": "2026-07-15",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "98-Legado/07-Evolucao/Entidades-v2.md",
+      "sha256": "7f44e3a153529a22fcfcc4db5b99839488080bd5b974323dc04e1d9d14407f1a",
+      "lines": 25,
+      "updated": "2026-06-08",
+      "status": "confirmado",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "07-Evolucao/Galeria-de-Templates.md",
+      "sha256": "f0927b899be24d677dd6e02aefcf987fda0793e3f7afde26405015cf51e4564c",
+      "lines": 62,
+      "updated": "2026-07-15",
+      "status": "implementado",
+      "source": "operador",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "07-Evolucao/Governança-de-Dados.md",
+      "sha256": "14b4d0cccf235168d49263e784e84c582c77c1207352e50df35717e9bef92748",
+      "lines": 24,
+      "updated": "2026-06-08",
+      "status": "a-validar",
+      "source": "gaas-supabase",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "07-Evolucao/Performance-do-Conteudo-GaaS.md",
+      "sha256": "3e8aa785af11416bee608819b4eeef8eb252bae290335cadbbcbc80024d2e1e9",
+      "lines": 76,
+      "updated": "2026-07-15",
+      "status": "implementado",
+      "source": "produto-e-codigo",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "08-Engenharia/AppsFlyer-Ingestao-Template-Arquitetura.md",
+      "sha256": "6421f572fc91a586e609cb9b072cfd21d8f403ede155dc3e681cbae218052aab",
+      "lines": 117,
+      "updated": "2026-07-28",
+      "status": "proposto",
+      "source": "investigacao-mcp-appsflyer + planilha-governanca + decisao-operador",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "08-Engenharia/Skills-e-Disponibilidade-por-IA.md",
+      "sha256": "dbf40911a856451f7d85bbeb3ed6ac28b0485481a8bce7cffa5f27ba80636522",
+      "lines": 141,
+      "updated": "2026-08-07",
+      "status": "confirmado",
+      "source": "inventario-repositorio",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "09-Inteligencia-IA/Fontes-e-Proveniencia-Growth.md",
+      "sha256": "450c9c2b098a1b21ba65b69063ed1ac991c7d8c374b4f65a89f3410368ce7902",
+      "lines": 60,
+      "updated": "2026-10-02",
+      "status": "confirmado",
+      "source": "operador",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "09-Inteligencia-IA/Loop-de-Aprendizado-Growth.md",
+      "sha256": "20f19daec58c415644700fc59233940b59f450fc0a9a65b5cc7f9dbca704a7b4",
+      "lines": 303,
+      "updated": "2026-09-24",
+      "status": "release-7c-candidata",
+      "source": "decisao-produto-pablo-codex",
+      "read_scope": "complete note"
+    },
+    {
+      "path": "02-Entidades-Dados/Templates-Vibe-Revisao-2026/dataset_vibe_completo.json",
+      "sha256": "7c5414a3c4a074ef1aa945e211acfae54293d27739767618f771292283ace857",
+      "records": 61,
+      "read_scope": "parsed all records; provenance, metadata and reuse profile"
+    },
+    {
+      "path": "02-Entidades-Dados/Templates-Vibe-Revisao-2026/estrutura_bau_regua.json",
+      "sha256": "dc4bd611c506410aa09e4401afcaef1214090a0c02e661a0db660c37e08d7956",
+      "records": 41,
+      "read_scope": "parsed all records; provenance, metadata and reuse profile"
+    },
+    {
+      "path": "02-Entidades-Dados/Amostras-Comunicacoes-Reais/dataset_completo.json",
+      "sha256": "42bc577f5d30df0e16a2a1de71bab561563a28b9ac2cf92fd52e958c7753a903",
+      "records": 73,
+      "read_scope": "parsed all records; provenance, metadata and reuse profile"
+    }
+  ]
+}

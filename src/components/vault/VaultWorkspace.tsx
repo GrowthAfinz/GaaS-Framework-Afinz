@@ -164,6 +164,18 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const target = params.get('wiki_path');
+    if (catalogLoading || !target) return;
+    const matches = resolveWikiTarget(catalog, target);
+    if (matches.length !== 1) { setNotice('A ficha ainda não foi sincronizada com a Wiki. Consulte a origem da skill no catálogo.'); return; }
+    params.delete('wiki_path'); params.delete('wiki_ai'); params.delete('ai_objective');
+    const search = buildGrowthLearningSectionItemSearch('vault', matches[0].id, params.toString());
+    window.history.replaceState({}, '', window.location.pathname + search);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, [catalog, catalogLoading, routeVersion]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
     if (catalogLoading || !(params.get('section') === 'results' || params.get('wiki_topic') === 'results')) return;
     const matches = resolveWikiTarget(catalog, '07-Evolucao/Resultados-Evolucao-e-Retrospectivas');
     if (matches.length !== 1) { setNotice('O assunto Resultados ainda não está disponível no índice da Wiki.'); return; }

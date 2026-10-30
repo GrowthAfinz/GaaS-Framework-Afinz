@@ -133,3 +133,6 @@ __pycache__/
 # Report Live production exports are local evidence, never repository source.
 artifacts/report-live-async/golden/
 
+
+# Generated public skill catalog and downloads
+/public/skills/

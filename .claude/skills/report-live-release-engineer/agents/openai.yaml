@@ -1,0 +1,4 @@
+interface:
+  display_name: "Report Live Release Engineer"
+  short_description: "Build, certify, publish and roll back Report Live"
+  default_prompt: "Use $report-live-release-engineer to audit and safely release the Report Live deck."

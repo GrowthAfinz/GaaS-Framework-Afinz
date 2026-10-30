@@ -1,0 +1,248 @@
+{
+  "contract": "gaas-emails-input/1",
+  "status": "draft",
+  "generatedBy": {
+    "tool": "claude",
+    "model": "claude-opus-5-5",
+    "generatedAt": "2026-10-15T12:00:00Z"
+  },
+  "source": {
+    "kind": "planilha",
+    "file": "Regua_Plurix_TopoFunil_Proposta_Outubro26_3.xlsx"
+  },
+  "ruler": {
+    "segment": "V2 TOPO DE FUNIL DINÂMICO",
+    "partner": "Plurix",
+    "tpCampanha": "Topo de Funil",
+    "templateSlotId": "builtin-plurix-v13"
+  },
+  "emails": [
+    {
+      "sequence": "E-mail 3",
+      "weekKey": "Semana 2",
+      "fields": {
+        "TP_CAMPANHA": {
+          "value": "Topo de Funil",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "SEQUENCIA": {
+          "value": "E-mail 3",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "ASSUNTO": {
+          "value": "Mais economia no carrinho com o cartão +amigo",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "PRE_CABECALHO": {
+          "value": "Vantagens extras em produtos selecionados do supermercado.",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "HEADER_TITULO": {
+          "value": "Até 40 dias para pagar!",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "HEADER_SUBTITULO": {
+          "value": "Mais flexibilidade e economia para o seu bolso. Aproveite!",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "HEADER_IMAGEM_CARTAO": {
+          "value": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/29a7dd93-cebf-47eb-9a7c-822ffcfc2be2.png",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Ainda dá tempo, {{nome}}: você tem R$ {{limite}} de limite pré-aprovado para pedir seu cartão +amigo.",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Olá, %%=v(@FirstName)=%%!",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "TITULO_CTA_1": {
+          "value": "PEDIR CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "BANNER_1_CORPO": {
+          "value": "",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "TITULO_COPY_2": {
+          "value": "Mais motivos para aproveitar as compras",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "TITULO_CTA_2": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "BANNER_2_CORPO": {
+          "value": "",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 3"
+        },
+        "COPY_1_PRETO": {
+          "value": "Na hora de fazer as compras, <b>cada desconto conta!</b><br>Com o <b>cartão de crédito +amigo</b>, você pode aproveitar <b>vantagens extras</b> em produtos selecionados {no_mercado}.",
+          "origin": "inferred",
+          "source": "regra supermercado",
+          "justification": "Nome da rede resolvido pelo GaaS."
+        }
+      },
+      "secondBlock": [
+        {
+          "type": "lead",
+          "text": "Com o <b>cartão de crédito do Clube +amigo</b>, você paga suas compras com segurança e praticidade e ainda conta com <b>benefícios no dia a dia</b>:"
+        },
+        {
+          "type": "check_list",
+          "items": [
+            "<b>A partir de 5% de desconto</b> em produtos selecionados.",
+            "<b>Até 40 dias para pagar</b>: mais flexibilidade para você.",
+            "<b>Até 70% de desconto</b> em consultas, exames e medicamentos.",
+            "<b>Benefícios com Visa</b>: aceito no Brasil e no mundo, com acesso a promoções, descontos, sorteios e benefícios exclusivos."
+          ]
+        },
+        {
+          "type": "closing",
+          "text": "Peça seu cartão +amigo e aproveite os descontos disponíveis!"
+        }
+      ],
+      "factsUsed": [
+        "5%",
+        "70%",
+        "40 dias",
+        "Visa"
+      ]
+    },
+    {
+      "sequence": "E-mail 4",
+      "weekKey": "Semana 2",
+      "fields": {
+        "TP_CAMPANHA": {
+          "value": "Topo de Funil",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "SEQUENCIA": {
+          "value": "E-mail 4",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "ASSUNTO": {
+          "value": "Até 40 dias para pagar suas compras!",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "PRE_CABECALHO": {
+          "value": "Peça o cartão +amigo e aproveite mais prazo, descontos extras e benefícios.",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "HEADER_TITULO": {
+          "value": "Use seu cartão dentro e fora do mercado!",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "HEADER_SUBTITULO": {
+          "value": "Peça seu cartão +amigo e aproveite os melhores descontos.",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "HEADER_IMAGEM_CARTAO": {
+          "value": "https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/c6f51660-3c13-448e-aef3-5a68efaf2310.png",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "MENSAGEM_LIMITE": {
+          "value": "Vale lembrar, {{nome}}: você tem R$ {{limite}} de limite pré-aprovado no cartão +amigo.",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "TITULO_COPY_1_AZUL": {
+          "value": "Olá, %%=v(@FirstName)=%%!",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "TITULO_CTA_1": {
+          "value": "PEDIR CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "BANNER_1_CORPO": {
+          "value": "",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "TITULO_COPY_2": {
+          "value": "Vantagens para as compras e para o dia a dia",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "TITULO_CTA_2": {
+          "value": "QUERO MEU CARTÃO +AMIGO",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "BANNER_2_CORPO": {
+          "value": "",
+          "origin": "xlsx",
+          "source": "Briefing Fábrica / E-mail 4"
+        },
+        "COPY_1_PRETO": {
+          "value": "O <b>cartão de crédito +amigo</b> pode acompanhar você em muito mais momentos do que as compras {no_mercado}.<br>Com a bandeira Visa, ele é aceito em estabelecimentos no Brasil e no exterior e ainda traz <b>benefícios extras para você economizar</b> e cuidar da sua rotina.",
+          "origin": "inferred",
+          "source": "regra supermercado",
+          "justification": "Nome da rede resolvido pelo GaaS."
+        }
+      },
+      "secondBlock": [
+        {
+          "type": "lead",
+          "text": "Com o <b>cartão de crédito +amigo</b>, você conta com:"
+        },
+        {
+          "type": "benefit_grid",
+          "items": [
+            {
+              "title": "Visa no Brasil e no mundo",
+              "text": "Mais possibilidades de uso e o <b>Programa Vai de Visa</b>, com promoções, descontos, sorteios e benefícios exclusivos."
+            },
+            {
+              "title": "Desconto extra no mercado",
+              "text": "<b>+5% de desconto extra</b> em produtos selecionados nas redes participantes."
+            },
+            {
+              "title": "Mais prazo para pagar",
+              "text": "<b>Até 40 dias</b>, conforme a data da compra e o vencimento da fatura."
+            },
+            {
+              "title": "Desconto em saúde",
+              "text": "<b>Até 70% de desconto</b> em consultas, exames e medicamentos pelo Programa Você Bem."
+            }
+          ]
+        },
+        {
+          "type": "closing",
+          "text": "Solicite seu cartão +amigo e descubra tudo o que ele pode oferecer!"
+        }
+      ],
+      "factsUsed": [
+        "5%",
+        "70%",
+        "40 dias",
+        "Visa"
+      ]
+    }
+  ],
+  "pendencies": []
+}

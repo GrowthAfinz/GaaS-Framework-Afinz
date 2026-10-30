@@ -1,0 +1,7 @@
+interface:
+  display_name: "Growth SaaS Marketing Cloud"
+  short_description: "UX, governanca e inteligencia para GaaS, CRM e midia"
+  default_prompt: "Use $growth-saas-marketing-cloud to projetar UX analitica, governanca de templates, motores de insight e orquestracao de campanhas para GaaS, CRM ou midia paga."
+
+policy:
+  allow_implicit_invocation: true

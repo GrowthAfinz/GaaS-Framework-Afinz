@@ -1,0 +1,14 @@
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { noteName, skillNote, catalogNote } from './skill-documentation.mjs';
+const root = fileURLToPath(new URL('../../', import.meta.url));
+const index = process.argv.indexOf('--vault');
+if (index < 0 || !process.argv[index+1]) throw new Error('Use --vault <pasta do vault>');
+const vault = path.resolve(process.argv[index+1]);
+const target = path.join(vault, '09-Inteligencia-IA/Skills');
+const catalog = JSON.parse(await readFile(path.join(root,'public/skills/catalog.json'),'utf8'));
+await mkdir(target,{recursive:true});
+for(const skill of catalog.skills) await writeFile(path.join(target,`${noteName(skill)}.md`),skillNote(skill));
+await writeFile(path.join(target,'Catalogo-de-Skills.md'),catalogNote(catalog));
+console.log(`${catalog.skills.length} fichas e índice exportados para ${target}. Nenhuma nota externa ao catálogo foi alterada.`);

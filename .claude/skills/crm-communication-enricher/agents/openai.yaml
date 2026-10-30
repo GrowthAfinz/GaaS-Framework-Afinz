@@ -1,0 +1,4 @@
+interface:
+  display_name: "Enriquecedor de Comunicacoes CRM"
+  short_description: "Cruza prints CRM com o Framework historico"
+  default_prompt: "Use $crm-communication-enricher para cruzar estes prints com activities, preservar Oferta + Promocional como par e gerar um enriquecimento revisavel."

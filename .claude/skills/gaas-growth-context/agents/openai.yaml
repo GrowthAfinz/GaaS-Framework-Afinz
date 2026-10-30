@@ -1,0 +1,5 @@
+interface:
+  display_name: "GaaS Growth Context"
+  short_description: "Contexto de growth para reports GaaS"
+  default_prompt: "Use $gaas-growth-context para preparar o contexto estrategico, contrato de views e narrativa de um report GaaS."
+

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SFMC Acquisition Email Designer"
+  short_description: "Cria, evolui e audita emails HTML e AMPscript sem regressao."
+  default_prompt: "Crie ou evolua este email de aquisicao para SFMC, preserve a logica dinamica, compare todas as sequencias afetadas e entregue codigo, regressao visual e QA."
