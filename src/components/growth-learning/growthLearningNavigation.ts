@@ -36,6 +36,8 @@ const CONTEXT_PARAM = 'growth_context';
 function clearContextParams(params: URLSearchParams): void {
   params.delete('create');
   params.delete(CONTEXT_PARAM);
+  params.delete('dev_task');
+  params.delete('task_view');
 }
 
 export function isGrowthLearningView(search: string): boolean {

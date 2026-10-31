@@ -1,0 +1,207 @@
+[
+  {
+    "task_key": "MEM-01",
+    "title": "Definir o ciclo de ativação e reutilização",
+    "area": "Loop de Memória",
+    "priority": "P0",
+    "status": "backlog",
+    "dependencies": [],
+    "description": "Planejar o motor macro: pedido explícito via skill Claude/Codex → releitura pertinente da base → interpretação de gatilhos e resultados → investigação e execução generativa → revisão → aprendizado → reutilização em nova ativação. Os agentes são uma camada de execução central ou de apoio principal, ainda em evolução. Não pressupor agendamento autônomo ou framework finalizado.",
+    "acceptance_criteria": [
+      "Contrato de entrada, saída e responsabilidade de cada fase revisado com Pablo",
+      "Separar memória operacional dos agentes, hipóteses e conhecimento de negócio validado",
+      "Definir como uma nova ativação recupera conhecimento aprovado e verifica sua aplicação"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-02",
+    "title": "Especificar a integração dos agentes com Fila e Wiki",
+    "area": "Fila e Wiki",
+    "priority": "P0",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-01"
+    ],
+    "description": "Prioridade de produto: agentes trabalham sobre Fila e Wiki. Planejar seleção de trabalhos, contexto, novas leituras, interpretação de sinais, pesquisa, contribuição coordenada a várias notas e retorno ao mesmo item da Fila. Aprovação humana simples por conjunto e evidências versionadas. Não tratar conclusão de execução como aprovação ou enriquecimento comprovado.",
+    "acceptance_criteria": [
+      "Fluxo Fila → agentes → propostas Wiki → decisão → retorno à Fila desenhado",
+      "Definir vínculo entre trabalho, execução, evidência, proposta e versão de nota",
+      "Incluir descoberta, conexão, hipótese, oportunidade e lacuna acionável, com critérios próprios"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-03",
+    "title": "Testar investigação generativa em aquisição CRM",
+    "area": "Agentes",
+    "priority": "P1",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-01",
+      "MEM-02"
+    ],
+    "description": "Executar a proposta exp-3: como melhorar jornadas e comunicações de aquisição CRM usando o conhecimento disponível. Cada especialista investiga uma pergunta e tenta uma contribuição fundamentada. Não forçar novidade. A primeira exp-2 validou coordenação e documentação; não demonstrou oportunidade de negócio ou reuso persistente.",
+    "acceptance_criteria": [
+      "Missões investigativas complementares e fontes pertinentes definidas",
+      "Entregas mostram tentativas, evidências, alternativas, implicação e próximo teste",
+      "Pablo avalia separadamente rigor e contribuição efetiva ao conhecimento"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-04",
+    "title": "Reorganizar Assuntos e resultados da Wiki",
+    "area": "Wiki",
+    "priority": "P1",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-01"
+    ],
+    "description": "Planejar menos páginas canônicas e conteúdo mais completo, didático e conectado. Reordenar Assuntos para favorecer interpretação analítica dos relatórios. Incluir referências recentes de resultados em série de vários meses, com cobertura e comparabilidade. Preservar dados históricos, fontes, links e rastreabilidade, sem enxugar a Wiki de Resultados ou editar derivados à mão.",
+    "acceptance_criteria": [
+      "Inventário de páginas e proposta de agrupamento por assunto com destinos canônicos",
+      "Modelo didático com conceitos, operação, evolução multimensal, limites e referências",
+      "Plano de conservação, redirecionamento e revisão dos geradores antes de qualquer migração"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-05",
+    "title": "Redesenhar Registros e fichas dos agentes",
+    "area": "Registros",
+    "priority": "P1",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-01",
+      "MEM-02"
+    ],
+    "description": "Criar proposta nova de Registros para acompanhar evolução do Loop e visão específica dos agentes. Cada papel terá nota e histórico completo sem limite editorial arbitrário de tamanho, com delegações, entregas, notas, revisões e lições. A leitura usa índices e sínteses referenciadas sem apagar o histórico. Ficha mostra função, versão de prompt, executor, evolução, avaliações e uso de memória. Não confundir registros dos agentes com outcomes comerciais.",
+    "acceptance_criteria": [
+      "Separar visão macro do Loop e ficha individual de cada agente",
+      "Definir histórico preservado, busca, linha do tempo e sínteses de consulta",
+      "Distinguir autoavaliação, ADM, Editor e revisão humana; rastrear o reuso das lições"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-06",
+    "title": "Planejar testes A/B multiformato e cross-sell",
+    "area": "Testes e Tarefas",
+    "priority": "P1",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-01"
+    ],
+    "description": "Especificar atributos de acompanhamento para experimentos growth em diferentes formatos, canais e frentes, incluindo cross-sell de seguros e novos dados que Pablo ainda apresentará. Modelo atual de investigações não é uma central A/B finalizada. Pode-se planejar agora; instrumentação e execução dependerão das novas fontes e definições de resultado.",
+    "acceptance_criteria": [
+      "Definir hipótese, grupos, unidade de alocação, público, exposição, janela, métrica e limites",
+      "Separar tarefa de desenvolvimento, investigação, experimento e execução",
+      "Contrato preliminar cross-sell com eventos e fontes pendentes claramente identificados"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-07",
+    "title": "Planejar incorporação de Apostas em Testes e Tarefas",
+    "area": "Testes e Tarefas",
+    "priority": "P2",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-06"
+    ],
+    "description": "Diretriz do Pablo: descontinuar a aba Apostas e integrar partes importantes em Testes e Tarefas. Planejar preservação de hipótese, evidência, aprovação, responsável, execução, checklist, janela e vínculos históricos. Não remover a aba nem apagar registros antes de mapear capacidades, rotas e migração.",
+    "acceptance_criteria": [
+      "Mapear capacidades e dados atuais de Apostas para o destino",
+      "Plano de transição preserva IDs, decisões, histórico e links",
+      "Critérios para retirar a aba definidos e revisados antes da implementação"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-08",
+    "title": "Redefinir o papel de Outcomes no Loop",
+    "area": "Outcomes",
+    "priority": "P2",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-06"
+    ],
+    "description": "Pablo quer alterar Outcomes, mas o papel futuro permanece aberto. Avaliar proposta de núcleo de Verificação e Aprendizados: o que foi executado, resultado observado, limites, decisão humana e o que pode ser reutilizado. A tela pode ser própria ou integrada a Testes e Tarefas; isso não está decidido. Não equiparar tarefa concluída a hipótese validada.",
+    "acceptance_criteria": [
+      "Comparar alternativas de tela própria e integração aos testes",
+      "Definir estados de resultado observado, inconclusivo, não verificável e revisão",
+      "Preservar distinção entre execução, efeito, aprendizado de negócio e lição de agente"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-09",
+    "title": "Planejar Report Live com geração assíncrona de PPTX",
+    "area": "Report Live",
+    "priority": "P2",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-01"
+    ],
+    "description": "Direção futura: Claude Code gera PPTX usando a skill afinz-pptx, substituindo geração via Google Slides API; arquivo concluído é disponibilizado no GaaS. Planejar dados, composição, marca, revisão visual, versionamento, upload, acesso, histórico e recuperação. Não mudar agora o pipeline vigente nem declarar o novo fluxo pronto.",
+    "acceptance_criteria": [
+      "Contrato do pedido e snapshot de dados definido",
+      "Planejar geração pela skill Afinz e QA antes da publicação do arquivo",
+      "Definir estados assíncronos, destino no GaaS, versões e recuperação de falhas"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-10",
+    "title": "Provar Google Sheets como insumo do PPTX",
+    "area": "Report Live",
+    "priority": "P2",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-09"
+    ],
+    "description": "Testar tese: ler Google Sheets como fonte de dados, congelar o recorte e usar Claude Code para gerar o PPTX. Sheets não precisa ser o editor de slides, e a geração/upload será assíncrona. Confirmar planilha, abas, permissões de leitura, contratos de métricas e rastreabilidade antes do protótipo.",
+    "acceptance_criteria": [
+      "Leitura autorizada de intervalos com valores e datas preservados",
+      "Snapshot rastreável usado na geração de um PPTX Afinz de teste",
+      "Validação do arquivo e do upload posterior ao GaaS, sem dependência de Google Slides API"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-11",
+    "title": "Planejar publicação Wiki e sincronização com o PC",
+    "area": "Fila e Wiki",
+    "priority": "P1",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-02"
+    ],
+    "description": "Manter direção aceita: aprovação humana simplificada por conjunto, publicação de versão na Wiki primeiro e sincronização da mesma versão para o PC de Pablo depois. Planejar conflito, retomada, leitura durante publicação e proteção contra inventário local obsoleto. O teste de cópia e a publicação administrativa atual não equivalem a esse motor pronto.",
+    "acceptance_criteria": [
+      "Definir autoridade, versão aprovada e comprovantes de Wiki e PC",
+      "Proteger contra alteração posterior à aprovação e sobrescrita por cópia antiga",
+      "Testes de falha e retomada previstos, sem perda ou exclusão silenciosa de notas"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  },
+  {
+    "task_key": "MEM-12",
+    "title": "Medir aprendizado e reuso entre ativações",
+    "area": "Loop de Memória",
+    "priority": "P2",
+    "status": "backlog",
+    "dependencies": [
+      "MEM-03",
+      "MEM-05"
+    ],
+    "description": "Planejar e depois testar um ciclo real de reutilização: lição candidata, revisão/aprovação, recuperação na próxima ativação, uso registrado e avaliação de efeito. Separar melhoria dentro de uma rodada de aprendizado persistente entre execuções. Definir como reprogramar o fluxo, prompts e contexto sem promover automaticamente reflexões a fatos ou ampliar permissões.",
+    "acceptance_criteria": [
+      "Definir promoção, revisão, substituição e validade das lições",
+      "Comparar tarefa/evidência controladas quando avaliar melhoria",
+      "Ficha e histórico mostram lição recuperada, uso/recusa, efeito e limitações"
+    ],
+    "source_note": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md"
+  }
+]
