@@ -1,5 +1,6 @@
 import {supabase} from '../../../services/supabaseClient';
-export const TASK_STATUS = {backlog:'Backlog',planejando:'Em planejamento',pronta:'Pronta para executar',em_execucao:'Em execução',bloqueada:'Bloqueada',concluida:'Concluída',cancelada:'Cancelada'} as const;
+export const TASK_STATUS = {backlog:'A planejar',planejando:'Em planejamento',pronta:'Pronta para executar',em_execucao:'Em execução',bloqueada:'Bloqueada',concluida:'Concluída',cancelada:'Cancelada'} as const;
+export const TASK_PRIORITY={P0:'Começar por aqui',P1:'Na sequência',P2:'Mais adiante',P3:'Ideias futuras'} as const;
 export type TaskStatus=keyof typeof TASK_STATUS;
 export interface DevelopmentTask {
  id:string;task_key:string;title:string;description:string;area:string;priority:'P0'|'P1'|'P2'|'P3';status:TaskStatus;

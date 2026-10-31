@@ -1,7 +1,7 @@
 [
   {
     "task_key": "MEM-01",
-    "title": "Definir o ciclo de ativação e reutilização",
+    "title": "Como o Loop de Memória deve funcionar",
     "area": "Loop de Memória",
     "priority": "P0",
     "status": "backlog",
@@ -16,7 +16,7 @@
   },
   {
     "task_key": "MEM-02",
-    "title": "Especificar a integração dos agentes com Fila e Wiki",
+    "title": "Como os agentes trabalham com a Fila e a Wiki",
     "area": "Fila e Wiki",
     "priority": "P0",
     "status": "backlog",
@@ -33,7 +33,7 @@
   },
   {
     "task_key": "MEM-03",
-    "title": "Testar investigação generativa em aquisição CRM",
+    "title": "Encontrar melhorias nas jornadas de CRM",
     "area": "Agentes",
     "priority": "P1",
     "status": "backlog",
@@ -51,7 +51,7 @@
   },
   {
     "task_key": "MEM-04",
-    "title": "Reorganizar Assuntos e resultados da Wiki",
+    "title": "Organizar e aprofundar os assuntos da Wiki",
     "area": "Wiki",
     "priority": "P1",
     "status": "backlog",
@@ -68,7 +68,7 @@
   },
   {
     "task_key": "MEM-05",
-    "title": "Redesenhar Registros e fichas dos agentes",
+    "title": "Acompanhar a evolução de cada agente",
     "area": "Registros",
     "priority": "P1",
     "status": "backlog",
@@ -86,7 +86,7 @@
   },
   {
     "task_key": "MEM-06",
-    "title": "Planejar testes A/B multiformato e cross-sell",
+    "title": "Acompanhar testes A/B e cross-sell",
     "area": "Testes e Tarefas",
     "priority": "P1",
     "status": "backlog",
@@ -103,7 +103,7 @@
   },
   {
     "task_key": "MEM-07",
-    "title": "Planejar incorporação de Apostas em Testes e Tarefas",
+    "title": "Reunir Apostas em Testes e Tarefas",
     "area": "Testes e Tarefas",
     "priority": "P2",
     "status": "backlog",
@@ -120,7 +120,7 @@
   },
   {
     "task_key": "MEM-08",
-    "title": "Redefinir o papel de Outcomes no Loop",
+    "title": "Definir como avaliar resultados e aprendizados",
     "area": "Outcomes",
     "priority": "P2",
     "status": "backlog",
@@ -137,7 +137,7 @@
   },
   {
     "task_key": "MEM-09",
-    "title": "Planejar Report Live com geração assíncrona de PPTX",
+    "title": "Gerar apresentações Afinz com Claude Code",
     "area": "Report Live",
     "priority": "P2",
     "status": "backlog",
@@ -154,7 +154,7 @@
   },
   {
     "task_key": "MEM-10",
-    "title": "Provar Google Sheets como insumo do PPTX",
+    "title": "Usar dados do Google Sheets nas apresentações",
     "area": "Report Live",
     "priority": "P2",
     "status": "backlog",
@@ -171,7 +171,7 @@
   },
   {
     "task_key": "MEM-11",
-    "title": "Planejar publicação Wiki e sincronização com o PC",
+    "title": "Manter Wiki e computador sincronizados",
     "area": "Fila e Wiki",
     "priority": "P1",
     "status": "backlog",
@@ -188,7 +188,7 @@
   },
   {
     "task_key": "MEM-12",
-    "title": "Medir aprendizado e reuso entre ativações",
+    "title": "Verificar se os agentes aprendem entre ciclos",
     "area": "Loop de Memória",
     "priority": "P2",
     "status": "backlog",

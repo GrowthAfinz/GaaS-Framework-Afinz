@@ -156,3 +156,8 @@ ficam para planejamento posterior, como solicitado. O backlog é o mecanismo par
 
 [[Loop-de-Aprendizado-Growth]] · [[Experimento-Agentes-Wiki-2026-10-31]] · [[Operacao-Fila-Notificacoes-Notas-de-Resultado]]
 · [[MOC-Inteligencia-IA]] · [[Evolucao-Cronologica-GaaS-2026-10]]
+
+
+## SDD GaaS: linguagem e objetivo do menu
+
+A área de desenvolvimento dentro de Testes e Tarefas passa a se chamar **SDD GaaS**. O objetivo é priorizar melhorias, transformar análises em especificações claras e acompanhar a evolução do GaaS. Temas recebem títulos diretos; prioridades são apresentadas como Começar por aqui, Na sequência e Mais adiante. Identificadores técnicos permanecem internos, sem alterar dependências, critérios ou histórico.
