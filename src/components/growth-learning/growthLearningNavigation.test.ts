@@ -17,6 +17,12 @@ import {
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
+  it('does not carry a development task into an existing CRM investigation link', () => {
+    const params=new URLSearchParams(buildGrowthLearningSectionItemSearch('investigations','crm-1','?view=learning&section=investigations&dev_task=dev-1&task_view=development'));
+    expect(params.get('item')).toBe('crm-1');
+    expect(params.has('dev_task')).toBe(false);
+    expect(params.has('task_view')).toBe(false);
+  });
   it('places Wiki next to the queue and preserves the operational sequence', () => {
     expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'investigations', 'report-live', 'bets', 'outcomes', 'memory']);
   });

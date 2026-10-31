@@ -40,6 +40,8 @@ jobs:
         run: npm run test:skills
       - name: Frontend tests
         run: npm test
+      - name: Development backlog and notification contracts
+        run: node --test scripts/test-development-backlog.mjs
       - name: SFMC package ingestion SQL contracts
         run: npm run test:sfmc-package-sql
       - name: Content performance and automatic linkage SQL contracts

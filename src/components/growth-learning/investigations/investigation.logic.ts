@@ -16,4 +16,4 @@ export function historicalMedian(metrics:InvestigationMetric[],period:string,key
  if(values.length<4)return null;
  const mid=Math.floor(values.length/2);return values.length%2?values[mid]:(values[mid-1]+values[mid])/2;
 }
-export function investigationSearch(id?:string){const p=new URLSearchParams(window.location.search);p.set('view','learning');p.set('section','investigations');if(id)p.set('item',id);else p.delete('item');return '?'+p;}
+export function investigationSearch(id?:string){const p=new URLSearchParams(window.location.search);p.set('view','learning');p.set('section','investigations');p.set('task_view','investigations');p.delete('dev_task');if(id)p.set('item',id);else p.delete('item');return '?'+p;}

@@ -1,4 +1,4 @@
-import { GrowthInvestigations } from './investigations/GrowthInvestigations';
+import { TasksWorkspace } from './development/TasksWorkspace';
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import {
   BookMarked,
@@ -161,7 +161,7 @@ export const GrowthLearningWorkspace: React.FC<
                 {
                   {
                     feed: "Identifique o que precisa de atenção e consulte a evidência antes de agir.",
-                    investigations: "Investigue mudanças, revise as evidências e registre a próxima decisão.",
+                    investigations: "Planeje o desenvolvimento do GaaS e acompanhe investigações, entregas e próximas decisões.",
                     bets: "Acompanhe hipóteses, responsáveis, execução e próximos compromissos.",
                     outcomes:
                       "Verifique resultados, registre limitações e decida o que pode ser reutilizado.",
@@ -203,7 +203,7 @@ export const GrowthLearningWorkspace: React.FC<
             )}
           </div>
         )}
-        {section === "investigations" ? <GrowthInvestigations initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "feed" ? (
+        {section === "investigations" ? <TasksWorkspace initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "feed" ? (
           <GrowthFeedView
             periodStart={periodStart}
             periodEnd={periodEnd}
