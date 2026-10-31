@@ -1,3 +1,4 @@
+import {TASK_PRIORITY} from '../development/developmentService';
 import {ReactNode,useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Bell,CheckCircle2,ChevronRight,Clock3,RefreshCw,Star,X} from 'lucide-react';
@@ -8,7 +9,8 @@ import type {KnowledgeNote} from '../../vault/knowledge/knowledge.types';
 import {attentionBody,defaultNoteAppend,listAttention,LoopItem,LOOP_COMMAND,preferAttention,proposeResultNote,requestSourceAnalysis} from './attentionService';
 import './notifications.css';
 const LABELS:Record<string,string>={needs_data:'Precisa de conferência',failed:'Erro de processamento',analysis_ready:'Análise disponível',running:'Em análise',awaiting_analysis:'Aguardando análise',needs_review:'Aguardando revisão',pending:'Aguardando análise',completed:'Concluída',blocked:'Pendência de dados'};
-const FRONTS:Record<string,string>={crm_acquisition:'CRM',paid_media:'Mídia paga',b2c_origin:'B2C',rentabilization:'Rentabilização',knowledge:'Wiki',gaas_development:'Desenvolvimento GaaS'};
+const FRONTS:Record<string,string>={crm_acquisition:'CRM',paid_media:'Mídia paga',b2c_origin:'B2C',rentabilization:'Rentabilização',knowledge:'Wiki',gaas_development:'SDD GaaS'};
+const noticeSummary=(i:LoopItem)=>i.kind==='development_task'?i.summary.replace(/^P[0-3]/,p=>TASK_PRIORITY[p as keyof typeof TASK_PRIORITY]):i.summary;
 const control='rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 hover:border-cyan-500 disabled:opacity-50';
 export function LoopAttention({placement='feed',goalNotice,onCountChange}:{placement?:'feed'|'planner';goalNotice?:(onVisibilityChange:(visible:boolean)=>void)=>ReactNode;onCountChange?:(count:number)=>void}){
  const {user}=useAuth();const setView=useAppStore(s=>s.setTab);const [items,setItems]=useState<LoopItem[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true),[selected,setSelected]=useState<LoopItem|null>(null),[busy,setBusy]=useState(false),[showHidden,setShowHidden]=useState(false),[notice,setNotice]=useState('');
@@ -49,7 +51,7 @@ export function LoopAttention({placement='feed',goalNotice,onCountChange}:{place
      <button type="button" disabled={busy} aria-label={'Fechar aviso: '+i.title} title="Fechar até uma mudança relevante" className="notification-dismiss" onClick={()=>prefer(i,'dismiss')}><X size={16}/></button>
    </div>
    <h4 className="notification-title">{i.title}</h4>
-   <p className="notification-summary">{i.summary}</p>
+   <p className="notification-summary">{noticeSummary(i)}</p>
    <footer className="notification-actions">
      <button type="button" onClick={()=>open(i)} className="notification-primary">Ver resumo <ChevronRight size={14}/></button>
      <button type="button" disabled={busy} className="notification-secondary" onClick={()=>prefer(i,'snooze',new Date(Date.now()+86400000).toISOString())}><Clock3 size={13}/>Mostrar amanhã</button>
@@ -61,7 +63,7 @@ export function LoopAttention({placement='feed',goalNotice,onCountChange}:{place
  {selected&&createPortal(<div className="fixed inset-0 z-[90] flex justify-end bg-slate-950/30" onClick={()=>setSelected(null)}><aside data-loop-drawer role="dialog" aria-modal="true" aria-label={'Resumo: '+selected.title} className="h-full w-full max-w-2xl overflow-y-auto bg-white p-5 shadow-xl" onClick={e=>e.stopPropagation()}>
  <div className="flex items-start justify-between gap-4"><h2 className="text-lg font-semibold">{selected.title}</h2><button type="button" autoFocus className={control} aria-label="Fechar resumo" onClick={()=>setSelected(null)}><X size={16}/></button></div>
  <p className="mt-2 text-xs text-slate-500">{FRONTS[selected.front]} · {selected.period} · revisão {selected.revision}</p>
- <h3 className="mt-5 font-semibold">O que aconteceu</h3><p className="mt-2 text-sm leading-6">{selected.summary}</p>
+ <h3 className="mt-5 font-semibold">O que aconteceu</h3><p className="mt-2 text-sm leading-6">{noticeSummary(selected)}</p>
  <h3 className="mt-5 font-semibold">O que fazer agora</h3><p className="mt-2 text-sm leading-6">{selected.next_action}</p>
  {(selected.analysis||selectedBody)&&<section className="mt-5 border-t pt-4"><h3 className="font-semibold">Análise do agente</h3><p className="mt-2 text-xs">{LABELS[selected.analysis?.state||selected.state]||'Análise'}{selected.analysis?.last_error&&' · '+selected.analysis.last_error}</p>{selectedBody&&<><p className="mt-2 text-sm">{selectedBody.summary}</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{selectedBody.facts.map((f,n)=><li key={n}>{f.text}</li>)}</ul><h4 className="mt-3 text-sm font-semibold">O que ainda não sabemos</h4><ul className="list-disc pl-5 text-sm">{selectedBody.limitations.map((f,n)=><li key={n}>{f}</li>)}</ul><h4 className="mt-3 text-sm font-semibold">Próximas verificações</h4><ul className="list-disc pl-5 text-sm">{selectedBody.next_checks.map((f,n)=><li key={n}>{f}</li>)}</ul></>}</section>}
  <details className="mt-5 text-xs"><summary className="cursor-pointer font-semibold">Evidências e procedência</summary><pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all bg-slate-50 p-3">{JSON.stringify(selected.evidence,null,2)}</pre></details>
