@@ -1,0 +1,2015 @@
+{
+  "vault_key": "afinz-crm-midia",
+  "date": "2026-11-03",
+  "note_count": 502,
+  "notes": [
+    {
+      "relative_path": "00-Indice/Changelog-do-Vault.md",
+      "content_hash": "857e7c41f8ae6caf795433bfa36e68b5dff39d7ef57daf5232087f9b36cfc380"
+    },
+    {
+      "relative_path": "00-Indice/Enciclopedia-Servicos-Growth.md",
+      "content_hash": "5789b7ecca9b06de5fd2d9678b30325af6369dd79af0527c5c083dc05c9faa29"
+    },
+    {
+      "relative_path": "00-Indice/MOC-Estrategia.md",
+      "content_hash": "52b2d4eb9fab74933c1f2c074da2e942ca5c52c832271d22961d4e974f5b5e85"
+    },
+    {
+      "relative_path": "00-Indice/MOC-Midia-Paga.md",
+      "content_hash": "4979575843b3c12698d67056c90be74b75b98597ef5585ab69ef15bcdd1a94ed"
+    },
+    {
+      "relative_path": "00-Indice/MOC-Operacao.md",
+      "content_hash": "5420cb83f7c620301f418069555f99d499cbfa5c46b5e84965d70f968750d7b3"
+    },
+    {
+      "relative_path": "00-Indice/🏠 HOME.md",
+      "content_hash": "36693cba9af0118d1ec12c9c2d6831aa868e597b4fa6798321df1e069b49985a"
+    },
+    {
+      "relative_path": "01-Conceitos/Base-Acionável.md",
+      "content_hash": "b9c97ed76515bc0b9832e7ee96262c8e9e423dca05acbae5f9764368b9b76d4f"
+    },
+    {
+      "relative_path": "01-Conceitos/CAC-Ótimo.md",
+      "content_hash": "8ab46a2f39d3bb06cc49fd8f497bac33d9e20b67c50fe128e22e3ddbd64c9fbb"
+    },
+    {
+      "relative_path": "01-Conceitos/CAC.md",
+      "content_hash": "e5d6da519bf7773e299c11798d2eb774ffbbfb9bc8b29f280f99dcd830c792ef"
+    },
+    {
+      "relative_path": "01-Conceitos/Campanha.md",
+      "content_hash": "3ed8edd0e6dab43c0cc6528d1bbef567e8680b9eed3f20923ddae9a2aa9c41e7"
+    },
+    {
+      "relative_path": "01-Conceitos/Carrinho-Abandonado.md",
+      "content_hash": "685cca1392f2e42652b8e0511b10d98ac391e4e5ba74f6c3ec8322db384abba0"
+    },
+    {
+      "relative_path": "01-Conceitos/Disparo.md",
+      "content_hash": "bb0e9732de04be3ae9f641914047aa75f5c9f58d9f3d3ce6cb113cc46f4b401d"
+    },
+    {
+      "relative_path": "01-Conceitos/Etapa-de-Aquisição.md",
+      "content_hash": "b831d7c252295ee216ea9fb91878dd74cb5ab6962d942297474a32da15b011f6"
+    },
+    {
+      "relative_path": "01-Conceitos/Experimento.md",
+      "content_hash": "0abcec120a450b1d5ec4befc8dadc196c4a37b9159fc6c3a908ec84fed2f9c90"
+    },
+    {
+      "relative_path": "01-Conceitos/Funil-AARRR.md",
+      "content_hash": "d46a692bd35fb9b26cf741c13449f66379ee353449b4e73299278d19c892499a"
+    },
+    {
+      "relative_path": "01-Conceitos/Hipótese.md",
+      "content_hash": "2ba4683f9ea51176bcd6e3c4f5c61d6b733c28355024adcc3936897726fb841a"
+    },
+    {
+      "relative_path": "01-Conceitos/Jornada.md",
+      "content_hash": "c08843e8a39161d6a93b28737dd061219e051f751a041f7c762aeb6181356bf9"
+    },
+    {
+      "relative_path": "01-Conceitos/Lead.md",
+      "content_hash": "e1eaae041bb1ce8be9ee182daa7b58218016799270c63e17a64d4a8262fe162f"
+    },
+    {
+      "relative_path": "01-Conceitos/MCC.md",
+      "content_hash": "74e001caf77f375293dee6120172aede2a81bce7e595f118a31d573ef8c3430e"
+    },
+    {
+      "relative_path": "01-Conceitos/Métricas-de-Mídia.md",
+      "content_hash": "c14c2338a6c3b4a9cabd66a2b77e831acb9e989613aba65b0020b8ea62429e82"
+    },
+    {
+      "relative_path": "01-Conceitos/Mídia-Paga.md",
+      "content_hash": "e8af39522f52ca2eaff7b2cb7fae8898f2ad501eb38081c7f0687d0485e60099"
+    },
+    {
+      "relative_path": "01-Conceitos/Oportunidade.md",
+      "content_hash": "4727b654c73e1f77cafae3386295235bcf52e0c9427b04a395ff961b65d8edfb"
+    },
+    {
+      "relative_path": "01-Conceitos/Plataformas-de-Comunicação.md",
+      "content_hash": "de295f0c3a2ac37484179ce36d7027fdfb6582da33c6b37582552b14929248ac"
+    },
+    {
+      "relative_path": "01-Conceitos/Repescagem.md",
+      "content_hash": "25a10920a7ca34f166c5ae42cf4fd6a0af0df18f5e7ad5d534b8ffc3ec082b11"
+    },
+    {
+      "relative_path": "01-Conceitos/Régua.md",
+      "content_hash": "0a2eeb3eec56cfa5543c807e1b13915c7125be52fb419261aeb6bdf83c712793"
+    },
+    {
+      "relative_path": "01-Conceitos/Safra.md",
+      "content_hash": "c82fa962c0bc3707d582df49d4742fb2e3bdc2c3f89c52cca809a1c7a69483a1"
+    },
+    {
+      "relative_path": "01-Conceitos/Spend-to-Card.md",
+      "content_hash": "65ef2c07f07730d45c3979cadf2eaa4b780cdcff72a87f712ddf294f9e67bbbe"
+    },
+    {
+      "relative_path": "01-Conceitos/Taxonomia-Activity-Name.md",
+      "content_hash": "67025a8cb12d073505008d1fcc70614929f44898c3566859d56bbcb98061e799"
+    },
+    {
+      "relative_path": "01-Conceitos/Template.md",
+      "content_hash": "8f4bf155d3b526106be39f99211a6b869d796f07a46ecbb6342f29836a22e641"
+    },
+    {
+      "relative_path": "01-Conceitos/Topo-de-Funil.md",
+      "content_hash": "e1d955cdbbc609db1661964babffde9571b152b74dc1572e7f20a4e3060f5d8f"
+    },
+    {
+      "relative_path": "01-Conceitos/Upgrade.md",
+      "content_hash": "a55b7748b9582dd799819b70833e08224b0bd5d2e8e2c8a8295215f406801dea"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Amostras-Comunicacoes-Reais/Amostras-Comunicacoes-Reais.md",
+      "content_hash": "169b75c217b0c7cc3661b7c70febf2fe7711a05b28f29b38f54a153906379359"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Amostras-Comunicacoes-Reais/README.md",
+      "content_hash": "169b75c217b0c7cc3661b7c70febf2fe7711a05b28f29b38f54a153906379359"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dicionario-de-Produtos/Beneficios-e-Vigencia.md",
+      "content_hash": "321130f3bbca1c8af419e655fbf91a90ac96b8833d7435a59597f74bc347f275"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dicionario-de-Produtos/Cartao-Afinz-Visa.md",
+      "content_hash": "3a4977e54ecd10e6c2c16415f9c296c3e7b1b65c9948dcdd6bdb52aa5dc2255b"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dicionario-de-Produtos/Cartao-Amigo-Afinz-Visa.md",
+      "content_hash": "8356613064b94bf2982807282653b52613dee23fc7cf5988972c4deb1ff83510"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dicionario-de-Produtos/Cartao-Bem-Mais-Afinz-Visa.md",
+      "content_hash": "d8fe0bce638d7d7ada29d84633b9a1c5f6775d2e5b0ac6985e7b3a450b18daab"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dicionario-de-Produtos/Cartao-Dia-Afinz-Visa.md",
+      "content_hash": "d02b15481a53388f73532505927422d477c055d4be16beb991a89479519bc380"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dicionario-de-Produtos/Dicionario-de-Produtos.md",
+      "content_hash": "03ae5346230efce443fd85323707e19a5fcf8a72ef8610a370cafcaa2448ae78"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dicionario-de-Produtos/Pode-Dizer-Nao-Pode-Dizer.md",
+      "content_hash": "a13f550c22f093b5a4016d0fedcb3fa25db382bf321dbd2dec70be2fde076749"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Dimensao-Canonica-de-Parceiro.md",
+      "content_hash": "31b9ba3cc60fc3d6b4b5463157ece11a1bc22d9be8943718e109e470830515e2"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Falha-Sincronizacao-Meta-Supabase-4Dias-Ago26.md",
+      "content_hash": "f0ca3f735fdf88cf866888b21ed68cf0052c9ee8f0c899fccb0dd338d7d40e9e"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Quebra-de-Medicao-Aquisicao-B2C-Jun26.md",
+      "content_hash": "e49f4c94a9d2376e5c56a8d7e81ae7e404c1fa5912c7268c6e458796e1af932b"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-BRIEFING_OFERTAS_VISA.md",
+      "content_hash": "79fdf6909d12fdfa146a7134e917c32487a5cdc7f4c2649dae8aa7a8b9d49829"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-CLIENTES_ATIVOS.md",
+      "content_hash": "7c75a8fc7cea565f1b5aa1165dba826b2a33d0815fd70a1d80f24d9778141f43"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-MAPA_MCC.md",
+      "content_hash": "d5adbacd3afd2a9fd3cb34f7bc8f7999e5a258b8ec3243d3c2d3566312d5cad7"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_APTOS.md",
+      "content_hash": "81eddeb411cfe94a3de01d3ba343c62d9a3443f5de155417fbfb4a07eb3b4f5e"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_CRUZAMENTO.md",
+      "content_hash": "37b087bfbf2abfca5ddcb309d0ddc51291ba4f9a95a100f6058abc1b01026230"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_ENVIO.md",
+      "content_hash": "6299f035335b3342370ce260977fa3f45055f3793bef861d340ccc2918cc466f"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_FUNIL.md",
+      "content_hash": "8d0a918a0f9921344d31827d5e13bef7b2cf1f7f281d99898ff84ec320ce94d7"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/MOC-SFMC-DEs-e-Automations.md",
+      "content_hash": "adf29ec3fd7fa4c90e0cd60dfb43747ec29e52bffa7a3375588bdc9be27e9a5f"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Supabase-Schema.md",
+      "content_hash": "66724a07f94e4e76ab3c2357961aaffd38234743d19d0ae91066247b836bf328"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Supabase-Visão-Geral.md",
+      "content_hash": "baa398cf675fa03dbe1e75d903a43a865b03ebc395a654886ad7a3c9258f7534"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Templates-Vibe-Revisao-2026/README.md",
+      "content_hash": "7e45e878b8fb4ab919da5365301a6709a1db9ec129d53e8d3c6371cc0f50a5e5"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Templates-Vibe-Revisao-2026/Templates-Vibe-Revisao-2026.md",
+      "content_hash": "8bd93cebc1cf5f5898e41e5d5d34af968b80df788b79c0624c3d21dcc9ec3636"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/Views-Performance.md",
+      "content_hash": "76769b487eb7c8ef7935d03f7588588a790573261bef60a85c045f326ec0a78e"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/activities.md",
+      "content_hash": "35e0edbb41d265a86a79b9bd794e8892581e435454a2d1ec7bb4e439728bde20"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/ad_creatives.md",
+      "content_hash": "84d47e6af1014209c135808254cdabae6f244fcafab0b19b97bf12bb868d085a"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/appsflyer_template_daily.md",
+      "content_hash": "35feb19d6894c8bd3cba749236f7684c9923a892f15a9da0d05456f3958ac8e1"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/b2c_daily_metrics.md",
+      "content_hash": "676c15d2707d154e07e75d6e43483ae172423eab7b4c4054d993582ab302381a"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/campaign_budgets.md",
+      "content_hash": "2abbbcab2281c34b8a3a066829540b4199f4b69b768c7c15254c845983b3b693"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/campaign_context.md",
+      "content_hash": "90bbb4f8f1832cee355c935382afde1ede1e9d81e3461f2ec37e96d2f1276623"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/collection_execution_logs.md",
+      "content_hash": "2295df348a7c8eaf91e6bfc26c5867a3dac7688e13b0013d98fcf0dcda8d9c59"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/collection_queue.md",
+      "content_hash": "631ce45c4e59997601fc2e33af30cca1a644a3f591ed957eeafc9ad370d723df"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/communication_slots.md",
+      "content_hash": "84e1ac3982811b94d0e6dc88f5768e02174f24b36973e593f3cfa0679d20132b"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/communication_templates.md",
+      "content_hash": "d1a3d4ba3c8dca2b4c580fc1a5672185b8fb228432e7bd5c741068a82d14f16a"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/copa_lp_daily.md",
+      "content_hash": "c4ea415f6f8d47d53e8e13a4a7e62a784715c2d70a8b4145f89d166de2d88eeb"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/copa_visa_daily.md",
+      "content_hash": "bc8179819cc187ccac62f922705cd00b6afbea1490f1820431541c455e4d31ba"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/dispatch_descriptions.md",
+      "content_hash": "4909e807a3e4629699a6f6084dc9038b835e2bf8f55715d6699cd6fa1158490e"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/gaas_dinamica_bi_metrics.md",
+      "content_hash": "ffa2b308fb91b4cd6d0c4f30af076cc30b2912b7e9ac6948c8caee92ec7798a4"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/gaas_update_runs.md",
+      "content_hash": "9cbd875306cd84c5bb34a082310a86de06fa817ee4ea9e59db5019aeae418e06"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/goals.md",
+      "content_hash": "feedba0a4c83e0a20b8d7cfb8abe62b1436981bdedabc6ede23c1271ba063095"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/paid_media_budgets.md",
+      "content_hash": "817de02700f701d08eb895c4eb6c3b515f7eff14fc654d1579d0230c3655b30a"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/paid_media_campaign_mappings.md",
+      "content_hash": "b05300b6a7f26e7fc5b89876d66102b05a7a83e20819f6ff7367b33d9e341c98"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/paid_media_insights.md",
+      "content_hash": "97a9f7bf21f1960d21b2e8af378fd99ada47022a9331bfc43b75c85198945e11"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/paid_media_metrics.md",
+      "content_hash": "a3d751f2cbc6a5f87e7fe83fa9094ecce8170234bfd3f4b11038deab7cc36868"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/paid_media_objectives.md",
+      "content_hash": "6fd17b5202b349b3530abdeabd1dd48202ff4bf91ba6f4f97615bca00d52874d"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/paid_media_targets.md",
+      "content_hash": "54eaeaa0695304c095e9fb5366adb05135258958070b78d6cf49312db161b2cf"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/profiles.md",
+      "content_hash": "cd81842f0b8ba1c9cc42ea997d5e0facd10a06a656937749ca1240754fa76d9b"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/rentabilizacao_activities.md",
+      "content_hash": "7a3d64c5507fc4d3439248c62fb2f1b9dc6b3dbac5dfc68876d1e781d352eb54"
+    },
+    {
+      "relative_path": "03-Dimensoes/Bandeiras-Plurix.md",
+      "content_hash": "2546d0a265d3614b05eee6cb9bff2ec13b012d753607946f39b932c20b1524e9"
+    },
+    {
+      "relative_path": "03-Dimensoes/Copa-2026.md",
+      "content_hash": "ccb4ba2f7995d5a6e8cc246ce5b5cee8a6eea6cd2805947380a148fe06bf47bd"
+    },
+    {
+      "relative_path": "03-Dimensoes/Vibe.md",
+      "content_hash": "f517a04db82385fb83e3d39bb0e690a00fdba3b6807ae96e9e2686247b635c44"
+    },
+    {
+      "relative_path": "04-Operacao/AppsFlyer-Tracking-CRM.md",
+      "content_hash": "5a09274d3967de5c22e42a8ae2fb9b72a9f26d1ac56b7b661283336992372011"
+    },
+    {
+      "relative_path": "04-Operacao/Automacao-VDV-Pool-de-Ofertas.md",
+      "content_hash": "cfb3d2207de09541d9c470d94a04590cb79d420db97996667f2393201209b5c5"
+    },
+    {
+      "relative_path": "04-Operacao/Comunicacoes-Pacote-SFMC-Catalogo.md",
+      "content_hash": "f915ee56979ae04d17002af3838e8dcc8f09f9514784c7ffa60eee2a997e677b"
+    },
+    {
+      "relative_path": "04-Operacao/Emails-Dinamicos-Plurix-V11.md",
+      "content_hash": "fc1169851b6287e6c3f253d9e51ffe0d0c9b6c62e49378c89501406d299b071c"
+    },
+    {
+      "relative_path": "04-Operacao/Emails-Dinamicos-Plurix.md",
+      "content_hash": "f687d46d9a9546d9adf679d75bb9b68c2b837a2c6468c2a9040e9ea3ef485691"
+    },
+    {
+      "relative_path": "04-Operacao/Emails-Dinamicos-SFMC.md",
+      "content_hash": "619037944407134510f1a4de210ae675da57decbe6ca7b4dde109a0e73d00fa7"
+    },
+    {
+      "relative_path": "04-Operacao/Emails-Dinamicos-Vai-de-Visa.md",
+      "content_hash": "d744a01037f9e03010d7d1adbc9d83354f4659aae2624895904f47845f26d9ae"
+    },
+    {
+      "relative_path": "04-Operacao/Fabrica-de-Emails-GaaS.md",
+      "content_hash": "ee5bc87f4328975eeeab9e110d0127195834c582b6fbfe888a3a171b76ac8d93"
+    },
+    {
+      "relative_path": "04-Operacao/Ficha-de-Produto-Guia.md",
+      "content_hash": "bf277b5fdbddbc6d0bf10a63103e132e20e9eca31bf1045cabb44101a438920c"
+    },
+    {
+      "relative_path": "04-Operacao/Formatacao-WhatsApp-Variaveis-e-Espacamento.md",
+      "content_hash": "4ecfb25e744b77c9afec6b7f03ffa360e473951bbe6ca46ca6825fb5095785c5"
+    },
+    {
+      "relative_path": "04-Operacao/Plurix-Recencia-Automation-e-Comunicacoes.md",
+      "content_hash": "fbd1c1ae8f405dcfe82844afa20b5928abbc369b5710e2dab6b70c0c2f2b74fc"
+    },
+    {
+      "relative_path": "04-Operacao/SFMC-Package-Manager-e-Pacotes.md",
+      "content_hash": "6051a6bc5995b48dbd3af28d034605a0a7d8e0e73a6db672d1e6ac974beee611"
+    },
+    {
+      "relative_path": "04-Operacao/SFMC-Packs-Fluxos-Vinculos-e-Aprendizados.md",
+      "content_hash": "4cda26585591bf88d6dfafe673defcb290e9dbed0dbbf3e9fe333d36b65ad5e4"
+    },
+    {
+      "relative_path": "04-Operacao/SFMC-Query-Studio-e-SQL.md",
+      "content_hash": "585d9b4fc2cfc8de239bd5b0ade4a95213acbecd06a03b47945cf6dda56dabc6"
+    },
+    {
+      "relative_path": "04-Operacao/SFMC-Salesforce-Marketing-Cloud.md",
+      "content_hash": "81927a51213ac6bb5a35e5f4484e61c36bc102d3c63ca14c0f8d4952ef652d52"
+    },
+    {
+      "relative_path": "04-Operacao/Servico-Emails-Dinamicos.md",
+      "content_hash": "3e451e0e33c4125247ed84546d6a2a7b9d496bd99d88697d2f46b4ccf2b56e26"
+    },
+    {
+      "relative_path": "04-Operacao/WhatsApp-Respostas-de-Opt-out.md",
+      "content_hash": "51bf1cd36a72fc5107ed55550763d5475d9c6d1c3025ec744514aaacd6c59cdf"
+    },
+    {
+      "relative_path": "05-Estrategia/Anti-Overlap-Pressão-de-Contato.md",
+      "content_hash": "9ac859695e50030e506f3e3b91e1a091b786f0c477e64138fee3dc1720d458f6"
+    },
+    {
+      "relative_path": "05-Estrategia/Ativacao-de-Audiencias-Diaria.md",
+      "content_hash": "773ae459fa8b810cf08236d4fef4867aefbe348463fdf37320fd228c892e409e"
+    },
+    {
+      "relative_path": "05-Estrategia/Briefing-e-Regua-de-Aquisicao.md",
+      "content_hash": "a19337ba116b3282459552692908bb3503947aabc3b34ca7483694c6f8ffe66a"
+    },
+    {
+      "relative_path": "05-Estrategia/Deck-Plano-de-Midias-Arquitetura.md",
+      "content_hash": "893a5731215d1fbadc13e89ba84b15a03e1395f7bf23008cbb8f69ee2f793acb"
+    },
+    {
+      "relative_path": "05-Estrategia/Deck-Relatorio-Resultados-Arquitetura.md",
+      "content_hash": "c51e1bcf667c6d322eda87b791c8f35bf58fad5c60e5b1cf37d93d42144d8fb6"
+    },
+    {
+      "relative_path": "05-Estrategia/Estrategia-Bases-Segmentadas-Original-2026-01.md",
+      "content_hash": "3840c959f5f874d4692ace3d100c60e2bc2c71deeb1e76b25dbf70fffea65aaa"
+    },
+    {
+      "relative_path": "05-Estrategia/Estrategia-Multicanal-Vibe-Mar-Fechado.md",
+      "content_hash": "328235622064c3afd75429d76990cecae8178a8edf647205c6464fcb65504963"
+    },
+    {
+      "relative_path": "05-Estrategia/Fabrica-XLSX-TOPO-CRM-3.md",
+      "content_hash": "a92a4072a35ce48e46d8f881bcaa33175e8b1b9d28e497b2c62af853ef1a777c"
+    },
+    {
+      "relative_path": "05-Estrategia/Função-Objetivo.md",
+      "content_hash": "fde12efef711c7d86180f9ad2f6c22d18db3adfa317b40f98f180f7485fc795b"
+    },
+    {
+      "relative_path": "05-Estrategia/Motor-de-Briefing-Automatico.md",
+      "content_hash": "3e47de0e5698a42f9122c215babd8b8eaf82e5c0b88fe634e51d51cced11be0a"
+    },
+    {
+      "relative_path": "05-Estrategia/Ontologia-v2.md",
+      "content_hash": "989b8be82743e236952bf5ab5492e9f3f50f47660501cb2fd2ebe24e6fe853c3"
+    },
+    {
+      "relative_path": "05-Estrategia/Orquestrador.md",
+      "content_hash": "d44f5fc2fea6d705ae3b687e95475e90c8c4815676bdb392d763f5d3045c9f83"
+    },
+    {
+      "relative_path": "05-Estrategia/Plano-de-Midias-Afinz-Vibe-Handoff.md",
+      "content_hash": "790eff6de8db15d06b1a662f2bfb67caa4b92e82665e956f5dfd618090ffa4a5"
+    },
+    {
+      "relative_path": "05-Estrategia/Regua-Vibe-Ativacao.md",
+      "content_hash": "6e4cd08874a7cc142d6b2742d9bef48e601de1ba0978c5677267496f7e82b002"
+    },
+    {
+      "relative_path": "05-Estrategia/Reguas-Inteligentes-Arquitetura.md",
+      "content_hash": "343ddf4d6186867acf998e125fe4d14472275c364944774a1af5f4a935559eb3"
+    },
+    {
+      "relative_path": "05-Estrategia/Report-Live-Arquitetura-Editorial.md",
+      "content_hash": "0c332e10999557d94a533a412d7866769650f0b2cc817ced582dd1a627a351b5"
+    },
+    {
+      "relative_path": "05-Estrategia/Roadmap-Framework.md",
+      "content_hash": "34cfa7e1a1e0836fa36be40c77a3c856236ff174fe931bc405679441b709f54c"
+    },
+    {
+      "relative_path": "05-Estrategia/SFMC-Integracao-API-Roadmap.md",
+      "content_hash": "e11fc1ba660ea28abc2d5de74fe2f38ef075bbf297f27c5b2dd06d762cc7ea42"
+    },
+    {
+      "relative_path": "05-Estrategia/Sistema-de-Experimentacao-Referencias.md",
+      "content_hash": "1a217c2190d271385d8e8690fd0f429d1ec0f68cbfb90350ea96383ac8617d31"
+    },
+    {
+      "relative_path": "05-Estrategia/Teste-Afinidade-MCC-vs-Generico.md",
+      "content_hash": "4cf45cc7fed4715a5bae6cd93695735fa7fee2f0c2809e44b2fc9e48624c75b0"
+    },
+    {
+      "relative_path": "06-Performance/CAC-por-Canal.md",
+      "content_hash": "8f27bf431deee8bf165b3a2eeaf1056c3eb277605ae4bfbe1de0ec2a6db6637a"
+    },
+    {
+      "relative_path": "06-Performance/CPA-por-Plataforma.md",
+      "content_hash": "b2fbe0388749187a86473b9fd28a8c1dd133995d0274b86e9f60315099e4b9ee"
+    },
+    {
+      "relative_path": "06-Performance/Eficiência-de-Criativo.md",
+      "content_hash": "13b3c64c3a0a33d9959ce0505e74c40b549e816cc062a7e86675bc9370f9ed49"
+    },
+    {
+      "relative_path": "06-Performance/Evolução-Temporal.md",
+      "content_hash": "f7237a37840980a8d604a5f46b4a121faf1c7c482e30a8d0cf6ae5c5a41cb25a"
+    },
+    {
+      "relative_path": "06-Performance/Funil-de-Aquisição.md",
+      "content_hash": "a2facd29b1d1b62b5f60564626e384d5a05b6e208cfcf62ed1e51fca926e7b00"
+    },
+    {
+      "relative_path": "06-Performance/KPIs-Núcleo.md",
+      "content_hash": "4bc76837510fe394f9a18ad3fc71044bb29ec930cc08bad60037da881dc8989a"
+    },
+    {
+      "relative_path": "06-Performance/Mapa-de-Oportunidades.md",
+      "content_hash": "64f4da2d66b3f2fb8ffe2dad2ab16fd79e2fbef7b719cff9b66880e9a5eed4bc"
+    },
+    {
+      "relative_path": "06-Performance/Metas-e-CAC.md",
+      "content_hash": "b0283a02a208bb38b45d4a68ade09503b6fcd87ed4bcbf0fb83ef6431ec2a945"
+    },
+    {
+      "relative_path": "06-Performance/Performance-por-Segmento.md",
+      "content_hash": "1f1146a786756df243364838c337d70ca52373c9b199a5d9841c196adce1a544"
+    },
+    {
+      "relative_path": "06-Performance/Serie-Historica-Aquisicao-Mar-Ago-2026.md",
+      "content_hash": "6dec170b6d43b0bb64c75952668ee2958f041a730493347a93880f9672f6f672"
+    },
+    {
+      "relative_path": "06-Performance/Spend-e-Tendência.md",
+      "content_hash": "9bdaf1b1ea106e3b8a3ecbc9f7095451c43ae551bc6cab5ed09b632fd036d834"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-448af753-1fd9-48b9-b5cc-147edafa2b4d.md",
+      "content_hash": "3197141faaef68515793399162ec2ec94935c238fdeb124be12fd01430df369b"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-603a21e6-0164-41d1-9cab-3d9b4421682e.md",
+      "content_hash": "f014440a23e43f9279ec23ef8e02142611b4c47b7c7aa5aa9554b2c68ffb153b"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-B2C-4afee99546.md",
+      "content_hash": "ab5ba1f15cee06b5ec08d1f11638b923c9545a0ee909867753f7f2c2e0fcf9fb"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-B2C-5be9323f8c.md",
+      "content_hash": "b0f71f232e0cccca1d0497cbcc78d490d8c24f03656d19ee9646e7cc7b0a5325"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-B2C-714bdb4ba7.md",
+      "content_hash": "063bae97f8887c265231e7f8d2bdd697d7df7724e710c7f21bef3a1335ac1041"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-19c7aabc26.md",
+      "content_hash": "120524fc95145bc5aa9edd6d773d5fbd0148ccb7bcba3f244b4e2e566a68c1cd"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-26c4728876.md",
+      "content_hash": "ac2105cecccf4edf9af1616345320c416b5f16badf3ca0800586b0997bc25c57"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-304ced246a.md",
+      "content_hash": "29289f0a5cbd0f138f35dee5a855445f854858f61f786c38e6ee70b7c2b11f70"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-4b3ed3a9f6.md",
+      "content_hash": "9fea11f6c4fbb2cee8f5ee48eddb7a80ac8f1ec72610718ddbbb50c0157d6b7d"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-537ddb3562.md",
+      "content_hash": "4f932a15753894fd873a766ec5d950550786bfa1bf8e300aa7932988222df99c"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-847a397519.md",
+      "content_hash": "fc63be9d1f04f792d342bffe6abdfbcb0f011d4dc43d31ed11b479d60791086a"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-9b34c8fcbc.md",
+      "content_hash": "49b243ed981fd749006a03ace649a838bd15218ec52a3ed744678e4922ce000c"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-9e984ee1f5.md",
+      "content_hash": "ae7d55cc4612a67c07fb380bb90444d8a37d6a19078713cbea12f326c748bf3c"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-d604465632.md",
+      "content_hash": "c4205df6ae9ef70120ff2a1c2a05039d596b320176984cd5f3ff259bb8cc9831"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-d7ed98a0d3.md",
+      "content_hash": "798c5f989784c3be9bdbf5cdd6d8e19adb3ab91413e29d6cd42e898618980e81"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-d8718b3973.md",
+      "content_hash": "54f3c0c59d61035747519f4c01f30c3497e46936221ec951e7b810aa09f7ea6f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-COP-ddb36d70fa.md",
+      "content_hash": "1328161b687dd1df9d4a979a97e6f55840adb3df39e4dca2e5cd117fa3477720"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-0104a32e90.md",
+      "content_hash": "ddf104e434b06a05e3b1c0255e2603cbfa9e60215cc23ed97f786f5b2da76127"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-015928e5ba.md",
+      "content_hash": "95ffa6ca5ff6e303a3c393d4b5d9790ae20383468a45563da6d076dd2b1982a9"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-073dcbe686.md",
+      "content_hash": "3c564cea0f1d132a9078c34829a4f149944f1cad13b062e54ccef429c22b6d56"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-24693c62ef.md",
+      "content_hash": "3b16e01b8a50960d3091acb0f306377af5f3f17564da8fa011d7bc6fd91bd1e7"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-2cc364c6bd.md",
+      "content_hash": "986684d1648b6a90217bd12f99580f233655d9b67ede39c57a7f5133e77a46ee"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-3bd920ad5c.md",
+      "content_hash": "4541e945c312f14674c95dd9c2640035217b43418874585a29e3607efcac6d7d"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-4b4cf35f73.md",
+      "content_hash": "938ecc9c4901b6c3c03dfe5de99759e60e4d9b5b78e9e168715c0edadfd98944"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-5eaebf1046.md",
+      "content_hash": "ffc6bf32a4c9b9a9cbc23228271843e52282e6e732c77c2f6e0cafdb570f60be"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-6714bb10d7.md",
+      "content_hash": "c6ded5cd2d343900c52f5bf5d21a72d8d04a4c322fcbdab68d870bb200683726"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-6d4dfb4e59.md",
+      "content_hash": "98aff880a24159eed691568e028a1c1a07b68733c76d95ac943c5aeff6b03d76"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-6e7d329c84.md",
+      "content_hash": "c5052fae921b102d93e8d000eabaadd2fd1e4349fa977d73c20cd9e3c242c7b0"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-798bf8f3a7.md",
+      "content_hash": "bb7c130232e6076b66e571a6d95e05527d8800432a7799677ce50ccec03125e1"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-85fefd8ebc.md",
+      "content_hash": "6f07c6c1ae825e3c8ee98e21178417c5fbdd7e67d449499b12f8dd90142bf209"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-86b77dd1bc.md",
+      "content_hash": "e657ba1f4ebc7db4a940f6d7e818f84feca94ffd3320211c8a649283dafe9842"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-89856bcf7b.md",
+      "content_hash": "afbe6a525d9d3a00f34f4f0fe1ba87a87d49037835e04c66c5656769200f35c3"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-91f6d115db.md",
+      "content_hash": "7e34ea1bfb3ae439719d49741723eb3e02a6d7d4b54f0eb2fe3b998754b6ce5d"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-92fbd40403.md",
+      "content_hash": "b8211afc477d27f5260d9c1843c2850de0a24bd9dd4f308ecdf6a1337cf6abae"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-9475544ed5.md",
+      "content_hash": "4a6702f52fc0e6252fba1407f0a607b659528c1f10f7ddb0e8f510cb23efab5a"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-a695575900.md",
+      "content_hash": "40d8f38e608e0216bf9fae0e6396d47d979ff114c8b7ab3aa593d436d4ba2181"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-ac74764beb.md",
+      "content_hash": "9ce5753ce21c630481b482460ce523c1881f9690620bacafd216850419e1b3a8"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-b34ee27854.md",
+      "content_hash": "798bfd6246d194ecde7aeb5fc998b4ef7803118190ca5c9acc2b485802ee189b"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-b9d196a55b.md",
+      "content_hash": "51e75a90d4b4989d7e42c7661b544c2b586663c034d2df3931a5c4e64388c965"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-bcaf001164.md",
+      "content_hash": "391141679ddb099d4fafa1f86029cc0f9359e7b72a634d364c6af58ad0016f54"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-bdc57e480d.md",
+      "content_hash": "6ef48408f810120a76c892fe116bb99d54e7d1bc86424948c85fe0dfb5363fda"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-beb36081a4.md",
+      "content_hash": "f7d8bddf070d1a93dcf73549e818b83d497443160d4e7e64e74de4f61c6f6723"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-c063e536a7.md",
+      "content_hash": "8d4d24dda23cade79a11c015c1b12947e3315259bf93d929fc23d02dad6ca528"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-cc03a5f98d.md",
+      "content_hash": "13c13a6614931389b8eca629ed3cfd280fc8a53dba06e83ad8b175a945d89758"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-e2dbd0d4bf.md",
+      "content_hash": "8421fbe734178eb2bc031e4986eee0ada7f53aae380c465bae4a052e47517ed8"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-e3353b859a.md",
+      "content_hash": "32e89a342107163e646b3b13c65e728c6f525d85049e1c7b712068492fc880d9"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-e3372078aa.md",
+      "content_hash": "a883df9b53cb0713998ad2ffc4d6d37f039eb84116be0c4aca658863eb6dfc9e"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-e63826e827.md",
+      "content_hash": "fbb7bfba4c15a2d9ab7ab12c1b8982262a5b7d6a58823e3b749617e88f6f9da3"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-f5ee848cf4.md",
+      "content_hash": "1f23e1dd575839bf95973856270d43e610fb81a14c325a5d54d8b07f3ad366f3"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-CRM-f9b25b84df.md",
+      "content_hash": "f6207d11175b8236b4c614499a4edd88ff0685aa96f9ebd9c7e86bc8a796e3a4"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-DOC-51b3cef914.md",
+      "content_hash": "22da7d58247397fede9120f8de85eaf2100b3ac9a16a71c4d397888422285de3"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-DOC-630a24b417.md",
+      "content_hash": "85c08d9563a50fc24e1098fd748ad282adaca3240d6ecd67f6e1f977ebcd326f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-DOC-666bf90687.md",
+      "content_hash": "d11979b60507d3079c66db63993325dc31ffa0542321013a7db31cb362e4696f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-DOC-73261c7af2.md",
+      "content_hash": "b72018f8c2896f4946dadcb982066df2122cf847f54d6745942ba74801bc5903"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-DOC-81a09f4b24.md",
+      "content_hash": "ff02c7f876476508398629d7f3d25cb866d001527c734aeb6616b91d337d9c07"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-DOC-ee94b3fe07.md",
+      "content_hash": "e88b301bf8e85b5a6f8dc8b9af30fb22f2c56baa97e05653d9ab14b8cca50370"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-DOC-fb7dca22d0.md",
+      "content_hash": "409b9810cf596dcb68517482097073ce144ac7a1e8c191a24d8279b0a2b3d0d1"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-FUN-0badd49a28.md",
+      "content_hash": "1de82ef4ea649773f694add50a9fb925236da994da4f772e9f8ab91e7bc9b99e"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-FUN-1bec633c12.md",
+      "content_hash": "4a1e7a3eaa22f1abc43b3ff019228a38b10640f2b314a6e0f510e8187e660a08"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-FUN-2a5d2238d6.md",
+      "content_hash": "c41db44065145d98f13a266b3be9b96bc53e5e99a20487e2adce97edf9ada5e2"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-FUN-639564c9b1.md",
+      "content_hash": "0442128ca729924607db8d594a43c97008152bfada00397953200768731bb462"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-FUN-d0ea18ef02.md",
+      "content_hash": "ef0375f08d569c3a1ef752e60df16731648c79d8d1dc3792b060d312be114d56"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-FUN-d7584129d8.md",
+      "content_hash": "533e0a6281693db1c689bc90543d4010df5a41cfc9bec85cfa7d0c9ecc5d3e0f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-08ed46706f.md",
+      "content_hash": "5a28bd2dd8b3de6493341d51eb3189849f0279b7da64557b12ce6bcdfc07193c"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-0ee73fb55c.md",
+      "content_hash": "fde1ca7a250fdbf3ca8bb13e4e0152387ac563b89fa823fecf76667b6f80f4f5"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-1f0e38c2ce.md",
+      "content_hash": "ea0b38a3825697fdc69d8b5d0aeb793db3aee2e4a2151c1bb858b6453d95e6d4"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-29e899b793.md",
+      "content_hash": "b9c8cf4689372a2265dffc013b855741b9321331777126ecd9b21121de66e938"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-2f93a84e04.md",
+      "content_hash": "8e5fc6b90f0cdc2fb3f2bf1c7a165d71526b7310f2f3f6f866a7807a01aaa881"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-35c8b54f21.md",
+      "content_hash": "7df6cd3e11798d24bf4be983ed89b00c7e271512c5baecb7c976dd5668a6afdd"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-475220bcf5.md",
+      "content_hash": "cab657655e980b81bae2b39f6e198a0a63fda87c834c6a7e0821da12bf70301e"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-540eef7f13.md",
+      "content_hash": "0efbe42750e647918f603ccf59c80557882b82a8807d115cb1cd41ca1ee809b2"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-5ab7fdc52e.md",
+      "content_hash": "40da1da74415e318eb78c7aa0cd8295b10ed5cfd6c2a8191b5ff39a011acbb75"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-99fa712f05.md",
+      "content_hash": "6bc9d5a921961849d541c494716cd7d302e6c47b9c1520dbbfec6b3cae9fea04"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-9bf942ef44.md",
+      "content_hash": "6646c4a2f9c5781ac71c561f178a0c069fbc7aa0976aadf056854dcc6665c32d"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-a3ebf599c4.md",
+      "content_hash": "c65a27754d1ca5b81e5147c5de43e765b621cb378a8f590eff34677abd106c04"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-cacb3c4ddf.md",
+      "content_hash": "300b9a880d8c78dcfe49b7250ffa180501fd70a6decd36f073eeef4a43391ada"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-ce794875a5.md",
+      "content_hash": "6c01fd979cb1c79467ce8b82049eadfbced1dbc32f6b335f87f8d367bbfb34e0"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-dafb201b6b.md",
+      "content_hash": "423f58e16a766184c0079b7f0acfd5949787b41fba172144890a7ed609033cde"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-db53ce3e3e.md",
+      "content_hash": "2c5f08d31ac9d34ec6f7b57e7fcfc9c47bfc2d1fa3be98fd74e2c94273be9fb5"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-e104cd20c5.md",
+      "content_hash": "4f2715d1ea25337db9707514f8e6141488154ce4dff40526746aab10a2981304"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MAP-fc64408131.md",
+      "content_hash": "2598df062bc2d0bbfcbf315a2dcc17112f1864f677ed92a543afa7e62b8a78c2"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-1504cb124b.md",
+      "content_hash": "5bf48a24723bebc5632b273cf7ec75c7cdd82f6b02d05a0866863960aeb8b5a9"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-177efec6eb.md",
+      "content_hash": "be8b3b9e0af54f52cc7cc70bad163aa207c1dd24ecc691aafa5a0daa0506064f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-17ac6dcad3.md",
+      "content_hash": "0daf187160ca2d28d4f4d2ae2e71562bb6816c9f91da7d927bb9811e0a03ba3e"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-1a8e5ee6f6.md",
+      "content_hash": "9adcc57885f27a22e94f1b442d056edb7b6aece23265fc437241831a42f1bc81"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-22e003e36c.md",
+      "content_hash": "ca89b36f88b8f24f410eda4b05bac4ff65596d063c87943428694d3ddc896abf"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-2612783a0e.md",
+      "content_hash": "3fe66cec0288b39ae52a852c8edf20cbc86a41b7a6ff92ab969a9ce803d48b4e"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-2aeaceede0.md",
+      "content_hash": "ce0d2e205ad0c8d9b17049a885eb73df2c237d0e67b53fc425780eab374ddd10"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-38c6bd165e.md",
+      "content_hash": "37665c5dc99c20633af034c3d77c8a8bc0b4c590a559204f3755710e11996c5f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-4e9d64cee0.md",
+      "content_hash": "37347f2af5b0a264d0fb057cb77782e716640ead400090fea3a5582dc03eb4a2"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-4fc930fa38.md",
+      "content_hash": "30f190ad78ecdc94f320088a433810209ac41a8c3544a162aa9eb4f4141c25d9"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-541e83fe93.md",
+      "content_hash": "32d962f4780bd41f89c5a54f6fd72af89b352630a1953133adfd9306fca60247"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-56e21e834a.md",
+      "content_hash": "e9714c8a7ec4205437bbf27c30237d2079fe99fb3cc9de7cb32f03f18cf9dda1"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-5730915745.md",
+      "content_hash": "d216dbd5cf7fa2acac547e5c8225868a3236b960f9ff428d93712cafca29c4a4"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-5b97c12f44.md",
+      "content_hash": "f07ac1d5b7ac39e232635adbc7dbe60876e4b363b0d41934ea950cd273d96dbc"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-63d353d227.md",
+      "content_hash": "9025d4984f225414a994b58bf1abac43390aadb8981f509cf92a8c5aa7ba3cee"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-7edc7f7c5f.md",
+      "content_hash": "6df811e256bfa70d5f7f4786d29af8cdee5cd97b345abfd86ce7ed755d240c20"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-837592a9f9.md",
+      "content_hash": "9e0711d7f3d1ce9da2d4ba0e03a69cf09f61be93e5267315fcbfcf40762e6b73"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-84a1c17afc.md",
+      "content_hash": "820bd2650f9b77c3542b042549627e124fa8f4d5848a6e88d8e1b6fe3686923a"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-86be5fb0f2.md",
+      "content_hash": "0553f91b5d2a3f5190edd43a8b70d7d6eb6e995cd9e64b8ea0e5debb1d9d2e73"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-8c57a3dfcd.md",
+      "content_hash": "927569b01a963015c3845d6cd0dc253330a5a762c989b81002b25c19f0c75c74"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-909cf08aeb.md",
+      "content_hash": "773433037e53ef7a7b41013a510e7445e421ec52e46e7cffa739dc236795cac7"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-94e2f30f00.md",
+      "content_hash": "56c6a02b007306625ad76abab636250a8ab32739b4e12657041319ca13673745"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-9f682ce6e5.md",
+      "content_hash": "a3d18c27e643ac24143cf39f72f2bb47137de3e7bb896244ad0bcde857321533"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-aa8e600ba0.md",
+      "content_hash": "951224de5a705455c61112c21273a39924412a62f6f737c07f4bd1e8858773d0"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-aed91ae096.md",
+      "content_hash": "4f568ac1ce6a027f40c27bcdd8b445cd391bd0de294e2fe344ae6d89858d8af8"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-af1a701f20.md",
+      "content_hash": "123afedfef77213980f940444e5ef8f8c2e06aac0ad73915ab8a86fc93331bb9"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-c3f9d50f7c.md",
+      "content_hash": "4dd4edfd3744eabf9f7fb9a372aadb854ed250aa94d4f2aa525ec0a4d5e3bde1"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-d4b68873cd.md",
+      "content_hash": "67acd82d767f3cffd876c620601639f8c05a04edcf9bbdf0da512376f48e7049"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-MID-e37eedc954.md",
+      "content_hash": "7eb6a672cb6d05e95ac5ed31f6e9aefc09ffc9f899f55536a196435141943085"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-0500aab9d6.md",
+      "content_hash": "4aba549832348904425a4b3000e5945c2ab35ed6b10f76b28339e263f1538570"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-093062a4b8.md",
+      "content_hash": "8266368d8ba9d722f4cfe0839647a26c0699685fcbcc293d16a40a710fb872d7"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-09a331cabd.md",
+      "content_hash": "10453d49c31870d1e3a9e54e42d57fd38b62fea315417dac2aabc23f4b8bac41"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-0a46d97819.md",
+      "content_hash": "44dcbc64e51e0935d85418da2f2c6ea3d5578abb4174363c51a8a4e87b1e323a"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-1565b28c8f.md",
+      "content_hash": "557750f36593a6340ad6d8e502be29fc819049d8d83cba57f8ba00b54dfffb73"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-16761c8a3a.md",
+      "content_hash": "61172837745be0b8eb8962c484d0a696f969448357c8ca54ea95c77a1b2cd6ef"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-1752944e1c.md",
+      "content_hash": "fd6ef129cd649b6a7904ad44731e9420278bd29a50aa932f78bf6a84827b07f9"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-2cbba934fa.md",
+      "content_hash": "b737705d31f4bc1ece205a41f175d3e0b7294aace4537a671a3383ab6cc9b71a"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-2f0e84a868.md",
+      "content_hash": "0ef128710a3d95c5180474701da732202110337b60e6c7a3a49b443b53ec7833"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-328952fe4d.md",
+      "content_hash": "222ec59006ce2a53f13d1890f22a4b35d44a891a6191f51c6a0335309b9d7bd3"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-339eff5a34.md",
+      "content_hash": "a4c055a59c3f8ba6764b83dd4a308c129791a5c4a34eb5dce02a5c3feaa10c36"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-392d973d79.md",
+      "content_hash": "4f3f145c1b96ab070e6a35c35eff1889fdd68f35b9c2908d1d70732d333587eb"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-3d51d00ed6.md",
+      "content_hash": "ae00067d2c134a079166751ff2df9a60501dfdff5c004d4a006216d287d2f445"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-5051e37f02.md",
+      "content_hash": "b1fde7589aa65dd54b7cf558351d48f6f351260c06fa981b97f18401114d5e5d"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-55b43e6e2a.md",
+      "content_hash": "dbddfb7c5cdfbad614ff961398343e48bc71f0af95ae00038a3715c964091331"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-613bd68a2c.md",
+      "content_hash": "0234d6c6258b50bc0302c7180aa28f44f1ef3b20847f5695ffad43233de4ff10"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-63c4e611b8.md",
+      "content_hash": "afe6da2930047b4cb822225211926547d011e6524e01baaab2e6fd032b163823"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-68eae484cf.md",
+      "content_hash": "8592c3fcadd5c338eb6e288f8d3096f44fd727556684864a2b87749800670efc"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-6afea2d2e0.md",
+      "content_hash": "3900ef7d9181583b60c4220691b3a67fb4296b59ea1029eea551be3e46845bae"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-6ca0baf5f3.md",
+      "content_hash": "51b8b9312bba80a9419ff2c22312b32a6e82211d3490fdd020f88bb338ff4fc5"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-77f8f33e8f.md",
+      "content_hash": "931602148ddedd915bdc380d1ab4ff35cb82dab81921cb504205a23bf27fe028"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-7ab8558f4b.md",
+      "content_hash": "ccd749dabeec3cbe68f7ee6c59403c019e6c35cf5ae8cceb90b6bfd1da284b8f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-7b62e804a9.md",
+      "content_hash": "a03ca3b76029e3da43b626d12dd9eff7ec14baad0544f70810681fd6efe9f34c"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-7cfb8b35bf.md",
+      "content_hash": "0c280d8265ea8605a31734418f349ceda1ea17a105016cd922caa88d915ea187"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-7f04768511.md",
+      "content_hash": "1676cc200ca29fcf46bf808c8a699a78a335fc70d6dca2cc73c0fc0a4555f4d7"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-839315987f.md",
+      "content_hash": "eeaf2b0a01bdd5ab741218418df354deb2b91b02b06dd262afc0aaf51d759567"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-8cc1b6d474.md",
+      "content_hash": "e47df70ae3fcc7c9789212dae8b1aec2193680bff1b475524cb6d358dfa215f4"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-929cf587a1.md",
+      "content_hash": "e6b775305ad64833c6e0cb415472078e0bc425eea56281c4ce237666ebcf6d12"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-96f7a0892e.md",
+      "content_hash": "31238b5dfeebb340c06bf5678d4d9bed74946cb9af5640cd73dca7a4117aa4ae"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-9bbaebd866.md",
+      "content_hash": "56959fdbf05026327d25434bdeb104ab8327e980757316431c89e727a1ae5f8f"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-a9cebf447f.md",
+      "content_hash": "f61f55812aaba7a1909015c5483309c445aee42e0dad44a092001272c3a0286c"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-aede134f3d.md",
+      "content_hash": "caf69c7145e9db7efb9850129527587daada30ba3c2765faecffe9ccfdfc292b"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-bc1d462c4c.md",
+      "content_hash": "20d3787d73dba9ac228eebf6cc539bd301cf0452baba275f795f1846e60157ec"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-bda382d827.md",
+      "content_hash": "d57532800f227df7508be1f1a6333502a69300903b1f94afdeccbc0e253c7b15"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-bfa7c5c65b.md",
+      "content_hash": "d2af563552188a0fc6f5b55f460fc2cca1b502b471db5933124cfb949bb9ba0d"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-cafe598fb3.md",
+      "content_hash": "25ebcaa3d9a07dc2c65c267c8b6370802054b83920161ce7ab63a5b4e1caaf02"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-cd4c748d2b.md",
+      "content_hash": "b623e2f7dda8ef129b6709ca633145e5298a25b30dfba75acb8ff81baf864737"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-de7adb7cce.md",
+      "content_hash": "f09e55db485a53732d9e56887c4dcd79e7703cd48a9013a1bd0af6a821fe9909"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-deaef88d25.md",
+      "content_hash": "b0e9d31d13e36f445c1d09eb5af921b3efbab6f85dca540b36c410e0af9f480b"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-e26f566672.md",
+      "content_hash": "5349db4755b620f2239d16760f8d6338dc1f94ec395c12f85d0f86222ae591d0"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-e833be777d.md",
+      "content_hash": "d89a85455c617ab9ea78e7788786997e2c88a8e4acf73bd7f45a50cb66cc3878"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-f73bceeb96.md",
+      "content_hash": "ef1f270074c85ee1637b13fc2fa2df866799bf534b9b0f545739a74c6d93dc89"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-RENT-fcb2005be4.md",
+      "content_hash": "3c1c401d99da06fa7a41a89171f5fd62762aab4250a0058a963c19042532d8af"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-f226c6fb-c322-4b40-ac30-7e8f1731cca8.md",
+      "content_hash": "20bb1eba0a05dab0278bc2efdd7b580abae1dd0ca97054730dcf10fb9f92d1ad"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-024476253fd8.md",
+      "content_hash": "c65100af440910c9417012227208b4d67a799cc8482d892d4b9750a7c46270ea"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-09afa7db922a.md",
+      "content_hash": "24c2dea2f3d89f21690d7edbed9db1b634a1db6d534e549bcb68a7befdad6016"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-0bb04cf1b4dc.md",
+      "content_hash": "c6074a8225fcebc8a86b46094f5514aaa788cdb725d845c4f30c41663b857380"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-0c86e5eb4ace.md",
+      "content_hash": "1ef7a123135a830fb927fe67c7b3058c7fcce1f8cf3aa0632bbb4e84fd250dbd"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-163f687a4476.md",
+      "content_hash": "2ddd45ff5ee18c282accb69da09f3d0c833611470023cc39a6152f11dc88ac53"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-40b44271ae6b.md",
+      "content_hash": "32117819b4a54a5337e973f73b9740b86dcf15216a14684cef82d578d4420874"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-5c9b7f87ad8d.md",
+      "content_hash": "ea9a80cf7f7f82df6870ab4ee0621d653ec8b6f92993c18b63d720bf8a36e1ca"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-8c84d7594bc5.md",
+      "content_hash": "67e8874870e89678e25804f89b15f976a9f439964d0e2934534f335e748142c9"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-bd12f62ae14b.md",
+      "content_hash": "0f4afb480050eda762a79c29c44dec1bb765a14cee9a2119fc0cd1830ed4f416"
+    },
+    {
+      "relative_path": "07-Evolucao/Assunto-meta-name-e299f03e8f65.md",
+      "content_hash": "851c1edca1a3757b73cd1b4f13359deb62362f6d5483146097bff5aecff5054f"
+    },
+    {
+      "relative_path": "07-Evolucao/Auditoria-Jornadas-SFMC-2026-10.md",
+      "content_hash": "be0fa684017a6acfb8be8e0b4550a053f6d1f366a54b428376bf2b68096d2652"
+    },
+    {
+      "relative_path": "07-Evolucao/Catalogo-Analitico-CRM.md",
+      "content_hash": "bb8c516296457b16c215165acdf32d8e7c533fe2e7a0e2fef05862a21acbfd81"
+    },
+    {
+      "relative_path": "07-Evolucao/Catalogo-Analitico-Midia-B2C.md",
+      "content_hash": "066236ca25702311d8bbc533a8d4d3b38e04f98d3bacaa6f3f18eb23c5a9956b"
+    },
+    {
+      "relative_path": "07-Evolucao/Conflitos-de-Fonte-Produtos-2026-08.md",
+      "content_hash": "591f85f10a1912982047928fae0b70b452501c4644959d14b49c87c6ee47f39f"
+    },
+    {
+      "relative_path": "07-Evolucao/Decisões-Abertas.md",
+      "content_hash": "fc76e8453ba7db6f417d2e34e48558b4d4bfae68c6265a776b816f5b6d5f8d88"
+    },
+    {
+      "relative_path": "07-Evolucao/Decisões-Tomadas.md",
+      "content_hash": "f9e15d761ed73829563c28da534db20d9e45b211e38532311d303cafd9534456"
+    },
+    {
+      "relative_path": "07-Evolucao/Evolucao-Cronologica-GaaS-2026-10.md",
+      "content_hash": "566d6e92334f8f738441669df62a6182c1b9f0df180fe2bdba06f1018f5b9ac2"
+    },
+    {
+      "relative_path": "07-Evolucao/Funis-de-Onboarding-GaaS.md",
+      "content_hash": "ddf5d664db36ecc950000107a86124210edb2663c3102bb71dc6f26939e6637b"
+    },
+    {
+      "relative_path": "07-Evolucao/Galeria-de-Templates.md",
+      "content_hash": "f0927b899be24d677dd6e02aefcf987fda0793e3f7afde26405015cf51e4564c"
+    },
+    {
+      "relative_path": "07-Evolucao/Glossário-de-Siglas.md",
+      "content_hash": "b715f4cacc06025d5036d3da017323d79096690ef439d105d02efd2c834add45"
+    },
+    {
+      "relative_path": "07-Evolucao/Governança-de-Dados.md",
+      "content_hash": "14b4d0cccf235168d49263e784e84c582c77c1207352e50df35717e9bef92748"
+    },
+    {
+      "relative_path": "07-Evolucao/Historico-Resultados-B2C.md",
+      "content_hash": "324a14511e9c8ed761289791f592366387ba2e81031c4b79120f989d66efd0bb"
+    },
+    {
+      "relative_path": "07-Evolucao/Historico-Resultados-CRM.md",
+      "content_hash": "708b7e156358bbddf8776a090fe0f14517a3a3956c90b865a08e4159322c9073"
+    },
+    {
+      "relative_path": "07-Evolucao/Historico-Resultados-Midia-Paga.md",
+      "content_hash": "6ce22da28c926612aecd6cf93bf1c97f907ea678d750811d5669e7fe16902d7f"
+    },
+    {
+      "relative_path": "07-Evolucao/Inconsistências-a-Corrigir.md",
+      "content_hash": "701d18c53c2f809d8bdbab0166f9021c1b1f9631c3289a2e2de1a53b4a725dc7"
+    },
+    {
+      "relative_path": "07-Evolucao/Inventario-Operacoes-Growth.md",
+      "content_hash": "59d5cfb8ed4485570717e220026f2d05f2f57d679e6cb65f5d2001476e7038d6"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Acordo-Certo.md",
+      "content_hash": "109eb3f018fb270e189e5ecd35796a3feda265b2aa3982386138889e8c49abf5"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Alvorada.md",
+      "content_hash": "a0254bf73676f78db65504304c402d15e2eca04a75a11c3139fbfada087f938b"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Bem-Barato.md",
+      "content_hash": "24bbeb6b7cdd9ae88dd25cd14a41f9c495fc16fb24aa305ea3b53dd87d1eafb8"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Bom-Pra-Credito.md",
+      "content_hash": "f7fd2c4d6090fff15889e5a71e4bd46b7666c3005e46375739752d5de788ce26"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Dia.md",
+      "content_hash": "9172c0814345f1b8aaba826d3cee7cb6f3199a7ac75699204f1b8aef436f935a"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Plurix.md",
+      "content_hash": "288190b44c0147e2ed276bbdecacb1d4d88e5a07f10be7ae5e9df65b2085a203"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Proprietaria.md",
+      "content_hash": "bb021785be81e3fdf5c9724bc06f68de62b307f833ebdfbca48697c3bda8e16d"
+    },
+    {
+      "relative_path": "07-Evolucao/Parceiro-Serasa.md",
+      "content_hash": "70400989e72efbea57edbf14c18aff4aa0f53ac1ebd6ce1f9a45e122e7c02013"
+    },
+    {
+      "relative_path": "07-Evolucao/Performance-Atividades-e-Fluxo-de-Jornadas.md",
+      "content_hash": "83ba855c354fc6960160f2326a5106645cf94eb91eddf2e6bb074a9df541f950"
+    },
+    {
+      "relative_path": "07-Evolucao/Performance-do-Conteudo-GaaS.md",
+      "content_hash": "3e8aa785af11416bee608819b4eeef8eb252bae290335cadbbcbc80024d2e1e9"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-B2C.md",
+      "content_hash": "89330c49c140c38c154cf4c2a8bece13aec496cb2a8b2b6e6ae7b02705a47d24"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Abandonados.md",
+      "content_hash": "25c47d053947ecd3955fe05f1d5d036a22833ab230af9c9aeaf91a61ad65c1f7"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Aprovados_nao_convertidos.md",
+      "content_hash": "99175925d0aab73c738ff3274dd55c643a0bdeee2452e61d8fa7137fbc2dc67e"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Base_Proprietaria.md",
+      "content_hash": "2720ef8fa5998ee9d865a016c85213ae3c4be4e878d90baf6a897149d67b5ff0"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-CRM.md",
+      "content_hash": "b8a6599a699f075fc3136ea663317b876fefdd030c0c9ede0603311c79254772"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Cartonistas.md",
+      "content_hash": "63db090b9067b91682353e89a4b80fe6dd5c8a85b4c4cf72884c1f9f6e11cfe3"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Instabilidade.md",
+      "content_hash": "7479d5c6808287ec1f767641463f3105d7cb3ac5a3c350828dd9618e5ab8a4d8"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Leads_Parceiros.md",
+      "content_hash": "357707aede689ebfb40106419dcecc31b01a36f457d6f3740ad32126eca0d1ab"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Negados.md",
+      "content_hash": "25db82c5ef55bd12f6de6d74e25a87de98115a9282d587c615f099f9e698422c"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM-Recencia_de_Compra.md",
+      "content_hash": "1da48903b51ce4ad8e1052b71551339d9e0ffc25b13d7c8abe6c3c5fe069c364"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-CRM.md",
+      "content_hash": "6c0ca924cc484cffca3877c533a7a08a5e5e5315d2fac0a954d46a59c9d76384"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-Evolucao-e-Retrospectivas.md",
+      "content_hash": "76c617cf8fba66f27ee18737771ccad70fc8d6cc9d8735fdb68dd5fd6f04fc90"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-Midia-Paga.md",
+      "content_hash": "aef710de4dd7e6a5bbf0f9e9cbb1258c84a10a76580fe1f4a4f7074bba998c6b"
+    },
+    {
+      "relative_path": "07-Evolucao/Resultados-Qualidade-e-Cobertura.md",
+      "content_hash": "6114b70e2082dda476f95c6730018656b9cd5573b96612a536536d026efcd4fd"
+    },
+    {
+      "relative_path": "07-Evolucao/Retrospectiva-Growth-2026-09.md",
+      "content_hash": "adc57200b5fde747f3692fdd4ed4cb7938816bed9d1bfcc38fa16f65128487be"
+    },
+    {
+      "relative_path": "07-Evolucao/Retrospectiva-Mensal-Growth.md",
+      "content_hash": "740db43e228c016f15c05f23f8c75dac885509a576df962637eb68a4a299d2de"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Abandonados.md",
+      "content_hash": "adfe77cdd815f90e1c107704dfbc14dd513cfb6717eb2b2c2917c9ca5ed00a59"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Aprovados-nao-convertidos.md",
+      "content_hash": "577f3461b02a51eb029f87a71fff8885ea36c2f9fa236b11207bfece9249c08e"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Base-Proprietaria.md",
+      "content_hash": "36a47970b3e9b4d425586718ce3b3d26904c4fbf74f9b6db539416477108f123"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-CRM.md",
+      "content_hash": "7cd7b050a41a44ea72c2e0f208dc4275dc699dd6df279c128f5dba59ffcb24cd"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Cartonistas.md",
+      "content_hash": "58b9f63ec4b90e24465111f4d54cb8d763303b72da30bfc478d53690e029e2f8"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Instabilidade.md",
+      "content_hash": "837632205885388d5acf276d653d43b1a2c4f1f8e358bd25245fb6f5edb36fd1"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Leads-Parceiros.md",
+      "content_hash": "03ba546746847d96929a15e277ad3d3177a1a76ca0d5a7b9925d1475ae44aa15"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Negados.md",
+      "content_hash": "bf047505f3c4a5f18e85cc262f7bc2001c15419e9943c98cf636a1ee794e3a98"
+    },
+    {
+      "relative_path": "07-Evolucao/Segmento-Recencia-de-Compra.md",
+      "content_hash": "4813b7bf4c63ec92aa973cb2c9a796959c6838f916508fa158b1908e201d37d8"
+    },
+    {
+      "relative_path": "08-Engenharia/ADR-001.md",
+      "content_hash": "00b99e0ba94ac84864ac192add7690628cfe2860610e2d9a153f3572f5bccc69"
+    },
+    {
+      "relative_path": "08-Engenharia/AppsFlyer-Ingestao-Template-Arquitetura.md",
+      "content_hash": "6421f572fc91a586e609cb9b072cfd21d8f403ede155dc3e681cbae218052aab"
+    },
+    {
+      "relative_path": "08-Engenharia/Backlog-Desenvolvimento-GaaS-Loop-2026-10.md",
+      "content_hash": "8ccf6056bbd68d37cdb5b7758d0f0868303584db8aac98d0ba91a021f8d4c048"
+    },
+    {
+      "relative_path": "08-Engenharia/Como-Trabalhar-SDD-no-GaaS.md",
+      "content_hash": "550ef7d67e88ae573434a3e8401f2da60a417295d0a7401da22fa0ee4356f7fe"
+    },
+    {
+      "relative_path": "08-Engenharia/Export-XLSX-Renta-Copa.md",
+      "content_hash": "13734e12277cedd1eaa9954191868794cc64f69caf8d275a76fa8187fe84ac7c"
+    },
+    {
+      "relative_path": "08-Engenharia/Funil-Onboarding-Arquitetura-e-Ingestao.md",
+      "content_hash": "15f0863d4344d64b5224c767fed69ae516f4e7aa5f37743fe79dd17625979396"
+    },
+    {
+      "relative_path": "08-Engenharia/GaaS-Vault-Library.md",
+      "content_hash": "cd22f30c1ed301dee34adfd7a702ccb274086f2bca5aac0e0f355f9a864e6d53"
+    },
+    {
+      "relative_path": "08-Engenharia/Importador-Segmentacao-Aquisicao-2026-10.md",
+      "content_hash": "507c18fd222af3e0ebd541dcf2f82f10397de8c6318151a7c2e61283a30bc58d"
+    },
+    {
+      "relative_path": "08-Engenharia/MOC-Engenharia.md",
+      "content_hash": "89a2df0e4faf6ad1e710cdbd98298edaadfb2ac5facc6bc5c08f311cdece6ed7"
+    },
+    {
+      "relative_path": "08-Engenharia/Report-Live-Enciclopedia.md",
+      "content_hash": "5b26d1c68421d922501ebfa4b6632eff85f9545585810fa4f4904cb8bc0f9182"
+    },
+    {
+      "relative_path": "08-Engenharia/Report-Live-Publicacao-Assincrona-Supabase.md",
+      "content_hash": "70b9e9638ce217f8bf1fa9d0888a1bcf5c4480ba1aa1f0165e717c5e50d7c037"
+    },
+    {
+      "relative_path": "08-Engenharia/Report-Live-Sheets-Slides.md",
+      "content_hash": "a1ad69c68f575226d34f8dae96a32220a438e27cb5a3f186b8d7d291ff9e5b16"
+    },
+    {
+      "relative_path": "08-Engenharia/Report-Live-Versionamento-e-Publicacao.md",
+      "content_hash": "a04e394b8a8d1a0ea3e2f8b51b1c0d363fd26cde199590615bb3816a02eb134b"
+    },
+    {
+      "relative_path": "08-Engenharia/Skills-e-Disponibilidade-por-IA.md",
+      "content_hash": "42351b2a625e5d2c19373f3949bf467226fbc71fa8f47ca66a362de6a73e0873"
+    },
+    {
+      "relative_path": "08-Engenharia/Testes-e-Tarefas-Quatro-Frentes.md",
+      "content_hash": "70ff3587ddbe0335fc25f0fb2190f340aebd27b83c419ed598108f27174bc865"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Agente-Report-Live-Handoff.md",
+      "content_hash": "4493aef64b4396de9b64fd0671058139f641279c076a18d828fccc1e8a2c58e9"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Agentes-e-Workflows.md",
+      "content_hash": "94d65691cbd704db4097f38ac8e03e0ec0f81b1a4c4d1ea4bf2082e229d84f80"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Auditoria-Contexto-Vault-2026-10-02.md",
+      "content_hash": "0dd77244fa97fabd62934383541f5c6c1130b66bd00895692190d774e1c462ed"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Convenções-do-Vault.md",
+      "content_hash": "058180c7209081b14fa08b162ca64b152d309bcba13a8cd47152fa494e970445"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Dossie-Mestre-Operacao-CRM-Midia.md",
+      "content_hash": "77f7c9b4a98c38ef2e54fec1ae77fa5ab0f4556303da04fa791dd28665ede981"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Estrategia-de-Contexto.md",
+      "content_hash": "43dc788115dd5e922494ea3579afd07ea1ab72936f3cbac3f78d689012d92f24"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Experimento-Agentes-Wiki-2026-10-31.md",
+      "content_hash": "27feaba65f80cb79081cea822427c2cc860c8c2763f82f5054a49d3477b42eac"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Ficha-Tecnica-Growth-e-Auditoria-Report-Live-2026-09.md",
+      "content_hash": "d5e4688b4bf2fd6f10210b03bd17fad789c2e9f4cd7183c2648eb0d510100c05"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Fontes-e-Proveniencia-Growth.md",
+      "content_hash": "450c9c2b098a1b21ba65b69063ed1ac991c7d8c374b4f65a89f3410368ce7902"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/GA4-MCP-Google-Analytics.md",
+      "content_hash": "fb47f7cdac513ad160d1eed7f9cf85e52612a1137096629a77c725e6f06fdfd6"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Inteligencia-Compartilhada-GaaS.md",
+      "content_hash": "0f4b4d5ce58989fd9d2de35f244d2c67d811e0faed9ae91f23453545b49ec94b"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Loop-de-Aprendizado-Growth.md",
+      "content_hash": "23fa10ff698adfc06da22b7c7eef39a57a69676d5b40d89ba4e92cb6abc7fbd6"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/MCP-Visão-Geral.md",
+      "content_hash": "6a4bd2ff98521af82f161b4a2224faa54763d887a8199baf1d1a6d2d30f4cd00"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/MOC-Inteligencia-IA.md",
+      "content_hash": "3148b764f1ce76b7a85be41089aa8c952fc206c38966ff647b5badc512eac5bb"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Motor-de-Agentes-Loop-de-Memoria-2026-10.md",
+      "content_hash": "949d0e4fb31924591f9e880366bbdce7d67a9037e27f409c8982bfe2b87c1168"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Obsidian-MCP.md",
+      "content_hash": "3e5fbd17b54afd59ad8c22cde3bc655afe77b83e729e1cb80ebb844289e62cc7"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Operacao-Fila-Notificacoes-Notas-de-Resultado.md",
+      "content_hash": "4152490fa40059ad1f6349903a50b7c1da0c4e5e6c3b841bada060c1baefef9e"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Padrao-Editorial-Enciclopedia.md",
+      "content_hash": "ed6566bd50c7c7f1e702d79f9ad38f8d8fdb780709dfb61dabf8850cdd7e556f"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Reidratacao-Alerts-Vivo.md",
+      "content_hash": "1dda81b3648c9b9874216b1fb186504f14011149e337f6996cec944a858fb72f"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Report-Live-Loop-de-Outcome.md",
+      "content_hash": "f006be4a942db14c4ebcb6ec77443446c1a425afbcec9aeaff7b3248a174aea6"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Report-Live-V2-Loop-de-Aprendizado-e-Memoria.md",
+      "content_hash": "f520502795789473fc1773181218e1258ea26e3b44b1f4d85be0df94efd87dad"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Report-Live-V4-Growth-Context-Handoff-Codex.md",
+      "content_hash": "cdbbb2809e0edc46cbf6f9fb8ac9d44cf33f9328e5f799f4034cf5f40cf12e79"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Revisao-Claude-Report-Live-V4.md",
+      "content_hash": "cfd6c3980e93d3aff1cb9af7501dccfe191a5550c84748e13360dd63cfe76824"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Roteamento-de-Memoria.md",
+      "content_hash": "5ad18ad369b931933a5ac8ea9283a19dc3315b018bd126b4d059d27020c35768"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Runbook-Vault-Vivo.md",
+      "content_hash": "406e1c996744de07f22eb850695a1f24979628305f55fa89c68797e06e86f863"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills-do-Projeto.md",
+      "content_hash": "ab9ec0cbdcf2706180889fe6e74fea97c069898a774fe14ddff1b450e891ac93"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Catalogo-de-Skills.md",
+      "content_hash": "966e3d7dbb59f34189a2a4eb3a275e80342ce29f9750af4ff27871740b517119"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-afinz-copy-aquisicao.md",
+      "content_hash": "1b3e32dba89bc7d11c46ba394f7a74c8c7c8b8da460194ad3f0a93ac0e8f6bb8"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-afinz-crm-diarizado.md",
+      "content_hash": "bb4374be2caa5c0aff048b7527bc3848534ceaa1e64ae7cc3ed6f4521e2bc23f"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-afinz-pptx-campanha.md",
+      "content_hash": "9682ff907fcc4ec861d858eca6f636b2870034bb99cf90a32bde8e0936e32733"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-afinz-pptx.md",
+      "content_hash": "02ff658557da1a70412348463613a0ab4648a97ac3c9017c80ac979c7d9e3194"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-b2c-originacao-updater.md",
+      "content_hash": "19b9cf9f2f938737db7c01b25fe2037bd52f724a6e2fe563b15df8f09ae184f0"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-copa-crm-parser.md",
+      "content_hash": "dd1bdf206f60f8f565ac41768ff5b022a7915d7f7c32ab3c9528ce3c8a2566dd"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-crm-communication-enricher.md",
+      "content_hash": "39b7f0b38a191a539361e52efa3869f01e469ec3c05a751a5b2d97f2c1a5f6ec"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-crm-dispatch-intelligence.md",
+      "content_hash": "ef5e172e8bd1a65cd2614455b2a30c8a7d42f61d859777cc1f0cabb59c6c3cc1"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-diarizado-pacing.md",
+      "content_hash": "d6c17285acb0647431c49b9168970f9eb77d5007734ab18bf00873ecd033c586"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-emails-dinamicos-sfmc.md",
+      "content_hash": "165bb291b30b080a3c1e51b6dd1c4e44e097e80597ecaaf0ea94900e1e1bbbc5"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-activities-csv-ingest.md",
+      "content_hash": "5cefa7e5175a74b636fb554c135ca6c8bee872810f51cf81283da537f2ba0af0"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-emails-plurix.md",
+      "content_hash": "f8ba4b0d243baf76db45107f6568b450ea4180ca06673d0f8db88df347e1760b"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-funil-aquisicao-ingest.md",
+      "content_hash": "1aac871cb8c439cf53c3e77eb0042032d07a5b3b6956f83ff33a2c5bc5e130cc"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-governanca-comunicacoes.md",
+      "content_hash": "80c6cb001b539e6f1ca399bc0405e30c3bda35a1ad2299ebdb93550dcc68106d"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-growth-context.md",
+      "content_hash": "01aae58c2cfb93ef27ad7c2b3e93cfb2c6025df0e9e0bf2ba3958a91be388647"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-growth-investigation.md",
+      "content_hash": "99c2fb07dac206d63c238cc03ee131c9ad9831c2345527129a8d4f7d8dfc07c6"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-growth-loop-operator.md",
+      "content_hash": "bc663ed6cbe90ae1a1595177ea957dcdd59bd5b6a7cab8d90517b7bd95d7ab01"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-insight-engine.md",
+      "content_hash": "33b62804a339355bdf8267f4e58e1b5024c61e4666bb779bf203d07cdee60b58"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-midia-report.md",
+      "content_hash": "c68f05e67ad3503ddf1622377c801e77158fdc8bb4df3d08dc69e8a9a9eef445"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-momento-disparo.md",
+      "content_hash": "26e1c7809efb5a28fd4e5c77e2f7e299bccc7934531b1bf839dbffa6c66c280e"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-relatorio-xlsx.md",
+      "content_hash": "82e8cd6d96d902e63b760647d0ac3ff4e78ee4b6727f26271d1413b2019cfed2"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-template-reconciliation.md",
+      "content_hash": "ce0cc17109f9e8b28607b1afdc2fd806117a106d7455c435971bbbd02d90b430"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-growth-brain-intelligence-engine.md",
+      "content_hash": "177ab94498433889226f99f20b6d65b3d47a4546b9b86d7cdcdeaf07ad35b788"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-growth-data-quality-monitor.md",
+      "content_hash": "01529ed013a229ffd0ecc98afaddc7f63a5fbcb9f3bb41099bb9832f2a73671f"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-growth-report-operator.md",
+      "content_hash": "b4e90fa5845e3c86a8bf56be211c6de51ac323c3ea293746acb38358e6bd31c8"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-growth-saas-marketing-cloud.md",
+      "content_hash": "3280c0493c1ca2a78af50631679137035ec1735a2be5a8f09307815cb74f528f"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-measurement-attribution-auditor.md",
+      "content_hash": "377358da33780844c9972e7d4ccfbd2e84d7d82e9a1d52791e676db621808de2"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-meta-ads-remote.md",
+      "content_hash": "356788fe9e3d3344472f1f59600e306cc20e2358c98a6669ab37e081dc213085"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-paid-media-campaign-analyst.md",
+      "content_hash": "d514ad04f84c0db97b55cfdc5bd8f1c982e8ea48b6799a734a5c6378fa423690"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-produtos-afinz.md",
+      "content_hash": "98d20490e7d1702296f6371d4dee7138d08455f8a5dddc61ef305fdfee028bde"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-report-live-release-engineer.md",
+      "content_hash": "ef7422aa9a5fc33f69caf2dcd683644445014bb3b70ab0f5a87e7f09d8b0e90f"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-segment-performance-analyst.md",
+      "content_hash": "91b9c43a6696f6d2ea21541d226e5ef04ade04aa29c6b1edfc8215e0af8cffb7"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-sfmc-acquisition-email-designer.md",
+      "content_hash": "013775ba7d885fdc0e141c0d067922889105b8c7bf191a97ab5db9571daccfc5"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-sfmc-jornadas-pacote.md",
+      "content_hash": "f88848cc8509a4ec812705e2eef4a9885a6acf77d93cf57102b94b54ab228e5b"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Skills/Skill-storytellingfiltergaas.md",
+      "content_hash": "5b1ccdc37067a666a80fd6ad2207f786ddc5d7758928bdada65ff0609eafea99"
+    },
+    {
+      "relative_path": "09-Inteligencia-IA/Vault-como-Contexto.md",
+      "content_hash": "45442d7a5a357ffed42744bdb03ab4086fb4c06fbdac5a8845dd48ce99d542cf"
+    },
+    {
+      "relative_path": "10-Resultados/Dominios/Dominio-CRM-Aquisicao.md",
+      "content_hash": "0a7a3da36ad3288e5fdd4020958d2287cecc4d5567365e021339058f554830c7"
+    },
+    {
+      "relative_path": "10-Resultados/Dominios/Dominio-Midia-Paga.md",
+      "content_hash": "58d59706e24d91c4395c6f0c294921fff170b9af9c6e81d6ee8892aaac08391a"
+    },
+    {
+      "relative_path": "10-Resultados/Dominios/Dominio-Originacao-B2C.md",
+      "content_hash": "1626ed4f8aa521c1064b09c10f65b9c6682ef3bb3801e01e16db70a4c0050114"
+    },
+    {
+      "relative_path": "10-Resultados/Dominios/Dominio-Rentabilizacao.md",
+      "content_hash": "c444edd6f8dfbcea0cdc14e6bb11b87cf6cc70fd7b6549feec258ee98982283e"
+    },
+    {
+      "relative_path": "10-Resultados/Iniciativas/Iniciativa-Copa-2026.md",
+      "content_hash": "ba647d495915c8a95355a7edbc61d3275b1282c4af7df5f043275ee54da7c8bb"
+    },
+    {
+      "relative_path": "10-Resultados/Iniciativas/Iniciativa-Pool-de-Ofertas-Parceiros.md",
+      "content_hash": "cd07bcab99ae8dad8e2a96d87a079325871c430f1506e6dfc9ec3ee686120ff1"
+    },
+    {
+      "relative_path": "10-Resultados/Iniciativas/Iniciativa-Pool-de-Ofertas-Vai-de-Visa.md",
+      "content_hash": "0b73a960c1b6ebf4523cfb848831a5dde16974f58878b95e81ff43a742d5131f"
+    },
+    {
+      "relative_path": "10-Resultados/Mecanicas/Ativacao-e-Boas-Vindas.md",
+      "content_hash": "49da7e08d97f12411628751d681b328c4d33cf2bc01f17460d4c036bd0136845"
+    },
+    {
+      "relative_path": "10-Resultados/Mecanicas/Comunicados-e-Testes.md",
+      "content_hash": "3a3068bf1604bb126eaf77a2bd154fd15dfffc62d5b3af4b28bff02e82944e1d"
+    },
+    {
+      "relative_path": "10-Resultados/Mecanicas/Credito-e-Investimento.md",
+      "content_hash": "675ab2b3bf027af3bab4290d10fff4153761f05af516faf59ad57be1a2f32076"
+    },
+    {
+      "relative_path": "10-Resultados/Mecanicas/Incentivo-ao-Uso.md",
+      "content_hash": "180ef2635d8d8aca1155e1615e5dda5e76d8d0d77cfd9f93aa6ed5d4735debd3"
+    },
+    {
+      "relative_path": "10-Resultados/Mecanicas/Reativacao-e-Datas.md",
+      "content_hash": "a1ee667834b435d715cd9be12ab74acadf0281e1869f987854de03e48b553e50"
+    },
+    {
+      "relative_path": "10-Resultados/Mecanicas/Seguros.md",
+      "content_hash": "23326a28a032e1d4fd1118f75dbba70fdac5c526d143b666d1c95eae6840b313"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Acordo-Certo.md",
+      "content_hash": "1dc94b01a659c0f305439990dba7e09c6eaab52395935529fef7448df73794a2"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Alvorada.md",
+      "content_hash": "547ca3f775771a90cb66ce985b4dd01d3b1fec1fed2c13bd6e79cca9a41896b9"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Bem-Barato.md",
+      "content_hash": "b8b57b82ee2341412717cd7a467ac79b3e00b0b2c6290ebbf209a1dd8d46b3c1"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Bom-Pra-Credito.md",
+      "content_hash": "0ac48059e89afda0b05056f449b0536b6a5ff0a8b3693ec36f1ea26cfa3eb5ef"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Dia.md",
+      "content_hash": "2e68843fe8d6ff318daf06dc2c91768829219cd59694a9863c90dcbdf4055c58"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Plurix.md",
+      "content_hash": "3dda38e628c1f5cfd366280f1a485b2dbf429c1c9dcd8ed67b9d06dc0af0c02c"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Proprietaria.md",
+      "content_hash": "4193e8085a4e1e12a9518e0c26bafd97eb40e4e0bdf61920f6a9e6f896bbe244"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Serasa.md",
+      "content_hash": "99ebd9b03f2b6bc3882b26695893ad33b3be3780bf16b7fd6a939641e23e290d"
+    },
+    {
+      "relative_path": "10-Resultados/Parceiros/Super-Nosso.md",
+      "content_hash": "d941133187f50e9d87598efe564b9a47c081a210d698e317f431c696363e0907"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Carrinho-Abandonado.md",
+      "content_hash": "7f91853403139050720a574d3ed69430cafdc88253584d2e7fdefaacbbafe7ec"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Cartonistas.md",
+      "content_hash": "e45da1177d0353b6cec26c3a6cc9fec49d2c6ce36b6ba3876a30c7044981392a"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Leads-de-Parceiros.md",
+      "content_hash": "cbd58a195c2431ccc12aab04cd803f4d806492314979f0adb40a98db9a7ae045"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Pos-Instabilidade.md",
+      "content_hash": "26bab0ffa7018b545e978b90f6d3f15aa651530423492eb61a1da59c7e41fa23"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Recencia-de-Compra.md",
+      "content_hash": "f0ee8387714a3b8fff88b3331587e22db6421dfb52d48d8c37cee5e1782b3337"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Repescagem.md",
+      "content_hash": "0eadbd1471025020735dc234c04b8b2bfba9a94fa45aeb505d6a13a00641a1a0"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Topo-de-Funil.md",
+      "content_hash": "db6d48074853465e3bef8e8b19b196c5a4f149197d17d1956ba00688a08b7568"
+    },
+    {
+      "relative_path": "10-Resultados/Publicos/Publico-Upgrade.md",
+      "content_hash": "66bb7a00fa1179684fb95e1b9541b41ca8be4835808e9beef3998550f40a7b8c"
+    },
+    {
+      "relative_path": "98-Legado/00-Indice/MOC-Conceitos.md",
+      "content_hash": "4d50f7dd34c58698f8290b22c87e36a9519f63193f6b22798e8ce934a812ef52"
+    },
+    {
+      "relative_path": "98-Legado/02-Entidades-Dados/DE_VDV_BASE_ELEGIVEL.md",
+      "content_hash": "c415130e87f30c6c77fbfc7c63157e728c223a042ac5f165fd36ecf69d5d3771"
+    },
+    {
+      "relative_path": "98-Legado/02-Entidades-Dados/DE_VDV_OFERTAS.md",
+      "content_hash": "e70b1cfddb4d274a5392ff3eaa112faf1b6155f813a21661d144102dea674f23"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/BUs.md",
+      "content_hash": "5da2d0dec0d35b3fda300a538e7ef01cffe584d06bbbc92d13be89031cbce5d5"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Canais.md",
+      "content_hash": "76dee852f4d55e12cb31ef856d7e94de1fcee7e72a1fff88eaaee9ac6bd2ec27"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Criativos.md",
+      "content_hash": "bfd7f43a9ec280aa2eb28e1d11c4ed8bc27a680fb77037aa69dd3fd8d086aab4"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Objetivos-de-Campanha.md",
+      "content_hash": "e5cbb8b175946f4c44293cc99d19a5b6fe59a2fbabc4b026a7d7f24a440b041f"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Ofertas.md",
+      "content_hash": "7fedbcba46a965629fa7038d5f6e50b3c0b730a1b378ed7237a031af75791751"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Parceiros.md",
+      "content_hash": "7ff44550a6a7acf6510fd24d84b9ea783293fdd802f22f2aad32b294991dd49b"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Perfis-de-Crédito.md",
+      "content_hash": "0eea92c51b868d0e6d2675471bf6c3c7c43890fe87b58d6917dc52c4105a3882"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Plataformas-Mídia.md",
+      "content_hash": "f269ccf38ccb133ae9c5a78ad288ae1be25a768759cd24c20a63cb85dda10c05"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Produtos.md",
+      "content_hash": "338dcbd8b63ee6fa298b22952c531ffc94728ab71851550672c4d4889b7752bc"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Segmentos.md",
+      "content_hash": "0f1a3201e5f798499d12e7784653fe21f9bf658f1f463f2719b64119f862b9a2"
+    },
+    {
+      "relative_path": "98-Legado/03-Dimensoes/Subgrupos.md",
+      "content_hash": "2bfd414886f43468332c0c195bf99cb09604c78cc070df3b47721baa0c02f624"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Configurações.md",
+      "content_hash": "811a57958894e64f83586f8c953d68b504f231aff6a65da2d914cd348b9efcbb"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Custos-e-Investimento.md",
+      "content_hash": "b69394dd8d2ed0a00780df3a6bd0d702cede0aa339e677d5c506a2844c8f24a7"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Diário-de-Bordo.md",
+      "content_hash": "ec1cf0f5aabe473625c5521c3e1a9a46e91654ff607cb3b46e94545e419a9411"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Explorador-Avançado.md",
+      "content_hash": "e8fe8419abfe231ce65325c570b5667ec615f3514700a0ea41e914054e54ec58"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/GaaS-9-Áreas.md",
+      "content_hash": "21f22e38c6f5361ab971dc3b7649f3eef9c3a7f654e400599bd994187d1f877b"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Ingestão-de-Dados.md",
+      "content_hash": "0959a437e0270f68a5e1861b12268ffa83f81b361ae7e14e0a6a6c302b6ab050"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Integração-Mídia-Paga.md",
+      "content_hash": "1f3e2ab109edb568dd523b4435755e295a72e9593da59a6ed34c994d66378057"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Jornada-Disparos.md",
+      "content_hash": "2b897ab0a0f8faee8813001e05163179b0d9f98c5d0aba014bf04c0788adb0c1"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Launch-Planner.md",
+      "content_hash": "14f7dd3d43034b638d93475d1fc9af332693095d83c84f25597ab288e58558c2"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Mídia-Analytics.md",
+      "content_hash": "e7bb7d2e360505bdb4a35d95c7b3e30c913bf10755e4cf537bd4d2fcf42f68cf"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/O-que-é-o-GaaS.md",
+      "content_hash": "2e4b90a836ae5faf66891f1161109aba7d80d2d1b2e0fe660e491acdc00472b5"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Orientador.md",
+      "content_hash": "eae3b77c45894bf1942c7ef668d61a19d4cf69657178cb57f95a4b7ea87a58df"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Originação-B2C.md",
+      "content_hash": "efac25a91c8b8d32d27ce2563fd8515c404c3bb6cb5c67e76df20f235ca3cc92"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Pilar-Automação-por-Histórico.md",
+      "content_hash": "a6d0844dbf4395aedeeb368d92bca030a2dd012f3b8fed158b20954354bd782e"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Relatório.md",
+      "content_hash": "29b23e252040598f49b56e48fa5826004d04eaf9e30ef3a03f80e74639f50310"
+    },
+    {
+      "relative_path": "98-Legado/04-Operacao/Resultados.md",
+      "content_hash": "a6799e46dd9ce3f63b4f1def7e7b7b1b9869069cf3380fe46c0acda259d8ccdf"
+    },
+    {
+      "relative_path": "98-Legado/05-Estrategia/Casos-de-Uso.md",
+      "content_hash": "02b447c0a2e3ff419907fe57ba81f5b82751bc9eb145572b67c09985d81a0a77"
+    },
+    {
+      "relative_path": "98-Legado/05-Estrategia/Framework-v1-Diretor.md",
+      "content_hash": "47f50e39feb2e95b68f21697ea287f8f0845180bf80cdad571e802aa08059845"
+    },
+    {
+      "relative_path": "98-Legado/07-Evolucao/Entidades-v2.md",
+      "content_hash": "9af03d0308009a68edc4586bc519ff3c83c8a8092e94f42e152f99a998a9e72f"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Arquitetura-Geral.md",
+      "content_hash": "33150a79d6d28876faa76b3deafdd0398c2c5b8011dcb21b04be897b821e35df"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Camada-de-Serviços.md",
+      "content_hash": "11634156415ec981e8be342eb1a4f875467d59ac666d818636fb832256f11156"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Como-Rodar-e-Deploy.md",
+      "content_hash": "94a4f263e9695f74f83af0dcc1c38879498572eb8d11188fc64e7ba31346028b"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Componentes-por-Aba.md",
+      "content_hash": "852689347cc0b2cefa44e5c2f0c93760c112f6b4f96267bd6daa765c0339dbf4"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Convenções-de-Código.md",
+      "content_hash": "3895f4c7dfde8602b97ceccf215af0fcc90a05130e2265f86cda81b8f1878426"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Decisões-Técnicas.md",
+      "content_hash": "f75ae2c33e8121080dfe3a97283ba5251a9a61636346467e08cc2d1b76d35fa0"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Dívida-Técnica.md",
+      "content_hash": "726165f9cf3cc7d3c6b33ada588643129f7cc35de10d770f9fcb5e822c99a38f"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Histórico-de-Evolução.md",
+      "content_hash": "9b3c8c5ecaefc6ec7105802cd9ef4c5f6f817e4b501abd0c94c2e2af17145103"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Hooks-Catálogo.md",
+      "content_hash": "bd4cada47b1506cfd6b710bede1ddfbe0b0bde825b4c64225a530aa1ea64f620"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Modal-de-Disparo.md",
+      "content_hash": "bfa3123ecd6a09fc500bec8b19cc471575bf3ec2e7e7c57911adc6c122d70e55"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Modelo-de-Estado.md",
+      "content_hash": "202e0d12df3a9fb3ca4b5bb736c223c436f2858db7ffe4adfce9bbbd75c05e71"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Módulo-Paid-Media-Afinz.md",
+      "content_hash": "22b787c1e0b6cd01e83336c584d0cb388b4a77d280b9c95297f259baf5b8edb1"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Pipeline-ML.md",
+      "content_hash": "4be7c9149fa1920bd806aa0ff95dbd5436c51852b399d6fceea46c2d2bf72e37"
+    },
+    {
+      "relative_path": "98-Legado/08-Engenharia/Stack-e-Dependências.md",
+      "content_hash": "6eee19f8ec15cabf721ffc3b8684565b6b02c7ad1bd64ec4ae1a8c5e96b3babf"
+    },
+    {
+      "relative_path": "README.md",
+      "content_hash": "1cf3ff10ab34fdb0903a23da5f217f3e79e080d4421653953528db77333340b7"
+    }
+  ]
+}

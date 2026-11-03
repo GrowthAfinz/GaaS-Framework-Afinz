@@ -38,6 +38,8 @@ function clearContextParams(params: URLSearchParams): void {
   params.delete(CONTEXT_PARAM);
   params.delete('dev_task');
   params.delete('task_view');
+  params.delete('task_space');
+  for (const key of [...params.keys()]) if (key.startsWith('work_')) params.delete(key);
 }
 
 export function isGrowthLearningView(search: string): boolean {
