@@ -31,7 +31,7 @@ para contornar a interrupção.
 - Assets: ícones da biblioteca existente; marca/cabeçalho reais preservados na aplicação.
 - Conteúdo: textos e estados reais diferem dos exemplos ilustrativos; decisões não foram fabricadas.
 
-## O que falta antes de publicar
+## Revisão visual ainda pendente
 
 1. Retomar navegador autorizado e capturar implementação na mesma escala e resolução da referência.
 2. Comparar os dois artefatos juntos e corrigir diferenças P0/P1/P2.
@@ -41,3 +41,12 @@ para contornar a interrupção.
 6. Atualizar documentação da Wiki e publicar após os checks.
 
 final result: blocked
+
+## Publicação autorizada pelo usuário
+
+Pablo respondeu em 03/11/2026: “Publique com os testes atuais e registre a revisão visual como pendente”.
+Essa autorização dispensa a revisão visual como condição desta publicação; não converte o
+resultado visual em aprovado. Build, validação de tipos, contratos e controles de acesso
+continuam exigidos. A revisão visual/interpretativa permanece como acompanhamento posterior.
+
+final result: blocked — visual review pending; release explicitly authorized by user

@@ -72,3 +72,10 @@ A IA pode recuperar contexto, propor próximos passos, identificar lacunas e pre
 contribuições. A interface deve mostrar fontes e distinguir sugestão de decisão registrada.
 Aprendizado só é publicado pela governança existente de propostas da Wiki; o percurso
 visual da iniciativa não promove hipótese a conhecimento validado.
+
+## Direção final de publicação · 03/11/2026
+
+Pablo autorizou publicar com os testes atuais, registrando a revisão visual como pendente.
+A referência permanece o alvo visual; a entrega não alega equivalência pixel a pixel.
+Favoritos são locais por usuário, decisões reais têm registro próprio e a etapa é explícita.
+A ativação dos agentes continua por comando. A autorização não encerra as tarefas macro do Loop.

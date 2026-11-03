@@ -1112,6 +1112,17 @@ O motor desta nota é apenas a camada técnica do produto. A definição complet
 - O SQL **não grava ofertas por CPF**: a regra é fixa (grupo + versão + limite), então o que cada cliente viu é reconstruível pela `ID_VERSAO_OFERTAS` da [DE-VDV_ENVIO](dados.md#de-vdv_envio).
 - A LP recebe o `ID_ENVIO` (aleatório) no link, nunca o CPF.
 
+### Template dinâmico v1 (03/11/2026, fim do dia)
+
+- Referências do Marketing: "KV E-mail Black Afinz 2026 - v1 persona" (ID 191865) e "- v2 cartão"; diferem só no hero.
+- Arquivo `VDV_BF26_Template_Dinamico.html`: toda a lógica no 1º bloco `%%[ ]%%` (lookup, vigência, variáveis `@C1…@C3`); o corpo usa só `IF` e `v()`, porque a prévia da Fábrica não executa `FOR`/lookup no corpo (`ampscript/renderer.ts`).
+- Nome: `FIRST_NAME` da [DE-VDV_ENVIO](dados.md#de-vdv_envio) com `ProperCase` e saudação sem nome quando vazio (o HTML de referência usava `%%PRI_NOME%%`, que não existe na DE de envio).
+- Assunto e pré-cabeçalho: propriedades do e-mail com `%%=v(@Assunto)=%%` e `%%=v(@PreHeader)=%%`, lidos de [DE-BRIEFING_OFERTAS_VISA](dados.md#de-briefing_ofertas_visa) → validar no Test Send.
+- Cada card tem link (logo + "Aproveitar ›") com `RedirectTo` e alias `VDV_<versão>_<grupo>_P<posição>_<ID_OFERTA>` para medir clique por marca e posição. Os cards de referência não tinham link.
+- Bloco "Condições das ofertas" em texto vivo com `NOTA_CONDICOES` (inclui "Beba com moderação" da Evino).
+- Vitrine sem oferta vigente: o cliente é pulado (`RaiseError` com skip), nunca recebe e-mail vazio.
+- Pendente: foto + logo das 12 marcas no Content Builder (só oBoticário tem, vindo do HTML de referência).
+
 As seções abaixo registram o desenho inicial (6 slots, reservas); a mecânica de reserva volta quando o pool crescer.
 
 ## Por que o contrato de 36 colunas não resolve sozinho

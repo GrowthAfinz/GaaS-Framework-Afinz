@@ -11,18 +11,18 @@
 3. Carregue só as outras camadas que a tarefa toca, pela coluna "Quando carregar".
 4. Estes arquivos são derivados. A fonte canônica é a nota no vault: corrija lá e recompile.
 5. Número com 📊 é snapshot datado. Antes de afirmar tendência, confira no Supabase.
-6. Nenhum arquivo aqui passa de 120.000 tokens estimados (decisão D-2 do ADR-001). O arquivo único `docs/AFINZ_GAAS_ONTOLOGY.md` continua sendo gerado por compatibilidade, mas tem ~942.009 tokens: não carregue inteiro.
+6. Nenhum arquivo aqui passa de 120.000 tokens estimados (decisão D-2 do ADR-001). O arquivo único `docs/AFINZ_GAAS_ONTOLOGY.md` continua sendo gerado por compatibilidade, mas tem ~943.424 tokens: não carregue inteiro.
 
 ## Camadas
 
 | Arquivo | Camada | Notas | Tokens (est.) | Quando carregar |
 |---|---|---:|---:|---|
 | [core.md](core.md) | Núcleo: conceitos, dimensões, estratégia e IA | 62 | 63.407 | Primeira camada de qualquer tarefa. Conceitos, dimensões, função-objetivo, regras de proveniência e de memória. |
-| [dados.md](dados.md) | Dados: entidades do Supabase, produtos e performance | 60 | 55.308 | Tarefa que lê ou escreve tabela, cruza métrica, cita produto ou usa snapshot de performance. |
-| [operacao.md](operacao.md) | Operação: SFMC, e-mails dinâmicos e abas do GaaS | 17 | 55.974 | Tarefa de jornada, DE, template, ingestão ou comportamento de uma aba. |
-| [engenharia.md](engenharia.md) | Engenharia: código, arquitetura e Report Live | 15 | 58.287 | Tarefa que muda código, migration, deploy ou o Report Live. |
+| [dados.md](dados.md) | Dados: entidades do Supabase, produtos e performance | 60 | 55.651 | Tarefa que lê ou escreve tabela, cruza métrica, cita produto ou usa snapshot de performance. |
+| [operacao.md](operacao.md) | Operação: SFMC, e-mails dinâmicos e abas do GaaS | 17 | 56.346 | Tarefa de jornada, DE, template, ingestão ou comportamento de uma aba. |
+| [engenharia.md](engenharia.md) | Engenharia: código, arquitetura e Report Live | 15 | 58.884 | Tarefa que muda código, migration, deploy ou o Report Live. |
 | [ia.md](ia.md) | IA e aprendizado: loop, Report Live, Dossiê Mestre e conectores | 55 | 80.949 | Tarefa sobre o loop de Aprendizado e Memória, Report Live, motor de insights ou conectores (GA4, MCP). |
-| [evolucao.md](evolucao.md) | Evolução: decisões, governança, catálogos e changelog | 16 | 46.220 | Tarefa que precisa de decisão aberta ou tomada, inconsistência de dado, glossário ou histórico do vault. |
+| [evolucao.md](evolucao.md) | Evolução: decisões, governança, catálogos e changelog | 16 | 46.336 | Tarefa que precisa de decisão aberta ou tomada, inconsistência de dado, glossário ou histórico do vault. |
 | [resultados-1.md](resultados-1.md) | Resultados: histórico, segmentos, parceiros e retrospectivas | 36 | 84.946 | Tarefa que lê resultado passado de CRM, B2C ou mídia, ou fala de um segmento ou parceiro. |
 | [resultados-2.md](resultados-2.md) | Resultados: histórico, segmentos, parceiros e retrospectivas | 10 | 81.044 | Tarefa que lê resultado passado de CRM, B2C ou mídia, ou fala de um segmento ou parceiro. |
 | [resultados-3.md](resultados-3.md) | Resultados: histórico, segmentos, parceiros e retrospectivas | 14 | 72.219 | Tarefa que lê resultado passado de CRM, B2C ou mídia, ou fala de um segmento ou parceiro. |
@@ -259,7 +259,7 @@ Notas geradas `Assunto-*` não são listadas uma a uma: abra o arquivo `assuntos
 - [Report-Live-Sheets-Slides](engenharia.md#report-live-sheets-slides) · engenharia · 2026-07-08 · confirmado
 - [Report-Live-Versionamento-e-Publicacao](engenharia.md#report-live-versionamento-e-publicacao) · engenharia · 2026-09-23 · producao-v1
 - [Skills-e-Disponibilidade-por-IA](engenharia.md#skills-e-disponibilidade-por-ia) · engenharia · 2026-10-30 · confirmado
-- [Testes-e-Tarefas-Quatro-Frentes](engenharia.md#testes-e-tarefas-quatro-frentes) · especificacao · 2026-11-03 · implementacao-em-validacao
+- [Testes-e-Tarefas-Quatro-Frentes](engenharia.md#testes-e-tarefas-quatro-frentes) · especificacao · 2026-11-03 · implementado-revisao-visual-pendente
 
 ### 09-Inteligencia-IA
 

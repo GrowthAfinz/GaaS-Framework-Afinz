@@ -1279,6 +1279,22 @@ Junho recebeu 57% mais verba e entregou menos lead — sinal de teto de audiênc
 
 `ID_VERSAO` · `CD_GRUPO` · `NR_POSICAO` · `ID_OFERTA` · `NM_MARCA` · `URL_LOGO` · `TX_PREFIXO` ("até") · `TX_VALOR` ("15%") · `TX_SUFIXO` ("OFF") · `DS_COMPLEMENTO` ("em todo o site") · `DS_MARCA` (descrição curta) · `COR_DESTAQUE` (cor da marca no valor, hex) · `TP_RESGATE` (CUPOM / LINK / PAGAR_COM_VISA) · `CD_CUPOM` · `URL_CTA` · `NOTA_CONDICOES` · `VL_LIMITE_EXIGIDO` · `DT_INICIO` · `DT_FIM` · `FL_ATIVA`. Recomendado tornar `NM_MARCA`, `TX_VALOR` e `URL_CTA` obrigatórios (card quebrado é recusado no import).
 
+**Campos acrescentados em 03/11/2026 (7, total 27)** para o template dinâmico (card híbrido + envelope):
+
+| Campo | Tipo | Uso |
+|---|---|---|
+| `URL_FUNDO` | Text 500 | foto da marca atrás do card (1200×300, exibida 600×150, foto nos 35% da esquerda) |
+| `URL_CARD` | Text 500 | opcional: arte inteira do card; preenchida, substitui o card híbrido |
+| `ALT_CARD` | Text 200 | texto alternativo da arte inteira |
+| `TX_ASSUNTO` | Text 150 | assunto do e-mail (envelope) |
+| `TX_PREHEADER` | Text 200 | pré-cabeçalho (envelope) |
+| `URL_HERO` | Text 500 | imagem do topo (KV) |
+| `ALT_HERO` | Text 200 | alt do hero |
+
+Envelope (assunto, pré-cabeçalho, hero) é **repetido em todas as linhas** da versão; o template lê da 1ª linha da vitrine. Isso permite assunto por grupo no futuro, mas no 1º teste fica igual em todos os grupos para não confundir a leitura SEG-A × SEG-B.
+
+**Card híbrido (decisão de 03/11/2026):** foto e logo da marca são imagens no Content Builder (ativos perenes, reaproveitados entre safras); valor, complemento, cupom e CTA são texto vindo da DE. Arquivo da versão: `BRIEFING_OFERTAS_VISA_BF26_V1.csv`. Evino usa o cupom `VISA1` (frete grátis na 1ª compra); `VISA2` fica fora.
+
 ## O pool de ofertas
 
 As ofertas são tratadas como **um pool único priorizado**, não como vitrines independentes:
