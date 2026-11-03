@@ -5,7 +5,7 @@
   "notes": [
     {
       "relative_path": "00-Indice/Changelog-do-Vault.md",
-      "content_hash": "857e7c41f8ae6caf795433bfa36e68b5dff39d7ef57daf5232087f9b36cfc380"
+      "content_hash": "39aa11b571ebbc51d5a0edf43477e2222cfaf1174c308a46cdeb9099f911dbcb"
     },
     {
       "relative_path": "00-Indice/Enciclopedia-Servicos-Growth.md",
@@ -177,7 +177,7 @@
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-BRIEFING_OFERTAS_VISA.md",
-      "content_hash": "79fdf6909d12fdfa146a7134e917c32487a5cdc7f4c2649dae8aa7a8b9d49829"
+      "content_hash": "5f6d65fcf5e489ad3658b1c7dff1b19e61401e068494a0f634ad5dc31c58b366"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-CLIENTES_ATIVOS.md",
@@ -361,7 +361,7 @@
     },
     {
       "relative_path": "04-Operacao/Emails-Dinamicos-Vai-de-Visa.md",
-      "content_hash": "d744a01037f9e03010d7d1adbc9d83354f4659aae2624895904f47845f26d9ae"
+      "content_hash": "91195d9609cd9766acc787a2b7761c12a58e664055562e93fd9581a4190cdf87"
     },
     {
       "relative_path": "04-Operacao/Fabrica-de-Emails-GaaS.md",
@@ -1445,7 +1445,7 @@
     },
     {
       "relative_path": "08-Engenharia/Testes-e-Tarefas-Quatro-Frentes.md",
-      "content_hash": "70ff3587ddbe0335fc25f0fb2190f340aebd27b83c419ed598108f27174bc865"
+      "content_hash": "3806a6f9347b25dbe3e432d899ff05232e17fd0bb0e49ca2bb16758aa7609461"
     },
     {
       "relative_path": "09-Inteligencia-IA/Agente-Report-Live-Handoff.md",

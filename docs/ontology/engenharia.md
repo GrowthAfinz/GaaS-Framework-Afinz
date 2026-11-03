@@ -2724,7 +2724,7 @@ repo, ou ele reimplementa a montagem com `python-pptx` puro.
 
 ## Testes-e-Tarefas-Quatro-Frentes
 
-> **title:** `Testes e Tarefas — quatro frentes de acompanhamento` | **tipo:** `especificacao` | **camada:** `engenharia` | **criado:** `2026-11-03` | **atualizado:** `2026-11-03` | **status:** `implementacao-em-validacao` | **fonte:** `pedido-pablo-e-implementacao-codex-2026-11-03` | **tags:** `gaas, sdd, tarefas, experimentos, crm, visa, loop`
+> **title:** `Testes e Tarefas — quatro frentes de acompanhamento` | **tipo:** `especificacao` | **camada:** `engenharia` | **criado:** `2026-11-03` | **atualizado:** `2026-11-03` | **status:** `implementado-revisao-visual-pendente` | **fonte:** `pedido-pablo-e-implementacao-codex-2026-11-03` | **tags:** `gaas, sdd, tarefas, experimentos, crm, visa, loop`
 
 # Testes e Tarefas — quatro frentes de acompanhamento
 
@@ -2822,6 +2822,37 @@ Registros/Outcomes e integração das partes de Apostas. Não declarar essas fre
 [Como-Trabalhar-SDD-no-GaaS](#como-trabalhar-sdd-no-gaas) · [Backlog-Desenvolvimento-GaaS-Loop-2026-10](#backlog-desenvolvimento-gaas-loop-2026-10) ·
 [Motor-de-Agentes-Loop-de-Memoria-2026-10](ia.md#motor-de-agentes-loop-de-memoria-2026-10) · [Iniciativa-Pool-de-Ofertas-Vai-de-Visa](resultados-2.md#iniciativa-pool-de-ofertas-vai-de-visa) ·
 [Teste-Afinidade-MCC-vs-Generico](core.md#teste-afinidade-mcc-vs-generico)
+
+## Novo padrão: Iniciativas por frentes de negócio · 03/11/2026
+
+Pablo escolheu a proposta visual com navegação lateral por frente, iniciativa e trabalhos no
+centro e contexto da Wiki à direita, renomeada para **Iniciativas por frentes de negócio**.
+O padrão substitui os cabeçalhos repetidos e a lista extensa como entrada principal.
+
+A implementação acrescenta percurso explícito (Contexto, Preparação, Teste/Desenvolvimento,
+Leitura/Verificação, Aprendizado), pergunta orientadora, referências de contexto e registro
+de decisões da iniciativa. Etapa e contexto são versionados; decisões corrigidas preservam
+os registros anteriores. Favorito é preferência local por usuário. Formulários, histórico,
+filtros e quadro anteriores continuam acessíveis sob demanda.
+
+“Preparar próximo passo” abre o trabalho pertinente; “Preparar sessão com os agentes” gera
+briefing revisável para ativação por skill, sem chamar LLM automaticamente. Os agentes não
+aprovam suas propostas por esse botão. Fontes, versões e aprovação da Wiki seguem o contrato
+do [Motor-de-Agentes-Loop-de-Memoria-2026-10](ia.md#motor-de-agentes-loop-de-memoria-2026-10).
+
+O contexto das quatro iniciativas foi preparado a partir das notas canônicas. O Visa está
+em preparação, conforme o desenho e as pendências registrados em
+[Iniciativa-Pool-de-Ofertas-Vai-de-Visa](resultados-2.md#iniciativa-pool-de-ofertas-vai-de-visa). Nenhuma decisão ou venda foi fabricada a partir
+da ilustração. O registro de decisões fica vazio até o operador registrar definições.
+
+Os checks automáticos e testes de contratos são o critério desta publicação. A validação
+visual foi interrompida pela ferramenta de navegação; Pablo autorizou expressamente:
+“Publique com os testes atuais e registre a revisão visual como pendente”. Portanto, a
+revisão visual e de responsividade permanece pendente; não declarar fidelidade de 100%.
+
+Implementação e plano detalhado: PR #67 no repositório GaaS-Framework-Afinz e
+`docs/plans/iniciativas-por-frentes-visao-aprovada.md`. O novo padrão preserva a rota
+`?view=learning&section=investigations`.
 
 
 ---

@@ -13,6 +13,12 @@ fonte: gaas-supabase
 
 ## 2026-11-03 · Testes e Tarefas por frente
 
+- Novo padrão **Iniciativas por frentes de negócio**, escolhido por Pablo: navegação lateral,
+  percurso, contexto, pergunta e decisões versionadas. Ativação dos agentes continua por skill.
+- Publicação autorizada com os testes atuais e revisão visual pendente. Ver
+  [[Testes-e-Tarefas-Quatro-Frentes]]; não representa conclusão dos agentes nem resultado CRM.
+
+
 - [[Testes-e-Tarefas-Quatro-Frentes]]: central com SDD, aquisição, rentabilização e cross-sell;
   iniciativas, formulários por tipo, versões e integração de atenção com a Fila.
 - Contexto Visa incluído na sincronização completa; cadastros de planejamento não afirmam envio ou resultado.

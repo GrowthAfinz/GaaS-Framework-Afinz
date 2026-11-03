@@ -41,7 +41,7 @@ jobs:
       - name: Frontend tests
         run: npm test
       - name: Development backlog and notification contracts
-        run: node --test scripts/test-development-backlog.mjs scripts/test-tasks-four-fronts.mjs scripts/test-wiki-snapshot.mjs
+        run: node --test scripts/test-development-backlog.mjs scripts/test-tasks-four-fronts.mjs scripts/test-wiki-snapshot.mjs scripts/test-initiative-workbench.mjs
       - name: SFMC package ingestion SQL contracts
         run: npm run test:sfmc-package-sql
       - name: Content performance and automatic linkage SQL contracts
