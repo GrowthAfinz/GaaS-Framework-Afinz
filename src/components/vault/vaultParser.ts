@@ -36,7 +36,7 @@ const parseLinks = (markdown: string): VaultLinkInput[] => {
   const links: VaultLinkInput[] = [];
   for (const match of markdown.matchAll(WIKILINK)) {
     const raw = match[1].trim();
-    const [destination, displayText] = raw.split('|', 2);
+    const [destination, displayText] = raw.replace(/\\\|/g, '|').split('|', 2);
     const [target, fragment] = destination.split('#', 2);
     const cleanTarget = normalizeVaultPath(target.trim());
     links.push({
@@ -109,7 +109,7 @@ export const filesFromInput = async (files: FileList): Promise<VaultSourceFile[]
 );
 
 export const rewriteWikilinksForReader = (markdown: string) => markdown.replace(FRONTMATTER, '').replace(WIKILINK, (_full, raw: string) => {
-  const [destination, displayText] = raw.split('|', 2);
+  const [destination, displayText] = raw.replace(/\\\|/g, '|').split('|', 2);
   const label = displayText || destination.split('#').pop() || destination;
   return `[${label}](vault:${encodeURIComponent(destination)})`;
 });

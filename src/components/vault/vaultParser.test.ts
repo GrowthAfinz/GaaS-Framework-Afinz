@@ -31,6 +31,13 @@ Conecta com [[03-Dimensoes/Segmentos#B2C|segmentos prioritários]].`,
     expect(note.content_hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it('resolves escaped wikilink aliases used inside Markdown tables', async () => {
+    const text = String.raw`| [[10-Resultados/Mecanicas/Seguros\|Seguros]] |`;
+    const note = await parseVaultMarkdown({relativePath:'Teste.md',lastModified:1,text});
+    expect(note.links[0]).toMatchObject({target_path:'10-Resultados/Mecanicas/Seguros',display_text:'Seguros'});
+    expect(rewriteWikilinksForReader(text)).toContain('[Seguros](vault:10-Resultados%2FMecanicas%2FSeguros)');
+  });
+
   it('ignores Obsidian internals and templates', async () => {
     const notes = await parseVaultFiles([
       { relativePath: '.obsidian/config.md', text: '# Config', lastModified: 1 },

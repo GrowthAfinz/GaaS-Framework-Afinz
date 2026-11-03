@@ -24,6 +24,11 @@ export async function taskHistory(id:string):Promise<TaskEvent[]>{
 }
 export function taskError(error:unknown):string {
  const message=error&&typeof error==='object'&&'message'in error?String(error.message):String(error);
+ if(message.includes('experiment_design_required'))return 'Complete hipótese, população, alocação, células, versão, métrica, janela, fonte e critério antes de preparar o experimento.';
+ if(message.includes('experiment_reading_required'))return 'Para encerrar o experimento, registre a leitura e uma conclusão, inclusive inconclusiva.';
+ if(message.includes('invalid_work_link'))return 'Revise as referências: use título e endereço https, link interno ou caminho de nota.';
+ if(message.includes('spec_design_required'))return 'Registre comportamento esperado, cenários e verificação antes de executar a especificação.';
+ if(message.includes('experiment_close_required'))return 'Encerre ou cancele o experimento antes de concluir seu acompanhamento.';
  if(message.includes('revision_conflict'))return 'Esta tarefa mudou. Atualize a lista e reabra a tarefa antes de salvar.';
  if(message.includes('dependencies_pending'))return 'Conclua as dependências antes de iniciar a execução ou concluir esta tarefa.';
  if(message.includes('dependency_cycle')||message.includes('invalid_task_dependency'))return 'Revise as dependências: elas precisam existir e não podem formar um ciclo.';

@@ -40,7 +40,7 @@ for (const relativePath of files) {
   const links = [];
   for (const wiki of text.matchAll(wikiPattern)) {
     const raw = wiki[1].trim();
-    const [destination, display] = raw.split('|', 2);
+    const [destination, display] = raw.replace(/\\\|/g, '|').split('|', 2);
     const [target, fragment] = destination.split('#', 2);
     links.push({ ordinal: links.length, raw_target: raw, target_path: target.trim().replaceAll('\\', '/') || null, fragment: fragment?.trim() || null, display_text: display?.trim() || null });
   }
