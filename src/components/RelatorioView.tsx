@@ -1,3 +1,4 @@
+import { ReportWorkspaceHeader, ReportKpiStrip, ReportDeliveryLayout } from './relatorio/ReportWorkspace';
 import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
 import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download, CalendarDays, Files, ArrowDownToLine, Target } from 'lucide-react';
@@ -811,54 +812,12 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     <div className="p-6 space-y-8 max-w-full">
 
       {/* ── PAGE HEADER ── */}
-      <div className="rounded-2xl overflow-hidden shadow-md">
-        <div style={{ background: `linear-gradient(135deg, ${TEAL} 0%, #00A8B0 100%)` }} className="px-8 py-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-white tracking-tight">{rentab ? 'Relatórios | Rentabilização' : 'Relatórios | Aquisição'}</h1>
-                <div className="ml-2 flex rounded-xl border border-white/30 bg-white/15 p-1">
-                  {[
-                    { key: 'performance' as const, label: 'Overview' },
-                    { key: 'daily' as const, label: 'Diário' },
-                    { key: 'monthly' as const, label: 'Mensal' },
-                    { key: 'journey' as const, label: 'Evolução e anomalias' },
-                    { key: 'xlsx' as const, label: 'Relatórios' },
-                  ].map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => setReportMode(option.key)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                        reportMode === option.key
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-white/80 hover:bg-white/15 hover:text-white'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="text-cyan-100 text-sm">
-                {reportActivities.length} disparos analisados
-                {selectedBU ? ` · BU: ${selectedBU}` : ' · Todas as BUs'}
-                {' · '}
-                {segmentoRows.length} segmentos · {canalRows.length} canais
-                <span className="ml-2 opacity-70">· {format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</span>
-              </p>
-            </div>
-            {!rentab && reportMode !== 'xlsx' && reportMode !== 'journey' && (
-              <button type="button" onClick={createContextualBet} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/30 bg-white px-4 py-2.5 text-xs font-black text-cyan-800 shadow-sm transition hover:bg-cyan-50">
-                <Target size={15} /> Criar aposta
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* KPI Summary Strip */}
-        {reportMode === 'performance' && <div className="grid grid-cols-4 divide-x divide-slate-200 bg-white border-x border-b border-slate-200">
-          {(rentab
+      <ReportWorkspaceHeader
+        title={rentab ? 'Relatórios | Rentabilização' : 'Relatórios | Aquisição'}
+        view={reportMode} onViewChange={setReportMode}
+        description={<>{reportActivities.length} disparos analisados{selectedBU ? ` · BU: ${selectedBU}` : ' · Todas as BUs'} · {segmentoRows.length} segmentos · {canalRows.length} canais <span className="ml-2 opacity-70">· {format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</span></>}
+        actions={!rentab && reportMode !== 'xlsx' && reportMode !== 'journey' ? <button type="button" onClick={createContextualBet} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/30 bg-white px-4 py-2.5 text-xs font-black text-cyan-800 shadow-sm transition hover:bg-cyan-50"><Target size={15} /> Criar aposta</button> : null}
+        summaryStrip={reportMode === 'performance' ? <ReportKpiStrip items={(rentab
             ? [
               { label: 'Base Enviada', value: fmtN(segmentoTotal.baseEnviada), current: segmentoTotal.baseEnviada, previous: previousSegmentoTotal.baseEnviada },
               { label: 'Base Entregue', value: fmtN(segmentoTotal.baseEntregue), current: segmentoTotal.baseEntregue, previous: previousSegmentoTotal.baseEntregue },
@@ -871,24 +830,8 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
               { label: 'Aprovados', value: fmtN(segmentoTotal.aprovados), current: segmentoTotal.aprovados, previous: previousSegmentoTotal.aprovados },
               { label: 'Emissões', value: fmtN(segmentoTotal.emissoes), current: segmentoTotal.emissoes, previous: previousSegmentoTotal.emissoes },
             ]
-          ).map(kpi => (
-            <div key={kpi.label} className="px-6 py-3 text-center">
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{kpi.label}</p>
-              <div className="mt-0.5">
-                <MetricValue
-                  value={kpi.value}
-                  current={kpi.current}
-                  previous={kpi.previous}
-                  previousValue={fmtN(kpi.previous)}
-                  align="center"
-                  strong
-                  valueClassName="text-xl text-slate-800"
-                />
-              </div>
-            </div>
-          ))}
-        </div>}
-      </div>
+          ).map(kpi => ({ label: kpi.label, value: <MetricValue value={kpi.value} current={kpi.current} previous={kpi.previous} previousValue={fmtN(kpi.previous)} align="center" strong valueClassName="text-xl text-slate-800" /> }))} /> : null}
+      />
 
       {growthSourceContext && <RelatedGrowthBets context={growthSourceContext} />}
 
@@ -908,7 +851,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           <p className="px-1 text-xs text-slate-500">
             Período <b className="text-slate-700">{format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</b> · aplica-se a todos os relatórios (mensais comparam vs mês anterior).
           </p>
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] lg:items-start">
+          <ReportDeliveryLayout>
           <div className="order-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
@@ -975,7 +918,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
             ))}
           </div>
           </div>
-          </div>
+          </ReportDeliveryLayout>
         </section>
       )}
 

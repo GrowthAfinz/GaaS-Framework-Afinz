@@ -1,3 +1,4 @@
+import { ReportDailyModeControl } from './ReportWorkspace';
 import React, { useMemo, useState } from 'react';
 import { format, subDays } from 'date-fns';
 import { CalendarData } from '../../types/framework';
@@ -104,26 +105,7 @@ export const DailyReportView: React.FC<DailyReportViewProps> = ({ data, selected
           </button>
         )}
 
-        {/* Toggle Diário ↔ Acumulado */}
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          {[
-            { key: false, label: 'Diário' },
-            { key: true, label: 'Acumulado' },
-          ].map((option) => (
-            <button
-              key={String(option.key)}
-              type="button"
-              onClick={() => setAccumulated(option.key)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                accumulated === option.key
-                  ? 'bg-cyan-600 text-white shadow-sm'
-                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <ReportDailyModeControl accumulated={accumulated} onChange={setAccumulated} />
 
         <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Atalho diário</span>
         <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">

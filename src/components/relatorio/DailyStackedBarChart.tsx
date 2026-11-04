@@ -1,3 +1,4 @@
+import { ReportChartPanel } from './ReportWorkspace';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
@@ -247,7 +248,7 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
   }, [lowVolumeZoom.available]);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <ReportChartPanel>
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
           <ColumnsCustomizer
@@ -490,6 +491,6 @@ export const DailyStackedBarChart: React.FC<DailyStackedBarChartProps> = ({ titl
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </ReportChartPanel>
   );
 };

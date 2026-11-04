@@ -5,5 +5,5 @@ import {InsuranceWorkspace} from '/src/components/insurance/InsuranceWorkspace.t
 import '/src/App.css';
 if(!import.meta.env.DEV)throw new Error('Local preview only');
 const packet=await fetch('/artifacts/insurance-local/insurance-snapshot.json').then(r=>r.json());
-createRoot(document.getElementById('root')).render(React.createElement('main',{className:'mx-auto max-w-6xl p-8'},React.createElement('p',{className:'mb-5 text-sm text-amber-800'},'Validação local com cópia das referências. Sem autenticação, gravação ou publicação no GaaS.'),React.createElement(InsuranceWorkspace,{initialPacket:packet})));
+createRoot(document.getElementById('root')).render(React.createElement('main',{className:'min-h-screen bg-slate-50 p-6'},React.createElement('p',{className:'mb-5 text-sm text-amber-800'},'Validação local com cópia das referências. Sem autenticação, gravação ou publicação no GaaS.'),React.createElement(InsuranceWorkspace,{initialPacket:packet})));
 </script></body></html>

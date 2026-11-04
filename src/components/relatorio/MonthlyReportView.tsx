@@ -1,3 +1,4 @@
+import { ReportMonthRangeControl } from './ReportWorkspace';
 import React, { useMemo } from 'react';
 import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 import { CalendarData } from '../../types/framework';
@@ -50,29 +51,7 @@ export const MonthlyReportView: React.FC<MonthlyReportViewProps> = ({ data, sele
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-xs text-slate-400">
-            {selectedBU ? `BU ${selectedBU} · ` : ''}{monthlyTotals.length} mês{monthlyTotals.length !== 1 ? 'es' : ''} no recorte
-          </span>
-          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Atalho mensal</span>
-          <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-            {quickRanges.map((months) => (
-              <button
-                key={months}
-                type="button"
-                onClick={() => applyQuickRange(months)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                  activeQuickRange === months
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
-                }`}
-              >
-                {months}M
-              </button>
-            ))}
-          </div>
-          <span className="text-xs text-slate-400">ou use o período personalizado do topo</span>
-      </div>
+      <ReportMonthRangeControl active={activeQuickRange} onChange={applyQuickRange} caption={<>{selectedBU ? `BU ${selectedBU} · ` : ''}{monthlyTotals.length} mês{monthlyTotals.length !== 1 ? 'es' : ''} no recorte</>} />
 
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
         <MonthlyStackedBarChart

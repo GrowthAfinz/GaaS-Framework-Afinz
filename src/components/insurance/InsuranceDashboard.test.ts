@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { insuranceScorecard } from './InsuranceDashboard';
+import { insuranceScorecard } from './insuranceReportModel';
 import type { InsuranceMetric } from './insuranceCore';
 
 const metric = (product: string, code: string, value: number | null, period = 'window_total'): InsuranceMetric => ({ product, code, value, period, state: value === null ? 'missing' : value === 0 ? 'zero_observed' : 'observed', unit: code === 'digital_cost' ? 'BRL' : 'count', source: 'fixture' });
