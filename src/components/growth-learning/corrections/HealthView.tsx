@@ -3,7 +3,7 @@ import { wikiTopicForNote } from '../../vault/wikiNavigation';
 import {
   daysSince, healthSummary, isGeneratedNote, isOpen, reviewQueue, type FeedbackItem, type ReviewNote, type ReviewRecord,
 } from '../../feedback/feedbackModel';
-import { createFeedback, feedbackError, listNoteReviews, listReviewNotes, noteContent, recordNoteReview } from '../../feedback/feedbackService';
+import { configureHydration, createFeedback, feedbackError, hydrationStatus, isFeedbackAdmin, listNoteReviews, listReviewNotes, noteContent, recordNoteReview, type HydrationStatus } from '../../feedback/feedbackService';
 import { notifyFeedbackChanged, openFeedback } from '../../feedback/feedbackBus';
 
 const date = (value: string | null) => value ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z')) : 'sem data';
@@ -17,6 +17,62 @@ function preview(markdown: string): { text: string; snapshots: string[] } {
     .replace(/\[\[([^\]|]+)\|?([^\]]*)\]\]/g, (_, a, b) => b || a).replace(/\*\*|__|`/g, '').replace(/^>\s?/gm, '')
     .replace(/\n{3,}/g, '\n\n').trim().slice(0, 900);
   return { text, snapshots };
+}
+
+const dateTime = (value: string | null) => value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(value)) : 'nunca';
+
+/** Portão de hidratação: as skills só reidratam os números quando a checagem estiver vencida. */
+function HydrationCard() {
+  const [status, setStatus] = useState<HydrationStatus | null>(null);
+  const [admin, setAdmin] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [days, setDays] = useState('7');
+  const [stale, setStale] = useState('30');
+  const [enabled, setEnabled] = useState(true);
+  const [error, setError] = useState('');
+  const load = useCallback(async () => {
+    const [s, a] = await Promise.all([hydrationStatus(), isFeedbackAdmin()]);
+    setStatus(s); setAdmin(a);
+    if (s) { setDays(String(Math.max(1, Math.round(s.cadence_hours / 24)))); setStale(String(s.stale_after_days)); setEnabled(s.enabled); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  if (!status) return null;
+  const save = async () => {
+    try { await configureHydration(Math.max(1, Number(days)) * 24, Math.max(1, Number(stale)), enabled); setEditing(false); setError(''); await load(); }
+    catch (e) { setError(feedbackError(e)); }
+  };
+  const notes = status.last_result?.stale_notes || [];
+  return (
+    <section aria-label="Hidratação dos números" className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Hidratação dos números</h3>
+          <p className="mt-1 text-sm text-slate-600">As skills do Loop e de Correções só reidratam snapshots quando a checagem vence. Assim não gastam token atualizando à toa.</p>
+        </div>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${!status.enabled ? 'bg-slate-100 text-slate-600' : status.due ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}>
+          {!status.enabled ? 'Pausada' : status.due ? 'Checagem vencida' : 'Em dia'}
+        </span>
+      </div>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
+        <div><dt className="text-xs text-slate-500">Última checagem</dt><dd className="font-semibold text-slate-800">{dateTime(status.last_checked_at)}{status.last_checked_by ? ` · ${status.last_checked_by}` : ''}</dd></div>
+        <div><dt className="text-xs text-slate-500">Próxima checagem</dt><dd className="font-semibold text-slate-800">{status.next_check_at ? dateTime(status.next_check_at) : 'na próxima rodada da skill'}</dd></div>
+        <div><dt className="text-xs text-slate-500">Frequência</dt><dd className="font-semibold text-slate-800">a cada {Math.round(status.cadence_hours / 24) || 1} dia(s)</dd></div>
+        <div><dt className="text-xs text-slate-500">Snapshot vencido após</dt><dd className="font-semibold text-slate-800">{status.stale_after_days} dias{status.last_result?.stale_count !== undefined ? ` · ${status.last_result.stale_count} notas vencidas` : ''}</dd></div>
+      </dl>
+      {notes.length > 0 && <p className="mt-3 text-xs text-slate-600">Mais antigas na última checagem: {notes.slice(0, 5).map(n => `${n.path.split('/').pop()?.replace(/\.md$/, '')} (${n.snapshot})`).join(' · ')}</p>}
+      {admin && !editing && <button type="button" onClick={() => setEditing(true)} className="mt-3 text-xs font-bold text-cyan-800">Reprogramar</button>}
+      {admin && editing && (
+        <div className="mt-3 flex flex-wrap items-end gap-2 text-xs">
+          <label className="font-semibold text-slate-700">Checar a cada (dias)<input value={days} onChange={e => setDays(e.target.value.replace(/\D/g, ''))} className="mt-1 block w-24 rounded border border-slate-300 p-1.5" /></label>
+          <label className="font-semibold text-slate-700">Snapshot vence após (dias)<input value={stale} onChange={e => setStale(e.target.value.replace(/\D/g, ''))} className="mt-1 block w-24 rounded border border-slate-300 p-1.5" /></label>
+          <label className="flex items-center gap-1.5 font-semibold text-slate-700"><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />Ativa</label>
+          <button type="button" onClick={() => void save()} className="rounded bg-teal-700 px-3 py-1.5 font-bold text-white">Salvar</button>
+          <button type="button" onClick={() => setEditing(false)} className="rounded border border-slate-300 px-3 py-1.5 font-bold text-slate-700">Cancelar</button>
+        </div>
+      )}
+      {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
+    </section>
+  );
 }
 
 export function HealthView({ items, onChanged }: { items: FeedbackItem[]; onChanged: () => void }) {
@@ -97,6 +153,8 @@ export function HealthView({ items, onChanged }: { items: FeedbackItem[]; onChan
         <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Geradas por script</p><p className="mt-1 text-2xl font-bold">{summary.generated}</p><p className="text-xs text-slate-500">correção vai para o gerador</p></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Com correção aberta</p><p className="mt-1 text-2xl font-bold">{summary.withOpenItems}</p><p className="text-xs text-slate-500">notas com selo na Wiki</p></div>
       </div>
+
+      <HydrationCard />
 
       <div className="flex flex-wrap items-start gap-4">
         <section aria-label="Revisar próxima" className="min-w-0 flex-[999_1_640px] rounded-xl border border-slate-200 bg-white p-5">

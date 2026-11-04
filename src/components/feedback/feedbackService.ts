@@ -193,3 +193,25 @@ export async function noteHashByPath(path: string): Promise<string | null> {
   const { data } = await supabase.from('gaas_vault_notes').select('content_hash').eq('relative_path', path).is('deleted_at', null).limit(1);
   return (data as { content_hash: string }[] | null)?.[0]?.content_hash || null;
 }
+
+export interface HydrationStatus {
+  enabled: boolean;
+  cadence_hours: number;
+  stale_after_days: number;
+  last_checked_at: string | null;
+  next_check_at: string | null;
+  last_checked_by: string | null;
+  last_result: { stale_count?: number; stale_notes?: { path: string; snapshot: string }[]; note?: string } | null;
+  due: boolean;
+}
+
+/** Portão de hidratação: quando foi a última checagem dos snapshots e quando é a próxima. */
+export async function hydrationStatus(): Promise<HydrationStatus | null> {
+  const { data, error } = await supabase.rpc('gaas_vault_hydration_status');
+  if (error) return null;
+  return data as HydrationStatus;
+}
+
+export async function configureHydration(cadenceHours: number, staleAfterDays: number, enabled: boolean): Promise<void> {
+  must(await supabase.rpc('gaas_vault_hydration_configure', { p_cadence_hours: cadenceHours, p_stale_after_days: staleAfterDays, p_enabled: enabled }));
+}

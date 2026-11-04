@@ -16,7 +16,7 @@ const FILTER_CHIPS: { id: TipoFilter; label: string }[] = [
     { id: 'risco_concentracao', label: 'Riscos' },
 ];
 
-export const InsightDeckModal: React.FC = () => {
+export const InsightDeckModal: React.FC<{ trigger?: 'floating' | 'inline' }> = ({ trigger = 'floating' }) => {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [insights, setInsights] = useState<CrmInsight[]>([]);
@@ -63,7 +63,7 @@ export const InsightDeckModal: React.FC = () => {
             {/* Botão flutuante */}
             <button
                 onClick={() => setOpen(true)}
-                className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-900 text-white pl-4 pr-5 py-3 rounded-full shadow-lg hover:bg-slate-800 hover:shadow-xl transition-all"
+                className={trigger === 'inline' ? "flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-slate-800 hover:bg-slate-50" : "fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-slate-900 text-white pl-4 pr-5 py-3 rounded-full shadow-lg hover:bg-slate-800 hover:shadow-xl transition-all"}
                 title="Abrir Insight Deck"
             >
                 <span className="relative">
