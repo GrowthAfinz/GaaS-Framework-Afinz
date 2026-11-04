@@ -121,6 +121,7 @@ export function ReportTimeSeriesChart({
               {series.map((label, i) => (
                 <Bar
                   key={label}
+                  isAnimationActive={false}
                   dataKey={label}
                   stackId={stackable ? "report" : undefined}
                   fill={REPORT_SERIES_COLORS[i % REPORT_SERIES_COLORS.length]}
