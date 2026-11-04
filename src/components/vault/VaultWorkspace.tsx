@@ -85,7 +85,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const businessFields=analytics?([{key:'bu',label:'BU'},{key:'partner',label:'Parceiro'},{key:'segment',label:'Público'},{key:'stage',label:'Etapa'}] as const).map(field=>({...field,value:analytics.scope[field.key]||[...new Set((analytics.anyOf||[]).map(rule=>rule[field.key]).filter(Boolean))].join(' · ')||[...new Set(variants.map(variant=>variant[field.key]).filter(Boolean))].join(' · ')||reading.context[field.key==='stage'?'stages':field.key]||''})).filter(field=>field.value):[];
   const dataIndex = useWikiDataIndex();
   const noteBindings = dataIndex.bindings.filter(binding => binding.note_id === selected?.id);
-  const insuranceBlock = selected && noteBindings.length ? <WikiDataBlocks key={selected.id} noteId={selected.id} bindings={noteBindings} /> : null;
+  const insuranceBlock = selected && noteBindings.length ? <WikiDataBlocks key={'data:'+selected.id} noteId={selected.id} bindings={noteBindings} /> : null;
   const resultBlock = resultsConfig && selected ? <section id="resultados-vivos" className="my-6 scroll-mt-24" aria-label="Resultados deste assunto"><ResultsWorkspace key={selected.id} embedded={{...resultsConfig,noteId:selected.id}} /></section> : null;
   const openScopedResult=(config:typeof resultsConfig,scope:Partial<ResultsScope>,month:string)=>{
     if(!selected||!config||!resultsConfig)return;
@@ -95,8 +95,8 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
   const changeResultMonth=(month:string)=>{const params=new URLSearchParams(window.location.search);if(validMonth(month))params.set('result_month',month);else params.delete('result_month');window.history.pushState({},'',window.location.pathname+'?'+params+window.location.hash);window.dispatchEvent(new PopStateEvent('popstate'));};
-  const matrixBlock = matrixConfig && selected ? <AudiencePartnerMatrix key={selected.id} config={matrixConfig} variants={variants} month={new URLSearchParams(window.location.search).get('result_month')||''} onMonth={changeResultMonth} onOpen={(scope,month)=>openScopedResult(matrixConfig,scope,month)} /> : null;
-  const listsBlock = listsConfig && selected ? <WikiScopedRecords key={selected.id} config={listsConfig} relativePath={selected.relative_path} noteId={selected.id} operationIds={[listsConfig.scope.operation_id||'',...variants.map(variant=>variant.operation_id||'')]} onOpenRetrospective={(scope,month)=>openScopedResult(resultsConfig,scope,month)} /> : null;
+  const matrixBlock = matrixConfig && selected ? <AudiencePartnerMatrix key={'matrix:'+selected.id} config={matrixConfig} variants={variants} month={new URLSearchParams(window.location.search).get('result_month')||''} onMonth={changeResultMonth} onOpen={(scope,month)=>openScopedResult(matrixConfig,scope,month)} /> : null;
+  const listsBlock = listsConfig && selected ? <WikiScopedRecords key={'lists:'+selected.id} config={listsConfig} relativePath={selected.relative_path} noteId={selected.id} operationIds={[listsConfig.scope.operation_id||'',...variants.map(variant=>variant.operation_id||'')]} onOpenRetrospective={(scope,month)=>openScopedResult(resultsConfig,scope,month)} /> : null;
   // On the new page families, live blocks sit under their own headings; otherwise they keep the legacy position.
   const anchorOf=(ids:string[])=>pageType?reading.sections.find(section=>ids.includes(section.id))?.id||'':'';
   const anchors={result:anchorOf(['resultado-ao-vivo','resultado']),matrix:anchorOf(['por-parceiro','por-publico','publico-parceiro','publico-x-parceiro']),lists:anchorOf(['decisoes-apostas-e-aprendizados','o-que-ja-aprendemos'])};
