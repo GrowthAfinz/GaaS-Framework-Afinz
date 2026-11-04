@@ -5,6 +5,7 @@ import {
   CircleGauge,
   Inbox,
   Library,
+  MessageSquareWarning,
   ListChecks,
   Presentation,
   type LucideIcon,
@@ -21,6 +22,10 @@ import { GrowthFeedView } from "./feed/GrowthFeedView";
 import { GrowthBetsView } from "./bets/GrowthBetsView";
 import { GrowthOutcomesView } from "./outcomes/GrowthOutcomesView";
 import { GrowthMemoryView } from "./memory/GrowthMemoryView";
+import { CorrectionsWorkspace } from "./corrections/CorrectionsWorkspace";
+import { countOpenFeedback } from "../feedback/feedbackService";
+import { onFeedbackChanged, openFeedback } from "../feedback/feedbackBus";
+import { readGrowthLearningItem } from "./growthLearningNavigation";
 const VaultWorkspace = lazy(() =>
   import("../vault/VaultWorkspace").then((module) => ({
     default: module.VaultWorkspace,
@@ -46,6 +51,7 @@ const SECTION_META: Record<
   outcomes: { label: "Outcomes", icon: CircleGauge },
   memory: { label: "Registros", icon: BookMarked },
   vault: { label: "Wiki", icon: Library },
+  corrections: { label: "Correções e melhorias", icon: MessageSquareWarning },
 };
 
 const SECTIONS = GROWTH_LEARNING_SECTIONS.map((id) => ({
@@ -96,6 +102,13 @@ export const GrowthLearningWorkspace: React.FC<
   const [outcomeCount, setOutcomeCount] = useState<number | null>(null);
   const [memoryCount, setMemoryCount] = useState<number | null>(null);
   const [vaultCount, setVaultCount] = useState<number | null>(null);
+  const [correctionsCount, setCorrectionsCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const refresh = () => void countOpenFeedback().then(setCorrectionsCount).catch(() => setCorrectionsCount(null));
+    refresh();
+    return onFeedbackChanged(refresh);
+  }, []);
 
   useEffect(() => {
     const syncSection = () =>
@@ -115,6 +128,7 @@ export const GrowthLearningWorkspace: React.FC<
     if (id === "outcomes") return outcomeCount;
     if (id === "memory") return memoryCount;
     if (id === "vault") return vaultCount;
+    if (id === "corrections") return correctionsCount;
     return null;
   };
 
@@ -151,7 +165,7 @@ export const GrowthLearningWorkspace: React.FC<
           </nav>
         </header>
 
-        {section !== "vault" && section !== "investigations" && (
+        {section !== "vault" && section !== "investigations" && section !== "corrections" && (
           <div className="!mt-0 flex flex-wrap items-center justify-between gap-3 rounded-b-xl border border-t-0 border-slate-200 bg-white px-4 py-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
@@ -173,6 +187,19 @@ export const GrowthLearningWorkspace: React.FC<
                 }
               </p>
             </div>
+            <div className="flex flex-wrap items-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const label = SECTION_META[section].label;
+                const item = readGrowthLearningItem(window.location.search);
+                const types = { feed: "feed_item", "report-live": "report_live", bets: "bet", outcomes: "outcome", memory: "memory" } as const;
+                openFeedback({ surface: section, pageLabel: label, locationLabel: item ? `${label} › item aberto` : label, targetType: item ? types[section as keyof typeof types] : "page", targetId: item || undefined });
+              }}
+              className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-semibold text-cyan-800 hover:bg-cyan-100"
+            >
+              Correção para IA
+            </button>
             {section === "feed" || section === "report-live" ? (
               <label className="text-xs text-slate-600">
                 Período {section === "feed" ? "dos eventos" : "solicitado"}
@@ -201,6 +228,7 @@ export const GrowthLearningWorkspace: React.FC<
                   : "Todos os períodos · filtros próprios abaixo"}
               </span>
             )}
+            </div>
           </div>
         )}
         {section === "investigations" ? <TasksWorkspace initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "feed" ? (
@@ -230,6 +258,8 @@ export const GrowthLearningWorkspace: React.FC<
               <VaultWorkspace onCountChange={setVaultCount} />
             </Suspense>
           </div>
+        ) : section === "corrections" ? (
+          <CorrectionsWorkspace onCountChange={setCorrectionsCount} />
         ) : section === "report-live" ? (
           <section className="space-y-4">
             <ReportLiveCard

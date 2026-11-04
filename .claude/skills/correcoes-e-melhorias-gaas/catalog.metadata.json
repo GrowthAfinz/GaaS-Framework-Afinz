@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "origin": "repo-app",
+  "agents": [
+    "claude-code",
+    "codex"
+  ],
+  "process": [
+    "Loop"
+  ],
+  "owner": "Time GaaS Afinz",
+  "last_validated": null,
+  "packaged_at": "2026-11-04",
+  "compatibility": "Instruções portáveis; execução não validada por ambiente",
+  "license": "Distribuição pública autorizada pelo titular; sem concessão adicional de licença"
+}

@@ -32,6 +32,7 @@ import { usePeriod } from './contexts/PeriodContext';
 import { useBU } from './contexts/BUContext';
 import { endOfMonth, format, startOfMonth, subDays, subMonths } from 'date-fns';
 import { MainLayout } from './components/layout/MainLayout';
+import { FeedbackLauncher } from './components/feedback/FeedbackLauncher';
 import { LaunchPlanner } from './components/launch-planner/LaunchPlanner';
 import PaidMediaAfinzApp from './modules/paid-media-afinz/PaidMediaAfinzApp';
 import { AnimatePresence } from 'framer-motion';
@@ -364,6 +365,7 @@ function App() {
     return (
       <AppErrorBoundary>
         <PaidMediaAfinzApp onBack={() => setTab('launch')} />
+        <FeedbackLauncher />
       </AppErrorBoundary>
     );
   }
@@ -611,6 +613,7 @@ function App() {
         )}
       </div>
     </MainLayout>
+    <FeedbackLauncher />
     </AppErrorBoundary>
   );
 }
