@@ -100,7 +100,8 @@ function updateBrowserSearch(search: string): void {
 }
 
 export function readGrowthLearningItem(search: string): string | null {
-  return new URLSearchParams(search).get('item');
+  const params = new URLSearchParams(search);
+  return params.get('item') || (params.get('section') === 'vault' ? params.get('wiki_note') : null);
 }
 
 export function buildGrowthLearningItemSearch(itemId: string | null, currentSearch: string): string {

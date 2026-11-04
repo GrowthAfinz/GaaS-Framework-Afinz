@@ -102,7 +102,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const anchors={result:anchorOf(['resultado-ao-vivo','resultado']),matrix:anchorOf(['por-parceiro','por-publico','publico-parceiro','publico-x-parceiro']),lists:anchorOf(['decisoes-apostas-e-aprendizados','o-que-ja-aprendemos'])};
   // Blocks without a heading of their own travel with the result block, wherever it is.
   const liveGroup=<>{!anchors.matrix&&matrixBlock}{insuranceBlock}{resultBlock}{!anchors.lists&&listsBlock}</>;
-  const blocksAfter=(id:string)=><>{id===anchors.result&&liveGroup}{id===anchors.matrix&&matrixBlock}{id===anchors.lists&&listsBlock}</>;
+  const blocksAfter=(id:string)=><>{anchors.result&&id===anchors.result&&liveGroup}{anchors.matrix&&id===anchors.matrix&&matrixBlock}{anchors.lists&&id===anchors.lists&&listsBlock}</>;
   const allCount = folders.reduce((sum, item) => sum + item.note_count, 0);
 
   useEffect(() => { onCountChange?.(allCount); }, [allCount, onCountChange]);

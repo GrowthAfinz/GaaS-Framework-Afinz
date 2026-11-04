@@ -17,6 +17,11 @@ import {
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
+  it('opens a report-linked Wiki note without treating that note as a feed item', () => {
+    expect(readGrowthLearningItem('?view=learning&section=vault&wiki_note=insurance-note')).toBe('insurance-note');
+    expect(readGrowthLearningItem('?view=learning&section=feed&wiki_note=insurance-note')).toBeNull();
+    expect(readGrowthLearningItem('?view=learning&section=vault&wiki_note=old-note&item=current-note')).toBe('current-note');
+  });
   it('does not carry a development task into an existing CRM investigation link', () => {
     const params=new URLSearchParams(buildGrowthLearningSectionItemSearch('investigations','crm-1','?view=learning&section=investigations&dev_task=dev-1&task_view=development'));
     expect(params.get('item')).toBe('crm-1');
