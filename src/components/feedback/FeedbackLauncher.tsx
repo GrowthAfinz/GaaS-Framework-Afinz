@@ -15,11 +15,25 @@ const correctionsHref = () => {
   return `${window.location.pathname}?${params}`;
 };
 
-function describeElement(element: Element): { text: string; label: string } {
+const clean = (value: string | null | undefined) => (value || '').replace(/\s+/g, ' ').trim();
+const shorten = (value: string, max = 60) => value.length > max ? value.slice(0, value.lastIndexOf(' ', max) > 20 ? value.lastIndexOf(' ', max) : max).trim() + '…' : value;
+
+/**
+ * Rótulo curto do ponto marcado: nome acessível, título do bloco (ou do bloco pai) ou a primeira linha.
+ * O texto completo continua indo como trecho citado (anchor.exact), não como localização.
+ */
+export function describeElement(element: Element): { text: string; label: string } {
   const html = element as HTMLElement;
-  const text = (html.innerText || html.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 300);
-  const named = html.getAttribute('aria-label') || html.getAttribute('title') || '';
-  const label = (named || text || element.tagName.toLowerCase()).slice(0, 80);
+  const text = clean(html.innerText || html.textContent).slice(0, 300);
+  const named = clean(html.getAttribute('aria-label') || html.getAttribute('title'));
+  const ownHeading = html.matches('h1,h2,h3,h4,h5,h6') ? html : html.querySelector('h1,h2,h3,h4,h5,h6');
+  let heading = clean(ownHeading?.textContent);
+  for (let node = html.parentElement; !heading && node && node !== document.body; node = node.parentElement) {
+    const candidate = node.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > header h1, :scope > header h2, :scope > header h3');
+    heading = clean(candidate?.textContent);
+  }
+  const firstLine = clean((html.innerText || '').split('\n').find(line => line.trim()));
+  const label = shorten(named || heading || firstLine || element.tagName.toLowerCase());
   return { text, label };
 }
 
