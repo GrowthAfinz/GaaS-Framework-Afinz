@@ -98,3 +98,21 @@ test('renaming keeps the old name as alias for workspaces and initiatives',async
   await as(other);await assert.rejects(one('select growth_rename_workspace($1,$2) r',['sdd','Outro nome']),/access_denied/);
  }finally{await db.close();}
 });
+test('hydration gate: due on first run, records date and time, reprogrammable, only admin or agent writes',async()=>{
+ const {db,as,one}=await setup();try{
+  await db.exec(migration('_vault_hydration_gate.sql'));
+  await as(other);
+  const first=(await one('select gaas_vault_hydration_status() s')).s;assert.equal(first.due,true);assert.equal(first.cadence_hours,168);
+  await assert.rejects(one('select gaas_vault_hydration_record($1) r',['{"stale_count":3}']),/admin_required/);
+  await as(admin);
+  const rec=(await one('select gaas_vault_hydration_record($1,$2) r',['{"stale_count":3}','claude-code'])).r;
+  assert.ok(rec.last_checked_at);assert.equal(rec.last_result.stale_count,3);
+  assert.equal((await one('select gaas_vault_hydration_status() s')).s.due,false);
+  const conf=(await one('select gaas_vault_hydration_configure($1,$2,$3) r',[1,15,true])).r;
+  assert.equal(conf.cadence_hours,1);assert.equal(conf.stale_after_days,15);
+  assert.equal(new Date(conf.next_check_at)-new Date(conf.last_checked_at),3600000);
+  await db.exec('reset role');await db.exec(`select set_config('request.jwt.claim.sub','',false)`);await db.exec(`select set_config('request.jwt.claims','{"role":"service_role"}',false)`);await db.exec('set role service_role');
+  assert.equal((await one('select gaas_vault_hydration_record($1,$2) r',['{"stale_count":0}','agente'])).r.last_result.stale_count,0);
+  await db.exec('reset role;set role anon;');await assert.rejects(one('select gaas_vault_hydration_status() s'),/permission denied/);
+ }finally{await db.close();}
+});

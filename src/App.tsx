@@ -34,6 +34,7 @@ import { useBU } from './contexts/BUContext';
 import { endOfMonth, format, startOfMonth, subDays, subMonths } from 'date-fns';
 import { MainLayout } from './components/layout/MainLayout';
 import { FeedbackLauncher } from './components/feedback/FeedbackLauncher';
+import { FEATURES } from './config/features';
 import { LaunchPlanner } from './components/launch-planner/LaunchPlanner';
 import PaidMediaAfinzApp from './modules/paid-media-afinz/PaidMediaAfinzApp';
 import { AnimatePresence } from 'framer-motion';
@@ -184,6 +185,16 @@ function App() {
       window.removeEventListener('popstate', syncTabFromUrl);
     };
   }, [setTab]);
+
+  // Aba Jornada & Disparos desligada por flag: o link antigo abre Relatórios › Evolução e anomalias.
+  useEffect(() => {
+    if (activeTab !== 'jornada' || FEATURES.jornadaDisparosTab) return;
+    const params = new URLSearchParams(window.location.search);
+    params.set('view', 'relatorio');
+    params.set('report_mode', 'journey');
+    window.history.replaceState({}, '', window.location.pathname + '?' + params + window.location.hash);
+    setTab('relatorio');
+  }, [activeTab, setTab]);
 
   // Link direto pra uma aba que o perfil não vê no menu cai no Launch.
   const { canSeeTab, loadingProfile } = useUserRole();
@@ -488,7 +499,7 @@ function App() {
                   />
                 </PageTransition>
               )}
-              {activeTab === 'jornada' && (
+              {activeTab === 'jornada' && FEATURES.jornadaDisparosTab && (
                 <PageTransition>
                   <JornadaDisparosView
                     data={filteredData}
