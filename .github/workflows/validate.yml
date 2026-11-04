@@ -40,6 +40,8 @@ jobs:
         run: npm run test:skills
       - name: Frontend tests
         run: npm test
+      - name: Insurance ingestion, security and Office package contracts
+        run: npm run test:insurance
       - name: Development backlog and notification contracts
         run: node --test scripts/test-development-backlog.mjs scripts/test-tasks-four-fronts.mjs scripts/test-wiki-snapshot.mjs scripts/test-initiative-workbench.mjs scripts/test-corrections-and-improvements.mjs
       - name: SFMC package ingestion SQL contracts

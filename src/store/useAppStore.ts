@@ -75,8 +75,8 @@ interface AppState {
     setPerfDeepLink: (dl: { view: 'overview' | 'gallery' | 'table'; query: string } | null) => void;
 
     // Deep-link transitório do Launch Planner para um modo específico de Relatórios.
-    reportDeepLink: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' } | null;
-    setReportDeepLink: (dl: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' } | null) => void;
+    reportDeepLink: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' | 'insurance' } | null;
+    setReportDeepLink: (dl: { mode: 'performance' | 'daily' | 'monthly' | 'xlsx' | 'insurance' } | null) => void;
 
     // Deep-link transitório de uma aposta para o funil analítico que a originou.
     funnelDeepLink: { funnel: 'serasa-marketplace' | 'serasa-bi' | 'paid-media' | 'app-afinz' | 'appsflyer' } | null;
