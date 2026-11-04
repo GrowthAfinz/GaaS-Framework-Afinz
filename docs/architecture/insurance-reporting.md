@@ -13,7 +13,7 @@ Implementação isolada do domínio de Seguros, acessível na aba Relatório. N�
 
 ## Contrato de dados
 
-A migration `20261104022153_insurance_data_foundation.sql` é autocontida. Cria o schema privado `growth_data`, contratos de fonte, lotes, registros originais, populações, produtos, métricas, revisões, cinco famílias de fatos, snapshots, vínculos, impactos em notas, responsabilidades, artefatos e revisão de certificação. Integra `report_runs`, `report_frozen_inputs` e `report_run_sources` existentes. As RPCs públicas são invoker; funções internas verificam a identidade e as memberships existentes no banco. Não há grants de tabelas brutas ao cliente, políticas públicas de arquivos ou permissões baseadas em metadados editáveis do usuário.
+A migration `20261104032148_insurance_data_foundation.sql` é autocontida. Cria o schema privado `growth_data`, contratos de fonte, lotes, registros originais, populações, produtos, métricas, revisões, cinco famílias de fatos, snapshots, vínculos, impactos em notas, responsabilidades, artefatos e revisão de certificação. Integra `report_runs`, `report_frozen_inputs` e `report_run_sources` existentes. As RPCs públicas são invoker; funções internas verificam a identidade e as memberships existentes no banco. Não há grants de tabelas brutas ao cliente, políticas públicas de arquivos ou permissões baseadas em metadados editáveis do usuário.
 
 Valores distinguem zero observado, ausente, não aplicável e erro. Taxas são recalculadas apenas com denominadores compatíveis; não são médias de percentuais. Identidades provisórias dos disparos permanecem restritas ao lote: nomes semelhantes não provam duplicidade entre arquivos. Toda revisão conserva a fonte.
 
@@ -48,3 +48,7 @@ node scripts/insurance-export.mjs '<performance.xlsx>' '<radar.xlsx>' --pptx '<c
 Os testes SQL executam em PostgreSQL descartável via PGlite, incluindo permissões, idempotência, estados, certificação e imutabilidade. Os testes Office com referências reais são opcionais e não enviam os arquivos a serviços externos. `scripts/insurance-preview.html` é um harness local de desenvolvimento com pacote gerado, sem sessão nem gravação; não integra o fluxo publicado. `artifacts/insurance-local` é ignorado pelo Git.
 
 Para ativar em ambiente compartilhado, revisar e aplicar a migration no projeto correto antes de disponibilizar o frontend. Esta entrega de código não aplica migrations remotas, não altera notas e não publica arquivos vivos.
+
+## Ativação em 04/11/2026
+
+Migration aplicada no projeto mipiwxadnpwtcgfcedym, versão remota 20261104032148. Verificação: 24 tabelas com RLS, zero grants de tabelas a anon/authenticated, oito RPCs invoker sem execução anônima e bucket privado de 30 MB. Os avisos informativos de RLS sem políticas refletem o bloqueio intencional do acesso bruto; o cliente usa somente as operações governadas. Nenhum novo aviso de segurança ERROR/WARN associado a Seguros foi identificado. A carga de referência foi validada localmente; não foi salva ou certificada em produção. A validação visual publicada foi interrompida pelo controle de computador por não confirmar a URL do Chrome. Nenhuma nota ou apresentação viva foi publicada.
