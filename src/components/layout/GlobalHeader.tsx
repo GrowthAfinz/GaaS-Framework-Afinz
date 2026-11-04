@@ -141,6 +141,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                 { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => navigateToTab('originacao-b2c') },
                 { id: 'funil-aquisicao', label: 'Funil de Aquisição', icon: Funnel, onClick: () => navigateToTab('funil-aquisicao') },
                 { id: 'relatorio', label: viewSettings.frente === 'rentabilizacao' ? 'Relatórios | Rentabilização' : 'Relatórios | Aquisição', icon: ClipboardList, onClick: () => navigateToTab('relatorio') },
+                { id: 'relatorio-seguros', label: 'Relatórios | Seguros', icon: ShieldCheck, onClick: () => navigateToTab('relatorio-seguros') },
                 ...(FEATURES.jornadaDisparosTab ? [{ id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') } as HeaderNavItem] : []),
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => navigateToTab('orientador') },
             ]
@@ -256,13 +257,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             {/* ── RIGHT: Controls ────────────────────────────────────── */}
             <div className="shrink-0 flex items-center gap-3">
                 {/* BU Filter (dropdown compacto) */}
-                <BUDropdown />
+                {activeTab !== 'relatorio-seguros' && <BUDropdown />}
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-slate-200" />
 
                 {/* Frente Switch (Aquisição | Rentabilização) */}
-                <FrenteSwitcher />
+                {activeTab !== 'relatorio-seguros' && <FrenteSwitcher />}
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-slate-200" />

@@ -1,4 +1,3 @@
-import { InsuranceWorkspace } from './insurance/InsuranceWorkspace';
 import React, { useMemo, useCallback, useState, useEffect, useRef, useDeferredValue } from 'react';
 import { format } from 'date-fns';
 import { FileSpreadsheet, FileText, Save, ArrowLeft, TrendingUp, DollarSign, BarChart2, Info, ChevronUp, ChevronDown, Search, FilterX, Maximize2, X, Download, CalendarDays, Files, ArrowDownToLine, Target } from 'lucide-react';
@@ -159,10 +158,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const globalFilters = viewSettings.filtrosGlobais;
   const rentab = viewSettings.frente === 'rentabilizacao';
   const { selectedBUs } = useBU();
-  const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly' | 'journey' | 'xlsx' | 'insurance'>(() => new URLSearchParams(window.location.search).get('report_mode') === 'journey' ? 'journey' : 'performance');
+  const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly' | 'journey' | 'xlsx'>(() => new URLSearchParams(window.location.search).get('report_mode') === 'journey' ? 'journey' : 'performance');
 
   const growthSourceContext = useMemo<GrowthBetSourceContext | null>(() => {
-    if (rentab || reportMode === 'xlsx' || reportMode === 'insurance' || reportMode === 'journey') return null;
+    if (rentab || reportMode === 'xlsx' || reportMode === 'journey') return null;
     const modeContract = {
       performance: { surface: 'reports_overview' as const, label: 'Overview', route: 'reports:overview' },
       daily: { surface: 'reports_daily' as const, label: 'Diário', route: 'reports:daily' },
@@ -203,9 +202,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
 
   useEffect(() => {
     if (!reportDeepLink) return;
-    setReportMode(reportDeepLink.mode);
+    if (reportDeepLink.mode === 'insurance') setTab('relatorio-seguros');
+    else setReportMode(reportDeepLink.mode);
     setReportDeepLink(null);
-  }, [reportDeepLink, setReportDeepLink]);
+  }, [reportDeepLink, setReportDeepLink, setTab]);
   const allActivities = useMemo(() => Object.values(data).flat(), [data]);
   const previousAllActivities = useMemo(() => Object.values(previousData ?? {}).flat(), [previousData]);
   const filterReportActivities = useCallback((activities: Activity[]) => (
@@ -795,12 +795,11 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
     </div>
   );
 
-  if (reportMode === 'insurance') return <div className="p-6"><button type="button" className="mb-5 text-sm text-cyan-700 underline" onClick={() => setReportMode('xlsx')}>Voltar aos relatórios</button><InsuranceWorkspace /></div>;
 
   if (reportActivities.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3 text-slate-400">
-        <button type="button" className="rounded border px-4 py-2 text-cyan-700" onClick={() => setReportMode('insurance')}>Abrir Relatórios | Seguros</button><FileText size={40} className="opacity-40" />
+        <FileText size={40} className="opacity-40" />
         <p className="text-base font-medium">Nenhum dado disponível para o período selecionado.</p>
         <p className="text-sm">Ajuste os filtros ou faça upload de um arquivo CSV.</p>
       </div>
@@ -817,7 +816,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-white tracking-tight">Relatório de Performance</h1>
+                <h1 className="text-2xl font-bold text-white tracking-tight">{rentab ? 'Relatórios | Rentabilização' : 'Relatórios | Aquisição'}</h1>
                 <div className="ml-2 flex rounded-xl border border-white/30 bg-white/15 p-1">
                   {[
                     { key: 'performance' as const, label: 'Overview' },
@@ -825,7 +824,6 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                     { key: 'monthly' as const, label: 'Mensal' },
                     { key: 'journey' as const, label: 'Evolução e anomalias' },
                     { key: 'xlsx' as const, label: 'Relatórios' },
-                    { key: 'insurance' as const, label: 'Seguros' },
                   ].map((option) => (
                     <button
                       key={option.key}

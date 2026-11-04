@@ -37,7 +37,8 @@ export const NAV_CONFIG: NavGroup[] = [
         items: [
             { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp },
             { id: 'resultados', label: 'Resultados', icon: BarChart3 },
-            { id: 'relatorio', label: 'Relatório', icon: ClipboardList },
+            { id: 'relatorio', label: 'Relatórios | Aquisição', icon: ClipboardList },
+            { id: 'relatorio-seguros', label: 'Relatórios | Seguros', icon: ClipboardList },
             { id: 'orientador', label: 'Orientador', icon: Lightbulb },
         ]
     },
