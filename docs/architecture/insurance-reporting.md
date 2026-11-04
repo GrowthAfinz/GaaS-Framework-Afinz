@@ -1,6 +1,10 @@
 # Relatórios | Seguros
 
-Implementação isolada do domínio de Seguros, acessível na aba Relatório. Não depende de registros CRM para abrir e não mistura o total da companhia com os produtos digitais.
+Implementação isolada do domínio de Seguros, acessível em Análise → Relatórios | Seguros, com rota própria `?view=relatorio-seguros`. Aquisição permanece em Relatórios | Aquisição, na rota histórica `?view=relatorio`. Não depende de registros CRM para abrir e não mistura o total da companhia com os produtos digitais.
+
+O BI de Seguros mantém o layout claro, cabeçalho teal, cards e cores do GaaS, com filtros próprios de versão, produto e período. Os filtros globais de CRM, BU e frente não aparecem nesta rota. Abre a versão certificada mais recente disponível, ou a última versão em revisão quando ainda não há certificação. A visão geral inclui contratações, cadastros, investimento, custo por contratação, etapas da LP e evolução mensal por produto. Valores agregados incompletos continuam ausentes e custo consolidado usa soma dos custos dividida pela soma das contratações.
+
+A conversão de negócio de Seguros é a contratação confirmada após o formulário da LP. Cadastro enviado é etapa intermediária; não é venda. O contrato atual lê as contratações agregadas do XLSX e não prova o evento individual de confirmação nem um funil sequencial de pessoas. Essa limitação permanece visível até existir fonte de confirmação com identificador, data e status próprios. Cartão emitido continua exclusivo do domínio de Aquisição.
 
 ## Fluxo implementado
 

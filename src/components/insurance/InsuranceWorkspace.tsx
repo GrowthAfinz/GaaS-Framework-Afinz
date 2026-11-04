@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { InsuranceDashboard } from "./InsuranceDashboard";
 import {
   InsurancePacket,
   InsuranceMetric,
@@ -106,6 +107,14 @@ export function InsuranceWorkspace({
         if (r !== "none") {
           const rows = await listInsuranceSnapshots();
           if (active) setSnapshots(rows);
+          const latest = rows.find((s) => s.status === "certified") || rows[0];
+          if (active && latest) {
+            const saved = await readInsuranceSnapshot(latest.id);
+            if (active) {
+              setSelected(saved);
+              setPacket(saved.manifest!);
+            }
+          }
         }
       })
       .catch((e) => {
@@ -166,18 +175,18 @@ export function InsuranceWorkspace({
           ];
   return (
     <section className="space-y-6" aria-label="Relatórios de Seguros">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-widest text-cyan-700">
+      <header style={{ background: 'linear-gradient(135deg, #00C6CC 0%, #00A8B0 100%)' }} className="rounded-2xl px-6 py-6 text-white shadow-md">
+        <p className="text-xs font-semibold uppercase tracking-widest text-cyan-50">
           Relatórios | Seguros
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">
-          Acompanhamento de Seguros
+        <h1 className="mt-2 text-2xl font-bold text-white">
+          Performance de Seguros
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-cyan-50">
           Resultados por produto, evolução da jornada e fontes que sustentam o
           comitê.
         </p>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-cyan-50">
           Este módulo usa filtros próprios. A seleção global de BU não redefine
           o universo dos seguros.
         </p>
@@ -326,6 +335,13 @@ export function InsuranceWorkspace({
           carga abaixo.
         </p>
       )}
+      {packet && tab === "overview" && (
+        <InsuranceDashboard
+          metrics={packet.metrics}
+          product={product}
+          period={period}
+        />
+      )}
       {packet && ["overview", "journey", "channels"].includes(tab) && (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
@@ -349,8 +365,7 @@ export function InsuranceWorkspace({
                     <td className="p-3">
                       {(
                         {
-                          contracts_digital:
-                            "Contratações efetivadas — digital",
+                          contracts_digital: "Contratações de seguro — digital",
                           registrations_digital: "Cadastros — digital",
                           cost_per_contract: "Custo por contratação",
                           digital_cost: "Custo digital",

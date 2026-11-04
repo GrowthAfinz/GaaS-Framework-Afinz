@@ -5,6 +5,9 @@ describe('tabNavigation', () => {
   it('lê a aba do ?view=', () => {
     expect(readTabFromSearch('?view=jornada')).toBe('jornada');
     expect(readTabFromSearch('?view=comunicacoes-fluxo')).toBe('comunicacoes-fluxo');
+    expect(readTabFromSearch('?view=relatorio-seguros')).toBe('relatorio-seguros');
+    expect(buildTabSearch('relatorio-seguros')).toBe('?view=relatorio-seguros');
+    expect(readTabFromSearch('?view=relatorio')).toBe('relatorio');
   });
 
   it('mantém o ?view=learning do Loop de Memória', () => {

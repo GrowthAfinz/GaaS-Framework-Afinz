@@ -19,6 +19,7 @@ const TAB_SLUGS: Record<TabId, string> = {
   'midia-paga': 'midia-paga',
   explorador: 'explorador',
   relatorio: 'relatorio',
+  'relatorio-seguros': 'relatorio-seguros',
   'aprendizado-growth': 'learning',
   comunicacoes: 'comunicacoes',
   'comunicacoes-cadastro': 'comunicacoes-cadastro',
