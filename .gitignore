@@ -136,3 +136,6 @@ artifacts/report-live-async/golden/
 
 # Generated public skill catalog and downloads
 /public/skills/
+
+# Local insurance reference data and QA previews
+/artifacts/insurance-local/

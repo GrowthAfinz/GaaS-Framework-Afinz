@@ -44,7 +44,8 @@
     "predev": "node scripts/skills/build-skills-catalog.mjs",
     "check:skills": "node scripts/skills/build-skills-catalog.mjs --check",
     "test:skills": "node --test scripts/skills/test-skills-catalog.mjs",
-    "pretest:skills": "node scripts/skills/build-skills-catalog.mjs"
+    "pretest:skills": "node scripts/skills/build-skills-catalog.mjs",
+    "test:insurance": "node --test scripts/test-insurance-foundation.mjs scripts/test-insurance-office.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -61,6 +62,7 @@
     "idb-keyval": "^6.2.2",
     "js-yaml": "5.4.2",
     "jspdf": "4.2.1",
+    "jszip": "3.10.1",
     "lucide-react": "^0.563.0",
     "papaparse": "^5.4.1",
     "react": "^18.2.0",
@@ -84,6 +86,7 @@
     "@types/react-beautiful-dnd": "^13.1.5",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
+    "@xmldom/xmldom": "0.9.12",
     "autoprefixer": "^10.4.16",
     "gh-pages": "^6.3.0",
     "playwright": "^1.59.1",

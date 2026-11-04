@@ -1,3 +1,4 @@
+import { InsuranceNoteBlock } from '../insurance/InsuranceWorkspace';
 import { WikiConnections } from './graph/WikiConnections';
 import { withTimeout } from './graph/wikiGraphService';
 import { WikiNotesExplorer } from './notes/WikiNotesExplorer';
@@ -82,6 +83,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const resultsConfig=analytics||matrixConfig;
   const listsConfig=useMemo(()=>selected?readWikiLiveLists(selected.frontmatter,resultsConfig,Boolean(pageType)):null,[selected,resultsConfig,pageType]);
   const businessFields=analytics?([{key:'bu',label:'BU'},{key:'partner',label:'Parceiro'},{key:'segment',label:'Público'},{key:'stage',label:'Etapa'}] as const).map(field=>({...field,value:analytics.scope[field.key]||[...new Set((analytics.anyOf||[]).map(rule=>rule[field.key]).filter(Boolean))].join(' · ')||[...new Set(variants.map(variant=>variant[field.key]).filter(Boolean))].join(' · ')||reading.context[field.key==='stage'?'stages':field.key]||''})).filter(field=>field.value):[];
+  const insuranceBlock = selected ? <InsuranceNoteBlock key={selected.id} noteId={selected.id} showEmpty={selected.relative_path === '10-Resultados/Mecanicas/Seguros.md'} /> : null;
   const resultBlock = resultsConfig && selected ? <section id="resultados-vivos" className="my-6 scroll-mt-24" aria-label="Resultados deste assunto"><ResultsWorkspace key={selected.id} embedded={{...resultsConfig,noteId:selected.id}} /></section> : null;
   const openScopedResult=(config:typeof resultsConfig,scope:Partial<ResultsScope>,month:string)=>{
     if(!selected||!config||!resultsConfig)return;
@@ -97,7 +99,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const anchorOf=(ids:string[])=>pageType?reading.sections.find(section=>ids.includes(section.id))?.id||'':'';
   const anchors={result:anchorOf(['resultado-ao-vivo','resultado']),matrix:anchorOf(['por-parceiro','por-publico','publico-parceiro','publico-x-parceiro']),lists:anchorOf(['decisoes-apostas-e-aprendizados','o-que-ja-aprendemos'])};
   // Blocks without a heading of their own travel with the result block, wherever it is.
-  const liveGroup=<>{!anchors.matrix&&matrixBlock}{resultBlock}{!anchors.lists&&listsBlock}</>;
+  const liveGroup=<>{!anchors.matrix&&matrixBlock}{insuranceBlock}{resultBlock}{!anchors.lists&&listsBlock}</>;
   const blocksAfter=(id:string)=><>{id===anchors.result&&liveGroup}{id===anchors.matrix&&matrixBlock}{id===anchors.lists&&listsBlock}</>;
   const allCount = folders.reduce((sum, item) => sum + item.note_count, 0);
 
