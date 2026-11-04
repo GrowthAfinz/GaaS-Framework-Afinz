@@ -101,3 +101,10 @@ Os bindings atuais de Seguros cobrem parte do XLSX/PPTX de referência; não há
 `plan_increment.py` recebe um array de registros já normalizados e um estado congelado com `existing` e `checkpoints`. Exemplo de checkpoint: `{"dataset_id":"insurance_dispatch","partition":{"source_system":"sfmc","source_account_code":"BU1","channel_code":"email"},"closed_through":"2026-10-31"}`. Campos de chave são definidos no catálogo; os valores deste exemplo são sintéticos.
 
 A saída separa candidatos e motivos de ignorado/bloqueado. `can_apply` permanece falso nesta versão: faltam o adaptador de entrada bruta, o writer governado e a camada rápida de leitura. O planejador não executa SQL, não autentica e não atualiza relatórios.
+# Integração de consumidores · 0.2.0
+
+`report_contracts` no catálogo é o inventário executável dos consumidores dos 21 datasets. São sete contratos: `insurance.monthly` pronto para snapshots existentes; `portfolio.monthly`, `portfolio.scenarios`, `credit.monthly`, `offers.monthly`, `experiments.measurement` e `editorial.evidence` planejados. Dependências numéricas (`consumes`) e contexto (`related_to`) são distintos.
+
+Seguros alimenta o bloco da nota `10-Resultados/Mecanicas/Seguros.md`. Portfólio se relaciona a Rentabilização, Ativação e Incentivo ao Uso; CP a Crédito e Investimento; Pool às iniciativas de parceiros/Visa; narrativa às notas de arquitetura/publicação do Report Live. Esses vínculos futuros não ativam números em notas antes dos contratos e recortes correspondentes estarem prontos.
+
+BI/Wiki recebem a leitura leve `gaas-report-data/1`. Certificação compara os dados consumidos e encaminha alterações à Fila existente; não altera nem aprova prosa. `potential_consumers` no plano é previsão, com `reports_refreshed=false`. O writer bruto permanece pendente.

@@ -1,5 +1,8 @@
 import { supabase } from "../../services/supabaseClient";
 import { InsurancePacket, validatePacket } from "./insuranceCore";
+import { readReportDataset } from '../report-data/reportDataService';
+import { upsertManagedDataBlock } from '../report-data/reportDataContract';
+import { insurancePacketFromReportData } from './insuranceReportData';
 export interface SnapshotRow {
   id: string;
   status: string;
@@ -48,6 +51,10 @@ export const listInsuranceSnapshots = () =>
   rpc<SnapshotRow[]>("insurance_list_snapshots");
 export const readInsuranceSnapshot = (id: string) =>
   rpc<SnapshotRow>("insurance_read_snapshot", { p_id: id });
+export async function readInsuranceReportSnapshot(id: string): Promise<SnapshotRow> {
+  const data = await readReportDataset(id, {}, true);
+  return { id, status: data.snapshot.status, period_start: data.snapshot.period_start, period_end: data.snapshot.period_end, snapshot_hash: data.snapshot.hash!, created_at: '', manifest: insurancePacketFromReportData(data) };
+}
 export const readInsuranceNoteSnapshot = (id: string) =>
   rpc<SnapshotRow | null>("insurance_note_snapshot", { p_note_id: id });
 export const bindInsuranceNote = (id: string) =>
@@ -145,44 +152,43 @@ export async function insuranceRole() {
   if (error) throw error;
   return data?.active ? (data.role as string) : "none";
 }
+async function insuranceEditorialReview(snapshotId?: string) {
+  if (!snapshotId) throw new Error('Salve e certifique a versão antes de preparar uma revisão da Wiki.');
+  const { data, error } = await supabase.from('growth_loop_items').select('id,revision,evidence')
+    .eq('kind', 'data_review').eq('evidence->>snapshot_id', snapshotId).neq('state', 'resolved').limit(1).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Esta versão não tem revisão editorial pendente. Confira o acompanhamento na Fila.');
+  return data;
+}
 export async function prepareInsuranceNote(
   packet: InsurancePacket,
   snapshotId?: string,
 ) {
+  const item = await insuranceEditorialReview(snapshotId);
   const { data, error } = await supabase
     .from("gaas_vault_notes")
     .select("id,relative_path,content_hash,content_markdown")
-    .eq("relative_path", "10-Resultados/Mecanicas/Seguros.md")
+    .eq("id", item.evidence.note_id)
     .is("deleted_at", null)
     .single();
   if (error) throw error;
+  const frozen = await readReportDataset(snapshotId!);
   const lines = [
     "",
-    `## Acompanhamento de Seguros — ${packet.periodStart} a ${packet.periodEnd}`,
+    `## Revisão do acompanhamento — ${frozen.snapshot.period_start} a ${frozen.snapshot.period_end}`,
     "",
     `Fonte: snapshot ${snapshotId || "local em revisão"}. Valores associados às fontes; não comprovam incrementalidade.`,
     "",
-    "| Produto | Indicador | Valor |",
-    "|---|---|---|",
+    "Os indicadores estão no bloco de dados certificado desta nota. Este rascunho não declara mudança de conclusão, causa ou decisão.",
+    "",
+    "Interpretação e próximo passo: pendentes de análise e revisão editorial.",
   ];
-  for (const m of packet.metrics.filter(
-    (m) =>
-      m.period === "window_total" &&
-      [
-        "contracts_digital",
-        "registrations_digital",
-        "cost_per_contract",
-      ].includes(m.code),
-  ))
-    lines.push(
-      `| ${m.product} | ${m.code} | ${m.value === null ? "—" : m.value.toLocaleString("pt-BR")} |`,
-    );
   lines.push(
     "",
     "Limites de leitura:",
-    ...packet.issues.map((i) => `- ${i.message}`),
+    ...frozen.issues.map((i) => `- ${i.message}`),
   );
-  const markdown = data.content_markdown + "\n" + lines.join("\n");
+  const markdown = upsertManagedDataBlock(data.content_markdown, 'insurance-summary', lines.join("\n"));
   const { sha256 } = await import("./insuranceParser");
   return {
     schema: "gaas-knowledge-contribution/1",
@@ -204,13 +210,14 @@ export async function submitInsuranceNote(snapshot: SnapshotRow) {
   if (snapshot.status !== "certified" || !snapshot.manifest)
     throw new Error("SNAPSHOT_NOT_CERTIFIED");
   const [
-    { fetchKnowledgeSnapshot, registerKnowledgePack, submitContribution },
+    { fetchKnowledgeSnapshot, registerKnowledgePack },
     { buildKnowledgeArchive },
   ] = await Promise.all([
     import("../vault/knowledge/knowledgeService"),
     import("../vault/knowledge/knowledgePack"),
   ]);
   const baseline = await fetchKnowledgeSnapshot();
+  const item = await insuranceEditorialReview(snapshot.id);
   const proposal = await prepareInsuranceNote(snapshot.manifest, snapshot.id);
   const note = baseline.notes.find(
     (n) => n.relative_path === proposal.changes[0].path,
@@ -222,12 +229,11 @@ export async function submitInsuranceNote(snapshot: SnapshotRow) {
     `Acompanhamento de Seguros — snapshot ${snapshot.id}`,
   );
   await registerKnowledgePack(manifest, archive);
-  const contributionId = await submitContribution(
-    manifest.id,
-    "Atualizar acompanhamento de Seguros",
-    proposal.rationale,
-    proposal.changes,
-  );
+  const change = proposal.changes[0];
+  const contributionId = await rpc<string>('growth_loop_submit_note', {
+    p_item: item.id, p_revision: item.revision, p_pack: manifest.id,
+    p_path: change.path, p_base_hash: change.base_hash, p_markdown: change.markdown,
+  });
   return { contributionId, packId: manifest.id };
 }
 export async function archiveInsurancePackage(

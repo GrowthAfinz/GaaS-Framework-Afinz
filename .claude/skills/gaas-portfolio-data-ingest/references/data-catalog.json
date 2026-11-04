@@ -1,13 +1,17 @@
 {
   "schema": "gaas-portfolio-data-catalog/1",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "verified_on": "2026-11-04",
   "project_id": "mipiwxadnpwtcgfcedym",
   "purpose": "raw inputs -> normalized facts -> reporting datasets -> XLSX/PPTX outputs",
   "runtime": {
     "normalized_raw_writer_ready": false,
     "fast_bi_read_model_ready": false,
-    "legacy_reference_import_is_raw_ingest": false
+    "legacy_reference_import_is_raw_ingest": false,
+    "shared_report_read_contract_ready": true,
+    "wiki_data_blocks_ready": true,
+    "certified_snapshot_note_impacts_ready": true,
+    "lightweight_snapshot_read_ready": true
   },
   "policy": {
     "existing_key": "ignore_and_audit",
@@ -61,6 +65,9 @@
       ],
       "related_existing_tables": [
         "public.rentabilizacao_activities"
+      ],
+      "report_contracts": [
+        "insurance.monthly"
       ]
     },
     {
@@ -96,6 +103,9 @@
       ],
       "related_existing_tables": [
         "growth_data.outcome_facts"
+      ],
+      "report_contracts": [
+        "insurance.monthly"
       ]
     },
     {
@@ -129,6 +139,9 @@
       ],
       "related_existing_tables": [
         "growth_data.outcome_facts"
+      ],
+      "report_contracts": [
+        "insurance.monthly"
       ]
     },
     {
@@ -175,7 +188,10 @@
         "XLSX Performance: funil e representatividade",
         "Comitê 30/10: slides 8–10"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "insurance.monthly"
+      ]
     },
     {
       "dataset_id": "insurance_traffic",
@@ -216,7 +232,10 @@
         "Seguros: funil LP, leitura de Lojinha e cobertura",
         "XLSX Performance: sessões e conversões"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "insurance.monthly"
+      ]
     },
     {
       "dataset_id": "media_aggregate",
@@ -258,6 +277,9 @@
       ],
       "related_existing_tables": [
         "public.paid_media_metrics"
+      ],
+      "report_contracts": [
+        "insurance.monthly"
       ]
     },
     {
@@ -299,6 +321,9 @@
       ],
       "related_existing_tables": [
         "public.paid_media_metrics"
+      ],
+      "report_contracts": [
+        "insurance.monthly"
       ]
     },
     {
@@ -339,7 +364,10 @@
         "Seguros: Carteira / Mensal",
         "Radar: IPP Seguros e carteira"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.monthly"
+      ]
     },
     {
       "dataset_id": "portfolio_stock",
@@ -379,7 +407,10 @@
         "Radar / Painel / Cap1",
         "Comitês: ativação, churn, farol RxO e YoY"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.monthly"
+      ]
     },
     {
       "dataset_id": "portfolio_retention",
@@ -416,7 +447,10 @@
       "report_consumers": [
         "Radar / Painel: retenção e churn"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.monthly"
+      ]
     },
     {
       "dataset_id": "portfolio_usage",
@@ -455,7 +489,10 @@
         "Radar / Painel / Cap2",
         "Comitês: frequência, spending e ticket"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.monthly"
+      ]
     },
     {
       "dataset_id": "portfolio_cohort",
@@ -492,7 +529,10 @@
       "report_consumers": [
         "Cap1: ativação por safra / MOB4"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.monthly"
+      ]
     },
     {
       "dataset_id": "portfolio_engagement",
@@ -535,7 +575,10 @@
         "Radar: clusters e abertura do Dormente",
         "Comitês: engajamento e oportunidades CRM"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.monthly"
+      ]
     },
     {
       "dataset_id": "portfolio_revenue",
@@ -576,7 +619,10 @@
         "Radar / Painel / Cap3",
         "Comitês: receita total e receita por vivo/ativado"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.monthly"
+      ]
     },
     {
       "dataset_id": "insurance_budget",
@@ -611,7 +657,10 @@
       "report_consumers": [
         "Orçamento / Projeções / Cenários de Seguros"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.scenarios"
+      ]
     },
     {
       "dataset_id": "portfolio_projection",
@@ -645,7 +694,10 @@
       "report_consumers": [
         "Cenário Base / Reestruturação / impacto e sensibilidades"
       ],
-      "related_existing_tables": []
+      "related_existing_tables": [],
+      "report_contracts": [
+        "portfolio.scenarios"
+      ]
     },
     {
       "dataset_id": "credit_personal",
@@ -693,6 +745,9 @@
       ],
       "related_existing_tables": [
         "public.rentabilizacao_activities"
+      ],
+      "report_contracts": [
+        "credit.monthly"
       ]
     },
     {
@@ -734,6 +789,9 @@
       "related_existing_tables": [
         "public.activities",
         "public.rentabilizacao_activities"
+      ],
+      "report_contracts": [
+        "offers.monthly"
       ]
     },
     {
@@ -777,6 +835,9 @@
       "related_existing_tables": [
         "public.dynamic_email_pool_offers",
         "public.experiments"
+      ],
+      "report_contracts": [
+        "offers.monthly"
       ]
     },
     {
@@ -822,6 +883,9 @@
         "public.experiments",
         "public.vw_experiment_metrics",
         "public.vw_experiment_metrics_daily"
+      ],
+      "report_contracts": [
+        "experiments.measurement"
       ]
     },
     {
@@ -855,6 +919,9 @@
       "related_existing_tables": [
         "public.gaas_knowledge_contributions",
         "public.report_runs"
+      ],
+      "report_contracts": [
+        "editorial.evidence"
       ]
     }
   ],
@@ -1010,5 +1077,221 @@
     "propensity/exposure/app_status",
     "scenario_kind_and_version",
     "business_calendar_timezone"
+  ],
+  "report_contracts": [
+    {
+      "query_contract": "insurance.monthly",
+      "version": "1",
+      "domain": "insurance",
+      "status": "ready",
+      "title": "Acompanhamento de Seguros",
+      "upstream_dataset_ids": [
+        "insurance_dispatch",
+        "insurance_contract_event",
+        "insurance_lp_event",
+        "insurance_outcome",
+        "insurance_traffic",
+        "insurance_investment",
+        "media_aggregate"
+      ],
+      "output_consumers": [
+        "Seguros: Overview / Diario / Mensal / Evolucao e anomalias",
+        "Performance: Resumo Comite",
+        "Comite 30/10: slides 8-10"
+      ],
+      "definition_owner": "Time GaaS Afinz",
+      "refresh_policy": "certified_snapshot_only",
+      "editorial_policy": "existing_knowledge_contribution_review",
+      "note_dependencies": [
+        {
+          "relative_path": "10-Resultados/Mecanicas/Seguros.md",
+          "relationship": "consumes",
+          "activation": "on_first_certified_snapshot",
+          "editorial_owner": "Time GaaS Afinz"
+        }
+      ],
+      "default_note_scope": {
+        "metrics": [
+          "contracts_digital",
+          "registrations_digital",
+          "cost_per_contract"
+        ],
+        "periods": [
+          "window_total"
+        ]
+      }
+    },
+    {
+      "query_contract": "portfolio.monthly",
+      "version": "1",
+      "domain": "portfolio",
+      "status": "planned",
+      "title": "Carteira, uso e retencao",
+      "upstream_dataset_ids": [
+        "insurance_stock",
+        "portfolio_stock",
+        "portfolio_retention",
+        "portfolio_usage",
+        "portfolio_cohort",
+        "portfolio_engagement",
+        "portfolio_revenue"
+      ],
+      "output_consumers": [
+        "Radar Portfolio",
+        "Comite: carteira / uso / receita"
+      ],
+      "definition_owner": "Time GaaS Afinz",
+      "refresh_policy": "certified_snapshot_only",
+      "editorial_policy": "existing_knowledge_contribution_review",
+      "note_dependencies": [
+        {
+          "relative_path": "10-Resultados/Dominios/Dominio-Rentabilizacao.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        },
+        {
+          "relative_path": "10-Resultados/Mecanicas/Incentivo-ao-Uso.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        },
+        {
+          "relative_path": "10-Resultados/Mecanicas/Ativacao-e-Boas-Vindas.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        }
+      ]
+    },
+    {
+      "query_contract": "portfolio.scenarios",
+      "version": "1",
+      "domain": "portfolio",
+      "status": "planned",
+      "title": "Cenarios e orcamento",
+      "upstream_dataset_ids": [
+        "insurance_budget",
+        "portfolio_projection"
+      ],
+      "output_consumers": [
+        "Performance: cenarios",
+        "Radar: projecoes"
+      ],
+      "definition_owner": "Time GaaS Afinz",
+      "refresh_policy": "certified_snapshot_only",
+      "editorial_policy": "existing_knowledge_contribution_review",
+      "note_dependencies": [
+        {
+          "relative_path": "10-Resultados/Dominios/Dominio-Rentabilizacao.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        }
+      ]
+    },
+    {
+      "query_contract": "credit.monthly",
+      "version": "1",
+      "domain": "credit",
+      "status": "planned",
+      "title": "Credito pessoal",
+      "upstream_dataset_ids": [
+        "credit_personal"
+      ],
+      "output_consumers": [
+        "Comite: credito pessoal"
+      ],
+      "definition_owner": "Time GaaS Afinz",
+      "refresh_policy": "certified_snapshot_only",
+      "editorial_policy": "existing_knowledge_contribution_review",
+      "note_dependencies": [
+        {
+          "relative_path": "10-Resultados/Mecanicas/Credito-e-Investimento.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        }
+      ]
+    },
+    {
+      "query_contract": "offers.monthly",
+      "version": "1",
+      "domain": "offers",
+      "status": "planned",
+      "title": "Pool de ofertas",
+      "upstream_dataset_ids": [
+        "offers_pool",
+        "crm_pressure"
+      ],
+      "output_consumers": [
+        "Radar: pool / pressao CRM",
+        "Comite: ofertas"
+      ],
+      "definition_owner": "Time GaaS Afinz",
+      "refresh_policy": "certified_snapshot_only",
+      "editorial_policy": "existing_knowledge_contribution_review",
+      "note_dependencies": [
+        {
+          "relative_path": "10-Resultados/Iniciativas/Iniciativa-Pool-de-Ofertas-Parceiros.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        },
+        {
+          "relative_path": "10-Resultados/Iniciativas/Iniciativa-Pool-de-Ofertas-Vai-de-Visa.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        }
+      ]
+    },
+    {
+      "query_contract": "experiments.measurement",
+      "version": "1",
+      "domain": "experiments",
+      "status": "planned",
+      "title": "Mensuracao de experimentos",
+      "upstream_dataset_ids": [
+        "experiment_measurement"
+      ],
+      "output_consumers": [
+        "Comite: testes e proximos passos"
+      ],
+      "definition_owner": "Time GaaS Afinz",
+      "refresh_policy": "certified_snapshot_only",
+      "editorial_policy": "existing_knowledge_contribution_review",
+      "note_dependencies": []
+    },
+    {
+      "query_contract": "editorial.evidence",
+      "version": "1",
+      "domain": "editorial",
+      "status": "planned",
+      "title": "Evidencias editoriais",
+      "upstream_dataset_ids": [
+        "editorial_evidence"
+      ],
+      "output_consumers": [
+        "Narrativa do Report Live"
+      ],
+      "definition_owner": "Time GaaS Afinz",
+      "refresh_policy": "certified_snapshot_only",
+      "editorial_policy": "existing_knowledge_contribution_review",
+      "note_dependencies": [
+        {
+          "relative_path": "05-Estrategia/Report-Live-Arquitetura-Editorial.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        },
+        {
+          "relative_path": "08-Engenharia/Report-Live-Versionamento-e-Publicacao.md",
+          "relationship": "related_to",
+          "activation": "pending_contract_and_scope",
+          "editorial_owner": "Time GaaS Afinz"
+        }
+      ]
+    }
   ]
 }

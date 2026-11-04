@@ -97,6 +97,14 @@ def plan(registry, records, state):
         decisions.append(item)
 
     candidates = [records[d["index"]] for d in decisions if d["status"] == "candidate_new"]
+    candidate_datasets = {record["dataset_id"] for record in candidates}
+    potential_consumers = [
+        {"query_contract": contract["query_contract"], "status": contract["status"],
+         "dataset_ids": sorted(candidate_datasets.intersection(contract["upstream_dataset_ids"])),
+         "notes": contract["note_dependencies"], "outputs": contract["output_consumers"]}
+        for contract in registry.get("report_contracts", [])
+        if candidate_datasets.intersection(contract["upstream_dataset_ids"])
+    ]
     return {
         "schema": "gaas-portfolio-increment-plan/1",
         "catalog_version": registry["version"],
@@ -107,6 +115,9 @@ def plan(registry, records, state):
         "counts": dict(Counter(d["status"] for d in decisions)),
         "decisions": decisions,
         "candidates": candidates,
+        "potential_consumers": potential_consumers,
+        "reports_refreshed": False,
+        "editorial_check": "after_certification_only" if candidates else "no_new_candidates",
     }
 
 

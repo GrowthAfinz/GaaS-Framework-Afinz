@@ -2,7 +2,7 @@
 name: gaas-portfolio-data-ingest
 description: Mapear dados brutos de Seguros, portfólio, CP e Pool aos contratos do Supabase e preparar cargas somente de inclusão para os relatórios GaaS. Usar ao receber arquivos novos dessas frentes; XLSX/PPTX de comitê são modelos de saída, não o formato obrigatório de entrada.
 metadata:
-  version: 0.1.0
+  version: 0.2.0
   origin: codex
   agents: [codex, claude-code, cowork]
   process: [Dados, Produto]
@@ -20,7 +20,7 @@ A entrada recorrente é bruta. O produto final é o BI, a planilha e o comitê m
 
 Ler [data-catalog.json](references/data-catalog.json) para localizar dataset, tabela, grão, campos de chave, partição, medidas e consumidores. Ler [inventory.md](references/inventory.md) para regras de negócio e estado real da implementação. Inspecionar o schema atual antes de escrever: `exists` significa que a tabela foi observada, não que o adaptador bruto ou o read model já estejam prontos.
 
-O catálogo separa tabelas existentes de propostas. Nesta versão, o writer de dados brutos e a camada rápida de leitura ainda não estão implementados. Não chamar o parser/RPC legado de workbook como se fosse um importador bruto; não improvisar inserts para contornar essa falta. Entregar o plano e identificar o contrato faltante. Essa condição deve ser atualizada no catálogo quando o backend correspondente for implementado e testado.
+O catálogo separa tabelas existentes de propostas. O writer bruto e o read model normalizado universal continuam pendentes. Existe leitura leve `gaas-report-data/1` para snapshots de Seguros: `report_data_read` serve BI/Office e `report_data_note_blocks` serve a Wiki sem células brutas. Isso não transforma o parser/RPC legado de workbook em importador bruto. Não improvisar inserts para contornar um writer ausente; entregar o plano e identificar o contrato faltante.
 
 Se a tarefa incluir implementar a infraestrutura faltante, desenvolver e testar esse contrato no repositório antes da carga. A pré-condição técnica não cria uma nova exigência de aprovação para trabalho já autorizado pelo usuário.
 
@@ -41,6 +41,16 @@ Se a tarefa incluir implementar a infraestrutura faltante, desenvolver e testar 
 5. Quando existir writer aprovado para o dataset, aplicar somente os candidatos novos, com chave única e proteção transacional contra concorrência; registrar incluídos, ignorados por chave, ignorados por histórico e bloqueados. Se o writer não existe, parar no plano revisável, sem alegar carga realizada.
 6. Reconciliar medidas admitidas e gerar a nova versão de leitura dos relatórios a partir dos fatos. Preservar versões anteriores e invalidar outputs derivados afetados. O BI deve receber agregados leves, não células brutas ou arquivos completos.
 7. Para XLSX/PPTX, carregar o dataset congelado do relatório e o template versionado; registrar fonte, corte e hashes. A referência Office é destino de renderização. O renderer atual só tem bindings numéricos completos para parte de Seguros: não declarar cobertura de todos os slides ou cenários sem mapear e validar os demais.
+
+## Wiki e consumidores
+
+`report_contracts` no catálogo é o mapa canônico de dataset → contrato de leitura → notas e outputs. `consumes` declara dependência numérica; `related_to` é contexto e não autoriza vincular números. Contratos `planned` não ativam blocos. Dono de definição e revisão fica declarado em cada contrato/dependência. Não criar uma segunda lista manual no app ou em frontmatter.
+
+A projeção de deploy está em `growth_data.report_contracts`; no repositório, validar drift com `node scripts/build-portfolio-report-contracts.mjs --check`. Novos contratos exigem versão e migration novas, preservando versões certificadas; o gerador da primeira release não é um sincronizador de produção.
+
+Na certificação, os bindings aprovados congelam recorte e versão. O banco compara os indicadores efetivamente consumidos, período, semântica e limites de qualidade; abre/revisa `data_review` na Fila existente somente quando essa leitura muda. Blocos numéricos consultam a versão certificada; texto não é alterado. Propostas seguem `growth_loop_submit_note`, hashes-base e revisão de contribuições. A skill não aprova sua própria proposta nem decide que o texto dispensa alteração; essa conclusão pode ser registrada pelo revisor no app com justificativa.
+
+O recibo local `potential_consumers` é previsão para candidatos novos, não prova de refresh. Após gravação/certificação, conferir snapshots, `note_impacts` e Fila. Informar separadamente dados admitidos, leitura disponível, pendência editorial e arquivos ainda vinculados a versões anteriores.
 
 ## Semântica que não pode mudar
 

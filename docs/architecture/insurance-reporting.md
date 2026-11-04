@@ -58,3 +58,6 @@ Para ativar em ambiente compartilhado, revisar e aplicar a migration no projeto 
 ## Ativação em 04/11/2026
 
 Migration aplicada no projeto mipiwxadnpwtcgfcedym, versão remota 20261104032148. Verificação: 24 tabelas com RLS, zero grants de tabelas a anon/authenticated, oito RPCs invoker sem execução anônima e bucket privado de 30 MB. Os avisos informativos de RLS sem políticas refletem o bloqueio intencional do acesso bruto; o cliente usa somente as operações governadas. Nenhum novo aviso de segurança ERROR/WARN associado a Seguros foi identificado. A carga de referência foi validada localmente; não foi salva ou certificada em produção. A validação visual publicada foi interrompida pelo controle de computador por não confirmar a URL do Chrome. Nenhuma nota ou apresentação viva foi publicada.
+# Integração com a Wiki
+
+O contrato leve, o catálogo de dependências e o fluxo editorial estão descritos em [portfolio-knowledge-integration.md](portfolio-knowledge-integration.md). Essa integração usa os snapshots existentes; não constitui o writer bruto universal nem completa os renderers Office.

@@ -1,8 +1,5 @@
-export type DataState =
-  | "observed"
-  | "zero_observed"
-  | "missing"
-  | "not_applicable";
+import type { ReportMetric, ReportMetricState } from '../report-data/reportDataContract';
+export type DataState = ReportMetricState;
 export type CellValue = string | number | boolean | null;
 export interface SourceCell {
   value: CellValue;
@@ -15,15 +12,7 @@ export interface WorkbookSource {
   storage_path?: string;
   sheets: Record<string, Record<string, SourceCell>>;
 }
-export interface InsuranceMetric {
-  product: string;
-  code: string;
-  period: string;
-  value: number | null;
-  state: DataState;
-  source: string;
-  unit: string;
-}
+export type InsuranceMetric = ReportMetric;
 export interface InsuranceIssue {
   code: string;
   severity: "warning" | "blocking";
@@ -32,6 +21,8 @@ export interface InsuranceIssue {
 }
 export interface InsurancePacket {
   version: "insurance/1";
+  /** True only for the lightweight report projection. Office/review hydrate the frozen source on demand. */
+  projection_only?: boolean;
   sources: WorkbookSource[];
   metrics: InsuranceMetric[];
   issues: InsuranceIssue[];

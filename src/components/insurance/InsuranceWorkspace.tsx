@@ -28,7 +28,7 @@ import {
   listInsuranceSnapshots,
   prepareInsuranceNote,
   readInsuranceSnapshot,
-  readInsuranceNoteSnapshot,
+  readInsuranceReportSnapshot,
   rejectInsuranceSnapshot,
   restoreInsuranceSources,
   saveInsuranceSnapshot,
@@ -112,7 +112,7 @@ export function InsuranceWorkspace({
           if (active) setSnapshots(rows);
           const latest = rows.find((s) => s.status === "certified") || rows[0];
           if (active && latest) {
-            const saved = await readInsuranceSnapshot(latest.id);
+            const saved = await readInsuranceReportSnapshot(latest.id);
             if (active) {
               setSelected(saved);
               setPacket(saved.manifest!);
@@ -144,11 +144,23 @@ export function InsuranceWorkspace({
     };
   }, [publisher]);
   const [reportMode, setReportMode] = useState<ReportView>("performance");
+  const [hydratingReport, setHydratingReport] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (reportMode !== 'xlsx' || !packet?.projection_only || !selected) { setHydratingReport(false); return; }
+    setHydratingReport(true);
+    readInsuranceSnapshot(selected.id).then(full => {
+      if (active) { setSelected(full); setPacket(full.manifest!); }
+    }).catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setHydratingReport(false); });
+    return () => { active = false; };
+  }, [reportMode, packet?.projection_only, selected?.id]);
+
   const score = packet
     ? insuranceScorecard(packet.metrics, product, period)
     : null;
   return (
     <section className="space-y-8" aria-label="Relatórios de Seguros">
+      {hydratingReport && <p role="status" className="text-sm text-slate-500">Carregando os arquivos e as evidências desta versão…</p>}
       <ReportWorkspaceHeader
         title="Relatórios | Seguros"
         view={reportMode}
@@ -224,7 +236,7 @@ export function InsuranceWorkspace({
               const id = e.target.value;
               if (!id) return;
               void run(async () => {
-                const s = await readInsuranceSnapshot(id);
+                const s = await readInsuranceReportSnapshot(id);
                 setSelected(s);
                 setPacket(s.manifest!);
                 setFiles([]);
@@ -361,7 +373,7 @@ export function InsuranceWorkspace({
           period={period}
         />
       )}
-      {packet && reportMode === "xlsx" && tab === "scenarios" && (
+      {packet && !packet.projection_only && reportMode === "xlsx" && tab === "scenarios" && (
         <section className="space-y-3">
           <h2 className="font-semibold">Premissas e cenário da referência</h2>
           <p className="text-sm text-slate-600">
@@ -412,7 +424,7 @@ export function InsuranceWorkspace({
           </p>
         </section>
       )}
-      {packet && reportMode === "xlsx" && tab === "changes" && (
+      {packet && !packet.projection_only && reportMode === "xlsx" && tab === "changes" && (
         <section className="space-y-4">
           <h2 className="font-semibold">Diferenças entre versões</h2>
           <label className="block text-sm">
@@ -476,7 +488,7 @@ export function InsuranceWorkspace({
           )}
         </section>
       )}
-      {packet && reportMode === "xlsx" && tab === "portfolio" && (
+      {packet && !packet.projection_only && reportMode === "xlsx" && tab === "portfolio" && (
         <section className="space-y-3">
           <h2 className="font-semibold">Contexto do portfólio de seguros</h2>
           <p className="text-sm text-slate-600">
@@ -522,7 +534,7 @@ export function InsuranceWorkspace({
           )}
         </section>
       )}
-      {packet && reportMode === "xlsx" && tab === "sources" && (
+      {packet && !packet.projection_only && reportMode === "xlsx" && tab === "sources" && (
         <div className="space-y-5">
           <h2 className="font-semibold">Validações da carga</h2>
           {publisher && (
@@ -704,7 +716,7 @@ export function InsuranceWorkspace({
           </div>
         </details>
       )}
-      {packet && reportMode === "xlsx" && tab === "exports" && (
+      {packet && !packet.projection_only && reportMode === "xlsx" && tab === "exports" && (
         <ReportDeliveryLayout>
           <div className="order-1 min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-5 text-sm shadow-sm">
             <h2 className="font-semibold">Arquivos no modelo de referência</h2>
@@ -934,67 +946,6 @@ export function InsuranceWorkspace({
       {busy && (
         <p role="status" className="text-sm text-cyan-700">
           Processando…
-        </p>
-      )}
-    </section>
-  );
-}
-
-export function InsuranceNoteBlock({
-  noteId,
-  showEmpty = false,
-}: {
-  noteId: string;
-  showEmpty?: boolean;
-}) {
-  const [snapshot, setSnapshot] = useState<SnapshotRow | null>(null),
-    [error, setError] = useState("");
-  useEffect(() => {
-    let active = true;
-    readInsuranceNoteSnapshot(noteId)
-      .then((s) => {
-        if (active) setSnapshot(s);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [noteId]);
-  if (!snapshot && !showEmpty) return null;
-  return (
-    <section
-      className="my-6 border-t py-5"
-      aria-label="Resultados certificados de Seguros"
-    >
-      <h3 className="font-semibold">Acompanhamento certificado de Seguros</h3>
-      {snapshot ? (
-        <>
-          <p className="mt-2 text-sm">
-            {snapshot.period_start} a {snapshot.period_end}
-          </p>
-          <ul className="mt-2 text-sm">
-            {snapshot
-              .manifest!.metrics.filter(
-                (m) =>
-                  m.period === "window_total" && m.code === "contracts_digital",
-              )
-              .map((m) => (
-                <li key={m.product}>
-                  {m.product}: {formatMetric(m)} contratações registradas
-                </li>
-              ))}
-          </ul>
-          <p className="mt-2 text-xs text-slate-500">
-            Consulta ao snapshot certificado; não altera o histórico editorial
-            desta nota.
-          </p>
-        </>
-      ) : (
-        <p className="mt-2 text-sm text-slate-500">
-          {error ||
-            "Sem snapshot certificado disponível para este acompanhamento."}
         </p>
       )}
     </section>

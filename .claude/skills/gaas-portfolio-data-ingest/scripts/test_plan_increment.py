@@ -15,6 +15,16 @@ def dispatch(identifier, day="2026-11-01", sent=0, channel="email"):
 
 
 class IncrementPlanTest(unittest.TestCase):
+    def test_dependency_receipt_has_no_effect_for_ignored_inputs(self):
+        result = module.plan(REGISTRY, [dispatch("already")], {"existing": [dispatch("already")]})
+        self.assertEqual(result["potential_consumers"], [])
+        self.assertFalse(result["reports_refreshed"])
+        self.assertEqual(result["editorial_check"], "no_new_candidates")
+        result = module.plan(REGISTRY, [dispatch("new")], {})
+        self.assertEqual(result["potential_consumers"][0]["query_contract"], "insurance.monthly")
+        self.assertEqual(result["potential_consumers"][0]["notes"][0]["relationship"], "consumes")
+        self.assertFalse(result["reports_refreshed"])
+
     def test_existing_key_changed_values_never_overwrites_and_history_is_ignored(self):
         state = {"existing": [dispatch("already", sent=100)], "checkpoints": [{"dataset_id": "insurance_dispatch", "partition": {"source_system": "sfmc", "source_account_code": "BU1", "channel_code": "email"}, "closed_through": "2026-10-31"}]}
         result = module.plan(REGISTRY, [dispatch("already", sent=900), dispatch("old", "2026-10-30"), dispatch("new")], state)

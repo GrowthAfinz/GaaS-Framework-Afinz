@@ -6,6 +6,7 @@ import {
   WorkbookSource,
 } from "./insuranceCore";
 import { sha256 } from "./insuranceParser";
+import { insuranceReportData } from './insuranceReportData';
 
 const NS = {
   sheet: "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
@@ -66,7 +67,7 @@ export function snapshotCells(
   const source = packet.sources.find((s) => s.sheets["Resumo Comitê"]);
   if (!source) throw new Error("INSURANCE_SOURCE_MISSING");
   const sheets = structuredClone(source.sheets);
-  for (const metric of packet.metrics) {
+  for (const metric of insuranceReportData(packet).metrics) {
     const base = Number(
       Object.keys(METRICS).find((r) => METRICS[Number(r)][0] === metric.code),
     );
@@ -101,7 +102,7 @@ export function snapshotCells(
           ? "window_total"
           : String(summary[col + "5"]?.value).slice(0, 7);
       const find = (code: string) =>
-        packet.metrics.find(
+        insuranceReportData(packet).metrics.find(
           (m) =>
             m.product === product && m.period === period && m.code === code,
         )?.value ?? null;
@@ -279,7 +280,7 @@ export async function renderReferencePptx(
       "TEMPLATE_VERSION_MISMATCH: utilize o comitê de 30/10, com 21 slides.",
     );
   const metric = (product: string, code: string) =>
-    packet.metrics.find(
+    insuranceReportData(packet).metrics.find(
       (m) =>
         m.product === product && m.code === code && m.period === "window_total",
     )?.value ?? null;
@@ -424,7 +425,7 @@ export async function renderReferencePptx(
               sheets["Resumo Comitê"][month + "5"]?.value,
             ).slice(0, 7);
             const value =
-              packet.metrics.find(
+              insuranceReportData(packet).metrics.find(
                 (m) =>
                   m.product === product &&
                   m.code === "digital_sales_share" &&

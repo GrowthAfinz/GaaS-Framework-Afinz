@@ -18,7 +18,7 @@ const core = await import(
 );
 const admin = "11111111-1111-4111-8111-111111111111",
   viewer = "22222222-2222-4222-8222-222222222222";
-function sample() {
+export function sample() {
   const summary = {};
   for (const [i, c] of ["D", "E", "F", "G", "H", "I", "J"].entries())
     summary[c + "5"] = { value: `2026-${String(i + 4).padStart(2, "0")}-01` };

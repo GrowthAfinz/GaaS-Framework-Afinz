@@ -1,4 +1,4 @@
-import { InsuranceNoteBlock } from '../insurance/InsuranceWorkspace';
+import { WikiDataBlocks, useWikiDataIndex } from './WikiDataBlocks';
 import { WikiConnections } from './graph/WikiConnections';
 import { withTimeout } from './graph/wikiGraphService';
 import { WikiNotesExplorer } from './notes/WikiNotesExplorer';
@@ -83,7 +83,9 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const resultsConfig=analytics||matrixConfig;
   const listsConfig=useMemo(()=>selected?readWikiLiveLists(selected.frontmatter,resultsConfig,Boolean(pageType)):null,[selected,resultsConfig,pageType]);
   const businessFields=analytics?([{key:'bu',label:'BU'},{key:'partner',label:'Parceiro'},{key:'segment',label:'Público'},{key:'stage',label:'Etapa'}] as const).map(field=>({...field,value:analytics.scope[field.key]||[...new Set((analytics.anyOf||[]).map(rule=>rule[field.key]).filter(Boolean))].join(' · ')||[...new Set(variants.map(variant=>variant[field.key]).filter(Boolean))].join(' · ')||reading.context[field.key==='stage'?'stages':field.key]||''})).filter(field=>field.value):[];
-  const insuranceBlock = selected ? <InsuranceNoteBlock key={selected.id} noteId={selected.id} showEmpty={selected.relative_path === '10-Resultados/Mecanicas/Seguros.md'} /> : null;
+  const dataIndex = useWikiDataIndex();
+  const noteBindings = dataIndex.bindings.filter(binding => binding.note_id === selected?.id);
+  const insuranceBlock = selected && noteBindings.length ? <WikiDataBlocks key={selected.id} noteId={selected.id} bindings={noteBindings} /> : null;
   const resultBlock = resultsConfig && selected ? <section id="resultados-vivos" className="my-6 scroll-mt-24" aria-label="Resultados deste assunto"><ResultsWorkspace key={selected.id} embedded={{...resultsConfig,noteId:selected.id}} /></section> : null;
   const openScopedResult=(config:typeof resultsConfig,scope:Partial<ResultsScope>,month:string)=>{
     if(!selected||!config||!resultsConfig)return;
