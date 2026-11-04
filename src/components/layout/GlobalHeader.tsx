@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
 import { useAppStore } from '../../store/useAppStore';
+import { FEATURES } from '../../config/features';
 import { NavDropdown } from './NavDropdown';
 import { FrenteSwitcher } from './FrenteSwitcher';
 import { BUDropdown } from './BUDropdown';
@@ -139,8 +140,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             items: [
                 { id: 'originacao-b2c', label: 'Originação B2C', icon: PieChart, onClick: () => navigateToTab('originacao-b2c') },
                 { id: 'funil-aquisicao', label: 'Funil de Aquisição', icon: Funnel, onClick: () => navigateToTab('funil-aquisicao') },
-                { id: 'relatorio', label: 'Relatórios', icon: ClipboardList, onClick: () => navigateToTab('relatorio') },
-                { id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') },
+                { id: 'relatorio', label: viewSettings.frente === 'rentabilizacao' ? 'Relatórios | Rentabilização' : 'Relatórios | Aquisição', icon: ClipboardList, onClick: () => navigateToTab('relatorio') },
+                ...(FEATURES.jornadaDisparosTab ? [{ id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') } as HeaderNavItem] : []),
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => navigateToTab('orientador') },
             ]
         },

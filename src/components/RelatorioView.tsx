@@ -17,6 +17,7 @@ import { exportFechamentoCopaXlsx } from '../utils/fechamentoCopaExcelExport';
 import { exportHighFrequencyPartnerXlsx, HighFrequencyPartner } from '../utils/highFrequencyPartnersExcelExport';
 import { SegmentLabel, formatSegmentText } from './relatorio/segmentLabels';
 import { ReportLiveOutputCard } from './relatorio/ReportLiveOutputCard';
+import { JourneyHealthSection } from './relatorio/JourneyHealthSection';
 import { GrowthBetSourceContext, openGrowthBetSourceContext, openGrowthLearningSection } from './growth-learning/growthLearningNavigation';
 import { RelatedGrowthBets } from './growth-learning/bets/RelatedGrowthBets';
 import {
@@ -157,10 +158,10 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
   const globalFilters = viewSettings.filtrosGlobais;
   const rentab = viewSettings.frente === 'rentabilizacao';
   const { selectedBUs } = useBU();
-  const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly' | 'xlsx'>('performance');
+  const [reportMode, setReportMode] = useState<'performance' | 'daily' | 'monthly' | 'journey' | 'xlsx'>(() => new URLSearchParams(window.location.search).get('report_mode') === 'journey' ? 'journey' : 'performance');
 
   const growthSourceContext = useMemo<GrowthBetSourceContext | null>(() => {
-    if (rentab || reportMode === 'xlsx') return null;
+    if (rentab || reportMode === 'xlsx' || reportMode === 'journey') return null;
     const modeContract = {
       performance: { surface: 'reports_overview' as const, label: 'Overview', route: 'reports:overview' },
       daily: { surface: 'reports_daily' as const, label: 'Diário', route: 'reports:daily' },
@@ -819,6 +820,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                     { key: 'performance' as const, label: 'Overview' },
                     { key: 'daily' as const, label: 'Diário' },
                     { key: 'monthly' as const, label: 'Mensal' },
+                    { key: 'journey' as const, label: 'Evolução e anomalias' },
                     { key: 'xlsx' as const, label: 'Relatórios' },
                   ].map((option) => (
                     <button
@@ -844,7 +846,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
                 <span className="ml-2 opacity-70">· {format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</span>
               </p>
             </div>
-            {!rentab && reportMode !== 'xlsx' && (
+            {!rentab && reportMode !== 'xlsx' && reportMode !== 'journey' && (
               <button type="button" onClick={createContextualBet} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/30 bg-white px-4 py-2.5 text-xs font-black text-cyan-800 shadow-sm transition hover:bg-cyan-50">
                 <Target size={15} /> Criar aposta
               </button>
@@ -896,6 +898,9 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
         <DailyReportView data={data} selectedBU={selectedBU} rentabilizacao={rentab} />
       )}
 
+      {reportMode === 'journey' && (
+        <div className="mt-4"><JourneyHealthSection data={data} selectedBU={selectedBU} /></div>
+      )}
       {reportMode === 'xlsx' && (
         <section className="mx-auto w-full max-w-6xl space-y-8">
           <p className="px-1 text-xs text-slate-500">

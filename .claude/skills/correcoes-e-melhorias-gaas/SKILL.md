@@ -3,7 +3,7 @@ name: correcoes-e-melhorias-gaas
 description: Lê a aba Correções e melhorias do GaaS (comentários do time para a IA), apresenta cada item em tópicos para o Pablo decidir a ordem, grava as decisões e executa na ordem combinada (correção de nota no vault, ajuste no app por PR, ou trabalho novo no SDD). Compartilhada por Claude e Codex; usar só por comando explícito, como "roda as correções", "o que o time pediu pra IA", "processa a aba Correções e melhorias".
 ---
 
-# Correções e melhorias · 1.0.0
+# Correções e melhorias · 1.1.0
 
 Skill canônica da troca Humano → IA do GaaS. Spec: `08-Engenharia/Spec-Correcoes-e-Melhorias-GaaS.md` no vault; decisões em `09-Inteligencia-IA/Correcoes-e-Melhorias-GaaS.md`. A plataforma nunca inicia uma LLM: esta skill roda quando o Pablo pede.
 
@@ -35,6 +35,18 @@ commit;
 ```
 
 Grave SQL longo em arquivo com quebra de linha LF e rode com `supabase db query --linked -f arquivo.sql`.
+
+## 0. Portão de hidratação
+
+Antes de ler a fila, rode da raiz de `ACALENDARIO APP/`:
+
+```bash
+python scripts/vault_hydration_gate.py check --by claude-code   # ou --by codex
+```
+
+- **PULAR**: não reidrate snapshots nesta rodada. Cite no fechamento a data e o horário da próxima checagem.
+- **REIDRATAR**: a checagem já ficou gravada no GaaS (data, horário, notas vencidas). Inclua a reidratação como item a apresentar ao Pablo, usando `python scripts/rehydrate_vault.py` em dry-run. Nada é aplicado sem aprovação.
+- `--force` só com pedido explícito do Pablo. A frequência é reprogramável em Saúde do acervo › Reprogramar.
 
 ## 1. Ler
 
