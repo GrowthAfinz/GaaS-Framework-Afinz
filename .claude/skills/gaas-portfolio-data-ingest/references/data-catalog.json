@@ -1,0 +1,1014 @@
+{
+  "schema": "gaas-portfolio-data-catalog/1",
+  "version": "0.1.0",
+  "verified_on": "2026-11-04",
+  "project_id": "mipiwxadnpwtcgfcedym",
+  "purpose": "raw inputs -> normalized facts -> reporting datasets -> XLSX/PPTX outputs",
+  "runtime": {
+    "normalized_raw_writer_ready": false,
+    "fast_bi_read_model_ready": false,
+    "legacy_reference_import_is_raw_ingest": false
+  },
+  "policy": {
+    "existing_key": "ignore_and_audit",
+    "closed_period": "ignore_and_audit",
+    "conflicting_duplicate_in_file": "block_key",
+    "unknown_layout_or_grain": "quarantine",
+    "historical_correction": "only_by_new_explicit_user_instruction",
+    "update_delete": "forbidden_in_regular_ingestion"
+  },
+  "datasets": [
+    {
+      "dataset_id": "insurance_dispatch",
+      "title": "Comunicações de Seguros",
+      "target_table": "growth_data.dispatch_facts",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "ocorrência de envio × canal",
+      "key_fields": [
+        "source_system",
+        "source_account_code",
+        "source_dispatch_id",
+        "channel_code"
+      ],
+      "partition_fields": [
+        "source_system",
+        "source_account_code",
+        "channel_code"
+      ],
+      "measure_fields": [
+        "sent",
+        "delivered",
+        "opens_unique",
+        "reads",
+        "clicks_unique",
+        "failed",
+        "undelivered",
+        "unsubscribes",
+        "lp_registrations",
+        "unit_cost",
+        "communication_cost"
+      ],
+      "reference_locations": [
+        "Performance: Base de disparos (3 blocos independentes)"
+      ],
+      "report_consumers": [
+        "Seguros: Overview / Diário / Evolução e anomalias",
+        "Comitê 30/10: slides 8–10"
+      ],
+      "related_existing_tables": [
+        "public.rentabilizacao_activities"
+      ]
+    },
+    {
+      "dataset_id": "insurance_contract_event",
+      "title": "Confirmação e cancelamento individual de seguro",
+      "target_table": "growth_data.insurance_contract_events",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "evento com identificador estável e data de negócio; produto/origem ligados somente por IDs comprovados",
+      "key_fields": [
+        "source_system",
+        "source_contract_id",
+        "event_id",
+        "event_type"
+      ],
+      "partition_fields": [
+        "source_system",
+        "product_code",
+        "population_code"
+      ],
+      "measure_fields": [
+        "contract_count",
+        "premium_amount"
+      ],
+      "reference_locations": [
+        "Performance: funil LP e contratação (fontes individuais ainda ausentes nos modelos)"
+      ],
+      "report_consumers": [
+        "Seguros: cadastro, contratação e cancelamento por data, quando a fonte fornecer esses eventos"
+      ],
+      "related_existing_tables": [
+        "growth_data.outcome_facts"
+      ]
+    },
+    {
+      "dataset_id": "insurance_lp_event",
+      "title": "Eventos brutos de formulário LP",
+      "target_table": "growth_data.insurance_lp_events",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "evento com identificador estável e data de negócio; produto/origem ligados somente por IDs comprovados",
+      "key_fields": [
+        "source_system",
+        "form_submission_id",
+        "event_id"
+      ],
+      "partition_fields": [
+        "source_system",
+        "product_code",
+        "population_code"
+      ],
+      "measure_fields": [
+        "registration_count"
+      ],
+      "reference_locations": [
+        "Performance: funil LP e contratação (fontes individuais ainda ausentes nos modelos)"
+      ],
+      "report_consumers": [
+        "Seguros: cadastro, contratação e cancelamento por data, quando a fonte fornecer esses eventos"
+      ],
+      "related_existing_tables": [
+        "growth_data.outcome_facts"
+      ]
+    },
+    {
+      "dataset_id": "insurance_outcome",
+      "title": "Cadastros e contratações confirmadas",
+      "target_table": "growth_data.outcome_facts",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × produto × população × origem × base temporal",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "product_code",
+        "population_code",
+        "origin_code",
+        "time_basis",
+        "count_method",
+        "franchise_code"
+      ],
+      "partition_fields": [
+        "product_code",
+        "population_code",
+        "origin_code",
+        "time_basis",
+        "count_method",
+        "franchise_code"
+      ],
+      "measure_fields": [
+        "source_activated_count",
+        "delivered_source_count",
+        "lp_registrations",
+        "effective_contracts",
+        "company_new_sales",
+        "cancelled_contracts"
+      ],
+      "reference_locations": [
+        "Performance: Performance geral conversoes / Preenchimentos LP por midia / Acompanhamento mensal / inputs externos do Resumo Comitê"
+      ],
+      "report_consumers": [
+        "Seguros: Overview / Mensal",
+        "XLSX Performance: funil e representatividade",
+        "Comitê 30/10: slides 8–10"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "insurance_traffic",
+      "title": "LP e Lojinha: tráfego e eventos",
+      "target_table": "growth_data.traffic_facts",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × superfície × produto × origem × definição",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "product_code",
+        "population_code",
+        "surface_code",
+        "origin_code",
+        "session_definition_version"
+      ],
+      "partition_fields": [
+        "product_code",
+        "population_code",
+        "surface_code",
+        "origin_code",
+        "session_definition_version"
+      ],
+      "measure_fields": [
+        "sessions",
+        "engaged_sessions",
+        "registrations",
+        "purchase_sessions"
+      ],
+      "reference_locations": [
+        "Performance: Acompanhamento mensal (Lojinha) / inputs de tráfego do Resumo Comitê"
+      ],
+      "report_consumers": [
+        "Seguros: funil LP, leitura de Lojinha e cobertura",
+        "XLSX Performance: sessões e conversões"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "media_aggregate",
+      "title": "Mídia agregada da Lojinha/Seguros",
+      "target_table": "growth_data.media_aggregate_facts",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × plataforma × produto × superfície × definição de clique, sem inventar campanhas/anúncios",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "platform_code",
+        "product_code",
+        "surface_code",
+        "click_definition_version",
+        "population_code"
+      ],
+      "partition_fields": [
+        "platform_code",
+        "product_code",
+        "surface_code",
+        "click_definition_version",
+        "population_code"
+      ],
+      "measure_fields": [
+        "spend",
+        "impressions",
+        "registered_clicks"
+      ],
+      "reference_locations": [
+        "Performance: Acompanhamento mensal (Investimentos Meta, Impressões, Cliques registrados e CPC)"
+      ],
+      "report_consumers": [
+        "Lojinha: investimento e eficiência de mídia",
+        "Seguros: aquisição digital"
+      ],
+      "related_existing_tables": [
+        "public.paid_media_metrics"
+      ]
+    },
+    {
+      "dataset_id": "insurance_investment",
+      "title": "Mensageria, mídia e custos digitais",
+      "target_table": "growth_data.investment_facts",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × produto × população × tipo de custo × origem",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "product_code",
+        "population_code",
+        "cost_type",
+        "origin_code",
+        "currency"
+      ],
+      "partition_fields": [
+        "product_code",
+        "population_code",
+        "cost_type",
+        "origin_code",
+        "currency"
+      ],
+      "measure_fields": [
+        "amount"
+      ],
+      "reference_locations": [
+        "Performance: Investimentos em mídia / Base de disparos / Acompanhamento mensal"
+      ],
+      "report_consumers": [
+        "Seguros: custos por cadastro e contratação",
+        "XLSX Performance: investimento",
+        "Comitê 30/10: slides 8–10"
+      ],
+      "related_existing_tables": [
+        "public.paid_media_metrics"
+      ]
+    },
+    {
+      "dataset_id": "insurance_stock",
+      "title": "Apólices: abertura, novas, canceladas e fechamento",
+      "target_table": "growth_data.portfolio_observations",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × métrica × produto × população × ramo × regime",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "metric_code",
+        "product_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "partition_fields": [
+        "metric_code",
+        "product_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "measure_fields": [
+        "value"
+      ],
+      "reference_locations": [
+        "Radar: Base Seguros"
+      ],
+      "report_consumers": [
+        "Seguros: Carteira / Mensal",
+        "Radar: IPP Seguros e carteira"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "portfolio_stock",
+      "title": "Portfólio: aptos, vivos, ativados, originação e cancelamentos",
+      "target_table": "growth_data.portfolio_observations",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × métrica × população × ramo × regime",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "metric_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "partition_fields": [
+        "metric_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "measure_fields": [
+        "value"
+      ],
+      "reference_locations": [
+        "Radar: Base Portfólio",
+        "PPTX 16/10: cap. Ativação",
+        "PPTX 30/10: visão geral"
+      ],
+      "report_consumers": [
+        "Radar / Painel / Cap1",
+        "Comitês: ativação, churn, farol RxO e YoY"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "portfolio_retention",
+      "title": "Retenção realizada e metas",
+      "target_table": "growth_data.portfolio_observations",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × métrica × ramo × cenário",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "metric_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "partition_fields": [
+        "metric_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "measure_fields": [
+        "value"
+      ],
+      "reference_locations": [
+        "Radar: Base Retenção"
+      ],
+      "report_consumers": [
+        "Radar / Painel: retenção e churn"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "portfolio_usage",
+      "title": "Uso: faturamento, transações e denominadores",
+      "target_table": "growth_data.portfolio_observations",
+      "table_status": "exists",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × métrica × população × ramo × regime",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "metric_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "partition_fields": [
+        "metric_code",
+        "population_code",
+        "branch_code",
+        "scenario_kind",
+        "measurement_regime"
+      ],
+      "measure_fields": [
+        "value"
+      ],
+      "reference_locations": [
+        "Radar: Base Faturamento / Cap2 Uso Ramo",
+        "PPTX 16/10: cap. Uso"
+      ],
+      "report_consumers": [
+        "Radar / Painel / Cap2",
+        "Comitês: frequência, spending e ticket"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "portfolio_cohort",
+      "title": "Safras e MOB de ativação/reativação",
+      "target_table": "growth_data.portfolio_cohort_facts",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "safra × MOB × ramo × população",
+      "key_fields": [
+        "cohort_month",
+        "mob",
+        "branch_code",
+        "population_code",
+        "activation_definition_version"
+      ],
+      "partition_fields": [
+        "branch_code",
+        "population_code",
+        "activation_definition_version"
+      ],
+      "measure_fields": [
+        "new_accounts",
+        "eligible_accounts",
+        "activated_accounts",
+        "reactivated_accounts"
+      ],
+      "reference_locations": [
+        "Radar: Base Portfólio (Safras por Ramos)",
+        "PPTX 16/10: slide 8"
+      ],
+      "report_consumers": [
+        "Cap1: ativação por safra / MOB4"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "portfolio_engagement",
+      "title": "Clusters e componentes de engajamento",
+      "target_table": "growth_data.portfolio_engagement_facts",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × ramo × cluster/score × método",
+      "key_fields": [
+        "business_date",
+        "branch_code",
+        "population_code",
+        "cluster_code",
+        "score_dimension",
+        "score_bucket",
+        "method_version"
+      ],
+      "partition_fields": [
+        "branch_code",
+        "population_code",
+        "cluster_code",
+        "score_dimension",
+        "score_bucket",
+        "method_version"
+      ],
+      "measure_fields": [
+        "account_count",
+        "population_count",
+        "measure_value"
+      ],
+      "reference_locations": [
+        "Radar: Base engajamento",
+        "PPTX 30/10: slides 4–6",
+        "PPTX 16/10: cap. Engajamento"
+      ],
+      "report_consumers": [
+        "Radar: clusters e abertura do Dormente",
+        "Comitês: engajamento e oportunidades CRM"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "portfolio_revenue",
+      "title": "Receitas por rubrica, ramo e cenário",
+      "target_table": "growth_data.portfolio_revenue_facts",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × rubrica × ramo × cenário × regime",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "revenue_line_code",
+        "branch_code",
+        "population_code",
+        "scenario_kind",
+        "measurement_regime",
+        "currency"
+      ],
+      "partition_fields": [
+        "revenue_line_code",
+        "branch_code",
+        "population_code",
+        "scenario_kind",
+        "measurement_regime",
+        "currency"
+      ],
+      "measure_fields": [
+        "amount"
+      ],
+      "reference_locations": [
+        "Radar: Base Receitas (2) / Cap3 Monetização Ramo",
+        "PPTX 16/10: cap. Monetização"
+      ],
+      "report_consumers": [
+        "Radar / Painel / Cap3",
+        "Comitês: receita total e receita por vivo/ativado"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "insurance_budget",
+      "title": "Orçamento de Seguros, preço e premissas",
+      "target_table": "growth_data.scenario_assumptions",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_versions",
+      "date_field": "business_date",
+      "grain": "versão de cenário × período × produto × ramo × premissa",
+      "key_fields": [
+        "scenario_version",
+        "business_date",
+        "branch_code",
+        "product_code",
+        "measure_code"
+      ],
+      "partition_fields": [
+        "scenario_version",
+        "branch_code",
+        "product_code",
+        "measure_code"
+      ],
+      "measure_fields": [
+        "value"
+      ],
+      "reference_locations": [
+        "Radar: Orçamento Seguros",
+        "Performance: Resumo Comitê (cenários financeiros)"
+      ],
+      "report_consumers": [
+        "Orçamento / Projeções / Cenários de Seguros"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "portfolio_projection",
+      "title": "Reestruturação: premissas e projeções",
+      "target_table": "growth_data.scenario_assumptions",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_versions",
+      "date_field": "business_date",
+      "grain": "versão de cenário × período × ramo × premissa",
+      "key_fields": [
+        "scenario_version",
+        "business_date",
+        "branch_code",
+        "product_code",
+        "measure_code"
+      ],
+      "partition_fields": [
+        "scenario_version",
+        "branch_code",
+        "product_code",
+        "measure_code"
+      ],
+      "measure_fields": [
+        "value"
+      ],
+      "reference_locations": [
+        "Radar: Projeções com reestruturação"
+      ],
+      "report_consumers": [
+        "Cenário Base / Reestruturação / impacto e sensibilidades"
+      ],
+      "related_existing_tables": []
+    },
+    {
+      "dataset_id": "credit_personal",
+      "title": "CP: elegibilidade, exposição e contratação",
+      "target_table": "growth_data.credit_outcome_facts",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × público × propensão × exposição × app × população",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "population_code",
+        "audience_code",
+        "propensity_band",
+        "exposure_band",
+        "app_status",
+        "time_basis"
+      ],
+      "partition_fields": [
+        "population_code",
+        "audience_code",
+        "propensity_band",
+        "exposure_band",
+        "app_status",
+        "time_basis"
+      ],
+      "measure_fields": [
+        "eligible_count",
+        "contacted_count",
+        "message_count",
+        "contract_count",
+        "origination_amount",
+        "crm_cost",
+        "limit_amount"
+      ],
+      "reference_locations": [
+        "PPTX 30/10: slides 11–14",
+        "PPTX 16/10: slides 32–34"
+      ],
+      "report_consumers": [
+        "Comitê: CP, conversão, custo e segmentação"
+      ],
+      "related_existing_tables": [
+        "public.rentabilizacao_activities"
+      ]
+    },
+    {
+      "dataset_id": "crm_pressure",
+      "title": "Pressão de CRM e mensuração histórica",
+      "target_table": "growth_data.crm_pressure_observations",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "período × canal × frente × universo explícito",
+      "key_fields": [
+        "period_start",
+        "business_date",
+        "channel_code",
+        "front_code",
+        "population_code",
+        "inclusion_scope"
+      ],
+      "partition_fields": [
+        "channel_code",
+        "front_code",
+        "population_code",
+        "inclusion_scope"
+      ],
+      "measure_fields": [
+        "message_count",
+        "eligible_count",
+        "reads",
+        "crm_cost"
+      ],
+      "reference_locations": [
+        "PPTX 16/10: slides 27–31"
+      ],
+      "report_consumers": [
+        "Comitê: mensuração, pressão, com/sem CP e Copa"
+      ],
+      "related_existing_tables": [
+        "public.activities",
+        "public.rentabilizacao_activities"
+      ]
+    },
+    {
+      "dataset_id": "offers_pool",
+      "title": "Pool/Visa: desempenho de ofertas",
+      "target_table": "growth_data.offer_performance_facts",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "dia × oferta × campanha × canal × público",
+      "key_fields": [
+        "business_date",
+        "offer_id",
+        "campaign_id",
+        "channel_code",
+        "population_code"
+      ],
+      "partition_fields": [
+        "offer_id",
+        "campaign_id",
+        "channel_code",
+        "population_code"
+      ],
+      "measure_fields": [
+        "exposed_count",
+        "click_count",
+        "claim_count",
+        "purchase_count",
+        "transaction_count",
+        "spend_amount",
+        "crm_cost"
+      ],
+      "reference_locations": [
+        "PPTX 30/10: slides 15–18 (desenho, sem comprovação de resultado)"
+      ],
+      "report_consumers": [
+        "Comitê: Pool/Visa, uso e testes"
+      ],
+      "related_existing_tables": [
+        "public.dynamic_email_pool_offers",
+        "public.experiments"
+      ]
+    },
+    {
+      "dataset_id": "experiment_measurement",
+      "title": "Medições de experimentos e controles",
+      "target_table": "growth_data.experiment_measurements",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_periods",
+      "date_field": "business_date",
+      "grain": "experimento × versão × braço × período × métrica",
+      "key_fields": [
+        "experiment_id",
+        "experiment_version",
+        "arm_code",
+        "period_start",
+        "business_date",
+        "metric_code",
+        "population_code",
+        "attribution_window"
+      ],
+      "partition_fields": [
+        "experiment_id",
+        "experiment_version",
+        "arm_code",
+        "metric_code",
+        "population_code",
+        "attribution_window"
+      ],
+      "measure_fields": [
+        "value",
+        "assigned_count",
+        "observed_count"
+      ],
+      "reference_locations": [
+        "PPTX 30/10: slides 18–21 (plano)"
+      ],
+      "report_consumers": [
+        "Incrementalidade e decisão sobre experimentos"
+      ],
+      "related_existing_tables": [
+        "public.experiments",
+        "public.vw_experiment_metrics",
+        "public.vw_experiment_metrics_daily"
+      ]
+    },
+    {
+      "dataset_id": "editorial_evidence",
+      "title": "Contexto, hipóteses, decisões documentadas e notas",
+      "target_table": "growth_data.editorial_evidence",
+      "table_status": "proposed",
+      "raw_adapter_status": "pending_first_raw_contract",
+      "write_operation": "insert_only",
+      "time_policy": "append_new_versions",
+      "date_field": "business_date",
+      "grain": "edição da fonte × objeto/bloco × tipo de evidência",
+      "key_fields": [
+        "source_sha256",
+        "source_locator",
+        "evidence_kind"
+      ],
+      "partition_fields": [
+        "source_sha256",
+        "evidence_kind"
+      ],
+      "measure_fields": [],
+      "reference_locations": [
+        "Performance: Capa e notas do Resumo",
+        "Radar: Data Sources",
+        "PPTX: 65 slides, notas e referências"
+      ],
+      "report_consumers": [
+        "Textos de comitê / notas de metodologia / propostas de Wiki"
+      ],
+      "related_existing_tables": [
+        "public.gaas_knowledge_contributions",
+        "public.report_runs"
+      ]
+    }
+  ],
+  "shared_tables_existing": [
+    "growth_data.source_contracts",
+    "growth_data.ingest_batches",
+    "growth_data.ingest_records",
+    "growth_data.products",
+    "growth_data.product_memberships",
+    "growth_data.populations",
+    "growth_data.metric_definitions",
+    "growth_data.fact_revisions",
+    "growth_data.reconciliations",
+    "growth_data.snapshots",
+    "growth_data.snapshot_revisions",
+    "growth_data.snapshot_metrics",
+    "growth_data.snapshot_bindings",
+    "growth_data.content_bindings",
+    "growth_data.binding_metrics",
+    "growth_data.note_impacts",
+    "growth_data.output_artifacts",
+    "growth_data.responsibilities",
+    "growth_data.certification_reviews",
+    "public.report_runs",
+    "public.report_frozen_inputs",
+    "public.report_run_sources"
+  ],
+  "shared_tables_proposed": [
+    "growth_data.ingest_checkpoints",
+    "growth_data.ingest_decisions",
+    "growth_data.scenario_versions",
+    "growth_data.scenario_results"
+  ],
+  "reference_scope": {
+    "xlsx_sheets": 21,
+    "pptx_slides": 65,
+    "references_are_output_models": true,
+    "baseline_requires_separate_bootstrap_contract": true
+  },
+  "derived_metrics": [
+    {
+      "code": "delivery_rate",
+      "formula": "delivered / sent",
+      "constraint": "mesma ocorrência/população; zero e ausente no denominador não são taxa zero"
+    },
+    {
+      "code": "cost_per_contract",
+      "formula": "SUM(cost) / SUM(confirmed_contracts)",
+      "constraint": "mesmo período, produto, universo e autoridade; não calcular média de CACs"
+    },
+    {
+      "code": "digital_share",
+      "formula": "digital_new_contracts / company_new_sales",
+      "constraint": "definições comerciais comparáveis e corte compatível"
+    },
+    {
+      "code": "ipp_insurance",
+      "formula": "closing_policies / live_accounts",
+      "constraint": "estoques no mesmo corte; não representa necessariamente pessoas únicas"
+    },
+    {
+      "code": "activation_rate_eligible",
+      "formula": "activated_accounts / eligible_accounts",
+      "constraint": "distinto de ativados/vivos; o material usa denominadores que precisam de contratos separados"
+    },
+    {
+      "code": "activation_rate_live",
+      "formula": "activated_accounts / live_accounts",
+      "constraint": "não usar como alias de ativados/aptos"
+    },
+    {
+      "code": "voluntary_churn",
+      "formula": "voluntary_cancellations / live_accounts_previous_month",
+      "constraint": "mesmo ramo e universo; falta do mês anterior bloqueia o cálculo"
+    },
+    {
+      "code": "frequency",
+      "formula": "transactions / activated_accounts",
+      "constraint": "razão mensal; denominador por definição aprovada"
+    },
+    {
+      "code": "spending",
+      "formula": "purchase_amount / activated_accounts",
+      "constraint": "razão mensal; YTD ponderado e média das razões mensais são definições distintas"
+    },
+    {
+      "code": "ticket",
+      "formula": "purchase_amount / transactions",
+      "constraint": "não confundir com spending por ativado"
+    },
+    {
+      "code": "revenue_per_live",
+      "formula": "operating_revenue / live_accounts",
+      "constraint": "regime contábil, período e tratamento do denominador definidos"
+    },
+    {
+      "code": "engagement_share",
+      "formula": "cluster_accounts / eligible_accounts",
+      "constraint": "mesma versão do modelo de cluster; percentual arredondado não vira contagem exata"
+    },
+    {
+      "code": "mom_yoy_rxo",
+      "formula": "comparable_actual / comparable_baseline - 1",
+      "constraint": "baseline, parcialidade, janelas comparáveis e direção do indicador governadas; N/A preservado"
+    },
+    {
+      "code": "media_cpc_registered",
+      "formula": "spend / registered_clicks",
+      "constraint": "preservar definição de clique; não renomear para CPC de link sem fonte compatível"
+    }
+  ],
+  "surface_codes": {
+    "lp_total": {
+      "surface": "lp",
+      "stage": "all"
+    },
+    "lojinha_total": {
+      "surface": "lojinha",
+      "stage": "all"
+    },
+    "lojinha_home": {
+      "surface": "lojinha",
+      "stage": "home"
+    },
+    "lojinha_cart": {
+      "surface": "lojinha",
+      "stage": "cart"
+    },
+    "lojinha_payment": {
+      "surface": "lojinha",
+      "stage": "payment"
+    },
+    "lojinha_completion": {
+      "surface": "lojinha",
+      "stage": "completion"
+    },
+    "lojinha_purchase": {
+      "surface": "lojinha",
+      "stage": "purchase"
+    }
+  },
+  "surface_policy": "Do not sum stages as independent sessions or treat an aggregate page export as a sequential person-level funnel. Analytics purchase/session is not insurance confirmation.",
+  "dimensions_to_govern": [
+    "source_system/account",
+    "commercial_product/report_group",
+    "branch_and_rollup_version",
+    "population_and_count_method",
+    "surface_and_event_stage",
+    "origin_and_attribution_window",
+    "revenue_line_and_accounting_regime",
+    "cohort_and_MOB",
+    "engagement_cluster_and_score_version",
+    "propensity/exposure/app_status",
+    "scenario_kind_and_version",
+    "business_calendar_timezone"
+  ]
+}
