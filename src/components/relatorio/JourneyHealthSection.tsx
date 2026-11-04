@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { AlertTriangle, BarChart2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { AnomalyType, CalendarData } from '../../types/framework';
+import { Activity, AnomalyType, CalendarData } from '../../types/framework';
+import { AnomalyEvolutionChart } from './AnomalyEvolutionChart';
 import { useAppStore } from '../../store/useAppStore';
 import { DailyDetailsModal } from '../jornada/DailyDetailsModal';
 import { PerformanceEvolutionChart } from '../jornada/PerformanceEvolutionChart';
@@ -27,14 +28,18 @@ export function JourneyHealthSection({ data, selectedBU }: { data: CalendarData;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [anomalyFilters, setAnomalyFilters] = useState<AnomalyType[]>([]);
 
+  const accept = useCallback((activity: Activity) =>
+    (!selectedBU || activity.bu === selectedBU)
+    && (!selectedCanais.length || selectedCanais.includes(activity.canal))
+    && (!selectedSegmentos.length || selectedSegmentos.includes(activity.segmento))
+    && (!selectedParceiros.length || selectedParceiros.includes(activity.parceiro)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [selectedBU, selectedCanais.join('|'), selectedSegmentos.join('|'), selectedParceiros.join('|')]);
+
   const selectedActivities = useMemo(() => {
     if (!selectedDate) return [];
-    return (data[format(selectedDate, 'yyyy-MM-dd')] || []).filter(activity =>
-      (!selectedBU || activity.bu === selectedBU)
-      && (!selectedCanais.length || selectedCanais.includes(activity.canal))
-      && (!selectedSegmentos.length || selectedSegmentos.includes(activity.segmento))
-      && (!selectedParceiros.length || selectedParceiros.includes(activity.parceiro)));
-  }, [data, selectedDate, selectedBU, selectedCanais, selectedSegmentos, selectedParceiros]);
+    return (data[format(selectedDate, 'yyyy-MM-dd')] || []).filter(accept);
+  }, [data, selectedDate, accept]);
 
   const toggle = (id: AnomalyType) => setAnomalyFilters(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
 
@@ -44,7 +49,7 @@ export function JourneyHealthSection({ data, selectedBU }: { data: CalendarData;
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
         <div>
           <h2 className="text-base font-semibold text-slate-900">Evolução e anomalias</h2>
-          <p className="text-xs text-slate-500">Clique num dia do gráfico para ver os disparos. No modo Anomalias, filtre o detalhe por tipo de problema.</p>
+          <p className="text-xs text-slate-500">Clique num dia do gráfico para ver os disparos. No modo Anomalias, o gráfico mostra os disparos com problema e os filtros escolhem os tipos.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {mode === 'anomalies' && (
@@ -67,6 +72,9 @@ export function JourneyHealthSection({ data, selectedBU }: { data: CalendarData;
           <InsightDeckModal trigger="inline" />
         </div>
       </div>
+      {mode === 'anomalies' ? (
+        <AnomalyEvolutionChart data={data} filters={anomalyFilters} accept={accept} onDayClick={setSelectedDate} />
+      ) : (
       <PerformanceEvolutionChart
         data={data}
         selectedBU={selectedBU}
@@ -75,6 +83,7 @@ export function JourneyHealthSection({ data, selectedBU }: { data: CalendarData;
         selectedParceiros={selectedParceiros}
         onDayClick={dateStr => setSelectedDate(new Date(`${dateStr}T00:00:00`))}
       />
+      )}
     </section>
   );
 }

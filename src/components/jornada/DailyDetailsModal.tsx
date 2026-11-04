@@ -1,5 +1,6 @@
 import React from 'react';
 import { Activity, AnomalyType } from '../../types/framework';
+import { matchesAnomaly } from './anomalies';
 import { X, Edit2, Check, ExternalLink, ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import { deriveActivityMetrics, aggregateMetrics } from '../../utils/activityMetrics';
 import { useAppStore } from '../../store/useAppStore';
@@ -100,26 +101,7 @@ export const DailyDetailsModal: React.FC<DailyDetailsModalProps> = ({
     if (!date && !titleOverride) return null;
 
     // Filtro por anomalias (mantém comportamento original)
-    const filteredActivities = activities.filter((activity) => {
-        if (anomalyFilters.length === 0) return true;
-
-        const rawCartoes = String(activity.raw['Cartões Gerados'] || '').toLowerCase().trim();
-        const isPending = rawCartoes.includes('aguardando') || rawCartoes.includes('confirmar');
-
-        const rawDisparado = String(activity.raw['Disparado?'] || '').toLowerCase().trim();
-        const isDisparado = ['sim', 's', 'yes', 'y', 'enviado', 'ok', 'true', '1'].includes(rawDisparado);
-
-        const isNoSent = isDisparado && (activity.kpis.baseEnviada || 0) === 0;
-        const isNoDelivered = isDisparado && (activity.kpis.baseEntregue || 0) === 0;
-        const isNoOpen = isDisparado && (activity.kpis.taxaAbertura || 0) === 0;
-
-        if (anomalyFilters.includes('pending') && isPending) return true;
-        if (anomalyFilters.includes('no_sent') && isNoSent) return true;
-        if (anomalyFilters.includes('no_delivered') && isNoDelivered) return true;
-        if (anomalyFilters.includes('no_open') && isNoOpen) return true;
-
-        return false;
-    });
+    const filteredActivities = anomalyFilters.length === 0 ? activities : activities.filter((activity) => matchesAnomaly(activity, anomalyFilters));
 
     const summary = aggregateMetrics(filteredActivities);
     const activityRows = filteredActivities.map((activity, originalIndex) => ({
