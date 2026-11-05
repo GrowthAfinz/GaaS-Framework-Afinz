@@ -31,3 +31,6 @@ The history pattern scan covered 4,731 textual blobs reachable from main, up to 
 npm audit initially reported 14 findings. Compatible patch updates were applied; remaining major tool upgrades and SheetJS issues require a separate compatibility review. Do not use audit fix --force blindly.
 
 Incident logs, IPs, email roster, traffic snapshots, HTTP test results and deployment backups are local private evidence and must not be committed to this public repo.
+
+## Scheduled Meta credential
+The legacy scheduled Meta call used the public anon JWT. Its Vault credential was replaced server-side with a fresh private random value. The Edge boundary verifies that value through a service-only RPC; the public key remains denied. The gateway JWT toggle is off for this collector because the private dispatch token is not a JWT; signed users still require approved membership. A probe using the real internal credential reached only invalid-mode validation (400), without collecting or changing business data.
