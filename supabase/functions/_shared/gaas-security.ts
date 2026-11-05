@@ -6,6 +6,7 @@ export interface GaasGuardOptions {
   publicKey: string;
   worker?: boolean;
   dispatchKey?: string;
+  dispatchVerifier?: string;
   fetcher?: typeof fetch;
 }
 const cors = {
@@ -33,6 +34,14 @@ export function createGaasGuardHandler(handler: GaasHandler, options: GaasGuardO
         });
         if (checked.ok && await checked.json() === true) return handler(request, info);
       }
+      if (options.dispatchVerifier && /^[a-f0-9]{64}$/i.test(token) && serviceKeys[0]) {
+        const checked = await fetcher(options.url + "/rest/v1/rpc/" + options.dispatchVerifier, {
+          method: "POST",
+          headers: { apikey: serviceKeys[0], Authorization: "Bearer " + serviceKeys[0], "Content-Type": "application/json" },
+          body: JSON.stringify({ p_token: token }),
+        });
+        if (checked.ok && await checked.json() === true) return handler(request, info);
+      }
       if (!token) return deny(401);
       if (!options.url || !options.publicKey) return deny(503);
       const checked = await fetcher(options.url + "/rest/v1/rpc/gaas_access_status", {
@@ -46,7 +55,7 @@ export function createGaasGuardHandler(handler: GaasHandler, options: GaasGuardO
     } catch { return deny(503); }
   };
 }
-export function gaasSecureServe(handler: GaasHandler, extra: Pick<GaasGuardOptions, "worker" | "dispatchKey"> = {}) {
+export function gaasSecureServe(handler: GaasHandler, extra: Pick<GaasGuardOptions, "worker" | "dispatchKey" | "dispatchVerifier"> = {}) {
   let modernKeys: string[] = [];
   try { modernKeys = Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}")).filter((v): v is string => typeof v === "string"); } catch { /* no optional modern keys */ }
   return Deno.serve(createGaasGuardHandler(handler, {
@@ -55,5 +64,6 @@ export function gaasSecureServe(handler: GaasHandler, extra: Pick<GaasGuardOptio
     publicKey: Deno.env.get("SUPABASE_ANON_KEY") ?? "",
     worker: extra.worker,
     dispatchKey: extra.dispatchKey,
+    dispatchVerifier: extra.dispatchVerifier,
   }));
 }

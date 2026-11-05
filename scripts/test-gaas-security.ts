@@ -41,3 +41,12 @@ Deno.test("custom dispatch credential scoped to configured collector",async()=>{
  const wrapped=createGaasGuardHandler(()=>new Response("ok"),{...base,dispatchKey:"collector-secret"});
  assert((await wrapped(new Request("https://edge.invalid",{headers:{Authorization:"Bearer collector-secret"}}),info)).status===200);
 });
+Deno.test("scheduled dispatch checks the private server verifier",async()=>{
+ const wrapped=createGaasGuardHandler(()=>new Response("ok"),{...base,dispatchVerifier:"gaas_verify_meta_dispatch",fetcher:async(input)=>Response.json(String(input).endsWith("/gaas_verify_meta_dispatch"))});
+ assert((await wrapped(new Request("https://edge.invalid",{headers:{Authorization:"Bearer "+"a".repeat(64)}}),info)).status===200);
+});
+Deno.test("fake scheduled dispatch credential fails closed",async()=>{
+ let called=false;
+ const wrapped=createGaasGuardHandler(()=>{called=true;return new Response("bad");},{...base,dispatchVerifier:"gaas_verify_meta_dispatch",fetcher:async()=>Response.json(false)});
+ assert((await wrapped(new Request("https://edge.invalid",{headers:{Authorization:"Bearer "+"0".repeat(64)}}),info)).status===403);assert(!called);
+});

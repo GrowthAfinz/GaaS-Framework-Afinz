@@ -55,7 +55,8 @@ verify_jwt = true
 
 [functions.collect-meta-events]
 enabled = true
-verify_jwt = true
+# The handler verifies approved sessions or the private scheduled-dispatch credential.
+verify_jwt = false
 
 [functions.email-image-proxy]
 enabled = true

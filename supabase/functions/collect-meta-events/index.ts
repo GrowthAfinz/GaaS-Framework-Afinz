@@ -1,5 +1,5 @@
 import { gaasSecureServe } from "../_shared/gaas-security.ts";
-const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchKey: undefined });
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchVerifier: "gaas_verify_meta_dispatch" });
 // =====================================================================
 // Governed Meta funnel collector. Disabled by default through feature flag.
 // NO substitui `collect-meta-ads`. Dual-write por feature flag. Legado INTOCADO.
