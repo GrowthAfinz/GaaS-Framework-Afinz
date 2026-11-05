@@ -22,7 +22,7 @@ try {
   await p.route("https://*.supabase.co/**", (r) => r.abort());
   await p.goto("http://localhost:3199/.vdv-qa.html");
   await p
-    .getByRole("heading", { name: "Pool Vai de Visa", exact: true })
+    .getByRole("heading", { name: "Pool Vai de Visa · V1", exact: true })
     .waitFor();
   await p.getByText("0 erros ·", { exact: false }).waitFor();
   await p
