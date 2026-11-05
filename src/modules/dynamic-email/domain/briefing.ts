@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import type { FactoryContext } from './factoryEmail';
 import { HEADER_CODE_PATTERN } from './topoPlurixV10';
 import { validateLimitMessage } from './limitMessage';
 
@@ -24,7 +25,7 @@ export const HEADER_TITLE_LIMIT = 34;
 export const HEADER_SUBTITLE_LIMIT = 60;
 
 export type BriefingColumn = typeof BRIEFING_COLUMNS[number];
-export type BriefingRow = Record<BriefingColumn, string> & { __id: string; __journeyConfirmed?: boolean };
+export type BriefingRow = Record<BriefingColumn, string> & { __id: string; __journeyConfirmed?: boolean; __editor?: FactoryContext };
 
 export interface ValidationIssue {
   severity: 'error' | 'warning';

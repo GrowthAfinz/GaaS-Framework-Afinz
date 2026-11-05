@@ -56,3 +56,22 @@ export async function saveVdv(
     fromDb(r, table),
   );
 }
+import type { WorkspaceBriefing } from '../domain/workspace';
+import { exportableRow } from '../domain/workspace';
+import { toBriefing } from './workspaceService';
+import { validateVdv } from '../domain/vaiDeVisa';
+import { factoryContextSchema } from '../domain/factoryEmail';
+
+export function vdvSaveItems(table:Table,rows:Record<string,string>[]) {
+ return rows.filter(r=>!r.__version||r.__dirty==='true').map(row=>({...Object.fromEntries(columns(table).map(c=>[c.toLowerCase(),c==='ATIVA'?row[c].toLowerCase()==='true':c==='POSICAO'?Number(row[c]):row[c]])),source:row.__source==='import'?'import':'gaas',expected_version:Number(row.__version||0)}));
+}
+/** Salva conteúdo compartilhado e documentos numa única transação, com comparação de versões. */
+export async function saveVdvFactory(rows:WorkspaceBriefing[],content:{briefing:VdvBriefingRow[];movimento:VdvMovimentoRow[]},warnings:string[]) {
+ for(const row of rows)factoryContextSchema.parse(row.__editor);
+ const errors=validateVdv(content).filter(i=>i.severity==='error');
+ if(errors.length)throw new Error(errors.map(i=>i.message).join(' '));
+ const documents=rows.map(row=>({id:row.__id,briefing_data:exportableRow(row),partner:row.__meta.partner,segment:row.__meta.segment,week_key:row.__meta.weekKey,campaign_group_id:row.__meta.campaignGroupId,status:row.__meta.status,version:row.__meta.version,expected_version:row.__meta.savedAt?row.__meta.version-1:0,template_slot_id:row.__meta.templateSlotId,activity_names:row.__meta.activityNames,journey_confirmed:!!row.__journeyConfirmed,acknowledged_missing_activity:!!row.__meta.acknowledgedMissingActivity}));
+ const {data,error}=await supabase.rpc('save_vdv_factory',{briefing_items:vdvSaveItems('briefing',content.briefing),movimento_items:vdvSaveItems('movimento',content.movimento),documents,warnings});
+ if(error)throw error;const result=data as {rows:Record<string,unknown>[];briefing:Record<string,unknown>[];movimento:Record<string,unknown>[]};
+ return {rows:result.rows.map(toBriefing),content:{briefing:result.briefing.map(r=>fromDb(r,'briefing')),movimento:result.movimento.map(r=>fromDb(r,'movimento'))}};
+}
