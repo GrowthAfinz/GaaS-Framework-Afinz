@@ -1,0 +1,705 @@
+%%[
+/* =====================================================================
+   VDV · Pool de Ofertas Vai de Visa · e-mail dinâmico v5
+   KV E-mail Black Afinz 2026 - v1 persona
+   ÚNICA LINHA QUE MUDA ENTRE OS DOIS E-MAILS: SET @VersaoEmail
+   Audiência: VDV_ENVIO
+   Conteúdo:  BRIEFING_OFERTAS_VISA   (PK ID; TIPO = OFERTA | TEMA | HERO)
+   Vitrine:   MOVIMENTO_OFERTAS_VISA  (PK VERSAO + GRUPO + CELULA + POSICAO)
+   Este bloco também vai no campo Pré-cabeçalho (o SFMC processa
+   pré-cabeçalho → HTML → texto → assunto); a guarda @VDVInicializado
+   evita rodar duas vezes. O corpo usa só IF/ELSE e v() (padrão Fábrica).
+   ===================================================================== */
+SET @VersaoEmail = "V1"
+IF Empty(@VDVInicializado) THEN
+SET @DE  = "BRIEFING_OFERTAS_VISA"
+SET @MOV = "MOVIMENTO_OFERTAS_VISA"
+
+/* --- audiência (VDV_ENVIO) --- */
+SET @Grupo        = Trim(AttributeValue("CD_GRUPO"))
+SET @Celula       = Trim(AttributeValue("DS_CELULA_TESTE"))
+SET @Versao       = Trim(AttributeValue("ID_VERSAO_OFERTAS"))
+SET @Parceiro     = Uppercase(Trim(AttributeValue("NM_PARCEIRO")))
+SET @NmCartaoBase = Trim(AttributeValue("NM_CARTAO"))
+SET @FirstName    = Trim(AttributeValue("FIRST_NAME"))
+IF NOT Empty(@FirstName) THEN
+  IF IndexOf(@FirstName, " ") > 0 THEN
+    SET @FirstName = Substring(@FirstName, 1, Subtract(IndexOf(@FirstName, " "), 1))
+  ENDIF
+  SET @FirstName = ProperCase(@FirstName)
+ENDIF
+IF Empty(@Versao) THEN SET @Versao = "BF26_V1" ENDIF
+IF @Celula == "SEG-B" OR @Celula == "GEN-A" OR Empty(@Grupo) THEN
+  SET @GrupoVitrine = "GENERICO"
+ELSE
+  SET @GrupoVitrine = @Grupo
+ENDIF
+SET @Hoje = SystemDateToLocalDate(Now())
+
+/* --- TEMA (TIPO = TEMA, 1 por versão) --- */
+SET @TemaRows = LookupRows(@DE, "TIPO", "TEMA", "VERSAO", @Versao, "ATIVA", "True")
+IF RowCount(@TemaRows) == 0 THEN
+  RaiseError(Concat("VDV sem tema para a versão ", @Versao), true)
+ENDIF
+SET @T = Row(@TemaRows, 1)
+SET @NmTema       = Field(@T, "TEMA")
+SET @Assunto      = Field(@T, "ASSUNTO")
+SET @PreHeader    = Field(@T, "PREHEADER")
+IF @VersaoEmail == "V2" THEN
+  IF NOT Empty(Field(@T, "ASSUNTO_V2"))   THEN SET @Assunto   = Field(@T, "ASSUNTO_V2") ENDIF
+  IF NOT Empty(Field(@T, "PREHEADER_V2")) THEN SET @PreHeader = Field(@T, "PREHEADER_V2") ENDIF
+ENDIF
+SET @Saudacao     = Field(@T, "SAUDACAO")
+SET @SaudSemNome  = Field(@T, "SAUDACAO_SEM_NOME")
+SET @Intro        = Field(@T, "INTRO")
+SET @CartaoPadrao = Field(@T, "CARTAO_PADRAO")
+SET @CtaCard      = Field(@T, "CTA")
+SET @TitCond      = Field(@T, "TITULO_CONDICOES")
+SET @RodCond      = Field(@T, "RODAPE_CONDICOES")
+SET @CorFundo     = Field(@T, "COR_FUNDO")
+SET @CorTexto     = Field(@T, "COR_TEXTO")
+SET @CorTitulo    = Field(@T, "COR_TITULO")
+SET @CorTema      = Field(@T, "COR_TEMA")
+IF Empty(@CorFundo)     THEN SET @CorFundo  = "#000000" ENDIF
+IF Empty(@CorTexto)     THEN SET @CorTexto  = "#FFFFFF" ENDIF
+IF Empty(@CorTitulo)    THEN SET @CorTitulo = "#00C6CC" ENDIF
+IF Empty(@CorTema)      THEN SET @CorTema   = "#D3FF00" ENDIF
+IF Empty(@Assunto)      THEN SET @Assunto   = "Ofertas do seu {CARTAO}" ENDIF
+IF Empty(@CtaCard)      THEN SET @CtaCard   = "Aproveitar oferta" ENDIF
+IF Empty(@TitCond)      THEN SET @TitCond   = "Condições das ofertas" ENDIF
+IF Empty(@SaudSemNome)  THEN SET @SaudSemNome = "Olá!" ENDIF
+IF Empty(@CartaoPadrao) THEN SET @CartaoPadrao = "cartão Afinz Visa" ENDIF
+
+/* --- HERO (TIPO = HERO)
+       parceiro com arte  -> arte do parceiro nos 2 e-mails
+       B2B2C sem arte     -> V2 (cartão institucional) nos 2 e-mails
+       B2C                -> V1 no e-mail 1, V2 no e-mail 2 --- */
+SET @HeroCount = 0
+SET @HeroParceiro = 0
+SET @NomeCartaoHero = ""
+IF NOT Empty(@Parceiro) THEN
+  SET @HeroRows  = LookupRows(@DE, "TIPO", "HERO", "VERSAO", @Versao, "HERO", @Parceiro, "ATIVA", "True")
+  SET @HeroCount = RowCount(@HeroRows)
+  IF @HeroCount > 0 THEN SET @HeroParceiro = 1 ENDIF
+ENDIF
+IF @HeroCount == 0 THEN
+  IF NOT Empty(@Parceiro) THEN SET @HeroCod = "V2" ELSE SET @HeroCod = @VersaoEmail ENDIF
+  SET @HeroRows  = LookupRows(@DE, "TIPO", "HERO", "VERSAO", @Versao, "HERO", @HeroCod, "ATIVA", "True")
+  SET @HeroCount = RowCount(@HeroRows)
+ENDIF
+SET @Hero = ""
+IF @HeroCount > 0 THEN
+  SET @H = Row(@HeroRows, 1)
+  SET @Hero     = Field(@H, "HERO_IMG")
+  SET @AltHero  = Field(@H, "HERO_ALT")
+  SET @LinkHero = Field(@H, "HERO_LINK")
+  IF @HeroParceiro == 1 THEN SET @NomeCartaoHero = Field(@H, "NOME_CARTAO") ENDIF
+  IF Empty(@AltHero) THEN SET @AltHero = @NmTema ENDIF
+ENDIF
+
+/* --- nome do cartão: NOME_CARTAO do hero do parceiro > NM_CARTAO da base > CARTAO_PADRAO --- */
+IF NOT Empty(@NomeCartaoHero) THEN
+  SET @NomeCartao = @NomeCartaoHero
+ELSE
+  IF NOT Empty(@NmCartaoBase) THEN
+    SET @NomeCartao = Concat("cartão ", ProperCase(@NmCartaoBase))
+  ELSE
+    SET @NomeCartao = @CartaoPadrao
+  ENDIF
+ENDIF
+
+/* --- tokens: {NOME} {TEMA} {CARTAO} --- */
+SET @TemaHtml = Concat('<b style="color:', @CorTema, ';">', @NmTema, '</b>')
+IF NOT Empty(@FirstName) AND NOT Empty(@Saudacao) THEN
+  SET @SaudacaoFinal = Replace(@Saudacao, "{NOME}", @FirstName)
+ELSE
+  SET @SaudacaoFinal = @SaudSemNome
+ENDIF
+SET @Intro     = Replace(Replace(Replace(@Intro, "{TEMA}", @TemaHtml), "{CARTAO}", @NomeCartao), "{NOME}", @FirstName)
+SET @Assunto   = Replace(Replace(Replace(@Assunto, "{CARTAO}", @NomeCartao), "{TEMA}", @NmTema), "{NOME}", @FirstName)
+SET @PreHeader = Replace(Replace(Replace(@PreHeader, "{CARTAO}", @NomeCartao), "{TEMA}", @NmTema), "{NOME}", @FirstName)
+
+/* --- VITRINE: MOVIMENTO da célula; se não houver, CELULA = TODAS.
+       Até 6 posições (5-6 = reserva); ficam as 3 primeiras ofertas ativas e vigentes --- */
+SET @MovRows = LookupOrderedRows(@MOV, 6, "POSICAO ASC", "VERSAO", @Versao, "GRUPO", @GrupoVitrine, "CELULA", @Celula, "ATIVA", "True")
+IF RowCount(@MovRows) == 0 THEN
+  SET @MovRows = LookupOrderedRows(@MOV, 6, "POSICAO ASC", "VERSAO", @Versao, "GRUPO", @GrupoVitrine, "CELULA", "TODAS", "ATIVA", "True")
+ENDIF
+SET @Total = RowCount(@MovRows)
+SET @N = 0
+IF @Total > 0 THEN
+  FOR @i = 1 TO @Total DO
+    IF @N < 3 THEN
+      SET @OfId    = Field(Row(@MovRows, @i), "OFERTA_ID")
+      SET @CatRows = LookupRows(@DE, "ID", @OfId, "ATIVA", "True")
+      IF RowCount(@CatRows) > 0 THEN
+        SET @C  = Row(@CatRows, 1)
+        SET @Ok = 1
+        SET @Ini = Field(@C, "INICIO")
+        SET @Fim = Field(@C, "FIM")
+        IF NOT Empty(@Ini) THEN IF DateDiff(@Ini, @Hoje, "D") < 0 THEN SET @Ok = 0 ENDIF ENDIF
+        IF NOT Empty(@Fim) THEN IF DateDiff(@Hoje, @Fim, "D") < 0 THEN SET @Ok = 0 ENDIF ENDIF
+        IF Empty(Field(@C, "LINK")) OR Empty(Field(@C, "VALOR")) THEN SET @Ok = 0 ENDIF
+        IF @Ok == 1 THEN
+          SET @N = Add(@N, 1)
+          IF @N == 1 THEN SET @S1R = @C ENDIF
+          IF @N == 2 THEN SET @S2R = @C ENDIF
+          IF @N == 3 THEN SET @S3R = @C ENDIF
+          IF @N == 4 THEN SET @S4R = @C ENDIF
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT @i
+ENDIF
+IF @N == 0 THEN
+  RaiseError(Concat("VDV: nenhuma oferta vigente em ", @Versao, " / ", @GrupoVitrine), true)
+ENDIF
+
+/* --- slot 1 --- */
+IF @N >= 1 THEN
+  SET @R = @S1R
+  SET @S1Marca    = Field(@R, "MARCA")
+  SET @S1Logo     = Field(@R, "LOGO")
+  SET @S1Foto     = Field(@R, "FOTO")
+  SET @S1Alt      = Field(@R, "ALT")
+  SET @S1Pref     = Field(@R, "PREFIXO")
+  SET @S1Valor    = Field(@R, "VALOR")
+  SET @S1Suf      = Field(@R, "SUFIXO")
+  SET @S1Compl    = Field(@R, "COMPLEMENTO")
+  SET @S1Cor      = Field(@R, "COR")
+  SET @S1Resg     = Field(@R, "RESGATE")
+  SET @S1Cupom    = Field(@R, "CUPOM")
+  SET @S1Url      = Field(@R, "LINK")
+  SET @S1Nota     = Field(@R, "CONDICOES")
+  SET @S1Fim      = Field(@R, "FIM")
+  SET @S1Validade = ""
+  IF NOT Empty(@S1Fim) THEN SET @S1Validade = Format(@S1Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S1Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P1_", Field(@R, "ID"))
+  IF Empty(@S1Cor) THEN SET @S1Cor = "#00C6CC" ENDIF
+  IF Empty(@S1Alt) THEN SET @S1Alt = Concat("Oferta ", @S1Marca) ENDIF
+ENDIF
+
+/* --- slot 2 --- */
+IF @N >= 2 THEN
+  SET @R = @S2R
+  SET @S2Marca    = Field(@R, "MARCA")
+  SET @S2Logo     = Field(@R, "LOGO")
+  SET @S2Foto     = Field(@R, "FOTO")
+  SET @S2Alt      = Field(@R, "ALT")
+  SET @S2Pref     = Field(@R, "PREFIXO")
+  SET @S2Valor    = Field(@R, "VALOR")
+  SET @S2Suf      = Field(@R, "SUFIXO")
+  SET @S2Compl    = Field(@R, "COMPLEMENTO")
+  SET @S2Cor      = Field(@R, "COR")
+  SET @S2Resg     = Field(@R, "RESGATE")
+  SET @S2Cupom    = Field(@R, "CUPOM")
+  SET @S2Url      = Field(@R, "LINK")
+  SET @S2Nota     = Field(@R, "CONDICOES")
+  SET @S2Fim      = Field(@R, "FIM")
+  SET @S2Validade = ""
+  IF NOT Empty(@S2Fim) THEN SET @S2Validade = Format(@S2Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S2Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P2_", Field(@R, "ID"))
+  IF Empty(@S2Cor) THEN SET @S2Cor = "#00C6CC" ENDIF
+  IF Empty(@S2Alt) THEN SET @S2Alt = Concat("Oferta ", @S2Marca) ENDIF
+ENDIF
+
+/* --- slot 3 --- */
+IF @N >= 3 THEN
+  SET @R = @S3R
+  SET @S3Marca    = Field(@R, "MARCA")
+  SET @S3Logo     = Field(@R, "LOGO")
+  SET @S3Foto     = Field(@R, "FOTO")
+  SET @S3Alt      = Field(@R, "ALT")
+  SET @S3Pref     = Field(@R, "PREFIXO")
+  SET @S3Valor    = Field(@R, "VALOR")
+  SET @S3Suf      = Field(@R, "SUFIXO")
+  SET @S3Compl    = Field(@R, "COMPLEMENTO")
+  SET @S3Cor      = Field(@R, "COR")
+  SET @S3Resg     = Field(@R, "RESGATE")
+  SET @S3Cupom    = Field(@R, "CUPOM")
+  SET @S3Url      = Field(@R, "LINK")
+  SET @S3Nota     = Field(@R, "CONDICOES")
+  SET @S3Fim      = Field(@R, "FIM")
+  SET @S3Validade = ""
+  IF NOT Empty(@S3Fim) THEN SET @S3Validade = Format(@S3Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S3Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P3_", Field(@R, "ID"))
+  IF Empty(@S3Cor) THEN SET @S3Cor = "#00C6CC" ENDIF
+  IF Empty(@S3Alt) THEN SET @S3Alt = Concat("Oferta ", @S3Marca) ENDIF
+ENDIF
+
+/* --- slot 4 --- */
+IF @N >= 4 THEN
+  SET @R = @S4R
+  SET @S4Marca    = Field(@R, "MARCA")
+  SET @S4Logo     = Field(@R, "LOGO")
+  SET @S4Foto     = Field(@R, "FOTO")
+  SET @S4Alt      = Field(@R, "ALT")
+  SET @S4Pref     = Field(@R, "PREFIXO")
+  SET @S4Valor    = Field(@R, "VALOR")
+  SET @S4Suf      = Field(@R, "SUFIXO")
+  SET @S4Compl    = Field(@R, "COMPLEMENTO")
+  SET @S4Cor      = Field(@R, "COR")
+  SET @S4Resg     = Field(@R, "RESGATE")
+  SET @S4Cupom    = Field(@R, "CUPOM")
+  SET @S4Url      = Field(@R, "LINK")
+  SET @S4Nota     = Field(@R, "CONDICOES")
+  SET @S4Fim      = Field(@R, "FIM")
+  SET @S4Validade = ""
+  IF NOT Empty(@S4Fim) THEN SET @S4Validade = Format(@S4Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S4Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P4_", Field(@R, "ID"))
+  IF Empty(@S4Cor) THEN SET @S4Cor = "#00C6CC" ENDIF
+  IF Empty(@S4Alt) THEN SET @S4Alt = Concat("Oferta ", @S4Marca) ENDIF
+ENDIF
+
+SET @VDVInicializado = 1
+ENDIF
+]%%
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <style type="text/css">
+      ReadMsgBody{ width: 100%;}
+      .ExternalClass {width: 100%;}
+      .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div {line-height: 100%;}
+      body {-webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;margin:0 !important;}
+      p { margin: 1em 0;}
+      table td { border-collapse: collapse;}
+      img {outline:0;}
+      a img {border:none;}
+      @-ms-viewport{ width: device-width;}
+    </style>
+    <style type="text/css">
+      @media only screen and (max-width: 480px) {
+        .container {width: 100% !important;}
+        .footer { width:auto !important; margin-left:0; }
+        .mobile-hidden { display:none !important; }
+        .logo { display:block !important; padding:0 !important; }
+        img { max-width:100% !important; height:auto !important; max-height:auto !important;}
+        .header img{max-width:100% !important;height:auto !important; max-height:auto !important;}
+        .photo img { width:100% !important; max-width:100% !important; height:auto !important;}
+        .drop { display:block !important; width: 100% !important; float:left; clear:both;}
+        .footerlogo { display:block !important; width: 100% !important; padding-top:15px; float:left; clear:both;}
+        .nav4, .nav5, .nav6 { display: none !important; }
+        .tableBlock {width:100% !important;}
+        .responsive-td {width:100% !important; display:block !important; padding:0 !important; }
+        .fluid, .fluid-centered {
+          width: 100% !important;
+          max-width: 100% !important;
+          height: auto !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+        .fluid-centered {
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+        /* MOBILE GLOBAL STYLES - DO NOT CHANGE */
+body, .tb_properties{font-family: Tahoma, Geneva, sans-serif !important; font-size: 16px !important; color: #000000 !important; line-height: 1.15 !important; padding: 0px !important; }.buttonstyles{font-family: Tahoma, Geneva, sans-serif !important; font-size: 16px !important; color: #000000 !important; padding: 10px !important; }h1{font-family: Tahoma, Geneva, sans-serif !important; font-size: 22px !important; color: #202020 !important; line-height: 1 !important; }h2{font-family: Tahoma, Geneva, sans-serif !important; font-size: 20px !important; color: #202020 !important; line-height: 1 !important; }h3{font-family: Tahoma, Geneva, sans-serif !important; font-size: 18px !important; color: #202020 !important; line-height: 1 !important; }a:not(.buttonstyles){line-height: 1 !important; }.mobile-hidden{display: none !important; }.responsive-td {width: 100% !important; display: block !important; padding: 0 !important;}
+/* END OF MOBILE GLOBAL STYLES - DO NOT CHANGE */
+      }
+      @media only screen and (max-width: 640px) {
+        .container { width:100% !important; }
+        .mobile-hidden { display:none !important; }
+        .logo { display:block !important; padding:0 !important; }
+        .photo img { width:100% !important; height:auto !important;}
+        .nav5, .nav6 { display: none !important;}
+        .fluid, .fluid-centered {
+          width: 100% !important;
+          max-width: 100% !important;
+          height: auto !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+        .fluid-centered {
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+      }
+    </style>
+    <!--[if mso]>
+      <style type="text/css">
+          /* Begin Outlook Font Fix */
+              body, table, td {
+                 font-family : Tahoma, Geneva, sans-serif;
+                 line-height : 100%;
+                 font-size : 16px;
+                 color : #000000;
+              }
+          /* End Outlook Font Fix */
+      </style>
+    <![endif]-->
+    <style type="text/css">
+.afz-grid {
+  width:100%;
+  max-width:600px;
+}
+
+.afz-photo {
+  display:block;
+  width:100%;
+  height:auto;
+  border:0;
+}
+
+.afz-logo {
+  display:block;
+  width:100px;
+  height:70px;
+  margin:0 auto;
+  border:0;
+}
+
+.afz-info {
+  font-family:Tahoma,Arial,sans-serif;
+  font-size:16px !important;
+  line-height:21px !important;
+}
+
+.afz-percent {
+  font-family:Tahoma,Arial,sans-serif;
+  font-size:48px !important;
+  line-height:52px !important;
+  font-weight:bold;
+  color:#00C6CC;
+}
+
+.afz-copy {
+  font-family:Tahoma,Arial,sans-serif;
+  font-size:16px !important;
+  line-height:22px !important;
+}
+
+.afz-coupon-label {
+  font-family:Tahoma,Arial,sans-serif;
+  font-size:14px !important;
+  line-height:20px !important;
+}
+
+.afz-coupon {
+  font-family:Tahoma,Arial,sans-serif;
+  font-size:18px !important;
+  line-height:24px !important;
+  font-weight:bold;
+  color:#003E9E;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+.afz-validity {
+  font-family:Tahoma,Arial,sans-serif;
+  font-size:14px !important;
+  line-height:20px !important;
+}
+
+.afz-cta {
+  display:block;
+  padding:16px 6px !important;
+  font-family:Tahoma,Arial,sans-serif;
+  font-size:16px !important;
+  line-height:22px !important;
+  font-weight:bold;
+  color:#000000 !important;
+  text-decoration:none;
+  text-align:center;
+}
+
+@media only screen and (max-width:600px) {
+  .afz-grid > tbody, .afz-grid > tbody > tr { display:block !important; width:100% !important; }
+  .afz-grid > tbody > tr > td { display:block !important; width:100% !important; box-sizing:border-box; }
+  .afz-grid > tbody > tr > td.vdv-space { display:none !important; }
+  .vdv-card { display:block !important; width:100% !important; box-sizing:border-box; }
+  .vdv-space { display:none !important; }
+  .afz-grid {
+    width:100% !important;
+  }
+  .afz-section-padding {
+    padding:8px !important;
+  }
+  .afz-card-padding {
+    padding:16px 8px !important;
+  }
+  .afz-logo {
+    width:90px !important;
+    height:63px !important;
+  }
+  .afz-info {
+    font-size:15px !important;
+    line-height:20px !important;
+  }
+  .afz-percent {
+    font-size:42px !important;
+    line-height:46px !important;
+  }
+  .afz-copy {
+    font-size:15px !important;
+    line-height:21px !important;
+  }
+  .afz-coupon {
+    font-size:16px !important;
+    line-height:22px !important;
+  }
+  .afz-validity {
+    font-size:14px !important;
+    line-height:20px !important;
+  }
+  .afz-cta {
+    font-size:15px !important;
+    line-height:21px !important;
+    padding:15px 4px !important;
+  }
+}
+
+@media only screen and (max-width:360px) {
+  .afz-card-padding {
+    padding:14px 6px !important;
+  }
+  .afz-percent {
+    font-size:38px !important;
+    line-height:42px !important;
+  }
+  .afz-coupon {
+    font-size:15px !important;
+    line-height:21px !important;
+  }
+  .afz-validity {
+    font-size:13px !important;
+    line-height:19px !important;
+  }
+  .afz-cta {
+    font-size:14px !important;
+    line-height:20px !important;
+  }
+}
+</style>
+  </head>
+  <body bgcolor="#FFFFFF" text="#000000" style="-webkit-text-size-adjust:none;background-color : #FFFFFF; font-family : Tahoma, Geneva, sans-serif; line-height : 100%; font-size : 16px; color : #000000; padding : 0px; ">
+    <div style="font-size:0; line-height:0;"><custom name="opencounter" type="tracking"><custom name="usermatch" type="tracking" /></div>
+    <table width="100%" border="0" cellpadding="0" cellspacing="0" align="center">
+      <tr><td align="center" valign="top"><custom type="header"/></td></tr>
+      <tr>
+        <td align="center">
+          <table cellspacing="0" cellpadding="0" border="0" width="600" class="container" align="center">
+            <tr>
+              <td>
+                <table class="tb_properties border_style" style="background-color:#000000; font-size:16px; font-family:Tahoma, Geneva, sans-serif; line-height:100%; color:#000000;" cellspacing="0" cellpadding="0" bgcolor="#000000" width="100%">
+                  <tr>
+                    <td class="responsive-td" valign="top" style="width: 100%;">
+<!-- LOGO AFINZ (fixo) -->
+<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: #000000; min-width: 100%; " class="stylingblock-content-wrapper"><tr><td style="padding: 15px 40px; " class="stylingblock-content-wrapper camarker-inner"><table width="100%" cellspacing="0" cellpadding="0" role="presentation"><tr><td align="center"><img data-assetid="10433" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/25caaa90-4480-4991-aca0-d60f1f96f899.png" alt="Afinz" height="46" width="120" style="display: block; padding: 0px; text-align: center; height: 46px; width: 120px; border: 0px transparent;"></td></tr></table></td></tr></table>
+<!-- HERO -->
+%%[ IF NOT Empty(@Hero) THEN ]%%
+<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="min-width: 100%; " class="stylingblock-content-wrapper"><tr><td class="stylingblock-content-wrapper camarker-inner"><table width="100%" cellspacing="0" cellpadding="0" role="presentation"><tr><td align="center">%%[ IF NOT Empty(@LinkHero) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@LinkHero))=%%" alias="VDV_HERO" target="_blank">%%[ ENDIF ]%%<img src="%%=v(@Hero)=%%" alt="%%=v(@AltHero)=%%" width="600" style="display: block; padding: 0px; width: 100%; max-width: 600px; height: auto; border: 0px transparent;">%%[ IF NOT Empty(@LinkHero) THEN ]%%</a>%%[ ENDIF ]%%</td></tr></table></td></tr></table>
+%%[ ENDIF ]%%
+<!-- SAUDAÇÃO + ABERTURA -->
+<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: %%=v(@CorFundo)=%%; min-width: 100%; border-top: 3px solid %%=v(@CorTema)=%%; " class="stylingblock-content-wrapper"><tr><td style="padding: 30px 40px 30px; " class="stylingblock-content-wrapper camarker-inner"><div style="text-align: center; line-height: 115%;">
+ <span style="color:%%=v(@CorTitulo)=%%; font-size:22px;"><b>%%=v(@SaudacaoFinal)=%%</b></span><br>
+ <br>
+ <span style="color:%%=v(@CorTexto)=%%; font-size:18px;">%%=v(@Intro)=%%</span></div></td></tr></table>
+<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="min-width: 100%; " class="stylingblock-content-wrapper"><tr><td class="stylingblock-content-wrapper camarker-inner">
+<!-- VDV: até 3 ofertas; primeiro centralizado quando ímpar; mobile em coluna -->
+<table role="presentation" class="afz-grid" align="center" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;table-layout:fixed;">
+%%[ IF @N == 2 THEN ]%%<tr><td class="vdv-card" width="50%" valign="top" style="width:50%;padding:5px;vertical-align:top;"><!-- ===== SLOT 1 ===== -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF; border-radius:12px;">
+%%[ IF NOT Empty(@S1Foto) THEN ]%%<tr><td><a href="%%=RedirectTo(TreatAsContent(@S1Url))=%%" alias="%%=v(@S1Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S1Foto)=%%" alt="%%=v(@S1Alt)=%%" width="280" class="afz-photo" style="display:block; width:100%; height:auto; border:0; border-radius:12px 12px 0 0;"></a></td></tr>%%[ ENDIF ]%%
+<tr>
+<td class="afz-card-padding" align="center" style="padding:16px 12px; font-family:Tahoma,Arial,sans-serif; color:#000000;">
+%%[ IF NOT Empty(@S1Logo) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@S1Url))=%%" alias="%%=v(@S1Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S1Logo)=%%" alt="%%=v(@S1Marca)=%%" width="100" height="70" class="afz-logo" style="display:block; width:100px; height:70px; margin:0 auto; border:0; font-family:Tahoma,Arial,sans-serif; font-size:16px; font-weight:bold; color:#000000;"></a>%%[ ELSE ]%%<div style="height:70px; line-height:70px; font-family:Tahoma,Arial,sans-serif; font-size:20px; font-weight:bold; color:#000000; overflow:hidden;">%%=v(@S1Marca)=%%</div>%%[ ENDIF ]%%
+%%[ IF NOT Empty(@S1Pref) THEN ]%%<div class="afz-copy" style="font-size:16px; line-height:22px;">%%=v(@S1Pref)=%%</div>%%[ ENDIF ]%%
+<div class="afz-percent" style="font-size:48px; line-height:52px; font-weight:bold; color:%%=v(@S1Cor)=%%;">%%=v(@S1Valor)=%%</div>
+<div class="afz-copy" style="font-size:16px; line-height:22px; min-height:44px;">%%=v(@S1Suf)=%% %%=v(@S1Compl)=%%</div>
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+%%[ IF @S1Resg == "CUPOM" AND NOT Empty(@S1Cupom) THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Código:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">%%=v(@S1Cupom)=%%</div>
+%%[ IF NOT Empty(@S1Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S1Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF @S1Resg == "PAGAR_COM_VISA" THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Como usar:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">Pague com Visa</div>
+%%[ IF NOT Empty(@S1Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S1Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF NOT Empty(@S1Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S1Validade)=%%</div>%%[ ENDIF ]%%%%[ ENDIF ]%%%%[ ENDIF ]%%
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td bgcolor="%%=v(@CorTema)=%%" align="center" style="background-color:%%=v(@CorTema)=%%; border-radius:7px;">
+<a href="%%=RedirectTo(TreatAsContent(@S1Url))=%%" alias="%%=v(@S1Alias)=%%" target="_blank" class="afz-cta" style="display:block; padding:16px 6px; font-family:Tahoma,Arial,sans-serif; font-size:16px; line-height:22px; font-weight:bold; color:#000000; text-decoration:none;">%%=v(@CtaCard)=%%</a>
+</td></tr></table>
+</td>
+</tr>
+</table></td><td class="vdv-card" width="50%" valign="top" style="width:50%;padding:5px;vertical-align:top;"><!-- ===== SLOT 2 ===== -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF; border-radius:12px;">
+%%[ IF NOT Empty(@S2Foto) THEN ]%%<tr><td><a href="%%=RedirectTo(TreatAsContent(@S2Url))=%%" alias="%%=v(@S2Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S2Foto)=%%" alt="%%=v(@S2Alt)=%%" width="280" class="afz-photo" style="display:block; width:100%; height:auto; border:0; border-radius:12px 12px 0 0;"></a></td></tr>%%[ ENDIF ]%%
+<tr>
+<td class="afz-card-padding" align="center" style="padding:16px 12px; font-family:Tahoma,Arial,sans-serif; color:#000000;">
+%%[ IF NOT Empty(@S2Logo) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@S2Url))=%%" alias="%%=v(@S2Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S2Logo)=%%" alt="%%=v(@S2Marca)=%%" width="100" height="70" class="afz-logo" style="display:block; width:100px; height:70px; margin:0 auto; border:0; font-family:Tahoma,Arial,sans-serif; font-size:16px; font-weight:bold; color:#000000;"></a>%%[ ELSE ]%%<div style="height:70px; line-height:70px; font-family:Tahoma,Arial,sans-serif; font-size:20px; font-weight:bold; color:#000000; overflow:hidden;">%%=v(@S2Marca)=%%</div>%%[ ENDIF ]%%
+%%[ IF NOT Empty(@S2Pref) THEN ]%%<div class="afz-copy" style="font-size:16px; line-height:22px;">%%=v(@S2Pref)=%%</div>%%[ ENDIF ]%%
+<div class="afz-percent" style="font-size:48px; line-height:52px; font-weight:bold; color:%%=v(@S2Cor)=%%;">%%=v(@S2Valor)=%%</div>
+<div class="afz-copy" style="font-size:16px; line-height:22px; min-height:44px;">%%=v(@S2Suf)=%% %%=v(@S2Compl)=%%</div>
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+%%[ IF @S2Resg == "CUPOM" AND NOT Empty(@S2Cupom) THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Código:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">%%=v(@S2Cupom)=%%</div>
+%%[ IF NOT Empty(@S2Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S2Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF @S2Resg == "PAGAR_COM_VISA" THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Como usar:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">Pague com Visa</div>
+%%[ IF NOT Empty(@S2Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S2Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF NOT Empty(@S2Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S2Validade)=%%</div>%%[ ENDIF ]%%%%[ ENDIF ]%%%%[ ENDIF ]%%
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td bgcolor="%%=v(@CorTema)=%%" align="center" style="background-color:%%=v(@CorTema)=%%; border-radius:7px;">
+<a href="%%=RedirectTo(TreatAsContent(@S2Url))=%%" alias="%%=v(@S2Alias)=%%" target="_blank" class="afz-cta" style="display:block; padding:16px 6px; font-family:Tahoma,Arial,sans-serif; font-size:16px; line-height:22px; font-weight:bold; color:#000000; text-decoration:none;">%%=v(@CtaCard)=%%</a>
+</td></tr></table>
+</td>
+</tr>
+</table></td></tr>%%[ ELSE ]%%
+<tr><td class="vdv-space" width="25%" style="width:25%"></td><td class="vdv-card" width="50%" valign="top" style="width:50%;padding:5px;vertical-align:top;"><!-- ===== SLOT 1 ===== -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF; border-radius:12px;">
+%%[ IF NOT Empty(@S1Foto) THEN ]%%<tr><td><a href="%%=RedirectTo(TreatAsContent(@S1Url))=%%" alias="%%=v(@S1Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S1Foto)=%%" alt="%%=v(@S1Alt)=%%" width="280" class="afz-photo" style="display:block; width:100%; height:auto; border:0; border-radius:12px 12px 0 0;"></a></td></tr>%%[ ENDIF ]%%
+<tr>
+<td class="afz-card-padding" align="center" style="padding:16px 12px; font-family:Tahoma,Arial,sans-serif; color:#000000;">
+%%[ IF NOT Empty(@S1Logo) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@S1Url))=%%" alias="%%=v(@S1Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S1Logo)=%%" alt="%%=v(@S1Marca)=%%" width="100" height="70" class="afz-logo" style="display:block; width:100px; height:70px; margin:0 auto; border:0; font-family:Tahoma,Arial,sans-serif; font-size:16px; font-weight:bold; color:#000000;"></a>%%[ ELSE ]%%<div style="height:70px; line-height:70px; font-family:Tahoma,Arial,sans-serif; font-size:20px; font-weight:bold; color:#000000; overflow:hidden;">%%=v(@S1Marca)=%%</div>%%[ ENDIF ]%%
+%%[ IF NOT Empty(@S1Pref) THEN ]%%<div class="afz-copy" style="font-size:16px; line-height:22px;">%%=v(@S1Pref)=%%</div>%%[ ENDIF ]%%
+<div class="afz-percent" style="font-size:48px; line-height:52px; font-weight:bold; color:%%=v(@S1Cor)=%%;">%%=v(@S1Valor)=%%</div>
+<div class="afz-copy" style="font-size:16px; line-height:22px; min-height:44px;">%%=v(@S1Suf)=%% %%=v(@S1Compl)=%%</div>
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+%%[ IF @S1Resg == "CUPOM" AND NOT Empty(@S1Cupom) THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Código:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">%%=v(@S1Cupom)=%%</div>
+%%[ IF NOT Empty(@S1Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S1Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF @S1Resg == "PAGAR_COM_VISA" THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Como usar:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">Pague com Visa</div>
+%%[ IF NOT Empty(@S1Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S1Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF NOT Empty(@S1Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S1Validade)=%%</div>%%[ ENDIF ]%%%%[ ENDIF ]%%%%[ ENDIF ]%%
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td bgcolor="%%=v(@CorTema)=%%" align="center" style="background-color:%%=v(@CorTema)=%%; border-radius:7px;">
+<a href="%%=RedirectTo(TreatAsContent(@S1Url))=%%" alias="%%=v(@S1Alias)=%%" target="_blank" class="afz-cta" style="display:block; padding:16px 6px; font-family:Tahoma,Arial,sans-serif; font-size:16px; line-height:22px; font-weight:bold; color:#000000; text-decoration:none;">%%=v(@CtaCard)=%%</a>
+</td></tr></table>
+</td>
+</tr>
+</table></td><td class="vdv-space" width="25%" style="width:25%"></td></tr>
+%%[ IF @N == 3 THEN ]%%<tr><td colspan="3"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed"><tr><td class="vdv-card" width="50%" valign="top" style="width:50%;padding:5px;vertical-align:top;"><!-- ===== SLOT 2 ===== -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF; border-radius:12px;">
+%%[ IF NOT Empty(@S2Foto) THEN ]%%<tr><td><a href="%%=RedirectTo(TreatAsContent(@S2Url))=%%" alias="%%=v(@S2Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S2Foto)=%%" alt="%%=v(@S2Alt)=%%" width="280" class="afz-photo" style="display:block; width:100%; height:auto; border:0; border-radius:12px 12px 0 0;"></a></td></tr>%%[ ENDIF ]%%
+<tr>
+<td class="afz-card-padding" align="center" style="padding:16px 12px; font-family:Tahoma,Arial,sans-serif; color:#000000;">
+%%[ IF NOT Empty(@S2Logo) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@S2Url))=%%" alias="%%=v(@S2Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S2Logo)=%%" alt="%%=v(@S2Marca)=%%" width="100" height="70" class="afz-logo" style="display:block; width:100px; height:70px; margin:0 auto; border:0; font-family:Tahoma,Arial,sans-serif; font-size:16px; font-weight:bold; color:#000000;"></a>%%[ ELSE ]%%<div style="height:70px; line-height:70px; font-family:Tahoma,Arial,sans-serif; font-size:20px; font-weight:bold; color:#000000; overflow:hidden;">%%=v(@S2Marca)=%%</div>%%[ ENDIF ]%%
+%%[ IF NOT Empty(@S2Pref) THEN ]%%<div class="afz-copy" style="font-size:16px; line-height:22px;">%%=v(@S2Pref)=%%</div>%%[ ENDIF ]%%
+<div class="afz-percent" style="font-size:48px; line-height:52px; font-weight:bold; color:%%=v(@S2Cor)=%%;">%%=v(@S2Valor)=%%</div>
+<div class="afz-copy" style="font-size:16px; line-height:22px; min-height:44px;">%%=v(@S2Suf)=%% %%=v(@S2Compl)=%%</div>
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+%%[ IF @S2Resg == "CUPOM" AND NOT Empty(@S2Cupom) THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Código:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">%%=v(@S2Cupom)=%%</div>
+%%[ IF NOT Empty(@S2Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S2Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF @S2Resg == "PAGAR_COM_VISA" THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Como usar:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">Pague com Visa</div>
+%%[ IF NOT Empty(@S2Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S2Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF NOT Empty(@S2Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S2Validade)=%%</div>%%[ ENDIF ]%%%%[ ENDIF ]%%%%[ ENDIF ]%%
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td bgcolor="%%=v(@CorTema)=%%" align="center" style="background-color:%%=v(@CorTema)=%%; border-radius:7px;">
+<a href="%%=RedirectTo(TreatAsContent(@S2Url))=%%" alias="%%=v(@S2Alias)=%%" target="_blank" class="afz-cta" style="display:block; padding:16px 6px; font-family:Tahoma,Arial,sans-serif; font-size:16px; line-height:22px; font-weight:bold; color:#000000; text-decoration:none;">%%=v(@CtaCard)=%%</a>
+</td></tr></table>
+</td>
+</tr>
+</table></td><td class="vdv-card" width="50%" valign="top" style="width:50%;padding:5px;vertical-align:top;"><!-- ===== SLOT 3 ===== -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF; border-radius:12px;">
+%%[ IF NOT Empty(@S3Foto) THEN ]%%<tr><td><a href="%%=RedirectTo(TreatAsContent(@S3Url))=%%" alias="%%=v(@S3Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S3Foto)=%%" alt="%%=v(@S3Alt)=%%" width="280" class="afz-photo" style="display:block; width:100%; height:auto; border:0; border-radius:12px 12px 0 0;"></a></td></tr>%%[ ENDIF ]%%
+<tr>
+<td class="afz-card-padding" align="center" style="padding:16px 12px; font-family:Tahoma,Arial,sans-serif; color:#000000;">
+%%[ IF NOT Empty(@S3Logo) THEN ]%%<a href="%%=RedirectTo(TreatAsContent(@S3Url))=%%" alias="%%=v(@S3Alias)=%%" target="_blank" style="text-decoration:none;"><img src="%%=v(@S3Logo)=%%" alt="%%=v(@S3Marca)=%%" width="100" height="70" class="afz-logo" style="display:block; width:100px; height:70px; margin:0 auto; border:0; font-family:Tahoma,Arial,sans-serif; font-size:16px; font-weight:bold; color:#000000;"></a>%%[ ELSE ]%%<div style="height:70px; line-height:70px; font-family:Tahoma,Arial,sans-serif; font-size:20px; font-weight:bold; color:#000000; overflow:hidden;">%%=v(@S3Marca)=%%</div>%%[ ENDIF ]%%
+%%[ IF NOT Empty(@S3Pref) THEN ]%%<div class="afz-copy" style="font-size:16px; line-height:22px;">%%=v(@S3Pref)=%%</div>%%[ ENDIF ]%%
+<div class="afz-percent" style="font-size:48px; line-height:52px; font-weight:bold; color:%%=v(@S3Cor)=%%;">%%=v(@S3Valor)=%%</div>
+<div class="afz-copy" style="font-size:16px; line-height:22px; min-height:44px;">%%=v(@S3Suf)=%% %%=v(@S3Compl)=%%</div>
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+%%[ IF @S3Resg == "CUPOM" AND NOT Empty(@S3Cupom) THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Código:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">%%=v(@S3Cupom)=%%</div>
+%%[ IF NOT Empty(@S3Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S3Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF @S3Resg == "PAGAR_COM_VISA" THEN ]%%
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EAF7F8; border-radius:7px;"><tr><td align="center" style="padding:12px 6px; font-family:Tahoma,Arial,sans-serif;">
+<div class="afz-coupon-label" style="font-size:14px; line-height:20px;">Como usar:</div>
+<div class="afz-coupon" style="font-size:18px; line-height:24px; font-weight:bold; color:#007d81; overflow-wrap:anywhere; word-break:break-word;">Pague com Visa</div>
+%%[ IF NOT Empty(@S3Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S3Validade)=%%</div>%%[ ENDIF ]%%
+</td></tr></table>
+%%[ ELSE ]%%%%[ IF NOT Empty(@S3Validade) THEN ]%%<div class="afz-validity" style="font-size:14px; line-height:20px; color:#555555; margin-top:5px;">Válido até %%=v(@S3Validade)=%%</div>%%[ ENDIF ]%%%%[ ENDIF ]%%%%[ ENDIF ]%%
+<div style="height:12px; line-height:12px; font-size:0;">&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td bgcolor="%%=v(@CorTema)=%%" align="center" style="background-color:%%=v(@CorTema)=%%; border-radius:7px;">
+<a href="%%=RedirectTo(TreatAsContent(@S3Url))=%%" alias="%%=v(@S3Alias)=%%" target="_blank" class="afz-cta" style="display:block; padding:16px 6px; font-family:Tahoma,Arial,sans-serif; font-size:16px; line-height:22px; font-weight:bold; color:#000000; text-decoration:none;">%%=v(@CtaCard)=%%</a>
+</td></tr></table>
+</td>
+</tr>
+</table></td></tr></table></td></tr>%%[ ENDIF ]%%
+%%[ ENDIF ]%%</table>
+</td></tr></table>
+<!-- CONDIÇÕES -->
+<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color:%%=v(@CorFundo)=%%; min-width:100%; border-top:1px solid %%=v(@CorTema)=%%;"><tr><td style="padding:20px 40px 10px; font-family:Tahoma,Geneva,sans-serif; font-size:11px; line-height:16px; color:#BBBBBB;">
+<b style="color:%%=v(@CorTexto)=%%;">%%=v(@TitCond)=%%</b><br>
+%%[ IF @N >= 1 THEN ]%%%%[ IF NOT Empty(@S1Nota) THEN ]%%<b>%%=v(@S1Marca)=%%:</b> %%=v(@S1Nota)=%%<br>%%[ ENDIF ]%%%%[ ENDIF ]%%
+%%[ IF @N >= 2 THEN ]%%%%[ IF NOT Empty(@S2Nota) THEN ]%%<b>%%=v(@S2Marca)=%%:</b> %%=v(@S2Nota)=%%<br>%%[ ENDIF ]%%%%[ ENDIF ]%%
+%%[ IF @N >= 3 THEN ]%%%%[ IF NOT Empty(@S3Nota) THEN ]%%<b>%%=v(@S3Marca)=%%:</b> %%=v(@S3Nota)=%%<br>%%[ ENDIF ]%%%%[ ENDIF ]%%
+%%[ IF @N >= 4 THEN ]%%%%[ IF NOT Empty(@S4Nota) THEN ]%%<b>%%=v(@S4Marca)=%%:</b> %%=v(@S4Nota)=%%<br>%%[ ENDIF ]%%%%[ ENDIF ]%%
+%%[ IF NOT Empty(@RodCond) THEN ]%%%%=v(@RodCond)=%%%%[ ENDIF ]%%
+</td></tr></table>
+<table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: #000000; min-width: 100%; " class="stylingblock-content-wrapper"><tr><td style="padding: 15px 0px; " class="stylingblock-content-wrapper camarker-inner"><div style="text-align: center;">
+</div><table align="center" border="0" cellpadding="5" cellspacing="5" style="width:100%;">
+
+  <tr>
+   <td style="text-align: center;">
+    <a alias="" conversion="false" data-linkto="https://" href="https://www.instagram.com/afinzoficial/" rel="noopener" target="_blank" title=""><img alt="" data-assetid="10726" height="31" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/b07a3e46-7c00-409b-81fe-c1b5eceebf64.png" width="31"></a></td><td style="text-align: center;">
+    <a alias="" conversion="false" data-linkto="https://" href="https://web.facebook.com/Afinz" rel="noopener" target="_blank" title=""><img alt="" data-assetid="10724" height="30" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/8f2daf4e-a386-471d-bc7b-aea7a6c8c416.png" width="30"></a></td><td style="text-align: center;">
+    <a alias="" conversion="false" data-linkto="https://" href="https://www.tiktok.com/@afinzoficial" rel="noopener" target="_blank" title=""><img alt="" data-assetid="83543" height="30" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/31227d6c-28bc-41b4-8b27-c64795765698.png" width="30"></a></td><td style="text-align: center;">
+    <a alias="" conversion="false" data-linkto="https://" href="https://afinz.com.br/blog/" rel="noopener" target="_blank" title=""><img alt="" data-assetid="10725" height="30" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/f37dd205-17fa-47d9-a98a-4f538ef8d637.png" width="30"></a></td><td style="text-align: center;">
+    <a alias="" conversion="false" data-linkto="https://" href="https://afinz.com.br/" rel="noopener" target="_blank" title=""><img alt="" data-assetid="10727" height="31" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef14c352-0006-411d-b873-9b35c7dffde9.png" width="31"></a></td><td style="text-align: center;">
+    <a alias="" conversion="false" data-linkto="https://" href="https://afinz.com.br/" title=""><img alt="" data-assetid="34947" height="48" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/ef047fde-3280-44a8-9be4-d05a194ad834.png" style="height: 48px; width: 90px;" width="90"></a></td></tr></table></td></tr></table><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: #000000; min-width: 100%; " class="stylingblock-content-wrapper"><tr><td style="padding: 15px 40px; " class="stylingblock-content-wrapper camarker-inner"><span style="font-size:16px;"><b><span style="color:#ffffff;">Central de Atendimento:</span></b></span></td></tr></table><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: #000000; min-width: 100%; " class="stylingblock-content-wrapper"><tr><td style="padding: 0px; " class="stylingblock-content-wrapper camarker-inner"><table cellspacing="0" cellpadding="0" role="presentation" style="width: 100%;"><tr><td><table cellspacing="0" cellpadding="0" role="presentation" style="width: 100%;"><tr><td valign="top" class="responsive-td" style="width: 50%; padding-right: 3px;"><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: #000000; min-width: 100%; " class="stylingblock-content-wrapper"><tr><td style="padding: 0px 40px; " class="stylingblock-content-wrapper camarker-inner"><div style="line-height: 115%;">
+ <p>
+  <span style="color:#ffffff;"><span style="font-size:13px;"><span style="font-family:Tahoma,Geneva,sans-serif;"><b>Central de Relacionamento&nbsp; -&nbsp; Pessoa F&iacute;sica</b><br>
+  4090-1730</span></span></span><br>
+  <br>
+  <img alt="" data-assetid="10290" height="15" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2d479835-b293-4baf-b1ad-a53644a21566.png" style="height: 15px; width: 15px; padding: 0px; text-align: center;" width="15"><span style="color:#ffffff;"><span style="font-size:13px;"><span style="font-family:Tahoma,Geneva,sans-serif;">&nbsp;(11) 4090-1730<br>
+  <br>
+  <b>SAC</b><br>
+  0800 773 6660</span></span></span></p></div></td></tr></table></td><td valign="top" class="responsive-td" style="width: 50%; padding-left: 3px;"><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: #000000; min-width: 100%; " class="stylingblock-content-wrapper"><tr><td style="padding: 0px 40px 30px; " class="stylingblock-content-wrapper camarker-inner"><p style="line-height: 115%;">
+ <span style="color:#ffffff;"><span style="font-size: 13px;"><b>Deficiente Auditivo</b></span></span><br>
+ <img alt="" data-assetid="10290" height="15" src="https://image.relacionamento.afinz.com.br/lib/fe3711747364047d761773/m/1/2d479835-b293-4baf-b1ad-a53644a21566.png" style="height: 15px; width: 15px; padding: 0px; text-align: center;" width="15"><span style="color:#ffffff;"><span style="font-size:13px;"><span style="font-family:Tahoma,Geneva,sans-serif;">&nbsp;(11) 4090-1730</span></span></span></p><div style="line-height: 115%;">
+ <span style="color:#ffffff;"><span style="font-size:13px;"><span style="font-family:Tahoma,Geneva,sans-serif;"><b>Ouvidoria</b><br>
+ 0800 772 0602</span></span><br>
+ <span style="font-size:13px;"><span style="font-family:Tahoma,Geneva,sans-serif;">Seg. a Sex. 10h &agrave;s 16h</span></span></span></div></td></tr></table></td></tr></table></td></tr></table></td></tr></table><table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: #000000; min-width: 100%; " class="stylingblock-content-wrapper"><tr><td style="padding: 0px 30px; " class="stylingblock-content-wrapper camarker-inner"><p style="text-align: center; line-height: 100%;">
+ <span style="color:#999999;"><span style="font-size:10px;"><span style="font-family:Tahoma,Geneva,sans-serif;">Enviado por&nbsp;<b>Banco Afinz S.A &ndash; Banco M&uacute;ltiplo &ndash; CNPJ: 04.814.563/0001-74 | Afinz Institui&ccedil;&atilde;o de Pagamento S.A &ndash; CNPJ 60.114.865/0001-00</b></span></span></span><br>
+ <span style="color:#999999;"><span style="font-size:10px;"><span style="font-family:Tahoma,Geneva,sans-serif;">Rua XV de novembro, 45 - Sorocaba, SP</span></span></span></p></td></tr></table>
+
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr><td valign="top"><custom type="footer" /></td></tr>
+    </table>
+  </body>
+</html>

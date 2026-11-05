@@ -1,3 +1,6 @@
+import { VaiDeVisaWorkspace, VdvSampleControls, type VdvData } from './VaiDeVisaWorkspace';
+import { detectVdvTemplate, resolveVdvPreview, VDV_SAMPLES } from '../domain/vaiDeVisa';
+import { loadVdv } from '../services/vaiDeVisaService';
 import { buildSfmcExport, type SfmcExportOptions } from '../domain/sfmcExport';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { createPortal } from 'react-dom';
@@ -295,9 +298,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [template, setTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
   const [savedTemplate, setSavedTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
   const [templateSyncState, setTemplateSyncState] = useState('Carregando catálogo compartilhado…');
-  const [mode, setMode] = useState<'briefings' | 'strategy' | 'reviews' | 'library' | 'template' | 'topo' | 'prompt'>('briefings');
+  const [mode, setModeRaw] = useState<'briefings' | 'strategy' | 'reviews' | 'library' | 'template' | 'topo' | 'prompt' | 'vdv'>('briefings');
+  const [vdvDirty,setVdvDirty] = useState(false);
+  const setMode = (next: typeof mode) => {if(mode==='vdv'&&next!=='vdv'&&vdvDirty&&!window.confirm('Sair e descartar alterações não salvas do Pool Vai de Visa?'))return;setVdvDirty(false);setModeRaw(next);};
   const [headerVariants, setHeaderVariants] = useState<HeaderVariant[]>([]);
   const [partnerAssets, setPartnerAssets] = useState<PartnerHeaderAsset[]>([]);
+  const [vdvData, setVdvData] = useState<VdvData>({briefing:[],movimento:[]});
+  const [vdvSample, setVdvSample] = useState({...VDV_SAMPLES[0].sample});
+  useEffect(() => { void Promise.all([loadVdv('briefing'),loadVdv('movimento')]).then(([briefing,movimento])=>setVdvData({briefing,movimento})).catch(()=>{ /* A aba VDV permite recarregar após aplicar a migration. */ }); }, []);
   const [poolOffers, setPoolOffers] = useState<PoolOffer[]>([]);
   const [previewSendDate, setPreviewSendDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [emailStrategies, setEmailStrategies] = useState<EmailStrategy[]>([]);
@@ -478,6 +486,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
     : effectivePrincipalId;
   const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
+  const vdvTemplate = detectVdvTemplate(previewTemplate);
+  const vdvPreview = useMemo(()=>vdvTemplate ? resolveVdvPreview({...vdvData,sample:vdvSample,versaoEmail:vdvTemplate.versaoEmail,today:previewSendDate}) : null,[vdvData,vdvSample,vdvTemplate?.versaoEmail,previewSendDate]);
   const usesTopoV10 = previewTemplate.includes('TB_HEADER_VARIACOES');
   // V13: o bloco 3 vem do pool e o header dinâmico vem do próprio briefing.
   const usesPool = usesTopoV10 || previewTemplate.includes('DE_POOL_OFERTAS_PLURIX');
@@ -510,10 +520,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
   };
   const setRowField = (rowId: string, field: BriefingColumn, value: string) => setRows((current) => current.map((row) => row.__id === rowId ? { ...row, [field]: value } : row));
   const render = useMemo(() => {
+    if(vdvPreview?.skipped) return {html:'',diagnostics:vdvPreview.diagnostics};
     if (!previewRow) return { html: '', diagnostics: [] };
     const anchoredTemplate = injectBlockAnchors(previewTemplate, previewRow, STRUCTURE_ANCHOR_SPECS).replace(POOL_ANCHOR_COMMENT, blockSentinel('pool'));
-    return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden', vars: topoPreview?.vars ?? briefingPoolPreview?.vars });
-  }, [briefingPoolPreview, previewRow, previewTemplate, showMarketingNotes, subscriber, topoPreview]);
+    return renderDynamicEmail(anchoredTemplate, previewRow, { ...subscriber, PRODUTO: previewRow.NM_PRODUTO_INTERNO, SEQUENCIA: previewRow.SEQUENCIA, TP_CAMPANHA: previewRow.TP_CAMPANHA }, { pendingAssets: showMarketingNotes ? 'observations' : 'hidden', vars: vdvPreview?.vars ?? topoPreview?.vars ?? briefingPoolPreview?.vars });
+  }, [vdvPreview, briefingPoolPreview, previewRow, previewTemplate, showMarketingNotes, subscriber, topoPreview]);
   const previewContextKey = emailPreviewContextKey(selected?.__id ?? '', linkedTemplateId);
   const templateActiveCols = useMemo(() => templateActiveColumns(previewTemplate), [previewTemplate]);
   const isColumnEditable = (field: BriefingColumn) => templateActiveCols.size === 0 || templateActiveCols.has(field);
@@ -632,12 +643,14 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const updateField = (field: BriefingColumn, value: string) => selected && selected.__meta.status !== 'archived' && setRows((current) => applyWorkspaceField(current, selected.__id, field, value));
   const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? { ...applyFix(row, issue), __meta: row.__meta } : row)); };
   const openExport = () => {
+    if(vdvTemplate){setAnnouncement('E-mail Vai de Visa: exporte pela aba Pool Vai de Visa.');return;}
     if (!activeRows.length) { setAnnouncement(exportBlockReason || 'Nada para exportar.'); return; }
     setExportOpen(true);
   };
   const confirmExport = (weekKeys: Set<string>, filename: string, options: SfmcExportOptions) => {
     const exportRows = rows.filter((row) => row.__meta.status !== 'archived'
       && weekKeys.has(weekKeyFor(row.__meta.partner, row.__meta.segment, row.__meta.weekKey)));
+    if(exportRows.some(row=>detectVdvTemplate(templateSlots.find(slot=>slot.id===row.__meta.templateSlotId)?.source??savedTemplate))){setAnnouncement('E-mail Vai de Visa: exporte pela aba Pool Vai de Visa.');return;}
     if (!exportRows.length) { setAnnouncement('Selecione ao menos uma semana sem pendências para exportar.'); return; }
     // Duas réguas do GaaS podem usar a mesma chave do SFMC; no mesmo CSV isso duplicaria a linha na DE.
     const keyOwners = new Map<string, Set<string>>();
@@ -1040,6 +1053,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <button role="tab" aria-selected={mode === 'reviews'} onClick={() => setMode('reviews')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'reviews' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}>Revisões</button>
             <button role="tab" aria-selected={mode === 'library'} onClick={() => setMode('library')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'library' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Images className="mr-1.5 inline" size={14}/>Biblioteca de ativos</button>
             <button role="tab" aria-selected={mode === 'template'} onClick={() => setMode('template')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'template' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Code2 className="mr-1.5 inline" size={14}/>Template-fonte</button>
+            <button role="tab" aria-selected={mode === 'vdv'} onClick={()=>setMode('vdv')} className="rounded-lg px-3 py-2 text-xs font-bold text-white">Pool Vai de Visa</button>
             <button role="tab" aria-selected={mode === 'topo'} onClick={() => setMode('topo')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'topo' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Sparkles className="mr-1.5 inline" size={14}/>Header e ofertas</button>
           </div>
           {mode === 'briefings' && <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1057,7 +1071,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       </div>
     </header>
 
-    {mode === 'prompt' ? <PromptAiWorkspace context={{ briefings: rows, emailStrategies, rulers, productContexts, productGuardrails, assets, templates: templateSlots }} onSave={async (text,file,sha256,choices) => { const saved = await saveEmailInputDrafts(text,file,sha256,choices,rows); const fresh = await loadBriefings(); setRows(fresh); await refreshManagement(); return saved; }} onOpen={(id) => { setSelectedId(id); setMode('briefings'); }}/> : mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedGuardrail={(saved) => setProductGuardrails((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace aiContext={{ briefings: rows, emailStrategies, rulers, segments: factorySegments, productContexts, productGuardrails, assets, legalTexts, templates: templateSlots, signatureSettings, reviewRuns, reviewSuggestions, defaultPartner: selected?.__meta.partner }} runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'topo' ? <TopoV10Workspace variants={headerVariants} onVariantsChange={setHeaderVariants} assets={partnerAssets} onAssetsChange={setPartnerAssets} offers={poolOffers} onOffersChange={setPoolOffers} signatureSettings={signatureSettings} onAnnounce={setAnnouncement}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
+    {mode === 'vdv' ? <VaiDeVisaWorkspace onDirtyChange={setVdvDirty} data={vdvData} onChange={setVdvData} today={previewSendDate} onDateChange={setPreviewSendDate}/> : mode === 'prompt' ? <PromptAiWorkspace context={{ briefings: rows, emailStrategies, rulers, productContexts, productGuardrails, assets, templates: templateSlots }} onSave={async (text,file,sha256,choices) => { const saved = await saveEmailInputDrafts(text,file,sha256,choices,rows); const fresh = await loadBriefings(); setRows(fresh); await refreshManagement(); return saved; }} onOpen={(id) => { setSelectedId(id); setMode('briefings'); }}/> : mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedGuardrail={(saved) => setProductGuardrails((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace aiContext={{ briefings: rows, emailStrategies, rulers, segments: factorySegments, productContexts, productGuardrails, assets, legalTexts, templates: templateSlots, signatureSettings, reviewRuns, reviewSuggestions, defaultPartner: selected?.__meta.partner }} runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'topo' ? <TopoV10Workspace variants={headerVariants} onVariantsChange={setHeaderVariants} assets={partnerAssets} onAssetsChange={setPartnerAssets} offers={poolOffers} onOffersChange={setPoolOffers} signatureSettings={signatureSettings} onAnnounce={setAnnouncement}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
@@ -1230,9 +1244,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
                   </span>
                 </label>}
               </div>
-              {selected && <div className="space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
-                <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
-                <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{selected.PRE_CABECALHO || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo do e-mail</span>}</span></div>
+              {vdvPreview && <VdvSampleControls sample={vdvSample} onChange={setVdvSample} today={previewSendDate} onDateChange={setPreviewSendDate} preview={vdvPreview}/>}
+              {selected && !vdvPreview && <div className="space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
+                <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{(vdvPreview?.vars.Assunto ?? selected.ASSUNTO) || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
+                <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{(vdvPreview?.vars.PreHeader ?? selected.PRE_CABECALHO) || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo do e-mail</span>}</span></div>
               </div>}
               {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="min-h-[300px] bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
             </section>
@@ -1246,8 +1261,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4"><div><div className="flex items-center gap-2"><h2 id="email-preview-title" className="text-lg font-bold text-slate-900">Visualização do e-mail</h2><span className="rounded-full bg-cyan-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-cyan-700">Simulação local</span></div><p className="mt-0.5 text-xs text-slate-500">Revise conteúdo e personalização. A certificação final acontece no Test Send do SFMC.</p></div><button autoFocus onClick={() => setPreviewOpen(false)} className="rounded-lg p-2 text-slate-500 outline-none hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-cyan-500" aria-label="Fechar visualização"><X size={19}/></button></div>
         <div className="grid gap-3 border-b border-slate-200 bg-white px-5 py-3 md:grid-cols-[1fr_180px_180px]">
           <div className="space-y-1.5 self-center">
-            <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{selected.ASSUNTO || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
-            <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{selected.PRE_CABECALHO || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo</span>}</span></div>
+            <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{(vdvPreview?.vars.Assunto ?? selected.ASSUNTO) || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
+            <div className="flex gap-2 text-sm"><span className="w-[104px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{(vdvPreview?.vars.PreHeader ?? selected.PRE_CABECALHO) || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo</span>}</span></div>
           </div>
           <MiniInput label="Nome de teste" value={subscriber.PRI_NOME} onChange={(value) => setSubscriber((current) => ({ ...current, PRI_NOME: value }))}/><LimitTestInput value={subscriber.LIMITE} onChange={(value) => setSubscriber((current) => ({ ...current, LIMITE: value }))}/>
         </div>
