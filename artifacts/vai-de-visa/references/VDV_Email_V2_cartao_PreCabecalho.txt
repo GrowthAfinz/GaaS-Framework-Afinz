@@ -1,0 +1,256 @@
+%%[
+/* =====================================================================
+   VDV · Pool de Ofertas Vai de Visa · e-mail dinâmico v5
+   KV E-mail Black Afinz 2026 - v2 cartão
+   ÚNICA LINHA QUE MUDA ENTRE OS DOIS E-MAILS: SET @VersaoEmail
+   Audiência: VDV_ENVIO
+   Conteúdo:  BRIEFING_OFERTAS_VISA   (PK ID; TIPO = OFERTA | TEMA | HERO)
+   Vitrine:   MOVIMENTO_OFERTAS_VISA  (PK VERSAO + GRUPO + CELULA + POSICAO)
+   Este bloco também vai no campo Pré-cabeçalho (o SFMC processa
+   pré-cabeçalho → HTML → texto → assunto); a guarda @VDVInicializado
+   evita rodar duas vezes. O corpo usa só IF/ELSE e v() (padrão Fábrica).
+   ===================================================================== */
+SET @VersaoEmail = "V2"
+IF Empty(@VDVInicializado) THEN
+SET @DE  = "BRIEFING_OFERTAS_VISA"
+SET @MOV = "MOVIMENTO_OFERTAS_VISA"
+
+/* --- audiência (VDV_ENVIO) --- */
+SET @Grupo        = Trim(AttributeValue("CD_GRUPO"))
+SET @Celula       = Trim(AttributeValue("DS_CELULA_TESTE"))
+SET @Versao       = Trim(AttributeValue("ID_VERSAO_OFERTAS"))
+SET @Parceiro     = Uppercase(Trim(AttributeValue("NM_PARCEIRO")))
+SET @NmCartaoBase = Trim(AttributeValue("NM_CARTAO"))
+SET @FirstName    = Trim(AttributeValue("FIRST_NAME"))
+IF NOT Empty(@FirstName) THEN
+  IF IndexOf(@FirstName, " ") > 0 THEN
+    SET @FirstName = Substring(@FirstName, 1, Subtract(IndexOf(@FirstName, " "), 1))
+  ENDIF
+  SET @FirstName = ProperCase(@FirstName)
+ENDIF
+IF Empty(@Versao) THEN SET @Versao = "BF26_V1" ENDIF
+IF @Celula == "SEG-B" OR @Celula == "GEN-A" OR Empty(@Grupo) THEN
+  SET @GrupoVitrine = "GENERICO"
+ELSE
+  SET @GrupoVitrine = @Grupo
+ENDIF
+SET @Hoje = SystemDateToLocalDate(Now())
+
+/* --- TEMA (TIPO = TEMA, 1 por versão) --- */
+SET @TemaRows = LookupRows(@DE, "TIPO", "TEMA", "VERSAO", @Versao, "ATIVA", "True")
+IF RowCount(@TemaRows) == 0 THEN
+  RaiseError(Concat("VDV sem tema para a versão ", @Versao), true)
+ENDIF
+SET @T = Row(@TemaRows, 1)
+SET @NmTema       = Field(@T, "TEMA")
+SET @Assunto      = Field(@T, "ASSUNTO")
+SET @PreHeader    = Field(@T, "PREHEADER")
+IF @VersaoEmail == "V2" THEN
+  IF NOT Empty(Field(@T, "ASSUNTO_V2"))   THEN SET @Assunto   = Field(@T, "ASSUNTO_V2") ENDIF
+  IF NOT Empty(Field(@T, "PREHEADER_V2")) THEN SET @PreHeader = Field(@T, "PREHEADER_V2") ENDIF
+ENDIF
+SET @Saudacao     = Field(@T, "SAUDACAO")
+SET @SaudSemNome  = Field(@T, "SAUDACAO_SEM_NOME")
+SET @Intro        = Field(@T, "INTRO")
+SET @CartaoPadrao = Field(@T, "CARTAO_PADRAO")
+SET @CtaCard      = Field(@T, "CTA")
+SET @TitCond      = Field(@T, "TITULO_CONDICOES")
+SET @RodCond      = Field(@T, "RODAPE_CONDICOES")
+SET @CorFundo     = Field(@T, "COR_FUNDO")
+SET @CorTexto     = Field(@T, "COR_TEXTO")
+SET @CorTitulo    = Field(@T, "COR_TITULO")
+SET @CorTema      = Field(@T, "COR_TEMA")
+IF Empty(@CorFundo)     THEN SET @CorFundo  = "#000000" ENDIF
+IF Empty(@CorTexto)     THEN SET @CorTexto  = "#FFFFFF" ENDIF
+IF Empty(@CorTitulo)    THEN SET @CorTitulo = "#00C6CC" ENDIF
+IF Empty(@CorTema)      THEN SET @CorTema   = "#D3FF00" ENDIF
+IF Empty(@Assunto)      THEN SET @Assunto   = "Ofertas do seu {CARTAO}" ENDIF
+IF Empty(@CtaCard)      THEN SET @CtaCard   = "Aproveitar oferta" ENDIF
+IF Empty(@TitCond)      THEN SET @TitCond   = "Condições das ofertas" ENDIF
+IF Empty(@SaudSemNome)  THEN SET @SaudSemNome = "Olá!" ENDIF
+IF Empty(@CartaoPadrao) THEN SET @CartaoPadrao = "cartão Afinz Visa" ENDIF
+
+/* --- HERO (TIPO = HERO)
+       parceiro com arte  -> arte do parceiro nos 2 e-mails
+       B2B2C sem arte     -> V2 (cartão institucional) nos 2 e-mails
+       B2C                -> V1 no e-mail 1, V2 no e-mail 2 --- */
+SET @HeroCount = 0
+SET @HeroParceiro = 0
+SET @NomeCartaoHero = ""
+IF NOT Empty(@Parceiro) THEN
+  SET @HeroRows  = LookupRows(@DE, "TIPO", "HERO", "VERSAO", @Versao, "HERO", @Parceiro, "ATIVA", "True")
+  SET @HeroCount = RowCount(@HeroRows)
+  IF @HeroCount > 0 THEN SET @HeroParceiro = 1 ENDIF
+ENDIF
+IF @HeroCount == 0 THEN
+  IF NOT Empty(@Parceiro) THEN SET @HeroCod = "V2" ELSE SET @HeroCod = @VersaoEmail ENDIF
+  SET @HeroRows  = LookupRows(@DE, "TIPO", "HERO", "VERSAO", @Versao, "HERO", @HeroCod, "ATIVA", "True")
+  SET @HeroCount = RowCount(@HeroRows)
+ENDIF
+SET @Hero = ""
+IF @HeroCount > 0 THEN
+  SET @H = Row(@HeroRows, 1)
+  SET @Hero     = Field(@H, "HERO_IMG")
+  SET @AltHero  = Field(@H, "HERO_ALT")
+  SET @LinkHero = Field(@H, "HERO_LINK")
+  IF @HeroParceiro == 1 THEN SET @NomeCartaoHero = Field(@H, "NOME_CARTAO") ENDIF
+  IF Empty(@AltHero) THEN SET @AltHero = @NmTema ENDIF
+ENDIF
+
+/* --- nome do cartão: NOME_CARTAO do hero do parceiro > NM_CARTAO da base > CARTAO_PADRAO --- */
+IF NOT Empty(@NomeCartaoHero) THEN
+  SET @NomeCartao = @NomeCartaoHero
+ELSE
+  IF NOT Empty(@NmCartaoBase) THEN
+    SET @NomeCartao = Concat("cartão ", ProperCase(@NmCartaoBase))
+  ELSE
+    SET @NomeCartao = @CartaoPadrao
+  ENDIF
+ENDIF
+
+/* --- tokens: {NOME} {TEMA} {CARTAO} --- */
+SET @TemaHtml = Concat('<b style="color:', @CorTema, ';">', @NmTema, '</b>')
+IF NOT Empty(@FirstName) AND NOT Empty(@Saudacao) THEN
+  SET @SaudacaoFinal = Replace(@Saudacao, "{NOME}", @FirstName)
+ELSE
+  SET @SaudacaoFinal = @SaudSemNome
+ENDIF
+SET @Intro     = Replace(Replace(@Intro, "{TEMA}", @TemaHtml), "{CARTAO}", @NomeCartao)
+SET @Assunto   = Replace(Replace(Replace(@Assunto, "{CARTAO}", @NomeCartao), "{TEMA}", @NmTema), "{NOME}", @FirstName)
+SET @PreHeader = Replace(Replace(Replace(@PreHeader, "{CARTAO}", @NomeCartao), "{TEMA}", @NmTema), "{NOME}", @FirstName)
+
+/* --- VITRINE: MOVIMENTO da célula; se não houver, CELULA = TODAS.
+       Até 6 posições (5-6 = reserva); ficam as 4 primeiras ofertas ativas e vigentes --- */
+SET @MovRows = LookupOrderedRows(@MOV, 6, "POSICAO ASC", "VERSAO", @Versao, "GRUPO", @GrupoVitrine, "CELULA", @Celula, "ATIVA", "True")
+IF RowCount(@MovRows) == 0 THEN
+  SET @MovRows = LookupOrderedRows(@MOV, 6, "POSICAO ASC", "VERSAO", @Versao, "GRUPO", @GrupoVitrine, "CELULA", "TODAS", "ATIVA", "True")
+ENDIF
+SET @Total = RowCount(@MovRows)
+SET @N = 0
+IF @Total > 0 THEN
+  FOR @i = 1 TO @Total DO
+    IF @N < 4 THEN
+      SET @OfId    = Field(Row(@MovRows, @i), "OFERTA_ID")
+      SET @CatRows = LookupRows(@DE, "ID", @OfId, "ATIVA", "True")
+      IF RowCount(@CatRows) > 0 THEN
+        SET @C  = Row(@CatRows, 1)
+        SET @Ok = 1
+        SET @Ini = Field(@C, "INICIO")
+        SET @Fim = Field(@C, "FIM")
+        IF NOT Empty(@Ini) THEN IF DateDiff(@Ini, @Hoje, "D") < 0 THEN SET @Ok = 0 ENDIF ENDIF
+        IF NOT Empty(@Fim) THEN IF DateDiff(@Hoje, @Fim, "D") < 0 THEN SET @Ok = 0 ENDIF ENDIF
+        IF Empty(Field(@C, "LINK")) OR Empty(Field(@C, "VALOR")) THEN SET @Ok = 0 ENDIF
+        IF @Ok == 1 THEN
+          SET @N = Add(@N, 1)
+          IF @N == 1 THEN SET @S1R = @C ENDIF
+          IF @N == 2 THEN SET @S2R = @C ENDIF
+          IF @N == 3 THEN SET @S3R = @C ENDIF
+          IF @N == 4 THEN SET @S4R = @C ENDIF
+        ENDIF
+      ENDIF
+    ENDIF
+  NEXT @i
+ENDIF
+IF @N == 0 THEN
+  RaiseError(Concat("VDV: nenhuma oferta vigente em ", @Versao, " / ", @GrupoVitrine), true)
+ENDIF
+
+/* --- slot 1 --- */
+IF @N >= 1 THEN
+  SET @R = @S1R
+  SET @S1Marca    = Field(@R, "MARCA")
+  SET @S1Logo     = Field(@R, "LOGO")
+  SET @S1Foto     = Field(@R, "FOTO")
+  SET @S1Alt      = Field(@R, "ALT")
+  SET @S1Pref     = Field(@R, "PREFIXO")
+  SET @S1Valor    = Field(@R, "VALOR")
+  SET @S1Suf      = Field(@R, "SUFIXO")
+  SET @S1Compl    = Field(@R, "COMPLEMENTO")
+  SET @S1Cor      = Field(@R, "COR")
+  SET @S1Resg     = Field(@R, "RESGATE")
+  SET @S1Cupom    = Field(@R, "CUPOM")
+  SET @S1Url      = Field(@R, "LINK")
+  SET @S1Nota     = Field(@R, "CONDICOES")
+  SET @S1Fim      = Field(@R, "FIM")
+  SET @S1Validade = ""
+  IF NOT Empty(@S1Fim) THEN SET @S1Validade = Format(@S1Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S1Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P1_", Field(@R, "ID"))
+  IF Empty(@S1Cor) THEN SET @S1Cor = "#00C6CC" ENDIF
+  IF Empty(@S1Alt) THEN SET @S1Alt = Concat("Oferta ", @S1Marca) ENDIF
+ENDIF
+
+/* --- slot 2 --- */
+IF @N >= 2 THEN
+  SET @R = @S2R
+  SET @S2Marca    = Field(@R, "MARCA")
+  SET @S2Logo     = Field(@R, "LOGO")
+  SET @S2Foto     = Field(@R, "FOTO")
+  SET @S2Alt      = Field(@R, "ALT")
+  SET @S2Pref     = Field(@R, "PREFIXO")
+  SET @S2Valor    = Field(@R, "VALOR")
+  SET @S2Suf      = Field(@R, "SUFIXO")
+  SET @S2Compl    = Field(@R, "COMPLEMENTO")
+  SET @S2Cor      = Field(@R, "COR")
+  SET @S2Resg     = Field(@R, "RESGATE")
+  SET @S2Cupom    = Field(@R, "CUPOM")
+  SET @S2Url      = Field(@R, "LINK")
+  SET @S2Nota     = Field(@R, "CONDICOES")
+  SET @S2Fim      = Field(@R, "FIM")
+  SET @S2Validade = ""
+  IF NOT Empty(@S2Fim) THEN SET @S2Validade = Format(@S2Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S2Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P2_", Field(@R, "ID"))
+  IF Empty(@S2Cor) THEN SET @S2Cor = "#00C6CC" ENDIF
+  IF Empty(@S2Alt) THEN SET @S2Alt = Concat("Oferta ", @S2Marca) ENDIF
+ENDIF
+
+/* --- slot 3 --- */
+IF @N >= 3 THEN
+  SET @R = @S3R
+  SET @S3Marca    = Field(@R, "MARCA")
+  SET @S3Logo     = Field(@R, "LOGO")
+  SET @S3Foto     = Field(@R, "FOTO")
+  SET @S3Alt      = Field(@R, "ALT")
+  SET @S3Pref     = Field(@R, "PREFIXO")
+  SET @S3Valor    = Field(@R, "VALOR")
+  SET @S3Suf      = Field(@R, "SUFIXO")
+  SET @S3Compl    = Field(@R, "COMPLEMENTO")
+  SET @S3Cor      = Field(@R, "COR")
+  SET @S3Resg     = Field(@R, "RESGATE")
+  SET @S3Cupom    = Field(@R, "CUPOM")
+  SET @S3Url      = Field(@R, "LINK")
+  SET @S3Nota     = Field(@R, "CONDICOES")
+  SET @S3Fim      = Field(@R, "FIM")
+  SET @S3Validade = ""
+  IF NOT Empty(@S3Fim) THEN SET @S3Validade = Format(@S3Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S3Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P3_", Field(@R, "ID"))
+  IF Empty(@S3Cor) THEN SET @S3Cor = "#00C6CC" ENDIF
+  IF Empty(@S3Alt) THEN SET @S3Alt = Concat("Oferta ", @S3Marca) ENDIF
+ENDIF
+
+/* --- slot 4 --- */
+IF @N >= 4 THEN
+  SET @R = @S4R
+  SET @S4Marca    = Field(@R, "MARCA")
+  SET @S4Logo     = Field(@R, "LOGO")
+  SET @S4Foto     = Field(@R, "FOTO")
+  SET @S4Alt      = Field(@R, "ALT")
+  SET @S4Pref     = Field(@R, "PREFIXO")
+  SET @S4Valor    = Field(@R, "VALOR")
+  SET @S4Suf      = Field(@R, "SUFIXO")
+  SET @S4Compl    = Field(@R, "COMPLEMENTO")
+  SET @S4Cor      = Field(@R, "COR")
+  SET @S4Resg     = Field(@R, "RESGATE")
+  SET @S4Cupom    = Field(@R, "CUPOM")
+  SET @S4Url      = Field(@R, "LINK")
+  SET @S4Nota     = Field(@R, "CONDICOES")
+  SET @S4Fim      = Field(@R, "FIM")
+  SET @S4Validade = ""
+  IF NOT Empty(@S4Fim) THEN SET @S4Validade = Format(@S4Fim, "dd/MM/yyyy", "Date") ENDIF
+  SET @S4Alias    = Concat("VDV_", @Versao, "_", @VersaoEmail, "_", @GrupoVitrine, "_P4_", Field(@R, "ID"))
+  IF Empty(@S4Cor) THEN SET @S4Cor = "#00C6CC" ENDIF
+  IF Empty(@S4Alt) THEN SET @S4Alt = Concat("Oferta ", @S4Marca) ENDIF
+ENDIF
+
+SET @VDVInicializado = 1
+ENDIF
+]%%%%=TreatAsContent(@PreHeader)=%%

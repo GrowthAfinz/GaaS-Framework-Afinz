@@ -13,3 +13,10 @@ export function plurixEnvelope(source: string): { version: string; subject: stri
 
 /** Nome mantido para compatibilidade com o envelope da V11. */
 export const v11Envelope = plurixEnvelope;
+
+/** O envelope VDV deriva do primeiro bloco do HTML atual. */
+export function vdvEnvelope(source:string) {
+ if(!source.includes('@VDVInicializado'))return null;
+ const setup=source.match(/^\s*(%%\[[\s\S]*?\]%%)/)?.[1];
+ return {version:'Vai de Visa '+(/SET\s+@VersaoEmail\s*=\s*"V2"/i.test(source)?'V2':'V1'),subject:'%%=TreatAsContent(@Assunto)=%%',preheader:setup?setup+'%%=TreatAsContent(@PreHeader)=%%':'',error:setup?undefined:'Preparo VDV ausente.'};
+}

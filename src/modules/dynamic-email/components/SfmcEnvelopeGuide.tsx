@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Copy } from 'lucide-react';
-import { plurixEnvelope } from '../domain/sfmcEnvelope';
+import { plurixEnvelope, vdvEnvelope } from '../domain/sfmcEnvelope';
 
 export function SfmcEnvelopeGuide({ source }: { source: string }) {
   const [message, setMessage] = useState('');
-  const envelope = plurixEnvelope(source);
+  const envelope = vdvEnvelope(source) ?? plurixEnvelope(source);
   if (!envelope) return null;
   const copy = async (value: string, label: string) => {
     try { await navigator.clipboard.writeText(value); setMessage(`${label} copiado.`); }
@@ -21,7 +21,7 @@ export function SfmcEnvelopeGuide({ source }: { source: string }) {
       </div>
       <div className="rounded-lg border border-slate-200 bg-white p-3">
         <div className="flex items-center justify-between gap-2"><h4 className="text-xs font-bold text-slate-800">Pré-cabeçalho</h4><button type="button" disabled={!envelope.preheader} onClick={() => copy(envelope.preheader, 'Pré-cabeçalho')} className="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-cyan-800 disabled:opacity-40"><Copy size={12}/>Copiar pré-cabeçalho completo</button></div>
-        <p className="my-2 text-xs leading-5 text-slate-600">Inclui o preparo da {envelope.version} e o campo PRE_CABECALHO. O SFMC processa este campo antes do HTML; por isso, copiar somente a expressão final não basta.</p>
+        <p className="my-2 text-xs leading-5 text-slate-600">Inclui o preparo da {envelope.version} e o campo de pré-cabeçalho resolvido. O SFMC processa este campo antes do HTML; por isso, copiar somente a expressão final não basta.</p>
         <details><summary className="cursor-pointer text-xs font-semibold text-cyan-800">Ver código completo do pré-cabeçalho</summary><textarea aria-label="Código completo do pré-cabeçalho SFMC" readOnly value={envelope.preheader} rows={8} className="mt-2 w-full resize-y rounded border border-slate-200 bg-slate-50 p-2 font-mono text-xs"/></details>
         {envelope.error && <p role="alert" className="mt-2 text-xs text-red-700">{envelope.error}</p>}
       </div>

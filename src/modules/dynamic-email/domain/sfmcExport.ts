@@ -4,6 +4,7 @@ export type SfmcExportOptions = { campaignType: string; requireDynamicHeader: bo
 
 /** Apply only the operator's export choices; never invent missing creative content. */
 export function prepareSfmcExport(rows: BriefingRow[], options: SfmcExportOptions): BriefingRow[] {
+  if(rows.some(row => String((row as BriefingRow & {__meta?:{templateSlotId?:string}}).__meta?.templateSlotId??'').startsWith('builtin-vdv-')))throw new Error('E-mail Vai de Visa: exporte pela aba Pool Vai de Visa.');
   const prepared = rows.map(row => ({ ...row, TP_CAMPANHA: options.campaignType.trim() || row.TP_CAMPANHA }));
   const keys = new Set<string>();
   for (const row of prepared) {
