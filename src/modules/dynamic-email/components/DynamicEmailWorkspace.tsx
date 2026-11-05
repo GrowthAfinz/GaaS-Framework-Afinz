@@ -1,6 +1,11 @@
-import { VdvInboxSection } from './VdvInboxSection';
-import { VaiDeVisaWorkspace, VdvSampleControls, type VdvData } from './VaiDeVisaWorkspace';
-import { detectVdvTemplate, resolveVdvPreview, VDV_SAMPLES } from '../domain/vaiDeVisa';
+import { VdvEmailFields } from './VdvEmailFields';
+import { VdvCampaignTree } from './VdvCampaignTree';
+import { isVdvEmail, ensureVdvTemplate, materializeVdvTemplate, projectVdvEditorial, factoryFamilyOrder, createVdvEdition, VDV_SLOT } from '../domain/factoryEmail';
+import { validateVdv, exportVdvBriefingCsv, exportVdvMovimentoCsv } from '../domain/vaiDeVisa';
+import { saveVdvFactory } from '../services/vaiDeVisaService';
+import { type VdvData } from './VaiDeVisaWorkspace';
+import { detectVdvTemplate, resolveVdvPreview, VDV_SAMPLES, parseVdvBriefingCsv, parseVdvMovimentoCsv } from '../domain/vaiDeVisa';
+import { VDV_BRIEFING_CSV, VDV_MOVIMENTO_CSV } from '../fixtures/vdvBF26V1.csv';
 import { loadVdv } from '../services/vaiDeVisaService';
 import { buildSfmcExport, type SfmcExportOptions } from '../domain/sfmcExport';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
@@ -209,6 +214,8 @@ const stripDynamicTokens = (value: string) => value
   .replace(/\s+/g, ' ')
   .trim();
 
+const DEV_PREVIEW = import.meta.env.DEV && typeof window !== 'undefined' && window.location.hash === '#dynamic-email-preview';
+
 function demoRows(): BriefingRow[] {
   const visa = emptyBriefingRow('00000000-0000-4000-8000-000000000001');
   Object.assign(visa, { DT_INICIO: '2026-06-01T00:00', DT_FIM: '2026-12-31T23:59', UTM_CAMPANHA: 'repescagem_visa', TP_CAMPANHA: 'Repescagem', SEQUENCIA: 'E-mail 1', ASSUNTO: 'Seu cartão Afinz Visa com limite pré-aprovado!', PRE_CABECALHO: 'Peça já o seu! Limite disponível para usar na hora', CARTAO_NM_COMERCIAL: 'Afinz Visa', NM_PRODUTO_INTERNO: 'INSTITUCIONAL', TITULO_COPY_1_AZUL: 'Sua aprovação chegou!', COR_COPY_1: '#00C6CC', TAMANHO_DA_FONTE_TITULO_COPY_1: '24', COPY_1_PRETO: 'Olá, %%=v(@FirstName)=%%!<br><br>Sua solicitação de cartão <b>%%=v(@CartaoNmComercial)=%%</b> foi reavaliada e aprovada: limite de %%=v(@LimiteNovo)=%% já disponível.', COR_COPY_PRETO_1: '#222222', TAMANHO_DA_FONTE_TITULO_COPY_PRETO_1: '16', TITULO_CTA_1: 'PEÇA JÁ O SEU CARTÃO', LINK_CTA_1: 'https://cartao-afinz.onelink.me/I1Ur/zr4jy3g1' });
@@ -217,8 +224,8 @@ function demoRows(): BriefingRow[] {
   return [visa, plurix];
 }
 
-function downloadText(name: string, content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+function downloadText(name: string, content: string, mime = 'text/plain;charset=utf-8') {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = name;
@@ -251,7 +258,7 @@ const initialTemplateSlots = (): EmailTemplateSlot[] => {
   const storedPrincipalId = localStorage.getItem(PRIMARY_TEMPLATE_KEY) ?? '';
   const normalize = (slots: Array<Partial<EmailTemplateSlot> & Pick<EmailTemplateSlot, 'id' | 'name' | 'source'>>): EmailTemplateSlot[] => {
     const principalId = slots.some((slot) => slot.id === storedPrincipalId) ? storedPrincipalId : slots[0]?.id;
-    return slots.map((slot) => ({ ...slot, isPrincipal: slot.id === principalId, version: Number(slot.version ?? 1), updatedAt: slot.updatedAt ?? new Date().toISOString() }));
+    return ensureVdvTemplate(slots.map((slot) => ({ ...slot, isPrincipal: slot.id === principalId, version: Number(slot.version ?? 1), updatedAt: slot.updatedAt ?? new Date().toISOString() })));
   };
   try {
     const stored = JSON.parse(localStorage.getItem(TEMPLATE_SLOTS_KEY) ?? 'null');
@@ -299,15 +306,21 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [template, setTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
   const [savedTemplate, setSavedTemplate] = useState(() => initialSlotsRef.current.find((slot) => slot.isPrincipal)?.source ?? initialSlotsRef.current[0].source);
   const [templateSyncState, setTemplateSyncState] = useState('Carregando catálogo compartilhado…');
-  const [mode, setModeRaw] = useState<'briefings' | 'strategy' | 'reviews' | 'library' | 'template' | 'topo' | 'prompt' | 'vdv'>('briefings');
-  const [vdvTouch, setVdvTouch] = useState<'V1'|'V2'>('V1');
+  const [mode, setModeRaw] = useState<'briefings' | 'strategy' | 'reviews' | 'library' | 'template' | 'topo' | 'prompt'>('briefings');
   const [vdvDirty,setVdvDirty] = useState(false);
-  const setMode = (next: typeof mode) => {if(mode==='vdv'&&next!=='vdv'&&vdvDirty&&!window.confirm('Sair e descartar alterações não salvas do Pool Vai de Visa?'))return;setVdvDirty(false);setModeRaw(next);};
+  const setMode = (next: typeof mode) => {setModeRaw(next);};
   const [headerVariants, setHeaderVariants] = useState<HeaderVariant[]>([]);
   const [partnerAssets, setPartnerAssets] = useState<PartnerHeaderAsset[]>([]);
-  const [vdvData, setVdvData] = useState<VdvData>({briefing:[],movimento:[]});
+  const [vdvData, setVdvData] = useState<VdvData>(()=>{try{return JSON.parse(localStorage.getItem('gaas-vdv-draft-v1')??'null')??{briefing:[],movimento:[]};}catch{return {briefing:[],movimento:[]};}});
+  const [vdvLoadError,setVdvLoadError] = useState('');
+  useEffect(()=>{if(!vdvDirty)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[vdvDirty]);
+  useEffect(()=>{localStorage.setItem('gaas-vdv-draft-v1',JSON.stringify(vdvData));},[vdvData]);
   const [vdvSample, setVdvSample] = useState({...VDV_SAMPLES[0].sample});
-  useEffect(() => { void Promise.all([loadVdv('briefing'),loadVdv('movimento')]).then(([briefing,movimento])=>setVdvData({briefing,movimento})).catch(()=>{ /* A aba VDV permite recarregar após aplicar a migration. */ }); }, []);
+  useEffect(() => { void Promise.all([loadVdv('briefing'),loadVdv('movimento')]).then(([briefing,movimento])=>setVdvData(current=>current.briefing.some(r=>r.__dirty==='true')||current.movimento.some(r=>r.__dirty==='true')?current:{briefing,movimento})).catch((error)=>{
+    // Só na rota local de prévia (sem login): usa a fixture BF26_V1 para exercitar o editor.
+    if(DEV_PREVIEW){setVdvData(current=>current.briefing.length?current:{briefing:parseVdvBriefingCsv(VDV_BRIEFING_CSV),movimento:parseVdvMovimentoCsv(VDV_MOVIMENTO_CSV)});return;}
+    setVdvLoadError('Não foi possível carregar o conteúdo compartilhado do Pool: '+String(error.message??error));
+  });  }, []);
   const [poolOffers, setPoolOffers] = useState<PoolOffer[]>([]);
   const [previewSendDate, setPreviewSendDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [emailStrategies, setEmailStrategies] = useState<EmailStrategy[]>([]);
@@ -449,7 +462,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
     catch { setTaxonomyState('error'); }
   };
   useEffect(() => { Promise.allSettled([loadBriefings(), loadAssets(), loadLegalTexts(), loadSignatureSettings(), migrateLocalTemplateSlots(initialSlotsRef.current)]).then(([briefings, assetRows, legalRows, settings, sharedTemplates]) => {
-    if (briefings.status === 'fulfilled') { setRows(briefings.value); setSelectedId(briefings.value.find((row) => row.__meta.status !== 'archived')?.__id ?? briefings.value[0]?.__id ?? ''); }
+    if (DEV_PREVIEW) setRows((current) => current.some(isVdvEmail) ? current : [...current, ...createVdvEdition('BF26_V1', 'Black Friday')]);
+    if (briefings.status === 'fulfilled' && !(DEV_PREVIEW && !briefings.value.length)) { setRows(briefings.value); setSelectedId(briefings.value.find((row) => row.__meta.status !== 'archived')?.__id ?? briefings.value[0]?.__id ?? ''); }
     if (assetRows.status === 'fulfilled') setAssets(assetRows.value);
     if (legalRows.status === 'fulfilled') setLegalTexts(legalRows.value);
     if (settings.status === 'fulfilled' && settings.value.length) setSignatureSettings(settings.value);
@@ -464,32 +478,36 @@ export const DynamicEmailWorkspace: React.FC = () => {
           ? { ...slot, name: PLURIX_V10_TEMPLATE_NAME, source: PLURIX_V10_TEMPLATE, updatedAt: '2026-10-05T12:00:00.000Z' }
         : slot);
       const principal = effectiveSharedTemplates.find((slot) => slot.isPrincipal) ?? effectiveSharedTemplates[0];
-      setTemplateSlots(effectiveSharedTemplates); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
+      setTemplateSlots(ensureVdvTemplate(effectiveSharedTemplates)); setPrincipalTemplateId(principal.id); setSelectedTemplateId(principal.id); setTemplate(principal.source); setSavedTemplate(principal.source);
       setTemplateSyncState('Compartilhado com todos os usuários');
     } else setTemplateSyncState('Cache local — falha ao sincronizar templates');
     setSyncState(briefings.status === 'fulfilled' ? 'Sincronizado com o GaaS' : 'Rascunho local — não sincronizado');
   }); void refreshTaxonomy(); }, []);
   const activeRows = useMemo(() => rows.filter((row) => row.__meta.status !== 'archived'), [rows]);
-  const issuesByRow = useMemo(() => validateRows(activeRows), [activeRows]);
+  const issuesByRow = useMemo(() => {const map=validateRows(activeRows.filter(row=>!isVdvEmail(row)));for(const row of activeRows.filter(isVdvEmail)){const messages=validateVdv({...vdvData,today:previewSendDate});const t=vdvData.briefing.find(b=>b.TIPO==='TEMA'&&b.VERSAO===row.__editor!.contentVersion&&b.ATIVA.toLowerCase()==='true');map.set(row.__id,[...messages.map(i=>({severity:i.severity,code:'vdv-'+i.field,message:i.message})),...(!t?[{severity:'error' as const,code:'vdv-theme',message:'Tema ativo da campanha não encontrado.'}]:[])]);}return map;}, [activeRows,vdvData,previewSendDate]);
   const rowsInCurrentView = useMemo(() => briefingRowsForView(rows, showArchived), [rows, showArchived]);
-  const selected = rowsInCurrentView.find((row) => row.__id === selectedId) ?? rowsInCurrentView[0];
+  const selectedBase = rowsInCurrentView.find((row) => row.__id === selectedId) ?? rowsInCurrentView[0];
+  const selected = selectedBase ? projectVdvEditorial(selectedBase,vdvData.briefing) : undefined;
+  const nativeVdv = isVdvEmail(selected);
   // Trocar de assinatura dentro do mesmo e-mail mantém os blocos abertos; trocar de e-mail recolhe.
   useEffect(() => { setOpenSections(new Set()); setEditorHoverBlock(null); setRailHoverBlock(null); }, [selected?.__meta.campaignGroupId]);
   const toggleSection = (id: string) => setOpenSections((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const focusStructureBlock = (id: string) => {
+    const detail=document.getElementById(`eb-${id}`);if(detail?.tagName==='DETAILS')(detail as HTMLDetailsElement).open=true;
     setOpenSections((current) => (current.has(id) ? current : new Set(current).add(id)));
     setEditorHoverBlock(id);
     requestAnimationFrame(() => setTimeout(() => document.getElementById(`eb-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30));
   };
   const activeStructureBlock = railHoverBlock ?? editorHoverBlock ?? [...openSections].find((id) => STRUCTURE_IDS.has(id)) ?? null;
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
-  const linkedTemplateId = selected?.__meta.templateSlotId && templateSlots.some((slot) => slot.id === selected.__meta.templateSlotId)
+  const linkedTemplateId = selected?.__editor && !selected.__meta.templateSlotId ? VDV_SLOT : selected?.__meta.templateSlotId && templateSlots.some((slot) => slot.id === selected.__meta.templateSlotId)
     ? selected.__meta.templateSlotId
     : effectivePrincipalId;
-  const previewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
+  const rawPreviewTemplate = templateSlots.find((slot) => slot.id === linkedTemplateId)?.source ?? savedTemplate;
+  const previewTemplate = selected?.__editor ? materializeVdvTemplate(rawPreviewTemplate,selected.__editor.touch) : rawPreviewTemplate;
   const previewRow = useMemo(() => selected && !showMarketingNotes ? projectMarketingPreview(selected, rows, assets) : selected, [assets, rows, selected, showMarketingNotes]);
   const vdvTemplate = detectVdvTemplate(previewTemplate);
-  const vdvPreview = useMemo(()=>vdvTemplate ? resolveVdvPreview({...vdvData,sample:vdvSample,versaoEmail:vdvTemplate.versaoEmail,today:previewSendDate}) : null,[vdvData,vdvSample,vdvTemplate?.versaoEmail,previewSendDate]);
+  const vdvPreview = useMemo(()=>vdvTemplate ? resolveVdvPreview({...vdvData,sample:{...vdvSample,ID_VERSAO_OFERTAS:selected?.__editor?.contentVersion??vdvSample.ID_VERSAO_OFERTAS},versaoEmail:vdvTemplate.versaoEmail,today:previewSendDate}) : null,[vdvData,vdvSample,vdvTemplate?.versaoEmail,previewSendDate,selected?.__editor?.contentVersion]);
   const usesTopoV10 = previewTemplate.includes('TB_HEADER_VARIACOES');
   // V13: o bloco 3 vem do pool e o header dinâmico vem do próprio briefing.
   const usesPool = usesTopoV10 || previewTemplate.includes('DE_POOL_OFERTAS_PLURIX');
@@ -533,6 +551,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const structureBlocks = useMemo<StructureBlock[]>(() => {
     const row = previewRow;
     if (!row) return [];
+    if(nativeVdv&&vdvPreview){return [
+      {id:'vdv-hero',num:1,label:'Hero',anchor:vdvPreview.vars.Hero?{kind:'image' as const,value:vdvPreview.vars.Hero}:null,status:'filled' as const},
+      {id:'vdv-intro',num:2,label:'Saudação e abertura',anchor:{kind:'text' as const,value:vdvPreview.vars.SaudacaoFinal},status:'filled' as const},
+      {id:'vdv-offers',num:3,label:'Vitrine e ofertas',anchor:vdvPreview.vars.S1Foto?{kind:'image' as const,value:vdvPreview.vars.S1Foto}:{kind:'text' as const,value:vdvPreview.vars.S1Marca},status:'filled' as const},
+      {id:'vdv-conditions',num:4,label:'Condições',anchor:{kind:'text' as const,value:vdvPreview.vars.TitCond},status:'filled' as const}];}
     const issueFields = new Set(selectedIssues.map((issue) => issue.field).filter(Boolean) as string[]);
     return visibleStructureBlocks(usesPool, usesLimitMessage).map((block) => {
       if (block.id === 'limit') {
@@ -558,23 +581,23 @@ export const DynamicEmailWorkspace: React.FC = () => {
       const templateLocked = ownedFields.length > 0 && templateActiveCols.size > 0 && ownedFields.some((field) => !templateActiveCols.has(field));
       return { id: block.id, num: block.num, label: block.label, anchor, status, templateLocked };
     });
-  }, [limitBandText, poolOffer, previewRow, selectedIssues, templateActiveCols, usesLimitMessage, usesPool]);
+  }, [nativeVdv,vdvPreview,limitBandText, poolOffer, previewRow, selectedIssues, templateActiveCols, usesLimitMessage, usesPool]);
   const structureNum = useMemo<Record<string, number>>(() => Object.fromEntries(visibleStructureBlocks(usesPool, usesLimitMessage).map((block) => [block.id, block.num])), [usesLimitMessage, usesPool]);
   const allIssues = [...issuesByRow.values()].flat();
   const technicalErrorCount = allIssues.filter((issue) => issue.severity === 'error').length;
   const editorialGroups = useMemo(() => [...new Set(rows.map((row) => row.__meta.campaignGroupId))].map((id) => {
-    const groupRows = rows.filter((row) => row.__meta.campaignGroupId === id);
+    const groupRows = rows.filter((row) => row.__meta.campaignGroupId === id).map(row=>projectVdvEditorial(row,vdvData.briefing));
     const visibleRows = groupRows.filter((row) => row.__meta.status !== 'archived');
     const representative = visibleRows.find((row) => row.NM_PRODUTO_INTERNO.toUpperCase() === 'AMIGAO') ?? visibleRows[0] ?? groupRows[0];
     const issues = visibleRows.flatMap((row) => issuesByRow.get(row.__id) ?? []);
     return { id, rows: groupRows, visibleRows, representative, hasErrors: issues.some((issue) => issue.severity === 'error') };
-  }), [issuesByRow, rows]);
+  }), [issuesByRow, rows,vdvData]);
   const filteredGroups = useMemo(() => editorialGroups.flatMap((group) => {
     const scopedRows = briefingRowsForView(group.rows, showArchived);
     if (!scopedRows.length) return [];
     const row = scopedRows.find((item) => item.NM_PRODUTO_INTERNO.toUpperCase() === 'AMIGAO') ?? scopedRows[0];
     const hasErrors = showArchived ? false : group.hasErrors;
-    if (statusFilter === 'ready' && hasErrors) return [];
+    if (statusFilter === 'ready' && (hasErrors || (isVdvEmail(row)&&row.__meta.status!=='ready'))) return [];
     if (statusFilter === 'needs-review' && !hasErrors) return [];
     const haystack = [row.__meta.partner, row.__meta.segment, row.__meta.weekKey, row.TP_CAMPANHA, row.SEQUENCIA, row.UTM_CAMPANHA, row.ASSUNTO, ...scopedRows.map((item) => item.__meta.subgroup)].join(' ').toLowerCase();
     if (!haystack.includes(query.trim().toLowerCase())) return [];
@@ -596,7 +619,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const activeEditorialGroupCount = editorialGroups.filter((group) => group.visibleRows.length > 0).length;
   // Entrada da árvore de export: um registro por e-mail editorial ativo.
   const exportGroups = useMemo<ExportGroupInput[]>(() => editorialGroups
-    .filter((group) => group.visibleRows.length)
+    .filter((group) => group.visibleRows.length && !isVdvEmail(group.representative))
     .map((group) => ({
       id: group.id,
       partner: group.representative.__meta.partner,
@@ -645,12 +668,12 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const updateField = (field: BriefingColumn, value: string) => selected && selected.__meta.status !== 'archived' && setRows((current) => applyWorkspaceField(current, selected.__id, field, value));
   const fixIssue = (issue: ValidationIssue) => { if (selected) setRows((current) => current.map((row) => row.__id === selected.__id ? { ...applyFix(row, issue), __meta: row.__meta } : row)); };
   const openExport = () => {
-    if(vdvTemplate){setAnnouncement('E-mail Vai de Visa: exporte pela aba Pool Vai de Visa.');return;}
+    if(nativeVdv&&selected?.__editor){if(selectedIssues.some(i=>i.severity==='error')){setAnnouncement('Corrija os erros do Pool antes de exportar.');return;}const stamp=previewSendDate.replace(/-/g,'');downloadText(`BRIEFING_OFERTAS_VISA_${stamp}.csv`,exportVdvBriefingCsv(vdvData.briefing),'text/csv;charset=utf-8');downloadText(`MOVIMENTO_OFERTAS_VISA_${selected.__editor.contentVersion}_${stamp}.csv`,exportVdvMovimentoCsv(vdvData.movimento.filter(m=>m.VERSAO===selected.__editor!.contentVersion)),'text/csv;charset=utf-8');downloadText(`VDV_${selected.__editor.touch}.html`,previewTemplate,'text/html;charset=utf-8');setAnnouncement('Pacote Visa exportado: dois CSVs e HTML do toque selecionado.');return;}
     if (!activeRows.length) { setAnnouncement(exportBlockReason || 'Nada para exportar.'); return; }
     setExportOpen(true);
   };
   const confirmExport = (weekKeys: Set<string>, filename: string, options: SfmcExportOptions) => {
-    const exportRows = rows.filter((row) => row.__meta.status !== 'archived'
+    const exportRows = rows.filter((row) => !isVdvEmail(row) && row.__meta.status !== 'archived'
       && weekKeys.has(weekKeyFor(row.__meta.partner, row.__meta.segment, row.__meta.weekKey)));
     if(exportRows.some(row=>detectVdvTemplate(templateSlots.find(slot=>slot.id===row.__meta.templateSlotId)?.source??savedTemplate))){setAnnouncement('E-mail Vai de Visa: exporte pela aba Pool Vai de Visa.');return;}
     if (!exportRows.length) { setAnnouncement('Selecione ao menos uma semana sem pendências para exportar.'); return; }
@@ -735,6 +758,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     await refreshManagement();
   };
   const duplicateBriefing = () => {
+    if(nativeVdv){duplicateVdvCampaign();return;}
     if (!selected) return;
     const campaignGroupId = crypto.randomUUID();
     const copies = rows.filter((row) => row.__meta.campaignGroupId === selected.__meta.campaignGroupId && row.__meta.status !== 'archived').map((row) => ({ ...row, __id: crypto.randomUUID(), __journeyConfirmed: false, __meta: { ...row.__meta, campaignGroupId, status: 'draft' as const, version: 1, savedAt: undefined } }));
@@ -818,6 +842,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const duplicateGroup = (groupId: string) => {
     const sourceRows = rows.filter((row) => row.__meta.campaignGroupId === groupId && row.__meta.status !== 'archived');
     if (!sourceRows.length) return;
+    if(isVdvEmail(sourceRows[0])){duplicateVdvCampaign(sourceRows[0]);return;}
     const campaignGroupId = crypto.randomUUID();
     const copies = sourceRows.map((row) => ({ ...row, __id: crypto.randomUUID(), __journeyConfirmed: false, __meta: { ...row.__meta, campaignGroupId, status: 'draft' as const, version: 1, savedAt: undefined } }));
     setRows((current) => [...current, ...copies]); setSelectedId(copies[0].__id); setAnnouncement('E-mail duplicado como rascunho. Revise sequência, vigência e Activity Name.');
@@ -960,6 +985,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
       setAnnouncement(`E-mail movido para ${target.partner} · ${segmentDisplayLabel(target.segment)} · ${target.weekKey}. Reconfirme a jornada no SFMC.`);
     } catch (error) { setAnnouncement(error instanceof Error ? error.message : 'Falha ao mover o e-mail.'); }
   };
+  const duplicateVdvCampaign = (target:WorkspaceBriefing|undefined = selected) => {
+    if(!target?.__editor)return;const version=window.prompt('Código da nova versão (ex.: NATAL26_V1):')?.trim().toUpperCase();if(!version)return;if(!/^[A-Z0-9_]{1,40}$/.test(version)||vdvData.briefing.some(b=>b.VERSAO===version)){setAnnouncement('Use uma versão nova, com letras, números e underscore.');return;}
+    const name=window.prompt('Nome da nova campanha:','Natal')?.trim();if(!name)return;const previous=target.__editor.contentVersion;
+    setVdvData(d=>({briefing:[...d.briefing,...d.briefing.filter(r=>r.VERSAO===previous&&r.TIPO!=='OFERTA').map((r,i)=>({...r,ID:`${r.TIPO}_${version}_${i}`,VERSAO:version,__version:'',__dirty:'true',__source:'gaas'}))],movimento:[...d.movimento,...d.movimento.filter(r=>r.VERSAO===previous).map(r=>({...r,VERSAO:version,__version:'',__dirty:'true',__source:'gaas'}))]}));const created=createVdvEdition(version,name);setRows(current=>[...current,...created]);setSelectedId(created[0].__id);setVdvDirty(true);setAnnouncement('Campanha duplicada como rascunho. Revise vigência, conteúdo e salve os dois e-mails.');
+  };
   const saveCurrent = async (ready: boolean) => {
     if (!selected || savingRef.current) return;
     savingRef.current = true;
@@ -967,7 +997,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
     setIsSaving(true);
     setAnnouncement('Salvando briefing…');
     try {
-      const saved = await saveBriefings(group.map((row) => ({ row, warnings: (issuesByRow.get(row.__id) ?? []).map((issue) => issue.message) })));
+      const result = nativeVdv ? await saveVdvFactory(group,vdvData,(selectedIssues??[]).map(i=>i.message)) : null;
+      const saved = result ? result.rows : await saveBriefings(group.map((row) => ({ row, warnings: (issuesByRow.get(row.__id) ?? []).map((issue) => issue.message) })));
+      if(result){setVdvData(result.content);setVdvDirty(false);}
       setRows((current) => current.map((row) => saved.find((item) => item.__id === row.__id) ?? row));
       setSyncState('Sincronizado com o GaaS');
       setAnnouncement(`Versão ${saved.find((item) => item.__id === selected.__id)?.__meta.version ?? group.find((item) => item.__id === selected.__id)?.__meta.version} salva e definida como atual.`);
@@ -1055,7 +1087,6 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <button role="tab" aria-selected={mode === 'reviews'} onClick={() => setMode('reviews')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'reviews' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}>Revisões</button>
             <button role="tab" aria-selected={mode === 'library'} onClick={() => setMode('library')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'library' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Images className="mr-1.5 inline" size={14}/>Biblioteca de ativos</button>
             <button role="tab" aria-selected={mode === 'template'} onClick={() => setMode('template')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'template' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Code2 className="mr-1.5 inline" size={14}/>Template-fonte</button>
-            <button role="tab" aria-selected={mode === 'vdv'} onClick={()=>setMode('vdv')} className="rounded-lg px-3 py-2 text-xs font-bold text-white">Pool Vai de Visa</button>
             <button role="tab" aria-selected={mode === 'topo'} onClick={() => setMode('topo')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'topo' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Sparkles className="mr-1.5 inline" size={14}/>Header e ofertas</button>
           </div>
           {mode === 'briefings' && <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1063,7 +1094,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <HeaderAction onClick={() => fileRef.current?.click()} icon={<Upload size={15}/>} label="Importar CSV"/>
             <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
             <HeaderAction onClick={() => openRuler()} icon={<ListChecks size={15}/>} label="Criar régua"/>
-            <HeaderAction onClick={() => openNewBriefing()} icon={<Plus size={15}/>} label="Novo e-mail"/>
+            <HeaderAction disabled={nativeVdv} onClick={() => openNewBriefing()} icon={<Plus size={15}/>} label="Novo e-mail"/>
             <HeaderAction onClick={() => setDeleteOpen(true)} disabled={!selected} icon={<Trash2 size={15}/>} label="Excluir" danger/>
             <button disabled={!activeRows.length} onClick={openExport} title={activeRows.length ? 'Escolher réguas e baixar o CSV para o SFMC' : (exportBlockReason || 'Nada para exportar')} className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 outline-none transition hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/50"><Download size={15}/>Exportar CSV</button>
             {exportBlockReason && !activeRows.length && <p className="w-full text-right text-[11px] font-semibold text-amber-100">{exportBlockReason}</p>}
@@ -1073,7 +1104,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
       </div>
     </header>
 
-    {mode === 'vdv' ? <VaiDeVisaWorkspace initialTouch={vdvTouch} onBack={()=>setMode('briefings')} onDirtyChange={setVdvDirty} data={vdvData} onChange={setVdvData} today={previewSendDate} onDateChange={setPreviewSendDate}/> : mode === 'prompt' ? <PromptAiWorkspace context={{ briefings: rows, emailStrategies, rulers, productContexts, productGuardrails, assets, templates: templateSlots }} onSave={async (text,file,sha256,choices) => { const saved = await saveEmailInputDrafts(text,file,sha256,choices,rows); const fresh = await loadBriefings(); setRows(fresh); await refreshManagement(); return saved; }} onOpen={(id) => { setSelectedId(id); setMode('briefings'); }}/> : mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedGuardrail={(saved) => setProductGuardrails((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace aiContext={{ briefings: rows, emailStrategies, rulers, segments: factorySegments, productContexts, productGuardrails, assets, legalTexts, templates: templateSlots, signatureSettings, reviewRuns, reviewSuggestions, defaultPartner: selected?.__meta.partner }} runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'topo' ? <TopoV10Workspace variants={headerVariants} onVariantsChange={setHeaderVariants} assets={partnerAssets} onAssetsChange={setPartnerAssets} offers={poolOffers} onOffersChange={setPoolOffers} signatureSettings={signatureSettings} onAnnounce={setAnnouncement}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
+    {mode === 'prompt' ? <PromptAiWorkspace context={{ briefings: rows, emailStrategies, rulers, productContexts, productGuardrails, assets, templates: templateSlots }} onSave={async (text,file,sha256,choices) => { const saved = await saveEmailInputDrafts(text,file,sha256,choices,rows); const fresh = await loadBriefings(); setRows(fresh); await refreshManagement(); return saved; }} onOpen={(id) => { setSelectedId(id); setMode('briefings'); }}/> : mode === 'strategy' ? <StrategyWorkspace strategies={emailStrategies} contexts={productContexts} guardrails={productGuardrails} rows={rows} syncState={managementState} onRefresh={() => void refreshManagement()} onSaved={(saved) => setEmailStrategies((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedContext={(saved) => setProductContexts((current) => current.map((item) => item.id === saved.id ? saved : item))} onSavedGuardrail={(saved) => setProductGuardrails((current) => current.map((item) => item.id === saved.id ? saved : item))}/> : mode === 'reviews' ? <ExternalReviewWorkspace aiContext={{ briefings: rows, emailStrategies, rulers, segments: factorySegments, productContexts, productGuardrails, assets, legalTexts, templates: templateSlots, signatureSettings, reviewRuns, reviewSuggestions, defaultPartner: selected?.__meta.partner }} runs={reviewRuns} suggestions={reviewSuggestions} syncState={managementState} onRefresh={() => void refreshManagement()} onDecide={async (id, status) => { await decideExternalSuggestion(id, status); await refreshManagement(); }}/> : mode === 'template' ? <TemplateSourceWorkspace slots={templateSlots} selectedId={effectiveSelectedId} principalId={effectivePrincipalId} source={template} syncState={templateSyncState} fileRef={templateFileRef} onSelect={selectTemplateSlot} onSourceChange={setTemplate} onRename={(id, name) => setTemplateSlots((current) => current.map((slot) => slot.id === id ? { ...slot, name } : slot))} onSave={() => void saveTemplate()} onCreate={() => void createTemplateSlot()} onUpload={(file) => void uploadTemplate(file)} onDuplicate={(id) => void duplicateTemplateSlot(id)} onDelete={(id) => void deleteTemplateSlot(id)} onMakePrincipal={(id) => void makeTemplatePrincipal(id)}/> : mode === 'topo' ? <TopoV10Workspace variants={headerVariants} onVariantsChange={setHeaderVariants} assets={partnerAssets} onAssetsChange={setPartnerAssets} offers={poolOffers} onOffersChange={setPoolOffers} signatureSettings={signatureSettings} onAnnounce={setAnnouncement}/> : mode === 'library' ? <AssetLibrary assets={assets} setAssets={setAssets} taxonomy={taxonomy}/> :
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
@@ -1094,7 +1125,6 @@ export const DynamicEmailWorkspace: React.FC = () => {
           <div className="p-2.5">
             <div className="mb-2 flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Dimensão da caixa de briefings">{([['partner', 'Por parceiro'], ['journey', 'Por jornada']] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={treeDimension === value} onClick={() => { setTreeDimension(value); localStorage.setItem('gaas-email-tree-dimension-v1', value); }} className={`min-h-8 flex-1 rounded-md px-2 text-[11px] font-bold outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-500 ${treeDimension === value ? 'bg-white text-cyan-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{label}</button>)}</div>
             <div className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">{treeDimension === 'partner' ? 'Parceiro › segmento › semana › e-mail › assinaturas' : 'Família › jornada › parceiro › segmento › semana › e-mail'}</div>
-            {!showArchived && <VdvInboxSection query={query} onOpen={(touch)=>{setVdvTouch(touch);setMode('vdv');}}/>}
             {(filteredGroups.length || emptyPartnerSlots.length) ? <BriefingTree
               groups={filteredGroups} emptyPartnerSlots={emptyPartnerSlots} strategies={emailStrategies} viewMode={treeDimension} selectedId={selected?.__id ?? ''} selectedWeek={selectedWeek} selectedSegment={selectedSegment} showArchived={showArchived}
               onSelect={selectEmail}
@@ -1132,9 +1162,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
 
         {selectedSegment ? <div className="min-w-0"><WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)} onOpenPlan={() => setMode('strategy')}/></div> : selectedWeek ? <div className="min-w-0"><WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onOpenPlan={() => setMode('strategy')}/></div> : selected ? <section id="email-editor-panel" className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
           <div className="rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3">
-            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{selected.__meta.partner || 'Parceiro pendente'} · {selected.__meta.segment || 'Segmento pendente'} · {selected.SEQUENCIA || 'Sequência pendente'}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Na Lixeira · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : 'Pronto para exportar'}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{nativeVdv ? `${selected.__editor!.campaignName} · ${selected.SEQUENCIA}` : `${selected.__meta.partner || 'Parceiro pendente'} · ${selected.__meta.segment || 'Segmento pendente'} · ${selected.SEQUENCIA || 'Sequência pendente'}`}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Na Lixeira · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : nativeVdv ? (selected.__meta.status==='ready'?'Pronto':'Rascunho · revisão editorial') : 'Pronto para exportar'}</span></div>
           </div>
-          <div id="email-editor-scroll" className="p-3.5">
+          {nativeVdv && selected.__editor && vdvPreview ? <><div id="email-editor-scroll">{vdvLoadError&&<p role="alert" className="p-3 text-xs text-red-700">{vdvLoadError}</p>}<fieldset disabled={selected.__meta.status==='archived'}><SfmcEnvelopeGuide source={previewTemplate}/><VdvEmailFields row={selected} data={vdvData} onChange={(data)=>{setVdvData(data);setVdvDirty(true);}} sample={{...vdvSample,ID_VERSAO_OFERTAS:selected.__editor.contentVersion}} onSample={setVdvSample} today={previewSendDate} onDate={setPreviewSendDate} preview={vdvPreview} onContext={(name)=>{setRows(current=>current.map(r=>r.__editor?.contentVersion===selected.__editor!.contentVersion?{...r,__editor:{...r.__editor,campaignName:name},__meta:{...r.__meta,weekKey:name}}:r));}} onDuplicate={()=>duplicateVdvCampaign()} onAnnounce={setAnnouncement}/></fieldset></div></> : <div id="email-editor-scroll" className="p-3.5">
             <label className="mb-2.5 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
             {selectedIssues.length > 0 && <div className="mb-2.5 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
             <EmailConfigSummary
@@ -1214,7 +1244,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 );
               })}
             </div>
-          </div>
+          </div>}
           <div className="sticky bottom-0 z-30 rounded-b-2xl border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-6px_20px_-4px_rgba(15,23,42,0.15)]">{selected.__meta.status === 'archived'
             ? <button type="button" onClick={() => void restoreSelected()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><ArchiveRestore size={16}/>Desarquivar e voltar a editar</button>
             : <><button type="button" onClick={() => setSaveOpen(true)} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white shadow-sm outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar briefing{selectedGroupErrorCount > 0 && <span className="rounded-full bg-white/20 px-1.5 text-[11px]">{selectedGroupErrorCount} pend.</span>}</button><p className="mt-1.5 text-center text-[11px] text-slate-500">Salve o rascunho ou marque como pronto depois de revisar os blocos.</p></>}</div>
@@ -1241,13 +1271,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 {previewToolsOpen && <label className="mt-2 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Template deste briefing
                   <span className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 bg-white px-2 focus-within:border-cyan-400">
                     <select value={linkedTemplateId} onChange={(event) => { const id = event.target.value; setSelectedTemplateId(id); updateGroupMeta({ templateSlotId: id }); }} className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-700 outline-none" aria-label="Template vinculado ao briefing">
-                      {templateSlots.map((slot) => <option key={slot.id} value={slot.id}>{slot.name}</option>)}
+                      {templateSlots.filter(slot=>nativeVdv?!!detectVdvTemplate(slot.source):!detectVdvTemplate(slot.source)).map((slot) => <option key={slot.id} value={slot.id}>{slot.name}</option>)}
                     </select>
                     <button type="button" onClick={() => { setSelectedTemplateId(linkedTemplateId); setMode('template'); }} className="ml-1 rounded-md p-1.5 text-cyan-700 hover:bg-cyan-50" aria-label="Editar HTML e AMPscript completo do template vinculado" title="Editar HTML e AMPscript completo"><Code2 size={14}/></button>
                   </span>
                 </label>}
               </div>
-              {vdvPreview && <VdvSampleControls sample={vdvSample} onChange={setVdvSample} today={previewSendDate} onDateChange={setPreviewSendDate} preview={vdvPreview}/>}
+              {vdvPreview && <div className="space-y-1 border-b border-slate-200 bg-white p-3 text-xs"><p><b>Assunto:</b> {vdvPreview.vars.Assunto}</p><p><b>Pré-cabeçalho:</b> {vdvPreview.vars.PreHeader}</p><p>Hero: {vdvPreview.heroUsed} · Célula: {vdvPreview.cellUsed}</p><p>Cards: {vdvPreview.cards.map(c=>`${c.marca} (posição ${c.position})`).join(' → ')}</p></div>}
               {selected && !vdvPreview && <div className="space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
                 <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{(vdvPreview?.vars.Assunto ?? selected.ASSUNTO) || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
                 <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{(vdvPreview?.vars.PreHeader ?? selected.PRE_CABECALHO) || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo do e-mail</span>}</span></div>
@@ -1529,13 +1559,13 @@ const JourneyBriefingTree = ({ groups, strategies, emptyPartnerSlots, showArchiv
   const entries = useMemo(() => {
     const map = new Map<string, { context: JourneyContext; groups: EditorialGroup[] }>();
     if (!showArchived) CANONICAL_JOURNEYS.forEach((context) => map.set(`${context.family}::${context.type}`, { context, groups: [] }));
-    groups.forEach((group) => { const context = journeyContextForStrategy(strategyByGroup.get(group.id), group.representative.TP_CAMPANHA, group.representative.__meta.segment); const key = `${context.family}::${context.type}`; const entry = map.get(key) ?? { context, groups: [] }; entry.groups.push(group); map.set(key, entry); });
+    groups.forEach((group) => { const context = group.representative.__editor ? {family:'Rentabilização',type:group.representative.__editor.rulerName} : journeyContextForStrategy(strategyByGroup.get(group.id), group.representative.TP_CAMPANHA, group.representative.__meta.segment); const key = `${context.family}::${context.type}`; const entry = map.get(key) ?? { context, groups: [] }; entry.groups.push(group); map.set(key, entry); });
     return [...map.values()];
   }, [groups, showArchived, strategyByGroup]);
   const families = useMemo(() => { const map = new Map<string, typeof entries>(); entries.forEach((entry) => map.set(entry.context.family, [...(map.get(entry.context.family) ?? []), entry])); return map; }, [entries]);
   const toggle = (key: string) => setExpanded((current) => { const next = new Set(current); next.has(key) ? next.delete(key) : next.add(key); return next; });
   const node = (key: string, label: string, count: string, level = 0) => <button type="button" onClick={() => toggle(key)} aria-expanded={expanded.has(key)} className="flex min-h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left text-xs font-bold text-slate-700 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-500" style={{ paddingLeft: `${8 + level * 12}px` }}>{expanded.has(key) ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="min-w-0 flex-1 truncate">{label}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">{count}</span></button>;
-  return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{showArchived ? 'Lixeira por jornada' : 'Orquestração'}</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">Recolher</button><button type="button" onClick={() => setExpanded(new Set([...families.entries()].flatMap(([family, items]) => [family, ...items.map(({ context }) => `${family}::${context.type}`)])))} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">Ver jornadas</button></div></div>{[...families.entries()].sort(([a], [b]) => naturalLabelSort(a, b)).map(([family, items]) => <div key={family}>{node(family, family.toUpperCase(), `${items.reduce((total, item) => total + item.groups.length, 0)} e-mails`)}{expanded.has(family) && items.sort((a, b) => naturalLabelSort(a.context.type, b.context.type)).map(({ context, groups: typeGroups }) => { const key = `${family}::${context.type}`; const covered = new Set(typeGroups.map((group) => group.representative.__meta.partner || 'Sem parceiro')); return <div key={key} className="ml-3">{node(key, context.type, `${covered.size}/${partners.length} parceiros`, 1)}{expanded.has(key) && <div className="ml-3 border-l border-cyan-100 pl-1"><PartnerBriefingTree {...actions} showArchived={showArchived} groups={typeGroups} emptyPartnerSlots={showArchived ? [] : partners.filter((partner) => !covered.has(partner))} onCreatePartnerRuler={(partner) => onCreatePartnerRuler(partner, context)}/></div>}</div>; })}</div>)}</div>;
+  return <div><div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{showArchived ? 'Lixeira por jornada' : 'Orquestração'}</span><div className="flex gap-1"><button type="button" onClick={() => setExpanded(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">Recolher</button><button type="button" onClick={() => setExpanded(new Set([...families.entries()].flatMap(([family, items]) => [family, ...items.map(({ context }) => `${family}::${context.type}`)])))} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">Ver jornadas</button></div></div>{[...families.entries()].sort(([a], [b]) => factoryFamilyOrder(a)-factoryFamilyOrder(b)||naturalLabelSort(a, b)).map(([family, items]) => <div key={family}>{node(family, family.toUpperCase(), `${items.reduce((total, item) => total + item.groups.length, 0)} e-mails`)}{expanded.has(family) && items.sort((a, b) => naturalLabelSort(a.context.type, b.context.type)).map(({ context, groups: typeGroups }) => { const key = `${family}::${context.type}`; const covered = new Set(typeGroups.map((group) => group.representative.__meta.partner || 'Sem parceiro')); return <div key={key} className="ml-3">{node(key, context.type, typeGroups.some(g=>isVdvEmail(g.representative))?`${typeGroups.length} e-mails`:`${covered.size}/${partners.length} parceiros`, 1)}{expanded.has(key) && <div className="ml-3 border-l border-cyan-100 pl-1">{typeGroups.length>0&&typeGroups.every(g=>isVdvEmail(g.representative))?<VdvCampaignTree rows={typeGroups.map(g=>g.representative)} selectedId={actions.selectedId} onSelect={actions.onSelect} onArchive={actions.onArchiveEmail} onRestore={actions.onRestoreEmail} onDuplicate={actions.onDuplicateEmail} archived={showArchived}/>:<PartnerBriefingTree {...actions} showArchived={showArchived} groups={typeGroups} emptyPartnerSlots={showArchived ? [] : partners.filter((partner) => !covered.has(partner))} onCreatePartnerRuler={(partner) => onCreatePartnerRuler(partner, context)}/>}</div>}</div>; })}</div>)}</div>;
 };
 
 const PartnerBriefingTree = ({ groups, emptyPartnerSlots, selectedId, selectedWeek, selectedSegment, showArchived, onSelect, onSelectSegment, onSelectWeek, onManage, onNewWeek, onNewEmail, onDuplicateWeek, onArchiveWeek, onDuplicateEmail, onArchiveEmail, onRestoreWeek, onRestoreEmail, onRenameWeek, onRenameSegment, onDuplicateRulerFromTree, onArchiveSegment, onRestoreSegment, onMoveEmail, onCreatePartnerRuler }: PartnerBriefingTreeProps) => {

@@ -1,12 +1,15 @@
+import { factoryContextSchema } from '../domain/factoryEmail';
 import { supabase } from '../../../services/supabaseClient';
 import { BRIEFING_COLUMNS, emptyBriefingRow, type BriefingRow } from '../domain/briefing';
 import type { ActivityTaxonomy, EmailAsset, EmailFactorySegment, EmailTemplateSlot, LegalText, RulerStrategy, SignatureSetting, WorkspaceBriefing } from '../domain/workspace';
 import { exportableRow, withMeta } from '../domain/workspace';
 
-const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
+export const toBriefing = (record: Record<string, any>): WorkspaceBriefing => {
   const source = record.briefing_data ?? {};
   const row = emptyBriefingRow(record.id);
   BRIEFING_COLUMNS.forEach((field) => { row[field] = String(source[field] ?? ''); });
+  const context = factoryContextSchema.safeParse(source.__editor);
+  if(context.success)row.__editor=context.data;
   row.__journeyConfirmed = Boolean(record.journey_confirmed);
   return withMeta(row, {
     partner: record.partner ?? '', segment: record.segment ?? '', subgroup: record.subgroup ?? '', weekKey: record.week_key ?? '',
