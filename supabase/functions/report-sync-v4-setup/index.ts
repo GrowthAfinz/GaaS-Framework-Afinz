@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchKey: undefined });
 // report-sync-v4-setup
 // Idempotent setup for the Report Live V4 sheet views and slide placeholders.
 import "@supabase/functions-js/edge-runtime.d.ts";
@@ -1942,7 +1944,7 @@ async function v1Thumbnails(ids: string[]) {
   return output;
 }
 
-Deno.serve(async (req: Request) => {
+serveGaas(async (req: Request) => {
   if (req.method !== "OPTIONS") {
     const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
     if (!SERVICE_KEY || token !== SERVICE_KEY) return json({ error: "Renderer restrito ao serviço de publicação." }, 403);

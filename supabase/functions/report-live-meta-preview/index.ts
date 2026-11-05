@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: true, dispatchKey: undefined });
 // Read-only platform evidence before a governed backfill. No business-table writes.
 import { createClient } from "npm:@supabase/supabase-js@2";
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -24,7 +26,7 @@ async function insights(campaign: string, day: string, metric: "actions" | "resu
   }
   throw new Error("Limite de páginas: evidência incompleta.");
 }
-Deno.serve(async request => {
+serveGaas(async request => {
   if (request.method !== "POST") return new Response("POST only",{status:405});
   const provided=request.headers.get("x-report-worker-token") ?? "";
   const auth=await admin.rpc("report_live_verify_worker",{p_token:provided});

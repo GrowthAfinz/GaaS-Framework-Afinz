@@ -46,7 +46,8 @@
     "test:skills": "node --test scripts/skills/test-skills-catalog.mjs",
     "pretest:skills": "node scripts/skills/build-skills-catalog.mjs",
     "test:insurance": "node --test scripts/test-insurance-foundation.mjs scripts/test-insurance-office.mjs",
-    "test:portfolio-knowledge": "node scripts/build-portfolio-report-contracts.mjs --check && node --test scripts/test-portfolio-knowledge-contracts.mjs"
+    "test:portfolio-knowledge": "node scripts/build-portfolio-report-contracts.mjs --check && node --test scripts/test-portfolio-knowledge-contracts.mjs",
+    "test:security": "node scripts/check-source-secrets.mjs && npx --yes deno@2.9.6 test scripts/test-gaas-security.ts"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

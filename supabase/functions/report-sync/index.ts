@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: true, dispatchKey: undefined });
 // Report Live v1.0 runtime
 // Supabase (source + manifest) -> Google Sheets (snapshot + tidy views)
 // -> Google Slides (one live deck, linked charts + governed narrative).
@@ -3265,4 +3267,4 @@ export async function handleReportRequest(request: Request): Promise<Response> {
     mode: requestedMode, status: "queued" }, 202);
 }
 
-if (import.meta.main) Deno.serve(handleReportRequest);
+if (import.meta.main) serveGaas(handleReportRequest);

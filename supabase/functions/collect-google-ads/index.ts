@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchKey: undefined });
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -161,7 +163,7 @@ function normalizeRow(row: GoogleAdsRow, accountName: string) {
   };
 }
 
-Deno.serve(async (req: Request) => {
+serveGaas(async (req: Request) => {
   try {
     if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN || !DEVELOPER_TOKEN || !SUPABASE_SERVICE_ROLE_KEY) {
       return jsonResponse({

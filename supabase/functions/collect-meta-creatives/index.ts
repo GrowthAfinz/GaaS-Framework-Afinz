@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchKey: undefined });
 // collect-meta-creatives - Supabase Edge Function
 // Meta Marketing API v25 | March 2026
 //
@@ -288,7 +290,7 @@ async function hostCreativeAsset(
   return promise;
 }
 
-Deno.serve(async (req) => {
+serveGaas(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' },
