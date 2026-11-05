@@ -1,0 +1,208 @@
+/* Wiki bar: the same controls in Leitura, Conexões and Notas.
+   Colors come from tokens so the map's dark theme can restyle it. */
+.wiki-bar {
+  --wb-surface: #ffffff;
+  --wb-glass: rgba(255, 255, 255, 0.88);
+  --wb-ink: #0f1a1b;
+  --wb-soft: #46585a;
+  --wb-faint: #7a8b8c;
+  --wb-rule: #d6e0e0;
+  --wb-accent: #007c80;
+  --wb-accent-bg: #e0f6f6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: var(--wb-ink);
+}
+.wiki-bar--fixed {
+  flex-wrap: wrap;
+  background: var(--wb-surface);
+  border: 1px solid #e2e8f0;
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  padding: 10px 12px;
+}
+.wiki-bar--floating {
+  position: absolute;
+  z-index: 30;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  pointer-events: none;
+}
+.wiki-bar--floating > * {
+  pointer-events: auto;
+}
+.wiki-bar__btn,
+.wiki-bar__search input,
+.wiki-bar__seg {
+  border: 1px solid var(--wb-rule);
+  border-radius: 8px;
+  background: var(--wb-surface);
+}
+.wiki-bar--floating .wiki-bar__btn,
+.wiki-bar--floating .wiki-bar__search input,
+.wiki-bar--floating .wiki-bar__seg {
+  background: var(--wb-glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.wiki-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--wb-soft);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+.wiki-bar__btn:hover,
+.wiki-bar__btn[aria-expanded="true"] {
+  border-color: var(--wb-accent);
+  color: var(--wb-ink);
+}
+.wiki-bar__icon {
+  width: 38px;
+  justify-content: center;
+  padding: 0;
+}
+.wiki-bar__search {
+  position: relative;
+  margin-left: auto;
+  width: min(360px, 34vw);
+}
+.wiki-bar__search-ico {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  color: var(--wb-faint);
+  pointer-events: none;
+}
+.wiki-bar__search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 52px 0 34px;
+  font-size: 13.5px;
+  color: var(--wb-ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.wiki-bar__search input:focus {
+  border-color: var(--wb-accent);
+  background: var(--wb-surface);
+}
+.wiki-bar__search input::placeholder {
+  color: var(--wb-faint);
+}
+.wiki-bar__search input::-webkit-search-cancel-button {
+  display: none;
+}
+.wiki-bar__search kbd {
+  position: absolute;
+  right: 9px;
+  top: 10px;
+  font: 10.5px/1 "Segoe UI", Arial, sans-serif;
+  color: var(--wb-faint);
+  border: 1px solid var(--wb-rule);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 3px 5px;
+  pointer-events: none;
+}
+.wiki-bar__search input:focus ~ kbd {
+  display: none;
+}
+.wiki-bar__clear {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--wb-faint);
+}
+.wiki-bar__clear:hover {
+  background: var(--wb-accent-bg);
+  color: var(--wb-ink);
+}
+.wiki-bar__seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  height: 38px;
+}
+.wiki-bar__seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--wb-soft);
+}
+.wiki-bar__seg button:hover {
+  color: var(--wb-ink);
+}
+.wiki-bar__seg button[aria-pressed="true"] {
+  background: var(--wb-accent-bg);
+  color: var(--wb-accent);
+  font-weight: 600;
+}
+.wiki-bar__ai {
+  border-color: var(--wb-accent);
+  color: var(--wb-accent);
+  font-weight: 600;
+}
+.wiki-bar__ai:hover {
+  background: var(--wb-accent-bg);
+  color: var(--wb-accent);
+}
+.wiki-bar__more {
+  position: relative;
+}
+.wiki-bar__more > summary {
+  list-style: none;
+}
+.wiki-bar__more > summary::-webkit-details-marker {
+  display: none;
+}
+.wiki-bar__menu {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 40;
+  width: 260px;
+  border: 1px solid var(--wb-rule);
+  border-radius: 10px;
+  background: var(--wb-surface);
+  box-shadow: 0 18px 40px -18px rgba(15, 26, 27, 0.35);
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--wb-soft);
+}
+@media (max-width: 1100px) {
+  .wiki-bar__lbl,
+  .wiki-bar__search kbd {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .wiki-bar__search {
+    order: 10;
+    width: 100%;
+    margin-left: 0;
+  }
+  .wiki-bar--floating {
+    flex-wrap: wrap;
+  }
+  .wiki-bar__ai {
+    display: none;
+  }
+}

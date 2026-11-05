@@ -18,12 +18,14 @@ export function wikiTopicForNote(note: (Pick<VaultNoteSummary, 'relative_path' |
   const path = normalizeWikiPath(note.relative_path);
   const exact = WIKI_TOPICS.find(topic => path === normalizeWikiPath(topic.target) || path.split('/').pop() === normalizeWikiPath(topic.target));
   if (exact) return exact.title;
-  if (note.tags.includes('growth-assunto') || wikiPageType(note) || note.folder === '07-Evolucao' || note.folder.startsWith('10-Resultados')) return 'Resultados';
-  if (/produto|briefing-e-regua/i.test(path) || note.folder === '01-Conceitos') return 'Produtos e propostas de valor';
+  // Subfolders (09-Inteligencia-IA/Skills, 02-Entidades-Dados/SFMC...) belong to their top-level folder.
+  const top = note.folder.split('/')[0];
+  if (note.tags.includes('growth-assunto') || wikiPageType(note) || top === '07-Evolucao' || top === '10-Resultados') return 'Resultados';
+  if (/produto|briefing-e-regua/i.test(path) || top === '01-Conceitos') return 'Produtos e propostas de valor';
   if (/email|sfmc|comunicac|regua/i.test(path)) return 'CRM e e-mails dinâmicos';
-  if (['02-Entidades-Dados', '03-Dimensoes', '06-Performance'].includes(note.folder)) return 'Dados e mensuração';
-  if (['08-Engenharia', '09-Inteligencia-IA'].includes(note.folder)) return 'Engenharia e IAs';
-  if (note.folder === '00-Indice') return 'Comece aqui';
+  if (['02-Entidades-Dados', '03-Dimensoes', '06-Performance'].includes(top)) return 'Dados e mensuração';
+  if (['08-Engenharia', '09-Inteligencia-IA'].includes(top)) return 'Engenharia e IAs';
+  if (top === '00-Indice') return 'Comece aqui';
   return 'Serviços de Growth';
 }
 

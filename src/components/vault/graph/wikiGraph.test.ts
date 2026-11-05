@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { VaultNoteSummary } from "../vaultTypes";
 import {
+  buildMapData,
   buildWikiGraph,
   graphNeighborhood,
   graphRouteSearch,
-  nodeRadius,
   readGraphRoute,
   visibleWikiGraph,
 } from "./wikiGraph";
@@ -95,18 +95,19 @@ describe("Wiki graph semantics", () => {
       }).nodes.map((n) => n.id),
     ).toEqual(["b"]);
   });
-  it("opens around the current note and preserves the reader route when sharing graph filters", () => {
+  it("opens the whole map on the current note and preserves the reader route when sharing graph filters", () => {
     const route = readGraphRoute("?item=a", "a");
     expect(route).toMatchObject({
-      scope: "local",
+      scope: "all",
       root: "a",
       focus: "a",
       depth: 1,
     });
     expect(readGraphRoute("", null).scope).toBe("all");
+    expect(readGraphRoute("?wiki_graph_scope=local&wiki_graph_root=a", null).scope).toBe("local");
     const search = graphRouteSearch(
       "?view=learning&section=vault&item=a&result_month=2026-09",
-      { ...route, depth: 2, query: "risco", topic: "Resultados" },
+      { ...route, scope: "local", depth: 2, query: "risco", topic: "Resultados" },
     );
     expect(new URLSearchParams(search).get("item")).toBe("a");
     expect(new URLSearchParams(search).get("result_month")).toBe("2026-09");
@@ -116,9 +117,29 @@ describe("Wiki graph semantics", () => {
       topic: "Resultados",
     });
   });
-  it("scales by distinct citations with bounded sizes", () => {
-    expect(nodeRadius(0)).toBe(3);
-    expect(nodeRadius(1)).toBeGreaterThan(nodeRadius(0));
-    expect(nodeRadius(10000)).toBe(10);
+  it("groups the map by subject with hubs, featured notes and a legacy layer", () => {
+    const many = [
+      ...Array.from({ length: 8 }, (_, i) => note("s" + i, "Fonte " + i)),
+      note("hub", "Contrato central"),
+      note("tab", "Tabela", "02-Entidades-Dados"),
+      { ...note("skill", "Skill", "09-Inteligencia-IA/Skills"), relative_path: "09-Inteligencia-IA/Skills/skill.md" },
+      { ...note("old", "Antiga", "98-Legado/08-Engenharia"), relative_path: "98-Legado/08-Engenharia/old.md" },
+    ];
+    const data = buildMapData(
+      buildWikiGraph(
+        many,
+        many.slice(0, 8).map((n) => ({ source_note_id: n.id, target_note_id: "hub" })),
+      ),
+    );
+    const byId = new Map(data.nodes.map((n) => [n.id, n]));
+    expect(byId.get("hub")).toMatchObject({ topic: "Engenharia e IAs", featured: true });
+    expect(byId.get("hub")!.val).toBeGreaterThan(byId.get("s0")!.val);
+    expect(byId.get("tab")).toMatchObject({ topic: "Dados e mensuração", shape: "gem" });
+    expect(byId.get("skill")).toMatchObject({ topic: "Engenharia e IAs", shape: "oct" });
+    expect(byId.get("old")).toMatchObject({ topic: "Legado", group: "leg", featured: false });
+    expect(byId.get("topic:eng")).toMatchObject({ type: "topic", count: 10 });
+    expect(data.nodes.some((n) => n.id === "root")).toBe(false);
+    expect(data.links.filter((l) => l.kind === "link")).toHaveLength(8);
+    expect(data.links.filter((l) => l.kind === "contains")).toHaveLength(many.length);
   });
 });

@@ -13,6 +13,8 @@ describe('Wiki navigation contracts', () => {
     expect(wikiTopicForNote({relative_path:'07-Evolucao/Assunto-Carrinho.md',folder:'07-Evolucao',tags:['growth-assunto']})).toBe('Resultados');
     expect(wikiTopicForNote({relative_path:'04-Operacao/Servico-Emails-Dinamicos.md',folder:'04-Operacao',tags:[]})).toBe('CRM e e-mails dinâmicos');
     expect(wikiTopicForNote({relative_path:'08-Engenharia/Contrato.md',folder:'08-Engenharia',tags:[]})).toBe('Engenharia e IAs');
+    expect(wikiTopicForNote({relative_path:'09-Inteligencia-IA/Skills/Skill-Exemplo.md',folder:'09-Inteligencia-IA/Skills',tags:[]})).toBe('Engenharia e IAs');
+    expect(wikiTopicForNote({relative_path:'02-Entidades-Dados/Amostras/Tabela.md',folder:'02-Entidades-Dados/Amostras',tags:[]})).toBe('Dados e mensuração');
     expect(wikiTopicForNote(null)).toBeNull();
   });
   it('opens Results as a canonical Wiki topic without confusing the older screen note', () => {
