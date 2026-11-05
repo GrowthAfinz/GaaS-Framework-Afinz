@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchKey: undefined });
 // =====================================================================
 // Imagens dos e-mails para o pacote "Prompt e IA" da Fábrica de E-mails.
 //
@@ -45,7 +47,7 @@ async function fetchImage(raw: string) {
   return { contentType, base64: toBase64(bytes) };
 }
 
-Deno.serve(async (req) => {
+serveGaas(async (req) => {
   if (req.method === "OPTIONS") {
     // Devolve exatamente os cabeçalhos que o navegador pediu: versões futuras do cliente não quebram.
     const asked = req.headers.get("access-control-request-headers");

@@ -1,6 +1,8 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: true, dispatchKey: undefined });
 // Isolated build validation endpoint. It cannot reach a Google mutation route.
 import { handleReportRequest } from "../report-sync/index.ts";
-Deno.serve(async (request: Request) => {
+serveGaas(async (request: Request) => {
   if (request.method !== "POST") return new Response("Build candidate: POST only", { status: 405 });
   try {
     const body = await request.clone().json();

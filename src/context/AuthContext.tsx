@@ -71,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email,
             options: {
                 emailRedirectTo: getAuthRedirectUrl('signin'),
+                shouldCreateUser: false,
             },
         });
         if (error) throw error;
@@ -84,15 +85,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) throw error;
     };
 
-    const signUpEmail = async (email: string, password: string) => {
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                emailRedirectTo: getBaseAppUrl()
-            }
-        });
-        if (error) throw error;
+    const signUpEmail = async (_email: string, _password: string) => {
+        throw new Error('O cadastro requer convite e aprovação do administrador.');
     };
 
     const signOut = async () => {
@@ -128,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email,
             options: {
                 emailRedirectTo: redirectUrl,
+                shouldCreateUser: false,
             },
         });
 

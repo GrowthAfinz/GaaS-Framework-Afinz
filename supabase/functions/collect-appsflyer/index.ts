@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchKey: Deno.env.get("COLLECT_APPSFLYER_AUTH_KEY") });
 // =====================================================================
 // Coletor diario governado do AppsFlyer via Pull API (raw + aggregate),
 // token V2.0. Espelha o padrao de `collect-meta-events`: run lifecycle,
@@ -895,7 +897,7 @@ async function collectAppsflyer(opts: {
 // Authorization com COLLECT_APPSFLYER_AUTH_KEY. Sem os dois secrets
 // batendo, a chamada nunca chega no corpo da funcao.
 // ---------------------------------------------------------------------
-Deno.serve(async (req) => {
+serveGaas(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
   const authHeader = req.headers.get("Authorization") ?? "";
   const expected = `Bearer ${DISPATCH_AUTH_KEY}`;

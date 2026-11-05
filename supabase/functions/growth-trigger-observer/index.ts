@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: true, dispatchKey: undefined });
 import {createClient,type SupabaseClient} from '@supabase/supabase-js';
 import {buildObservation,observationInputHash,parseObservationRequest} from '../_shared/growth-trigger-runtime.ts';
 import type {ObservationInput} from '../_shared/growth-trigger-runtime.ts';
@@ -87,5 +89,5 @@ return handleObservationRequest;
 if(import.meta.main){
   const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'';
   const admin=createClient(Deno.env.get('SUPABASE_URL')??'',key,{auth:{persistSession:false,autoRefreshToken:false}});
-  Deno.serve(createObservationHandler(admin,key));
+  serveGaas(createObservationHandler(admin,key));
 }

@@ -1,3 +1,5 @@
+import { gaasSecureServe } from "../_shared/gaas-security.ts";
+const serveGaas = (handler: Parameters<typeof gaasSecureServe>[0]) => gaasSecureServe(handler, { worker: false, dispatchKey: undefined });
 // =====================================================================
 // Governed Meta funnel collector. Disabled by default through feature flag.
 // NO substitui `collect-meta-ads`. Dual-write por feature flag. Legado INTOCADO.
@@ -629,7 +631,7 @@ function lastClosedDay(): string {
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
 }
-Deno.serve(async (req) => {
+serveGaas(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
