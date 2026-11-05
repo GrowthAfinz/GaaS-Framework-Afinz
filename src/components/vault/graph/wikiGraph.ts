@@ -1,5 +1,5 @@
 import type { VaultNoteSummary } from "../vaultTypes";
-import { wikiTopicForNote } from "../wikiNavigation";
+import { WIKI_TOPICS, wikiTopicForNote } from "../wikiNavigation";
 
 export interface VaultGraphLink {
   source_note_id: string;
@@ -12,7 +12,6 @@ export interface GraphNode {
   topic: string;
   incoming: number;
   outgoing: number;
-  radius: number;
 }
 export interface GraphEdge {
   source: string;
@@ -30,17 +29,123 @@ export interface GraphRoute {
   topic: string;
   query: string;
 }
-export const TOPIC_COLORS: Record<string, string> = {
-  "Comece aqui": "#159c9a",
-  Resultados: "#5b7cdd",
-  "Produtos e propostas de valor": "#a477d1",
-  "Serviços de Growth": "#40a985",
-  "CRM e e-mails dinâmicos": "#d89755",
-  "Dados e mensuração": "#d4759a",
-  "Engenharia e IAs": "#7084ad",
-};
-export const nodeRadius = (incoming: number) =>
-  Math.min(10, 3 + 0.65 * Math.sqrt(Math.max(0, incoming)));
+// The map groups notes by subject. Legacy notes get a layer of their own,
+// hidden until the reader turns it on. Colors live in wikiMap3d.css.
+export const LEGACY_GROUP = "Legado";
+export const MAP_GROUPS: { topic: string; key: string; code: string; description: string }[] = [
+  ...WIKI_TOPICS.map((topic, index) => ({
+    topic: topic.title,
+    key: ["start", "res", "prod", "serv", "crm", "dados", "eng"][index],
+    code: "A" + index,
+    description: topic.description,
+  })),
+  {
+    topic: LEGACY_GROUP,
+    key: "leg",
+    code: "LG",
+    description: "Notas antigas mantidas para consulta.",
+  },
+];
+export const mapGroupOf = (node: Pick<GraphNode, "path" | "topic">) =>
+  node.path.startsWith("98-Legado/") ? LEGACY_GROUP : node.topic;
+
+export type MapShape = "sphere" | "gem" | "oct";
+export interface MapNode {
+  id: string;
+  type: "topic" | "note";
+  group: string;
+  topic: string;
+  label: string;
+  path: string;
+  incoming: number;
+  outgoing: number;
+  val: number;
+  shape: MapShape;
+  featured: boolean;
+  code: string;
+  description: string;
+  count: number;
+}
+export interface MapLink {
+  source: string;
+  target: string;
+  kind: "contains" | "link";
+}
+export interface MapData {
+  nodes: MapNode[];
+  links: MapLink[];
+}
+const shapeOf = (path: string): MapShape =>
+  /^0[23]-/.test(path)
+    ? "gem"
+    : path.startsWith("09-Inteligencia-IA/Skills/")
+      ? "oct"
+      : "sphere";
+// Sizes follow Second Brain OS: every note is about the same size, the most
+// cited notes of each subject become "sections" and the subjects are hubs.
+export function buildMapData(graph: WikiGraph): MapData {
+  const byGroup = new Map<string, MapNode[]>();
+  const nodes: MapNode[] = [];
+  for (const n of graph.nodes) {
+    const topic = mapGroupOf(n);
+    const group = MAP_GROUPS.find((g) => g.topic === topic) || MAP_GROUPS[3];
+    const legacy = group.topic === LEGACY_GROUP;
+    const node: MapNode = {
+      id: n.id,
+      type: "note",
+      group: group.key,
+      topic: group.topic,
+      label: n.title,
+      path: n.path,
+      incoming: n.incoming,
+      outgoing: n.outgoing,
+      val: legacy
+        ? 0.7 + Math.min(n.incoming, 20) * 0.02
+        : 1.8 + Math.min(1.7, Math.log1p(n.incoming) * 0.42),
+      shape: shapeOf(n.path),
+      featured: false,
+      code: "",
+      description: "",
+      count: 0,
+    };
+    nodes.push(node);
+    byGroup.set(group.key, [...(byGroup.get(group.key) || []), node]);
+  }
+  const links: MapLink[] = [];
+  for (const group of MAP_GROUPS) {
+    const members = byGroup.get(group.key) || [];
+    if (!members.length) continue;
+    const id = "topic:" + group.key;
+    nodes.push({
+      id,
+      type: "topic",
+      group: group.key,
+      topic: group.topic,
+      label: group.topic,
+      path: "",
+      incoming: 0,
+      outgoing: 0,
+      val: group.topic === LEGACY_GROUP ? 6 : 14,
+      shape: "sphere",
+      featured: false,
+      code: group.code,
+      description: group.description,
+      count: members.length,
+    });
+    if (group.topic !== LEGACY_GROUP)
+      members
+        .filter((m) => m.incoming >= 6)
+        .sort((a, b) => b.incoming - a.incoming || a.label.localeCompare(b.label))
+        .slice(0, 3)
+        .forEach((m) => {
+          m.featured = true;
+          m.val = 6.3 + Math.min(2.75, Math.log1p(m.incoming) * 0.5);
+        });
+    for (const m of members) links.push({ source: id, target: m.id, kind: "contains" });
+  }
+  for (const e of graph.edges) links.push({ source: e.source, target: e.target, kind: "link" });
+  return { nodes, links };
+}
 export function buildWikiGraph(
   notes: VaultNoteSummary[],
   links: VaultGraphLink[],
@@ -74,7 +179,6 @@ export function buildWikiGraph(
       topic: wikiTopicForNote(n) || "Serviços de Growth",
       incoming: incoming.get(n.id) || 0,
       outgoing: outgoing.get(n.id) || 0,
-      radius: nodeRadius(incoming.get(n.id) || 0),
     })),
     edges,
   };
@@ -131,8 +235,10 @@ export function readGraphRoute(
 ): GraphRoute {
   const p = new URLSearchParams(search),
     root = p.get("wiki_graph_root") || currentNote || "";
+  // The 3D map opens on the whole Wiki with the current note selected; the
+  // note's own neighbourhood is an explicit choice ("Conexões" on the note).
   return {
-    scope: p.get("wiki_graph_scope") === "all" || !root ? "all" : "local",
+    scope: p.get("wiki_graph_scope") === "local" && root ? "local" : "all",
     root,
     focus: p.get("wiki_graph_node") || root,
     depth: p.get("wiki_graph_depth") === "2" ? 2 : 1,

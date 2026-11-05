@@ -8,9 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import {
-  ArrowLeft,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ExternalLink,
   FileText,
@@ -18,8 +16,6 @@ import {
   FolderOpen,
   LoaderCircle,
   Network,
-  Search,
-  X,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -50,24 +46,24 @@ const propertyValue = (value: unknown) =>
 
 // Plain vault reading, the way Obsidian shows notes: the whole folder tree,
 // the note as written, its properties and the notes that mention it.
+// The filter and the folder panel are driven by the Wiki bar (search and "Pastas").
 export function WikiNotesExplorer({
   notes,
   loading,
   noteId,
-  fromGraph,
+  query,
+  treeOpen,
   onOpen,
-  onBackToGraph,
   onShowInGraph,
 }: {
   notes: VaultNoteSummary[];
   loading: boolean;
   noteId: string | null;
-  fromGraph: boolean;
+  query: string;
+  treeOpen: boolean;
   onOpen: (id: string, fragment?: string) => void;
-  onBackToGraph: () => void;
   onShowInGraph: (id: string) => void;
 }) {
-  const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [note, setNote] = useState<VaultNote | null>(null);
   const [backlinks, setBacklinks] = useState<VaultBacklink[]>([]);
@@ -231,31 +227,17 @@ export function WikiNotesExplorer({
   );
 
   return (
-    <div className="grid min-h-[560px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[calc(var(--screen-h)-220px)] lg:grid-cols-[300px_minmax(0,1fr)]">
-      <aside
+    <div className={`grid min-h-[560px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[calc(var(--screen-h)-220px)] ${treeOpen ? "lg:grid-cols-[300px_minmax(0,1fr)]" : ""}`}>
+      {treeOpen && <aside
+        id="wiki-notes-tree"
         aria-label="Todas as notas"
         className="flex min-h-0 flex-col border-b border-slate-200 bg-slate-50/70 lg:border-b-0 lg:border-r"
       >
-        <div className="border-b border-slate-200 p-3">
-          <p className="mb-2 text-xs font-semibold text-slate-700">
-            Todas as notas{" "}
-            <span className="font-normal text-slate-400">({notes.length})</span>
+        <div className="border-b border-slate-200 px-3 py-2.5">
+          <p className="text-xs font-semibold text-slate-700">
+            {query ? "Notas filtradas" : "Todas as notas"}{" "}
+            <span className="font-normal text-slate-400">({query ? tree.count : notes.length})</span>
           </p>
-          <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 focus-within:border-cyan-500">
-            <Search size={14} className="shrink-0 text-slate-400" />
-            <input
-              aria-label="Filtrar notas"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filtrar por nome ou pasta…"
-              className="min-w-0 w-full bg-transparent text-xs text-slate-700 outline-none"
-            />
-            {query && (
-              <button aria-label="Limpar filtro" onClick={() => setQuery("")}>
-                <X size={12} className="text-slate-400" />
-              </button>
-            )}
-          </label>
         </div>
         <nav className="max-h-80 min-h-0 flex-1 overflow-y-auto p-2 lg:max-h-none">
           {loading ? (
@@ -270,39 +252,13 @@ export function WikiNotesExplorer({
             </p>
           )}
         </nav>
-      </aside>
+      </aside>}
       <article
         ref={page}
         aria-busy={reading}
         className="min-h-0 min-w-0 overflow-y-auto"
       >
-        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-slate-100 bg-white/95 px-5 py-2 backdrop-blur">
-          {fromGraph && (
-            <button
-              type="button"
-              onClick={onBackToGraph}
-              className="inline-flex items-center gap-1.5 rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-800 hover:bg-cyan-100"
-            >
-              <ArrowLeft size={13} />
-              Voltar ao mapa
-            </button>
-          )}
-          <button
-            aria-label="Voltar"
-            type="button"
-            onClick={() => window.history.back()}
-            className="rounded p-1.5 text-slate-500 hover:bg-slate-100"
-          >
-            <ChevronLeft size={15} />
-          </button>
-          <button
-            aria-label="Avançar"
-            type="button"
-            onClick={() => window.history.forward()}
-            className="rounded p-1.5 text-slate-500 hover:bg-slate-100"
-          >
-            <ChevronRight size={15} />
-          </button>
+        <div className="sticky top-0 z-10 flex min-h-[41px] flex-wrap items-center gap-2 border-b border-slate-100 bg-white/95 px-5 py-2 backdrop-blur">
           {note && (
             <>
               <p className="min-w-0 flex-1 truncate text-xs text-slate-400">
