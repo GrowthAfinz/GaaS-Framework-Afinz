@@ -132,18 +132,22 @@ export function VaiDeVisaWorkspace({
   today,
   onDateChange,
   onDirtyChange,
+  initialTouch = "V1",
+  onBack,
 }: {
   data: VdvData;
   onChange: (d: VdvData) => void;
   today: string;
   onDateChange: (s: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  initialTouch?: "V1" | "V2";
+  onBack?: () => void;
 }) {
   const [draft, setDraft] = useState(data);
   const [version, setVersion] = useState("BF26_V1");
   const [newVersion, setNewVersion] = useState("");
   const [sample, setSample] = useState({ ...VDV_SAMPLES[0].sample });
-  const [touch, setTouch] = useState<"V1" | "V2">("V1");
+  const [touch, setTouch] = useState<"V1" | "V2">(initialTouch);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -374,7 +378,8 @@ export function VaiDeVisaWorkspace({
   ];
   return (
     <div className="space-y-4 p-5 text-slate-900">
-      <h2 className="text-lg font-bold">Pool Vai de Visa</h2>
+      {onBack && <button type="button" className={btn} onClick={onBack}>← Voltar aos e-mails</button>}
+      <h2 className="text-lg font-bold">Pool Vai de Visa · {touch}</h2>
       <p className="text-sm">
         Até 3 ofertas válidas. No desktop, primeira centralizada quando ímpar;
         no mobile, cards em coluna.
