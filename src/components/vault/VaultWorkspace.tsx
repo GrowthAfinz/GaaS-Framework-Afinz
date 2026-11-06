@@ -9,6 +9,8 @@ import { ChevronRight, Copy, ExternalLink, FileText, FolderOpen, Home, Link2, Lo
 import ReactMarkdown from 'react-markdown';
 import { WikiCodeBlock } from './WikiDiagram';
 import { WikiMarkdownSections } from './WikiMarkdownSections';
+import { WikiStrategyDocument } from './strategy/WikiStrategyDocument';
+import { isStrategyPilot } from './strategy/strategyModel';
 import { WikiPilotChecklist } from './WikiPilotChecklist';
 import { isPilotHeading } from './wikiPilotModel';
 import remarkGfm from 'remark-gfm';
@@ -366,6 +368,10 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     <p>Índice atualizado: <strong className="font-semibold text-slate-700">{dateLabel(syncRun?.completed_at)}</strong></p>
     {isAdmin&&<div className="mt-3 border-t border-slate-100 pt-3"><p className="mb-2">Atualize a projeção a partir da pasta de origem.</p><input ref={folderInput} className="hidden" type="file" multiple {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={handleFiles} /><button type="button" disabled={syncing} onClick={() => folderInput.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60"><RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />{syncing ? progress : 'Sincronizar pasta'}</button></div>}
   </>};
+  if (!graphMode && !notesMode && !readerLoading && selected && isStrategyPilot(selected)) return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-2">
+    <WikiModeBar {...barCommon} nav={{label:'Assuntos',open:sidebar,onToggle:()=>{filter('',null,false);navigate(null);},controls:'wiki-reading-nav'}} search={{value:query,placeholder:'Buscar na Wiki…',ariaLabel:'Buscar na Wiki',inputRef:searchInput,onChange:value=>{filter(value,folder);navigate(null);}}}/>
+    <WikiStrategyDocument key={selected.id} note={selected} onOpen={openTarget} onHome={()=>navigate(null)}/>
+  </section>;
   return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-3" style={{fontFamily: "Segoe UI, Arial, sans-serif"}}>
     {mode==='reading'&&<WikiModeBar {...barCommon} nav={{label:'Assuntos',open:sidebar,onToggle:()=>setSidebar(value=>!value),controls:'wiki-reading-nav'}} search={{value:query,placeholder:'Buscar na Wiki…',ariaLabel:'Buscar na Wiki',inputRef:searchInput,onChange:value=>filter(value,folder)}}/>}
     {mode==='notes'&&<WikiModeBar {...barCommon} nav={{label:'Pastas',open:notesTree,onToggle:()=>setNotesTree(value=>!value),controls:'wiki-notes-tree'}} search={{value:notesQuery,placeholder:'Filtrar notas por nome ou pasta…',ariaLabel:'Filtrar notas',inputRef:searchInput,onChange:setNotesQuery}}/>}

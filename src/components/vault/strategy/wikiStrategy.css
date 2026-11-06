@@ -1,0 +1,105 @@
+/* The approved editorial direction is scoped to the Visa pilot only. */
+.wiki-strategy{--strategy-ink:#18212a;--strategy-muted:#66717d;--strategy-line:#d7dfe2;--strategy-teal:#007c80;--strategy-lime:#c1ef43;display:grid;grid-template-columns:240px minmax(0,1fr);background:#fff;color:var(--strategy-ink);font-family:'Segoe UI',Arial,sans-serif;min-height:700px;text-align:left}
+.wiki-strategy *, .strategy-history *{box-sizing:border-box;border-radius:0!important}
+.wiki-strategy button,.wiki-strategy summary,.strategy-history button{font:inherit;cursor:pointer}
+.wiki-strategy button:disabled,.strategy-history button:disabled{cursor:not-allowed;opacity:.45}
+.wiki-strategy button:focus-visible,.wiki-strategy summary:focus-visible,.strategy-history button:focus-visible{outline:2px solid var(--strategy-teal,#007c80);outline-offset:3px}
+.strategy-nav{border-right:1px solid var(--strategy-line);padding:22px 20px;align-self:start;position:sticky;top:12px}
+.strategy-search{display:flex;align-items:center;gap:9px;border:1px solid #bdc8ce;padding:10px 12px;margin-bottom:24px;color:#626e78}
+.strategy-search input{width:100%;min-width:0;background:transparent;border:0;outline:0;font-size:13px}
+.strategy-nav nav{display:flex;flex-direction:column;gap:4px}
+.strategy-nav nav button{padding:10px 12px;text-align:left;border:0;border-left:2px solid transparent;background:transparent;font-size:13px;line-height:1.45;color:#38434d}
+.strategy-nav nav button:hover{background:#f5f8f8}
+.strategy-nav nav button.is-active{border-left-color:var(--strategy-teal);background:#e8f4f3;color:#005c60;font-weight:600}
+.strategy-nav>.strategy-help{margin-top:28px;line-height:1.8}
+.strategy-main{min-width:0;padding:24px 32px 32px}
+.strategy-header{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:18px;padding-bottom:26px;border-bottom:1px solid #aebbc1;scroll-margin-top:20px}
+.strategy-breadcrumb{display:flex;gap:7px;align-items:center;font-size:13px;color:#42515b;min-height:36px}
+.strategy-breadcrumb button{padding:0;border:0;background:none;color:#007c80}
+.strategy-page-actions{display:flex;align-items:center;gap:16px;justify-content:flex-end}
+.strategy-page-actions>button,.strategy-editor-actions button,.strategy-footer button,.strategy-notice button,.strategy-history button.strategy-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;border:0;background:transparent;padding:8px 12px;font-size:13px;white-space:nowrap}
+.wiki-strategy .strategy-primary,.strategy-history .strategy-primary{background:var(--strategy-lime,#c1ef43);color:#172b22;font-weight:600;border:1px solid transparent}
+.wiki-strategy .strategy-primary:hover{background:#b3e238}
+.strategy-title{grid-column:1/-1;display:flex;align-items:center;gap:12px;margin:12px 0 8px}
+.strategy-title h1{font-size:32px;letter-spacing:-.7px;font-weight:700;line-height:1.18;margin:0;max-width:950px}
+.strategy-icon{display:inline-flex;align-items:center;justify-content:center;width:32px;min-width:32px;min-height:36px;border:0;background:transparent;color:#53626d;list-style:none}
+.strategy-icon:hover{background:#edf6f4;color:#006c70}
+.strategy-meta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;grid-column:1/-1;font-size:12px;color:var(--strategy-muted);margin:5px 0 10px}
+.strategy-state{display:inline-block;background:#d9f68d;color:#284123;padding:3px 8px;font-weight:600}
+.strategy-summary{grid-column:1/-1;margin:0!important;font-size:15px!important;line-height:1.65!important;max-width:1050px}
+.strategy-summary p{margin:0!important}
+.strategy-block{position:relative;border-bottom:1px solid var(--strategy-line);padding:21px 0 9px;scroll-margin-top:18px;min-width:0}
+.strategy-block-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.strategy-section-toggle{display:flex;align-items:center;gap:10px;min-width:0;text-align:left;border:0;background:transparent;padding:0}
+.strategy-section-toggle>svg{flex-shrink:0;color:#52636b;width:14px}
+.strategy-section-toggle h2{font-size:23px;font-weight:650;letter-spacing:-.35px;line-height:1.25;margin:0}
+.strategy-block-actions{display:flex;align-items:center;gap:2px}
+.strategy-menu{position:relative;flex-shrink:0}
+.strategy-menu summary{list-style:none}
+.strategy-menu summary::-webkit-details-marker{display:none}
+.strategy-menu>div{position:absolute;z-index:50;right:0;top:100%;width:214px;border:1px solid #c0cbd0;background:#fff;padding:4px;box-shadow:0 4px 12px #15222b0b}
+.strategy-menu>div>button{display:flex;align-items:center;gap:10px;width:100%;border:0;padding:10px;background:transparent;text-align:left;font-size:13px}
+.strategy-menu>div>button:hover{background:#edf5f4}
+.strategy-menu small{display:block;border-top:1px solid #dde3e6;margin-top:4px;padding:9px;color:#6b7881;font-size:11px}
+.strategy-menu button.strategy-delete{color:#9a3535}
+.strategy-add-block{padding:6px 0 0}
+.strategy-add-block summary{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;color:#007c80;font-size:13px}
+.strategy-add-block .strategy-menu>div{left:0;right:auto}
+.strategy-prose{font-size:14px;line-height:1.8;color:#35424b;overflow-wrap:anywhere}
+.strategy-prose p{margin:10px 0}
+.strategy-prose h2,.strategy-prose h3,.strategy-prose h4{font-weight:600;color:#25343d;line-height:1.4;margin:22px 0 10px}
+.strategy-prose h2{font-size:20px}.strategy-prose h3{font-size:17px}.strategy-prose h4{font-size:15px}
+.strategy-prose ul,.strategy-prose ol{padding-left:22px;margin:10px 0;list-style:revert}
+.strategy-prose a{color:#00777b;text-decoration:underline;text-underline-offset:3px}
+.strategy-prose blockquote{border-left:2px solid #91bbb8;background:#f4f9f8;padding:6px 16px;margin:16px 0}
+.strategy-prose table{width:100%;border-collapse:collapse;font-size:12px}
+.strategy-prose th,.strategy-prose td{border-bottom:1px solid #dce3e6;padding:9px 10px;text-align:left;vertical-align:top}
+.strategy-prose th{font-weight:600;color:#54646e;background:#f8faf9}
+.strategy-prose pre{max-width:100%;white-space:pre;overflow:auto}
+.strategy-prose code{font-size:12px;background:#f2f5f6;padding:2px 4px}
+.strategy-prose details{box-shadow:none!important;margin:8px 0;border-color:#e2e7e9}
+.strategy-prose details summary{background:#f9fbfb;padding:10px 12px;font-size:13px;font-weight:500}
+.strategy-prose figure{border-color:#e0e5e8;box-shadow:none}
+.strategy-task-block>div>section[aria-label="Atividades: Construção do Piloto"]{border:0;margin:0}
+.strategy-task-block section[aria-label="Atividades: Construção do Piloto"]>div:first-child{display:none}
+.strategy-task-block section[aria-label="Atividades: Construção do Piloto"]>div:nth-child(2)>div:first-child{padding:0 0 8px;font-size:12px}
+.strategy-task-block section[aria-label="Atividades: Construção do Piloto"] article>div:first-child{padding:5px 0}
+.strategy-task-block section[aria-label="Atividades: Construção do Piloto"] article>div:first-child>button span:first-child{font-size:14px}
+.strategy-task-block section[aria-label="Atividades: Construção do Piloto"]>div:nth-child(2)>p:last-child{font-size:11px;padding:10px 0;color:#839098}
+.strategy-editor{border-left:2px solid #007c80;background:#f8fbfa;padding:18px;margin:12px 0;grid-column:1/-1}
+.strategy-editor fieldset{border:0;min-width:0;padding:0}
+.strategy-editor label{display:block;font-size:13px;font-weight:600;color:#52646d}
+.strategy-editor input,.strategy-editor textarea{display:block;width:100%;border:1px solid #b7c7cc;background:white;font:400 14px/1.7 'Segoe UI',Arial,sans-serif;color:#26353e;padding:9px 11px;margin:6px 0 12px;resize:vertical}
+.strategy-editor textarea{font-family:Consolas,monospace;font-size:13px;min-height:120px}
+.strategy-editor-tabs{display:flex;gap:16px;border-bottom:1px solid #d7e0e1;margin-bottom:14px}
+.strategy-editor-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;font-size:13px;padding:8px 0;color:#6d7b83}
+.strategy-editor-tabs button[aria-pressed="true"]{border-bottom-color:#007c80;color:#006a6e}
+.strategy-editor-actions{display:flex;gap:10px;margin-top:14px}
+.strategy-help{font-size:12px;color:#7a8790;line-height:1.6}
+.strategy-notice{padding:12px 14px;margin:12px 0;border-left:2px solid #c99f3f;background:#fffbed;font-size:13px;line-height:1.6}
+.strategy-error{border-left-color:#b84c4c;background:#fff7f7;color:#8f3434}
+.strategy-feedback{font-size:12px;color:#007a70;padding:8px 0}
+.strategy-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:24px;font-size:11px;color:#839098}
+.strategy-history{--strategy-lime:#c1ef43;--strategy-teal:#007c80;position:fixed;inset:0 0 0 auto;width:min(680px,94vw);height:100dvh;max-height:none;max-width:none;margin:0;border:0;border-left:1px solid #bac6ca;padding:24px;background:#fff;color:#263640;overflow:auto;font:14px/1.7 'Segoe UI',Arial,sans-serif}
+.strategy-history::backdrop{background:#10252b55}
+.strategy-history>header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #d9e1e4;padding-bottom:14px}
+.strategy-history h2{font-size:22px;font-weight:600;margin:0}.strategy-history h3{font-size:16px;margin:18px 0 10px;font-weight:600}
+.strategy-history>p{font-size:12px;color:#6f7e88;margin:14px 0}
+.strategy-history-list{display:flex;flex-direction:column;margin:20px 0}
+.strategy-history-list button{background:transparent;border:0;border-bottom:1px solid #e0e6e8;text-align:left;padding:12px;display:flex;flex-direction:column;font-size:13px;color:#34464f}
+.strategy-history-list button[aria-pressed="true"]{background:#eaf5f2;border-left:2px solid #007c80}
+.strategy-history-list small{color:#819099;font-size:11px}
+.strategy-history pre{max-height:360px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f7f6;padding:12px;border:1px solid #dbe3e4;font-size:12px}
+.strategy-history section>button{display:inline-flex;gap:7px;padding:9px 12px;border:1px solid #c6d1d5;background:white}
+@media(min-width:1500px){.wiki-strategy{grid-template-columns:260px minmax(0,1fr)}.strategy-main{padding:26px 36px}}
+@media(max-width:1000px){.wiki-strategy{grid-template-columns:190px minmax(0,1fr)}.strategy-main{padding:20px}.strategy-nav{padding:20px 12px}.strategy-title h1{font-size:28px}.strategy-header{display:block}.strategy-page-actions{margin:10px 0;justify-content:flex-start}.strategy-section-toggle h2{font-size:21px}}
+@media(max-width:680px){.wiki-strategy{display:block}.strategy-nav{position:static;padding:14px;border-right:0;border-bottom:1px solid #d7dfe2}.strategy-nav nav{display:none}.strategy-nav>.strategy-help{display:none}.strategy-search{margin:0}.strategy-main{padding:18px 14px}.strategy-title h1{font-size:27px}.strategy-meta{font-size:11px;gap:7px}.strategy-section-toggle h2{font-size:20px}.strategy-page-actions{justify-content:space-between;gap:8px}.strategy-footer{display:block}.strategy-icon,.strategy-page-actions>button,.strategy-editor-actions button,.strategy-menu>div>button{min-height:44px}.strategy-icon{min-width:38px}.strategy-editor{padding:12px}.strategy-prose table{display:block;overflow-x:auto}.strategy-prose{font-size:14px}.strategy-task-block section article>div:first-child{column-gap:4px;grid-template-columns:2.25rem minmax(0,1fr) 4.5rem}.strategy-menu>div{width:190px}}
+@media(prefers-reduced-motion:reduce){.wiki-strategy *{scroll-behavior:auto!important;transition:none!important}}
+@media(min-width:1001px){.wiki-strategy{grid-template-columns:280px minmax(0,1fr)}}
+.strategy-task-block section[aria-label="Atividades: Construção do Piloto"] article>div:first-child{padding-top:3px;padding-bottom:3px}
+.strategy-task-block section article>div:first-child>button{min-height:34px}
+.strategy-task-block section article>div:first-child>label{min-height:36px}
+.strategy-source-status{border-bottom:1px solid #dce3e6;font-size:12px;color:#6d7a81;padding:9px 0}.strategy-source-status>summary{cursor:pointer}.strategy-footer-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.strategy-source-status{position:relative;border:0;padding:0;font-size:12px}.strategy-source-status>summary{color:#68777e}.strategy-source-status>.strategy-prose{position:absolute;left:0;top:100%;z-index:30;background:white;border:1px solid #c5d0d3;padding:14px;width:min(620px,65vw);box-shadow:0 4px 12px #15222b0b}.strategy-header{padding-bottom:18px}.strategy-main{padding-top:18px}.strategy-title{margin-top:8px}
+
+@media(max-width:680px){.strategy-source-status{position:static}.strategy-source-status>.strategy-prose{left:0;right:0;width:auto;max-width:100%}.strategy-header{position:relative}}

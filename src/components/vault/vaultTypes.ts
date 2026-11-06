@@ -40,6 +40,7 @@ export interface VaultNoteSummary {
 }
 
 export interface VaultNote extends Omit<VaultNoteSummary, 'rank' | 'total_count'> {
+  content_hash?: string;
   aliases: string[];
   content_markdown: string;
   frontmatter: Record<string, unknown>;
