@@ -1,8 +1,8 @@
 # WIKI-COLAB-01 · Layout compacto e atividades do piloto
 
-Versão: 1.0 · 06/11/2026 · Planejada para implementação na main
+Versão: 1.1 · 06/11/2026 · Piloto Visa
 
-Spec criada; funcionalidade ainda não implementada por este pacote.
+Implementação do piloto descrita em [PILOTO-VISA.md](PILOTO-VISA.md). Publicação condicionada ao validate do PR.
 
 ## Problema
 
@@ -18,7 +18,7 @@ Nenhuma spec anterior.
 
 ## Plano técnico
 
-Modificar WikiPilotChecklist e separar linha de leitura de formulário. Generalizar vínculo por configuração note_id/block_id; retirar dependência de caminho/heading fixos sem migrar outras notas automaticamente.
+Modificar WikiPilotChecklist e separar linha de leitura de formulário. Neste corte, habilitar explicitamente apenas o caminho Visa; vínculo genérico para outras notas permanece como evolução. Direção editorial 1: página branca, índice lateral, teal/lime, cantos retos. Adicionar, duplicar, reordenar e excluir seções e atividades com recuperação. Reusar registros de tarefas existentes.
 
 ## Verificação e recuperação
 

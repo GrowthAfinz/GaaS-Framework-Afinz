@@ -34,7 +34,7 @@ export async function searchVault(
 export async function getVaultNote(noteId: string): Promise<VaultNote> {
   const { data, error } = await supabase
     .from('gaas_vault_notes')
-    .select('id,relative_path,title,aliases,folder,content_markdown,frontmatter,tags,note_type,layer,status,source,source_modified_at,indexed_at')
+    .select('id,relative_path,title,aliases,folder,content_markdown,content_hash,frontmatter,tags,note_type,layer,status,source,source_modified_at,indexed_at')
     .eq('id', noteId)
     .is('deleted_at', null)
     .single();
