@@ -1,7 +1,7 @@
 {
   "vault_key": "afinz-crm-midia",
   "date": "2026-11-06",
-  "note_count": 506,
+  "note_count": 507,
   "notes": [
     {
       "relative_path": "00-Indice/Changelog-do-Vault.md",
@@ -438,6 +438,10 @@
     {
       "relative_path": "05-Estrategia/Estrategia-Multicanal-Vibe-Mar-Fechado.md",
       "content_hash": "328235622064c3afd75429d76990cecae8178a8edf647205c6464fcb65504963"
+    },
+    {
+      "relative_path": "05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md",
+      "content_hash": "e20605e5c1ff3ea54baf43755d2496bbe778d4e5cb4d0cb5fd7bdb95f6437e71"
     },
     {
       "relative_path": "05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md",

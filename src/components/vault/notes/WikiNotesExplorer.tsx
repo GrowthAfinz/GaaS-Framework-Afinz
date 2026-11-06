@@ -18,6 +18,8 @@ import {
   Network,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { WikiCodeBlock } from '../WikiDiagram';
+import { WikiMarkdownSections } from '../WikiMarkdownSections';
 import remarkGfm from "remark-gfm";
 import type { VaultBacklink, VaultNote, VaultNoteSummary } from "../vaultTypes";
 import { getVaultNote, listVaultBacklinks } from "../vaultService";
@@ -330,7 +332,7 @@ export function WikiNotesExplorer({
                 </details>
               )}
               <div className="mt-6 break-words text-sm leading-7 text-slate-700">
-                <ReactMarkdown
+                <WikiMarkdownSections content={markdown} render={(part) => <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   urlTransform={vaultUrlTransform}
                   components={{
@@ -365,13 +367,9 @@ export function WikiNotesExplorer({
                     td: ({ children }) => (
                       <td className="border border-slate-200 px-3 py-2 align-top">{children}</td>
                     ),
-                    pre: ({ children }) => (
-                      <pre className="my-4 overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs leading-6 text-slate-100 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit">
-                        {children}
-                      </pre>
-                    ),
-                    code: ({ children }) => (
-                      <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700">
+                    pre: WikiCodeBlock,
+                    code: ({ children, className }) => (
+                      <code className={`${className || ''} rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700`}>
                         {children}
                       </code>
                     ),
@@ -411,8 +409,8 @@ export function WikiNotesExplorer({
                     },
                   }}
                 >
-                  {markdown}
-                </ReactMarkdown>
+                  {part}
+                </ReactMarkdown>} />
               </div>
               <section
                 aria-label="Menções a esta nota"
