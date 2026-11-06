@@ -22,7 +22,7 @@ export default function WikiDiagramCanvas({ source, zoom, expanded }: { source: 
         if (active && host.current) {
           host.current.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true }, FORBID_TAGS: ['foreignObject', 'script', 'a', 'image'], FORBID_ATTR: ['onload', 'onclick'] });
           const diagram = host.current.querySelector('svg');
-          const naturalWidth = diagram?.viewBox.baseVal.width;
+          const naturalWidth = Number(diagram?.getAttribute('viewBox')?.trim().split(/\s+/)[2]);
           if (diagram && naturalWidth && !expanded) diagram.style.maxWidth = `${naturalWidth}px`;
         }
       } catch { if (active) setError(true); }
