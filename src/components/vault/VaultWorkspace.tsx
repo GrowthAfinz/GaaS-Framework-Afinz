@@ -9,6 +9,8 @@ import { ChevronRight, Copy, ExternalLink, FileText, FolderOpen, Home, Link2, Lo
 import ReactMarkdown from 'react-markdown';
 import { WikiCodeBlock } from './WikiDiagram';
 import { WikiMarkdownSections } from './WikiMarkdownSections';
+import { WikiPilotChecklist } from './WikiPilotChecklist';
+import { isPilotHeading } from './wikiPilotModel';
 import remarkGfm from 'remark-gfm';
 import { canSyncVault, getVaultNote, latestVaultSync, listVaultBacklinks, listVaultFolders, searchVault, syncVault } from './vaultService';
 import { filesFromInput, parseVaultFiles, rewriteWikilinksForReader } from './vaultParser';
@@ -319,7 +321,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const renderMarkdown=(content:string,lineOffset=0) => <WikiMarkdownSections content={content} render={(part, offset) => renderMarkdownBody(part,lineOffset+offset)} />;
   const renderMarkdownBody=(content:string,lineOffset=0) => <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={vaultUrlTransform} components={{
             h1: ({ node, children }) => <h4 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mb-3 mt-8 scroll-mt-24 text-2xl font-bold text-slate-900">{children}</h4>,
-            h2: ({ node, children }) => <><h4 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mb-3 mt-8 scroll-mt-24 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">{children}</h4></>,
+            h2: ({ node, children }) => <>{isPilotHeading(selected?.relative_path || '',headingProps(node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset).id || '') && <WikiPilotChecklist key={selected?.id}/>}<h4 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mb-3 mt-8 scroll-mt-24 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">{children}</h4></>,
             h3: ({ node, children }) => <h5 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mb-2 mt-6 scroll-mt-24 text-base font-bold text-slate-900">{children}</h5>,
             h4: ({ node, children }) => <h6 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mt-5 scroll-mt-24 font-bold text-slate-900">{children}</h6>,
             h5: ({ node, children }) => <h6 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))}>{children}</h6>,

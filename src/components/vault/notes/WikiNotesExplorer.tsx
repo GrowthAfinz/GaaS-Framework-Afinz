@@ -20,6 +20,8 @@ import {
 import ReactMarkdown from "react-markdown";
 import { WikiCodeBlock } from '../WikiDiagram';
 import { WikiMarkdownSections } from '../WikiMarkdownSections';
+import { WikiPilotChecklist } from '../WikiPilotChecklist';
+import { isPilotHeading } from '../wikiPilotModel';
 import remarkGfm from "remark-gfm";
 import type { VaultBacklink, VaultNote, VaultNoteSummary } from "../vaultTypes";
 import { getVaultNote, listVaultBacklinks } from "../vaultService";
@@ -170,12 +172,12 @@ export function WikiNotesExplorer({
   const heading =
     (Tag: "h2" | "h3" | "h4" | "h5", className: string) =>
     ({ children }: { children?: ReactNode }) => (
-      <Tag
+        <>{isPilotHeading(note?.relative_path || '',wikiHeadingId(textOf(children))) && <WikiPilotChecklist key={note?.id}/>}<Tag
         id={wikiHeadingId(textOf(children))}
         className={`scroll-mt-4 ${className}`}
       >
         {children}
-      </Tag>
+        </Tag></>
     );
 
   const renderFolder = (folder: NoteFolder, depth: number): ReactNode => (
