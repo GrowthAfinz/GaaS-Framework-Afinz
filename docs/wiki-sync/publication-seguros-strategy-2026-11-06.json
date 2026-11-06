@@ -1,0 +1,24 @@
+{
+  "scope": "partial; four new notes; no updates or deletions of other notes",
+  "date": "2026-11-06",
+  "note_id": "25931632-8994-4550-8333-290419fd9a15",
+  "notes": [
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-MAPA_SEGUROS.md",
+      "content_hash": "764dcbf30db7566768a51f3719193cef25a1b2f28dd8951baadcd71426b22717"
+    },
+    {
+      "relative_path": "04-Operacao/Automacao-Processos-Seguros.md",
+      "content_hash": "136750dc6335973bea42827afc5042643be3e6340fc9043aab003c2a0cdf3d3c"
+    },
+    {
+      "relative_path": "05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md",
+      "content_hash": "e607e2dc984735eb9b31ea83f56bb9951f1fe71e138b5da2b75cee3831a188f9"
+    },
+    {
+      "relative_path": "05-Estrategia/Segmentacao-Seguros-Celular.md",
+      "content_hash": "beb539745b9eb9ab8697655f6f447978c7f5fc6932865b9241f1c2614ebcfbe6"
+    }
+  ],
+  "validation": "local bundle rebuilt; vault lint reports unrelated drift; database hashes match publication"
+}
