@@ -5,7 +5,7 @@
 - O Plano pede Aquisição, Ciclo de Vida ou Rentabilização antes de listar produtos. O Pool usa o mesmo Plano, Ficha, accordion e controles de versão.
 - Black Friday é campanha, com versão técnica explícita, e seus dois documentos continuam sendo os toques V1 e V2. Grupos não duplicam briefings.
 - O editor compacto separa grupo do comprador, tratamento visualizado e vitrine editada. As ofertas são selecionadas por marca/benefício; ativação é booleana; posições posteriores à terceira são reservas.
-- A Biblioteca recebe uma subvisão Ofertas Visa com edição do catálogo, vigência, condições e usos por versão/grupo/célula/posição. Salva pelo RPC existente, sem alterar CSV ou template.
+- A Biblioteca recebe uma subvisão Ofertas Visa com criação de rascunho inativo, edição do catálogo, grupo, vigência, condições, seleção de imagens salvas e usos por versão/grupo/célula/posição. Salva pelo RPC existente, sem alterar CSV ou template. Rascunho ainda sem uso pode ser descartado localmente.
 - A campanha oferece comparação dos grupos e dos dois toques, em desktop/mobile, usando o renderizador e resolver atuais. A prévia usa a vitrine carregada; não simula Q08 nem consulta o SFMC.
 - A comparação do Plano Visa resolve assunto/preheader com herança do V2, abertura, cards válidos, CTA, links e hero da amostra. Aquisição conserva seus campos.
 
@@ -43,8 +43,13 @@ Publicação autorizada pelo operador: 16 notas do Pool e decisões atualizadas,
 
 Testes do módulo cobrem herança, grupos, genérico de comparação, vencimento, agrupamento por campanha, seleção anterior da frente, documentação de estados e migration em Postgres local via PGlite. O teste da migration também reaplica após alteração humana e verifica preservação de Aquisição.
 
-O build passou antes da última atualização documental; os checks finais do PR verificam a revisão completa. TypeScript usa o gate de regressão existente, que desconta a dívida documentada da main.
+O check `validate` passou no primeiro commit do PR #77 e será repetido na revisão visual final. TypeScript usa o gate de regressão existente, que desconta a dívida documentada da main.
 
-QA visual e print permanecem pendentes: o controle de navegador no Windows não conseguiu confirmar a URL e encerrou a inspeção; a tentativa seguinte não teve conexão com o servidor local nem Chrome disponível. Não há evidência de fidelidade visual final. A prévia local de QA usa os componentes reais e fixtures, não dados de clientes, e não faz parte do build publicado.
+QA visual local concluído após restabelecer o servidor e o navegador integrado. A página de QA usa os componentes reais e fixtures, não dados de clientes, e não faz parte do build publicado. Foram conferidos: seleção de frente, plano do Pool, criação de oferta sem salvar, troca de grupo sem mudar a vitrine editada, genérico de comparação, oito peças (quatro grupos e dois toques), desktop/mobile e estados do runbook. Esse teste não substitui a conferência autenticada no ambiente publicado após a migration.
+
+- [Plano do Pool](../../artifacts/visa-creation-2026-11-05/01-plano-pool.png)
+- [Editor e prévia](../../artifacts/visa-creation-2026-11-05/02-editor-pool.png)
+
+O salvamento do catálogo reaproveita `save_vdv_factory`: o RPC atual versiona todos os documentos Visa não arquivados e pode enviar outros toques/campanhas para revisão. A interface avisa desse alcance; a otimização para invalidar somente dependências reais fica fora deste corte.
 
 Nenhum Test Send ou SQL proposto foi executado no tenant SFMC. A Wiki publicada é documentação, não confirmação da implantação da rotação.

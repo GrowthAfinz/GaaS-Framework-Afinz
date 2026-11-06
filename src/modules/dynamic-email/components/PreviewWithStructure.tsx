@@ -59,7 +59,7 @@ const findAnchorEl = (doc: Document, block: StructureBlock): Element | null => {
 
 // mede a extensão REAL do conteúdo do e-mail, ignorando <html>/<body> esticados a 100%
 // (senão a altura do iframe realimenta o scrollHeight e cresce sem parar)
-const measureContentHeight = (doc: Document): number => {
+export const measureContentHeight = (doc: Document): number => {
   const body = doc.body;
   if (!body) return 0;
   const kids = Array.from(body.children) as HTMLElement[];

@@ -7,11 +7,13 @@ import {
   poolComparison,
   strategyFront,
   strategyScope,
+  newPoolOffer,
 } from "./poolCreation";
 import {
   parseVdvBriefingCsv,
   parseVdvMovimentoCsv,
   VDV_SAMPLES,
+  VDV_BRIEFING_COLUMNS,
 } from "./vaiDeVisa";
 import { VDV_BRIEFING_CSV, VDV_MOVIMENTO_CSV } from "../fixtures/vdvBF26V1.csv";
 import type { EmailStrategy } from "./management";
@@ -19,6 +21,18 @@ const data = {
   briefing: parseVdvBriefingCsv(VDV_BRIEFING_CSV),
   movimento: parseVdvMovimentoCsv(VDV_MOVIMENTO_CSV),
 };
+it("cria oferta inativa com identificador único e conserva as 41 colunas do contrato", () => {
+  const a = newPoolOffer(),
+    b = newPoolOffer();
+  expect(a.ID).not.toBe(b.ID);
+  expect(a.ID).toMatch(/^[A-Z0-9_]{3,60}$/);
+  expect(a.ATIVA).toBe("False");
+  expect(a.TIPO).toBe("OFERTA");
+  expect(a.__dirty).toBe("true");
+  expect(
+    VDV_BRIEFING_COLUMNS.every((column) => typeof a[column] === "string"),
+  ).toBe(true);
+});
 const base: EmailStrategy = {
   id: "plan",
   campaignGroupId: "group",

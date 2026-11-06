@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import type { VdvData } from "./VaiDeVisaWorkspace";
+import type { EmailAsset } from "../domain/workspace";
 import { vdvValidOffer } from "../domain/vaiDeVisa";
-import { poolGroupLabel } from "../domain/poolCreation";
+import { poolGroupLabel, newPoolOffer } from "../domain/poolCreation";
 
 const fieldStyle =
   "mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-cyan-400";
 const fields: Record<string, string> = {
   MARCA: "Marca",
+  GRUPO: "Grupo da oferta",
   VALOR: "Valor do benefício",
   PREFIXO: "Prefixo",
   SUFIXO: "Sufixo",
@@ -28,6 +30,7 @@ export function PoolOfferLibrary({
   saving,
   today,
   message,
+  assets = [],
 }: {
   data: VdvData;
   onChange: (data: VdvData) => void;
@@ -35,6 +38,7 @@ export function PoolOfferLibrary({
   saving: boolean;
   today: string;
   message: string;
+  assets?: EmailAsset[];
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("");
@@ -79,14 +83,29 @@ export function PoolOfferLibrary({
             editor.
           </p>
         </div>
-        <button
-          type="button"
-          disabled={saving || !data.briefing.some((r) => r.__dirty === "true")}
-          onClick={onSave}
-          className="rounded-lg bg-[#07595b] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
-        >
-          {saving ? "Salvando…" : "Salvar catálogo"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const offer = newPoolOffer();
+              onChange({ ...data, briefing: [...data.briefing, offer] });
+              setSelected(offer.ID);
+              setQuery("");
+              setOnlyUsed(false);
+            }}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-cyan-900"
+          >
+            Nova oferta
+          </button>
+          <button
+            type="button"
+            disabled={saving || !offers.some((r) => r.__dirty === "true")}
+            onClick={onSave}
+            className="rounded-lg bg-[#07595b] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+          >
+            {saving ? "Salvando…" : "Salvar catálogo"}
+          </button>
+        </div>
       </header>
       {message && (
         <p role="status" className="mt-2 text-xs text-cyan-900">
@@ -150,7 +169,30 @@ export function PoolOfferLibrary({
         {offer ? (
           <div className="rounded-xl border border-slate-200 p-3">
             <h3 className="text-sm font-bold">{offer.MARCA}</h3>
-            <p className="text-[10px] text-slate-500">{offer.ID}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] text-slate-500">{offer.ID}</p>
+              {!offer.__version && (
+                <button
+                  type="button"
+                  disabled={uses.length > 0}
+                  title={
+                    uses.length
+                      ? "Remova a oferta das vitrines antes de descartar."
+                      : "Descartar somente este rascunho local"
+                  }
+                  onClick={() => {
+                    onChange({
+                      ...data,
+                      briefing: data.briefing.filter((r) => r.ID !== offer.ID),
+                    });
+                    setSelected("");
+                  }}
+                  className="text-[10px] font-bold text-slate-500 disabled:opacity-40"
+                >
+                  Descartar rascunho
+                </button>
+              )}
+            </div>
             <div className="my-2 rounded-lg bg-amber-50 p-2 text-[11px] text-amber-900">
               <b>Usos da oferta</b>
               <p>
@@ -164,8 +206,8 @@ export function PoolOfferLibrary({
                   : "Sem vínculo em vitrines."}
               </p>
               <p className="mt-1">
-                Alterações afetam os dois toques das versões vinculadas e exigem
-                nova conferência.
+                A gravação compartilhada versiona os e-mails Visa e pode exigir
+                nova conferência, inclusive em outras campanhas.
               </p>
             </div>
             <label className="text-xs">
@@ -186,6 +228,28 @@ export function PoolOfferLibrary({
                   className={`text-[10px] font-semibold text-slate-500 ${key === "CONDICOES" ? "sm:col-span-2" : ""}`}
                 >
                   {label}
+                  {["LOGO", "FOTO"].includes(key) && assets.length > 0 && (
+                    <select
+                      aria-label={`Imagem salva para ${label}`}
+                      className={fieldStyle}
+                      value=""
+                      onChange={(e) => {
+                        const asset = assets.find(
+                          (a) => a.id === e.target.value,
+                        );
+                        if (asset) update(key, asset.externalUrl);
+                      }}
+                    >
+                      <option value="">Selecionar imagem da Biblioteca…</option>
+                      {assets
+                        .filter((a) => a.status !== "archived")
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                   {key === "CONDICOES" ? (
                     <textarea
                       aria-label={label}

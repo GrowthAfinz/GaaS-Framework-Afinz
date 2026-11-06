@@ -2,10 +2,22 @@ import type { EmailStrategy } from "./management";
 import type { WorkspaceBriefing } from "./workspace";
 import {
   resolveVdvPreview,
+  VDV_BRIEFING_COLUMNS,
   type VdvBriefingRow,
   type VdvMovimentoRow,
   type VdvSample,
 } from "./vaiDeVisa";
+
+/** Rascunho inativo até o operador preencher e validar o conteúdo comercial. */
+export const newPoolOffer = (): VdvBriefingRow => ({
+  ...Object.fromEntries(VDV_BRIEFING_COLUMNS.map((column) => [column, ""])),
+  ID: "OFERTA_" + crypto.randomUUID().replace(/-/g, "").toUpperCase(),
+  TIPO: "OFERTA",
+  ATIVA: "False",
+  RESGATE: "LINK",
+  __dirty: "true",
+  __source: "gaas",
+});
 
 export const POOL_GROUP_LABELS: Record<string, string> = {
   MODA: "Moda",

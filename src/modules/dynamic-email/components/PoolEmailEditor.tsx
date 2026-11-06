@@ -95,7 +95,11 @@ export function PoolEmailEditor({
 }) {
   const ctx = row.__editor!;
   const groups = poolGroups(data.movimento, ctx.contentVersion);
-  const [editGroup, setEditGroup] = useState("");
+  const [editGroup, setEditGroup] = useState(() =>
+    ["SEG-B", "GEN-A"].includes(sample.DS_CELULA_TESTE)
+      ? "GENERICO"
+      : sample.CD_GRUPO,
+  );
   const [editCell, setEditCell] = useState("");
   const [heroId, setHeroId] = useState("");
   const group = groups.includes(editGroup) ? editGroup : (groups[0] ?? "");

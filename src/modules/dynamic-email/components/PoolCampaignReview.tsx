@@ -6,6 +6,7 @@ import { resolveVdvPreview } from "../domain/vaiDeVisa";
 import { poolGroups, poolGroupLabel } from "../domain/poolCreation";
 import { materializeVdvTemplate, VDV_SLOT } from "../domain/factoryEmail";
 import { renderDynamicEmail } from "../ampscript/renderer";
+import { measureContentHeight } from './PreviewWithStructure';
 
 function Thumbnail({
   html,
@@ -17,27 +18,32 @@ function Thumbnail({
   title: string;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [height,setHeight]=useState(2200);
   const [scale, setScale] = useState(0.4);
   useEffect(() => {
     const element = container.current;
     if (!element) return;
-    const measure = () => setScale(Math.min(1, element.clientWidth / width));
+    const measure = () => setScale(Math.min(1, element.clientWidth / width,480/height));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [width]);
+  }, [width,height]);
+  const measure=()=>{const doc=frame.current?.contentDocument;if(doc?.body)setHeight(measureContentHeight(doc));};
   return (
-    <div ref={container} className="h-72 overflow-auto bg-slate-100">
-      <div style={{ height: 1300 * scale }}>
+    <div ref={container} className="overflow-hidden bg-slate-100">
+      <div style={{ height: height * scale,width:width*scale,margin:'0 auto' }}>
         <iframe
+          ref={frame}
           title={title}
-          sandbox=""
+          sandbox="allow-same-origin"
           loading="lazy"
           srcDoc={html}
+          onLoad={()=>{measure();const images=frame.current?.contentDocument?.images;if(images)Array.from(images).forEach(img=>{if(!img.complete)img.addEventListener('load',measure,{once:true});});}}
           style={{
             width,
-            height: 1300,
+            height,
             transform: `scale(${scale})`,
             transformOrigin: "top left",
           }}
