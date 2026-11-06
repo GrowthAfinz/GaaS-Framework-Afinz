@@ -1,5 +1,12 @@
 import {expect,it} from 'vitest';
 import {wikiReading,wikiNoteNavigationParams} from './wikiReading';
+it('keeps operating guidance visible and groups complete technical contracts under expandable sections',()=>{
+ const input='## Segmentação por aparelho\nRegra de seleção.\n\n## Referência técnica: Data Extensions\n### SEGUROS_DEVICE_CPF\n| Campo | Tipo |\n|---|---|\n| CPF | Text(11) |\n\n## Referência técnica: Automation Studio\nSequência das queries.\n';
+ const sections=wikiReading(input).sections;
+ expect(sections.map(s=>[s.id,s.technical])).toEqual([['segmentacao-por-aparelho',false],['referencia-tecnica-data-extensions',true],['referencia-tecnica-automation-studio',true]]);
+ expect(sections[1].content).toContain('### SEGUROS_DEVICE_CPF');
+ expect(sections[1].content).toContain('| CPF | Text(11) |');
+});
 it('preserves source text, heading offsets and technical records without treating fenced headings as sections',()=>{
  const input='# Nota\n\n## O que este assunto representa\nRecuperar proposta.\n\n## Escopo\n**O que precisa ser validado:** Confirmar entrada.\n\n## Registro de descoberta\n```json\n{"id":"A"}\n## não é uma seção\n```\n';
  const reading=wikiReading(input);

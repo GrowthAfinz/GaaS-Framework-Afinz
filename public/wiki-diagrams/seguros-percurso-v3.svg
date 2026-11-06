@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1325" viewBox="0 0 1120 1325" style="max-width:100%;height:auto" role="img" aria-labelledby="title desc">
+<title id="title">Seguros: mensal e trigger</title><desc id="desc">Uma base de elegibilidade alimenta a mensal por semanas e triggers MCC em D+1. Mensal ativa descarta trigger do mesmo seguro. A espera entre produtos dura 15 dias e permite triggers. Formulário suspende a oferta durante o processamento e posse confirmada encerra a aquisição do produto.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#526579"/></marker></defs>
+<rect width="1120" height="1325" rx="24" fill="#f7fafc"/>
+<text x="40" y="48" font-family="Arial, sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#18364a">Fluxo operacional de Seguros</text>
+<text x="40" y="83" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#526579">Régua mensal e triggers MCC • configuração no SFMC a validar</text>
+<rect x="180" y="112" width="760" height="107" rx="16" fill="#e7f8f8" stroke="#73cdce"/>
+<text x="202" y="147" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Elegibilidade por cliente</text>
+<text x="202" y="180" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Cadastro + posse + formulários + MCC + aparelho</text>
+<text x="202" y="208" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEGUROS_ELEGIBILIDADE_CPF</text>
+<path d="M560 219V246H305V277" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M560 246H815V277" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="70" y="277" width="470" height="857" rx="20" fill="#edf9f8" stroke="#b9e4e2"/>
+<rect x="580" y="277" width="470" height="857" rx="20" fill="#eef3ff" stroke="#cdd9f7"/>
+<text x="96" y="320" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start" fill="#007f83">MENSAL</text>
+<text x="606" y="320" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="start" fill="#3b5c9a">TRIGGER MCC</text>
+<rect x="90" y="342" width="430" height="110" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="112" y="377" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Escolher o próximo seguro</text>
+<text x="112" y="410" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Produto elegível da sequência</text>
+<text x="112" y="438" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Respeitar a data de liberação</text>
+<path d="M305 452V477" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="477" width="430" height="104" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="112" y="512" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Público mensal</text>
+<text x="112" y="545" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEG_APTOS_[SEGURO]_MENSAL</text>
+<path d="M305 581V606" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="606" width="430" height="110" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="112" y="641" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Percorrer as semanas</text>
+<text x="112" y="674" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEM1 → SEM2 → SEM3 → …</text>
+<text x="112" y="702" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">A jornada registra cada mudança</text>
+<path d="M305 716V741" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="741" width="430" height="110" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="112" y="776" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Concluir a última semana</text>
+<text x="112" y="809" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">AGUARDANDO_PROXIMO_PRODUTO</text>
+<text x="112" y="837" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Registrar conclusão e liberação</text>
+<path d="M305 851V876" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="876" width="430" height="108" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="112" y="911" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Esperar 15 dias</text>
+<text x="112" y="944" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Intervalo configurável</text>
+<text x="112" y="972" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Triggers continuam permitidos</text>
+<path d="M305 984V1009" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="90" y="1009" width="430" height="100" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="112" y="1044" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Voltar ao próximo elegível</text>
+<text x="112" y="1077" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Fim da sequência? Retorna ao primeiro.</text>
+<path d="M90 1059H48V397H90" fill="none" stroke="#526579" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+<rect x="600" y="342" width="430" height="110" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="622" y="377" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Compra na categoria</text>
+<text x="622" y="410" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Mulher: Saúde e Beleza</text>
+<text x="622" y="438" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Residencial: Eletrodomésticos</text>
+<text x="622" y="478" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Celular: Eletrônicos • entrada em D+1</text>
+<path d="M815 495V523" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="600" y="523" width="430" height="104" rx="16" fill="#f4f6ff" stroke="#a8bce8"/>
+<text x="622" y="558" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Está na mensal desse seguro?</text>
+<text x="622" y="591" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Verificar antes de autorizar a entrada</text>
+<path d="M700 627V662" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M933 627V662" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="712" y="651" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#526579">SIM</text>
+<text x="945" y="651" font-family="Arial, sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#526579">NÃO</text>
+<rect x="600" y="662" width="200" height="136" rx="16" fill="#fff6e8" stroke="#ecd3a0"/>
+<text x="622" y="697" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Descartar</text>
+<text x="622" y="730" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Registrar decisão</text>
+<text x="622" y="758" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Não reaproveitar</text>
+<text x="622" y="786" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">essa compra</text>
+<rect x="820" y="662" width="210" height="136" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="842" y="697" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Autorizar</text>
+<text x="842" y="730" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Aplicar os demais</text>
+<text x="842" y="758" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">critérios do</text>
+<text x="842" y="786" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">produto</text>
+<path d="M925 798V825" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="600" y="825" width="430" height="104" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="622" y="860" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Público de trigger</text>
+<text x="622" y="893" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEG_APTOS_[SEGURO]_TRIGGER</text>
+<path d="M815 929V954" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="600" y="954" width="430" height="100" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
+<text x="622" y="989" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Executar a jornada</text>
+<text x="622" y="1022" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Trigger ativo permite entrada na mensal.</text>
+<text x="604" y="1095" font-family="Arial, sans-serif" font-size="17" font-weight="400" text-anchor="start" fill="#3b5c9a">Mensal → trigger: bloqueia o mesmo seguro.</text>
+<rect x="70" y="1155" width="980" height="75" rx="16" fill="#fff6e8" stroke="#ecd3a0"/>
+<text x="92" y="1190" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Sem avanço de semana por mais de 15 dias?</text>
+<text x="92" y="1223" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Encerrar o ciclo e liberar o próximo produto mensal, sem nova espera.</text>
+<rect x="70" y="1240" width="980" height="69" rx="16" fill="#e7f8f8" stroke="#73cdce"/>
+<text x="92" y="1275" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Formulário: suspende a oferta durante o processamento.</text>
+<text x="92" y="1293" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Posse confirmada: encerra a aquisição daquele seguro nas duas frentes.</text>
+</svg>
