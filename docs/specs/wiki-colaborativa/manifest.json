@@ -1,0 +1,186 @@
+[
+  {
+    "key": "WIKI-COLAB-01",
+    "title": "Layout compacto e atividades do piloto",
+    "scope": "current",
+    "dependencies": [],
+    "problem": "A nota Visa mistura leitura longa, fichas e um checklist com nome específico; a edição de atividades não é evidente nem cobre todos os campos.",
+    "expected": "Renomear exatamente para Atividades: Construção do Piloto. Seta de recolher separada do lápis. Linhas com atividade, responsável, estado e conclusão; grupos recolhíveis; título, descrição, critérios, dependências, referências e evidências editáveis pelos controles do registro original. Manter preparação e validação separadas. Campos da tarefa usam saveWork e seu histórico, sem cópias.",
+    "criteria": [
+      "O novo nome aparece no cabeçalho e nome acessível, sem Seedlist no título do componente.",
+      "Editar uma atividade na Wiki altera o mesmo registro em Testes e Tarefas e vice-versa.",
+      "Reabrir preserva conclusão anterior no histórico; concluir continua exigindo critérios, data e evidência conforme contrato existente.",
+      "Editar, salvar e recolher não perdem foco, rolagem ou rascunho. Botão de lápis não alterna a seção.",
+      "Dependências inválidas ou cíclicas são rejeitadas no servidor; alterações de critérios respeitam recálculo das marcações."
+    ],
+    "plan": "Modificar WikiPilotChecklist e separar linha de leitura de formulário. Generalizar vínculo por configuração note_id/block_id; retirar dependência de caminho/heading fixos sem migrar outras notas automaticamente.",
+    "verification": "Comparar antes/depois em 1440, 1024 e 390 px; teclado e toque; testar datas antigas sem data e conclusão/reabertura já cobertas. Feature flag mantém atividades salvas recuperáveis.",
+    "out_of_scope": "Não muda SQL ou jornadas SFMC. Colaboração de não administradores só é liberada após WIKI-COLAB-02/03; não contornar permissões de tarefas.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-01.md"
+  },
+  {
+    "key": "WIKI-COLAB-02",
+    "title": "Persistência, versões e reconciliação com o vault",
+    "scope": "current",
+    "dependencies": [],
+    "problem": "gaas_vault_notes é projeção do vault; sync e publicador direto podem substituir conteúdo. Histórico de ingestão não é edição colaborativa completa.",
+    "expected": "Persistir versão operacional com revisão, autor derivado da sessão, origem, hash-base e idempotência. Gravação atômica condicionada à revisão; sem mudança não cria versão; restauração cria nova versão. Reconciliar base comum, app e arquivo. Preservar os dois conteúdos em conflito e o rascunho local. Todos os escritores e consumidores devem aderir ao contrato.",
+    "criteria": [
+      "Duas sessões sobre a mesma revisão: só uma grava; a outra recebe conflito e conserva o texto.",
+      "Repetir idempotency_key devolve a mesma gravação; falha transacional não deixa revisão parcial.",
+      "Casos arquivo=base, app=base, app=arquivo e ambos divergentes têm resultados definidos e testados; exclusão/renomeação não apagam edição pendente.",
+      "Sync por pasta, importador de lote e publish_single_vault_note não sobrescrevem edição humana silenciosamente.",
+      "Leitura, Notas, Conexões, busca, backlinks, context packs e selo de revisão humana usam a revisão correta.",
+      "Usuário fora do espaço não lê nem escreve; colaborador edita apenas notas/tarefas permitidas; histórico não aceita autor fornecido pelo cliente."
+    ],
+    "plan": "Proposta aditiva: wiki_documents, wiki_document_revisions, wiki_block_anchors, wiki_document_bindings e wiki_sync_conflicts. Reusar identidades e tabelas existentes onde compatíveis. RPC wiki_save_document(note_id,expected_revision,idempotency_key,changes). RLS por espaço/time, concessão explícita e limite de payload; nenhum service_role no browser. Decisão de permissões precisa descrever o grupo autorizado, não promover o time a admin global.",
+    "verification": "Testes SQL de RLS, revisão, retry e rollback; integração dos escritores e índices; guardar recibo por nota e hash. Exportação condicionada ao hash-base. Rollback do frontend mantém exportação/revisões disponíveis.",
+    "out_of_scope": "Não torna o GaaS fonte canônica por decisão implícita. Não promete sync automático com OneDrive no GitHub Pages. Não introduz CRDT nesta entrega.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-02.md"
+  },
+  {
+    "key": "WIKI-COLAB-03",
+    "title": "Lápis em toda a nota e editor contextual",
+    "scope": "current",
+    "dependencies": [
+      "WIKI-COLAB-01",
+      "WIKI-COLAB-02"
+    ],
+    "problem": "Hoje o corpo é leitura Markdown com Correção para IA; dois leitores próprios podem apresentar experiências diferentes.",
+    "expected": "Criar WikiDocumentSurface compartilhado entre Leitura e Notas e aberto por Conexões. Permitir editar título, propriedades editoriais, resumo, parágrafos, seções, tabelas, referências, Mermaid e SQL. Lápis discreto por unidade, sempre disponível por teclado/toque. Texto edita no lugar; código e diagrama têm fonte e prévia; atividades abrem o registro vinculado. Preservar Markdown original fora do trecho editado.",
+    "criteria": [
+      "Todos os tipos da nota Visa possuem ação de edição real e persistente; não há lápis decorativo ou que só abre correção para IA.",
+      "Título, H1 e propriedade title seguem um contrato único; renomear preserva IDs e links antigos.",
+      "Wikilinks com alias/fragmento, embeds, frontmatter, SQL e Mermaid preservam conteúdo não editado; parser ignora cercas ao identificar seções.",
+      "Salvar/Cancelar, Ctrl+S e navegação pendente preservam rascunho por usuário/nota/base; limpar no logout e não vazar entre contas.",
+      "Dados certificados e estado validado abrem edição de contexto/configuração ou ação de validação, sem permitir reescrever a fonte numérica como texto.",
+      "Abrir/recolher é preferência individual; busca e links abrem ancestrais recolhidos; IDs não dependem da linha ou do título atual."
+    ],
+    "plan": "Introduzir WikiBlockFrame, WikiSectionEditor, WikiPropertiesEditor e painel lateral único para atividade/histórico. Começar com adaptação de Markdown estruturado e patches validados pela revisão-base. BlockNote pode ser incorporado se a prova WIKI-COLAB-05 passar; não é dependência obrigatória desta fase.",
+    "verification": "Fixtures reais da nota Visa e outras notas pequenas; edição de tabela/código, cancelamento, rede caída, duas contas, foco e scroll. Lazy loading do editor e Mermaid. Animação de 120–180 ms apenas onde ajuda; respeitar reduced-motion.",
+    "out_of_scope": "Não inclui comentários, sugestões, blocos sincronizados ou coedição simultânea. Correção para IA permanece ação distinta, sem iniciar LLM automaticamente.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-03.md"
+  },
+  {
+    "key": "WIKI-COLAB-04",
+    "title": "QA integrado e release incremental na main",
+    "scope": "current",
+    "dependencies": [
+      "WIKI-COLAB-01",
+      "WIKI-COLAB-02",
+      "WIKI-COLAB-03"
+    ],
+    "problem": "Uma interface bonita não basta se perder conteúdo, permissões, links ou fidelidade entre leitores.",
+    "expected": "Validar ponta a ponta o piloto Visa, preparar release com feature flag por nota e publicar na main só com evidências. Primeiro disponibilizar piloto; expansão para outras notas após aceite de compatibilidade e estabilidade.",
+    "criteria": [
+      "Checklist de aceite 01–03 executado com evidências, sem marcar critério não testado.",
+      "Visual desktop/mobile sem sobreposição, corte de lápis, tabela ilegível ou salto de rolagem; teclado, toque e reduced-motion verificados.",
+      "Testes de integração e SQL pertinentes, typecheck:release e build aprovados. Schema remoto e advisors conferidos se houver migration.",
+      "Após deploy, editar/recarregar/comparar/restaurar e conferir conflito em sessões distintas autorizadas.",
+      "Rollback mantém versão humana acessível e exportável; não depende de apagar tabelas ou apagar histórico."
+    ],
+    "plan": "Publicar em PRs pequenos: UI, dados, edição e QA/release. Vincular commits, migrations e workflow ao trabalho. Não concluir a feature apenas porque as specs foram publicadas.",
+    "verification": "Comparação visual de referência com implementação no mesmo viewport; validar console, carga sob demanda e atualização do índice. Interromper expansão se houver perda ou divergência sem recuperação.",
+    "out_of_scope": "Sem migração em massa de notas ou concessão ampla de acessos; sem ativação de campanhas.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-04.md"
+  },
+  {
+    "key": "WIKI-COLAB-05",
+    "title": "Prova de compatibilidade BlockNote",
+    "scope": "future",
+    "dependencies": [],
+    "problem": "BlockNote tem UI pronta, mas Markdown é explicitamente lossy. Compatibilidade com o vault ainda não foi executada.",
+    "expected": "Prova isolada, versões fixadas e licença por pacote. Importar cópia da nota Visa e fixtures do acervo; comparar exportação e significado. Mapear conteúdo nativo, custom inline wikiLink e blocos de fonte preservada; decidir adotar BlockNote ou manter editor por seção.",
+    "criteria": [
+      "Cobertura de alias, fragmento, embed, frontmatter, diretiva details, listas aninhadas, tabelas, SQL e Mermaid.",
+      "Nenhum trecho não suportado é descartado silenciosamente; exportação e reimportação preservam o contrato.",
+      "Comparar bundle inicial/lazy, memória, mobile/IME, foco e latência antes/depois; registrar limites sem inventar resultados.",
+      "ADR com versão, licenças, exemplos revisados, formatos suportados e decisão fundamentada."
+    ],
+    "plan": "Usar Motion como referência de adaptador, WorkLedger para inline content por ID e Drafto para estado de salvamento. Não copiar regex de Markdown como parser nem PATCH sem revisão. JSON e Markdown não podem ser duas fontes editáveis independentes.",
+    "verification": "Executar sandbox sem reescrever vault ou produção. Guardar fixtures, diff e resultados reproduzíveis. Reprovação mantém editor por seção.",
+    "out_of_scope": "Futuro aberto; não instalar o editor no produto nem converter acervo só por publicar esta spec.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-05.md"
+  },
+  {
+    "key": "WIKI-COLAB-06",
+    "title": "Comentários, menções e sugestões por trecho",
+    "scope": "future",
+    "dependencies": [
+      "WIKI-COLAB-02",
+      "WIKI-COLAB-03"
+    ],
+    "problem": "O time precisa discutir mudanças no contexto e sugerir texto sem necessariamente substituir o conteúdo imediatamente.",
+    "expected": "Discussões ancoradas em IDs estáveis e contexto textual; responder/resolver; sugestões com aceitar/rejeitar. Comentários usam painel lateral único e menções respeitam o acesso.",
+    "criteria": [
+      "Mover/editar bloco preserva conversa; trecho excluído mantém discussão sem âncora identificada.",
+      "Aceitar sugestão gera revisão com autoria de proposta e aplicação; rejeitar preserva histórico.",
+      "Notificações não expõem conteúdo para pessoas sem permissão; nenhuma LLM é acionada automaticamente."
+    ],
+    "plan": "Avaliar CommentsExtension/threads do BlockNote ou interface própria com persistência autorizada; não confundir plugin de UI com backend pronto.",
+    "verification": "Testar mudança de âncora, permissões, resolução, edição concorrente e leitura mobile.",
+    "out_of_scope": "Futuro aberto; não bloqueia edição direta de conteúdo comum.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-06.md"
+  },
+  {
+    "key": "WIKI-COLAB-07",
+    "title": "Blocos reutilizáveis e referências fixadas por versão",
+    "scope": "future",
+    "dependencies": [
+      "WIKI-COLAB-02",
+      "WIKI-COLAB-03"
+    ],
+    "problem": "Regras repetidas entre estratégia, plano e runbook podem divergir; atualizar regra não pode reescrever a base de um teste passado.",
+    "expected": "Referenciar bloco com origem única; escolher acompanhar versão atual ou fixar revisão. Mostrar onde a edição repercute e respeitar acesso da origem.",
+    "criteria": [
+      "Editar origem atualiza referências vivas e não altera referências fixadas.",
+      "Sem acesso à origem, conteúdo não aparece em busca/preview/export.",
+      "Excluir ou restaurar origem preserva referências e histórico recuperável."
+    ],
+    "plan": "Persistir source_block_id, política de versão e revisão fixada; detectar ciclos. Exportar representação documentada para Markdown sem duplicação ambígua.",
+    "verification": "Testar dependências cíclicas, origem excluída, versões antigas e exportação do experimento.",
+    "out_of_scope": "Futuro aberto; não transformar regras atuais em blocos globais automaticamente.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-07.md"
+  },
+  {
+    "key": "WIKI-COLAB-08",
+    "title": "Criar atividade a partir do texto e modelos de estratégia",
+    "scope": "future",
+    "dependencies": [
+      "WIKI-COLAB-01",
+      "WIKI-COLAB-03"
+    ],
+    "problem": "Pendências descritas em texto exigem recadastro; a estrutura Visa ainda é específica de uma única nota.",
+    "expected": "Selecionar trecho e criar atividade no serviço existente, preservando link ao bloco. Oferecer modelo de estratégia reutilizável com seções e grupo de atividades configuráveis.",
+    "criteria": [
+      "Criar uma vez gera uma única tarefa compartilhada; retry não duplica.",
+      "Permissões e critérios de conclusão do serviço original continuam valendo.",
+      "Modelo cria nova estrutura com IDs próprios e sem copiar conclusões, evidências ou datas de outro piloto."
+    ],
+    "plan": "Reutilizar growth_save_development_task, vínculo note_id/block_id e configuração do modelo, não arrays fixos de chaves Visa.",
+    "verification": "Testar retry, links depois de renomear/mover trecho e criação sem acesso à iniciativa.",
+    "out_of_scope": "Futuro aberto; não cria tarefas ao selecionar texto sem ação explícita.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-08.md"
+  },
+  {
+    "key": "WIKI-COLAB-09",
+    "title": "Coedição simultânea e presença",
+    "scope": "future",
+    "dependencies": [
+      "WIKI-COLAB-02",
+      "WIKI-COLAB-03",
+      "WIKI-COLAB-05"
+    ],
+    "problem": "Concorrência por revisão protege salvamento, mas duas pessoas não editam o mesmo bloco em tempo real.",
+    "expected": "Avaliar Yjs e provider autenticado, presença e reconexão. Provar edição simultânea, persistência durável e checkpoints sem confundir CRDT com auditoria ou sync do vault.",
+    "criteria": [
+      "Duas sessões editam simultaneamente e convergem após reconexão sem perda.",
+      "Revogação de acesso bloqueia entrada e atualização; presença respeita escopo.",
+      "Histórico legível, restauração, custo e operação do provider documentados; exportação vault mantém base comum."
+    ],
+    "plan": "GitHub Pages permanece frontend. Selecionar serviço de colaboração separado e registrar custos, retenção e limites antes de contratar/ativar.",
+    "verification": "Testes multiusuário, offline/reconexão, revogação e recuperação do provider.",
+    "out_of_scope": "Futuro aberto; não ativar serviço pago nem infraestrutura por esta spec.",
+    "path": "docs/specs/wiki-colaborativa/WIKI-COLAB-09.md"
+  }
+]
