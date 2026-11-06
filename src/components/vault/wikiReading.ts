@@ -8,7 +8,7 @@ export function wikiReading(markdown: string) {
   const sections=starts.map((start,index)=>{
     const heading=headings.find(item=>item.line-1===start);
     return {content:lines.slice(start,starts[index+1]??lines.length).join('\n'),offset:start,
-      title:heading?.title||'',id:heading?.id||'',technical:heading?['registro-de-descoberta','proveniencia-do-inventario'].includes(wikiHeadingId(heading.title)):false};
+      title:heading?.title||'',id:heading?.id||'',technical:heading?(['registro-de-descoberta','proveniencia-do-inventario'].includes(wikiHeadingId(heading.title))||wikiHeadingId(heading.title).startsWith('referencia-tecnica-')):false};
   }).filter(section=>section.content.trim());
   const definition=sections.find(section=>['definicao','o-que-este-assunto-representa'].includes(section.id));
   const summary=definition?.content.split('\n').slice(1).join('\n').trim().split(/\n\s*\n/)[0]||'';

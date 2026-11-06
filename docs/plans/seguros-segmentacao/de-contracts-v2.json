@@ -1,0 +1,1555 @@
+{
+  "version": "seguros-sfmc-proposal/2",
+  "status": "DESENHO_PARA_VALIDACAO_NO_TENANT",
+  "de_contracts": [
+    {
+      "names": [
+        "SEGUROS_ELEGIBILIDADE_CPF"
+      ],
+      "fields": [
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "CPF normalizado; nunca número."
+        },
+        {
+          "name": "CONTACT_KEY",
+          "type": "Text",
+          "length": 254,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Identidade de envio existente; pacote atual usa CPF. Validar o vínculo antes de criar."
+        },
+        {
+          "name": "EMAIL",
+          "type": "EmailAddress",
+          "length": 254,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Endereço de e-mail."
+        },
+        {
+          "name": "PHONE",
+          "type": "Phone",
+          "length": 50,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Telefone com DDI e DDD; não presumir opt-in."
+        },
+        {
+          "name": "LOCALE",
+          "type": "Locale",
+          "length": 5,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Localidade validada; não preencher se desconhecida."
+        },
+        {
+          "name": "FIRST_NAME",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Primeiro nome para personalização."
+        },
+        {
+          "name": "FL_EMAIL_PERMITIDO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Permissão e entregabilidade do canal, reavaliadas antes do envio."
+        },
+        {
+          "name": "FL_SMS_PERMITIDO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Permissão e disponibilidade do canal SMS."
+        },
+        {
+          "name": "FL_WPP_PERMITIDO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Permissão e disponibilidade do canal WhatsApp."
+        },
+        {
+          "name": "STATUS_CONTA",
+          "type": "Text",
+          "length": 50,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Situação normalizada da conta selecionada."
+        },
+        {
+          "name": "LIMITE_DISPONIVEL",
+          "type": "Decimal",
+          "length": "18,2",
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Limite da conta apta selecionada; não somar cartões duplicados."
+        },
+        {
+          "name": "IDADE",
+          "type": "Number",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Idade informada pela fonte."
+        },
+        {
+          "name": "GENERO",
+          "type": "Text",
+          "length": 20,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Valor e semântica da fonte, sem inferir gênero por compra."
+        },
+        {
+          "name": "FL_SUPRESSAO_GERAL",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": true,
+          "purpose": "Desinteresse ou outro impedimento geral. Desconhecido exige conferência."
+        },
+        {
+          "name": "POSSE_MULHER",
+          "type": "Text",
+          "length": 15,
+          "required": true,
+          "primary_key": false,
+          "default": "DESCONHECIDA",
+          "purpose": "SIM / NAO / DESCONHECIDA; NAO exige fonte válida."
+        },
+        {
+          "name": "SOLICITACAO_MULHER",
+          "type": "Text",
+          "length": 25,
+          "required": true,
+          "primary_key": false,
+          "default": "DESCONHECIDA",
+          "purpose": "NENHUMA / EM_PROCESSAMENTO / CONFIRMADA / NAO_EFETIVADA / DESCONHECIDA."
+        },
+        {
+          "name": "APTO_MULHER",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Elegibilidade de produto; não é confirmação de entrada em jornada."
+        },
+        {
+          "name": "MOTIVO_MULHER",
+          "type": "Text",
+          "length": 200,
+          "required": true,
+          "primary_key": false,
+          "default": "PENDENTE_VALIDACAO",
+          "purpose": "Motivo principal da aptidão ou impedimento."
+        },
+        {
+          "name": "POSSE_RESIDENCIAL",
+          "type": "Text",
+          "length": 15,
+          "required": true,
+          "primary_key": false,
+          "default": "DESCONHECIDA",
+          "purpose": "SIM / NAO / DESCONHECIDA; NAO exige fonte válida."
+        },
+        {
+          "name": "SOLICITACAO_RESIDENCIAL",
+          "type": "Text",
+          "length": 25,
+          "required": true,
+          "primary_key": false,
+          "default": "DESCONHECIDA",
+          "purpose": "NENHUMA / EM_PROCESSAMENTO / CONFIRMADA / NAO_EFETIVADA / DESCONHECIDA."
+        },
+        {
+          "name": "APTO_RESIDENCIAL",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Elegibilidade de produto; não é confirmação de entrada em jornada."
+        },
+        {
+          "name": "MOTIVO_RESIDENCIAL",
+          "type": "Text",
+          "length": 200,
+          "required": true,
+          "primary_key": false,
+          "default": "PENDENTE_VALIDACAO",
+          "purpose": "Motivo principal da aptidão ou impedimento."
+        },
+        {
+          "name": "POSSE_CELULAR",
+          "type": "Text",
+          "length": 15,
+          "required": true,
+          "primary_key": false,
+          "default": "DESCONHECIDA",
+          "purpose": "SIM / NAO / DESCONHECIDA; NAO exige fonte válida."
+        },
+        {
+          "name": "SOLICITACAO_CELULAR",
+          "type": "Text",
+          "length": 25,
+          "required": true,
+          "primary_key": false,
+          "default": "DESCONHECIDA",
+          "purpose": "NENHUMA / EM_PROCESSAMENTO / CONFIRMADA / NAO_EFETIVADA / DESCONHECIDA."
+        },
+        {
+          "name": "APTO_CELULAR",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Elegibilidade de produto; não é confirmação de entrada em jornada."
+        },
+        {
+          "name": "MOTIVO_CELULAR",
+          "type": "Text",
+          "length": 200,
+          "required": true,
+          "primary_key": false,
+          "default": "PENDENTE_VALIDACAO",
+          "purpose": "Motivo principal da aptidão ou impedimento."
+        },
+        {
+          "name": "SEGMENTO_DEVICE",
+          "type": "Text",
+          "length": 40,
+          "required": true,
+          "primary_key": false,
+          "default": "SEM_DADO_CONFIAVEL",
+          "purpose": "RECENTE_IDENTIFICADO / IDENTIFICADO_SEM_RECENCIA / SEM_DADO_CONFIAVEL."
+        },
+        {
+          "name": "DEVICE_MARCA",
+          "type": "Text",
+          "length": 50,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Marca normalizada, quando confiável."
+        },
+        {
+          "name": "DEVICE_MODELO",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Modelo normalizado, quando confiável."
+        },
+        {
+          "name": "DEVICE_ULTIMO_USO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Último uso real observado na origem."
+        },
+        {
+          "name": "DEVICE_DT_REFERENCIA",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Referência da extração na origem."
+        },
+        {
+          "name": "DT_ULT_COMPRA_ELETRONICOS",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Última data por categoria, se a fonte for a MAPA_MCC."
+        },
+        {
+          "name": "DT_ULT_COMPRA_SAUDE_BELEZA",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Última data por categoria."
+        },
+        {
+          "name": "DT_ULT_COMPRA_ELETRODOMESTICOS",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Última data por categoria."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão aplicada, por exemplo SEG_V2."
+        },
+        {
+          "name": "ID_EXECUCAO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Execução que gerou a decisão."
+        },
+        {
+          "name": "DT_ATUALIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante da atualização pela automação."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/00_Dados",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Overwrite, somente com fontes válidas",
+      "writer": "Queries de elegibilidade",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEGUROS_CONTROLE_CPF",
+        "SEGUROS_CONTROLE_CPF_PREPARO"
+      ],
+      "fields": [
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Um percurso mensal por CPF."
+        },
+        {
+          "name": "ID_CICLO",
+          "type": "Text",
+          "length": 64,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Identificador imutável da participação mensal atual; vazio antes da inicialização."
+        },
+        {
+          "name": "SEGURO_ATUAL",
+          "type": "Text",
+          "length": 20,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "MULHER / RESIDENCIAL / CELULAR."
+        },
+        {
+          "name": "STATUS",
+          "type": "Text",
+          "length": 40,
+          "required": true,
+          "primary_key": false,
+          "default": "AGUARDANDO_INICIALIZACAO",
+          "purpose": "AGUARDANDO_INICIALIZACAO / ENTRADA_PENDENTE / SEM1… / AGUARDANDO_PROXIMO_PRODUTO / SEM_PRODUTO_ELEGIVEL."
+        },
+        {
+          "name": "PROXIMO_SEGURO",
+          "type": "Text",
+          "length": 20,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Próximo produto previsto; revalidar na liberação."
+        },
+        {
+          "name": "FL_CICLO_ATIVO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Indica ciclo mensal válido para contato."
+        },
+        {
+          "name": "DT_ENTRADA",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Entrada efetiva, não apenas inclusão no público."
+        },
+        {
+          "name": "DT_MUDANCA_STATUS",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Muda somente quando a etapa avança."
+        },
+        {
+          "name": "DT_CONCLUSAO_REGUA",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Somente conclusão normal da última semana."
+        },
+        {
+          "name": "DT_ENCERRAMENTO_CICLO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Encerramento normal ou por exceção."
+        },
+        {
+          "name": "DT_LIBERACAO_PROXIMO_PRODUTO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Conclusão + intervalo; inatividade libera sem nova espera."
+        },
+        {
+          "name": "DIAS_INTERVALO_APLICADO",
+          "type": "Number",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Valor congelado ao concluir a régua."
+        },
+        {
+          "name": "MOTIVO_SAIDA",
+          "type": "Text",
+          "length": 200,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "CONCLUSAO / SEM_AVANCO_15_DIAS / SOLICITACAO / CONTRATACAO / SUPRESSAO."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão aplicada, por exemplo SEG_V2."
+        },
+        {
+          "name": "ID_EXECUCAO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Execução que gerou a decisão."
+        },
+        {
+          "name": "DT_ATUALIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante da atualização pela automação."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/01_Controle",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "CONTROLE: Update a partir de PREPARO; PREPARO: Overwrite após ler estado e marcadores",
+      "writer": "Somente automação de conciliação",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "Dois objetos com o mesmo schema. A área PREPARO permite calcular o próximo estado sem sobrescrever a fonte que está sendo lida. A jornada não escreve diretamente nessas DEs.",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEGUROS_CONFIG_ESTRATEGIA"
+      ],
+      "fields": [
+        {
+          "name": "CHAVE",
+          "type": "Text",
+          "length": 80,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Identificador do parâmetro."
+        },
+        {
+          "name": "VALOR",
+          "type": "Text",
+          "length": 200,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Valor em texto, convertido e validado pela query."
+        },
+        {
+          "name": "TIPO",
+          "type": "Text",
+          "length": 10,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "NUMERO / TEXTO / BOOLEANO."
+        },
+        {
+          "name": "DESCRICAO",
+          "type": "Text",
+          "length": 300,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "O que altera e quando passa a valer."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão da configuração."
+        },
+        {
+          "name": "DT_ATUALIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Última alteração do parâmetro."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/01_Controle",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Update manual governado",
+      "writer": "Responsável CRM/Growth",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEGUROS_DEVICE_CPF"
+      ],
+      "fields": [
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Uma linha por CPF; IN seleciona o smartphone de uso mais recente."
+        },
+        {
+          "name": "DEVICE_ID_ORIGEM",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Identificador estável, se disponível; não usar como prova de compra."
+        },
+        {
+          "name": "TIPO_DISPOSITIVO",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": "DESCONHECIDO",
+          "purpose": "SMARTPHONE / TABLET / OUTRO / DESCONHECIDO."
+        },
+        {
+          "name": "MARCA",
+          "type": "Text",
+          "length": 50,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Marca padronizada."
+        },
+        {
+          "name": "MODELO",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Modelo padronizado; manter código de origem para rastreio."
+        },
+        {
+          "name": "SISTEMA",
+          "type": "Text",
+          "length": 20,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "ANDROID / IOS / OUTRO / DESCONHECIDO."
+        },
+        {
+          "name": "VERSAO_SISTEMA",
+          "type": "Text",
+          "length": 30,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão observada; não é condição comercial aprovada."
+        },
+        {
+          "name": "DT_PRIMEIRO_USO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Opcional; não demonstra troca de aparelho."
+        },
+        {
+          "name": "DT_ULTIMO_USO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Último evento real de uso do aparelho na origem."
+        },
+        {
+          "name": "DT_REFERENCIA_FONTE",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Referência do arquivo, obrigatória."
+        },
+        {
+          "name": "DT_CARGA",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Momento em que o SFMC recebeu a foto."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/00_Dados",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Overwrite, arquivo completo validado",
+      "writer": "Import da IN/lake; proposta de contrato de origem",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEGUROS_SOLICITACOES_CPF_PRODUTO"
+      ],
+      "fields": [
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Chave parcial da solicitação atual."
+        },
+        {
+          "name": "PRODUTO",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Chave parcial; produto normalizado."
+        },
+        {
+          "name": "ID_SOLICITACAO",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Identificador na fonte; não fabricar se ausente."
+        },
+        {
+          "name": "STATUS",
+          "type": "Text",
+          "length": 25,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "EM_PROCESSAMENTO / CONFIRMADA / NAO_EFETIVADA / DESCONHECIDA."
+        },
+        {
+          "name": "DT_FORMULARIO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante do aceite válido."
+        },
+        {
+          "name": "DT_RETORNO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante do retorno operacional, se recebido."
+        },
+        {
+          "name": "ACEITE_VALIDO",
+          "type": "Boolean",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Aceite de contratação validado; nulo exige revisão."
+        },
+        {
+          "name": "FONTE",
+          "type": "Text",
+          "length": 100,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "LP e/ou retorno que sustenta o estado."
+        },
+        {
+          "name": "DT_REFERENCIA_FONTE",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Referência da fonte consultada."
+        },
+        {
+          "name": "DT_ATUALIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Atualização da projeção operacional."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/00_Dados",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Update; preservar processamento sem retorno",
+      "writer": "Conciliação das LPs e retorno de contratação",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEG_APTOS_MULHER_MENSAL",
+        "SEG_APTOS_MULHER_TRIGGER",
+        "SEG_APTOS_RESIDENCIAL_MENSAL",
+        "SEG_APTOS_RESIDENCIAL_TRIGGER",
+        "SEG_APTOS_CELULAR_MENSAL",
+        "SEG_APTOS_CELULAR_TRIGGER"
+      ],
+      "fields": [
+        {
+          "name": "ID_ENTRADA",
+          "type": "Text",
+          "length": 80,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Chave estável por participação; não regenerar em toda execução."
+        },
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Cliente selecionado."
+        },
+        {
+          "name": "CONTACT_KEY",
+          "type": "Text",
+          "length": 254,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Mesmo Contact Key existente no SFMC."
+        },
+        {
+          "name": "ID_CICLO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Participação imutável usada nos marcadores."
+        },
+        {
+          "name": "PRODUTO",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Produto fixo correspondente à DE."
+        },
+        {
+          "name": "TIPO_REGUA",
+          "type": "Text",
+          "length": 10,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "MENSAL ou TRIGGER, fixo conforme a DE."
+        },
+        {
+          "name": "EMAIL",
+          "type": "EmailAddress",
+          "length": 254,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Endereço de e-mail."
+        },
+        {
+          "name": "PHONE",
+          "type": "Phone",
+          "length": 50,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Telefone com DDI e DDD; não presumir opt-in."
+        },
+        {
+          "name": "LOCALE",
+          "type": "Locale",
+          "length": 5,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Localidade validada; não preencher se desconhecida."
+        },
+        {
+          "name": "FIRST_NAME",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Primeiro nome para personalização."
+        },
+        {
+          "name": "FL_EMAIL_PERMITIDO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Permissão e entregabilidade do canal, reavaliadas antes do envio."
+        },
+        {
+          "name": "FL_SMS_PERMITIDO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Permissão e disponibilidade do canal SMS."
+        },
+        {
+          "name": "FL_WPP_PERMITIDO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Permissão e disponibilidade do canal WhatsApp."
+        },
+        {
+          "name": "DT_ENTRADA_PREVISTA",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Janela autorizada de entrada."
+        },
+        {
+          "name": "DT_GERACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Criação da entrada; não renovar em reexecuções."
+        },
+        {
+          "name": "ID_EVENTO_COMPRA",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Obrigatório para trigger; nulo na mensal."
+        },
+        {
+          "name": "CATEGORIA_MCC",
+          "type": "Text",
+          "length": 30,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Obrigatória no trigger; categoria normalizada."
+        },
+        {
+          "name": "DT_COMPRA",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Data/hora da compra quando disponível, ou data agregada identificada como tal."
+        },
+        {
+          "name": "SEGMENTO_DEVICE",
+          "type": "Text",
+          "length": 40,
+          "required": true,
+          "primary_key": false,
+          "default": "SEM_DADO_CONFIAVEL",
+          "purpose": "Segmento de aparelho no instante da seleção."
+        },
+        {
+          "name": "DEVICE_MARCA",
+          "type": "Text",
+          "length": 50,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Somente se confiável."
+        },
+        {
+          "name": "DEVICE_MODELO",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Somente se confiável."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão aplicada, por exemplo SEG_V2."
+        },
+        {
+          "name": "ID_EXECUCAO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Execução que gerou a decisão."
+        },
+        {
+          "name": "DT_ATUALIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante da atualização pela automação."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/02_Publicos",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": true,
+      "send_relationship": "CONTACT_KEY → Subscribers.Subscriber Key",
+      "action": "Update somente para novas entradas; não alterar payload de entrada já confirmada",
+      "writer": "Queries de seleção",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "Uma DE física para cada produto/tipo. ID_ENTRADA é PK; CONTACT_KEY é identidade de envio. Não confundir as duas chaves. O feed deve reter entradas pendentes até confirmação; não usar Overwrite diário.",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEG_MARCADOR_MULHER_MENSAL",
+        "SEG_MARCADOR_MULHER_TRIGGER",
+        "SEG_MARCADOR_RESIDENCIAL_MENSAL",
+        "SEG_MARCADOR_RESIDENCIAL_TRIGGER",
+        "SEG_MARCADOR_CELULAR_MENSAL",
+        "SEG_MARCADOR_CELULAR_TRIGGER"
+      ],
+      "fields": [
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Uma linha por cliente em cada DE física de marcador."
+        },
+        {
+          "name": "ID_CICLO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Copiado do Journey Data da entrada; nunca do ciclo atual de Contact Data."
+        },
+        {
+          "name": "PRODUTO",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Valor fixo da DE."
+        },
+        {
+          "name": "TIPO_REGUA",
+          "type": "Text",
+          "length": 10,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Valor fixo da DE."
+        },
+        {
+          "name": "STATUS",
+          "type": "Text",
+          "length": 40,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "ENTROU / SEM1… / CONCLUIU / SAIU."
+        },
+        {
+          "name": "DT_MARCADOR_SFMC",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Use current time da atividade; relógio SFMC do tenant."
+        },
+        {
+          "name": "MOTIVO_SAIDA",
+          "type": "Text",
+          "length": 200,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Somente quando houver encerramento."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão trazida pela entrada."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/03_Marcadores",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Update Contact, sem Overwrite da automação",
+      "writer": "Somente a jornada correspondente",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "Proposta para separar escritores simultâneos. PK CPF por DE, evitando atualização ambígua de chaves compostas por Update Contact. Validar cópia dinâmica do ID_CICLO no tenant. Só aceitar marcador cujo ciclo ainda seja o ciclo válido.",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEGUROS_HISTORICO_CICLOS"
+      ],
+      "fields": [
+        {
+          "name": "ID_CICLO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Uma linha por participação mensal ou trigger."
+        },
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Cliente."
+        },
+        {
+          "name": "PRODUTO",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Seguro."
+        },
+        {
+          "name": "TIPO_REGUA",
+          "type": "Text",
+          "length": 10,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "MENSAL / TRIGGER."
+        },
+        {
+          "name": "STATUS",
+          "type": "Text",
+          "length": 40,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Situação reconciliada da participação."
+        },
+        {
+          "name": "FL_CICLO_ATIVO",
+          "type": "Boolean",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": false,
+          "purpose": "Validade atual do ciclo para contatos."
+        },
+        {
+          "name": "DT_AUTORIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Seleção para a entrada."
+        },
+        {
+          "name": "DT_ENTRADA",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Confirmação de entrada."
+        },
+        {
+          "name": "DT_ULTIMO_AVANCO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Último marcador aceito do mesmo ciclo."
+        },
+        {
+          "name": "DT_ENCERRAMENTO",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Encerramento da participação."
+        },
+        {
+          "name": "MOTIVO_SAIDA",
+          "type": "Text",
+          "length": 200,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Razão do encerramento."
+        },
+        {
+          "name": "ID_EVENTO_COMPRA",
+          "type": "Text",
+          "length": 100,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Preenchido nos triggers; permite rastrear sua origem."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão aplicada, por exemplo SEG_V2."
+        },
+        {
+          "name": "ID_EXECUCAO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Execução que gerou a decisão."
+        },
+        {
+          "name": "DT_ATUALIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante da atualização pela automação."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/01_Controle",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Update por ID_CICLO, preservando ciclos encerrados",
+      "writer": "Conciliação; não é uma linha por contato ou por semana",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEGUROS_TRIGGER_CONTROLE"
+      ],
+      "fields": [
+        {
+          "name": "ID_EVENTO_COMPRA",
+          "type": "Text",
+          "length": 100,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Chave parcial; identidade estável do evento na fonte."
+        },
+        {
+          "name": "PRODUTO",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Chave parcial; decisão é por evento e seguro."
+        },
+        {
+          "name": "CPF",
+          "type": "Text",
+          "length": 11,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Cliente."
+        },
+        {
+          "name": "CATEGORIA_MCC",
+          "type": "Text",
+          "length": 30,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Categoria que acionou a seleção."
+        },
+        {
+          "name": "DT_COMPRA",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante ou data da compra, com granularidade declarada."
+        },
+        {
+          "name": "GRANULARIDADE_EVENTO",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "TRANSACAO ou CPF_CATEGORIA_DIA."
+        },
+        {
+          "name": "DECISAO",
+          "type": "Text",
+          "length": 25,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "DESCARTADO / AUTORIZADO / ENTRADA_CONFIRMADA / ENCERRADO."
+        },
+        {
+          "name": "MOTIVO",
+          "type": "Text",
+          "length": 200,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Por exemplo MENSAL_ATIVA, SOLICITACAO, POSSE, SEM_CANAL."
+        },
+        {
+          "name": "DT_DECISAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Primeira decisão; preservar em reexecuções."
+        },
+        {
+          "name": "ID_CICLO",
+          "type": "Text",
+          "length": 64,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Ciclo de trigger, se autorizado."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão aplicada, por exemplo SEG_V2."
+        },
+        {
+          "name": "ID_EXECUCAO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Execução que gerou a decisão."
+        },
+        {
+          "name": "DT_ATUALIZACAO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Instante da atualização pela automação."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/01_Controle",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Update idempotente por evento/produto",
+      "writer": "Somente se decisões não forem persistidas e retornadas pelo lake",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "DE condicional, não obrigatória se o lake oferecer esse contrato. Não contém uma cópia de todas as compras.",
+      "status": "PROPOSTA_DE_CRIACAO"
+    },
+    {
+      "names": [
+        "SEGUROS_EXECUCOES"
+      ],
+      "fields": [
+        {
+          "name": "ID_EXECUCAO",
+          "type": "Text",
+          "length": 64,
+          "required": true,
+          "primary_key": true,
+          "default": null,
+          "purpose": "Execução da automação."
+        },
+        {
+          "name": "DT_INICIO",
+          "type": "Date",
+          "length": null,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Início."
+        },
+        {
+          "name": "DT_FIM",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Fim, inclusive de falha."
+        },
+        {
+          "name": "STATUS",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "INICIADA / FONTES_INVALIDAS / FALHOU / CONCLUIDA."
+        },
+        {
+          "name": "DT_REFERENCIA_MAPA",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Referência real da MAPA."
+        },
+        {
+          "name": "DT_REFERENCIA_MCC",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Referência real de compras."
+        },
+        {
+          "name": "DT_REFERENCIA_DEVICE",
+          "type": "Date",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Referência real de DEVICE; ausência não invalida toda a estratégia."
+        },
+        {
+          "name": "QT_ELEGIVEIS",
+          "type": "Number",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Contagem observada após a seleção."
+        },
+        {
+          "name": "QT_ENTRADAS_MENSAL",
+          "type": "Number",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Entradas mensais autorizadas."
+        },
+        {
+          "name": "QT_ENTRADAS_TRIGGER",
+          "type": "Number",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Triggers autorizados."
+        },
+        {
+          "name": "QT_TRIGGERS_DESCARTADOS",
+          "type": "Number",
+          "length": null,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Eventos descartados nesta execução."
+        },
+        {
+          "name": "ERRO",
+          "type": "Text",
+          "length": 500,
+          "required": false,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Etapa e causa da falha; sem CPF ou contato em texto livre."
+        },
+        {
+          "name": "VERSAO_REGRA",
+          "type": "Text",
+          "length": 20,
+          "required": true,
+          "primary_key": false,
+          "default": null,
+          "purpose": "Versão em execução."
+        }
+      ],
+      "folder": "Shared Data Extensions/Seguro/01_Controle",
+      "external_key": "Mesmo nome técnico da DE; conferir unicidade no tenant antes de criar.",
+      "sendable": false,
+      "send_relationship": null,
+      "action": "Update por ID_EXECUCAO",
+      "writer": "Orquestração/Script Activity de acompanhamento",
+      "retention": "Sem exclusão automática no piloto; definir retenção antes de produção.",
+      "notes": "",
+      "status": "PROPOSTA_DE_CRIACAO"
+    }
+  ],
+  "note": "Não cria objetos nem altera SFMC. Campos e nomes propostos; confirmar BU, permissões e retenção antes de criar."
+}
