@@ -2,6 +2,8 @@
 
 Versão 1.0 · 06/11/2026. Pedido: criar specs para planejar e implementar os ajustes na main e deixar evoluções futuras abertas em Correções e Melhorias.
 
+[Abrir os registros de Correções e Melhorias e SDD](RECIBO.md).
+
 Este pacote publica planejamento e registros SDD. Não declara a interface implementada nem altera permissões, schema ou conteúdo do vault. A main é o destino das entregas de implementação. O pedido atual autoriza publicar estas specs na main.
 
 ## Primeiro corte
