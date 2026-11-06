@@ -24,6 +24,7 @@ export async function taskHistory(id:string):Promise<TaskEvent[]>{
 }
 export function taskError(error:unknown):string {
  const message=error&&typeof error==='object'&&'message'in error?String(error.message):String(error);
+ if(message.includes('completion_date')||message.includes('date/time field value')||message.includes('invalid input syntax for type date'))return 'Informe uma data de conclusão válida, até hoje, no horário de Brasília.';
  if(message.includes('experiment_design_required'))return 'Complete hipótese, população, alocação, células, versão, métrica, janela, fonte e critério antes de preparar o experimento.';
  if(message.includes('experiment_reading_required'))return 'Para encerrar o experimento, registre a leitura e uma conclusão, inclusive inconclusiva.';
  if(message.includes('invalid_work_link'))return 'Revise as referências: use título e endereço https, link interno ou caminho de nota.';
