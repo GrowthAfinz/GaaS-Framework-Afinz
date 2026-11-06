@@ -19,12 +19,17 @@ export default function WikiDiagramCanvas({ source, zoom, expanded }: { source: 
       try {
         if (source.length > 50000 || /%%\s*\{|^\s*---|\bclick\s+\S+\s+(?:href|call|"|')/m.test(source)) throw new Error('unsupported_diagram');
         const { svg } = await mermaid.render(`wiki-flow-${id}`, source);
-        if (active && host.current) host.current.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true }, FORBID_TAGS: ['foreignObject', 'script', 'a'], FORBID_ATTR: ['onload', 'onclick'] });
+        if (active && host.current) {
+          host.current.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true }, FORBID_TAGS: ['foreignObject', 'script', 'a', 'image'], FORBID_ATTR: ['onload', 'onclick'] });
+          const diagram = host.current.querySelector('svg');
+          const naturalWidth = Number(diagram?.getAttribute('viewBox')?.trim().split(/\s+/)[2]);
+          if (diagram && naturalWidth && !expanded) diagram.style.maxWidth = `${naturalWidth}px`;
+        }
       } catch { if (active) setError(true); }
     };
     void render();
     return () => { active = false; };
-  }, [source, id]);
+  }, [source, id, expanded]);
   if (error) return <div className="p-5 text-sm" role="alert"><p>Não foi possível desenhar este fluxo. Confira a sintaxe Mermaid na nota-fonte.</p><details className="mt-3"><summary className="cursor-pointer text-cyan-800">Consultar definição do fluxo</summary><pre className="mt-2 overflow-auto whitespace-pre-wrap text-xs">{source}</pre></details></div>;
   return <div className="overflow-auto p-4" tabIndex={0} aria-label="Diagrama; role para percorrer o fluxo"><div ref={host} role="img" aria-label="Fluxo descrito na seção da estratégia" style={{ width: expanded ? `${zoom}%` : '100%', minWidth: expanded ? 700 * zoom / 100 : 560 }} className="[&>svg]:mx-auto [&>svg]:h-auto [&>svg]:w-full" /></div>;
 }
