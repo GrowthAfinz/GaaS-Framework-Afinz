@@ -1,7 +1,7 @@
 {
   "vault_key": "afinz-crm-midia",
-  "date": "2026-11-03",
-  "note_count": 502,
+  "date": "2026-11-06",
+  "note_count": 506,
   "notes": [
     {
       "relative_path": "00-Indice/Changelog-do-Vault.md",
@@ -188,6 +188,10 @@
       "content_hash": "d5adbacd3afd2a9fd3cb34f7bc8f7999e5a258b8ec3243d3c2d3566312d5cad7"
     },
     {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-MAPA_SEGUROS.md",
+      "content_hash": "764dcbf30db7566768a51f3719193cef25a1b2f28dd8951baadcd71426b22717"
+    },
+    {
       "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_APTOS.md",
       "content_hash": "81eddeb411cfe94a3de01d3ba343c62d9a3443f5de155417fbfb4a07eb3b4f5e"
     },
@@ -340,6 +344,10 @@
       "content_hash": "5a09274d3967de5c22e42a8ae2fb9b72a9f26d1ac56b7b661283336992372011"
     },
     {
+      "relative_path": "04-Operacao/Automacao-Processos-Seguros.md",
+      "content_hash": "136750dc6335973bea42827afc5042643be3e6340fc9043aab003c2a0cdf3d3c"
+    },
+    {
       "relative_path": "04-Operacao/Automacao-VDV-Pool-de-Ofertas.md",
       "content_hash": "cfb3d2207de09541d9c470d94a04590cb79d420db97996667f2393201209b5c5"
     },
@@ -432,6 +440,10 @@
       "content_hash": "328235622064c3afd75429d76990cecae8178a8edf647205c6464fcb65504963"
     },
     {
+      "relative_path": "05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md",
+      "content_hash": "e607e2dc984735eb9b31ea83f56bb9951f1fe71e138b5da2b75cee3831a188f9"
+    },
+    {
       "relative_path": "05-Estrategia/Fabrica-XLSX-TOPO-CRM-3.md",
       "content_hash": "a92a4072a35ce48e46d8f881bcaa33175e8b1b9d28e497b2c62af853ef1a777c"
     },
@@ -474,6 +486,10 @@
     {
       "relative_path": "05-Estrategia/SFMC-Integracao-API-Roadmap.md",
       "content_hash": "e11fc1ba660ea28abc2d5de74fe2f38ef075bbf297f27c5b2dd06d762cc7ea42"
+    },
+    {
+      "relative_path": "05-Estrategia/Segmentacao-Seguros-Celular.md",
+      "content_hash": "beb539745b9eb9ab8697655f6f447978c7f5fc6932865b9241f1c2614ebcfbe6"
     },
     {
       "relative_path": "05-Estrategia/Sistema-de-Experimentacao-Referencias.md",
