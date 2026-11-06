@@ -7,6 +7,8 @@ import { WikiModeBar, type WikiBarCommon, type WikiMode } from './WikiModeBar';
 import { ChangeEvent, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Copy, ExternalLink, FileText, FolderOpen, Home, Link2, LoaderCircle, RefreshCw, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { WikiCodeBlock } from './WikiDiagram';
+import { WikiMarkdownSections } from './WikiMarkdownSections';
 import remarkGfm from 'remark-gfm';
 import { canSyncVault, getVaultNote, latestVaultSync, listVaultBacklinks, listVaultFolders, searchVault, syncVault } from './vaultService';
 import { filesFromInput, parseVaultFiles, rewriteWikilinksForReader } from './vaultParser';
@@ -314,7 +316,8 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const renderScope=(section:typeof reading.sections[number]) => <section key={section.offset} id={section.id} className="my-8 scroll-mt-24" aria-label="Escopo da operação"><h4 className="mb-3 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">Público, canais e proposta</h4><dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{reading.scopeFields.map(field=><div key={field.key} className="rounded-lg border border-slate-200 p-4"><dt className="text-xs font-semibold text-slate-500">{field.label}</dt><dd className="mt-2 flex flex-wrap gap-2">{field.values.map(value=><span key={value} className="rounded-md bg-cyan-50 px-2 py-1 text-sm text-cyan-900">{value}</span>)}</dd></div>)}</dl>{reading.pending&&<p className="mt-4 text-sm text-amber-800"><strong>O que falta confirmar: </strong>{reading.pending}</p>}<details className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4"><summary className="cursor-pointer text-sm font-medium text-slate-600">Escopo e elegibilidade na fonte</summary>{renderMarkdown(section.content,section.offset)}</details></section>;
   const renderJourneys=(section:typeof reading.sections[number]) => <section key={section.offset} id={section.id} className="my-8 scroll-mt-24" aria-label="Jornadas observadas"><h4 className="mb-3 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">Jornadas e safras observadas</h4><p className="mb-3 text-sm text-slate-600">Abra uma jornada para acompanhar seus resultados no mês selecionado. Os nomes preservam a identificação da fonte.</p><div className="max-h-96 space-y-2 overflow-y-auto">{reading.journeys.map(row=><button key={row.id} type="button" onClick={()=>openJourney(row.journey)} disabled={Boolean(analytics?.scope.journey&&analytics.scope.journey!==row.journey)} className="block w-full rounded-lg border border-slate-200 p-3 text-left hover:border-cyan-300 hover:bg-cyan-50 disabled:opacity-50"><span className="block break-words text-sm font-medium text-cyan-800">{row.journey.replace(/_/g,' ')}</span><span className="mt-1 block text-xs text-slate-500">Safra {row.safra} · {row.stage.replace(/_/g,' ')}{row.subgroup&&row.subgroup!=='N/A'?' · '+row.subgroup:''} · {row.rows} registros observados</span></button>)}</div><details className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4"><summary className="cursor-pointer text-sm font-medium text-slate-600">Campanhas e variantes na fonte</summary>{renderMarkdown(section.content,section.offset)}</details></section>;
 
-  const renderMarkdown=(content:string,lineOffset=0) => <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={vaultUrlTransform} components={{
+  const renderMarkdown=(content:string,lineOffset=0) => <WikiMarkdownSections content={content} render={(part, offset) => renderMarkdownBody(part,lineOffset+offset)} />;
+  const renderMarkdownBody=(content:string,lineOffset=0) => <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={vaultUrlTransform} components={{
             h1: ({ node, children }) => <h4 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mb-3 mt-8 scroll-mt-24 text-2xl font-bold text-slate-900">{children}</h4>,
             h2: ({ node, children }) => <><h4 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mb-3 mt-8 scroll-mt-24 border-b border-slate-100 pb-2 text-xl font-bold text-slate-900">{children}</h4></>,
             h3: ({ node, children }) => <h5 {...headingProps((node?.position?.start.line===undefined?undefined:node.position.start.line+lineOffset))} className="mb-2 mt-6 scroll-mt-24 text-base font-bold text-slate-900">{children}</h5>,
@@ -328,8 +331,8 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
             table: ({ children }) => <div className="my-5 overflow-x-auto"><table className="w-full border-collapse text-xs">{children}</table></div>,
             th: ({ children }) => <th className="border border-slate-200 bg-slate-50 px-3 py-2 text-left font-semibold">{children}</th>,
             td: ({ children }) => <td className="border border-slate-200 px-3 py-2 align-top">{children}</td>,
-            pre: ({ children }) => <pre className="my-4 overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs leading-6 text-slate-100 [&>code]:block [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit">{children}</pre>,
-            code: ({ children }) => <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700">{children}</code>,
+            pre: WikiCodeBlock,
+            code: ({ children, className }) => <code className={`${className || ''} rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700`}>{children}</code>,
             a: ({ href, children }) => {
               if (!href) return <span>{children}</span>;
               const meta = linkMeta(href);
