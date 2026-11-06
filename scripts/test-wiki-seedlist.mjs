@@ -13,6 +13,7 @@ test('completion gets a business date, edits preserve it, reopening keeps the ol
  const task=await save({title:'Atividade de teste',acceptance_criteria:['Critério'],completed_criteria:[0]});
  await assert.rejects(save({status:'concluida'},task.id,task.revision),/completion_evidence/);
  const done=await save({status:'concluida',resolution:'Evidência do teste'},task.id,task.revision);
+ assert.equal((await save({details:done.details},done.id,done.revision)).revision,done.revision);
  const today=(await db.query("select (now() at time zone 'America/Sao_Paulo')::date::text as business_date")).rows[0].business_date;
  assert.equal(done.details.completed_on,today);
  const edited=await save({description:'Descrição revista'},done.id,done.revision);assert.equal(edited.details.completed_on,today);
@@ -22,6 +23,8 @@ test('completion gets a business date, edits preserve it, reopening keeps the ol
  const reopened=await save({status:'planejando'},dated.id,dated.revision);assert.equal(reopened.details.completed_on,undefined);
  const old=(await db.query('select after_data from growth_development_task_events where task_id=$1 and revision=$2',[dated.id,dated.revision])).rows[0].after_data;
  assert.equal(old.details.completed_on,'2026-11-03');assert.equal(old.status,'concluida');
+ const legacy=(await db.query("insert into growth_development_tasks(task_key,title,status,created_by,acceptance_criteria,completed_criteria,resolution) values('LEGACY-DONE','Conclusão histórica sem data','concluida',auth.uid(),array['Aceite'],array[0],'Evidência antiga sem data de conclusão') returning *")).rows[0];
+ assert.equal((await save({description:'Edição posterior'},legacy.id,legacy.revision)).details.completed_on,undefined);
  }finally{await db.close();}
 });
 test('seed is additive and idempotent; dependencies, non-admin and anonymous guards survive',async()=>{
