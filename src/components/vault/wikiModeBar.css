@@ -34,6 +34,8 @@
 .wiki-bar--floating > * {
   pointer-events: auto;
 }
+.wiki-bar--with-below { flex-wrap: wrap; }
+.wiki-bar__below { flex: 0 0 100%; min-width: 0; order: 20; }
 .wiki-bar__btn,
 .wiki-bar__search input,
 .wiki-bar__seg {
