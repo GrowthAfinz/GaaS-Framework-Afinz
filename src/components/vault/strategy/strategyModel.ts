@@ -5,9 +5,10 @@ export interface TaskLayout { hidden: string[]; order: string[] }
 export interface StrategyDocument { title: string; summary: string; blocks: StrategyBlock[]; taskLayout: TaskLayout }
 export interface StrategyHead { note_id: string; revision: number; source_hash: string; source_markdown: string; document: StrategyDocument; updated_at: string; updated_by: string }
 export interface StrategyRevision extends Omit<StrategyHead, 'updated_at' | 'updated_by'> { actor_id: string; created_at: string; reason: string }
-export const isStrategyPilot = (note?: Pick<VaultNote, 'relative_path'> | null) => note?.relative_path === STRATEGY_PATH;
-export function initialStrategy(note: Pick<VaultNote, 'title' | 'content_markdown'>): StrategyDocument {
-  const source = note.content_markdown.replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n/, '').replace(/^\s*# [^\n]+\n/, '');
+export const isStrategyPilot = (note?: Pick<VaultNote, 'relative_path'> | null) => Boolean(note?.relative_path.startsWith('05-Estrategia/'));
+export const hasVisaActivities = (note?: Pick<VaultNote, 'relative_path'> | null) => note?.relative_path === STRATEGY_PATH;
+export function initialStrategy(note: Pick<VaultNote, 'title' | 'content_markdown'> & Partial<Pick<VaultNote,'relative_path'>>): StrategyDocument {
+  const source = note.content_markdown.replace(/\r\n?/g, '\n').replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n/, '').replace(/^\s*# [^\n]+\n/, '');
   const lines = source.split('\n');
   const sections: StrategyBlock[] = [];
   let title = 'Contexto e estado da operação', id = 'visao-geral', body: string[] = [], fence = '';
@@ -17,7 +18,7 @@ export function initialStrategy(note: Pick<VaultNote, 'title' | 'content_markdow
     const heading = !fence && line.match(/^## (.+)$/);
     if (heading) {
       sections.push({ id, title, type: 'markdown', content: body.join('\n') });
-      title = heading[1];
+      title = heading[1].trim();
       id = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
       // Preserve the old section anchors; block identity is persisted after import.
       if (sections.some(b => b.id === id)) id += '-'+sections.length;
@@ -30,7 +31,7 @@ export function initialStrategy(note: Pick<VaultNote, 'title' | 'content_markdow
   const summary = split < 0 ? intro.content.trim() : intro.content.trimStart().slice(0, split);
   const remainder = split < 0 ? '' : intro.content.trimStart().slice(split + 2);
   return { title: note.title, summary, blocks: [
-    { id:'pilot-activities', type:'tasks', title:'Atividades: Construção do Piloto', content:'' },
+    ...(note.relative_path===STRATEGY_PATH ? [{ id:'pilot-activities', type:'tasks' as const, title:'Atividades: Construção do Piloto', content:'' }] : []),
     ...sections,
     ...(remainder.trim() ? [{...intro,content:remainder}] : []),
   ], taskLayout:{hidden:[],order:[]} };

@@ -16,6 +16,7 @@ describe('Wiki navigation contracts', () => {
     expect(wikiTopicForNote({relative_path:'09-Inteligencia-IA/Skills/Skill-Exemplo.md',folder:'09-Inteligencia-IA/Skills',tags:[]})).toBe('Engenharia e IAs');
     expect(wikiTopicForNote({relative_path:'02-Entidades-Dados/Amostras/Tabela.md',folder:'02-Entidades-Dados/Amostras',tags:[]})).toBe('Dados e mensuração');
     expect(wikiTopicForNote(null)).toBeNull();
+    expect(wikiTopicForNote({relative_path:'05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md',folder:'05-Estrategia',tags:['sfmc']})).toBe('Estratégias');
   });
   it('opens Results as a canonical Wiki topic without confusing the older screen note', () => {
     const topic=WIKI_TOPICS.find(topic=>topic.title==='Resultados')!;

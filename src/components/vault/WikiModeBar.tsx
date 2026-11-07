@@ -16,6 +16,8 @@ export type WikiMode = "reading" | "connections" | "notes";
 /** What every Wiki screen shares: the mode switch, the AI entry and the "more" menu. */
 export interface WikiBarCommon {
   mode: WikiMode;
+  onBack?: () => void;
+  backLabel?: string;
   onMode: (mode: WikiMode) => void;
   onAI: () => void;
   menu: ReactNode;
@@ -52,6 +54,8 @@ export function WikiModeBar({
   floating = false,
   mode,
   onMode,
+  onBack,
+  backLabel,
   onAI,
   menu,
   nav,
@@ -67,15 +71,16 @@ export function WikiModeBar({
       <button
         type="button"
         className="wiki-bar__btn wiki-bar__icon"
-        onClick={() => window.history.back()}
-        title="Voltar à tela anterior"
-        aria-label="Voltar à tela anterior"
+        onClick={onBack || (() => window.history.back())}
+        title={backLabel || "Voltar à tela anterior"}
+        aria-label={backLabel || "Voltar à tela anterior"}
       >
         <ArrowLeft size={17} />
       </button>
       <button
         type="button"
         className="wiki-bar__btn"
+        aria-label={nav.label}
         aria-expanded={nav.open}
         aria-controls={nav.controls}
         onClick={nav.onToggle}

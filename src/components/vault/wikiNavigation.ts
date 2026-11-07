@@ -9,6 +9,7 @@ export const WIKI_TOPICS = [
   { title: 'CRM e e-mails dinâmicos', description: 'Do briefing à régua e à operação SFMC.', target: '04-Operacao/Servico-Emails-Dinamicos', folder: '04-Operacao' },
   { title: 'Dados e mensuração', description: 'Fontes, definições, evidências e limites.', target: '09-Inteligencia-IA/Fontes-e-Proveniencia-Growth', folder: '02-Entidades-Dados' },
   { title: 'Engenharia e IAs', description: 'Contratos, integrações e contexto para agentes.', target: '08-Engenharia/MOC-Engenharia', folder: '08-Engenharia' },
+  { title: 'Estratégias', description: 'Desenhos de estratégia, públicos, regras e decisões de implantação.', target: 'topic:strategies', folder: '05-Estrategia' },
 ] as const;
 
 export const normalizeWikiPath = (value: string) => value.replace(/\\/g, '/').replace(/\.md$/i, '').normalize('NFC').toLocaleLowerCase('pt-BR');
@@ -16,6 +17,7 @@ export const normalizeWikiPath = (value: string) => value.replace(/\\/g, '/').re
 export function wikiTopicForNote(note: (Pick<VaultNoteSummary, 'relative_path' | 'folder' | 'tags'> & { note_type?: string | null; frontmatter?: Record<string, unknown> }) | null) {
   if (!note) return null;
   const path = normalizeWikiPath(note.relative_path);
+  if(path.startsWith('05-estrategia/'))return 'Estratégias';
   const exact = WIKI_TOPICS.find(topic => path === normalizeWikiPath(topic.target) || path.split('/').pop() === normalizeWikiPath(topic.target));
   if (exact) return exact.title;
   // Subfolders (09-Inteligencia-IA/Skills, 02-Entidades-Dados/SFMC...) belong to their top-level folder.

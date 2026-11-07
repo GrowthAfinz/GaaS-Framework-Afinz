@@ -35,7 +35,7 @@ export const LEGACY_GROUP = "Legado";
 export const MAP_GROUPS: { topic: string; key: string; code: string; description: string }[] = [
   ...WIKI_TOPICS.map((topic, index) => ({
     topic: topic.title,
-    key: ["start", "res", "prod", "serv", "crm", "dados", "eng"][index],
+    key: ["start", "res", "prod", "serv", "crm", "dados", "eng", "strat"][index],
     code: "A" + index,
     description: topic.description,
   })),
