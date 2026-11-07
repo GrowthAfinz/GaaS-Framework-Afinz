@@ -131,3 +131,10 @@
 
 .strategy-table{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}.strategy-table:focus-visible{outline:2px solid #007c80;outline-offset:3px}
 @media(max-width:680px){.strategy-prose .strategy-table table{display:table;min-width:580px}.strategy-table::after{content:"Deslize para ver todas as colunas";display:block;position:sticky;left:0;font-size:11px;color:#60717b;padding:6px 0}}
+
+.strategy-prose details[data-wiki-section]>summary{position:relative;padding-right:58px;min-height:44px;background:#fafbfc}
+.wiki-detail-pencil{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:0;background:transparent;color:#60717b}
+.wiki-detail-pencil:hover{background:#edf6f4;color:#007c80}.wiki-detail-pencil:disabled{opacity:.4}
+.strategy-summary p+p{margin-top:10px!important}
+.strategy-prose figure>[aria-label="Diagrama; role para percorrer o fluxo"]{max-height:580px;overscroll-behavior:contain}
+@media(pointer:coarse){.wiki-detail-pencil{width:44px;height:44px}}

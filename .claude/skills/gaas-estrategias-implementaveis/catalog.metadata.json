@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "origin": "codex",
+  "agents": [
+    "codex",
+    "claude-code",
+    "cowork",
+    "chatgpt"
+  ],
+  "process": [
+    "Produto",
+    "Estratégia",
+    "Documentação"
+  ],
+  "owner": "Time GaaS Afinz",
+  "last_validated": "2026-11-07",
+  "compatibility": "Modelo editorial e implementação local verificados nesta entrega; uso no SFMC exige homologação própria.",
+  "license": "Distribuição pública autorizada pelo titular; sem concessão adicional de licença"
+}
