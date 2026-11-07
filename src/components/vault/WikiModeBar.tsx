@@ -40,6 +40,8 @@ interface WikiModeBarProps extends WikiBarCommon {
   };
   /** Mode-specific control placed before the mode switch (the map's theme toggle). */
   extra?: ReactNode;
+  /** A compact second row, used by the graph's category legend. */
+  below?: ReactNode;
 }
 
 const MODES = [
@@ -61,12 +63,13 @@ export function WikiModeBar({
   nav,
   search,
   extra,
+  below,
 }: WikiModeBarProps) {
   return (
     <div
       role="toolbar"
       aria-label="Navegação da Wiki"
-      className={`wiki-bar ${floating ? "wiki-bar--floating" : "wiki-bar--fixed"}`}
+      className={`wiki-bar ${floating ? "wiki-bar--floating" : "wiki-bar--fixed"} ${below ? "wiki-bar--with-below" : ""}`}
     >
       <button
         type="button"
@@ -141,6 +144,7 @@ export function WikiModeBar({
         </summary>
         <div className="wiki-bar__menu">{menu}</div>
       </details>
+      {below && <div className="wiki-bar__below">{below}</div>}
     </div>
   );
 }
