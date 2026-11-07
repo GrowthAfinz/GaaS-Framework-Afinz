@@ -6,7 +6,7 @@ tags:
   - gaas
 tipo: skill
 camada: ia
-atualizado: '2026-10-30'
+atualizado: '2026-11-07'
 status: confirmado
 fonte: catalogo-versionado-github
 skill_id: gaas-estrategias-implementaveis
