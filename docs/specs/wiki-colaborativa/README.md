@@ -4,6 +4,8 @@ Versão 1.0 · 06/11/2026. Pedido: criar specs para planejar e implementar os aj
 
 [Abrir os registros de Correções e Melhorias e SDD](RECIBO.md).
 
+A aplicação do modelo Visa à narrativa, aos fluxos e às fichas de Seguros está descrita em [Seguros: modelo Visa](SEGUROS-MODELO-VISA.md).
+
 O planejamento foi publicado no PR #85. O piloto Visa evolui agora com a direção editorial 1 aprovada por Pablo, inclusão, exclusão recuperável e reordenação. O recibo técnico está em [PILOTO-VISA.md](PILOTO-VISA.md). As specs 02/03/04 continuam parciais: este piloto não representa a implantação global da Wiki colaborativa.
 
 ## Primeiro corte

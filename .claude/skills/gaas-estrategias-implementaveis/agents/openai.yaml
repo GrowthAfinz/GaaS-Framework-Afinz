@@ -1,0 +1,4 @@
+interface:
+  display_name: "GaaS · Estratégias implementáveis"
+  short_description: "Notas e fluxos completos no modelo Visa"
+  default_prompt: "Use $gaas-estrategias-implementaveis para propor uma nota de estratégia completa, com narrativa e fluxos no modelo Visa, e apresente o mockup para validação antes de implementar."

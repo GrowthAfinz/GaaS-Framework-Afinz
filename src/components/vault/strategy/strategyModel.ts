@@ -27,13 +27,13 @@ export function initialStrategy(note: Pick<VaultNote, 'title' | 'content_markdow
   }
   sections.push({ id, title, type:'markdown', content:body.join('\n') });
   const intro = sections.shift()!;
-  const split = intro.content.trimStart().indexOf('\n\n');
-  const summary = split < 0 ? intro.content.trim() : intro.content.trimStart().slice(0, split);
-  const remainder = split < 0 ? '' : intro.content.trimStart().slice(split + 2);
+  const paragraphs=intro.content.trim().split(/\n\s*\n/);
+  const summary=paragraphs.slice(0,2).join('\n\n');
+  const remainder=paragraphs.slice(2).join('\n\n');
   return { title: note.title, summary, blocks: [
     ...(note.relative_path===STRATEGY_PATH ? [{ id:'pilot-activities', type:'tasks' as const, title:'Atividades: Construção do Piloto', content:'' }] : []),
-    ...sections,
     ...(remainder.trim() ? [{...intro,content:remainder}] : []),
+    ...sections,
   ], taskLayout:{hidden:[],order:[]} };
 }
 export function moveBlock(doc: StrategyDocument, id: string, delta: number): StrategyDocument {
@@ -51,4 +51,13 @@ export function strategyError(error: unknown): string {
  if(text.includes('source_conflict'))return 'A fonte no vault mudou. Compare as versões em Histórico antes de reconciliar.';
  if(text.includes('access_denied')||text.includes('42501'))return 'Seu acesso permite leitura. A edição deste piloto segue as permissões administrativas atuais.';
  return 'Não foi possível salvar. Sua edição continua aberta; tente novamente.';
+}
+
+export interface DetailAnchor { start:number; end:number; original:string }
+/** Replace only the chosen fenced detail; reject stale anchors rather than touching a neighbouring fiche. */
+export function replaceStrategyDetail(content:string,anchor:DetailAnchor,title:string,body:string):string {
+ const lines=content.split('\n');
+ if(anchor.start<0||anchor.end<anchor.start||anchor.end>=lines.length||lines.slice(anchor.start,anchor.end+1).join('\n')!==anchor.original||!/^:::details\s/.test(lines[anchor.start])||lines[anchor.end].trim()!==':::')throw new Error('strategy_detail_changed');
+ if(!title.trim()||/[\r\n]/.test(title))throw new Error('strategy_detail_title');
+ return [...lines.slice(0,anchor.start),':::details '+title.trim(),body,':::',...lines.slice(anchor.end+1)].join('\n');
 }

@@ -9,3 +9,5 @@ Para inventariar ou receber dados brutos de Seguros, portfólio, CP e Pool para 
 Ao receber pedido para rodar a fila de investigações Growth, abrir a skill canônica compartilhada por Codex e Claude em `.claude/skills/gaas-growth-investigation/SKILL.md` e seguir seu contrato. Não substituir pelo publicador legado de `crm_insights`.
 
 A plataforma não chama API de IA para este fluxo. Nenhuma alteração de fonte, campanha, orçamento ou publicação externa é autorizada pelo processamento dessa fila.
+
+Para criar ou revisar notas de estratégia e sua apresentação no GaaS, usar `.claude/skills/gaas-estrategias-implementaveis/SKILL.md`: a nota Visa é modelo de narrativa, profundidade, fluxos e fichas técnicas, além da aparência.
