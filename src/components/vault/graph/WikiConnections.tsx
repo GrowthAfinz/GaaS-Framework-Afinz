@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { Focus, Maximize2, Moon, RefreshCw, Sun, Type, X } from "lucide-react";
-import type { VaultNoteSummary } from "../vaultTypes";
+import type { VaultNote, VaultNoteSummary } from "../vaultTypes";
+import { getVaultNote } from "../vaultService";
+import { initialMapLayers, mapCategoryLayers, noteOpening } from "./wikiMapReading";
 import { WikiModeBar, type WikiBarCommon } from "../WikiModeBar";
 import { fetchWikiGraphLinks, withTimeout } from "./wikiGraphService";
 import {
@@ -48,7 +50,6 @@ export function WikiConnections({
   currentNote,
   active,
   syncKey,
-  onOpen,
   onOpenNote,
 }: {
   bar: WikiBarCommon;
@@ -68,9 +69,7 @@ export function WikiConnections({
   const [layers, setLayers] = useState<Record<string, boolean>>(() => {
     const topic = readGraphRoute(window.location.search, currentNote).topic;
     const saved = read<Record<string, boolean>>(LAYERS_KEY, {});
-    return Object.fromEntries(
-      MAP_GROUPS.map((g) => [g.key, topic ? g.topic === topic : saved[g.key] ?? g.topic !== LEGACY_GROUP]),
-    );
+    return initialMapLayers(topic, saved);
   });
   const [detailed, setDetailed] = useState(true);
   const [spin, setSpin] = useState(() => !matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -78,6 +77,9 @@ export function WikiConnections({
   const [query, setQuery] = useState("");
   const [hitAt, setHitAt] = useState(0);
   const [searching, setSearching] = useState(false);
+  const [opening, setOpening] = useState<{id:string; text:string; error:boolean} | null>(null);
+  const [openingRetry, setOpeningRetry] = useState(0);
+  const noteCache = useRef(new Map<string, VaultNote>());
   const wrap = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const labelBox = useRef<HTMLDivElement>(null);
@@ -157,6 +159,25 @@ export function WikiConnections({
     [layers, local],
   );
   const selected = route.focus ? byId.get(route.focus) || null : null;
+  const selectedNote = selected?.type === "note" ? selected.id : null;
+  useEffect(() => { noteCache.current.clear(); }, [syncKey]);
+  useEffect(() => {
+    if (!active || !selectedNote) { setOpening(null); return; }
+    let live = true;
+    setOpening(null);
+    const cached = noteCache.current.get(selectedNote);
+    void withTimeout(cached ? Promise.resolve(cached) : getVaultNote(selectedNote), 15000, "Prévia indisponível")
+      .then(note => { if (live) { noteCache.current.set(note.id, note); setOpening({id:note.id,text:noteOpening(note.content_markdown),error:false}); } })
+      .catch(() => { if (live) setOpening({id:selectedNote,text:"",error:true}); });
+    return () => { live = false; };
+  }, [active, selectedNote, syncKey, openingRetry]);
+  useLayoutEffect(() => {
+    const toolbar = wrap.current?.querySelector<HTMLElement>(".wiki-bar");
+    if (!toolbar) return;
+    const measure = () => wrap.current?.style.setProperty("--wm-top", `${toolbar.offsetTop + toolbar.offsetHeight + 12}px`);
+    measure(); const observer = new ResizeObserver(measure); observer.observe(toolbar);
+    return () => observer.disconnect();
+  }, []);
 
   // ---------------------------------------------------------------- engine
   useEffect(() => {
@@ -201,10 +222,15 @@ export function WikiConnections({
   const pick = (id: string | null) => {
     setContents(false);
     if (!id) return update({ focus: "" });
+    const node = byId.get(id);
+    if (node?.type === "topic") {
+      setLayers(mapCategoryLayers(node.group));
+      return update({ focus:id, scope:"all", root:"", topic:node.topic });
+    }
     update({ focus: id });
   };
   const ensureVisible = (n: MapNode) => {
-    if (!layers[n.group]) setLayers((l) => ({ ...l, [n.group]: true }));
+    if (!layers[n.group]) { setLayers(mapCategoryLayers(n.group)); update({scope:"all", topic:n.topic}); }
     if (local && !local.has(n.id)) update({ scope: "all" });
   };
   const select = (n: MapNode) => {
@@ -277,6 +303,11 @@ export function WikiConnections({
   const noteCount = (data?.nodes || []).filter((n) => n.type === "note").length;
   const shownNotes = (data?.nodes || []).filter((n) => n.type === "note" && isVisible(n)).length;
   const rootNote = local ? byId.get(route.root) : null;
+  const chooseCategory = (key: string | null) => {
+    setLayers(mapCategoryLayers(key));
+    update({scope:"all",root:"",topic:MAP_GROUPS.find(g=>g.key===key)?.topic||"",focus:key && selected?.group!==key ? "" : route.focus});
+  };
+  const categoryNames:Record<string,string>={start:"Comece aqui",res:"Resultados",prod:"Produtos",serv:"Serviços",crm:"CRM",dados:"Dados",eng:"Engenharia e IAs",strat:"Estratégias",leg:"Legado"};
 
   return (
     <section
@@ -297,6 +328,10 @@ export function WikiConnections({
       <WikiModeBar
         {...bar}
         floating
+        below={<div className="wm-glass wm-layers" role="group" aria-label="Filtrar mapa por assunto">
+          <button type="button" className="wm-lyr" aria-pressed={MAP_GROUPS.every(g=>layers[g.key])} onClick={()=>chooseCategory(null)}>Todos</button>
+          {groups.map(g=><button key={g.key} type="button" className="wm-lyr" style={dot(g.node!)} aria-label={`Filtrar assunto: ${g.topic}`} title={g.topic} aria-pressed={Boolean(layers[g.key]) && MAP_GROUPS.every(other=>other.key===g.key || !layers[other.key])} onClick={()=>chooseCategory(g.key)}><span className="wm-dot"/>{categoryNames[g.key]||g.topic}<span className="n">{g.node!.count}</span></button>)}
+        </div>}
         nav={{ label: "Assuntos", open: contents, onToggle: () => setContents((v) => !v), controls: "wiki-map-contents" }}
         search={{
           value: query,
@@ -416,13 +451,16 @@ export function WikiConnections({
                   <span className="p">{selected.path}</span>
                 </div>
                 <div className="wm-acts">
-                  <button type="button" className="wm-btn is-primary" onClick={() => onOpen(selected.id)}>Abrir nota</button>
                   <button type="button" className="wm-btn" onClick={() => showConnections(selected.id)} title="Mostra só esta nota e as notas ligadas a ela">
                     <Focus size={14} />
                     Conexões
                   </button>
                   <button type="button" className="wm-btn" onClick={() => select(byId.get("topic:" + selected.group)!)}>Ver assunto</button>
                 </div>
+                <section className="wm-opening" aria-label="Começo da nota">
+                  {!opening || opening.id!==selected.id ? <p role="status">Carregando o começo da nota…</p> : opening.error ? <><p role="status">Não foi possível carregar a prévia. Você pode abrir a nota completa.</p><button type="button" className="wm-btn" onClick={()=>setOpeningRetry(value=>value+1)}>Tentar novamente</button></> : <p className="wm-opening__text">{opening.text||"Esta nota ainda não tem conteúdo de leitura."}</p>}
+                  <button type="button" className="wm-btn is-primary" onClick={()=>onOpenNote(selected.id)}>Continuar leitura</button>
+                </section>
                 <div className="wm-grp">
                   <h4>Citada por <span>{refs.incoming.get(selected.id)?.length || 0}</span></h4>
                   {list(refs.incoming.get(selected.id) || [])}
@@ -480,14 +518,6 @@ export function WikiConnections({
               <button type="button" onClick={() => update({ scope: "all" })}>Ver todas as notas</button>
             </div>
           )}
-          <div className="wm-glass wm-layers" role="group" aria-label="Mostrar ou esconder assuntos">
-            {groups.map((g) => (
-              <button key={g.key} type="button" className="wm-lyr" style={dot(g.node!)} aria-pressed={Boolean(layers[g.key])} onClick={() => setLayers((l) => ({ ...l, [g.key]: !l[g.key] }))}>
-                <span className="wm-dot" />
-                {g.topic} <span className="n">{g.node!.count}</span>
-              </button>
-            ))}
-          </div>
         </div>
         <div className="wm-ctl">
           <button type="button" className="wm-glass" aria-pressed={detailed} title={detailed ? "Mostrando o nome de mais notas" : "Mostrando só os nomes principais"} aria-label="Mostrar mais nomes de notas" onClick={() => setDetailed((v) => !v)}>
