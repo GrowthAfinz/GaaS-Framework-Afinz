@@ -1,44 +1,69 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1010" viewBox="0 0 1120 1010" style="max-width:100%;height:auto" role="img" aria-labelledby="title desc">
-<title id="title">Seguros: execução no SFMC</title><desc id="desc">As fontes passam pela processos_seguros: validar, atualizar elegibilidade, conciliar participações, selecionar públicos e entregar às jornadas. Marcadores retornam ao controle. Decisões de trigger são registradas no lake ou em DE, local ainda a definir.</desc>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#526579"/></marker></defs>
-<rect width="1120" height="1010" rx="24" fill="#f7fafc"/>
-<text x="40" y="48" font-family="Arial, sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#18364a">Como a estratégia vira execução no SFMC</text>
-<text x="40" y="82" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#526579">Integração proposta à processos_seguros • etapas sequenciais</text>
-<rect x="70" y="110" width="980" height="110" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
-<text x="92" y="145" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Fontes da operação</text>
-<text x="92" y="178" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">CLIENTES ATIVOS • MAPA_SEGUROS • MAPA_MCC • formulários</text>
-<text x="92" y="206" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Fluxo de arquivos: formulários → S3/Athena → retorno da MAPA</text>
-<path d="M560 220V250" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="70" y="250" width="630" height="90" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
-<text x="92" y="285" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">1. Validar volume e atualidade</text>
-<text x="92" y="318" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Uma carga incompleta não deve redefinir os públicos.</text>
-<rect x="740" y="250" width="310" height="90" rx="16" fill="#fff6e8" stroke="#ecd3a0"/>
-<text x="762" y="285" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Parâmetros</text>
-<text x="762" y="318" font-family="Arial, sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#18364a">SEGUROS_CONFIG_ESTRATEGIA</text>
-<path d="M385 340V370" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="70" y="370" width="630" height="90" rx="16" fill="#e7f8f8" stroke="#73cdce"/>
-<text x="92" y="405" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">2. Atualizar elegibilidade</text>
-<text x="92" y="438" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEGUROS_ELEGIBILIDADE_CPF</text>
-<path d="M385 460V490" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="70" y="490" width="630" height="110" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
-<text x="92" y="525" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">3. Conciliar participações</text>
-<text x="92" y="558" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEGUROS_CONTROLE_CPF + histórico de ciclos</text>
-<text x="92" y="586" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Semanas, processamento, posse e inatividade</text>
-<rect x="740" y="490" width="310" height="110" rx="16" fill="#eef3ff" stroke="#cdd9f7"/>
-<text x="762" y="525" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Decisões de trigger</text>
-<text x="762" y="558" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Lake ou DE de controle</text>
-<text x="762" y="586" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Armazenamento a definir</text>
-<path d="M385 600V630" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="70" y="630" width="980" height="110" rx="16" fill="#e7f8f8" stroke="#73cdce"/>
-<text x="92" y="665" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">4. Selecionar os seis públicos de entrada</text>
-<text x="92" y="698" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEG_APTOS_[MULHER / RESIDENCIAL / CELULAR]_MENSAL</text>
-<text x="92" y="726" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">SEG_APTOS_[MULHER / RESIDENCIAL / CELULAR]_TRIGGER</text>
-<path d="M560 740V770" fill="none" stroke="#526579" stroke-width="2" marker-end="url(#arrow)"/>
-<rect x="70" y="770" width="980" height="110" rx="16" fill="#ffffff" stroke="#d8e3eb"/>
-<text x="92" y="805" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">5. Executar jornadas e devolver marcadores</text>
-<text x="92" y="838" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Pablo configura os marcadores de entrada, semana e encerramento.</text>
-<text x="92" y="866" font-family="Arial, sans-serif" font-size="19" font-weight="400" text-anchor="start" fill="#18364a">Identificar o ciclo em cada atualização; respeitar supressões antes dos contatos.</text>
-<path d="M70 825H32V545H70" fill="none" stroke="#526579" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
-<text x="70" y="930" font-family="Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#18364a">Ao liberar o próximo ciclo, invalidar o anterior.</text>
-<text x="70" y="965" font-family="Arial, sans-serif" font-size="21" font-weight="400" text-anchor="start" fill="#526579">Mudar a DE de controle, sozinho, não interrompe uma jornada antiga.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1220" viewBox="0 0 1280 1220" role="img" aria-labelledby="title desc">
+<title id="title">Da fonte à jornada, com retorno de estado.</title><desc id="desc">Fluxo técnico proposto: validar fontes, atualizar elegibilidade, conciliar participações, selecionar mensal, selecionar trigger considerando a mensal autorizada e executar jornadas. Parâmetros de intervalo e inatividade são independentes. As jornadas devolvem marcadores por ciclo; decisões de trigger têm armazenamento a definir no lake ou DE. Falha de carga não pode simular perda de posse.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#007c80"/></marker></defs>
+<rect width="1280" height="1220" fill="#fff"/>
+<text x="40" y="32" font-family="Segoe UI,Arial,sans-serif" font-size="13" font-weight="600" fill="#007c80">ESTRATÉGIAS / SEGUROS · 02 · EXECUÇÃO NO SFMC</text>
+<text x="40" y="76" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="700" fill="#18212a">Da fonte à jornada, com retorno de estado.</text>
+<text x="40" y="106" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="400" fill="#60717b">Integração proposta à processos_seguros · etapas em sequência; nomes de funções, sem implantação comprovada.</text>
+<path d="M40 127H1240" stroke="#d7dfe2"/>
+<rect x="40" y="148" width="1200" height="96" fill="#fff" stroke="#d7dfe2"/>
+<text x="58" y="178" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Fontes e troca de arquivos</text>
+<text x="58" y="205" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">CLIENTES ATIVOS · MAPA_SEGUROS · MAPA_MCC · formulários</text>
+<text x="58" y="229" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">processos_seguros: preparar / exportar formulários → S3 / Athena → importar retorno da MAPA.</text>
+<path d="M460 244V270" fill="none" stroke="#007c80" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="70" y="270" width="850" height="94" fill="#fff" stroke="#d7dfe2"/>
+<text x="88" y="299" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#007c80">01</text>
+<text x="123" y="300" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Validar volume e atualidade</text>
+<text x="123" y="327" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Carga incompleta não pode redefinir posse ou gerar públicos.</text>
+<path d="M495 364V390" fill="none" stroke="#007c80" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="70" y="390" width="850" height="94" fill="#eff7f6" stroke="#d7dfe2"/>
+<text x="88" y="419" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#007c80">02</text>
+<text x="123" y="420" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Atualizar a elegibilidade por CPF</text>
+<text x="123" y="447" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">SEGUROS_ELEGIBILIDADE_CPF · aptidão por produto e impedimentos.</text>
+<path d="M495 484V510" fill="none" stroke="#007c80" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="70" y="510" width="850" height="94" fill="#fff" stroke="#d7dfe2"/>
+<text x="88" y="539" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#007c80">03</text>
+<text x="123" y="540" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Conciliar participações e ciclos</text>
+<text x="123" y="567" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">SEGUROS_CONTROLE_CPF + histórico · semanas, solicitações, posse e inatividade.</text>
+<path d="M495 604V630" fill="none" stroke="#007c80" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="70" y="630" width="850" height="94" fill="#eff7f6" stroke="#d7dfe2"/>
+<text x="88" y="659" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#007c80">04</text>
+<text x="123" y="660" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Selecionar as três entradas mensais</text>
+<text x="123" y="687" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">SEG_APTOS_[MULHER / RESIDENCIAL / CELULAR]_MENSAL</text>
+<path d="M495 724V750" fill="none" stroke="#007c80" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="70" y="750" width="850" height="118" fill="#eff7f6" stroke="#d7dfe2"/>
+<text x="88" y="779" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#007c80">05</text>
+<text x="123" y="780" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Selecionar as três entradas de trigger</text>
+<text x="123" y="807" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">SEG_APTOS_[MULHER / RESIDENCIAL / CELULAR]_TRIGGER</text>
+<text x="123" y="831" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Considerar a mensal ativa e a autorizada nesta execução; registrar descarte.</text>
+<path d="M495 868V894" fill="none" stroke="#007c80" stroke-width="1.6" marker-end="url(#arrow)"/>
+<rect x="70" y="894" width="850" height="118" fill="#fff" stroke="#d7dfe2"/>
+<text x="88" y="923" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="600" fill="#007c80">06</text>
+<text x="123" y="924" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Executar jornadas e devolver marcadores</text>
+<text x="123" y="951" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Entrada, semana e encerramento identificados por CPF, produto, régua e ciclo.</text>
+<text x="123" y="975" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Pablo configura os marcadores; conferir supressões antes dos contatos.</text>
+<path d="M70 953H40V557H70" fill="none" stroke="#007c80" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<rect x="960" y="390" width="280" height="212" fill="#fff" stroke="#d7dfe2"/>
+<text x="978" y="420" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Parâmetros separados</text>
+<text x="978" y="447" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">SEGUROS_CONFIG_ESTRATEGIA</text>
+<text x="978" y="471" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Entre produtos · 15 dias</text>
+<text x="978" y="495" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Sem avanço · 15 dias</text>
+<text x="978" y="519" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Uma regra não substitui a outra.</text>
+<path d="M960 548H920" fill="none" stroke="#007c80" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<path d="M1100 602V676H920" fill="none" stroke="#007c80" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<rect x="960" y="750" width="280" height="262" fill="#fff" stroke="#d7dfe2"/>
+<text x="978" y="780" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="600" fill="#18212a">Decisões de trigger</text>
+<text x="978" y="807" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Evento identificado:</text>
+<text x="978" y="831" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">liberado, descartado</text>
+<text x="978" y="855" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">ou entrada confirmada.</text>
+<text x="978" y="879" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b"></text>
+<text x="978" y="903" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Lake ou DE de controle.</text>
+<text x="978" y="927" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Local ainda a definir.</text>
+<path d="M920 808H960" fill="none" stroke="#007c80" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arrow)"/>
+<rect x="40" y="1048" width="1200" height="76" fill="#f8fafb" stroke="#d7dfe2"/>
+<text x="58" y="1077" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="600" fill="#18212a">RETORNO DE ESTADO · encerrar um ciclo antes de liberar o seguinte</text>
+<text x="58" y="1104" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="400" fill="#60717b">Alterar a DE de controle, sozinho, não interrompe a jornada anterior. Identificar e invalidar o ciclo.</text>
+<path d="M40 1150H1240" stroke="#d7dfe2"/>
+<text x="40" y="1178" font-family="Segoe UI,Arial,sans-serif" font-size="15" font-weight="400" fill="#60717b">A VALIDAR · campos de posse, D+1 / identidade do evento, BU, chaves, reentrada e fonte oficial de solicitações.</text>
+<text x="40" y="1203" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="400" fill="#60717b">Formulário suspende a oferta; contratação depende de confirmação. Estes diagramas não executam automações.</text>
 </svg>

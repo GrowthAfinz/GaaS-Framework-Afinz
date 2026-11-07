@@ -103,3 +103,31 @@
 .strategy-source-status{position:relative;border:0;padding:0;font-size:12px}.strategy-source-status>summary{color:#68777e}.strategy-source-status>.strategy-prose{position:absolute;left:0;top:100%;z-index:30;background:white;border:1px solid #c5d0d3;padding:14px;width:min(620px,65vw);box-shadow:0 4px 12px #15222b0b}.strategy-header{padding-bottom:18px}.strategy-main{padding-top:18px}.strategy-title{margin-top:8px}
 
 @media(max-width:680px){.strategy-source-status{position:static}.strategy-source-status>.strategy-prose{left:0;right:0;width:auto;max-width:100%}.strategy-header{position:relative}}
+
+/* Estratégias: neutral actions, a bounded reading rail and an accessible mobile index. */
+.wiki-strategy .strategy-primary,.strategy-history .strategy-primary{background:#fff;color:#006c70;border:1px solid #b8cecf}
+.wiki-strategy .strategy-primary:hover,.strategy-history .strategy-primary:hover{background:#edf6f4}
+.strategy-nav{max-height:calc(100dvh - 28px);overflow-y:auto;overscroll-behavior:contain}
+.strategy-nav nav button{min-height:40px}
+.strategy-mobile-index{display:none}
+.strategy-prose img{display:block;max-width:100%;height:auto;margin:16px auto}
+.strategy-main{width:100%;max-width:1420px}
+.strategy-subjects{padding:16px;background:white;border:1px solid #d7dfe2;display:flex;flex-wrap:wrap;gap:8px}
+.strategy-subjects>p{width:100%;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#53626d;margin-bottom:4px}
+.strategy-subjects button{min-height:40px;padding:7px 12px;font-size:13px;border:1px solid #d7dfe2;background:white;color:#006c70}
+.strategy-subjects button:hover{background:#edf6f4}
+.strategy-index-page{background:#fff;padding:32px;color:#18212a}
+.strategy-eyebrow{font-size:12px;color:#007c80;letter-spacing:.04em}
+.strategy-index-page h1{font-size:32px;font-weight:700;margin:8px 0 12px}
+.strategy-index-page>p{max-width:850px;font-size:14px;line-height:1.8;margin-bottom:20px}
+.strategy-index-page>.strategy-search{max-width:460px}
+.strategy-index-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:0 28px}
+.strategy-index-grid button{background:white;border:0;border-top:1px solid #d7dfe2;padding:20px 0;text-align:left;color:#18212a}
+.strategy-index-grid button:hover{color:#007c80}
+.strategy-index-grid button>span{display:flex;justify-content:space-between;align-items:start;gap:12px;font-size:17px;font-weight:600;line-height:1.5}
+.strategy-index-grid small{display:block;font-size:12px;color:#60717b;margin-top:8px}
+@media(min-width:681px) and (max-width:1100px){.wiki-strategy{grid-template-columns:210px minmax(0,1fr)}.strategy-nav{padding:16px 12px}.strategy-main{padding:18px 22px}.strategy-title h1{font-size:28px}}
+@media(max-width:680px){.strategy-nav{max-height:none;overflow:visible;position:sticky;top:0;z-index:40;background:white;padding:10px 14px}.strategy-search{margin-bottom:0}.strategy-mobile-index{display:flex;align-items:center;justify-content:space-between;width:100%;background:white;border:0;padding:10px 0;color:#006c70;font-size:13px;font-weight:600;min-height:44px}.strategy-nav nav.is-open{display:flex;max-height:45dvh;overflow:auto;margin-top:10px}.strategy-nav nav button{min-height:44px}.strategy-nav .strategy-search{padding:8px 10px}.strategy-title{align-items:start}.strategy-title h1{font-size:25px;line-height:1.25}.strategy-section-toggle h2{font-size:19px}.strategy-block{scroll-margin-top:145px}.strategy-section-toggle{min-height:44px}.strategy-icon{min-width:44px}.strategy-history{width:100vw;padding:18px}.strategy-index-page{padding:20px 16px}.strategy-index-page h1{font-size:28px}}
+
+.strategy-table{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}.strategy-table:focus-visible{outline:2px solid #007c80;outline-offset:3px}
+@media(max-width:680px){.strategy-prose .strategy-table table{display:table;min-width:580px}.strategy-table::after{content:"Deslize para ver todas as colunas";display:block;position:sticky;left:0;font-size:11px;color:#60717b;padding:6px 0}}

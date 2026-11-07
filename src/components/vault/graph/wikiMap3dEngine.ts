@@ -88,7 +88,7 @@ export function createWikiMap(
   const R = 230;
   const ANCHOR: Record<string, [number, number, number]> = {
     serv: [-1, 0.05, 0.25], prod: [0.8, 0.32, -0.42], res: [0.78, -0.36, 0.5], dados: [-0.08, 0.62, -0.55],
-    eng: [-0.28, -0.92, -0.28], crm: [-0.62, -0.5, 0.6], start: [-0.35, 0.55, 0.62], leg: [0.25, 0.95, 0.55],
+    strat: [0.75, 0.65, -0.25], eng: [-0.28, -0.92, -0.28], crm: [-0.62, -0.5, 0.6], start: [-0.35, 0.55, 0.62], leg: [0.25, 0.95, 0.55],
   };
   for (const n of nodes) {
     const a = ANCHOR[n.group] || [0, 0, 0], j = () => (Math.random() - 0.5) * 30;

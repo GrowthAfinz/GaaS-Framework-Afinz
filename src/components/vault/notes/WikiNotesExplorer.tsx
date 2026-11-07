@@ -61,6 +61,7 @@ export function WikiNotesExplorer({
   treeOpen,
   onOpen,
   onShowInGraph,
+  onStrategyHome,
 }: {
   notes: VaultNoteSummary[];
   loading: boolean;
@@ -69,6 +70,7 @@ export function WikiNotesExplorer({
   treeOpen: boolean;
   onOpen: (id: string, fragment?: string) => void;
   onShowInGraph: (id: string) => void;
+  onStrategyHome?:()=>void;
 }) {
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [note, setNote] = useState<VaultNote | null>(null);
@@ -232,7 +234,7 @@ export function WikiNotesExplorer({
     </>
   );
 
-  if (note && !reading && isStrategyPilot(note)) return <WikiStrategyDocument key={note.id} note={note} onOpen={target=>{const candidates=resolveWikiTarget(notes,target.split('#')[0],note.relative_path);if(candidates.length===1)onOpen(candidates[0].id,target.split('#')[1]||'');}}/>;
+  if (note && !reading && isStrategyPilot(note)) return <WikiStrategyDocument key={note.id} note={note} onHome={onStrategyHome} onOpen={target=>{const candidates=resolveWikiTarget(notes,target.split('#')[0],note.relative_path);if(candidates.length===1)onOpen(candidates[0].id,target.split('#')[1]||'');}}/>;
   return (
     <div className={`grid min-h-[560px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm lg:h-[calc(var(--screen-h)-220px)] ${treeOpen ? "lg:grid-cols-[300px_minmax(0,1fr)]" : ""}`}>
       {treeOpen && <aside

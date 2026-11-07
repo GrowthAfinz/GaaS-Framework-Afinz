@@ -9,6 +9,7 @@ import { ChevronRight, Copy, ExternalLink, FileText, FolderOpen, Home, Link2, Lo
 import ReactMarkdown from 'react-markdown';
 import { WikiCodeBlock } from './WikiDiagram';
 import { WikiMarkdownSections } from './WikiMarkdownSections';
+import { WikiStrategiesIndex } from './strategy/WikiStrategiesIndex';
 import { WikiStrategyDocument } from './strategy/WikiStrategyDocument';
 import { isStrategyPilot } from './strategy/strategyModel';
 import { WikiPilotChecklist } from './WikiPilotChecklist';
@@ -50,6 +51,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const [query, setQuery] = useState(readQuery);
   const [folder, setFolder] = useState<string | null>(readFolder);
   const [browse, setBrowse] = useState(() => Boolean(readQuery() || readFolder() || new URLSearchParams(window.location.search).get('wiki_browse')));
+  const [strategyTopics,setStrategyTopics]=useState(false);
   const [sidebar, setSidebar] = useState(() => window.innerWidth >= 1024);
   const [notesQuery, setNotesQuery] = useState('');
   const [notesTree, setNotesTree] = useState(true);
@@ -123,7 +125,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     const destination=catalog.find(note=>note.id===id);
     if(catalogContext)writeCatalogRoute(params,catalogContext);
     else if(destination?.tags.includes('growth-assunto'))writeCatalogRoute(params,subjectRoute(destination));
-    params.delete('wiki_view');
+    params.delete('wiki_view');params.delete('wiki_topic');
     const search = buildGrowthLearningSectionItemSearch('vault', id, params.toString());
     window.history.pushState({}, '', `${window.location.pathname}${search}${fragment ? `#${encodeURIComponent(fragment)}` : ''}`);
     window.dispatchEvent(new PopStateEvent('popstate'));
@@ -270,6 +272,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   }, [selected, readerLoading, selectedId, routeVersion, graphMode, notesMode]);
 
   const openTarget = (target: string) => {
+    if(target==='topic:strategies'){openStrategies();return;}
     const [path, ...fragments] = target.split('#');
     const fragment = fragments.join('#');
     if (!path && selectedRef.current) { navigate(selectedRef.current, fragment); return; }
@@ -347,6 +350,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
             },
           }}>{content}</ReactMarkdown>;
   const pushWikiParams=(params:URLSearchParams,hash=window.location.hash)=>{window.history.pushState({},'',window.location.pathname+'?'+params+hash);window.dispatchEvent(new PopStateEvent('popstate'));};
+  const openStrategies=()=>{const params=new URLSearchParams(buildGrowthLearningSectionItemSearch('vault',null,wikiNoteNavigationParams(window.location.search).toString()).slice(1));for(const key of ['wiki_view','wiki_q','wiki_folder','wiki_browse'])params.delete(key);params.set('wiki_topic','strategies');setQuery('');setStrategyTopics(false);pushWikiParams(params,'');};
   // The note in view follows the reader across modes: the map's selection opens in Notas and Leitura, and vice versa.
   const setWikiView=(mode:'reading'|'connections'|'notes')=>{
     const params=new URLSearchParams(window.location.search);params.delete('wiki_from');
@@ -368,9 +372,12 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     <p>Índice atualizado: <strong className="font-semibold text-slate-700">{dateLabel(syncRun?.completed_at)}</strong></p>
     {isAdmin&&<div className="mt-3 border-t border-slate-100 pt-3"><p className="mb-2">Atualize a projeção a partir da pasta de origem.</p><input ref={folderInput} className="hidden" type="file" multiple {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={handleFiles} /><button type="button" disabled={syncing} onClick={() => folderInput.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60"><RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />{syncing ? progress : 'Sincronizar pasta'}</button></div>}
   </>};
+  const strategyBar=<WikiModeBar {...barCommon} onBack={()=>setStrategyTopics(value=>!value)} backLabel="Abrir assuntos sem fechar a nota" nav={{label:'Assuntos',open:strategyTopics,onToggle:()=>setStrategyTopics(value=>!value),controls:'wiki-strategy-subjects'}} search={{value:query,placeholder:'Buscar notas na Wiki…',ariaLabel:'Buscar na Wiki',inputRef:searchInput,onChange:setQuery}}/>;
+  const strategyPanels=<>{strategyTopics&&<nav id="wiki-strategy-subjects" aria-label="Assuntos da Wiki" className="strategy-subjects"><p>Escolha um assunto <button type="button" aria-label="Fechar assuntos" onClick={()=>setStrategyTopics(false)}><X size={16}/></button></p>{WIKI_TOPICS.map(topic=><button key={topic.title} type="button" onClick={()=>{setStrategyTopics(false);openTarget(topic.target);}}>{topic.title}</button>)}</nav>}{query&&<nav className="strategy-subjects" aria-label="Resultados de busca da Wiki">{catalog.filter(n=>(n.title+' '+n.relative_path).toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0,20).map(n=><button type="button" key={n.id} onClick={()=>{setQuery('');navigate(n.id);}}>{n.title}</button>)}</nav>}</>;
+  if (!graphMode&&!notesMode&&viewParams.get('wiki_topic')==='strategies'&&!selectedId) return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-2">{strategyBar}{strategyPanels}{catalogLoading?<p role="status">Carregando estratégias…</p>:<WikiStrategiesIndex notes={catalog} onOpen={id=>navigate(id)}/>}</section>;
   if (!graphMode && !notesMode && !readerLoading && selected && isStrategyPilot(selected)) return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-2">
-    <WikiModeBar {...barCommon} nav={{label:'Assuntos',open:sidebar,onToggle:()=>{filter('',null,false);navigate(null);},controls:'wiki-reading-nav'}} search={{value:query,placeholder:'Buscar na Wiki…',ariaLabel:'Buscar na Wiki',inputRef:searchInput,onChange:value=>{filter(value,folder);navigate(null);}}}/>
-    <WikiStrategyDocument key={selected.id} note={selected} onOpen={openTarget} onHome={()=>navigate(null)}/>
+    {strategyBar}{strategyPanels}
+    <WikiStrategyDocument key={selected.id} note={selected} onOpen={openTarget} onHome={openStrategies}/>
   </section>;
   return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-3" style={{fontFamily: "Segoe UI, Arial, sans-serif"}}>
     {mode==='reading'&&<WikiModeBar {...barCommon} nav={{label:'Assuntos',open:sidebar,onToggle:()=>setSidebar(value=>!value),controls:'wiki-reading-nav'}} search={{value:query,placeholder:'Buscar na Wiki…',ariaLabel:'Buscar na Wiki',inputRef:searchInput,onChange:value=>filter(value,folder)}}/>}
@@ -378,7 +385,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error} <button type="button" onClick={() => { void loadContext(); if (browse) void loadIndex(query, folder); }} className="font-bold underline">Tentar novamente</button></div>}
     {notice && <div role="status" className="flex items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div>{notice}{choices.map(note => <button key={note.id} type="button" onClick={() => navigate(note.id)} className="mt-2 block text-left font-semibold underline">{note.title} · {note.relative_path}</button>)}</div><button aria-label="Fechar aviso" type="button" onClick={() => { setNotice(null); setChoices([]); }}><X size={16} /></button></div>}
     {graphMode&&<WikiConnections bar={barCommon} notes={catalog} currentNote={selectedId} active={!catalogLoading} syncKey={syncRun?.id||''} onOpen={id=>navigate(id)} onOpenNote={id=>openNote(id,'',true)}/>}
-    {notesMode&&<WikiNotesExplorer notes={catalog} loading={catalogLoading} noteId={viewParams.get('wiki_note')} query={notesQuery} treeOpen={notesTree} onOpen={(id,fragment)=>openNote(id,fragment,viewParams.get('wiki_from')==='connections')} onShowInGraph={id=>showNoteInGraph(id,false)}/>}
+    {notesMode&&<WikiNotesExplorer onStrategyHome={openStrategies} notes={catalog} loading={catalogLoading} noteId={viewParams.get('wiki_note')} query={notesQuery} treeOpen={notesTree} onOpen={(id,fragment)=>openNote(id,fragment,viewParams.get('wiki_from')==='connections')} onShowInGraph={id=>showNoteInGraph(id,false)}/>}
     <div style={{display:graphMode||notesMode?'none':undefined}} className={`grid min-h-[560px] rounded-lg border border-slate-200 bg-white shadow-sm ${sidebar ? 'lg:grid-cols-[300px_minmax(0,1fr)]' : ''}`}>
       {sidebar && <aside id="wiki-reading-nav" className="rounded-t-2xl border-b border-slate-200 bg-slate-50/60 p-4 lg:self-start lg:rounded-l-2xl lg:rounded-tr-none lg:border-b-0 lg:border-r" aria-label="Explorar a Wiki">
         <div className="mb-4 flex gap-2"><button type="button" onClick={() => { filter('', null, false); navigate(null); }} className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"><Home size={14} />Início</button><button type="button" onClick={() => filter('', null)} className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">Todas ({allCount})</button></div>

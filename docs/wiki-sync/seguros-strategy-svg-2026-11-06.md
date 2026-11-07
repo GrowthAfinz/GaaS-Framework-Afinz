@@ -28,3 +28,7 @@ Publicar a nota no Supabase somente depois de os SVGs estarem disponíveis no de
 
 - [Diátaxis: Start here](https://www.diataxis.fr/start-here/): separar explicação da referência técnica.
 - [GOV.UK: Understand content design](https://guidance.publishing.service.gov.uk/writing-to-gov-uk-standards/plan-manage-content/understand-content-design/): organizar pela necessidade do leitor e reduzir duplicação.
+
+## Redesenho editorial posterior
+
+Por novo pedido de Pablo, os dois SVGs foram redesenhados com fundo branco, cantos retos, linhas finas e teal discreto. Mensal e trigger permanecem distintos; o mapa de execução separa seleção mensal e seleção trigger em sequência, incluindo a autorização mensal na mesma execução. Ver docs/specs/wiki-colaborativa/ESTRATEGIAS-20261106.md. Esta alteração de assets não altera o Markdown nem executa configuração no SFMC.
