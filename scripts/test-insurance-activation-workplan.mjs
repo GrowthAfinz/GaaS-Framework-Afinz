@@ -8,6 +8,7 @@ test('insurance plan preserves documentary scope, six launch gates and a depende
  await db.exec(migration('_tasks_four_fronts.sql'));
  await db.exec(`insert into growth_work_initiatives(id,title,workspace,source_note,created_by) values('03d2907e-2bb1-4c45-9b26-f3caf11480b4','Seguros','cross_sell','05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md',auth.uid())`);
  await db.exec(migration('_insurance_activation_workplan.sql'));
+ await db.exec(migration('_insurance_independent_fronts.sql'));
  const {rows}=await db.query("select task_key,status,dependencies,details,resolution from growth_development_tasks where initiative_id='03d2907e-2bb1-4c45-9b26-f3caf11480b4'");
  assert.equal(rows.length,63);assert.equal(rows.filter(r=>r.status==='concluida').length,6);
  assert.ok(rows.filter(r=>r.status==='concluida').every(r=>r.details.insurance_group==='built'&&r.resolution.includes('Não certifica')));
@@ -18,6 +19,8 @@ test('insurance plan preserves documentary scope, six launch gates and a depende
  assert.ok(!byKey.get('SEG-REGUA-ROTATIVA').dependencies.includes('SEG-DEVICE-IN'));
  assert.ok(byKey.get('SEG-CEL-MEN-PUBLICO').dependencies.includes('SEG-MODELOS'));
  assert.ok(!byKey.get('SEG-RES-MEN-PUBLICO').dependencies.includes('SEG-MODELOS'));
+ assert.ok(!byKey.get('SEG-MUL-MEN-PUBLICO').dependencies.includes('SEG-MAPA-MULHER'));
+ assert.ok(!byKey.get('SEG-MODELOS').dependencies.includes('SEG-CONFIRMAR-PRODUTOS'));
  await db.exec('create table report_live_memberships(user_id uuid,active boolean,role text)');
  await db.exec(readFileSync('supabase/migrations/20260928235051_gaas_vault_library.sql','utf8'));
  await db.exec('create table gaas_wiki_pilot_documents(note_id uuid)');
