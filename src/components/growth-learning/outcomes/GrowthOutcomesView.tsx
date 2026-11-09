@@ -1,13 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle,
-  CircleGauge,
-  Filter,
-  Loader2,
-  RefreshCw,
-  Search,
-} from "lucide-react";
-import {
   closeGrowthLearningItem,
   openGrowthLearningSectionItem,
   readGrowthLearningItem,
@@ -15,6 +7,7 @@ import {
 import { FRONT_LABELS } from "../feed/growthFeedRegistry";
 import {
   filterGrowthOutcomes,
+  isActionableOutcome,
   OUTCOME_BUCKET_LABELS,
   OUTCOME_VERDICT_LABELS,
 } from "./growthOutcome.logic";
@@ -24,18 +17,17 @@ import {
 } from "./growthOutcomeService";
 import { GrowthOutcome, GrowthOutcomeBucket } from "./growthOutcome.types";
 import { GrowthOutcomeDrawer } from "./GrowthOutcomeDrawer";
+import { openFeedback } from "../../feedback/feedbackBus";
+import { LedgerChip, LedgerEntry, LedgerLoading, LedgerState, LoopLedger, type LedgerTone } from "../ledger/LoopLedger";
+import { ledgerDate, plural, withUnit } from "../ledger/ledgerFormat";
 
 interface Props {
   onCountChange?: (count: number) => void;
 }
 
-const selectClass =
-  "rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 shadow-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100";
+const EXECUTION_LABELS: Record<string, string> = { not_started: "Não iniciada", partial: "Parcial", completed: "Concluída", cancelled: "Cancelada", unknown: "Sem registro" };
 
-function formatDate(value: string) {
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
-}
+const formatDate = ledgerDate;
 
 export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
   const [outcomes, setOutcomes] = useState<GrowthOutcome[]>([]);
@@ -114,193 +106,99 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
     () => filterGrowthOutcomes(outcomes, { bucket, front, query }),
     [bucket, front, outcomes, query],
   );
-  const summary = useMemo(() => ({
-    overdue: outcomes.filter((item) => item.due_bucket === 'overdue').length,
-    dueToday: outcomes.filter((item) => item.due_bucket === 'due_today').length,
-    ready: outcomes.filter((item) => item.due_bucket === 'ready_review').length,
-    waiting: outcomes.filter((item) => item.due_bucket === 'waiting_data').length,
-    contested: outcomes.filter((item) => item.due_bucket === 'contested').length,
-  }), [outcomes]);
+  const byBucket = useMemo(() => {
+    const counts = {} as Record<GrowthOutcomeBucket, number>;
+    for (const key of Object.keys(OUTCOME_BUCKET_LABELS) as GrowthOutcomeBucket[]) counts[key] = 0;
+    for (const item of outcomes) counts[item.due_bucket] = (counts[item.due_bucket] || 0) + 1;
+    return counts;
+  }, [outcomes]);
+  const actionable = outcomes.filter(isActionableOutcome).length;
   const open = (outcome: GrowthOutcome) => {
     setSelected(outcome);
-    openGrowthLearningSectionItem(
-      "outcomes",
-      outcome.outcome_id || outcome.bet_id,
-    );
+    openGrowthLearningSectionItem("outcomes", outcome.outcome_id || outcome.bet_id);
   };
 
+  const title = loading
+    ? "Outcomes"
+    : actionable === 0
+      ? "Nenhum resultado pede verificação"
+      : `${plural(actionable, "resultado pede", "resultados pedem")} verificação`;
+  const parts = [
+    byBucket.overdue ? (byBucket.overdue === 1 ? "um está atrasado" : `${byBucket.overdue} estão atrasados`) : "",
+    byBucket.due_today ? `${byBucket.due_today} vence${byBucket.due_today === 1 ? "" : "m"} hoje` : "",
+    byBucket.ready_review ? `${byBucket.ready_review} já ${byBucket.ready_review === 1 ? "pode" : "podem"} ser revisado${byBucket.ready_review === 1 ? "" : "s"}` : "",
+  ].filter(Boolean);
+  const summaryText = loading || error
+    ? undefined
+    : outcomes.length === 0
+      ? "A agenda nasce das apostas contratadas. Nenhum resultado é simulado para preencher esta área."
+      : parts.length
+        ? `${actionable === 1 && parts.length === 1 ? `Ele ${parts[0].replace(/^(um|\d+) /, "")}` : `Desses, ${parts.join(", ")}`}. Abra o resultado para comparar o observado com o contrato e registrar a conclusão.`
+        : "Os resultados em aberto ainda estão dentro da janela ou aguardando dados.";
+
+  const bucketTone = (key: GrowthOutcomeBucket): LedgerTone =>
+    key === "overdue" || key === "contested" ? "alert" : key === "due_today" || key === "waiting_data" ? "warn" : key === "ready_review" || key === "reviewed" ? "ok" : "neutral";
+
   return (
-    <section className="space-y-3">
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <CircleGauge size={15} /> Verificação de resultados
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            {filtered.length} de {outcomes.length} verificações nesta leitura
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex min-w-56 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm">
-            <Search size={14} className="text-slate-400" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="h-10 min-w-0 flex-1 text-xs outline-none"
-              aria-label="Buscar hipótese, métrica ou time" placeholder="Buscar hipótese, métrica ou time"
-            />
-          </label>
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">
-            <Filter size={13} /> Filtros
-          </span>
-          <select aria-label="Frente"
-            value={front}
-            onChange={(event) => setFront(event.target.value)}
-            className={selectClass}
-          >
-            <option value="all">Todas as frentes</option>
-            <option value="crm_acquisition">CRM Aquisição</option>
-            <option value="paid_media">Mídia Paga</option>
-            <option value="b2c_origin">Originação B2C</option>
-          </select>
-          <select aria-label="Estado da verificação"
-            value={bucket}
-            onChange={(event) => setBucket(event.target.value as typeof bucket)}
-            className={selectClass}
-          >
-            <option value="actionable">Exigem atenção</option>
-            <option value="all">Todos os estados</option>
-            {Object.entries(OUTCOME_BUCKET_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
-        <span className="mr-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Agenda de verificação</span>
-        <button type="button" onClick={() => setBucket('overdue')} className={`rounded-lg border px-3 py-2 text-xs font-bold ${summary.overdue ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-white text-slate-500'}`}>{summary.overdue} vencidos</button>
-        <button type="button" onClick={() => setBucket('due_today')} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">{summary.dueToday} para hoje</button>
-        <button type="button" onClick={() => setBucket('ready_review')} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">{summary.ready} prontos para revisão</button>
-        <button type="button" onClick={() => setBucket('waiting_data')} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">{summary.waiting} aguardando dados</button>
-        <button type="button" onClick={() => setBucket('contested')} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700">{summary.contested} contestados</button>
-      </div>
-
-      {loading ? (
-        <div className="grid min-h-[340px] place-items-center rounded-2xl border border-slate-200 bg-white">
-          <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-            <Loader2 size={18} className="animate-spin" /> Lendo agenda…
-          </span>
-        </div>
-      ) : error ? (
-        <div className="grid min-h-[340px] place-items-center rounded-2xl border border-rose-200 bg-rose-50 px-6 text-center">
-          <div>
-            <AlertCircle size={30} className="mx-auto text-rose-600" />
-            <h3 className="mt-3 font-black text-rose-900">
-              A agenda não pôde ser carregada
-            </h3>
-            <p className="mt-2 text-sm text-rose-800">{error}</p>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="mx-auto mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-900 px-4 py-2 text-xs font-bold text-white"
-            >
-              <RefreshCw size={14} /> Tentar novamente
-            </button>
-          </div>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="grid min-h-[340px] place-items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center">
-          <div>
-            <CircleGauge size={32} className="mx-auto text-slate-300" />
-            <h3 className="mt-3 font-black text-slate-800">
-              Nenhum outcome nesta leitura
-            </h3>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-              A agenda nasce das apostas contratadas. Nenhum resultado é
-              simulado para preencher esta área.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] text-left">
-              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Aposta</th>
-                  <th className="px-4 py-3">Frente</th>
-                  <th className="px-4 py-3">Métrica</th>
-                  <th className="px-4 py-3">Contrato</th>
-                  <th className="px-4 py-3">Observado</th>
-                  <th className="px-4 py-3">Execução</th>
-                  <th className="px-4 py-3">Janela</th>
-                  <th className="px-4 py-3">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((outcome) => (
-                  <tr
-                    key={outcome.bet_id}
-                    onClick={() => open(outcome)}
-                    className={`cursor-pointer text-sm transition hover:bg-cyan-50/50 ${selected?.bet_id === outcome.bet_id ? 'bg-cyan-50/70' : ''}`}
-                  >
-                    <td className="max-w-sm px-4 py-4">
-                      <div className="font-bold text-slate-900">
-                        {outcome.hypothesis}
-                      </div>
-                      <div className="mt-1 truncate text-xs text-slate-500">
-                        {outcome.team_scope}
-                        {outcome.owner ? ` · ${outcome.owner}` : ""}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-xs font-semibold text-slate-600">
-                      {FRONT_LABELS[outcome.front]}
-                    </td>
-                    <td className="px-4 py-4 font-semibold text-slate-800">
-                      {outcome.metric_name}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-bold text-slate-800">
-                        {outcome.expected_value}
-                        {outcome.expected_unit
-                          ? ` ${outcome.expected_unit}`
-                          : ""}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        baseline {outcome.baseline_value}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 font-bold text-slate-800">
-                      {outcome.observed_value === null
-                        ? "—"
-                        : `${outcome.observed_value}${outcome.observed_unit || outcome.expected_unit ? ` ${outcome.observed_unit || outcome.expected_unit}` : ""}`}
-                    </td>
-                    <td className="px-4 py-4 text-xs font-semibold text-slate-600">
-                      {outcome.execution_status.replace(/_/g, " ")}
-                    </td>
-                    <td className="px-4 py-4 text-xs text-slate-600">
-                      {formatDate(outcome.outcome_window_end)}
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-cyan-800">
-                        {OUTCOME_BUCKET_LABELS[outcome.due_bucket]}
-                      </span>
-                      {outcome.system_verdict && (
-                        <div className="mt-2 text-[11px] font-semibold text-slate-500">
-                          {OUTCOME_VERDICT_LABELS[outcome.system_verdict]}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+    <>
+      <LoopLedger
+        section="Outcomes"
+        title={title}
+        meta={!loading && !error && <>
+          {byBucket.overdue > 0 && <LedgerChip tone="alert">{plural(byBucket.overdue, "atrasado", "atrasados")}</LedgerChip>}
+          {byBucket.due_today > 0 && <LedgerChip tone="warn">{byBucket.due_today} para hoje</LedgerChip>}
+          {byBucket.ready_review > 0 && <LedgerChip tone="ok">{byBucket.ready_review} prontos para revisão</LedgerChip>}
+          {byBucket.contested > 0 && <LedgerChip tone="alert">{plural(byBucket.contested, "contestado", "contestados")}</LedgerChip>}
+          <span>Todos os períodos</span>
+        </>}
+        summary={summaryText}
+        search={{ value: query, onChange: setQuery, placeholder: "Buscar hipótese, métrica ou time", ariaLabel: "Buscar hipótese, métrica ou time" }}
+        segment={{ value: front, onChange: setFront, ariaLabel: "Frente", options: [{ value: "all", label: "Todas" }, { value: "crm_acquisition", label: "CRM Aquisição" }, { value: "paid_media", label: "Mídia Paga" }, { value: "b2c_origin", label: "Originação B2C" }] }}
+        index={[
+          { label: "Agenda de verificação", value: bucket, onSelect: (id) => setBucket(id as typeof bucket), items: [
+            { id: "actionable", label: "Exigem atenção", count: actionable },
+            ...(["overdue", "due_today", "ready_review", "waiting_data", "contested"] as GrowthOutcomeBucket[]).map((key) => ({ id: key, label: OUTCOME_BUCKET_LABELS[key], count: byBucket[key] || 0, tone: bucketTone(key) })),
+          ] },
+          { label: "Histórico", value: bucket, onSelect: (id) => setBucket(id as typeof bucket), items: [
+            ...(["scheduled", "reviewed", "not_verifiable"] as GrowthOutcomeBucket[]).map((key) => ({ id: key, label: OUTCOME_BUCKET_LABELS[key], count: byBucket[key] || 0 })),
+            { id: "all", label: "Todos", count: outcomes.length },
+          ] },
+        ]}
+        indexNote="Cada resultado vem de uma aposta. O que for confirmado pode virar registro reutilizável."
+        onFeedback={() => { const item = readGrowthLearningItem(window.location.search); openFeedback({ surface: "outcomes", pageLabel: "Outcomes", locationLabel: item ? "Outcomes › item aberto" : "Outcomes", targetType: item ? "outcome" : "page", targetId: item || undefined }); }}
+        footer={!loading && !error ? `${filtered.length} de ${plural(outcomes.length, "verificação", "verificações")} nesta leitura.` : undefined}
+      >
+        {loading ? <LedgerLoading label="Lendo agenda" /> : error ? (
+          <LedgerState tone="alert" title="A agenda não pôde ser carregada" action={{ label: "Tentar novamente", onClick: () => void load() }}>{error}</LedgerState>
+        ) : filtered.length === 0 ? (
+          <LedgerState title="Nenhum resultado nesta leitura">Troque o item do índice ou a frente. A agenda nasce das apostas contratadas.</LedgerState>
+        ) : (
+          <ul className="ledger-list">
+            {filtered.map((outcome) => {
+              const unit = outcome.observed_unit || outcome.expected_unit;
+              const late = outcome.due_bucket === "overdue";
+              return (
+                <LedgerEntry
+                  key={outcome.bet_id}
+                  selected={selected?.bet_id === outcome.bet_id}
+                  onOpen={() => open(outcome)}
+                  kicker={<><LedgerChip tone={bucketTone(outcome.due_bucket)}>{OUTCOME_BUCKET_LABELS[outcome.due_bucket]}</LedgerChip><span>{FRONT_LABELS[outcome.front]}</span>{outcome.system_verdict && <span>{OUTCOME_VERDICT_LABELS[outcome.system_verdict]}</span>}</>}
+                  title={outcome.hypothesis}
+                  text={outcome.conclusion || undefined}
+                  facts={[
+                    { label: "Métrica", value: outcome.metric_name },
+                    { label: "Contrato", value: withUnit(outcome.expected_value, outcome.expected_unit), hint: `hoje ${withUnit(outcome.baseline_value, outcome.expected_unit)}` },
+                    { label: "Observado", value: outcome.observed_value === null ? "Ainda sem leitura" : withUnit(outcome.observed_value, unit), tone: outcome.observed_value === null && late ? "warn" : undefined },
+                    { label: "Janela", value: `${formatDate(outcome.outcome_window_start)} a ${formatDate(outcome.outcome_window_end)}`, hint: late ? "vencida" : undefined, tone: late ? "alert" : undefined },
+                    { label: "Execução", value: EXECUTION_LABELS[outcome.execution_status] || outcome.execution_status },
+                    { label: "Responsável", value: outcome.owner || "Sem responsável", hint: outcome.team_scope, tone: outcome.owner ? undefined : "warn" },
+                  ]}
+                />
+              );
+            })}
+          </ul>
+        )}
+      </LoopLedger>
 
       {selected && (
         <GrowthOutcomeDrawer
@@ -309,6 +207,6 @@ export const GrowthOutcomesView: React.FC<Props> = ({ onCountChange }) => {
           onChanged={() => void load()}
         />
       )}
-    </section>
+    </>
   );
 };
