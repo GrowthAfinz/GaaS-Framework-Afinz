@@ -59,7 +59,7 @@ export function createWikiMap(
   let visibleFn: (n: MapNode) => boolean = () => true;
   let detailed = true;
   let panelW = 0;
-  let spin = !REDUCED;
+  let spin = false;
   const S = { sel: null as EngineNode | null, preview: null as EngineNode | null, focus: null as Set<string> | null, t0: performance.now() };
   const visible = (n: EngineNode) => visibleFn(n);
 
@@ -288,15 +288,23 @@ export function createWikiMap(
   }
 
   // ---------------------------------------------------------------- labels
-  type LabelEl = HTMLDivElement & { _n: EngineNode; _w: number; _h: number; _p: number };
+  // Every visible note gets a name tag; each frame the tags are placed in priority
+  // order and a tag that would overlap one already placed stays hidden, so the
+  // screen shows as many names as fit. Zooming in spreads the bubbles apart and
+  // more names fit. Among plain notes, the most cited ones win the space.
+  type LabelEl = HTMLDivElement & { _n: EngineNode; _w: number; _h: number; _p: number; _o: string; _t: string; _v: string; _z: string; _html: string };
   const labels = new Map<string, LabelEl>();
-  const prio = (n: EngineNode) => (n === S.sel ? 9 : n === S.preview ? 8 : (n.type === "topic" ? 5 : n.featured ? 4 : 2) + (S.focus && S.focus.has(n.id) ? 2 : 0));
+  const dirty: LabelEl[] = [];
+  let ordered: LabelEl[] = [];
+  const prio = (n: EngineNode) =>
+    n === S.sel ? 9 : n === S.preview ? 8
+      : (n.type === "topic" ? 5 : n.featured ? 4 : 2 + Math.min(0.9, Math.log1p(n.incoming) / 6)) + (S.focus && S.focus.has(n.id) ? 2 : 0);
   function labelSet() {
     const want = new Set<EngineNode>();
     for (const n of nodes) if (visible(n) && (n.type === "topic" || (detailed && n.featured))) want.add(n);
-    if (S.focus) [...S.focus].map((id) => byId.get(id)!).sort((a, b) => b.val - a.val).slice(0, detailed ? 70 : 24).forEach((n) => want.add(n));
-    if (!S.focus && detailed && nodes.filter((n) => visible(n) && n.type === "note").length < 80)
-      nodes.filter((n) => visible(n) && n.type === "note").forEach((n) => want.add(n));
+    // with a note selected, only its neighbourhood is in full colour, so only it gets names
+    if (S.focus) [...S.focus].map((id) => byId.get(id)!).sort((a, b) => b.val - a.val).slice(0, detailed ? Infinity : 24).forEach((n) => want.add(n));
+    else if (detailed) for (const n of nodes) if (n.type === "note" && visible(n)) want.add(n);
     if (S.preview && visible(S.preview)) want.add(S.preview);
     return want;
   }
@@ -310,14 +318,21 @@ export function createWikiMap(
         el = document.createElement("div") as LabelEl;
         el.className = `wm-lb wm-lb--${labelClass(n)}`;
         el.style.setProperty("--dot", cssDot(n));
-        el.dataset.id = n.id; el.style.opacity = "0";
+        el.dataset.id = n.id; el.style.opacity = "0"; el.style.visibility = "hidden";
+        el._o = "0"; el._t = el._v = el._z = el._html = "";
         labelBox.appendChild(el); labels.set(n.id, el); el._n = n;
       }
-      el.innerHTML = n.type === "topic" ? `<b>${esc(n.code)}</b>${esc(n.label)}` : esc(clip(n.label, n === S.sel ? 64 : 40));
-      el.classList.toggle("is-sel", n === S.sel);
+      const html = (n === S.sel ? "1" : "0") + (n.type === "topic" ? `<b>${esc(n.code)}</b>${esc(n.label)}` : esc(clip(n.label, n === S.sel ? 64 : 40)));
+      if (el._html !== html) {
+        el.innerHTML = html.slice(1);
+        el.classList.toggle("is-sel", n === S.sel);
+        el._html = html; dirty.push(el);
+      } else if (!el._w) dirty.push(el); // measured while hidden: try again
       el._p = prio(n);
     }
-    for (const [, el] of labels) { el._w = el.offsetWidth; el._h = el.offsetHeight; }
+    // measure only the tags whose text or style changed (one layout pass, not hundreds)
+    for (const el of dirty.splice(0)) { el._w = el.offsetWidth; el._h = el.offsetHeight; }
+    ordered = [...labels.values()].sort((a, b) => b._p - a._p);
   }
   const onLabelClick = (e: MouseEvent) => { const el = (e.target as HTMLElement).closest<HTMLElement>(".wm-lb"); if (el) callbacks.onPick(el.dataset.id!); };
   const onLabelOver = (e: MouseEvent) => { const el = (e.target as HTMLElement).closest<HTMLElement>(".wm-lb"); if (el) setPreview(byId.get(el.dataset.id!) || null); };
@@ -329,24 +344,53 @@ export function createWikiMap(
   const V = new THREE.Vector3();
   const project = (n: EngineNode) => { V.set(n.x!, n.y!, n.z!).project(camera); return { x: ((V.x + 1) / 2) * W, y: ((1 - V.y) / 2) * H, front: V.z < 1 && V.z > -1 }; };
   const pxRadius = (n: EngineNode, dist: number) => (n._r * n._s * (H / 2)) / (dist * Math.tan((camera.fov * Math.PI) / 360));
-  const placed: number[][] = [];
+  // placed boxes, bucketed in a coarse screen grid so the overlap test stays cheap with hundreds of tags
+  const CELL = 120;
+  const grid = new Map<number, number[][]>();
+  const cellKey = (cx: number, cy: number) => cx * 4096 + cy;
+  const overlaps = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let cx = Math.floor(x0 / CELL); cx <= Math.floor(x1 / CELL); cx++)
+      for (let cy = Math.floor(y0 / CELL); cy <= Math.floor(y1 / CELL); cy++)
+        for (const r of grid.get(cellKey(cx, cy)) || []) if (x0 < r[2] && x1 > r[0] && y0 < r[3] && y1 > r[1]) return true;
+    return false;
+  };
+  const place = (r: number[]) => {
+    for (let cx = Math.floor(r[0] / CELL); cx <= Math.floor(r[2] / CELL); cx++)
+      for (let cy = Math.floor(r[1] / CELL); cy <= Math.floor(r[3] / CELL); cy++) {
+        const k = cellKey(cx, cy), list = grid.get(k);
+        if (list) list.push(r); else grid.set(k, [r]);
+      }
+  };
+  // style writes only when a value really changes: a still map costs no DOM work
+  const put = (el: LabelEl, o: string, v: string, t: string, z: string) => {
+    if (el._o !== o) { el.style.opacity = o; el._o = o; }
+    if (el._v !== v) { el.style.visibility = v; el._v = v; }
+    if (v === "visible" && el._t !== t) { el.style.transform = t; el._t = t; }
+    if (el._z !== z) { el.style.zIndex = z; el._z = z; }
+  };
   scene.onBeforeRender = () => {
-    const cam = camera.position;
-    placed.length = 0;
-    for (const el of [...labels.values()].sort((a, b) => b._p - a._p)) {
-      const n = el._n, p = project(n), d = cam.distanceTo(V.set(n.x!, n.y!, n.z!));
-      const fog = scene.fog as THREE.Fog;
+    const cam = camera.position, fog = scene.fog as THREE.Fog;
+    grid.clear();
+    for (const el of ordered) {
+      const n = el._n;
+      if (n._o <= 0.05) { put(el, "0", "hidden", el._t, el._z); continue; }
+      const p = project(n), d = cam.distanceTo(V.set(n.x!, n.y!, n.z!));
       const depth = clamp(1 - (d - fog.near) / (fog.far - fog.near), 0.12, 1);
       let o = n._o * (p.front ? 1 : 0) * (n === S.sel ? 1 : depth);
       const off = pxRadius(n, d) + 4, x0 = p.x - el._w / 2, y0 = p.y + off;
-      if (o > 0.05) {
-        const hit = placed.some((r) => x0 < r[2] && x0 + el._w > r[0] && y0 < r[3] && y0 + el._h > r[1]);
-        if (hit) o *= el._p >= 8 ? 1 : 0.12; else placed.push([x0 - 4, y0 - 1, x0 + el._w + 4, y0 + el._h + 1]);
+      const offscreen = x0 + el._w < 0 || x0 > W || y0 + el._h < 0 || y0 > H;
+      if (offscreen) o = 0;
+      else if (o > 0.05) {
+        if (overlaps(x0, y0, x0 + el._w, y0 + el._h)) { if (el._p < 8) o = 0; }
+        else place([x0 - 4, y0 - 1, x0 + el._w + 4, y0 + el._h + 1]);
       }
-      el.style.opacity = o.toFixed(3);
-      el.style.visibility = o < 0.03 ? "hidden" : "visible";
-      el.style.transform = `translate3d(${p.x.toFixed(1)}px,${(p.y + off).toFixed(1)}px,0) translateX(-50%)`;
-      el.style.zIndex = n === S.sel ? "5" : n.type === "topic" ? "3" : "1";
+      put(
+        el,
+        o.toFixed(2),
+        o < 0.03 ? "hidden" : "visible",
+        `translate3d(${p.x.toFixed(1)}px,${(p.y + off).toFixed(1)}px,0) translateX(-50%)`,
+        n === S.sel ? "5" : n.type === "topic" ? "3" : "1",
+      );
     }
     if (S.sel) {
       const p = project(S.sel), d = cam.distanceTo(V.set(S.sel.x!, S.sel.y!, S.sel.z!)), size = pxRadius(S.sel, d) * 2 + 14;
