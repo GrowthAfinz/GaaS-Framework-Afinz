@@ -6,7 +6,7 @@ camada: estrategia
 aliases: [Estratégia do Pool de Ofertas Visa, Estratégia Vai de Visa, Estratégia Pool de Ofertas Visa, VDV Estratégia]
 atualizado: 2026-11-09
 status: a-validar
-status_detalhe: revisão de uma PREPARAÇÃO; montagem relatada; execução completa, motor adaptado e Test Send não comprovados
+status_detalhe: revisão de uma PREPARAÇÃO; Test Send pontual recebido em 09/11; execução completa e matriz de homologação pendentes
 fonte: contratos operacionais e SQLs de referência do Pool de Ofertas Visa; revisão editorial de 09/11/2026
 ---
 
@@ -16,7 +16,7 @@ O Pool de Ofertas Visa combina ofertas do programa Vai de Visa com a afinidade d
 
 E-mail, WhatsApp e SMS usam parcelas distintas do público em cada rodada. A VDV_SAFRA mantém grupos/células; a VDV_APTOS reúne a seleção por canal. As regras de seleção, automação, conteúdo e validação estão detalhadas abaixo, com contratos e SQLs nas fichas recolhíveis.
 
-> **Estado da operação:** revisão editorial de 09/11/2026. PREPARAÇÃO com seis passos e envio manual previsto. DEs e queries montadas; execução completa, conferência do FUNIL e Test Send do motor adaptado pendentes de validação.
+> **Estado da operação:** revisão editorial de 09/11/2026. PREPARAÇÃO com seis passos e envio manual previsto. DEs e queries montadas; renderização e recebimento de um Test Send confirmados pelo operador em 09/11. Execução completa, FUNIL e matriz de homologação seguem pendentes.
 
 
 ## 1. Visão geral e operação
@@ -33,7 +33,7 @@ E-mail, WhatsApp e SMS usam parcelas distintas do público em cada rodada. A VDV
 
 O Pool Visa usa o catálogo da bandeira e a afinidade por MCC. A frente de Parceiros usa acordos da própria Afinz; suas regras on-us, calendário e métricas não definem este piloto. Plurix depende de fonte e configuração próprias para uma etapa posterior.
 
-DEs, queries e importação do BRIEFING foram informados como montados na referência de e-mail. A execução integral, o FUNIL final e o Test Send seguem pendentes. A revisão multicanal abaixo exige aplicar deltas no SFMC; publicar código e notas não altera a DE ou Query Activity real.
+DEs, queries e importação do BRIEFING foram informados como montados na referência de e-mail. A execução integral e o FUNIL final seguem pendentes. Um Test Send foi recebido em 09/11, conforme relato do operador; a matriz completa de homologação permanece aberta. A revisão multicanal abaixo exige aplicar deltas no SFMC; publicar código e notas não altera a DE ou Query Activity real.
 
 
 ## 2. Grupos, células e unidade de comparação
@@ -112,6 +112,8 @@ A prévia revalida ofertas e reservas com HTML escapado, links HTTPS e sem scrip
 
 ## 5. Conteúdo, heros, seleção e rotação
 
+No desktop, ofertas 1 e 2 ficam lado a lado na primeira linha e a oferta 3 fica centralizada abaixo, com a mesma largura dos demais cards (2+1). Com duas ofertas, ambas ficam na primeira linha; com uma, ela fica centralizada. No mobile, a ordem é 1, 2, 3, uma abaixo da outra. São exibidas até três ofertas vigentes; inválidas/expiradas são descartadas e as reservas compactam as posições. Quatro cards permanecem evolução.
+
 O catálogo separa OFERTA, TEMA e HERO pelo TIPO na mesma BRIEFING. Tema e hero compõem o envelope; o POOL escolhe ofertas por grupo e rodada. A seleção não pertence a um CPF: clientes de uma mesma célula/grupo usam a mesma rodada, respeitando a regra SEG-B/GEN-A → GENERICO.
 
 VERSAO da seleção é BF26_V1_AAAAMMDD, uma rodada por data de Brasília no SQL. VERSAO_TEMA é BF26_V1. Na SAFRA, ID_VERSAO_OFERTAS guarda o tema da entrada; em APTOS, o campo guarda a rodada atual. O motor novo precisa resolver o tema pela seleção da rodada antes de buscar TEMA/HERO. Interpretar a rodada como versão do tema quebra essa consulta.
@@ -127,14 +129,14 @@ flowchart TD
   FA -->|GENERICO| GE["Ordem temporal geral<br/>Limite de duas marcas por categoria não implementado"]
   MIX & GE --> V["Até seis posições no POOL<br/>Principais e reservas · MOTIVO registrado"]
  end
- subgraph MOTOR["Motor de e-mail · adaptação ainda pendente"]
+ subgraph MOTOR["Motor de e-mail · fonte única; teste pontual recebido"]
   V --> VER["Rodada de APTOS → VERSAO_TEMA<br/>Selecionar grupo/célula da audiência"]
   VER --> HERO["B2C: V1 persona ou V2 cartão<br/>B2B2C: hero parceiro ou fallback V2"]
   VER --> VAL{"Oferta ainda ativa e vigente<br/>na renderização?"}
   VAL -->|Não| SKIP["Pular inválida e consultar reserva<br/>Compactar posições exibidas"]
   SKIP --> VAL
   VAL -->|Sim| CARD["Mostrar até três cards válidos<br/>Benefício, resgate, CTA e condições"]
-  HERO --> MAIL["Envelope + cards<br/>Desktop ímpar: primeiro centralizado<br/>Mobile: uma oferta abaixo da outra"]
+  HERO --> MAIL["Envelope + cards<br/>Desktop: ofertas 1 e 2 na primeira linha<br/>Oferta 3 centralizada abaixo · mesma largura<br/>Mobile: uma oferta abaixo da outra"]
   CARD --> MAIL
  end
 ```
@@ -229,7 +231,7 @@ flowchart TD
  CAT --> A
  F --> CHECK{"Operador conferiu fontes,<br/>alocação, rodada e APTOS?"}
  CHECK -->|Falha / alerta sem explicação| STOP["Não liberar envio<br/>Preservar evidência e diagnosticar"]
- CHECK -->|Consistente| READY["Audiência preparada<br/>Template/exportador adaptados e Test Send ainda necessários"]
+ CHECK -->|Consistente| READY["Audiência preparada<br/>Test Send pontual recebido<br/>Matriz de QA e deltas de canal pendentes"]
  READY -.-> FUT["Futuro: envio/segunda automação<br/>Depende de autorização e contrato de JobID"]
 ```
 
@@ -1844,9 +1846,15 @@ FROM (
 
 ## 11. Construção, testes e critérios de aceite
 
+:::details Test Send pontual recebido · 09/11/2026
+Em 09/11/2026, o operador confirmou que o e-mail dinâmico renderizou no SFMC e que o Test Send chegou corretamente à sua caixa. É um teste pontual relatado: não homologa todas as células, V2, clientes de e-mail/mobile, LP, WhatsApp/SMS ou envio em produção. O recebimento foi confirmado; não há incidente de entrega comprovado nesta evidência.
+
+A fonte final também recebeu correção local de largura/responsividade após o teste relatado. A conferência local de 1/2/3 ofertas em V1/V2 não equivale a um novo Test Send dessa correção.
+:::
+
 O bloco **Atividades: Construção do Piloto** reúne montagem, conferência de público, conteúdo, seedlist e homologação. Os registros são compartilhados com Testes e Tarefas.
 
-Os marcos concluídos permanecem no histórico. A etapa atual exige conferir a execução dos seis passos, a audiência dinâmica e o motor adaptado antes do Test Send.
+Os marcos concluídos permanecem no histórico. O Test Send pontual recebido em 09/11 é registrado na atividade de QA; ela permanece aberta para a matriz restante. Conferência dos seis passos, audiência dinâmica e demais aceites não são concluídos por esse teste.
 
 | Conferência | Resultado necessário | Evidência a guardar |
 |---|---|---|
@@ -1859,7 +1867,7 @@ Os marcos concluídos permanecem no histórico. A etapa atual exige conferir a e
 | APTOS dinâmica | Só safra selecionada/tratamentos; sai por inaptidão e volta sem re-sorteio; quem recebeu rodada anterior pode continuar | Cenários de limite, atraso, bloqueio, recência, _Subscribers e retorno |
 | Contrato do motor | Seleção unificada e distinção rodada/tema consumidas corretamente | Exportador/template adaptados e versão identificada |
 | Seedlist | V1/V2 nos quatro grupos; parceiro com/sem arte, nome/cartão ausentes, ofertas inválidas e reservas | Destinatários autorizados e capturas de Preview/Test Send |
-| Visual e navegação do e-mail | Primeiro card centralizado quando ímpar no desktop, cards empilhados no mobile, links/condições corretos | Clientes de e-mail testados e LP conferida, sem inferir entrega pelo preview |
+| Visual e navegação do e-mail | Desktop 2+1, terceira oferta com a mesma largura; mobile 1, 2, 3 empilhados, links/condições corretos | Clientes de e-mail testados e LP conferida, sem inferir entrega pelo preview |
 | Medição | SAFRA completa + JobID/rodada/toque e envios reais reconciliados | Contrato IN, chaves e cobertura; sem definir exposição pelo token de LP |
 
 Registrar o resultado e a data efetiva de cada validação na atividade correspondente.
@@ -1891,7 +1899,7 @@ Registrar o resultado e a data efetiva de cada validação na atividade correspo
 | Questão | Impacto | Evidência / próxima ação | Dono a confirmar |
 |---|---|---|---|
 | Primeira execução completa e FUNIL final | Impede declarar revisão homologada | Rodar seis passos sem envio e registrar resultados | Operador SFMC |
-| Fábrica/exportador/template no modelo unificado | Prévia antiga pode divergir do envio novo | Adaptar leitura POOL + VERSAO_TEMA e testar | Desenvolvimento + operador |
+| Importador/exportador e matriz do motor unificado | Test Send pontual não certifica todos os caminhos | Conferir paridade POOL + VERSAO_TEMA e demais cenários | Desenvolvimento + operador |
 | Nome comercial do cartão e múltiplos parceiros | Personalização incompleta/ambígua | Confirmar fonte e regra comercial, exercitar fallbacks | Produto/CRM/IN |
 | Imagens, links e vigência | Pode faltar o mínimo de três marcas | Conferir catálogo aceito no tenant e prioridades de criação | Ofertas/Criação/operador |
 | SFTP, frescor e conversão de todas as categorias | Reprocessar arquivo antigo pode parecer fonte atual | Cadência, responsável e referência de extração reais | IN |
@@ -1918,4 +1926,4 @@ Referências: [[Automacao-VDV-Pool-de-Ofertas]] · [[Rotacao-de-Ofertas-Vai-de-V
 
 Produção de peças de e-mail, WhatsApp e SMS confirmada. Canais sem sobreposição por rodada, controles sem contato nos três canais, app em 60 dias apenas para móveis e tetos por rodada de 5.000 WhatsApp/100.000 SMS. As seções de canais e LP detalham a aplicação.
 
-Permanecem em definição: pesos/cotas de canal, pressão por pessoa, orçamento e preço unitário, fonte das supressões móveis, assets da LP, vínculo JobID/rodada e primeira execução/Test Send da revisão. Histórico individual móvel existe, com investigação de localização/cobertura posterior; não é bloqueio do piloto.
+Permanecem em definição: pesos/cotas de canal, pressão por pessoa, orçamento e preço unitário, fonte das supressões móveis, assets da LP, vínculo JobID/rodada, execução completa e matriz de Test Send da revisão. Histórico individual móvel existe, com investigação de localização/cobertura posterior; não é bloqueio do piloto.

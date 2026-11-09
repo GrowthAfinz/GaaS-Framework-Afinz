@@ -10,6 +10,12 @@ fonte: operador; desenho a partir de [[Emails-Dinamicos-SFMC]] e do Bloco 3 do P
 
 # E-mail e LP dinâmicos do Pool Vai de Visa · revisão de 09/11
 
+## Evidência de Test Send e layout de 09/11
+
+Em 09/11/2026, o operador confirmou que o e-mail dinâmico renderizou no SFMC e que o Test Send chegou corretamente à sua caixa. É um teste pontual relatado: não homologa todas as células, V2, clientes de e-mail/mobile, LP, WhatsApp/SMS ou envio em produção. O recebimento foi confirmado; não há incidente de entrega comprovado nesta evidência.
+
+No desktop, ofertas 1 e 2 ficam lado a lado na primeira linha e a oferta 3 fica centralizada abaixo, com a mesma largura dos demais cards (2+1). Com duas ofertas, ambas ficam na primeira linha; com uma, ela fica centralizada. No mobile, a ordem é 1, 2, 3, uma abaixo da outra. São exibidas até três ofertas vigentes; inválidas/expiradas são descartadas e as reservas compactam as posições. Quatro cards permanecem evolução.
+
 ## 5. Conteúdo, heros, seleção e rotação
 
 O catálogo separa OFERTA, TEMA e HERO pelo TIPO na mesma BRIEFING. Tema e hero compõem o envelope; o POOL escolhe ofertas por grupo e rodada. A seleção não pertence a um CPF: clientes de uma mesma célula/grupo usam a mesma rodada, respeitando a regra SEG-B/GEN-A → GENERICO.
@@ -27,14 +33,14 @@ flowchart TD
   FA -->|GENERICO| GE["Ordem temporal geral<br/>Limite de duas marcas por categoria não implementado"]
   MIX & GE --> V["Até seis posições no POOL<br/>Principais e reservas · MOTIVO registrado"]
  end
- subgraph MOTOR["Motor de e-mail · adaptação ainda pendente"]
+ subgraph MOTOR["Motor de e-mail · fonte única; teste pontual recebido"]
   V --> VER["Rodada de APTOS → VERSAO_TEMA<br/>Selecionar grupo/célula da audiência"]
   VER --> HERO["B2C: V1 persona ou V2 cartão<br/>B2B2C: hero parceiro ou fallback V2"]
   VER --> VAL{"Oferta ainda ativa e vigente<br/>na renderização?"}
   VAL -->|Não| SKIP["Pular inválida e consultar reserva<br/>Compactar posições exibidas"]
   SKIP --> VAL
   VAL -->|Sim| CARD["Mostrar até três cards válidos<br/>Benefício, resgate, CTA e condições"]
-  HERO --> MAIL["Envelope + cards<br/>Desktop ímpar: primeiro centralizado<br/>Mobile: uma oferta abaixo da outra"]
+  HERO --> MAIL["Envelope + cards<br/>Desktop: ofertas 1 e 2 na primeira linha<br/>Oferta 3 centralizada abaixo · mesma largura<br/>Mobile: uma oferta abaixo da outra"]
   CARD --> MAIL
  end
 ```
@@ -62,7 +68,7 @@ O limite ≥ R$ 200 é da base; o contrato atual não contém limite mínimo por
 
 ## Contrato de implementação do motor
 
-O modelo atual do GaaS ainda exporta MOVIMENTO com seis colunas em vaiDeVisa.ts e vaiDeVisaService.ts. Não há suporte confirmado ao POOL unificado. A adaptação deve receber rodada de APTOS, resolver o tema no POOL, filtrar seleção, conferir catálogo vigente e compactar até três cards válidos a partir das seis candidatas. Preservar consulta compartilhada de tema/heros, exclusão de controles, fallback e condições, sem afirmar que este documento alterou AMPscript ou exportador.
+A fonte única de AMPscript recebe VERSAO_EMAIL opcional (vazio usa V1) e ID_VERSAO_OFERTAS da rodada; resolve VERSAO_TEMA em VDV_POOL_OFERTAS_GRUPO_POSICAO antes de consultar BRIEFING_OFERTAS_VISA. O fallback da Fábrica usa essa fonte. As fixtures históricas V5 e slots V1/V2 são preservados. O importador/exportador legado de MOVIMENTO com seis colunas ainda exige conferência de paridade com o POOL de nove campos: o teste recebido não certifica esse caminho. Tracking, links e condições legais são mantidos.
 
 ID_ENVIO continua um token estável para a LP, não JobID nem identificador do send. Confirmar como a LP receberá/identificará rodada e toque para não confundir consultas posteriores à mesma participação. Não colocar CPF aberto no link. Matriz de Test Send e demais aceites: [[Estrategia-Pool-de-Ofertas-Visa]].
 
