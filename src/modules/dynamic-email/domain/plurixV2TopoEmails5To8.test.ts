@@ -35,4 +35,12 @@ describe('Plurix V2 marketing briefings 5-8', () => {
     }
     expect(payload.emails[3].patch.ASSUNTO).not.toMatch(/ÚLTIMA CHANCE/);
   });
+
+  it('keeps the four application steps out of the headline', () => {
+    const email = payload.emails.find(e => e.number === 7)!;
+    expect(email.patch.TITULO_COPY_2).toBe('Veja como solicitar');
+    expect(email.secondBlock[0].type).toBe('steps');
+    expect(email.secondBlock[0].items).toHaveLength(4);
+    expect(email.patch.COPY_2_PRETO).toContain('Se aprovado, comece usando o cartão virtual disponibilizado no app.');
+  });
 });

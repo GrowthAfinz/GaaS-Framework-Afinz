@@ -10,7 +10,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from content_blocks import lead, check_list, closing
+from content_blocks import lead, check_list, closing, steps
 
 ROOT = Path(__file__).resolve().parents[2]
 SQL_PATH = ROOT / 'supabase/migrations/20261109190000_plurix_v2_topo_emails_5_8.sql'
@@ -49,6 +49,18 @@ def compile_source(source):
         blocks = [{'type': 'lead', 'text': intro}, {'type': 'check_list', 'items': items},
                   {'type': 'closing', 'text': clean(value('COPY_2_PRETO', number))}]
         patch['COPY_2_PRETO'] = lead(intro) + check_list(items) + closing(blocks[-1]['text'])
+        if number == 7:
+            title_lines = patch['TITULO_COPY_2'].split('<br>')
+            step_items = [{'title': re.sub(r'^\d\ufe0f?\u20e3\s*', '', line), 'text': ''}
+                          for line in title_lines[1:]]
+            assert len(step_items) == 4
+            patch['TITULO_COPY_2'] = title_lines[0].rstrip(':')
+            # Keep all the marketing text within the DE's 4000-character limit.
+            benefits_text = intro + '<br>' + '<br>'.join(items)
+            blocks = [{'type': 'steps', 'items': step_items},
+                      {'type': 'lead', 'text': benefits_text}, blocks[-1]]
+            patch['COPY_2_PRETO'] = (steps([(item['title'], item['text']) for item in step_items])
+                                    + lead(benefits_text) + closing(blocks[-1]['text']))
         assert all(len(v) <= 4000 and '\n' not in v for v in patch.values())
         emails.append({'number': number, 'week': (number + 1) // 2,
                        'day': 1 if number % 2 else 2, 'patch': patch, 'secondBlock': blocks})

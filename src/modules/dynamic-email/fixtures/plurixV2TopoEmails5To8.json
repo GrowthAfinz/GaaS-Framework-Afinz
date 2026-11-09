@@ -87,7 +87,7 @@
         "ASSUNTO": "Peça seu cartão +amigo pelo app é rápido e fácil!",
         "PRE_CABECALHO": "Aproveite e tenha acesso a descontos, benefícios e mais praticidade.",
         "COPY_1_PRETO": "Quer aproveitar descontos extras no supermercado, ter mais prazo para pagar e contar com benefícios para o dia a dia?<br>Com o cartão +amigo Afinz Visa você tem tudo isso! Acesse o app e peça o seu agora mesmo, é simples e rápido!",
-        "TITULO_COPY_2": "Veja como solicitar:<br>1️⃣ Acesse o app +amigo.<br>2️⃣ Preencha os dados solicitados.<br>3️⃣ Aguarde a análise de crédito.<br>4️⃣ Se aprovado, comece usando o cartão virtual disponibilizado no app.",
+        "TITULO_COPY_2": "Veja como solicitar",
         "HEADER": "",
         "HEADER_TITULO": "Seu cartão, suas vantagens!",
         "HEADER_SUBTITULO": "Peça o cartão +amigo pelo app e aproveite",
@@ -95,21 +95,33 @@
         "TITULO_COPY_1_AZUL": "Olá, %%=v(@FirstName)=%%!",
         "BANNER_1_CORPO": "",
         "BANNER_2_CORPO": "",
-        "COPY_2_PRETO": "<p style=\"margin:0 0 14px 0;text-align:center;\">Ao pedir seu cartão, você começa a aproveitar:</p><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin:0 auto;\"><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:6px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">&#10003;</div></td><td valign=\"middle\" style=\"padding:6px 0;text-align:left;font-size:15px;line-height:1.45;color:#242424;\">+5% de desconto extra em produtos selecionados.</td></tr><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:6px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">&#10003;</div></td><td valign=\"middle\" style=\"padding:6px 0;text-align:left;font-size:15px;line-height:1.45;color:#242424;\">Até 40 dias para pagar suas compras.</td></tr><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:6px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">&#10003;</div></td><td valign=\"middle\" style=\"padding:6px 0;text-align:left;font-size:15px;line-height:1.45;color:#242424;\">Até 70% de desconto em saúde em consultas, exames e medicamentos pelo Você Bem.</td></tr><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:6px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">&#10003;</div></td><td valign=\"middle\" style=\"padding:6px 0;text-align:left;font-size:15px;line-height:1.45;color:#242424;\">Aceitação Visa em estabelecimentos no Brasil e no exterior que aceitam a bandeira.</td></tr></table><p style=\"margin:16px 0 0 0;text-align:center;font-weight:700;color:#2C3490;\">Não deixe para depois: dê o próximo passo para aproveitar todas essas vantagens!</p>"
+        "COPY_2_PRETO": "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin:0 auto;\"><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:8px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">1</div></td><td valign=\"top\" style=\"padding:8px 0;text-align:left;\"><p style=\"margin:4px 0 2px 0;font-size:15px;font-weight:700;color:#2C3490;\">Acesse o app +amigo.</p><p style=\"margin:0;font-size:13px;line-height:1.45;color:#4A4F6A;\"></p></td></tr><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:8px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">2</div></td><td valign=\"top\" style=\"padding:8px 0;text-align:left;\"><p style=\"margin:4px 0 2px 0;font-size:15px;font-weight:700;color:#2C3490;\">Preencha os dados solicitados.</p><p style=\"margin:0;font-size:13px;line-height:1.45;color:#4A4F6A;\"></p></td></tr><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:8px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">3</div></td><td valign=\"top\" style=\"padding:8px 0;text-align:left;\"><p style=\"margin:4px 0 2px 0;font-size:15px;font-weight:700;color:#2C3490;\">Aguarde a análise de crédito.</p><p style=\"margin:0;font-size:13px;line-height:1.45;color:#4A4F6A;\"></p></td></tr><tr><td width=\"38\" valign=\"top\" style=\"width:38px;padding:8px 0;\"><div style=\"width:30px;height:30px;line-height:30px;border-radius:15px;background-color:#E7A921;color:#2C3490;font-size:14px;font-weight:700;text-align:center;\">4</div></td><td valign=\"top\" style=\"padding:8px 0;text-align:left;\"><p style=\"margin:4px 0 2px 0;font-size:15px;font-weight:700;color:#2C3490;\">Se aprovado, comece usando o cartão virtual disponibilizado no app.</p><p style=\"margin:0;font-size:13px;line-height:1.45;color:#4A4F6A;\"></p></td></tr></table><p style=\"margin:0 0 14px 0;text-align:center;\">Ao pedir seu cartão, você começa a aproveitar:<br>+5% de desconto extra em produtos selecionados.<br>Até 40 dias para pagar suas compras.<br>Até 70% de desconto em saúde em consultas, exames e medicamentos pelo Você Bem.<br>Aceitação Visa em estabelecimentos no Brasil e no exterior que aceitam a bandeira.</p><p style=\"margin:16px 0 0 0;text-align:center;font-weight:700;color:#2C3490;\">Não deixe para depois: dê o próximo passo para aproveitar todas essas vantagens!</p>"
       },
       "secondBlock": [
         {
-          "type": "lead",
-          "text": "Ao pedir seu cartão, você começa a aproveitar:"
+          "type": "steps",
+          "items": [
+            {
+              "title": "Acesse o app +amigo.",
+              "text": ""
+            },
+            {
+              "title": "Preencha os dados solicitados.",
+              "text": ""
+            },
+            {
+              "title": "Aguarde a análise de crédito.",
+              "text": ""
+            },
+            {
+              "title": "Se aprovado, comece usando o cartão virtual disponibilizado no app.",
+              "text": ""
+            }
+          ]
         },
         {
-          "type": "check_list",
-          "items": [
-            "+5% de desconto extra em produtos selecionados.",
-            "Até 40 dias para pagar suas compras.",
-            "Até 70% de desconto em saúde em consultas, exames e medicamentos pelo Você Bem.",
-            "Aceitação Visa em estabelecimentos no Brasil e no exterior que aceitam a bandeira."
-          ]
+          "type": "lead",
+          "text": "Ao pedir seu cartão, você começa a aproveitar:<br>+5% de desconto extra em produtos selecionados.<br>Até 40 dias para pagar suas compras.<br>Até 70% de desconto em saúde em consultas, exames e medicamentos pelo Você Bem.<br>Aceitação Visa em estabelecimentos no Brasil e no exterior que aceitam a bandeira."
         },
         {
           "type": "closing",
