@@ -11,6 +11,7 @@ import {
 } from "../domain/vaiDeVisa";
 import { poolGroups, poolGroupLabel } from "../domain/poolCreation";
 import { PoolAudienceControls } from "./PoolAudienceControls";
+import { PoolLandingPreview } from './PoolLandingPreview';
 const input =
   "mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400";
 const btn =
@@ -232,6 +233,7 @@ export function PoolEmailEditor({
         today={today}
         onDate={onDate}
       />
+      <PoolLandingPreview data={data} sample={sample} today={today} version={ctx.contentVersion}/>
       {!theme && (
         <p role="alert" className="text-xs text-red-700">
           Tema ativo não encontrado. Importe o conteúdo da campanha.

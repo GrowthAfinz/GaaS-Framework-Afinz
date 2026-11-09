@@ -6,11 +6,12 @@ describe('strategy pilot document',()=>{
   const content=readFileSync(new URL('../../../../docs/wiki-vault/05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md',import.meta.url),'utf8');
   const doc=initialStrategy({title:'Estratégia Pool de Ofertas Visa',content_markdown:content,relative_path:'05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md'});
   const exported=exportStrategy(doc);
-  expect(doc.blocks[0].type).toBe('tasks');expect(doc.blocks.filter(b=>b.type==='markdown')).toHaveLength(10);
+  expect(doc.blocks[0].type).toBe('tasks');expect(doc.blocks.filter(b=>b.type==='markdown')).toHaveLength(13);
   expect(exported.match(/```mermaid/g)).toHaveLength(3);
   expect(exported.match(/```sql/g)?.length).toBe(content.match(/```sql/g)?.length);
   expect(exported).toContain(':::details');expect(exported).toContain('[[DE-VDV_APTOS]]');
-  expect(exported).not.toContain('tags: [');expect(exported).toContain('SQL não testado');
+  expect(exported).not.toContain('tags: [');expect(exported).toContain('ULTIMO_ACESSO');
+  expect(exported).toContain('ID_POLITICA_CANAL');expect(exported).toContain('aplicação manual no SFMC pendente');
  });
  it('does not split headings inside code fences and keeps block IDs stable when moving',()=>{
   const doc=initialStrategy({title:'Teste',content_markdown:'# Teste\n\nResumo\n\n## A\n```sql\n## literal\n```\n## B\nTexto'});

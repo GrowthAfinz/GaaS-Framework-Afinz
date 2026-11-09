@@ -1,7 +1,7 @@
 {
   "vault_key": "afinz-crm-midia",
-  "date": "2026-11-07",
-  "note_count": 508,
+  "date": "2026-11-09",
+  "note_count": 513,
   "notes": [
     {
       "relative_path": "00-Indice/Changelog-do-Vault.md",
@@ -177,15 +177,15 @@
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-BRIEFING_OFERTAS_VISA.md",
-      "content_hash": "5f6d65fcf5e489ad3658b1c7dff1b19e61401e068494a0f634ad5dc31c58b366"
+      "content_hash": "8130ba8ccf9ea35c94515840157475f4bfda3dbd467b36a7412e54ffa9d076d5"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-CLIENTES_ATIVOS.md",
-      "content_hash": "7c75a8fc7cea565f1b5aa1165dba826b2a33d0815fd70a1d80f24d9778141f43"
+      "content_hash": "cb2639aa7ff204280012332d86b8f0354e2cf77c5113ed2215e380179a68101b"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-MAPA_MCC.md",
-      "content_hash": "d5adbacd3afd2a9fd3cb34f7bc8f7999e5a258b8ec3243d3c2d3566312d5cad7"
+      "content_hash": "1fb75b35d52e577820561f8b7c8c5fd1b5932dd7fb4425665b08824fc6028193"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-MAPA_SEGUROS.md",
@@ -193,23 +193,23 @@
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_APTOS.md",
-      "content_hash": "81eddeb411cfe94a3de01d3ba343c62d9a3443f5de155417fbfb4a07eb3b4f5e"
+      "content_hash": "8b113c04bf97b409102b392d468da1ce40ac0d62decc148cee482e282e1f3500"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_CRUZAMENTO.md",
-      "content_hash": "37b087bfbf2abfca5ddcb309d0ddc51291ba4f9a95a100f6058abc1b01026230"
+      "content_hash": "fe537831ffc8555b0c68fd33634e6279622a53fc0088135e9d9733548b7014ae"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_ENVIO.md",
-      "content_hash": "6299f035335b3342370ce260977fa3f45055f3793bef861d340ccc2918cc466f"
+      "content_hash": "88385719d5d92aa1ebe11b7ec367c42b8ce72bae46bd8c8ffb7927bdd2a2556a"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_FUNIL.md",
-      "content_hash": "8d0a918a0f9921344d31827d5e13bef7b2cf1f7f281d99898ff84ec320ce94d7"
+      "content_hash": "c7380a8fdff152cef18baf75aad070e048e01c1ed0a90b6c7cad5bab3d9caa49"
     },
     {
       "relative_path": "02-Entidades-Dados/SFMC/MOC-SFMC-DEs-e-Automations.md",
-      "content_hash": "adf29ec3fd7fa4c90e0cd60dfb43747ec29e52bffa7a3375588bdc9be27e9a5f"
+      "content_hash": "d00e827fb5772372b6c81891cfe8c4ebbad90be0db793bdf6b44484b523af21f"
     },
     {
       "relative_path": "02-Entidades-Dados/Supabase-Schema.md",
@@ -349,7 +349,7 @@
     },
     {
       "relative_path": "04-Operacao/Automacao-VDV-Pool-de-Ofertas.md",
-      "content_hash": "cfb3d2207de09541d9c470d94a04590cb79d420db97996667f2393201209b5c5"
+      "content_hash": "d2ab13efb3a7245e95f4bc17c38ca9d3ebb414aecd1ec5b8b2a196958c2bb586"
     },
     {
       "relative_path": "04-Operacao/Comunicacoes-Pacote-SFMC-Catalogo.md",
@@ -369,7 +369,7 @@
     },
     {
       "relative_path": "04-Operacao/Emails-Dinamicos-Vai-de-Visa.md",
-      "content_hash": "91195d9609cd9766acc787a2b7761c12a58e664055562e93fd9581a4190cdf87"
+      "content_hash": "43093af4faa88cc45b359be3ec2203e9f2dcc225a40fd6cab79c4ef3a10e3fd7"
     },
     {
       "relative_path": "04-Operacao/Fabrica-de-Emails-GaaS.md",
@@ -441,7 +441,7 @@
     },
     {
       "relative_path": "05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md",
-      "content_hash": "e20605e5c1ff3ea54baf43755d2496bbe778d4e5cb4d0cb5fd7bdb95f6437e71"
+      "content_hash": "5e8fa7236ba239fbcdf20fad3d5f468d1153afc168ba5e2b26f340171bf5c0d3"
     },
     {
       "relative_path": "05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md",
@@ -501,7 +501,7 @@
     },
     {
       "relative_path": "05-Estrategia/Teste-Afinidade-MCC-vs-Generico.md",
-      "content_hash": "4cf45cc7fed4715a5bae6cd93695735fa7fee2f0c2809e44b2fc9e48624c75b0"
+      "content_hash": "73ca158b5324cd9344461caa8c8e50a487f003cc3f8f9c918deb8063ac8e30fc"
     },
     {
       "relative_path": "06-Performance/CAC-por-Canal.md",
@@ -1221,11 +1221,11 @@
     },
     {
       "relative_path": "07-Evolucao/Decisões-Abertas.md",
-      "content_hash": "fc76e8453ba7db6f417d2e34e48558b4d4bfae68c6265a776b816f5b6d5f8d88"
+      "content_hash": "a390fc8b7a99b6d8115e039dba8f88c7cf3b941269105f74b024a880c2fd428e"
     },
     {
       "relative_path": "07-Evolucao/Decisões-Tomadas.md",
-      "content_hash": "f9e15d761ed73829563c28da534db20d9e45b211e38532311d303cafd9534456"
+      "content_hash": "8046e5a74efd9d97f06bdcb98b70068721e0473b63164f1d21cfcfa517cec8f8"
     },
     {
       "relative_path": "07-Evolucao/Evolucao-Cronologica-GaaS-2026-10.md",
@@ -1745,7 +1745,7 @@
     },
     {
       "relative_path": "10-Resultados/Iniciativas/Iniciativa-Pool-de-Ofertas-Vai-de-Visa.md",
-      "content_hash": "0b73a960c1b6ebf4523cfb848831a5dde16974f58878b95e81ff43a742d5131f"
+      "content_hash": "07b2e2e290bcfc59a7ee37ba6cc59cbeadaa79950694c70aea077de5e16f7f18"
     },
     {
       "relative_path": "10-Resultados/Mecanicas/Ativacao-e-Boas-Vindas.md",
@@ -2034,6 +2034,26 @@
     {
       "relative_path": "09-Inteligencia-IA/Skills/Skill-gaas-estrategias-implementaveis.md",
       "content_hash": "0a26b602c2d9b49f4de72dd602a2582770cc8941a797841441e98b3248ba8246"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-MOVIMENTO_OFERTAS_VISA.md",
+      "content_hash": "b92cf3a4b82da01673bdb7b389291b63961915c0881667080a59ea287cfd294e"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_DISPARO.md",
+      "content_hash": "76870a11c28f0073137f624b486f40848e108654248176657fcce766f41b86e4"
+    },
+    {
+      "relative_path": "02-Entidades-Dados/SFMC/DE-VDV_VITRINE_HISTORICO.md",
+      "content_hash": "9944405d236835af8594491d169ab6519d0f3c62ca66d1be69a6153cef8b5979"
+    },
+    {
+      "relative_path": "05-Estrategia/Rotacao-de-Ofertas-Vai-de-Visa.md",
+      "content_hash": "34a4b4aba9f3e902b70a9093cdbc5ee05a30a3fadf4bc655036e0d3e8f61ec31"
+    },
+    {
+      "relative_path": "04-Operacao/Plano-de-Comunicacao-Pool-Vai-de-Visa.md",
+      "content_hash": "a00f8d9666dad639af13398ccf0e05f49992ea0a99cce8494a75582bc9795879"
     }
   ]
 }
