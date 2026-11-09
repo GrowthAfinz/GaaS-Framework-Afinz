@@ -117,6 +117,10 @@
 .strategy-subjects>p{width:100%;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#53626d;margin-bottom:4px}
 .strategy-subjects button{min-height:40px;padding:7px 12px;font-size:13px;border:1px solid #d7dfe2;background:white;color:#006c70}
 .strategy-subjects button:hover{background:#edf6f4}
+.strategy-subjects>p.strategy-search-group{margin:6px 0 0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#53626d}
+.strategy-subjects[aria-label="Resultados de busca da Wiki"] button{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
+.strategy-subjects button small{font-size:11px;color:#6b7a84}
+.strategy-index-grid button small.strategy-index-date{display:block;margin-top:2px;color:#6b7a84}
 .strategy-index-page{background:#fff;padding:32px;color:#18212a}
 .strategy-eyebrow{font-size:12px;color:#007c80;letter-spacing:.04em}
 .strategy-index-page h1{font-size:32px;font-weight:700;margin:8px 0 12px}
