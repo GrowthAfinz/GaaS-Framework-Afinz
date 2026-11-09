@@ -311,7 +311,7 @@ describe("Contrato complementar VDV", () => {
   it("vars contém exatamente o contrato, inclusive slot 4 vazio", () => {
     const p = resolve();
     const names =
-      "VersaoEmail Versao GrupoVitrine NmTema Assunto PreHeader SaudacaoFinal Intro NomeCartao CtaCard TitCond RodCond LinkMaisOfertas CorFundo CorTexto CorTitulo CorTema Hero AltHero LinkHero N".split(
+      "VersaoEmail Versao GrupoVitrine NmTema Assunto PreHeader SaudacaoFinal Intro NomeCartao CtaCard TitCond RodCond LinkMaisOfertas AvisoLegal CorFundo CorTexto CorTitulo CorTema Hero AltHero LinkHero N".split(
         " ",
       );
     for (let k = 1; k <= 4; k++)

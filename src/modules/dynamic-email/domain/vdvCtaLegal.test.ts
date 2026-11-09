@@ -27,9 +27,9 @@ describe('Pool CTA adicional e aviso por marca', () => {
     expect(rendered.diagnostics).toEqual([]);
     expect(rendered.html).not.toContain('VDV_VER_MAIS_OFERTAS');
   });
-  it('preserves all existing brand conditions and appends the exact approved notice once', () => {
-    const old=parseVdvBriefingCsv(VDV_BRIEFING_CSV);
-    expect(patch.offers).toHaveLength(66);
-    for(const offer of patch.offers){expect(offer.CONDICOES).toContain(old.find(r=>r.ID===offer.ID)!.CONDICOES);expect(offer.CONDICOES.match(/As ofertas, descontos, benefícios/g)).toHaveLength(1);}
+  it('keeps the notice in the theme within the existing 500 character contract', () => {
+    expect(patch.offers).toEqual([]);
+    expect(patch.theme.CONDICOES.length).toBeLessThanOrEqual(500);
+    expect(patch.theme.CONDICOES).toBe('As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável.');
   });
 });

@@ -16,10 +16,9 @@ rows = baseline['briefing']
 changed = []
 for row in rows:
     before = dict(row)
-    if row['tipo'] == 'OFERTA' and legal not in (row['condicoes'] or ''):
-        row['condicoes'] = ((row['condicoes'] or '').rstrip() + '<br><br>' if row['condicoes'] else '') + legal
     if row['id'] == 'TEMA_BF26_V1':
         row['link'] = url
+        row['condicoes'] = legal
         row['assunto'] = 'Black Afinz: confira as ofertas do seu {CARTAO} 💳💙'
         row['preheader'] = 'Ofertas selecionadas para você e mais benefícios no site da Visa. Confira!'
         # Empty V2 overrides continue inheriting the shared envelope.
@@ -29,7 +28,7 @@ for row in rows:
 source = baseline['slot']['source'].replace('\r\n','\n')
 anchor = 'SET @TitCond'
 offset = source.index(anchor)
-source = source[:offset]+'SET @LinkMaisOfertas = Trim(Field(@T, "LINK"))\n'+source[offset:]
+source = source[:offset]+'SET @LinkMaisOfertas = Trim(Field(@T, "LINK"))\nSET @AvisoLegal = Field(@T, "CONDICOES")\n'+source[offset:]
 anchor = '<!-- CONDIÇÕES -->'
 assert source.count(anchor)==1
 cta = '''<!-- MAIS OFERTAS: LINK do registro TEMA; não altera links das marcas -->
@@ -39,6 +38,11 @@ cta = '''<!-- MAIS OFERTAS: LINK do registro TEMA; não altera links das marcas 
 %%[ ENDIF ]%%
 '''
 source = source.replace(anchor,cta+anchor)
+for slot in (1,2,3):
+    needle = f'%%=v(@S{slot}Nota)=%%<br>%%[ ENDIF ]%%%%[ ENDIF ]%%'
+    replacement = f'%%=v(@S{slot}Nota)=%%<br>%%[ ENDIF ]%%%%[ IF NOT Empty(@AvisoLegal) THEN ]%%<div style="margin-top:8px;margin-bottom:12px;">%%=v(@AvisoLegal)=%%</div>%%[ ENDIF ]%%%%[ ENDIF ]%%'
+    assert source.count(needle)==1
+    source=source.replace(needle,replacement)
 assert source.count('VDV_VER_MAIS_OFERTAS')==1
 assert source.count('%%[')==source.count(']%%')
 stack=[]
