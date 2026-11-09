@@ -59,6 +59,9 @@ const SECTIONS = GROWTH_LEARNING_SECTIONS.map((id) => ({
   ...SECTION_META[id],
 }));
 
+/** Apostas, Outcomes e Registros trazem o próprio cabeçalho, no desenho das Estratégias da Wiki. */
+const LEDGER_SECTIONS = new Set<GrowthLearningSection>(["bets", "outcomes", "memory"]);
+
 export const GrowthLearningWorkspace: React.FC<
   GrowthLearningWorkspaceProps
 > = ({ periodStart: initialStart, periodEnd: initialEnd }) => {
@@ -164,7 +167,7 @@ export const GrowthLearningWorkspace: React.FC<
           </nav>
         </header>
 
-        {section !== "vault" && section !== "investigations" && section !== "corrections" && (
+        {!LEDGER_SECTIONS.has(section) && section !== "vault" && section !== "investigations" && section !== "corrections" && (
           <div className="!mt-0 flex flex-wrap items-center justify-between gap-3 rounded-b-xl border border-t-0 border-slate-200 bg-white px-4 py-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
