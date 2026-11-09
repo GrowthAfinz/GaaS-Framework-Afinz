@@ -102,10 +102,10 @@ export function createWikiMap(
   const scene = graph.scene();
   const camera = graph.camera() as THREE.PerspectiveCamera;
   const controls = graph.controls() as OrbitControls;
-  graph.renderer().setPixelRatio(Math.min(devicePixelRatio, 2));
+  graph.renderer().setPixelRatio(Math.min(devicePixelRatio, 1.5));
   graph.width(W).height(H);
 
-  const GEO = { sphere: new THREE.SphereGeometry(1, 32, 22), gem: new THREE.IcosahedronGeometry(1, 0), oct: new THREE.OctahedronGeometry(1, 0), shell: new THREE.SphereGeometry(1, 40, 28) };
+  const GEO = { sphere: new THREE.SphereGeometry(1, 20, 14), gem: new THREE.IcosahedronGeometry(1, 0), oct: new THREE.OctahedronGeometry(1, 0), shell: new THREE.SphereGeometry(1, 24, 16) };
   const shelled = (n: MapNode) => n.type === "topic" || n.featured;
   const rimMaterial = (color: string) => new THREE.ShaderMaterial({
     uniforms: { color: { value: new THREE.Color(color) }, opacity: { value: 0 } },
@@ -288,30 +288,55 @@ export function createWikiMap(
   }
 
   // ---------------------------------------------------------------- labels
-  // Every visible note gets a name tag; each frame the tags are placed in priority
-  // order and a tag that would overlap one already placed stays hidden, so the
-  // screen shows as many names as fit. Zooming in spreads the bubbles apart and
-  // more names fit. Among plain notes, the most cited ones win the space.
-  type LabelEl = HTMLDivElement & { _n: EngineNode; _w: number; _h: number; _p: number; _o: string; _t: string; _v: string; _z: string; _html: string };
+  // Names are budgeted so the map stays fluid. Always named: subjects, featured
+  // notes, the selection and the hovered note. On top of that, up to NAME_BUDGET
+  // notes that are on screen right now, most cited first; the pick is redone when
+  // the camera stops, so zooming in reveals the names of what is close. While the
+  // camera moves, only the fixed names follow it. Overlapping tags stay hidden.
+  const NAME_BUDGET = 40, FOCUS_BUDGET = 40, SETTLE_MS = 220;
+  type LabelEl = HTMLDivElement & { _n: EngineNode; _w: number; _h: number; _p: number; _o: string; _t: string; _v: string; _z: string; _html: string; _on: boolean };
   const labels = new Map<string, LabelEl>();
   const dirty: LabelEl[] = [];
   let ordered: LabelEl[] = [];
+  let moving = false, settleTimer = 0;
   const prio = (n: EngineNode) =>
     n === S.sel ? 9 : n === S.preview ? 8
       : (n.type === "topic" ? 5 : n.featured ? 4 : 2 + Math.min(0.9, Math.log1p(n.incoming) / 6)) + (S.focus && S.focus.has(n.id) ? 2 : 0);
+  function onScreenNotes() {
+    const out: EngineNode[] = [];
+    for (const n of nodes) {
+      if (n.type !== "note" || n.featured || !visible(n) || n.x === undefined || n._ot <= 0.05) continue;
+      const p = project(n);
+      if (p.front && p.x > 0 && p.x < W && p.y > 0 && p.y < H) out.push(n);
+    }
+    return out.sort((a, b) => b.incoming - a.incoming).slice(0, NAME_BUDGET);
+  }
   function labelSet() {
     const want = new Set<EngineNode>();
     for (const n of nodes) if (visible(n) && (n.type === "topic" || (detailed && n.featured))) want.add(n);
     // with a note selected, only its neighbourhood is in full colour, so only it gets names
-    if (S.focus) [...S.focus].map((id) => byId.get(id)!).sort((a, b) => b.val - a.val).slice(0, detailed ? Infinity : 24).forEach((n) => want.add(n));
-    else if (detailed) for (const n of nodes) if (n.type === "note" && visible(n)) want.add(n);
+    if (S.focus) [...S.focus].map((id) => byId.get(id)!).sort((a, b) => b.val - a.val).slice(0, detailed ? FOCUS_BUDGET : 24).forEach((n) => want.add(n));
+    else if (detailed && !moving) onScreenNotes().forEach((n) => want.add(n));
+    if (S.sel) want.add(S.sel);
     if (S.preview && visible(S.preview)) want.add(S.preview);
     return want;
+  }
+  // camera moving: drop the extra names now, pick them again once it settles
+  function markMoving() {
+    if (!moving) { moving = true; if (!S.focus) refreshLabels(); }
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => { moving = false; if (!disposed) refreshLabels(); }, SETTLE_MS);
   }
   const labelClass = (n: EngineNode) => (n.type === "topic" ? "topic" : n.featured ? "section" : n.shape === "oct" ? "tool" : n.shape === "gem" ? "term" : "page");
   function refreshLabels() {
     const want = labelSet();
-    for (const [id, el] of labels) if (!want.has(byId.get(id)!)) { el.remove(); labels.delete(id); }
+    // tags leave the layout (display: none) but are kept, so coming back costs no re-measure
+    for (const el of labels.values()) {
+      const on = want.has(el._n);
+      if (el._on === on) continue;
+      el._on = on; el.style.display = on ? "" : "none";
+      if (!on) { el.style.visibility = el._v = "hidden"; el.style.opacity = el._o = "0"; }
+    }
     for (const n of want) {
       let el = labels.get(n.id);
       if (!el) {
@@ -319,7 +344,7 @@ export function createWikiMap(
         el.className = `wm-lb wm-lb--${labelClass(n)}`;
         el.style.setProperty("--dot", cssDot(n));
         el.dataset.id = n.id; el.style.opacity = "0"; el.style.visibility = "hidden";
-        el._o = "0"; el._t = el._v = el._z = el._html = "";
+        el._o = "0"; el._t = el._v = el._z = el._html = ""; el._on = true;
         labelBox.appendChild(el); labels.set(n.id, el); el._n = n;
       }
       const html = (n === S.sel ? "1" : "0") + (n.type === "topic" ? `<b>${esc(n.code)}</b>${esc(n.label)}` : esc(clip(n.label, n === S.sel ? 64 : 40)));
@@ -332,7 +357,7 @@ export function createWikiMap(
     }
     // measure only the tags whose text or style changed (one layout pass, not hundreds)
     for (const el of dirty.splice(0)) { el._w = el.offsetWidth; el._h = el.offsetHeight; }
-    ordered = [...labels.values()].sort((a, b) => b._p - a._p);
+    ordered = [...labels.values()].filter((el) => el._on).sort((a, b) => b._p - a._p);
   }
   const onLabelClick = (e: MouseEvent) => { const el = (e.target as HTMLElement).closest<HTMLElement>(".wm-lb"); if (el) callbacks.onPick(el.dataset.id!); };
   const onLabelOver = (e: MouseEvent) => { const el = (e.target as HTMLElement).closest<HTMLElement>(".wm-lb"); if (el) setPreview(byId.get(el.dataset.id!) || null); };
@@ -424,6 +449,7 @@ export function createWikiMap(
     controls.autoRotate = false;
   }
   function stepFlight(now: number) {
+    if (flight) markMoving();
     if (!flight) return;
     const f = flight, k = clamp((now - f.t0) / f.ms, 0, 1), e = ease(k);
     if (f.live) { const d = f.live(); if (isFinite(d)) f.to.radius = d; }
@@ -456,6 +482,7 @@ export function createWikiMap(
   const onEnd = () => { window.clearTimeout(spinTimer); spinTimer = window.setTimeout(resumeSpin, 5000); };
   controls.addEventListener("start", onStart);
   controls.addEventListener("end", onEnd);
+  controls.addEventListener("change", markMoving);
 
   // GaaS applies CSS zoom to the page. The renderer reads the pointer as
   // pageX - container offset (viewport pixels) but lays out in CSS pixels, so
@@ -584,6 +611,8 @@ export function createWikiMap(
       labelBox.removeEventListener("mouseout", onLabelOut);
       controls.removeEventListener("start", onStart);
       controls.removeEventListener("end", onEnd);
+      controls.removeEventListener("change", markMoving);
+      window.clearTimeout(settleTimer);
       labels.forEach((el) => el.remove());
       graph._destructor();
       stage.innerHTML = "";

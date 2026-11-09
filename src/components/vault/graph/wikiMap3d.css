@@ -126,7 +126,8 @@
   color: var(--m-soft);
   padding: 2px 5px;
   border-radius: 3px;
-  text-shadow: 0 0 3px var(--m-paper), 0 0 6px var(--m-paper), 0 0 10px var(--m-paper);
+  /* two small halos instead of three wide blurs: cheaper to repaint while the camera moves */
+  text-shadow: 0 0 2px var(--m-paper), 0 0 5px var(--m-paper);
 }
 /* hundreds of plain note tags: no GPU layer each, or memory balloons */
 .wm-lb--page,
