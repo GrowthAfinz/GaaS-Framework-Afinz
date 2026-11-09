@@ -27,3 +27,11 @@ Faltam aplicação dos deltas, política/pesos/cotas/pressão, ligação das sup
 Testes de fronteira de app, bloqueios/controles, simetria A/B, não sobreposição e tetos; tema/rodada, validade/reservas, escaping, import ambíguo e ausência de scripts na LP; leitor de notas e integridade dos snapshots. QA visual local em desktop/mobile com os componentes reais. O CI completo e o deploy são conferidos na publicação.
 
 Os testes locais não certificam o SFMC, as supressões de um provedor, a medição de compras ou a publicação final da LP.
+
+## Atualização posterior de 09/11 · fonte única e teste pontual
+
+O operador confirmou renderização no SFMC e recebimento correto de um Test Send. A evidência é pontual: V2, todas as células, clientes/mobile, LP, WhatsApp/SMS e produção não foram homologados por esse relato. O teste não é registrado como incidente de entrega.
+
+A fonte única do fallback da Fábrica resolve rodada/tema e VERSAO_EMAIL opcional. Desktop: duas ofertas na primeira linha e a terceira centralizada abaixo, todas com a mesma largura; mobile: ordem 1, 2, 3 empilhada. O acabamento de largura/mobile foi conferido localmente após o relato, sem novo envio no SFMC. Fixtures V5 e slots históricos V1/V2 preservados. Até três ofertas vigentes e compactação com reservas mantidas; quatro continua evolução.
+
+A sincronização usa controle de hash/versão do slot builtin-vdv-pool e dos cinco documentos, sem tombstones. Na atividade de QA existente, apenas o critério do Test Send pontual é concluído; dependências e demais critérios permanecem abertos.

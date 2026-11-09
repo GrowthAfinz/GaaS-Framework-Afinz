@@ -19,7 +19,13 @@ O Pool de Ofertas Visa combina ofertas do programa Vai de Visa com a afinidade d
 
 A VDV_SAFRA mantém os grupos e as células do teste; a VDV_APTOS reúne quem pode receber em cada rodada. As regras de seleção, automação, conteúdo e validação estão detalhadas abaixo, com contratos e SQLs nas fichas recolhíveis.
 
-> **Estado da operação:** revisão editorial de 09/11/2026. PREPARAÇÃO com seis passos e envio manual previsto. DEs e queries montadas; execução completa, conferência do FUNIL e Test Send do motor adaptado pendentes de validação.
+> **Estado da operação:** revisão editorial de 09/11/2026. PREPARAÇÃO com seis passos e envio manual previsto. DEs e queries montadas; renderização e recebimento de um Test Send confirmados pelo operador em 09/11. Execução completa, FUNIL e matriz de homologação seguem pendentes.
+
+## Test Send pontual · 09/11/2026
+
+Em 09/11/2026, o operador confirmou que o e-mail dinâmico renderizou no SFMC e que o Test Send chegou corretamente à sua caixa. É um teste pontual relatado: não homologa todas as células, V2, clientes de e-mail/mobile, LP, WhatsApp/SMS ou envio em produção. O recebimento foi confirmado; não há incidente de entrega comprovado nesta evidência.
+
+O acabamento desktop 2+1/mobile foi conferido localmente após esse relato; não representa novo envio ou homologação completa.
 
 ## 1. Intenção, escopo e estado da operação
 
@@ -34,8 +40,8 @@ A PREPARAÇÃO atualiza as fontes, inclui novos participantes, seleciona as ofer
 | DEs e queries | Montagem informada; CRUZAMENTO e SAFRA reconferidas | Executar os seis passos e conferir os resultados |
 | BRIEFING | Importação informada | Conferir registros aceitos, imagens e links |
 | FUNIL | SQL corrigido disponível | Executar e analisar contagens e alertas |
-| Fábrica | Catálogo e V1/V2 disponíveis | Adaptar ao POOL unificado e à versão de tema |
-| Homologação | Pendente | Realizar Test Send e registrar o aceite |
+| Fábrica | Fonte única rodada/tema e layout 2+1 | Conferir importador/exportador e matriz V1/V2 |
+| Homologação | Test Send pontual recebido em 09/11, conforme operador | Completar células, V2, clientes/mobile e canais restantes |
 
 Configuração e localização no SFMC estão nas fichas técnicas da automação e das DEs.
 
@@ -83,7 +89,7 @@ APTOS não é uma safra fechada e não elimina quem recebeu a rodada passada. A 
 
 O bloco **Atividades: Construção do Piloto** reúne montagem, conferência de público, conteúdo, seedlist e homologação. Os registros são compartilhados com Testes e Tarefas.
 
-Os marcos concluídos permanecem no histórico. A etapa atual exige conferir a execução dos seis passos, a audiência dinâmica e o motor adaptado antes do Test Send.
+Os marcos concluídos permanecem no histórico. O Test Send pontual recebido em 09/11 é registrado na atividade de QA; ela continua em execução para a matriz restante. Conferência dos seis passos, audiência dinâmica e demais aceites não são concluídos por esse teste.
 
 | Conferência | Resultado necessário | Evidência a guardar |
 |---|---|---|
@@ -96,7 +102,7 @@ Os marcos concluídos permanecem no histórico. A etapa atual exige conferir a e
 | APTOS dinâmica | Só safra selecionada/tratamentos; sai por inaptidão e volta sem re-sorteio; quem recebeu rodada anterior pode continuar | Cenários de limite, atraso, bloqueio, recência, _Subscribers e retorno |
 | Contrato do motor | Seleção unificada e distinção rodada/tema consumidas corretamente | Exportador/template adaptados e versão identificada |
 | Seedlist | V1/V2 nos quatro grupos; parceiro com/sem arte, nome/cartão ausentes, ofertas inválidas e reservas | Destinatários autorizados e capturas de Preview/Test Send |
-| Visual e navegação do e-mail | Primeiro card centralizado quando ímpar no desktop, cards empilhados no mobile, links/condições corretos | Clientes de e-mail testados e LP conferida, sem inferir entrega pelo preview |
+| Visual e navegação do e-mail | Desktop 2+1, terceira oferta com a mesma largura; mobile 1, 2, 3 empilhados, links/condições corretos | Clientes de e-mail testados e LP conferida, sem inferir entrega pelo preview |
 | Medição | SAFRA completa + JobID/rodada/toque e envios reais reconciliados | Contrato IN, chaves e cobertura; sem definir exposição pelo token de LP |
 
 Registrar o resultado e a data efetiva de cada validação na atividade correspondente.

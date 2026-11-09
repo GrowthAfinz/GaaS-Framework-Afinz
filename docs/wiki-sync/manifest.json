@@ -349,7 +349,7 @@
     },
     {
       "relative_path": "04-Operacao/Automacao-VDV-Pool-de-Ofertas.md",
-      "content_hash": "d2ab13efb3a7245e95f4bc17c38ca9d3ebb414aecd1ec5b8b2a196958c2bb586"
+      "content_hash": "f7865e480e90f45fcf05a30c6c020ff26be3a2d70b281cd78effd15834c770fb"
     },
     {
       "relative_path": "04-Operacao/Comunicacoes-Pacote-SFMC-Catalogo.md",
@@ -369,7 +369,7 @@
     },
     {
       "relative_path": "04-Operacao/Emails-Dinamicos-Vai-de-Visa.md",
-      "content_hash": "43093af4faa88cc45b359be3ec2203e9f2dcc225a40fd6cab79c4ef3a10e3fd7"
+      "content_hash": "6c0f7709bcf0989caf6c3d3b1be163680272d3560463be2a53c24fdcd4013fb2"
     },
     {
       "relative_path": "04-Operacao/Fabrica-de-Emails-GaaS.md",
@@ -441,7 +441,7 @@
     },
     {
       "relative_path": "05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md",
-      "content_hash": "5e8fa7236ba239fbcdf20fad3d5f468d1153afc168ba5e2b26f340171bf5c0d3"
+      "content_hash": "168397042922cac723472ef4fc756ed9fc065d1a735e2a416d41458dac7ed5f5"
     },
     {
       "relative_path": "05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md",
@@ -1745,7 +1745,7 @@
     },
     {
       "relative_path": "10-Resultados/Iniciativas/Iniciativa-Pool-de-Ofertas-Vai-de-Visa.md",
-      "content_hash": "07b2e2e290bcfc59a7ee37ba6cc59cbeadaa79950694c70aea077de5e16f7f18"
+      "content_hash": "851cb9acfe63326ab2183eec2e756ab5b5b2db323bfb833a623e70acf3d7d20b"
     },
     {
       "relative_path": "10-Resultados/Mecanicas/Ativacao-e-Boas-Vindas.md",
@@ -2053,7 +2053,7 @@
     },
     {
       "relative_path": "04-Operacao/Plano-de-Comunicacao-Pool-Vai-de-Visa.md",
-      "content_hash": "a00f8d9666dad639af13398ccf0e05f49992ea0a99cce8494a75582bc9795879"
+      "content_hash": "48480d2c25563d2ac7de89f42987b7f3cd813c47a4abfbe4d78befd58b8178bd"
     }
   ]
 }

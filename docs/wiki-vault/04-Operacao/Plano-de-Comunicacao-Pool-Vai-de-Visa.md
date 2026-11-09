@@ -14,15 +14,21 @@ fonte: "estratégia Pool_de_Ofertas_Vai_de_Visa_Estrategia.pdf (operação, 03/1
 
 A comunicação apresenta as ofertas selecionadas para cada grupo, com benefício, forma de resgate, vigência e condições por marca. V1 e V2 compartilham catálogo e regra de seleção, com variação do hero e do envelope.
 
+## Teste pontual e layout vigente · 09/11
+
+Em 09/11/2026, o operador confirmou que o e-mail dinâmico renderizou no SFMC e que o Test Send chegou corretamente à sua caixa. É um teste pontual relatado: não homologa todas as células, V2, clientes de e-mail/mobile, LP, WhatsApp/SMS ou envio em produção. O recebimento foi confirmado; não há incidente de entrega comprovado nesta evidência.
+
+No desktop, ofertas 1 e 2 ficam lado a lado na primeira linha e a oferta 3 fica centralizada abaixo, com a mesma largura dos demais cards (2+1). Com duas ofertas, ambas ficam na primeira linha; com uma, ela fica centralizada. No mobile, a ordem é 1, 2, 3, uma abaixo da outra. São exibidas até três ofertas vigentes; inválidas/expiradas são descartadas e as reservas compactam as posições. Quatro cards permanecem evolução.
+
 ## Toques e experiência
 
-V1 usa hero persona em B2C e V2 usa o cartão no respectivo toque. Parceiro B2B2C com arte usa sua arte; sem arte, fallback V2 da regra documentada. Até três ofertas válidas, com até seis candidatas para reservas. Primeiro card centralizado quando ímpar no desktop; mobile empilhado. Quatro cards é futuro.
+V1 usa hero persona em B2C e V2 usa o cartão no respectivo toque. Parceiro B2B2C com arte usa sua arte; sem arte, fallback V2 da regra documentada. Até três ofertas válidas, com até seis candidatas para reservas. Desktop 2+1, terceira oferta com a mesma largura; mobile empilhado na ordem 1, 2, 3. Quatro cards é futuro.
 
 O papel editorial de cada toque não define um schedule: a cadência recorrente provavelmente 2x/semana, dias e alternância V1/V2 continuam pendentes em 09/11. O intervalo 3–5 dias do desenho de 06/11 não deve ser executado como regra recorrente atual sem decisão. Nenhuma Send Activity faz parte da PREPARAÇÃO.
 
 ## Conteúdo e contrato do motor
 
-TEMA/HERO ficam no BRIEFING de 41 colunas. Rodada do POOL e versão do tema são distintas. APTOS traz rodada em ID_VERSAO_OFERTAS; o motor precisa resolver VERSAO_TEMA antes de buscar envelope/hero. Fábrica/exportador/template ainda requerem adaptação, e Test Send do motor novo não foi comprovado. A carga relatada do briefing não é validação de toda renderização.
+TEMA/HERO ficam no BRIEFING de 41 colunas. Rodada do POOL e versão do tema são distintas. APTOS traz rodada em ID_VERSAO_OFERTAS; o motor precisa resolver VERSAO_TEMA antes de buscar envelope/hero. A fonte única do template resolve rodada/tema e teve um Test Send pontual recebido em 09/11. A paridade do importador/exportador de CSV e a matriz completa de Test Send continuam pendentes. A carga relatada do briefing não é validação de toda renderização.
 
 NM_CARTAO NULL exige fallback de cartão sem inferir ORIGEM; NM_PARCEIRO ambíguo exige fallback e validação comercial. V2 herda assunto/preheader do V1 quando vazio na lógica anterior; verificar na adaptação. Nome vazio usa saudação própria. Não adicionar GRUPO_2/SAFRA ao catálogo.
 
