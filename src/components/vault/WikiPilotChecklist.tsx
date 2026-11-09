@@ -4,7 +4,7 @@ import { saveWork } from '../growth-learning/development/workService';
 import { TASK_STATUS, taskError, taskHistory, type TaskEvent } from '../growth-learning/development/developmentService';
 import { newWork, type WorkItem } from '../growth-learning/development/workModel';
 import { loadInsuranceTasks, INSURANCE_STRATEGY_PATH, loadPilotTasks } from './wikiPilotService';
-import { brazilToday, canQuickComplete, completionDate, displayCompletionDate, PILOT_GROUPS, PILOT_KEYS, pilotTaskGroup, activePilotProgress, preparePilotSave } from './wikiPilotModel';
+import { brazilToday, canQuickComplete, completionDate, displayCompletionDate, PILOT_GROUPS, PILOT_KEYS, pilotTaskGroup, activePilotProgress, preparePilotSave, insuranceTaskOrder } from './wikiPilotModel';
 import { WikiPilotTaskEditor } from './WikiPilotTaskEditor';
 import type { TaskLayout } from './strategy/strategyModel';
 
@@ -64,7 +64,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     [order[i],order[j]]=[order[j],order[i]];
     void updateLayout({hidden:layout?.hidden||[],order:[...order,...(layout?.order||[]).filter(k=>!order.includes(k))]});
   };
-  const taskOrder = (task: WorkItem) => { const custom=layout?.order.indexOf(task.task_key)??-1;return custom>=0?custom:PILOT_KEYS.includes(task.task_key)?1000+PILOT_KEYS.indexOf(task.task_key):2000; };
+  const taskOrder = (task: WorkItem) => { const custom=layout?.order.indexOf(task.task_key)??-1;return custom>=0?custom:insurance?1000+insuranceTaskOrder(task):PILOT_KEYS.includes(task.task_key)?1000+PILOT_KEYS.indexOf(task.task_key):2000; };
   const focusEditor = (id: string) => requestAnimationFrame(() => editors.current.get(id)?.focus({ preventScroll: true }));
   const close = () => { if (busy) return; const id = draft?.id; setDraft(null); baseline.current = ''; setInitialField(null); setMessage(''); setError(''); if (id) focusEditor(id); };
   const openTask = (task: WorkItem, completing = false, editTitle = false) => {
