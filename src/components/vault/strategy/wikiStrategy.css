@@ -107,7 +107,8 @@
 /* Estratégias: neutral actions, a bounded reading rail and an accessible mobile index. */
 .wiki-strategy .strategy-primary,.strategy-history .strategy-primary{background:#fff;color:#006c70;border:1px solid #b8cecf}
 .wiki-strategy .strategy-primary:hover,.strategy-history .strategy-primary:hover{background:#edf6f4}
-.strategy-nav{max-height:calc(100dvh - 28px);overflow-y:auto;overscroll-behavior:contain}
+/* the whole index, no inner scroll: the sticky top is set by the component (negative when it is taller than the screen) */
+.strategy-nav{max-height:none;overflow:visible;top:var(--strategy-nav-top,12px)}
 .strategy-nav nav button{min-height:40px}
 .strategy-mobile-index{display:none}
 .strategy-prose img{display:block;max-width:100%;height:auto;margin:16px auto}

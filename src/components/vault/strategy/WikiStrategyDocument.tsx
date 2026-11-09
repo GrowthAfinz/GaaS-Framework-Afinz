@@ -10,6 +10,7 @@ import { rewriteWikilinksForReader } from '../vaultParser';
 import { vaultUrlTransform } from '../vaultMarkdown';
 import { exportStrategy, initialStrategy, moveBlock, strategyError, hasVisaActivities, replaceStrategyDetail, type DetailAnchor, type StrategyBlock, type StrategyDocument, type StrategyHead, type StrategyRevision } from './strategyModel';
 import { loadStrategy, saveStrategy, strategyHistory } from './strategyService';
+import { getLocalViewport } from '../../../context/UIScaleContext';
 import './wikiStrategy.css';
 import { wikiHeadingId } from '../wikiNavigation';
 const textOf=(children:ReactNode):string=>Children.toArray(children).map(child=>typeof child==='string'||typeof child==='number'?String(child):isValidElement<{children?:ReactNode}>(child)?textOf(child.props.children):'').join('');
@@ -42,6 +43,18 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const [edit,setEdit]=useState<EditDraft|null>(null),[preview,setPreview]=useState(false),[taskDirty,setTaskDirty]=useState(false);
  const [closed,setClosed]=useState<Set<string>>(()=>readClosed(note)),[active,setActive]=useState('visao-geral'),[query,setQuery]=useState('');
  const manualActiveUntil=useRef(0);
+ // The index is shown whole, never in its own scroll box. When it is taller than the
+ // screen, a negative sticky top lets it travel with the page until its last item is
+ // visible, then it stays put; when it fits, it sticks 12px under the top as before.
+ const navRef=useRef<HTMLElement>(null);
+ useEffect(()=>{
+  const nav=navRef.current; if(!nav) return;
+  // sticky is measured against the element that actually scrolls (the app's content pane or the window)
+  const scroller=()=>{ for(let el=nav.parentElement;el;el=el.parentElement){ const y=getComputedStyle(el).overflowY; if((y==='auto'||y==='scroll')&&el.scrollHeight>el.clientHeight) return el; } return null; };
+  const place=()=>{ const box=scroller(); const room=box?box.clientHeight:getLocalViewport().height; nav.style.setProperty('--strategy-nav-top',Math.min(12,room-nav.offsetHeight-12)+'px'); };
+  place(); const observer=new ResizeObserver(place); observer.observe(nav); if(nav.parentElement) observer.observe(nav.parentElement); window.addEventListener('resize',place);
+  return ()=>{ observer.disconnect(); window.removeEventListener('resize',place); };
+ },[]);
  const [mobileIndex,setMobileIndex]=useState(false);
  const [historyOpen,setHistoryOpen]=useState(false),[revisions,setRevisions]=useState<StrategyRevision[]>([]),[selectedRevision,setSelectedRevision]=useState<StrategyRevision|null>(null),[historyError,setHistoryError]=useState('');
  const [reconciling,setReconciling]=useState(false),[retry,setRetry]=useState(0),[revisionWarning,setRevisionWarning]=useState(false);
@@ -122,7 +135,7 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
   <div className="strategy-editor-actions"><button className="strategy-primary" type="submit">{busy?'Salvando…':'Salvar alterações'}</button><button type="button" onClick={cancel}>Cancelar</button></div>
  </fieldset></form></div>;
  return <div className="wiki-strategy" onClickCapture={e=>{const button=(e.target as HTMLElement).closest('.strategy-menu button');button?.closest('details')?.removeAttribute('open');}} aria-label={doc.title+' · estratégia colaborativa'} aria-busy={loading||busy}>
-  <aside className="strategy-nav"><button type="button" className="strategy-mobile-index" aria-expanded={mobileIndex} aria-controls="strategy-document-index" onClick={()=>setMobileIndex(!mobileIndex)}>Nesta estratégia <ChevronDown size={16}/></button><label className="strategy-search"><Search size={16}/><input aria-label="Buscar nesta nota" placeholder="Buscar nesta nota" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+  <aside ref={navRef} className="strategy-nav"><button type="button" className="strategy-mobile-index" aria-expanded={mobileIndex} aria-controls="strategy-document-index" onClick={()=>setMobileIndex(!mobileIndex)}>Nesta estratégia <ChevronDown size={16}/></button><label className="strategy-search"><Search size={16}/><input aria-label="Buscar nesta nota" placeholder="Buscar nesta nota" value={query} onChange={e=>setQuery(e.target.value)}/></label>
    <nav id="strategy-document-index" className={mobileIndex?'is-open':''} aria-label="Índice da estratégia"><button className={active==='visao-geral'?'is-active':''} onClick={()=>{manualActiveUntil.current=Date.now()+1000;setQuery('');setMobileIndex(false);setActive('visao-geral');document.getElementById('strategy-header')?.scrollIntoView();}}>Visão geral</button>{doc.blocks.filter(b=>b.id!=='visao-geral').map(b=><button key={b.id} className={active===b.id?'is-active':''} onClick={()=>jump(b.id)}>{navTitle(b)}</button>)}</nav>
    <p className="strategy-help">{head?'Versão de trabalho · r'+head.revision:'Fonte do vault'}<br/>{canEdit?'Alterações recuperáveis no histórico.':'Leitura · edição conforme permissões atuais.'}</p>
   </aside>
