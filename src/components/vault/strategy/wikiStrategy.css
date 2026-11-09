@@ -154,3 +154,5 @@
 .strategy-source-status>summary{display:inline-block;background:#fff3d1;color:#6b4e0e;padding:3px 8px;font-weight:600}
 .strategy-source-status>summary:hover{background:#ffe9ad}
 .strategy-nav nav button{transition:background-color .15s,border-color .15s}
+
+.strategy-draft-notice{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;margin:12px 0;border:1px solid #dbe5e8;background:#f7fafb;font-size:13px;color:#42515b}.strategy-draft-notice span{flex:1 1 260px}.strategy-draft-notice button{border:1px solid #dbe5e8;background:white;padding:6px 10px;min-height:36px;color:#006c70}.strategy-draft-notice button:focus-visible{outline:2px solid #007c80;outline-offset:2px}
