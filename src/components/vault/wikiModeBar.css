@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: inherit;
   color: var(--wb-ink);
 }
 .wiki-bar--fixed {
@@ -107,7 +107,7 @@
   position: absolute;
   right: 9px;
   top: 10px;
-  font: 10.5px/1 "Segoe UI", Arial, sans-serif;
+  font-size: 10.5px; line-height: 1; font-family: inherit;
   color: var(--wb-faint);
   border: 1px solid var(--wb-rule);
   border-bottom-width: 2px;

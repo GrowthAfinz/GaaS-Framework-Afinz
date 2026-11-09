@@ -1,5 +1,5 @@
 /* The approved editorial direction is scoped to the Visa pilot only. */
-.wiki-strategy{--strategy-ink:#18212a;--strategy-muted:#66717d;--strategy-line:#d7dfe2;--strategy-teal:#007c80;--strategy-lime:#c1ef43;display:grid;grid-template-columns:240px minmax(0,1fr);background:#fff;color:var(--strategy-ink);font-family:'Segoe UI',Arial,sans-serif;min-height:700px;text-align:left}
+.wiki-strategy{--strategy-ink:#18212a;--strategy-muted:#66717d;--strategy-line:#d7dfe2;--strategy-teal:#007c80;--strategy-lime:#c1ef43;display:grid;grid-template-columns:240px minmax(0,1fr);background:#fff;color:var(--strategy-ink);font-family:inherit;min-height:700px;text-align:left}
 .wiki-strategy *, .strategy-history *{box-sizing:border-box;border-radius:0!important}
 .wiki-strategy button,.wiki-strategy summary,.strategy-history button{font:inherit;cursor:pointer}
 .wiki-strategy button:disabled,.strategy-history button:disabled{cursor:not-allowed;opacity:.45}
@@ -69,7 +69,7 @@
 .strategy-editor{border-left:2px solid #007c80;background:#f8fbfa;padding:18px;margin:12px 0;grid-column:1/-1}
 .strategy-editor fieldset{border:0;min-width:0;padding:0}
 .strategy-editor label{display:block;font-size:13px;font-weight:600;color:#52646d}
-.strategy-editor input,.strategy-editor textarea{display:block;width:100%;border:1px solid #b7c7cc;background:white;font:400 14px/1.7 'Segoe UI',Arial,sans-serif;color:#26353e;padding:9px 11px;margin:6px 0 12px;resize:vertical}
+.strategy-editor input,.strategy-editor textarea{display:block;width:100%;border:1px solid #b7c7cc;background:white;font-weight:400;font-size:14px;line-height:1.7;font-family:inherit;color:#26353e;padding:9px 11px;margin:6px 0 12px;resize:vertical}
 .strategy-editor textarea{font-family:Consolas,monospace;font-size:13px;min-height:120px}
 .strategy-editor-tabs{display:flex;gap:16px;border-bottom:1px solid #d7e0e1;margin-bottom:14px}
 .strategy-editor-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;font-size:13px;padding:8px 0;color:#6d7b83}
@@ -80,7 +80,7 @@
 .strategy-error{border-left-color:#b84c4c;background:#fff7f7;color:#8f3434}
 .strategy-feedback{font-size:12px;color:#007a70;padding:8px 0}
 .strategy-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:24px;font-size:11px;color:#839098}
-.strategy-history{--strategy-lime:#c1ef43;--strategy-teal:#007c80;position:fixed;inset:0 0 0 auto;width:min(680px,94vw);height:100dvh;max-height:none;max-width:none;margin:0;border:0;border-left:1px solid #bac6ca;padding:24px;background:#fff;color:#263640;overflow:auto;font:14px/1.7 'Segoe UI',Arial,sans-serif}
+.strategy-history{--strategy-lime:#c1ef43;--strategy-teal:#007c80;position:fixed;inset:0 0 0 auto;width:min(680px,94vw);height:100dvh;max-height:none;max-width:none;margin:0;border:0;border-left:1px solid #bac6ca;padding:24px;background:#fff;color:#263640;overflow:auto;font-size:14px;line-height:1.7;font-family:inherit}
 .strategy-history::backdrop{background:#10252b55}
 .strategy-history>header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #d9e1e4;padding-bottom:14px}
 .strategy-history h2{font-size:22px;font-weight:600;margin:0}.strategy-history h3{font-size:16px;margin:18px 0 10px;font-weight:600}
@@ -138,3 +138,13 @@
 .strategy-summary p+p{margin-top:10px!important}
 .strategy-prose figure>[aria-label="Diagrama; role para percorrer o fluxo"]{max-height:580px;overscroll-behavior:contain}
 @media(pointer:coarse){.wiki-detail-pencil{width:44px;height:44px}}
+
+/* Leitura: fonte do app (Calibri, herdada), texto corrido com largura confortável e status sem repetição. */
+.strategy-prose{font-size:15px}
+.strategy-summary{font-size:16px!important;max-width:88ch}
+.strategy-prose :is(p,ul,ol,blockquote,h2,h3,h4,h5,h6){max-width:88ch}
+.strategy-page-actions>button[aria-pressed]{color:#42515b}
+.strategy-page-actions>button[aria-pressed]:hover{background:#f5f8f8;color:#006c70}
+.strategy-source-status>summary{display:inline-block;background:#fff3d1;color:#6b4e0e;padding:3px 8px;font-weight:600}
+.strategy-source-status>summary:hover{background:#ffe9ad}
+.strategy-nav nav button{transition:background-color .15s,border-color .15s}

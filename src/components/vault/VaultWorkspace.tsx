@@ -379,7 +379,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     {strategyBar}{strategyPanels}
     <WikiStrategyDocument key={selected.id} note={selected} onOpen={openTarget} onHome={openStrategies}/>
   </section>;
-  return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-3" style={{fontFamily: "Segoe UI, Arial, sans-serif"}}>
+  return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-3">
     {mode==='reading'&&<WikiModeBar {...barCommon} nav={{label:'Assuntos',open:sidebar,onToggle:()=>setSidebar(value=>!value),controls:'wiki-reading-nav'}} search={{value:query,placeholder:'Buscar na Wiki…',ariaLabel:'Buscar na Wiki',inputRef:searchInput,onChange:value=>filter(value,folder)}}/>}
     {mode==='notes'&&<WikiModeBar {...barCommon} nav={{label:'Pastas',open:notesTree,onToggle:()=>setNotesTree(value=>!value),controls:'wiki-notes-tree'}} search={{value:notesQuery,placeholder:'Filtrar notas por nome ou pasta…',ariaLabel:'Filtrar notas',inputRef:searchInput,onChange:setNotesQuery}}/>}
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error} <button type="button" onClick={() => { void loadContext(); if (browse) void loadIndex(query, folder); }} className="font-bold underline">Tentar novamente</button></div>}

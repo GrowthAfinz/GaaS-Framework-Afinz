@@ -5,7 +5,7 @@ import DOMPurify from 'dompurify';
 // Shared, restrained visual language. Notes cannot override security or inject configuration.
 mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true, theme: 'base', look: 'classic', htmlLabels: false,
   flowchart: { htmlLabels: false, useMaxWidth: false, curve: 'linear', nodeSpacing: 30, rankSpacing: 48, wrappingWidth: 360 },
-  themeVariables: { fontFamily: 'Inter, Arial, sans-serif', fontSize: '14px', primaryColor: '#f8fafc', primaryTextColor: '#1e293b', primaryBorderColor: '#cbd5e1', lineColor: '#64748b', secondaryColor: '#ecfeff', tertiaryColor: '#ffffff', clusterBkg: '#ffffff', clusterBorder: '#cbd5e1', edgeLabelBackground: '#ffffff' },
+  themeVariables: { fontFamily: 'Calibri, "Segoe UI", Arial, sans-serif', fontSize: '14px', primaryColor: '#f8fafc', primaryTextColor: '#1e293b', primaryBorderColor: '#cbd5e1', lineColor: '#64748b', secondaryColor: '#ecfeff', tertiaryColor: '#ffffff', clusterBkg: '#ffffff', clusterBorder: '#cbd5e1', edgeLabelBackground: '#ffffff' },
 });
 
 export default function WikiDiagramCanvas({ source, zoom, expanded }: { source: string; zoom: number; expanded: boolean }) {
