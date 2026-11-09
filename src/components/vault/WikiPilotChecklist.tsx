@@ -3,7 +3,7 @@ import { CheckCheck, ChevronDown, ChevronRight, Pencil, RefreshCw, Plus, MoreHor
 import { saveWork } from '../growth-learning/development/workService';
 import { TASK_STATUS, taskError, taskHistory, type TaskEvent } from '../growth-learning/development/developmentService';
 import { newWork, type WorkItem } from '../growth-learning/development/workModel';
-import { loadPilotTasks } from './wikiPilotService';
+import { loadInsuranceTasks, INSURANCE_STRATEGY_PATH, loadPilotTasks } from './wikiPilotService';
 import { brazilToday, canQuickComplete, completionDate, displayCompletionDate, PILOT_GROUPS, PILOT_KEYS, pilotTaskGroup, activePilotProgress, preparePilotSave } from './wikiPilotModel';
 import { WikiPilotTaskEditor } from './WikiPilotTaskEditor';
 import type { TaskLayout } from './strategy/strategyModel';
@@ -11,8 +11,12 @@ import type { TaskLayout } from './strategy/strategyModel';
 const icon = 'inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-cyan-50 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700 disabled:opacity-40 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11';
 const groupsInitial: Record<string, boolean> = { built: false, prepare: true, validate: false, later: false };
 
-/** Visa pilot only. Uses the same records, revision checks and history as Testes e Tarefas. */
-export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork, historyLoader = taskHistory, layout, onLayoutChange, onDirtyChange, documentBusy = false, initiallyOpen = false }: { layout?: TaskLayout; onLayoutChange?: (layout: TaskLayout) => Promise<void>; onDirtyChange?: (dirty: boolean) => void; documentBusy?: boolean; initiallyOpen?: boolean; loader?: typeof loadPilotTasks; writer?: typeof saveWork; historyLoader?: typeof taskHistory }) {
+/** Note-bound work plans use the same records, revision checks and history as Testes e Tarefas. */
+export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork, historyLoader = taskHistory, layout, onLayoutChange, onDirtyChange, documentBusy = false, initiallyOpen = false, insurance = false }: { insurance?: boolean; layout?: TaskLayout; onLayoutChange?: (layout: TaskLayout) => Promise<void>; onDirtyChange?: (dirty: boolean) => void; documentBusy?: boolean; initiallyOpen?: boolean; loader?: typeof loadPilotTasks; writer?: typeof saveWork; historyLoader?: typeof taskHistory }) {
+  const taskLoader = insurance && loader === loadPilotTasks ? loadInsuranceTasks : loader;
+  const groupLabels: Record<string,string> = insurance ? {built:'Já realizado · diagnóstico e desenho',prepare:'Preparação comum',mulher_mensal:'Mulher · Mensal',mulher_trigger:'Mulher · Trigger',residencial_mensal:'Residencial · Mensal',residencial_trigger:'Residencial · Trigger',celular_mensal:'Celular · Mensal',celular_trigger:'Celular · Trigger',later:'Evoluções posteriores'} : PILOT_GROUPS;
+  const taskGroup = (task: WorkItem): string => insurance ? task.details.insurance_group || 'prepare' : pilotTaskGroup(task);
+  const activityTitle = insurance ? 'Atividades: Construção e ativação de Seguros' : 'Atividades: Construção do Piloto';
   const [data, setData] = useState<Awaited<ReturnType<typeof loadPilotTasks>> | null>(null);
   const [opened, setOpened] = useState(initiallyOpen), [pending, setPending] = useState(false), [busy, setBusy] = useState(false);
   const [groups, setGroups] = useState(groupsInitial);
@@ -25,11 +29,11 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
   const changed = Boolean(draft && JSON.stringify(draft) !== baseline.current);
   const load = async () => {
     const g = ++generation.current;
-    try { const next = await loader(); if (g === generation.current) { setData(next); setError(''); } }
+    try { const next = await taskLoader(); if (g === generation.current) { setData(next); setError(''); } }
     catch { if (g === generation.current) setError('Não foi possível consultar as atividades. Tente atualizar.'); }
   };
-  useEffect(() => { void load(); return () => { generation.current++; }; }, [loader]);
-  useEffect(() => { const focus = () => { if (!busy && !draft) void load(); }; window.addEventListener('focus', focus); return () => window.removeEventListener('focus', focus); }, [loader, busy, draft]);
+  useEffect(() => { void load(); return () => { generation.current++; }; }, [taskLoader]);
+  useEffect(() => { const focus = () => { if (!busy && !draft) void load(); }; window.addEventListener('focus', focus); return () => window.removeEventListener('focus', focus); }, [taskLoader, busy, draft]);
   useEffect(() => {
     if (!changed) return;
     const unload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
@@ -49,12 +53,13 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
   };
   const addTask = (copy?: WorkItem) => {
     if(changed || busy || documentBusy) { setMessage('Salve ou cancele a edição atual antes de adicionar uma atividade.'); return; }
-    const next: WorkItem = {...newWork('monetization'),...(copy ? structuredClone(copy) : {}),id:'',revision:0,task_key:'VDV-PILOT-'+crypto.randomUUID().slice(0,12),title:copy ? copy.title+' (cópia)' : '',status:'planejando',completed_criteria:[],resolution:null,details:{...(copy?.details||{}),wiki_pilot_note:'05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md',wiki_pilot_group:copy ? pilotTaskGroup(copy) : 'prepare'}};
+    const next: WorkItem = {...newWork('monetization'),...(copy ? structuredClone(copy) : {}),id:'',revision:0,task_key:(insurance?'SEG-PILOT-':'VDV-PILOT-')+crypto.randomUUID().slice(0,12),title:copy ? copy.title+' (cópia)' : '',status:'planejando',completed_criteria:[],resolution:null,details:{...(copy?.details||{}),wiki_pilot_note:insurance?INSURANCE_STRATEGY_PATH:'05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md',wiki_pilot_group:copy ? taskGroup(copy) : 'prepare',...(insurance?{insurance_group:copy?taskGroup(copy):'prepare'}:{})}};
+    if(insurance){next.initiative_id='03d2907e-2bb1-4c45-9b26-f3caf11480b4';next.source_note=INSURANCE_STRATEGY_PATH;}
     delete next.details.completed_on;
     baseline.current=JSON.stringify(next);setDraft(next);setInitialField('title');setError('');setMessage('');
   };
   const moveTask = (task: WorkItem,delta:number) => {
-    const order=visibleTasks.filter(t=>pilotTaskGroup(t)===pilotTaskGroup(task)).sort((a,b)=>taskOrder(a)-taskOrder(b)).map(t=>t.task_key);
+    const order=visibleTasks.filter(t=>taskGroup(t)===taskGroup(task)).sort((a,b)=>taskOrder(a)-taskOrder(b)).map(t=>t.task_key);
     const i=order.indexOf(task.task_key),j=i+delta;if(j<0||j>=order.length)return;
     [order[i],order[j]]=[order[j],order[i]];
     void updateLayout({hidden:layout?.hidden||[],order:[...order,...(layout?.order||[]).filter(k=>!order.includes(k))]});
@@ -70,7 +75,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     baseline.current = JSON.stringify(next);
     if (completing) { next.status = 'concluida'; next.details.completed_on = completionDate(task) || brazilToday(); }
     setDraft(next); setInitialField(editTitle ? 'title' : null); setMessage(''); setError('');
-    const group = pilotTaskGroup(task); if (group) setGroups(g => ({ ...g, [group]: true }));
+    const group = taskGroup(task); if (group) setGroups(g => ({ ...g, [group]: true }));
   };
   const save = async (task: WorkItem) => {
     if (busy) return;
@@ -81,7 +86,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
       const saved = await writer(prepared);
       setData(current => current && { ...current, tasks: current.tasks.some(t=>t.id===saved.id) ? current.tasks.map(t => t.id === saved.id ? saved : t) : [...current.tasks,saved] });
       baseline.current = ''; setDraft(null); setInitialField(null);
-      const savedGroup=pilotTaskGroup(saved);if(savedGroup){setGroups(g=>({...g,[savedGroup]:true}));setExpandedGroups(g=>({...g,[savedGroup]:true}));}
+      const savedGroup=taskGroup(saved);if(savedGroup){setGroups(g=>({...g,[savedGroup]:true}));setExpandedGroups(g=>({...g,[savedGroup]:true}));}
       setMessage(saved.status === 'concluida' ? 'Conclusão e data registradas.' : 'Atividade atualizada.');
       // A completed row must remain mounted until focus is restored, even in pending-only view.
       if (pending && saved.status === 'concluida') setPending(false);
@@ -97,27 +102,28 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     else openTask(task, true);
   };
   const blockCollapse = () => { setMessage('Salve ou cancele a edição atual antes de recolher as atividades.'); };
-  const label = data?.canEdit ? progress.validated ? 'Validado na seedlist' : progress.ready ? 'Pronto para testar na seedlist' : `Preparação ${progress.done}/${progress.total}` : data ? 'Acesso administrativo' : 'Consultar atividades';
-  return <section className="my-5 rounded-xl border border-slate-200 bg-white text-slate-700" aria-label="Atividades: Construção do Piloto">
+  const label = insurance ? `${visibleTasks.filter(t=>t.status==='concluida').length}/${visibleTasks.length} atividades concluídas · liberação por frente` : data?.canEdit ? progress.validated ? 'Validado na seedlist' : progress.ready ? 'Pronto para testar na seedlist' : `Preparação ${progress.done}/${progress.total}` : data ? 'Acesso administrativo' : 'Consultar atividades';
+  return <section className="my-5 rounded-xl border border-slate-200 bg-white text-slate-700" aria-label={activityTitle}>
     <div className="flex flex-wrap items-center justify-between gap-x-3 border-b border-slate-100 bg-slate-50/70 px-3 py-1 sm:px-4">
-      <button type="button" aria-expanded={opened} aria-controls="wiki-pilot-activities" onClick={() => { if (opened && (changed || busy)) { blockCollapse(); return; } setOpened(!opened); }} className="flex min-h-11 min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700">{opened ? <ChevronDown size={15} className="shrink-0"/> : <ChevronRight size={15} className="shrink-0"/>}<CheckCheck size={15} className="shrink-0 text-cyan-700"/><span>Atividades: Construção do Piloto</span></button>
+      <button type="button" aria-expanded={opened} aria-controls="wiki-pilot-activities" onClick={() => { if (opened && (changed || busy)) { blockCollapse(); return; } setOpened(!opened); }} className="flex min-h-11 min-w-0 items-center gap-2 text-left text-sm font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700">{opened ? <ChevronDown size={15} className="shrink-0"/> : <ChevronRight size={15} className="shrink-0"/>}<CheckCheck size={15} className="shrink-0 text-cyan-700"/><span>{activityTitle}</span></button>
       <span className="py-1 text-xs tabular-nums text-cyan-800">{label}</span>
     </div>
     <div id="wiki-pilot-activities" hidden={!opened}>
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4"><p className="text-xs text-slate-500">Preparação e validação na seedlist · {progress.validationDone}/{progress.validationTotal} validações</p><div className="flex items-center gap-2"><label className="flex min-h-9 items-center gap-1.5 text-xs"><input type="checkbox" checked={pending} onChange={e => setPending(e.target.checked)} disabled={Boolean(draft) || busy} className="accent-cyan-700"/>Só pendentes</label><button type="button" className={icon} disabled={busy || Boolean(draft)} onClick={() => void load()} aria-label="Atualizar atividades"><RefreshCw size={14}/></button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4"><p className="text-xs text-slate-500">{insurance ? 'Diagnóstico, preparação e seis frentes · conclusão documental não libera disparo' : `Preparação e validação na seedlist · ${progress.validationDone}/${progress.validationTotal} validações`}</p><div className="flex items-center gap-2"><label className="flex min-h-9 items-center gap-1.5 text-xs"><input type="checkbox" checked={pending} onChange={e => setPending(e.target.checked)} disabled={Boolean(draft) || busy} className="accent-cyan-700"/>Só pendentes</label><button type="button" className={icon} disabled={busy || Boolean(draft)} onClick={() => void load()} aria-label="Atualizar atividades"><RefreshCw size={14}/></button></div></div>
       {!data && !error && <p role="status" className="px-4 py-3 text-xs">Consultando atividades…</p>}
       {data && !data.canEdit && <p className="px-4 py-3 text-xs text-slate-500">As atividades seguem as permissões administrativas de Testes e Tarefas.</p>}
       {data?.canEdit && <>
-        {data.tasks.length < PILOT_KEYS.length && <p className="px-4 py-2 text-xs text-amber-800">Há atividades do piloto ainda não cadastradas. O marco de prontidão permanece pendente.</p>}
-        {Object.entries(PILOT_GROUPS).map(([group, name]) => {
-          const all = visibleTasks.filter(t => pilotTaskGroup(t) === group).sort((a,b) => taskOrder(a)-taskOrder(b));
+        {!insurance && data.tasks.length < PILOT_KEYS.length && <p className="px-4 py-2 text-xs text-amber-800">Há atividades do piloto ainda não cadastradas. O marco de prontidão permanece pendente.</p>}
+        {Object.entries(groupLabels).map(([group, name]) => {
+          const all = visibleTasks.filter(t => taskGroup(t) === group).sort((a,b) => taskOrder(a)-taskOrder(b));
           const tasks = all.filter(t => !pending || t.status !== 'concluida');
-          const shown=expandedGroups[group]||pending||draft&&pilotTaskGroup(draft)===group?tasks:tasks.slice(0,3);
+          const shown=expandedGroups[group]||pending||draft&&taskGroup(draft)===group?tasks:tasks.slice(0,3);
           if (!tasks.length) return null;
           return <div key={group} className="border-t border-slate-100">
-            <button type="button" aria-expanded={groups[group]} aria-controls={`wiki-pilot-${group}`} className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700 sm:px-4" onClick={() => { if (groups[group] && draft && pilotTaskGroup(draft) === group && (changed || busy)) { blockCollapse(); return; } setGroups(g => ({ ...g, [group]: !g[group] })); }}>{groups[group] ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="flex-1">{name}</span><span className="font-normal tabular-nums text-slate-400">{all.filter(t => t.status === 'concluida').length}/{all.length}</span></button>
+            <button type="button" aria-expanded={groups[group]} aria-controls={`wiki-pilot-${group}`} className="flex min-h-11 w-full items-center gap-2 px-3 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700 sm:px-4" onClick={() => { if (groups[group] && draft && taskGroup(draft) === group && (changed || busy)) { blockCollapse(); return; } setGroups(g => ({ ...g, [group]: !g[group] })); }}>{groups[group] ? <ChevronDown size={14}/> : <ChevronRight size={14}/>}<span className="flex-1">{name}</span><span className="font-normal tabular-nums text-slate-400">{all.filter(t => t.status === 'concluida').length}/{all.length}</span></button>
             <div id={`wiki-pilot-${group}`} hidden={!groups[group]}>
-              {group === 'later' && <p className="px-4 pb-2 text-xs text-slate-500">Não bloqueia o teste da seedlist.</p>}
+              {insurance && group !== 'built' && group !== 'prepare' && group !== 'later' && <p className="px-4 pb-2 text-xs text-slate-500">{all.some(t=>t.task_key.endsWith('-LIBERAR') && t.status==='concluida') ? 'Liberação do piloto registrada; conferir execução e leitura.' : `Liberação pendente · próxima atividade: ${all.find(t=>t.status!=='concluida')?.title || 'conferir dependências comuns e evidências'}.`}</p>}
+              {group === 'later' && <p className="px-4 pb-2 text-xs text-slate-500">{insurance ? 'Evoluções fora do caminho inicial; conferir dependências de cada piloto.' : 'Não bloqueia o teste da seedlist.'}</p>}
               {shown.map(task => <article key={task.id} className="border-t border-slate-100">
                 <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-start gap-x-2 px-3 py-1.5 sm:grid-cols-[1.25rem_minmax(0,1fr)_7rem_5rem_4.5rem] sm:items-center sm:px-4">
                   <label className="flex min-h-11 items-center justify-center sm:min-h-10"><input type="checkbox" aria-label={`${task.status === 'concluida' ? 'Reabrir' : 'Concluir'} ${task.title}`} checked={task.status === 'concluida'} disabled={busy||documentBusy} onChange={() => toggle(task)} className="h-4 w-4 accent-cyan-700"/></label>

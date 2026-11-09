@@ -4,7 +4,7 @@ tags: [estrategia, seguros, segmentacao, sfmc, regua]
 tipo: estrategia
 camada: estrategia
 aliases: [Estratégia de seguros, Segmentação de Seguros]
-atualizado: 2026-11-07
+atualizado: 2026-11-09
 status: proposto
 status_detalhe: estratégia operacional para CRM e Growth; contratos de DE e segmentação DEVICE propostos para validação no tenant
 fonte: decisões do Pablo em 06/11/2026; pacote SFMC e queries fornecidas; notas técnicas de Seguros
@@ -12,11 +12,41 @@ fonte: decisões do Pablo em 06/11/2026; pacote SFMC e queries fornecidas; notas
 
 # Estratégia de Segmentação de Seguros
 
-A estratégia organiza a oferta dos seguros Mulher, Residencial e Celular por duas formas de entrada: uma sequência mensal por produto e um acionamento por compra em categoria MCC. As duas frentes compartilham critérios de elegibilidade. A autorização de entrada e o acompanhamento da participação são separados por tipo de régua.
+A estratégia organiza a oferta dos seguros Mulher, Residencial e Celular conforme a elegibilidade e o momento de relacionamento de cada cliente. Queremos descobrir quais públicos geram contratações adicionais com uma pressão de contato adequada.
 
-Esta página reúne as regras, o percurso do cliente e as referências de configuração para o time de CRM e Growth preparar e conferir a implementação. Os mapas identificam condições, atividades, entidades e dependências. As fichas técnicas aprofundam campos, chaves, fontes, destinos, ações de gravação, SQLs disponíveis, testes e limitações.
+Existem duas formas de entrada: uma sequência recorrente de ofertas por produto, chamada **mensal**, e um **acionamento por compra** em categoria relacionada ao seguro, chamado trigger. Na sequência, o cliente percorre um produto por vez; no trigger, a entrada está prevista para o dia seguinte à compra, quando a fonte permitir.
 
-> **Estado da operação:** desenho proposto. As atividades de troca de arquivos da `processos_seguros` estão documentadas na referência de 04/11; seu estado atual precisa ser reconfirmado. As estruturas, nomes de queries e regras operacionais ampliadas abaixo são propostas para validação no tenant. A publicação desta página não cria DEs, homologa SQLs ou ativa jornadas.
+Antes de cada contato, verificamos permissões do canal, situação do cliente, solicitações em andamento e seguros já contratados. Para Residencial e Celular, o piloto proposto acrescenta o último acesso ao app. Para Celular, acrescenta uma lista de modelos e clusters de aparelhos a validar.
+
+> **Estado da operação:** estratégia e contratos propostos. Diagnóstico e desenho documentados não comprovam execução no SFMC. A integração existente precisa ser reconfirmada. Esta publicação organiza o trabalho; não cria DEs nem ativa automações ou disparos.
+
+## Como ler e decidir
+
+| Pergunta | Onde encontrar a resposta |
+|---|---|
+| Quem recebe cada seguro? | Público, recência do app e clusters de aparelho |
+| Quando recebe? | Sequência mensal ou compra em categoria MCC |
+| Quando espera, sai ou retorna? | Percurso e regras de convivência |
+| Como saber se funcionou? | Piloto, controle e medição |
+| O que falta para ativar? | Atividades compartilhadas com Testes e Tarefas, por frente |
+| Como implementar? | Mapas técnicos, fichas de DEs, atividades, SQLs e validações recolhíveis |
+
+**Mensal** é o nome da modalidade, não a promessa de um contato por mês. A duração da régua, seus contatos semanais e o intervalo entre produtos são parâmetros diferentes. **Sem avanço há mais de 15 dias** descreve um ciclo parado; não significa ausência de acesso ao app. **Aparelho identificado** não comprova cobertura comercial nem interesse em contratar.
+
+### Regras que precisam ficar à vista
+
+| Situação | Decisão do desenho |
+|---|---|
+| Mensal ativa ou autorizada para o mesmo seguro | Descartar trigger; não guardar o evento para depois |
+| Trigger ativo | Permite seleção mensal, respeitando pressão e revalidação |
+| Conclusão normal | Aguardar 15 dias configuráveis antes do próximo produto |
+| Mais de 15 dias sem avanço na semana | Invalidar ciclo e liberar próxima seleção sem acrescentar outra espera |
+| Formulário válido | Suspender ofertas daquele seguro nas duas frentes |
+| Posse confirmada | Encerrar aquisição daquele seguro |
+| Terminou a sequência | Retornar ao primeiro produto elegível; sem elegíveis, aguardar atualização |
+| Compra em Eletrônicos | Contexto de teste; não comprova compra de celular |
+
+Os detalhes de autorização, entrada efetiva, identidade do ciclo e exceções permanecem nas seções seguintes.
 
 ## 1. Intenção estratégica e escopo
 
@@ -41,12 +71,14 @@ flowchart TD
     POS["MAPA_SEGUROS<br/>Posse por produto · semântica a validar"] --> E
     SOL["Solicitações oficiais e retorno<br/>Fonte a reconciliar"] --> E
     COMP["Compra por categoria / MAPA_MCC<br/>Evento e atualização D+1 a validar"] --> E
-    DEV["SEGUROS_DEVICE_CPF · proposta<br/>Celular: segmentação complementar"] -.-> E
+    DEV["SEGUROS_DEVICE_CPF · proposta<br/>Celular: modelo e qualidade da observação"] -.-> E
+    APP["CLIENTES ATIVOS · ULTIMO_ACESSO<br/>Recência de app: Residencial e Celular"] -.-> E
+    MODELOS["Lista versionada de modelos · proposta<br/>Clusters de Celular a validar"] -.-> E
     E --> AP{"Conta, canal e produto aptos?<br/>Sem solicitação em processamento<br/>e sem posse confirmada?"}
     AP -->|Não / desconhecido| IMP["Sem nova oferta do produto<br/>Registrar motivo e pendência"]
   end
   subgraph M["Mensal · percurso por produto"]
-    AP -->|Sim| PM{"Próximo produto elegível<br/>e data de liberação atendida?"}
+    AP -->|Sim| PM{"Próximo produto elegível e liberação?<br/>Residencial/Celular: faixa de app do piloto<br/>Celular: modelo na lista aprovada?"}
     PM -->|Não| ESP["Aguardar condição<br/>SEM_PRODUTO_ELEGIVEL quando aplicável"]
     PM -->|Sim| AUT["Reservar ID_CICLO<br/>ENTRADA_PENDENTE"]
     AUT --> PUB["SEG_APTOS_*_MENSAL<br/>Nova entrada com identidade estável"]
@@ -96,6 +128,60 @@ Não exigimos valor mínimo da compra nesta versão. O valor acumulado de 12 mes
 
 A ordem inicial ainda precisa de aprovação. A recomendação é **Mulher → Residencial → Celular** para elegíveis a Mulher; **Residencial → Celular** para os demais. Produtos inelegíveis são pulados. Ao terminar a sequência, volta ao primeiro elegível; se nenhum estiver disponível, aguarda mudança de condição.
 
+### Último acesso ao app para Residencial e Celular
+
+Usar `ULTIMO_ACESSO` da CLIENTES ATIVOS como sinal de relacionamento com o app. Não substituir pela data de carga, cadastro ou último uso do DEVICE. Normalizar as datas para America/Sao_Paulo, conferir referência e qualidade da fonte e produzir uma linha por CPF, sem multiplicar clientes com várias contas. A regra de agregação entre contas deve ser homologada.
+
+| Faixa proposta | Uso inicial na mensal dos dois seguros |
+|---|---|
+| Até 30 dias | Público principal do piloto |
+| De 31 a 60 dias | Grupo de teste de ampliação |
+| De 61 a 90 dias | Expansão posterior, conforme volume e resultado |
+| Mais de 90 dias | Fora da oferta ativa inicial do piloto |
+| Ausente, inválido ou futuro | Dado desconhecido; separar dos inativos e investigar cobertura |
+
+As faixas são hipóteses de piloto, não condições da seguradora nem cortes homologados no tenant. Para datas de negócio, comparar hoje−30 até hoje, inclusive; depois hoje−60 até antes de hoje−30; depois hoje−90 até antes de hoje−60. Fixar fuso e data de referência da seleção para não sobrepor faixas. Uma carga recente com eventos antigos não renova o engajamento.
+
+O diagnóstico de 04/11 encontrou associação entre acesso recente e posse de Residencial. Isso motiva o teste, sem provar que filtrar por recência aumenta contratação. Não transferir automaticamente a mesma intensidade de associação para Celular.
+
+**Na entrada por compra:** registrar a faixa de app para análise; não impor silenciosamente o mesmo corte da mensal. A compra recente é outro sinal. O piloto do trigger precisa definir e registrar se haverá corte, teste ou apenas leitura por recência antes da liberação. Uso do app não comprova permissão ou uso de WhatsApp.
+
+### Segmentação por modelos para Seguro Celular
+
+No piloto mensal proposto, concentrar a oferta ativa em clientes com acesso recente ao app e smartphone identificado em uma lista de modelos selecionados. Os demais públicos podem participar de células menores de comparação, com regra, volume e autorização próprios. Não ampliar automaticamente para todo elegível.
+
+Essa proposta sucede a orientação anterior de oferta genérica ampla. Dado desconhecido não significa inelegibilidade comercial: significa que não há evidência para incluir a pessoa no núcleo deste piloto. Sem DEVICE atual e confiável, o piloto segmentado aguarda a fonte; eventual piloto genérico exige desenho e liberação próprios.
+
+| Verificação | Decisão necessária |
+|---|---|
+| Identificação | Converter código em marca/modelo padronizados e conferir atualidade da observação |
+| Condição comercial | Confirmar com Seguros restrições aplicáveis; não presumir aceitação pelo nome do modelo |
+| Seleção experimental | Aprovar lista de modelos exatos, versão, cluster e volume disponível |
+
+| Cluster ilustrativo | Composição a validar na base |
+|---|---|
+| Apple | Modelos de iPhone identificados individualmente |
+| Android intermediário | Modelos selecionados de Galaxy A e Moto G |
+| Android superior | Modelos selecionados de Galaxy S e Motorola Edge |
+| Demais modelos ou desconhecidos | Comparação limitada, sem expansão automática |
+
+Famílias são exemplos, não uma lista liberada. A lista final deve conter modelos exatos, códigos normalizados, regra de correspondência, condição comercial validada e versão. Se o volume não sustentar as células, reunir Androids antes de subdividir. Modelo não estima renda, preço ou plano; o cliente escolhe o plano na LP.
+
+O trigger permanece motivado por compra em **Eletrônicos**, com política de aplicação dos modelos e recência explicitamente definida no piloto. Detectar troca de aparelho é evolução separada, não requisito desse trigger. Primeira aparição de um registro pode ser reinstalação, não troca.
+
+### Dados e contrato complementar
+
+Pedir à IN dados atuais com CPF como texto de 11 dígitos, tipo, marca, modelo, sistema, último uso e referência real da extração. Abrir JSON e normalizar modelos na origem. Se houver vários aparelhos, selecionar o smartphone de uso mais recente com desempate estável. Confirmar finalidade de uso com o responsável pela fonte.
+
+A amostra de 100 linhas recebida em 04/11 tem referência de agosto/2025 e lacunas: explica a estrutura, mas não sustenta seleção atual. A data de carga não corrige isso.
+
+:::details Delta proposto dos contratos de seleção · ainda não implantado
+Transportar para elegibilidade e snapshot de entrada `ULTIMO_ACESSO_APP` (Date, anulável), `DT_REFERENCIA_SELECAO` (Date), `FAIXA_RECENCIA_APP` (Text; ATE_30D / DE_31_A_60D / DE_61_A_90D / MAIS_90D / DESCONHECIDO), `CLUSTER_MODELO` (Text), `VERSAO_LISTA_MODELOS` (Text) e identificação da célula experimental. Tamanhos finais, PK da lista de modelos, carga, retenção, nulos e versão da alocação ficam a homologar antes de criar DEs.
+
+Não reutilizar `SEGMENTO_DEVICE` como faixa de uso do app. Os três segmentos documentados abaixo descrevem qualidade/recência da observação do aparelho; o cluster de modelo e a recência do app são dimensões distintas. Campos de snapshots preservam a decisão original; bloqueios operacionais são revalidados antes de cada contato. DEVICE não necessário a Mulher ou Residencial não pode parar essas frentes.
+:::
+
+:::details Referência anterior de DEVICE · preservada para rastreabilidade, sucedida no piloto de 09/11
 ### Segmentação DEVICE para Seguro Celular
 
 Usar o aparelho para **priorizar e diferenciar o público**, mantendo o trigger por compra em Eletrônicos. Não precisamos começar com preço estimado, indicação automática de plano ou histórico de troca de aparelho.
@@ -119,6 +205,8 @@ O SFMC recebe colunas prontas. O JSON deve ser aberto e os códigos de modelo no
 **O que temos hoje:** uma amostra de 100 linhas recebida em 04/11, com referência de agosto/2025 e lacunas de data. Ela explica a estrutura, mas não sustenta seleção atual. Importar essa amostra hoje não torna os aparelhos recentes. Até receber uma fonte válida, classificar como SEM_DADO_CONFIAVEL e manter comunicação genérica. A finalidade de uso dessa fonte também precisa ser confirmada com seu responsável.
 
 Não inferir troca de aparelho apenas pela primeira aparição do registro: reinstalação do app pode gerar um novo registro. Não estimar renda, preço ou plano por marca. O cliente continua escolhendo o plano na LP. O resultado deve ser lido por segmento até contratação e, quando disponível, permanência.
+
+:::
 
 ## 4. Regras de convivência, cadência e controle de ciclo
 
@@ -173,7 +261,8 @@ flowchart TD
     S6 -->|Sim| S7 --> S8 --> S9 --> S10 --> S11 --> S12 --> S13 --> S14 --> S15
   end
   MCC["MAPA_MCC válida da frente Visa<br/>Não duplicar import; registrar referência"] --> S6
-  DEVICE["Fonte DEVICE · referência real<br/>Ausente / velha: apenas segmento genérico"] -.-> S8
+  APP["ULTIMO_ACESSO · CLIENTES ATIVOS<br/>Normalizar recência; snapshot na seleção"] -.-> S8
+  DEVICE["Fonte DEVICE e lista de modelos · proposta<br/>Ausente / velha: dado desconhecido<br/>Celular: aplicar política do piloto"] -.-> S8
   CONFIG["SEGUROS_CONFIG_ESTRATEGIA<br/>Parâmetros independentes e versionados"] --> S9
   S12 & S14 --> JORN["Seis jornadas por produto / tipo<br/>Configuração e reentrada a validar com Pablo"]
   JORN --> MARC["Seis SEG_MARCADOR_*<br/>ENTROU, SEMn, CONCLUIU, SAIU<br/>ID_CICLO do Journey Data original"]
@@ -515,7 +604,7 @@ DE condicional, não obrigatória se o lake oferecer esse contrato. Não contém
 | INTERVALO_MIN_TRIGGER_DIAS | A aprovar | NUMERO | A sugestão anterior de 30 dias ainda não é decisão. |
 | PERCENTUAL_CONTROLE | A aprovar | NUMERO | A sugestão anterior de 10% ainda não é decisão. |
 
-Parâmetro obrigatório ausente ou inválido bloqueia a etapa que depende dele. Não converter vazio em zero. Um parâmetro de DEVICE pendente não deve bloquear ofertas genéricas dos outros seguros.
+Parâmetro obrigatório ausente ou inválido bloqueia a etapa que depende dele. Não converter vazio em zero. Um parâmetro de DEVICE pendente não bloqueia Mulher ou Residencial; impede apenas a seleção de Celular que dependa dele. Oferta genérica de Celular exige desenho próprio liberado.
 :::
 
 :::details Fontes existentes: campos consumidos, sem recriação · contrato proposto
@@ -550,7 +639,7 @@ Cada etapa dependente ocupa um passo próprio no Automation Studio. Atividades n
 |---|---|---|---|
 | 0 | Registro de início / Script Activity | Referências das fontes → SEGUROS_EXECUCOES | Criar ID_EXECUCAO; STATUS=INICIADA. |
 | 1–5 existentes | Query, Extract, conversão, File Transfer e Import | LP → LP_SEGUROS_ATHENA → S3/Athena → MAPA_SEGUROS | Preservar as atividades existentes; confirmar nomes, horário e estado ativo com Pablo. |
-| 6 | Verificação de fontes / Verification e/ou Script Activity | Contagem, referência e chaves de MAPA, cadastro e compras | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha permite apenas segmento genérico. |
+| 6 | Verificação de fontes / Verification e/ou Script Activity | Contagem, referência e chaves de MAPA, cadastro e compras | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha fica como dado desconhecido; seleção de Celular dependente de modelo aguarda fonte. Oferta genérica exige célula ou desenho próprios liberados. |
 | 7 | Q_SEG_SOLICITACOES / SQL | LP oficial + retorno de contratação → SEGUROS_SOLICITACOES_CPF_PRODUTO | Update. Aceite válido inicia processamento; não apagar solicitação só porque saiu de uma foto da LP. |
 | 8 | Q_SEG_ELEGIBILIDADE / SQL | Cadastro deduplicado + posse + solicitações + DEVICE + MCC → SEGUROS_ELEGIBILIDADE_CPF | Overwrite somente após aprovação das fontes. Um CPF por linha; ausência de dado não vira posse=NAO. |
 | 9 | Q_SEG_CONTROLE_PREPARO / SQL | Controle atual + seis marcadores + elegibilidade + configuração → SEGUROS_CONTROLE_CPF_PREPARO | Overwrite da área de preparo. Aplicar primeiro supressões e solicitações, depois conclusão e inatividade. |
@@ -588,7 +677,7 @@ Fonte de definição: contrato de Automation Studio desta página. Os testes por
 | Configuração | Contrato proposto |
 |---|---|
 | Entrada e destino | Contagem, referência e chaves de MAPA, cadastro e compras |
-| Ação e condição | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha permite apenas segmento genérico. |
+| Ação e condição | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha fica como dado desconhecido; seleção de Celular dependente de modelo aguarda fonte. Oferta genérica exige célula ou desenho próprios liberados. |
 | Identidade da execução | ID_EXECUCAO deve acompanhar a decisão; ID_CICLO e ID_ENTRADA permanecem estáveis nas reexecuções aplicáveis. |
 | Dependência | Respeitar a sequência do mapa; somente as seleções por produto mutuamente exclusivas podem compartilhar passo após a decisão central. |
 | SQL / código | Implementação específica deste desenho ainda a escrever e homologar. Não reutilizar SQL de 04/11 sem compatibilizar campos e regras. |
@@ -1033,7 +1122,7 @@ Fonte técnica: [Salesforce — Update a Contact](https://help.salesforce.com/s/
 | Posse desconhecida ou fonte incompleta | Não transformar ausência em NAO; interromper a seleção afetada e registrar motivo. |
 | Marcador atrasado de outro ciclo | Ignorar e sinalizar; não reabrir participação antiga nem alterar a nova. |
 | Reexecução após falha parcial | Conferir escrita anterior; preservar os IDs e não duplicar autorização, ciclo ou entrada. |
-| DEVICE ausente, incerta ou desatualizada | Preservar segmento genérico quando os demais critérios permitem; não inferir preço, renda ou posse. |
+| DEVICE ausente, incerta ou desatualizada | Não incluir automaticamente no núcleo do piloto de modelos; registrar desconhecido. Oferta genérica somente em célula ou desenho próprios liberados; não inferir preço, renda ou posse. |
 | Compra agregada sem ID de transação | Identificar a limitação de grão; não contabilizar várias transações inexistentes nem prometer D+1 sem referência válida. |
 
 ## 9. Medição e limites de interpretação
@@ -1045,6 +1134,31 @@ As fontes devem permitir reconciliar o CPF e o produto sem duplicar contas/cart�
 Hipótese, janela de observação, grupo controle, alocação, critérios de sucesso e regra de decisão ainda precisam ser aprovados para o desenho atual. O controle de 10% e os filtros presentes no SQL anterior não são herdados automaticamente. Comparar recortes com denominadores e janelas equivalentes; volume bruto de públicos distintos não demonstra efeito incremental.
 
 Os resultados operacionais continuam em [[10-Resultados/Mecanicas/Seguros|Seguros]] e no BI. Esta nota define regras e limitações e referencia as fontes; não cria uma tabela de performance paralela.
+
+### Sequência dos testes do piloto
+
+Primeiro avaliar ampliação de recência (até 30 versus 31–60 dias), depois o desempenho por modelos dentro de faixas equivalentes e, em etapa posterior, a mensagem genérica versus personalizada pelo aparelho. Não alterar seleção, canal e copy simultaneamente e atribuir o resultado a um só fator.
+
+Reservar controle aleatório sem comunicação daquele seguro dentro de cada público testado. Proporção, tamanho, janela, orçamento e critério de decisão dependem do volume e precisam ser aprovados; 10% do desenho antigo não é regra herdada. Grupos de recência e marcas diferentes não foram sorteados entre si: a diferença bruta entre eles não prova causalidade. Avaliar tratamento contra controle dentro do público, com incerteza e exposição a outras réguas registradas.
+
+Resultado principal: contratação confirmada por cliente elegível no público/célula alocado, com leitura por produto e frente. Acompanhar custo, formulários, opt-out e permanência quando houver fonte. Sem retorno confiável, relatar geração de solicitações, não vendas. Registrar janelas equivalentes e não escalar por volume bruto ou clique isolado.
+
+## Atividades e liberação por frente
+
+O bloco interativo **Atividades: Construção e ativação de Seguros** usa os mesmos registros de Testes e Tarefas. Separa histórico documental, preparação comum, seis frentes e evoluções. Cada registro mantém responsável, próxima ação, dependências, critérios de aceite, evidências e histórico. Conclusão documental não certifica execução no SFMC.
+
+| Frente | O que precisa ser resolvido especificamente |
+|---|---|
+| Mulher · Mensal | Critérios comerciais, posse, posição na sequência e adaptação da régua existente |
+| Mulher · Trigger | Saúde e Beleza, fonte D+1, identidade de evento e descarte por mensal ativa/autorizada |
+| Residencial · Mensal | Flags de posse, faixas de acesso ao app, volumes, controle e régua |
+| Residencial · Trigger | Eletrodomésticos, D+1, política de recência e convivência |
+| Celular · Mensal | DEVICE atual, lista de modelos, clusters, recência, amostras e seleção |
+| Celular · Trigger | Eletrônicos, D+1, política de modelos/recência e compras sem aparelho identificado |
+
+Em cada frente: conferir público → revisar peças, canais, links, LP e tracking → configurar jornada e saídas → homologar seedlist/Preview/Test Send → validar retorno → registrar liberação do piloto → conferir primeira execução → decidir continuidade. Liberação da automação e liberação de disparo são marcos separados. Cada canal requer seu próprio aceite; um canal pendente não fica homologado pela validação de outro.
+
+As seis frentes têm prontidão própria. Dependências comuns são verificadas em cada liberação, sem exigir DEVICE para os outros produtos nem novos sinais de CEP/MCC para lançar os triggers já desenhados. Automação sem envio deve comprovar reexecução sem duplicação, recuperação de falha e inicialização do estado de quem já participa das réguas existentes.
 
 ## 10. Decisões pendentes, evolução e fontes
 
@@ -1065,3 +1179,7 @@ As notas de 04/11 preservam o diagnóstico e o desenho anterior. Para a nova imp
 ### Revisão editorial de 07/11/2026
 
 Estrutura e fluxos reorganizados no modelo da [[Estrategia-Pool-de-Ofertas-Visa|estratégia Visa]], com narrativa, fichas expansíveis e referência aos SQLs disponíveis. Preservados os contratos locais de DEs, DEVICE e Automation Studio como propostas. O mapa principal usa o desenho mensal/trigger atual; a extensão anterior de movimento/snapshot permanece separada e identificada. A revisão não homologa configurações nem ativa automações.
+
+### Revisão integrada de 09/11/2026
+
+Revisão autorizada por Pablo nesta conversa: abertura didática e regras visíveis; piloto por recência de app para Residencial/Celular; lista de modelos e clusters de Celular; atividades compartilhadas e liberação independente das seis frentes. Fichas e SQLs preservados; mapas ampliados com recência de app e lista de modelos, mantendo condições e caminhos anteriores. Referências anteriores de DEVICE mantidas como histórico, sem vigência automática. Publicação da documentação e do plano de trabalho não ativa campanhas nem homologa as novas hipóteses.

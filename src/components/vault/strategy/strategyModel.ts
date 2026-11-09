@@ -6,7 +6,7 @@ export interface StrategyDocument { title: string; summary: string; blocks: Stra
 export interface StrategyHead { note_id: string; revision: number; source_hash: string; source_markdown: string; document: StrategyDocument; updated_at: string; updated_by: string }
 export interface StrategyRevision extends Omit<StrategyHead, 'updated_at' | 'updated_by'> { actor_id: string; created_at: string; reason: string }
 export const isStrategyPilot = (note?: Pick<VaultNote, 'relative_path'> | null) => Boolean(note?.relative_path.startsWith('05-Estrategia/'));
-export const hasVisaActivities = (note?: Pick<VaultNote, 'relative_path'> | null) => note?.relative_path === STRATEGY_PATH;
+export const hasVisaActivities = (note?: Pick<VaultNote, 'relative_path'> | null) => [STRATEGY_PATH, '05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md'].includes(note?.relative_path || '');
 export function initialStrategy(note: Pick<VaultNote, 'title' | 'content_markdown'> & Partial<Pick<VaultNote,'relative_path'>>): StrategyDocument {
   const source = note.content_markdown.replace(/\r\n?/g, '\n').replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---\r?\n/, '').replace(/^\s*# [^\n]+\n/, '');
   const lines = source.split('\n');
@@ -28,10 +28,11 @@ export function initialStrategy(note: Pick<VaultNote, 'title' | 'content_markdow
   sections.push({ id, title, type:'markdown', content:body.join('\n') });
   const intro = sections.shift()!;
   const paragraphs=intro.content.trim().split(/\n\s*\n/);
-  const summary=paragraphs.slice(0,2).join('\n\n');
-  const remainder=paragraphs.slice(2).join('\n\n');
+  const summaryCount=note.relative_path==='05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md'?3:2;
+  const summary=paragraphs.slice(0,summaryCount).join('\n\n');
+  const remainder=paragraphs.slice(summaryCount).join('\n\n');
   return { title: note.title, summary, blocks: [
-    ...(note.relative_path===STRATEGY_PATH ? [{ id:'pilot-activities', type:'tasks' as const, title:'Atividades: Construção do Piloto', content:'' }] : []),
+    ...(hasVisaActivities(note as Pick<VaultNote,'relative_path'>) ? [{ id:'pilot-activities', type:'tasks' as const, title:note.relative_path===STRATEGY_PATH?'Atividades: Construção do Piloto':'Atividades: Construção e ativação de Seguros', content:'' }] : []),
     ...(remainder.trim() ? [{...intro,content:remainder}] : []),
     ...sections,
   ], taskLayout:{hidden:[],order:[]} };

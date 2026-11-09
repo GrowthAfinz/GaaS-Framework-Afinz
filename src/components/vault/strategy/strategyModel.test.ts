@@ -20,10 +20,10 @@ describe('strategy pilot document',()=>{
  });
 });
 
-it('imports insurance topics and diagrams without adding the Visa checklist',()=>{
+it('imports insurance topics and diagrams with the insurance activity binding',()=>{
  const content=readFileSync(new URL('../../../../docs/wiki-vault/05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md',import.meta.url),'utf8');
  const doc=initialStrategy({title:'Estratégia de Segmentação de Seguros',content_markdown:content,relative_path:'05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md'});
- expect(doc.blocks.some(b=>b.type==='tasks')).toBe(false);
+ expect(doc.blocks.find(b=>b.type==='tasks')?.title).toBe('Atividades: Construção e ativação de Seguros');
  expect(exportStrategy(doc).match(/```mermaid/g)).toHaveLength(3);
  expect(exportStrategy(doc).match(/```sql/g)).toHaveLength(3);
  expect(exportStrategy(doc)).toContain('SEGUROS_DEVICE_CPF');

@@ -60,12 +60,12 @@
 .strategy-prose details{box-shadow:none!important;margin:8px 0;border-color:#e2e7e9}
 .strategy-prose details summary{background:#f9fbfb;padding:10px 12px;font-size:13px;font-weight:500}
 .strategy-prose figure{border-color:#e0e5e8;box-shadow:none}
-.strategy-task-block>div>section[aria-label="Atividades: Construção do Piloto"]{border:0;margin:0}
-.strategy-task-block section[aria-label="Atividades: Construção do Piloto"]>div:first-child{display:none}
-.strategy-task-block section[aria-label="Atividades: Construção do Piloto"]>div:nth-child(2)>div:first-child{padding:0 0 8px;font-size:12px}
-.strategy-task-block section[aria-label="Atividades: Construção do Piloto"] article>div:first-child{padding:5px 0}
-.strategy-task-block section[aria-label="Atividades: Construção do Piloto"] article>div:first-child>button span:first-child{font-size:14px}
-.strategy-task-block section[aria-label="Atividades: Construção do Piloto"]>div:nth-child(2)>p:last-child{font-size:11px;padding:10px 0;color:#839098}
+.strategy-task-block>div>section[aria-label^="Atividades: Construção"]{border:0;margin:0}
+.strategy-task-block section[aria-label^="Atividades: Construção"]>div:first-child{display:none}
+.strategy-task-block section[aria-label^="Atividades: Construção"]>div:nth-child(2)>div:first-child{padding:0 0 8px;font-size:12px}
+.strategy-task-block section[aria-label^="Atividades: Construção"] article>div:first-child{padding:5px 0}
+.strategy-task-block section[aria-label^="Atividades: Construção"] article>div:first-child>button span:first-child{font-size:14px}
+.strategy-task-block section[aria-label^="Atividades: Construção"]>div:nth-child(2)>p:last-child{font-size:11px;padding:10px 0;color:#839098}
 .strategy-editor{border-left:2px solid #007c80;background:#f8fbfa;padding:18px;margin:12px 0;grid-column:1/-1}
 .strategy-editor fieldset{border:0;min-width:0;padding:0}
 .strategy-editor label{display:block;font-size:13px;font-weight:600;color:#52646d}
@@ -96,7 +96,7 @@
 @media(max-width:680px){.wiki-strategy{display:block}.strategy-nav{position:static;padding:14px;border-right:0;border-bottom:1px solid #d7dfe2}.strategy-nav nav{display:none}.strategy-nav>.strategy-help{display:none}.strategy-search{margin:0}.strategy-main{padding:18px 14px}.strategy-title h1{font-size:27px}.strategy-meta{font-size:11px;gap:7px}.strategy-section-toggle h2{font-size:20px}.strategy-page-actions{justify-content:space-between;gap:8px}.strategy-footer{display:block}.strategy-icon,.strategy-page-actions>button,.strategy-editor-actions button,.strategy-menu>div>button{min-height:44px}.strategy-icon{min-width:38px}.strategy-editor{padding:12px}.strategy-prose table{display:block;overflow-x:auto}.strategy-prose{font-size:14px}.strategy-task-block section article>div:first-child{column-gap:4px;grid-template-columns:2.25rem minmax(0,1fr) 4.5rem}.strategy-menu>div{width:190px}}
 @media(prefers-reduced-motion:reduce){.wiki-strategy *{scroll-behavior:auto!important;transition:none!important}}
 @media(min-width:1001px){.wiki-strategy{grid-template-columns:280px minmax(0,1fr)}}
-.strategy-task-block section[aria-label="Atividades: Construção do Piloto"] article>div:first-child{padding-top:3px;padding-bottom:3px}
+.strategy-task-block section[aria-label^="Atividades: Construção"] article>div:first-child{padding-top:3px;padding-bottom:3px}
 .strategy-task-block section article>div:first-child>button{min-height:34px}
 .strategy-task-block section article>div:first-child>label{min-height:36px}
 .strategy-source-status{border-bottom:1px solid #dce3e6;font-size:12px;color:#6d7a81;padding:9px 0}.strategy-source-status>summary{cursor:pointer}.strategy-footer-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
