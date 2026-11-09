@@ -20,7 +20,7 @@ async function setup(){
  await db.query('insert into gaas_vault_notes values($1,$2,$3,$4,null)',[note,'05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md','base',original]);
  await db.exec(migration);
  await db.exec(readFileSync('supabase/migrations/20261106204000_wiki_strategy_pilot_member_gate.sql','utf8'));
- await db.exec(readFileSync('supabase/migrations/20261107001500_wiki_strategy_notes.sql','utf8'));
+ await db.exec(readFileSync('supabase/migrations/20261107001500_wiki_strategy_notes.sql','utf8'));await db.exec(readFileSync('supabase/migrations/20261109141118_insurance_strategy_task_binding.sql','utf8'));
  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${admin}',false);`);
  const save=async(doc,revision=0,hash='base',request=crypto.randomUUID(),reconcile=false)=>(await db.query('select public.gaas_wiki_pilot_save($1,$2,$3,$4,$5,$6,$7) r',[note,revision,hash,JSON.stringify(doc),request,'Teste',reconcile])).rows[0].r;
  return{db,save};
@@ -75,12 +75,12 @@ test('malformed payloads and duplicate blocks are rejected transactionally',asyn
  }finally{await db.close();}
 });
 
-test('strategy folder is enabled without leaking the Visa task binding into insurance or other folders',async()=>{
+test('strategy folder is enabled enables insurance binding but denies other folders',async()=>{
  const{db,save}=await setup();try{
  await db.exec("reset role;update gaas_vault_notes set relative_path='05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md';set role authenticated;");
  assert.equal((await save(initial)).revision,1);
- await assert.rejects(save({...initial,blocks:[{id:'visa',type:'tasks',title:'Visa',content:''}]},1),/task_binding_not_enabled/);
+ assert.equal((await save({...initial,blocks:[{id:'insurance',type:'tasks',title:'Seguros',content:''}]},1)).revision,2);
  await db.exec("reset role;update gaas_vault_notes set relative_path='04-Operacao/Outro.md';set role authenticated;");
- await assert.rejects(save(initial,1),/note_not_enabled/);
+ await assert.rejects(save(initial,2),/note_not_enabled/);
  }finally{await db.close();}
 });
