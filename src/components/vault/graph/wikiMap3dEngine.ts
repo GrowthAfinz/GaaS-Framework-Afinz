@@ -1,5 +1,5 @@
 // 3D map of the Wiki. The rendering approach (bubbles with a rim, one draw call
-// for every edge, HTML labels with collision, fog, camera flights, signal dots)
+// for every edge, HTML labels with collision, fog, camera flights)
 // is adapted from Second Brain OS — MIT License, (c) 2026 undefined-ui/second-brain-os.
 // Loaded on demand: three.js only downloads when someone opens Conexões.
 import * as THREE from "three";
@@ -219,7 +219,6 @@ export function createWikiMap(
     geo.setPositions(pos); geo.setColors(col);
     hl.mesh.geometry.dispose(); hl.mesh.geometry = geo; hl.mesh.visible = list.length > 0;
     if (list.length) updateHL();
-    buildParticles();
   }
   function updateHL() {
     const buf = (hl.mesh.geometry.attributes.instanceStart as THREE.InterleavedBufferAttribute).data, arr = buf.array as Float32Array;
@@ -227,46 +226,6 @@ export function createWikiMap(
     buf.needsUpdate = true;
   }
 
-  // signal dots running along the edges of the selection
-  const PMAX = 900;
-  const ppos = new Float32Array(PMAX * 3), pcol = new Float32Array(PMAX * 3);
-  const pgeo = new THREE.BufferGeometry();
-  pgeo.setAttribute("position", new THREE.BufferAttribute(ppos, 3).setUsage(THREE.DynamicDrawUsage));
-  pgeo.setAttribute("color", new THREE.BufferAttribute(pcol, 3));
-  pgeo.setDrawRange(0, 0);
-  const dotTex = (() => {
-    const c = document.createElement("canvas"); c.width = c.height = 64;
-    const x = c.getContext("2d")!, g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-    g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.45, "rgba(255,255,255,.95)"); g.addColorStop(1, "rgba(255,255,255,0)");
-    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-    return new THREE.CanvasTexture(c);
-  })();
-  const pmat = new THREE.PointsMaterial({ size: 5.5, sizeAttenuation: false, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, opacity: 0 });
-  const points = new THREE.Points(pgeo, pmat);
-  points.frustumCulled = false; points.renderOrder = 3;
-  scene.add(points);
-  let particles: { l: EngineLink; out: boolean; ph: number; sp: number }[] = [];
-  function buildParticles() {
-    particles = [];
-    if (REDUCED || !S.sel) { pgeo.setDrawRange(0, 0); return; }
-    for (const l of hl.list) {
-      const out = l._S === S.sel, far = out ? l._T : l._S;
-      const c = new THREE.Color(dotOf(far)).lerp(new THREE.Color("#ffffff"), 0.12), k = l.kind === "contains" ? 1 : 2;
-      for (let j = 0; j < k && particles.length < PMAX; j++) {
-        particles.push({ l, out, ph: j / k + Math.random() * 0.25, sp: 0.28 + Math.random() * 0.14 });
-        pcol.set([c.r, c.g, c.b], (particles.length - 1) * 3);
-      }
-    }
-    pgeo.attributes.color.needsUpdate = true; pgeo.setDrawRange(0, particles.length);
-  }
-  function updateParticles(t: number) {
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i], a = p.out ? p.l._S : p.l._T, b = p.out ? p.l._T : p.l._S;
-      const k = (t * 0.001 * p.sp + p.ph) % 1, e = k * k * (3 - 2 * k);
-      ppos[i * 3] = lerp(a.x!, b.x!, e); ppos[i * 3 + 1] = lerp(a.y!, b.y!, e); ppos[i * 3 + 2] = lerp(a.z!, b.z!, e);
-    }
-    pgeo.attributes.position.needsUpdate = true;
-  }
 
   // ---------------------------------------------------------------- highlight
   const focusSetOf = (n: EngineNode) => { const s = new Set([n.id]); for (const id of nbr.get(n.id)!) if (visible(byId.get(id)!)) s.add(id); return s; };
@@ -545,9 +504,8 @@ export function createWikiMap(
       if (Math.abs(l._a - l._at) > 0.002) { l._a = lerp(l._a, l._at, 0.09); lcol[i * 8 + 3] = lcol[i * 8 + 7] = l._a; lchg = true; }
     }
     if (lchg) lgeo.attributes.color.needsUpdate = true;
-    hl.o = lerp(hl.o, hl.ot, 0.07); hl.mat.opacity = hl.o; pmat.opacity = hl.o;
+    hl.o = lerp(hl.o, hl.ot, 0.07); hl.mat.opacity = hl.o;
     if (now - lastLinks > 32 || flight) { updateLinkPositions(); lastLinks = now; }
-    if (particles.length) updateParticles(now);
     const dist = camera.position.distanceTo(controls.target), fog = scene.fog as THREE.Fog;
     fog.near = dist * 0.95; fog.far = dist * 3.4;
     applyView();
