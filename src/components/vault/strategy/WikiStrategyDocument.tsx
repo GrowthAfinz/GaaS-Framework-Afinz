@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, Children, isValidElement, type ReactNode, type ComponentProps } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Copy, Download, History, MoreHorizontal, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, History, MoreHorizontal, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { VaultNote } from '../vaultTypes';
@@ -19,6 +19,11 @@ import { supabase } from '../../../services/supabaseClient';
 
 type EditDraft = { kind:'block'; block:StrategyBlock; isNew:boolean; after?:string; fragment?:DetailAnchor } | {kind:'header';title:string;summary:string};
 const cleanTitle = (s:string)=>s.replace(/^\d+\.\s*/, '');
+const defaultClosed=(note:VaultNote)=>new Set(initialStrategy(note).blocks.filter(b=>b.id==='visao-geral'||/fichas? t[eé]cnicas?|onde isso fica|automation|refer[eê]ncias t[eé]cnicas/i.test(b.title)).map(b=>b.id));
+const closedKey=(noteId:string)=>'gaas-wiki-closed:'+noteId;
+// Remember which sections each reader collapsed, per note. Storage may be unavailable; fall back to the editorial default.
+const readClosed=(note:VaultNote):Set<string>=>{try{const raw=localStorage.getItem(closedKey(note.id));const ids:unknown=raw?JSON.parse(raw):null;if(Array.isArray(ids))return new Set(ids.filter((id):id is string=>typeof id==='string'));}catch{/* Storage unavailable. */}return defaultClosed(note);};
+const TRANSIENT_MESSAGE_MS=4000;
 const navTitle=(b:StrategyBlock)=>({'pilot-activities':'Atividades do piloto','2-o-percurso-completo-da-base-a-medicao':'Percurso','3-quem-entra-e-como-o-teste-compara-os-publicos':'Públicos e teste','4-a-experiencia-editorial-e-a-vitrine':'Experiência editorial','5-mapa-tecnico-das-automacoes':'Automações','6-ficha-tecnica-das-data-extensions':'Data Extensions','7-ficha-tecnica-das-atividades-e-sqls':'Atividades e SQLs','8-como-medir-e-o-que-falta-validar':'Medição'}[b.id]||cleanTitle(b.title));
 
 function Markdown({content,onOpen,onEditPart,editDisabled}:{content:string;onOpen?:(target:string)=>void;onEditPart?:(part:MarkdownPart)=>void;editDisabled?:boolean}) {
@@ -35,7 +40,8 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const [source,setSource]=useState(note),[head,setHead]=useState<StrategyHead|null>(null),[doc,setDoc]=useState(()=>initialStrategy(note));
  const [canEdit,setCanEdit]=useState(false),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [edit,setEdit]=useState<EditDraft|null>(null),[preview,setPreview]=useState(false),[taskDirty,setTaskDirty]=useState(false);
- const [closed,setClosed]=useState<Set<string>>(()=>new Set(initialStrategy(note).blocks.filter(b=>b.id==='visao-geral'||/fichas? t[eé]cnicas?|onde isso fica|automation|refer[eê]ncias t[eé]cnicas/i.test(b.title)).map(b=>b.id))),[active,setActive]=useState('visao-geral'),[query,setQuery]=useState('');
+ const [closed,setClosed]=useState<Set<string>>(()=>readClosed(note)),[active,setActive]=useState('visao-geral'),[query,setQuery]=useState('');
+ const manualActiveUntil=useRef(0);
  const [mobileIndex,setMobileIndex]=useState(false);
  const [historyOpen,setHistoryOpen]=useState(false),[revisions,setRevisions]=useState<StrategyRevision[]>([]),[selectedRevision,setSelectedRevision]=useState<StrategyRevision|null>(null),[historyError,setHistoryError]=useState('');
  const [reconciling,setReconciling]=useState(false),[retry,setRetry]=useState(0),[revisionWarning,setRevisionWarning]=useState(false);
@@ -47,6 +53,9 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const locked=busy||dirty;
  const sourceChanged=Boolean(head&&head.source_hash!==source.content_hash);
  const sourceOperation=source.content_markdown.match(/^> \*\*Estado da operação:\*\*[^\n]+/m)?.[0]||'';
+ // The badge already shows the document status; repeat it in text only when the badge shows the operation stage instead.
+ const docStatus=source.status||'a-validar';
+ const stateLabel=/PREPARAÇÃO/.test(sourceOperation)?'Em preparação':source.status||'Em revisão';
  const request=useRef<{body:string;id:string}|null>(null);
  useEffect(()=>{let active=true;setLoading(true);void loader(note.id).then(next=>{if(!active)return;setSource(next.source);setHead(next.head);setDoc(next.head?.document||initialStrategy(next.source));setCanEdit(next.canEdit);setError('');setRevisionWarning(false);
  const key=next.viewerId?'gaas-wiki-draft:'+next.viewerId+':'+note.id:null;setDraftKey(key);
@@ -61,6 +70,18 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
    requestAnimationFrame(()=>{const element=document.getElementById(id);let parent=element?.parentElement;while(parent){if(parent instanceof HTMLDetailsElement)parent.open=true;parent=parent.parentElement;}element?.scrollIntoView({block:'start'});});
   };reveal();window.addEventListener('hashchange',reveal);return()=>window.removeEventListener('hashchange',reveal);
  },[doc]);
+ useEffect(()=>{try{localStorage.setItem(closedKey(note.id),JSON.stringify([...closed]));}catch{/* Storage unavailable. */}},[closed,note.id]);
+ // Feedback like "Edição cancelada." is transient; a recovered draft stays visible until the reader acts on it.
+ useEffect(()=>{if(!message||message.startsWith('Rascunho recuperado'))return;const timer=window.setTimeout(()=>setMessage(''),TRANSIENT_MESSAGE_MS);return()=>window.clearTimeout(timer);},[message]);
+ // Scroll-spy: the index follows the section being read. Listens in capture phase because the scroll container is an app ancestor, not the window.
+ useEffect(()=>{let frame=0;
+  const update=()=>{frame=0;if(Date.now()<manualActiveUntil.current)return;const line=window.innerHeight*0.3;let current='visao-geral';
+   for(const block of doc.blocks){const element=document.getElementById(block.id);if(!element||element.hidden)continue;const top=element.getBoundingClientRect().top;if(top<=line)current=block.id;else break;}
+   setActive(current);};
+  const onScroll=()=>{if(!frame)frame=requestAnimationFrame(update);};
+  document.addEventListener('scroll',onScroll,{capture:true,passive:true});window.addEventListener('resize',onScroll);
+  return()=>{document.removeEventListener('scroll',onScroll,{capture:true});window.removeEventListener('resize',onScroll);if(frame)cancelAnimationFrame(frame);};
+ },[doc.blocks]);
  const notifyTaskDirty=useCallback((value:boolean)=>setTaskDirty(value),[]);
  const protect=()=>{if(locked){setMessage('Salve ou cancele a edição atual antes de continuar.');return true;}return false;};
  const focusBack=()=>requestAnimationFrame(()=>opener.current?.isConnected&&opener.current.focus({preventScroll:true}));
@@ -87,7 +108,10 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
   const content=type==='table'?'| Campo | Descrição |\n|---|---|\n| | |':type==='diagram'?'```mermaid\nflowchart LR\n  A[Início] --> B[Próximo passo]\n```':'';
   startEdit({kind:'block',isNew:true,after,block:{id:'block-'+crypto.randomUUID(),type:'markdown',title:type==='table'?'Nova tabela':type==='diagram'?'Novo diagrama':'Nova seção',content}},element);
  };
- const jump=(id:string)=>{setQuery('');setMobileIndex(false);setActive(id);setClosed(c=>{const next=new Set(c);next.delete(id);return next;});requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));};
+ const collapsible=doc.blocks.filter(b=>b.id!=='visao-geral');
+ const allClosed=collapsible.length>0&&collapsible.every(b=>closed.has(b.id));
+ const toggleAll=()=>{if(taskDirty||edit){setMessage('Salve ou cancele a edição antes de recolher.');return;}setClosed(allClosed?new Set():new Set(doc.blocks.map(b=>b.id)));};
+ const jump=(id:string)=>{manualActiveUntil.current=Date.now()+1000;setQuery('');setMobileIndex(false);setActive(id);setClosed(c=>{const next=new Set(c);next.delete(id);return next;});requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));};
  const closeHistory=()=>{dialog.current?.close();setHistoryOpen(false);setSelectedRevision(null);setReconciling(false);focusBack();};
  const download=()=>{const working=edit?.kind==='header'?{...doc,title:edit.title,summary:edit.summary}:edit?.kind==='block'?{...doc,blocks:(edit.isNew||!doc.blocks.some(b=>b.id===edit.block.id))?[...doc.blocks,edit.block]:doc.blocks.map(b=>{if(b.id!==edit.block.id)return b;if(!edit.fragment)return edit.block;try{return {...b,content:replaceStrategyDetail(b.content,edit.fragment,edit.block.title,edit.block.content)};}catch{return {...b,content:b.content+'\n\n### Rascunho recuperado: '+edit.block.title+'\n\n'+edit.block.content};}})}:doc;const blob=new Blob([exportStrategy(working)],{type:'text/markdown;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=source.relative_path.split('/').pop()?.replace(/\.md$/,'-trabalho.md')||'estrategia-trabalho.md';a.click();URL.revokeObjectURL(url);};
  const editor=(draft:EditDraft)=><div ref={editorRef} className="strategy-editor"><form onSubmit={e=>{e.preventDefault();saveEdit();}}><fieldset disabled={busy}>
@@ -99,16 +123,17 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  </fieldset></form></div>;
  return <div className="wiki-strategy" onClickCapture={e=>{const button=(e.target as HTMLElement).closest('.strategy-menu button');button?.closest('details')?.removeAttribute('open');}} aria-label={doc.title+' · estratégia colaborativa'} aria-busy={loading||busy}>
   <aside className="strategy-nav"><button type="button" className="strategy-mobile-index" aria-expanded={mobileIndex} aria-controls="strategy-document-index" onClick={()=>setMobileIndex(!mobileIndex)}>Nesta estratégia <ChevronDown size={16}/></button><label className="strategy-search"><Search size={16}/><input aria-label="Buscar nesta nota" placeholder="Buscar nesta nota" value={query} onChange={e=>setQuery(e.target.value)}/></label>
-   <nav id="strategy-document-index" className={mobileIndex?'is-open':''} aria-label="Índice da estratégia"><button className={active==='visao-geral'?'is-active':''} onClick={()=>{setQuery('');setMobileIndex(false);setActive('visao-geral');document.getElementById('strategy-header')?.scrollIntoView();}}>Visão geral</button>{doc.blocks.filter(b=>b.id!=='visao-geral').map(b=><button key={b.id} className={active===b.id?'is-active':''} onClick={()=>jump(b.id)}>{navTitle(b)}</button>)}</nav>
+   <nav id="strategy-document-index" className={mobileIndex?'is-open':''} aria-label="Índice da estratégia"><button className={active==='visao-geral'?'is-active':''} onClick={()=>{manualActiveUntil.current=Date.now()+1000;setQuery('');setMobileIndex(false);setActive('visao-geral');document.getElementById('strategy-header')?.scrollIntoView();}}>Visão geral</button>{doc.blocks.filter(b=>b.id!=='visao-geral').map(b=><button key={b.id} className={active===b.id?'is-active':''} onClick={()=>jump(b.id)}>{navTitle(b)}</button>)}</nav>
    <p className="strategy-help">{head?'Versão de trabalho · r'+head.revision:'Fonte do vault'}<br/>{canEdit?'Alterações recuperáveis no histórico.':'Leitura · edição conforme permissões atuais.'}</p>
   </aside>
   <main className="strategy-main">
    <header id="strategy-header" className="strategy-header"><div className="strategy-breadcrumb"><button onClick={()=>{if(!protect()){if(onHome)onHome();else window.location.assign('?view=learning&section=vault&wiki_topic=strategies');}}}>Wiki</button><ChevronRight size={12}/><span>Estratégias</span></div><div className="strategy-page-actions">
+    {collapsible.length>1&&<button type="button" aria-pressed={allClosed} onClick={toggleAll}>{allClosed?<><ChevronsUpDown size={17}/>Expandir seções</>:<><ChevronsDownUp size={17}/>Recolher seções</>}</button>}
     <button disabled={busy} onClick={e=>{opener.current=e.currentTarget;setHistoryOpen(true);}}><History size={17}/>Histórico</button>
     {canEdit&&<button className="strategy-primary" disabled={locked||sourceChanged} onClick={e=>add('text',undefined,e.currentTarget)}><Plus size={17}/>Adicionar seção</button>}
    </div>
    <div className="strategy-title"><h1>{doc.title}</h1>{canEdit&&<button className="strategy-icon" disabled={locked||sourceChanged} aria-label="Editar título e apresentação" onClick={e=>startEdit({kind:'header',title:doc.title,summary:doc.summary},e.currentTarget)}><Pencil size={15}/></button>}</div>
-   <div className="strategy-meta"><span className="strategy-state">{/PREPARAÇÃO/.test(sourceOperation)?'Em preparação':source.status||'Em revisão'}</span><span>Estado documental: {source.status||'a-validar'}</span>{head&&<span>Salva em {new Date(head.updated_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</span>}{sourceOperation&&<details className="strategy-source-status"><summary>Estado da operação · SQLs a validar</summary><div className="strategy-prose"><Markdown content={sourceOperation} onOpen={onOpen}/></div></details>}</div>
+   <div className="strategy-meta"><span className="strategy-state">{stateLabel}</span>{stateLabel!==docStatus&&<span>Estado documental: {docStatus}</span>}{head&&<span>Salva em {new Date(head.updated_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</span>}{sourceOperation&&<details className="strategy-source-status"><summary>Estado da operação · SQLs a validar</summary><div className="strategy-prose"><Markdown content={sourceOperation} onOpen={onOpen}/></div></details>}</div>
    {edit?.kind==='header'?editor(edit):<div className="strategy-prose strategy-summary"><Markdown content={doc.summary} onOpen={onOpen}/></div>}
    </header>
    {loading&&<p role="status" className="strategy-notice">Consultando a versão de trabalho…</p>}

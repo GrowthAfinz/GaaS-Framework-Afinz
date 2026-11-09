@@ -136,7 +136,6 @@ export const GrowthLearningWorkspace: React.FC<
     <div className={section === "investigations" ? "min-h-[calc(100vh-5rem)] bg-white pb-4" : "min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 pb-4 sm:px-5"}>
       <div
         className={"learning-workspace mx-auto max-w-[1800px] "+(section === "investigations" ? "space-y-0" : "space-y-4")}
-        style={{ fontFamily: "Segoe UI, Arial, sans-serif" }}
       >
         {/* Submenu colado no topo e na barra logo abaixo, separados só por uma linha */}
         <header className="overflow-hidden border-x border-b border-slate-200 bg-white">

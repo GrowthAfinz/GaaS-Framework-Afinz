@@ -1,5 +1,5 @@
 /* 3D map of the Wiki (Conexões). Layout and node look adapted from Second Brain OS (MIT);
-   colors are the Afinz palette and the type is the Wiki's (Segoe UI).
+   colors are the Afinz palette and the type is inherited from the app.
    The theme switch only affects the map: Leitura and Notas stay light like the rest of GaaS. */
 .wiki-map3d {
   --m-paper: #f3f6f6;
@@ -30,7 +30,7 @@
   position: relative;
   overflow: hidden;
   color: var(--m-ink);
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: inherit;
   background:
     radial-gradient(ellipse 70% 60% at 42% 45%, var(--m-glow) 0%, transparent 70%),
     radial-gradient(circle at 1px 1px, var(--m-grid) 1px, transparent 1.2px) 0 0 / 26px 26px,
@@ -197,7 +197,7 @@
   box-shadow: var(--m-shadow);
   padding: 9px 12px !important;
   max-width: 300px;
-  font: 13.5px/1.4 "Segoe UI", Arial, sans-serif !important;
+  font-size: 13.5px !important; line-height: 1.4 !important; font-family: inherit !important;
   white-space: normal !important;
 }
 .wm-tt-k {
