@@ -23,6 +23,7 @@ test('insurance plan preserves documentary scope, six launch gates and a depende
  await db.exec('create table gaas_wiki_pilot_documents(note_id uuid)');
  await db.exec(`insert into gaas_vault_notes(id,relative_path,title,content_markdown,content_hash) values('25931632-8994-4550-8333-290419fd9a15','05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md','Seguros','Fonte anterior preservada','aea9e74c70a1f9d08f4702b3e069315dc61b07d1fbeadc433a189114b79f36c1'),(gen_random_uuid(),'05-Estrategia/Outra.md','Outra','Intocada','outra')`);
  await db.exec(migration('_insurance_strategy_editorial.sql'));
+ await db.exec(migration('_insurance_strategy_map_alignment.sql'));
  const note=(await db.query("select content_markdown from gaas_vault_notes where id='25931632-8994-4550-8333-290419fd9a15'")).rows[0];
  assert.equal(note.content_markdown,readFileSync('docs/wiki-vault/05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md','utf8'));
  assert.equal((await db.query('select content_markdown from gaas_vault_note_revisions')).rows[0].content_markdown,'Fonte anterior preservada');

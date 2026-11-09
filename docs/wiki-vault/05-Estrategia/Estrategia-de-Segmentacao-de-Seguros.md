@@ -71,12 +71,14 @@ flowchart TD
     POS["MAPA_SEGUROS<br/>Posse por produto · semântica a validar"] --> E
     SOL["Solicitações oficiais e retorno<br/>Fonte a reconciliar"] --> E
     COMP["Compra por categoria / MAPA_MCC<br/>Evento e atualização D+1 a validar"] --> E
-    DEV["SEGUROS_DEVICE_CPF · proposta<br/>Celular: segmentação complementar"] -.-> E
+    DEV["SEGUROS_DEVICE_CPF · proposta<br/>Celular: modelo e qualidade da observação"] -.-> E
+    APP["CLIENTES ATIVOS · ULTIMO_ACESSO<br/>Recência de app: Residencial e Celular"] -.-> E
+    MODELOS["Lista versionada de modelos · proposta<br/>Clusters de Celular a validar"] -.-> E
     E --> AP{"Conta, canal e produto aptos?<br/>Sem solicitação em processamento<br/>e sem posse confirmada?"}
     AP -->|Não / desconhecido| IMP["Sem nova oferta do produto<br/>Registrar motivo e pendência"]
   end
   subgraph M["Mensal · percurso por produto"]
-    AP -->|Sim| PM{"Próximo produto elegível<br/>e data de liberação atendida?"}
+    AP -->|Sim| PM{"Próximo produto elegível e liberação?<br/>Residencial/Celular: faixa de app do piloto<br/>Celular: modelo na lista aprovada?"}
     PM -->|Não| ESP["Aguardar condição<br/>SEM_PRODUTO_ELEGIVEL quando aplicável"]
     PM -->|Sim| AUT["Reservar ID_CICLO<br/>ENTRADA_PENDENTE"]
     AUT --> PUB["SEG_APTOS_*_MENSAL<br/>Nova entrada com identidade estável"]
@@ -259,7 +261,8 @@ flowchart TD
     S6 -->|Sim| S7 --> S8 --> S9 --> S10 --> S11 --> S12 --> S13 --> S14 --> S15
   end
   MCC["MAPA_MCC válida da frente Visa<br/>Não duplicar import; registrar referência"] --> S6
-  DEVICE["Fonte DEVICE · referência real<br/>Ausente / velha: apenas segmento genérico"] -.-> S8
+  APP["ULTIMO_ACESSO · CLIENTES ATIVOS<br/>Normalizar recência; snapshot na seleção"] -.-> S8
+  DEVICE["Fonte DEVICE e lista de modelos · proposta<br/>Ausente / velha: dado desconhecido<br/>Celular: aplicar política do piloto"] -.-> S8
   CONFIG["SEGUROS_CONFIG_ESTRATEGIA<br/>Parâmetros independentes e versionados"] --> S9
   S12 & S14 --> JORN["Seis jornadas por produto / tipo<br/>Configuração e reentrada a validar com Pablo"]
   JORN --> MARC["Seis SEG_MARCADOR_*<br/>ENTROU, SEMn, CONCLUIU, SAIU<br/>ID_CICLO do Journey Data original"]
@@ -636,7 +639,7 @@ Cada etapa dependente ocupa um passo próprio no Automation Studio. Atividades n
 |---|---|---|---|
 | 0 | Registro de início / Script Activity | Referências das fontes → SEGUROS_EXECUCOES | Criar ID_EXECUCAO; STATUS=INICIADA. |
 | 1–5 existentes | Query, Extract, conversão, File Transfer e Import | LP → LP_SEGUROS_ATHENA → S3/Athena → MAPA_SEGUROS | Preservar as atividades existentes; confirmar nomes, horário e estado ativo com Pablo. |
-| 6 | Verificação de fontes / Verification e/ou Script Activity | Contagem, referência e chaves de MAPA, cadastro e compras | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha permite apenas segmento genérico. |
+| 6 | Verificação de fontes / Verification e/ou Script Activity | Contagem, referência e chaves de MAPA, cadastro e compras | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha fica como dado desconhecido; seleção de Celular dependente de modelo aguarda fonte. Oferta genérica exige célula ou desenho próprios liberados. |
 | 7 | Q_SEG_SOLICITACOES / SQL | LP oficial + retorno de contratação → SEGUROS_SOLICITACOES_CPF_PRODUTO | Update. Aceite válido inicia processamento; não apagar solicitação só porque saiu de uma foto da LP. |
 | 8 | Q_SEG_ELEGIBILIDADE / SQL | Cadastro deduplicado + posse + solicitações + DEVICE + MCC → SEGUROS_ELEGIBILIDADE_CPF | Overwrite somente após aprovação das fontes. Um CPF por linha; ausência de dado não vira posse=NAO. |
 | 9 | Q_SEG_CONTROLE_PREPARO / SQL | Controle atual + seis marcadores + elegibilidade + configuração → SEGUROS_CONTROLE_CPF_PREPARO | Overwrite da área de preparo. Aplicar primeiro supressões e solicitações, depois conclusão e inatividade. |
@@ -674,7 +677,7 @@ Fonte de definição: contrato de Automation Studio desta página. Os testes por
 | Configuração | Contrato proposto |
 |---|---|
 | Entrada e destino | Contagem, referência e chaves de MAPA, cadastro e compras |
-| Ação e condição | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha permite apenas segmento genérico. |
+| Ação e condição | Parar seleção se fonte essencial inválida. O limite histórico de 600 mil da MAPA é parâmetro a revisar; não prova atualidade. DEVICE ausente ou velha fica como dado desconhecido; seleção de Celular dependente de modelo aguarda fonte. Oferta genérica exige célula ou desenho próprios liberados. |
 | Identidade da execução | ID_EXECUCAO deve acompanhar a decisão; ID_CICLO e ID_ENTRADA permanecem estáveis nas reexecuções aplicáveis. |
 | Dependência | Respeitar a sequência do mapa; somente as seleções por produto mutuamente exclusivas podem compartilhar passo após a decisão central. |
 | SQL / código | Implementação específica deste desenho ainda a escrever e homologar. Não reutilizar SQL de 04/11 sem compatibilizar campos e regras. |
@@ -1179,4 +1182,4 @@ Estrutura e fluxos reorganizados no modelo da [[Estrategia-Pool-de-Ofertas-Visa|
 
 ### Revisão integrada de 09/11/2026
 
-Revisão autorizada por Pablo nesta conversa: abertura didática e regras visíveis; piloto por recência de app para Residencial/Celular; lista de modelos e clusters de Celular; atividades compartilhadas e liberação independente das seis frentes. Fichas, SQLs e diagramas preservados. Referências anteriores de DEVICE mantidas como histórico, sem vigência automática. Publicação da documentação e do plano de trabalho não ativa campanhas nem homologa as novas hipóteses.
+Revisão autorizada por Pablo nesta conversa: abertura didática e regras visíveis; piloto por recência de app para Residencial/Celular; lista de modelos e clusters de Celular; atividades compartilhadas e liberação independente das seis frentes. Fichas e SQLs preservados; mapas ampliados com recência de app e lista de modelos, mantendo condições e caminhos anteriores. Referências anteriores de DEVICE mantidas como histórico, sem vigência automática. Publicação da documentação e do plano de trabalho não ativa campanhas nem homologa as novas hipóteses.
