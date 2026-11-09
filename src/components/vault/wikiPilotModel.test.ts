@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { newWork } from '../growth-learning/development/workModel';
-import { canQuickComplete, completionDate, displayCompletionDate, isPilotHeading, PILOT_KEYS, pilotGroup, pilotProgress, preparePilotSave, VISA_STRATEGY_PATH } from './wikiPilotModel';
+import { canQuickComplete, completionDate, displayCompletionDate, isPilotHeading, PILOT_KEYS, pilotGroup, pilotProgress, preparePilotSave, VISA_STRATEGY_PATH, insuranceTaskOrder } from './wikiPilotModel';
 
 describe('Checklist do piloto', () => {
+ it('shows audience preparation before test, release and execution even when database timestamps tie',()=>{
+  const keys=['SEG-MUL-MEN-EXECUCAO','SEG-MUL-MEN-LEITURA','SEG-MUL-MEN-TESTE','SEG-MUL-MEN-PUBLICO','SEG-MUL-MEN-LIBERAR','SEG-MUL-MEN-CONTEUDO'];
+  const ordered=keys.map(task_key=>({task_key})).sort((a,b)=>insuranceTaskOrder(a)-insuranceTaskOrder(b));
+  expect(ordered.map(t=>t.task_key.split('-').pop())).toEqual(['PUBLICO','CONTEUDO','TESTE','LIBERAR','EXECUCAO','LEITURA']);
+  expect(insuranceTaskOrder({task_key:'SEG-DEVICE-IN'})).toBeLessThan(insuranceTaskOrder({task_key:'SEG-CEL-MEN-PUBLICO'}));
+ });
  it('resets acceptance when criteria change without mutating the original task', () => {
    const original = {...newWork(), title:'Atividade de teste', acceptance_criteria:['Critério A'],completed_criteria:[0]};
    const saved = preparePilotSave({...original,acceptance_criteria:[' Novo critério ',''],dependencies:['VDV-PLAN-1','','VDV-PLAN-1']},original);

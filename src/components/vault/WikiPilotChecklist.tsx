@@ -4,7 +4,7 @@ import { saveWork } from '../growth-learning/development/workService';
 import { TASK_STATUS, taskError, taskHistory, type TaskEvent } from '../growth-learning/development/developmentService';
 import { newWork, type WorkItem } from '../growth-learning/development/workModel';
 import { loadInsuranceTasks, INSURANCE_STRATEGY_PATH, loadPilotTasks } from './wikiPilotService';
-import { brazilToday, canQuickComplete, completionDate, displayCompletionDate, PILOT_GROUPS, PILOT_KEYS, pilotTaskGroup, activePilotProgress, preparePilotSave } from './wikiPilotModel';
+import { brazilToday, canQuickComplete, completionDate, displayCompletionDate, PILOT_GROUPS, PILOT_KEYS, pilotTaskGroup, activePilotProgress, preparePilotSave, insuranceTaskOrder } from './wikiPilotModel';
 import { WikiPilotTaskEditor } from './WikiPilotTaskEditor';
 import type { TaskLayout } from './strategy/strategyModel';
 
@@ -64,7 +64,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     [order[i],order[j]]=[order[j],order[i]];
     void updateLayout({hidden:layout?.hidden||[],order:[...order,...(layout?.order||[]).filter(k=>!order.includes(k))]});
   };
-  const taskOrder = (task: WorkItem) => { const custom=layout?.order.indexOf(task.task_key)??-1;return custom>=0?custom:PILOT_KEYS.includes(task.task_key)?1000+PILOT_KEYS.indexOf(task.task_key):2000; };
+  const taskOrder = (task: WorkItem) => { const custom=layout?.order.indexOf(task.task_key)??-1;return custom>=0?custom:insurance?1000+insuranceTaskOrder(task):PILOT_KEYS.includes(task.task_key)?1000+PILOT_KEYS.indexOf(task.task_key):2000; };
   const focusEditor = (id: string) => requestAnimationFrame(() => editors.current.get(id)?.focus({ preventScroll: true }));
   const close = () => { if (busy) return; const id = draft?.id; setDraft(null); baseline.current = ''; setInitialField(null); setMessage(''); setError(''); if (id) focusEditor(id); };
   const openTask = (task: WorkItem, completing = false, editTitle = false) => {
@@ -149,7 +149,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
         {onLayoutChange && <button type="button" className="flex min-h-11 items-center gap-2 px-4 text-sm font-medium text-teal-700" disabled={busy||documentBusy} onClick={()=>addTask()}><Plus size={16}/>Adicionar atividade</button>}
         {draft && !draft.id && <WikiPilotTaskEditor key={draft.task_key} draft={draft} original={JSON.parse(baseline.current)} setDraft={setDraft} busy={busy} initialField="title" onSave={()=>void save(draft)} onClose={close} history={[]} historyError=""/>}
       </>}
-      <p className="border-t border-slate-100 px-4 py-3 text-xs leading-5 text-slate-400">Mesmas atividades de Testes e Tarefas · 3 cards no piloto · quarto card e GRUPO_2 ficam para depois.</p>
+      <p className="border-t border-slate-100 px-4 py-3 text-xs leading-5 text-slate-400">{insurance ? 'Mesmas atividades de Testes e Tarefas · seis frentes com liberação própria · marcos documentais não certificam ativação no SFMC.' : 'Mesmas atividades de Testes e Tarefas · 3 cards no piloto · quarto card e GRUPO_2 ficam para depois.'}</p>
     </div>
     {error && <p role="alert" className="border-t border-rose-100 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
     {message && <p role="status" className="border-t border-cyan-100 bg-cyan-50/50 px-4 py-3 text-xs text-cyan-800">{message}</p>}

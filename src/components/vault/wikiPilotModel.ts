@@ -11,6 +11,16 @@ const groups: Record<string, PilotGroup> = {
   'VDV-PLAN-5': 'later', 'VDV-PLAN-6': 'later',
 };
 export const PILOT_KEYS = Object.keys(groups);
+/** Stable ordering: seeded rows can have the same created_at timestamp. */
+export function insuranceTaskOrder(task: Pick<WorkItem,'task_key'>): number {
+ const common=['SEG-RECONCILIAR','SEG-REGRAS','SEG-CONFIRMAR-PRODUTOS','SEG-INTEGRACAO','SEG-MAPA-MULHER','SEG-SOLICITACOES','SEG-APP','SEG-PILOTO','CROSS-DATA-01','SEG-BASE-CPF','SEG-REGUA-ROTATIVA','SEG-D1','SEG-AUTOMACAO-QA','SEG-CONVIVENCIA-QA','SEG-RESULTADO','SEG-CALL-BASE'];
+ const index=common.indexOf(task.task_key);if(index>=0)return index;
+ if(task.task_key==='SEG-DEVICE-IN')return 0;if(task.task_key==='SEG-MODELOS')return 1;
+ const stage=['PUBLICO','CONTEUDO','TESTE','LIBERAR','EXECUCAO','LEITURA'].indexOf(task.task_key.split('-').pop()||'');
+ if(stage>=0)return 100+stage;
+ if(task.task_key.startsWith('SEG-HIST-'))return Number(task.task_key.split('-').pop());
+ return 999;
+}
 export const pilotGroup = (key: string) => groups[key];
 export const isPilotHeading = (path: string, heading: string) => path === VISA_STRATEGY_PATH && heading === '1-intencao-estrategica';
 export const brazilToday = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date());
