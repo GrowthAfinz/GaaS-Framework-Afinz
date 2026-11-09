@@ -287,7 +287,7 @@ export function resolveVdvPreview({
       ? "GENERICO"
       : sample.CD_GRUPO.trim();
   const fields =
-    "VersaoEmail Versao GrupoVitrine NmTema Assunto PreHeader SaudacaoFinal Intro NomeCartao CtaCard TitCond RodCond CorFundo CorTexto CorTitulo CorTema Hero AltHero LinkHero N".split(
+    "VersaoEmail Versao GrupoVitrine NmTema Assunto PreHeader SaudacaoFinal Intro NomeCartao CtaCard TitCond RodCond LinkMaisOfertas AvisoLegal CorFundo CorTexto CorTitulo CorTema Hero AltHero LinkHero N".split(
       " ",
     );
   fields.forEach((f) => (vars[f] = ""));
@@ -366,6 +366,8 @@ export function resolveVdvPreview({
     CtaCard: theme.CTA || "Aproveitar oferta",
     TitCond: theme.TITULO_CONDICOES || "Condições das ofertas",
     RodCond: theme.RODAPE_CONDICOES,
+    LinkMaisOfertas: theme.LINK || "",
+    AvisoLegal: theme.CONDICOES || "",
     CorFundo: theme.COR_FUNDO || "#000000",
     CorTexto: theme.COR_TEXTO || "#FFFFFF",
     CorTitulo: theme.COR_TITULO || "#00C6CC",

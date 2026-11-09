@@ -26,6 +26,8 @@ const labels: Record<string, string> = {
   INTRO: "Texto de abertura",
   CARTAO_PADRAO: "Nome padrão do cartão",
   CTA: "Texto dos botões",
+  LINK: "Link de Ver mais ofertas",
+  CONDICOES: "Aviso legal após cada marca",
   TITULO_CONDICOES: "Título das condições",
   RODAPE_CONDICOES: "Rodapé de condições",
   INICIO: "Início",
@@ -160,7 +162,7 @@ export function PoolEmailEditor({
         {key.endsWith("_V2") && !r[key] && (
           <span className="ml-2 text-cyan-700">Herda do E-mail 1</span>
         )}
-        {["INTRO", "RODAPE_CONDICOES"].includes(key) ? (
+        {["INTRO", "RODAPE_CONDICOES", "CONDICOES"].includes(key) ? (
           <textarea
             aria-label={labels[key]}
             rows={3}
@@ -537,7 +539,7 @@ export function PoolEmailEditor({
           <p className="text-[10px] text-cyan-800">
             Compartilhado pelos dois toques.
           </p>
-          {["CTA", "TITULO_CONDICOES", "RODAPE_CONDICOES", "INICIO", "FIM"].map(
+          {["CTA", "LINK", "CONDICOES", "TITULO_CONDICOES", "RODAPE_CONDICOES", "INICIO", "FIM"].map(
             (f) => field(data.briefing.indexOf(theme), f),
           )}
         </Section>
