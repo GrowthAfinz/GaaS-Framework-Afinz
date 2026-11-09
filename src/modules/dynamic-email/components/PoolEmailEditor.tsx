@@ -27,7 +27,7 @@ const labels: Record<string, string> = {
   CARTAO_PADRAO: "Nome padrão do cartão",
   CTA: "Texto dos botões",
   LINK: "Link de Ver mais ofertas",
-  CONDICOES: "Aviso legal após cada marca",
+  CONDICOES: "Aviso legal (aparece uma vez, após as condições das marcas)",
   TITULO_CONDICOES: "Título das condições",
   RODAPE_CONDICOES: "Rodapé de condições",
   INICIO: "Início",

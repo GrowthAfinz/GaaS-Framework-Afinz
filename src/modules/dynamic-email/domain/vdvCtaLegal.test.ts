@@ -6,16 +6,16 @@ import { parseVdvBriefingCsv, parseVdvMovimentoCsv, resolveVdvPreview, VDV_SAMPL
 import { renderDynamicEmail } from '../ampscript/renderer';
 import { emptyBriefingRow } from './briefing';
 
-describe('Pool CTA adicional e aviso por marca', () => {
+describe('Pool CTA adicional, condições compactas e aviso legal único', () => {
   for (const touch of ['V1','V2'] as const) for (const count of [1,2,3]) {
-    it(`${touch}: ${count} marcas mantêm notas e ganham um único CTA final`, () => {
+    it(`${touch}: ${count} marcas: uma linha por marca, aviso legal uma única vez e um único CTA final`, () => {
       const briefing = parseVdvBriefingCsv(VDV_BRIEFING_CSV).map(row => ({...row,...(row.ID===patch.theme.ID?patch.theme:patch.offers.find(o=>o.ID===row.ID))}));
       const r = resolveVdvPreview({briefing,movimento:parseVdvMovimentoCsv(VDV_MOVIMENTO_CSV),sample:VDV_SAMPLES[0].sample,versaoEmail:touch,today:'2026-11-09'});
       const rendered = renderDynamicEmail(VDV_POOL_TEMPLATE,emptyBriefingRow(),{CPF:'00000000000',PRI_NOME:'ANA',LIMITE:'',PRODUTO:'',SEQUENCIA:'',TP_CAMPANHA:''},{vars:{...r.vars,N:String(count)}});
       expect(rendered.diagnostics).toEqual([]);
       expect(rendered.html.match(/VDV_VER_MAIS_OFERTAS/g)).toHaveLength(1);
       expect(rendered.html).toContain(`href="${patch.theme.LINK}"`);
-      expect(rendered.html.match(/As ofertas, descontos, benefícios/g)).toHaveLength(count);
+      expect(rendered.html.match(/As ofertas, descontos, benefícios/g)).toHaveLength(1);
       expect(r.vars.Assunto).toContain('Black Afinz: confira as ofertas');
       expect(r.vars.PreHeader).toBe(patch.theme.PREHEADER);
       for (let slot=1;slot<=count;slot++) expect(rendered.html).toContain(r.vars[`S${slot}Url`]);
