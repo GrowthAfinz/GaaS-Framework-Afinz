@@ -26,6 +26,7 @@ const labels: Record<string, string> = {
   INTRO: "Texto de abertura",
   CARTAO_PADRAO: "Nome padrão do cartão",
   CTA: "Texto dos botões",
+  LINK: "Link de Ver mais ofertas",
   TITULO_CONDICOES: "Título das condições",
   RODAPE_CONDICOES: "Rodapé de condições",
   INICIO: "Início",
@@ -537,7 +538,7 @@ export function PoolEmailEditor({
           <p className="text-[10px] text-cyan-800">
             Compartilhado pelos dois toques.
           </p>
-          {["CTA", "TITULO_CONDICOES", "RODAPE_CONDICOES", "INICIO", "FIM"].map(
+          {["CTA", "LINK", "TITULO_CONDICOES", "RODAPE_CONDICOES", "INICIO", "FIM"].map(
             (f) => field(data.briefing.indexOf(theme), f),
           )}
         </Section>

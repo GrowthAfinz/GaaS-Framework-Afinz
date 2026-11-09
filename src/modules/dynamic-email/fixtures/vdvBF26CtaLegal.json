@@ -1,0 +1,274 @@
+{
+  "theme": {
+    "ID": "TEMA_BF26_V1",
+    "LINK": "https://www.visa.com.br/promotions/visa-best-november.html",
+    "ASSUNTO": "Black Afinz: confira as ofertas do seu {CARTAO} 💳💙",
+    "PREHEADER": "Ofertas selecionadas para você e mais benefícios no site da Visa. Confira!"
+  },
+  "offers": [
+    {
+      "ID": "NOV26_ADCOS",
+      "CONDICOES": "15% OFF válido nas compras acima de R$300 + Frete grátis para todas as compras, válido para entrega econômica e não cumulativo.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_ALLIANZTRAVEL",
+      "CONDICOES": "60% OFF válido para todos os destinos, exceto viagens nacionais e Produto Anual - oferecer seguro apenas para MASS.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_ALURA",
+      "CONDICOES": "15% OFF em todo site (esse desconto é sobreposto quando tivermos uma oferta maior no nosso site, mas o cupom continua funcional).<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_ARNO",
+      "CONDICOES": "15% OFF válido para todo o site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_ASSISTCARD",
+      "CONDICOES": "Oferta apenas para MASS: 20% OFF em seguro viagem. Válido somente para pagamento com Visa.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_BELEZANAWEB",
+      "CONDICOES": "10% off em todo o site, válido para a primeira compra.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_BOXMAGENTA",
+      "CONDICOES": "R$ 30,00 OFF na 1ª assinatura em qualquer plano.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_CESTASMICHELLI",
+      "CONDICOES": "15% OFF em todo o site. Consulte as regras e condições no site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_CHILLIBEANS",
+      "CONDICOES": "10% off em todo o site, válido para a primeira compra.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_CLOVIS",
+      "CONDICOES": "5% de desconto em todo o site, válido para a primeira compra.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_COBASI",
+      "CONDICOES": "10% OFF* válido para todo o site. válido apenas na primeira compra, 1 uso por CPF e não cumulativo com a compra programada.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_DECATHLON",
+      "CONDICOES": "10% OFF em compras no site - Válido para compras acima de R$99 - 1 uso por CPF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_DROGAL",
+      "CONDICOES": "R$10 off em compras acima de R$150.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_DROGARIASP_25",
+      "CONDICOES": "Até R$25,00 OFF em diversos itens de farmácia - Desconto válido para a primeira compra no site, com valor mínimo de R$250. Válido para todos os produtos vendidos e entregues pela drogaria, exceto fraldas.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_DROGARIASP_40",
+      "CONDICOES": "Até R$40,00 OFF em diversos itens de farmácia - Desconto válido para compras no site com valor mínimo de R$500,00. Válido para todos os produtos vendidos e entregues pela drogaria, exceto fraldas.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_EFACIL",
+      "CONDICOES": "Até 15% OFF em acessórios para casa. Importante: o cupom concede descontos de 2% a 15% OFF, conforme a categoria do produto. Por isso, a comunicação deve ser sempre ATÉ 15% OFF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_EVINO",
+      "CONDICOES": "10% OFF em todo o site + frete grátis na primeira compra! Venda proibida para menores de 18 anos. Beba com moderação.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_EVINO_2",
+      "CONDICOES": "10% OFF nas compras acima de R$ 150! Venda proibida para menores de 18 anos. Beba com moderação.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_FOTOREGISTRO",
+      "CONDICOES": "Até 10% OFF válido para todo site; - Frete não incluso - Desconto cumulativo com o preço do site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_GIULIANAFLORES",
+      "CONDICOES": "15% OFF em compras em todo site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_GIULIANAFLORES_DUP",
+      "CONDICOES": "15% OFF em compras em todo site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_GOCASE",
+      "CONDICOES": "15% OFF válido em todo o site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_GRANADO",
+      "CONDICOES": "15% OFF em todo o site, válido para primeira compra.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_GUESS",
+      "CONDICOES": "10% OFF em pedidos acima de 200 reais. É válido 1 por cpf, e o cupom não é cumulativo com outras promoções.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_HERING",
+      "CONDICOES": "15% OFF em moda selecionada no site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_HOPELINGERIE",
+      "CONDICOES": "15% OFF em compras em todo site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_HOPERESORT",
+      "CONDICOES": "15% OFF em compras em todo site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_HOTEISCOM",
+      "CONDICOES": "6% OFF em hotéis selecionados - Cupom válido apenas para \"hotéis participantes\", mediante pagamento online. Desconto não se aplica a taxas, impostos ou tarifas cobradas na propriedade e está sujeito a disponibilidade e alterações sem aviso prévio.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_JEQUITI",
+      "CONDICOES": "10% OFF na primeira compra. Cupom válido em todo o site, exceto em promoções selecionadas. Desconto aplicável somente na 1ª compra.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_KARSTEN",
+      "CONDICOES": "Até 10% OFF em compras acima de R$ 299. Válido na primeira compra. Uma utilização por CPF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_KITCHENAID",
+      "CONDICOES": "Até 10% off em primeira compra acima de R$1299 (exceto peças de reposição e utensílios de cozinha.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_LACOSTE",
+      "CONDICOES": "Até 5% OFF em produtos do site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_LARROUDE",
+      "CONDICOES": "10% OFF em todo o site (sem valor mínimo).<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_LEGO",
+      "CONDICOES": "10% de desconto no site todo - Não válido para a categoria de Exclusivos.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_LOCCITANE_BRESIL",
+      "CONDICOES": "10% OFF em compra Cupom não cumulativo e não válido para SPA. 1 uso por CPF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_LOCCITANE_BRESIL_DUP",
+      "CONDICOES": "10% OFF em compra Cupom não cumulativo e não válido para SPA. 1 uso por CPF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_LOCCITANE_PROVENCE",
+      "CONDICOES": "10% OFF em compra Cupom não cumulativo e não válido para SPA. 1 uso por CPF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_LOCCITANE_PROVENCE_DUP",
+      "CONDICOES": "10% OFF em compra Cupom não cumulativo e não válido para SPA. 1 uso por CPF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_MOBIFACIL",
+      "CONDICOES": "10% OFF em compras no site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_MONTECARLO",
+      "CONDICOES": "15% OFF válido para diversos produtos - O cupom não é válido para lançamentos, alianças e relógios de terceiros.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_MOTOROLA",
+      "CONDICOES": "5% OFF em todos os smartphones.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_MOVIDA",
+      "CONDICOES": "12% OFF em reservas pagando com Visa.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_NIKE",
+      "CONDICOES": "Até 5% off válido para todo o site (exceto SNKRS, lançamentos e itens das seleções).<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_OBOTICARIO",
+      "CONDICOES": "15% OFF na primeira compra.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_OCEANE",
+      "CONDICOES": "10% OFF extra em pedidos acima de R$ 109 - Válido para todo o site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_OQVESTIR",
+      "CONDICOES": "15% OFF na primeira compra, em produtos sem desconto, vendidos e entregues por OQVestir, exceto produtos das marcas Coach, Le Lis, New Balance, Nike x Copa e On Running. Não cumulativo com outras ações de desconto do site. Uso único por CPF. Para garantir o benefício, faça login e insira o cupom divulgado nos canais oficiais do parceiro na sua sacola de compras. A ação é válida por tempo limitado e pode ser alterada e/ou encerrada a qualquer momento, sem aviso prévio.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_PETZ",
+      "CONDICOES": "10% OFF na primeira compra, 1 uso por CPF e não cumulativo com outras promoções.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_POLISHOP",
+      "CONDICOES": "10% de desconto em todo o site, válido para produtos “Vendido e Entregue por” Polishop.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_PROMOFARMA",
+      "CONDICOES": "5% off em todo o site, Válido para primeira compra.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_PUMA",
+      "CONDICOES": "15% OFF válido para itens no site, excluído de promoções ou outros descontos no site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_QUEIMADIARIA",
+      "CONDICOES": "20% Off Na Queima Diária Para Treinar Onde E Quando Quiser.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_RENTCARS",
+      "CONDICOES": "8% OFF com o cupom + até 30% OFF aplicado diretamente na tarifa do site. Aproveite!<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_RIACHUELO",
+      "CONDICOES": "10% off em todo o site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_SAMSCLUB",
+      "CONDICOES": "30% OFF para se tornar sócio Sam's Club + R$50,00 OFF em compras acima de R$200,00.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_SEARA",
+      "CONDICOES": "10% de desconto em Kits Seara - Válido para compras através do CPF ou CNPJ.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_SEARA_DUP",
+      "CONDICOES": "10% de desconto em Kits Seara - Válido para compras através do CPF ou CNPJ.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_SEMPARAR",
+      "CONDICOES": "Peça já sua tag Sem Parar por apenas R$39,90 e ganhe 12 mensalidades grátis.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_SEPHORA",
+      "CONDICOES": "10% OFF na primeira compra- Não cumulativo. Válido apenas para primeira compra e para compras a partir de R$349. Somente online. Cupom limitado para um uso por CPF.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_SHOP2GETHER",
+      "CONDICOES": "15% OFF na primeira compra, em produtos sem desconto, vendidos e entregues por OQVestir, exceto produtos das marcas Coach, Le Lis, New Balance, Nike x Copa e On Running. Não cumulativo com outras ações de desconto do site. Uso único por CPF. Para garantir o benefício, faça login e insira o cupom divulgado nos canais oficiais do parceiro na sua sacola de compras. A ação é válida por tempo limitado e pode ser alterada e/ou encerrada a qualquer momento, sem aviso prévio.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_SPICY",
+      "CONDICOES": "10% off em Cozinha, Mesa e Bar.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_TORRA",
+      "CONDICOES": "Até 10% OFF em compras no site.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_TRUSSARDI",
+      "CONDICOES": "10% OFF na primeira compra (sem valor mínimo).<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_WEBFONES",
+      "CONDICOES": "R$100 Off em compras a partir de R$1500 em todo o site, exceto em Giftcards.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_ZATTINI",
+      "CONDICOES": "15% OFF em itens selecionados.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_ZEEDOG",
+      "CONDICOES": "10% OFF na primeira compra, 1 uso por CPF e não cumulativo com outras promoções.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    },
+    {
+      "ID": "NOV26_ZEENOW",
+      "CONDICOES": "10% OFF na primeira compra, 1 uso por CPF e não cumulativo com outras promoções.<br><br>As ofertas, descontos, benefícios, condições comerciais, disponibilidade de estoque e respectivos prazos de validade são definidos e geridos pela Visa e/ou pelos parceiros participantes. Consulte as condições específicas de cada oferta diretamente no site do parceiro responsável."
+    }
+  ]
+}
