@@ -31,6 +31,36 @@ export async function searchVault(
   } as VaultSearchResult;
 }
 
+/**
+ * Wiki search ordered for reading: strategies first, then subjects and notes, newest update first.
+ * Accent-insensitive prefix match. Falls back to the legacy search if the new RPC is not deployed.
+ */
+export async function searchWiki(
+  query = '',
+  folder?: string | null,
+  offset = 0,
+  limit = 60,
+  sort: 'recent' | 'relevance' = 'recent',
+): Promise<VaultSearchResult> {
+  const { data, error } = await supabase.rpc('gaas_search_wiki', {
+    p_query: query,
+    p_folder: folder || null,
+    p_limit: limit,
+    p_offset: offset,
+    p_sort: sort,
+  });
+  if (error) {
+    // PGRST202: function not found (migration not applied yet). Keep the Wiki working.
+    if (error.code === 'PGRST202') return searchVault(query, folder, offset, limit);
+    throw error;
+  }
+  const items = data || [];
+  return {
+    items,
+    total: Number(items[0]?.total_count || 0),
+  } as VaultSearchResult;
+}
+
 export async function getVaultNote(noteId: string): Promise<VaultNote> {
   const { data, error } = await supabase
     .from('gaas_vault_notes')

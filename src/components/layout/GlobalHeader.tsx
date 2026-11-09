@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
     Search,
     Settings2,
@@ -19,6 +19,9 @@ import {
     ShieldCheck,
     BrainCircuit,
     X,
+    FileText,
+    Compass,
+    LoaderCircle,
 } from 'lucide-react';
 import { AfinzLogo } from '../../modules/paid-media-afinz/components/AfinzLogo';
 import { useAppStore } from '../../store/useAppStore';
@@ -31,6 +34,8 @@ import { FullscreenButton } from '../ui/FullscreenButton';
 import { useGlobalSearch, GlobalSearchResult, GlobalSearchResultType } from '../../hooks/useGlobalSearch';
 import { useExplorerStore, PendingNavigation } from '../../store/explorerStore';
 import { buildGrowthLearningSearch, openGrowthLearningSection } from '../growth-learning/growthLearningNavigation';
+import { useWikiSearch } from '../vault/useWikiSearch';
+import { buildWikiSearchUrl, formatWikiUpdatedOn, wikiNoteUpdatedOn } from '../vault/wikiSearch';
 import { onTabLinkClick, tabHref, TabId } from '../../services/tabNavigation';
 
 interface HeaderNavItem {
@@ -58,6 +63,19 @@ const GROUP_LABELS: Record<GlobalSearchResultType, string> = {
     activity: 'Activity Names',
 };
 
+interface HeaderSearchEntry {
+    key: string;
+    section: string;
+    title: string;
+    icon: React.FC<{ size: number; className?: string }>;
+    detail?: React.ReactNode;
+    badge?: number;
+    onSelect: () => void;
+}
+
+const StrategyIcon: React.FC<{ size: number; className?: string }> = (p) => <Compass {...p} />;
+const NoteIcon: React.FC<{ size: number; className?: string }> = (p) => <FileText {...p} />;
+
 const BU_DOT: Record<string, string> = {
     B2C: 'bg-blue-500',
     B2B2C: 'bg-emerald-500',
@@ -81,12 +99,9 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
     const inputRef = useRef<HTMLInputElement>(null);
 
     const results = useGlobalSearch(searchInput);
-
-    // Group results by type in the correct order
-    const grouped = TYPE_ORDER.map((type) => ({
-        type,
-        items: results.filter((r) => r.type === type),
-    })).filter((g) => g.items.length > 0);
+    const canSeeWiki = canSeeTab('aprendizado-growth');
+    const wikiSearch = useWikiSearch(searchInput, { limit: 12, enabled: canSeeWiki && isSearchOpen });
+    const [activeIndex, setActiveIndex] = useState(-1);
 
     const handleSelectResult = useCallback((result: GlobalSearchResult) => {
         const nav: PendingNavigation = {
@@ -99,6 +114,70 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
         setSearchInput('');
         setIsSearchOpen(false);
     }, [navigateToTab, setPendingNavigation]);
+
+    const openWiki = useCallback((noteId: string | null, query = '') => {
+        window.history.pushState({}, '', window.location.pathname + buildWikiSearchUrl(window.location.search, noteId, query));
+        window.dispatchEvent(new PopStateEvent('popstate'));
+        navigateToTab('aprendizado-growth');
+        setSearchInput('');
+        setIsSearchOpen(false);
+    }, [navigateToTab]);
+
+    // One flat list in display order, so the arrow keys walk the same order the eye reads:
+    // strategies first, then the operation (segments, journeys, dispatches), then subjects and notes.
+    const entries = useMemo<HeaderSearchEntry[]>(() => {
+        const wikiEntries = (kind: 'estrategia' | 'nota', max: number) => {
+            const group = wikiSearch.groups.find(item => item.kind === kind);
+            if (!group) return [];
+            return group.items.slice(0, max).map<HeaderSearchEntry>(note => ({
+                key: `wiki-${note.id}`,
+                section: group.label,
+                title: note.title,
+                icon: kind === 'estrategia' ? StrategyIcon : NoteIcon,
+                detail: <span className="text-[10px] text-slate-400">{formatWikiUpdatedOn(wikiNoteUpdatedOn(note))}</span>,
+                onSelect: () => openWiki(note.id),
+            }));
+        };
+        const operation = TYPE_ORDER.flatMap(type => results.filter(result => result.type === type).map<HeaderSearchEntry>(result => ({
+            key: `${result.type}-${result.label}`,
+            section: GROUP_LABELS[type],
+            title: result.label,
+            icon: TYPE_CONFIG[type].icon,
+            badge: result.count,
+            detail: result.bu ? (
+                <span className="flex items-center gap-1">
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${BU_DOT[result.bu] ?? 'bg-slate-400'}`} />
+                    <span className="text-[10px] text-slate-400">{result.bu}</span>
+                    {result.segmento && result.type === 'activity' && <span className="text-[10px] text-slate-400">· {result.segmento}</span>}
+                </span>
+            ) : undefined,
+            onSelect: () => handleSelectResult(result),
+        })));
+        return [...wikiEntries('estrategia', 4), ...operation, ...wikiEntries('nota', 5)];
+    }, [wikiSearch.groups, results, openWiki, handleSelectResult]);
+
+    useEffect(() => { setActiveIndex(-1); }, [searchInput]);
+
+    const handleSearchKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Escape') { setIsSearchOpen(false); inputRef.current?.blur(); return; }
+        if (!entries.length) return;
+        if (event.key === 'ArrowDown') { event.preventDefault(); setIsSearchOpen(true); setActiveIndex(index => (index + 1) % entries.length); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); setActiveIndex(index => (index <= 0 ? entries.length - 1 : index - 1)); }
+        else if (event.key === 'Enter' && searchInput.trim().length >= 2) { event.preventDefault(); entries[Math.max(activeIndex, 0)]?.onSelect(); }
+    }, [entries, activeIndex, searchInput]);
+
+    // "/" focuses the global search from anywhere that is not a text field (Ctrl+K stays with the Wiki bar).
+    useEffect(() => {
+        const handler = (event: KeyboardEvent) => {
+            if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+            const target = event.target as HTMLElement | null;
+            if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+            event.preventDefault();
+            inputRef.current?.focus();
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, []);
 
     const handleClear = useCallback(() => {
         setSearchInput('');
@@ -286,7 +365,14 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                                 setIsSearchOpen(true);
                             }}
                             onFocus={() => setIsSearchOpen(true)}
-                            placeholder="Buscar segmento, jornada..."
+                            onKeyDown={handleSearchKeyDown}
+                            placeholder={canSeeWiki ? 'Buscar segmento, jornada, nota...' : 'Buscar segmento, jornada...'}
+                            title="Atalho: tecla /"
+                            aria-label="Busca global"
+                            role="combobox"
+                            aria-expanded={isSearchOpen && searchInput.trim().length >= 2}
+                            aria-controls="global-search-results"
+                            aria-activedescendant={activeIndex >= 0 && entries[activeIndex] ? `global-search-${activeIndex}` : undefined}
                             className="bg-transparent border-none outline-none text-sm text-slate-700 w-full placeholder-slate-400"
                         />
                         {searchInput && (
@@ -298,65 +384,74 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
 
                     {/* Dropdown */}
                     {isSearchOpen && searchInput.trim().length >= 2 && (
-                        <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-[9999]">
-                            {grouped.length === 0 ? (
+                        <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-[9999]">
+                            {entries.length === 0 ? (
                                 <div className="px-4 py-4 text-sm text-slate-500 text-center">
-                                    Nenhum resultado para "<span className="font-medium text-slate-700">{searchInput}</span>"
+                                    {wikiSearch.loading ? (
+                                        <span className="inline-flex items-center gap-2"><LoaderCircle size={14} className="animate-spin" />Buscando...</span>
+                                    ) : (
+                                        <>Nenhum resultado para "<span className="font-medium text-slate-700">{searchInput}</span>"</>
+                                    )}
                                 </div>
                             ) : (
-                                <div className="max-h-80 overflow-y-auto py-1">
-                                    {grouped.map(({ type, items }) => {
-                                        const config = TYPE_CONFIG[type];
-                                        const Icon = config.icon;
+                                <div id="global-search-results" role="listbox" aria-label="Resultados da busca" className="max-h-[28rem] overflow-y-auto py-1">
+                                    {entries.map((entry, index) => {
+                                        const Icon = entry.icon;
+                                        const startsSection = index === 0 || entries[index - 1].section !== entry.section;
                                         return (
-                                            <div key={type}>
-                                                <div className="px-3 pt-2 pb-1">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                        {GROUP_LABELS[type]}
-                                                    </span>
-                                                </div>
-                                                {items.map((result) => (
-                                                    <button
-                                                        key={`${result.type}-${result.label}`}
-                                                        onClick={() => handleSelectResult(result)}
-                                                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 transition-colors text-left"
-                                                    >
-                                                        <Icon size={14} className="text-slate-400 shrink-0" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-sm font-medium text-slate-700 truncate">
-                                                                {result.label}
-                                                            </p>
-                                                            {result.bu && (
-                                                                <div className="flex items-center gap-1 mt-0.5">
-                                                                    <div className={`w-1.5 h-1.5 rounded-full ${BU_DOT[result.bu] ?? 'bg-slate-400'}`} />
-                                                                    <span className="text-[10px] text-slate-400">{result.bu}</span>
-                                                                    {result.segmento && result.type === 'activity' && (
-                                                                        <span className="text-[10px] text-slate-400">· {result.segmento}</span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        {result.count !== undefined && (
-                                                            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full tabular-nums shrink-0">
-                                                                {result.count}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                            <React.Fragment key={entry.key}>
+                                                {startsSection && (
+                                                    <div className="px-3 pt-2 pb-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                            {entry.section}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                <button
+                                                    id={`global-search-${index}`}
+                                                    role="option"
+                                                    aria-selected={index === activeIndex}
+                                                    onMouseEnter={() => setActiveIndex(index)}
+                                                    onClick={entry.onSelect}
+                                                    className={`w-full flex items-center gap-3 px-3 py-2 transition-colors text-left ${index === activeIndex ? 'bg-cyan-50' : 'hover:bg-slate-50'}`}
+                                                >
+                                                    <Icon size={14} className="text-slate-400 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-slate-700 truncate">{entry.title}</p>
+                                                        {entry.detail && <div className="mt-0.5">{entry.detail}</div>}
+                                                    </div>
+                                                    {entry.badge !== undefined && (
+                                                        <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full tabular-nums shrink-0">
+                                                            {entry.badge}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            </React.Fragment>
                                         );
                                     })}
-                                    <div className="border-t border-slate-100 mx-3 mt-1 pt-2 pb-2">
-                                        <button
-                                            onClick={() => handleSelectResult({ type: 'segmento', label: searchInput })}
-                                            className="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-cyan-600 transition-colors px-1"
-                                        >
-                                            <Search size={11} />
-                                            <span>Ver tudo para "<span className="font-semibold">{searchInput}</span>" no Framework</span>
-                                        </button>
-                                    </div>
+                                    {wikiSearch.loading && (
+                                        <p className="px-3 py-2 text-[11px] text-slate-400 flex items-center gap-1.5"><LoaderCircle size={11} className="animate-spin" />Buscando na Wiki...</p>
+                                    )}
                                 </div>
                             )}
+                            <div className="border-t border-slate-100 px-3 py-2 space-y-1.5">
+                                {canSeeWiki && (
+                                    <button
+                                        onClick={() => openWiki(null, searchInput)}
+                                        className="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-cyan-600 transition-colors px-1"
+                                    >
+                                        <BookOpen size={11} />
+                                        <span>Ver tudo para "<span className="font-semibold">{searchInput}</span>" na Wiki{wikiSearch.total ? ` (${wikiSearch.total})` : ''}</span>
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => handleSelectResult({ type: 'segmento', label: searchInput })}
+                                    className="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-cyan-600 transition-colors px-1"
+                                >
+                                    <Search size={11} />
+                                    <span>Ver tudo para "<span className="font-semibold">{searchInput}</span>" no Framework</span>
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

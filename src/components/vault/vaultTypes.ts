@@ -35,6 +35,10 @@ export interface VaultNoteSummary {
   source: string | null;
   source_modified_at: string | null;
   indexed_at: string;
+  /** Last update (YYYY-MM-DD) from the note's "atualizado", filled by gaas_search_wiki. */
+  updated_on?: string | null;
+  /** "estrategia" for 05-Estrategia, "nota" for subjects and notes; filled by gaas_search_wiki. */
+  kind?: 'estrategia' | 'nota' | null;
   rank: number;
   total_count: number;
 }

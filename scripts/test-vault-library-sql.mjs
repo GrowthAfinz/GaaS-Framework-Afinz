@@ -46,3 +46,17 @@ test('folder facets expose compact top-level counts', () => {
   assert.match(readerSql, /split_part\(note\.folder, '\/', 1\)/i);
   assert.match(readerSql, /count\(\*\)::integer as note_count/i);
 });
+
+const wikiSearchSql = await readFile(new URL('../supabase/migrations/20261109125211_wiki_search_recent.sql', import.meta.url), 'utf8');
+
+test('wiki search orders strategies first, newest first, accent-insensitive and authenticated-only', () => {
+  assert.match(wikiSearchSql, /create or replace function public\.gaas_search_wiki/i);
+  assert.match(wikiSearchSql, /security invoker/i);
+  assert.match(wikiSearchSql, /when note\.relative_path like '05-Estrategia\/%' then 'estrategia' else 'nota'/i);
+  assert.match(wikiSearchSql, /filtered\.updated_on end desc nulls last/i);
+  assert.match(wikiSearchSql, /frontmatter ->> 'atualizado'/i);
+  assert.match(wikiSearchSql, /extensions\.unaccent/i);
+  assert.match(wikiSearchSql, /grant execute on function public\.gaas_search_wiki[\s\S]+to authenticated/i);
+  assert.match(wikiSearchSql, /revoke all on function public\.gaas_search_wiki[\s\S]+from public, anon/i);
+  assert.doesNotMatch(wikiSearchSql.match(/function public\.gaas_search_wiki[\s\S]+?returns table \([\s\S]+?\)\s*language sql/i)?.[0] || '', /content_markdown/i);
+});

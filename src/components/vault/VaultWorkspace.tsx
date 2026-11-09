@@ -15,7 +15,9 @@ import { isStrategyPilot } from './strategy/strategyModel';
 import { WikiPilotChecklist } from './WikiPilotChecklist';
 import { isPilotHeading } from './wikiPilotModel';
 import remarkGfm from 'remark-gfm';
-import { canSyncVault, getVaultNote, latestVaultSync, listVaultBacklinks, listVaultFolders, searchVault, syncVault } from './vaultService';
+import { canSyncVault, getVaultNote, latestVaultSync, listVaultBacklinks, listVaultFolders, searchWiki, syncVault } from './vaultService';
+import { useWikiSearch } from './useWikiSearch';
+import { formatWikiUpdatedOn, groupWikiSearchResults, wikiNoteUpdatedOn } from './wikiSearch';
 import { filesFromInput, parseVaultFiles, rewriteWikilinksForReader } from './vaultParser';
 import { VaultBacklink, VaultFolderFacet, VaultNote, VaultNoteSummary, VaultSyncRun } from './vaultTypes';
 import { vaultUrlTransform } from './vaultMarkdown';
@@ -82,6 +84,10 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
   const prepared = useMemo(() => prepareWikiMarkdown(rewriteWikilinksForReader(selected?.content_markdown || '')), [selected]);
   const analytics = useMemo(()=>selected?readWikiAnalytics(selected.frontmatter):null,[selected]);
   const reading=useMemo(()=>wikiReading(rewriteWikilinksForReader(selected?.content_markdown||'')),[selected]);
+  // Strategy pages have their own quick results under the bar (the reading mode lists results in the sidebar).
+  const strategyView=!graphMode&&!notesMode&&(viewParams.get('wiki_topic')==='strategies'||Boolean(selected&&isStrategyPilot(selected)));
+  const strategySearch=useWikiSearch(query,{limit:20,minLength:1,enabled:strategyView});
+  const groupedSummaries=useMemo(()=>groupWikiSearchResults(summaries),[summaries]);
   const front=analytics?({crm:'CRM Aquisição',renta:'CRM Rentabilização e Seguros',media:'Mídia paga',b2c:'Originação B2C'}[analytics.domain]):'';
   const catalogFilters=selected?.frontmatter.growth_catalog&&typeof selected.frontmatter.growth_catalog==='object'?selected.frontmatter.growth_catalog as Record<string,unknown>:null;
   const catalogRoute=readCatalogRoute(window.location.search);
@@ -148,7 +154,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     const requestId = ++indexRequest.current;
     setListLoading(true); setError(null);
     try {
-      const result = await searchVault(nextQuery, nextFolder, offset, PAGE_SIZE);
+      const result = await searchWiki(nextQuery, nextFolder, offset, PAGE_SIZE);
       if (requestId !== indexRequest.current) return;
       setSummaries(current => append ? [...current, ...result.items] : result.items); setTotal(result.total);
     } catch (failure) {
@@ -167,7 +173,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
       const notes: VaultNoteSummary[] = [];
       let count = Infinity;
       while (notes.length < count) {
-        const page = await withTimeout(searchVault('', null, notes.length, 100), 20000, 'O índice de navegação demorou demais.');
+        const page = await withTimeout(searchWiki('', null, notes.length, 100), 20000, 'O índice de navegação demorou demais.');
         count = page.total;
         notes.push(...page.items);
         if (!page.items.length) break;
@@ -223,6 +229,8 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
 
   useEffect(() => {
     if (!browse) return;
+    // Show "Buscando…" during the debounce too, so the list never flashes "Nenhuma nota encontrada".
+    setListLoading(true);
     const timer = window.setTimeout(() => { void loadIndex(query, folder); }, 250);
     return () => window.clearTimeout(timer);
   }, [browse, query, folder, loadIndex]);
@@ -373,7 +381,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
     {isAdmin&&<div className="mt-3 border-t border-slate-100 pt-3"><p className="mb-2">Atualize a projeção a partir da pasta de origem.</p><input ref={folderInput} className="hidden" type="file" multiple {...({ webkitdirectory: '', directory: '' } as Record<string, string>)} onChange={handleFiles} /><button type="button" disabled={syncing} onClick={() => folderInput.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60"><RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />{syncing ? progress : 'Sincronizar pasta'}</button></div>}
   </>};
   const strategyBar=<WikiModeBar {...barCommon} onBack={()=>setStrategyTopics(value=>!value)} backLabel="Abrir assuntos sem fechar a nota" nav={{label:'Assuntos',open:strategyTopics,onToggle:()=>setStrategyTopics(value=>!value),controls:'wiki-strategy-subjects'}} search={{value:query,placeholder:'Buscar notas na Wiki…',ariaLabel:'Buscar na Wiki',inputRef:searchInput,onChange:setQuery}}/>;
-  const strategyPanels=<>{strategyTopics&&<nav id="wiki-strategy-subjects" aria-label="Assuntos da Wiki" className="strategy-subjects"><p>Escolha um assunto <button type="button" aria-label="Fechar assuntos" onClick={()=>setStrategyTopics(false)}><X size={16}/></button></p>{WIKI_TOPICS.map(topic=><button key={topic.title} type="button" onClick={()=>{setStrategyTopics(false);openTarget(topic.target);}}>{topic.title}</button>)}</nav>}{query&&<nav className="strategy-subjects" aria-label="Resultados de busca da Wiki">{catalog.filter(n=>(n.title+' '+n.relative_path).toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0,20).map(n=><button type="button" key={n.id} onClick={()=>{setQuery('');navigate(n.id);}}>{n.title}</button>)}</nav>}</>;
+  const strategyPanels=<>{strategyTopics&&<nav id="wiki-strategy-subjects" aria-label="Assuntos da Wiki" className="strategy-subjects"><p>Escolha um assunto <button type="button" aria-label="Fechar assuntos" onClick={()=>setStrategyTopics(false)}><X size={16}/></button></p>{WIKI_TOPICS.map(topic=><button key={topic.title} type="button" onClick={()=>{setStrategyTopics(false);openTarget(topic.target);}}>{topic.title}</button>)}</nav>}{query.trim()&&<nav className="strategy-subjects" aria-label="Resultados de busca da Wiki" aria-busy={strategySearch.loading}>{strategySearch.groups.map(group=><Fragment key={group.kind}><p className="strategy-search-group">{group.label}</p>{group.items.map(n=><button type="button" key={n.id} onClick={()=>{setQuery('');navigate(n.id);}}><span>{n.title}</span><small>{formatWikiUpdatedOn(wikiNoteUpdatedOn(n))}</small></button>)}</Fragment>)}{!strategySearch.loading&&!strategySearch.groups.length&&<p>{strategySearch.error||'Nenhuma nota encontrada.'}</p>}</nav>}</>;
   if (!graphMode&&!notesMode&&viewParams.get('wiki_topic')==='strategies'&&!selectedId) return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-2">{strategyBar}{strategyPanels}{catalogLoading?<p role="status">Carregando estratégias…</p>:<WikiStrategiesIndex notes={catalog} onOpen={id=>navigate(id)}/>}</section>;
   if (!graphMode && !notesMode && !readerLoading && selected && isStrategyPilot(selected)) return <section data-wiki-workspace aria-label="Wiki de Growth" className="space-y-2">
     {strategyBar}{strategyPanels}
@@ -393,7 +401,7 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
           <div className="mb-3 flex items-center justify-between gap-2"><p className="text-xs text-slate-500" aria-live="polite">{listLoading ? 'Buscando…' : `${total} notas encontradas`}</p><button type="button" onClick={() => filter('', null, false)} className="text-xs font-bold text-cyan-700">Assuntos</button></div>
           {folder && <p className="mb-2 break-words text-xs text-slate-500">Pasta: {folder}</p>}
           <div className="space-y-1">
-            {summaries.map(note => <button key={note.id} type="button" aria-current={selectedId === note.id ? 'page' : undefined} onClick={() => navigate(note.id)} className={`w-full rounded-xl border px-3 py-3 text-left ${selectedId === note.id ? 'border-cyan-200 bg-cyan-50' : 'border-transparent hover:border-slate-200 hover:bg-white'}`}><div className="flex items-start gap-2"><FileText size={15} className="mt-1 shrink-0 text-slate-500" /><span className="text-sm font-semibold leading-5 text-slate-800">{note.title}</span></div><p className="mt-1 text-xs text-slate-500">{note.folder || 'Geral'}</p></button>)}
+            {groupedSummaries.map(group => <section key={group.kind} aria-label={group.label} className="space-y-1"><p className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">{group.label}</p>{group.items.map(note => <button key={note.id} type="button" aria-current={selectedId === note.id ? 'page' : undefined} onClick={() => navigate(note.id)} className={`w-full rounded-xl border px-3 py-3 text-left ${selectedId === note.id ? 'border-cyan-200 bg-cyan-50' : 'border-transparent hover:border-slate-200 hover:bg-white'}`}><div className="flex items-start gap-2"><FileText size={15} className="mt-1 shrink-0 text-slate-500" /><span className="text-sm font-semibold leading-5 text-slate-800">{note.title}</span></div><p className="mt-1 text-xs text-slate-500">{formatWikiUpdatedOn(wikiNoteUpdatedOn(note))} · {note.folder || 'Geral'}</p></button>)}</section>)}
             {!listLoading && !total && <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-600">Nenhuma nota encontrada. Ajuste a busca ou remova o filtro.</p>}
             {summaries.length < total && <button disabled={listLoading} type="button" onClick={() => void loadIndex(query, folder, summaries.length, true)} className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs font-bold text-slate-700 disabled:opacity-60">{listLoading ? 'Carregando…' : 'Carregar mais'}</button>}
           </div>
