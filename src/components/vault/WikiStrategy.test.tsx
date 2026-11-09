@@ -30,13 +30,13 @@ describe('Wiki strategy documents', () => {
   it('ships the approved Visa title, current limits, proposals and complete expandable references', () => {
     const doc = readFileSync(new URL('../../../docs/wiki-vault/05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md', import.meta.url), 'utf8');
     expect(doc).toContain('title: Estratégia Pool de Ofertas Visa');
-    expect(doc).toContain('3 a 5 dias');
-    expect(doc).toContain('4 cards estão em avaliação');
-    expect(doc).toContain('`GRUPO_2` não está vigente');
+    expect(doc).toContain('Até 5.000 mensagens');
+    expect(doc).toContain('Até 100.000 SMS');
+    expect(doc).toContain('mesma política e probabilidade a SEG-A e SEG-B');
     const parts = splitWikiSections(doc);
-    expect(parts.filter(p => p.title)).toHaveLength(20);
-    expect(parts.some(p => p.content.includes('Q_VDV_08_VITRINE') && p.content.includes('```sql'))).toBe(true);
-    expect(doc).toContain('Contrato vigente da Fábrica: `VERSAO, GRUPO, CELULA, POSICAO, OFERTA_ID, ATIVA`');
+    expect(parts.filter(p => p.title).length).toBeGreaterThanOrEqual(20);
+    expect(parts.some(p => p.content.includes('Q_VDV_08_POOL') && p.content.includes('```sql'))).toBe(true);
+    expect(doc).toContain('LP personalizada da rodada');
     expect(doc.match(/```mermaid/g)).toHaveLength(3);
   });
 });

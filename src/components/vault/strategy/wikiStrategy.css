@@ -142,6 +142,7 @@
 /* Leitura: fonte do app (Calibri, herdada), texto corrido com largura confortável e status sem repetição. */
 .strategy-prose{font-size:15px}
 .strategy-summary{font-size:16px!important;max-width:88ch}
+@media(max-width:680px){.strategy-page-actions{flex-wrap:wrap}}
 .strategy-prose :is(p,ul,ol,blockquote,h2,h3,h4,h5,h6){max-width:88ch}
 .strategy-page-actions>button[aria-pressed]{color:#42515b}
 .strategy-page-actions>button[aria-pressed]:hover{background:#f5f8f8;color:#006c70}

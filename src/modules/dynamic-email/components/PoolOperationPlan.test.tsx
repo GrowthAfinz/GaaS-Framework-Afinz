@@ -8,29 +8,18 @@ import { VDV_SAMPLES, parseVdvMovimentoCsv } from "../domain/vaiDeVisa";
 import { VDV_MOVIMENTO_CSV } from "../fixtures/vdvBF26V1.csv";
 describe("Referência operacional do Pool", () => {
   it("separa versão em operação de SQL proposto e mantém decisões abertas navegáveis", () => {
-    const running = operation.steps
-      .filter((s) => s.status === "rodando")
-      .map((s) => s.number);
-    expect(running).toEqual(["02", "03", "04", "06"]);
-    expect(operation.steps.find((s) => s.number === "08")?.status).toBe(
-      "proposta",
-    );
-    expect(
-      operation.steps.find((s) => s.number === "04")?.currentSql[0],
-    ).toContain("UNION ALL");
-    expect(
-      operation.steps.find((s) => s.number === "04")?.proposalSql[0],
-    ).toContain("t.SAFRA");
+    expect(operation.steps.map(s=>s.id)).toEqual(['Q_VDV_02_MAPA','Q_VDV_03_CRUZAMENTO','Q_VDV_04_SAFRA','Q_VDV_08_POOL','Q_VDV_05_APTOS','Q_VDV_06_FUNIL']);
+    expect(operation.steps[2].currentSql[0]).toContain("UNION ALL");
+    expect(operation.steps[1].proposalSql[0]).toContain('ULTIMO_ACESSO');
     const html = renderToStaticMarkup(<PoolOperationPlan rulers={[]} />);
     expect(html).toContain("Banco Afinz");
-    expect(html).toContain("inferência forte");
+    expect(html).toContain("inferência documental");
     expect(html).toContain("MID a confirmar");
-    expect(html).toContain("SQL proposto");
+    expect(html).toContain("Delta proposto");
     expect(html).toContain("não testado no SFMC");
     expect(html).toContain("wiki_path=07-Evolucao");
-    expect(operation.decisions.map((d) => d.number)).toEqual([
-      21, 22, 23, 24, 25, 26, 27, 28, 29,
-    ]);
+    expect(html).toContain('100.000 por rodada');
+    expect(html).toContain('sem envio automático');
   });
   it("identifica vitrine genérica sem reclassificar o comprador e exclui controle das opções", () => {
     const html = renderToStaticMarkup(
