@@ -154,3 +154,21 @@ CLAUDE.local.md
 /test_sample.csv
 /artifacts/vai-de-visa/references/
 /.claude/skills/gaas-governanca-comunicacoes/outputs/
+/public/data/
+# Release 8: agregados reais, evidência certificada e saídas do backtest ficam locais.
+/docs/plans/learning-loop/release8/observed-aggregates.json
+/docs/plans/learning-loop/release8/backtest-results.json
+/docs/plans/learning-loop/release8/certified-evidence.json
+/docs/plans/learning-loop/release8/golden-september.json
+/docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md
+# Prints do app, e-mails renderizados e saídas de QA (podem mostrar dado real).
+/screenshots-publicado/
+/outputs/
+/artifacts/vai-de-visa/screenshots/
+/artifacts/vai-de-visa/previews/
+/artifacts/visa-creation-*/
+/artifacts/bem-barato-ruler-regression/
+/docs/design/*.png
+/docs/design/*.jpg
+# Templates e exemplos .pptx das skills: backup no bucket privado repo-privado/2026-11-10/pptx/.
+/.claude/skills/*/assets/*.pptx

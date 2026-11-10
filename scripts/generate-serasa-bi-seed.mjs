@@ -6,6 +6,8 @@ const [sourcePath, targetPath, batchDirectory] = process.argv.slice(2);
 if (!sourcePath || !targetPath) {
   throw new Error('Uso: node scripts/generate-serasa-bi-seed.mjs <normalized_daily.json> <migration.sql>');
 }
+const publicRepoPath = p => typeof p === 'string' && /(^|[\\/])(supabase[\\/]migrations|public[\\/]data)([\\/]|$)/.test(p);
+if ([targetPath].some(publicRepoPath)) throw new Error('Repositório público: grave o SQL/CSV fora do repo (scratchpad) e aplique direto no Supabase. Não use supabase/migrations nem public/data para dado de negócio.');
 
 const rawRows = JSON.parse(await readFile(sourcePath, 'utf8'));
 const volumeKeys = [

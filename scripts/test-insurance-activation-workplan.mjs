@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
-import {createHash} from 'node:crypto';
 import {fixture} from './development-test-fixture.mjs';
 const migration=suffix=>readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(f=>f.endsWith(suffix)),'utf8');
 test('insurance plan preserves documentary scope, six launch gates and a dependency graph without cycles',async()=>{
@@ -22,17 +21,7 @@ test('insurance plan preserves documentary scope, six launch gates and a depende
  assert.ok(!byKey.get('SEG-RES-MEN-PUBLICO').dependencies.includes('SEG-MODELOS'));
  assert.ok(!byKey.get('SEG-MUL-MEN-PUBLICO').dependencies.includes('SEG-MAPA-MULHER'));
  assert.ok(!byKey.get('SEG-MODELOS').dependencies.includes('SEG-CONFIRMAR-PRODUTOS'));
- await db.exec('create table report_live_memberships(user_id uuid,active boolean,role text)');
- await db.exec(readFileSync('supabase/migrations/20260928235051_gaas_vault_library.sql','utf8'));
- await db.exec('create table gaas_wiki_pilot_documents(note_id uuid)');
- await db.exec(`insert into gaas_vault_notes(id,relative_path,title,content_markdown,content_hash) values('25931632-8994-4550-8333-290419fd9a15','05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md','Seguros','Fonte anterior preservada','aea9e74c70a1f9d08f4702b3e069315dc61b07d1fbeadc433a189114b79f36c1'),(gen_random_uuid(),'05-Estrategia/Outra.md','Outra','Intocada','outra')`);
- await db.exec(migration('_insurance_strategy_editorial.sql'));
- await db.exec(migration('_insurance_strategy_map_alignment.sql'));
- const note=(await db.query("select content_markdown from gaas_vault_notes where id='25931632-8994-4550-8333-290419fd9a15'")).rows[0];
- // A nota não fica mais no repositório público: o hash prova que a migration grava exatamente a versão aprovada.
- assert.equal(createHash('sha256').update(note.content_markdown,'utf8').digest('hex'),'1aa09a86bb668dafbd8c6bd906d042f16976206c4a354bd4730fc0d191da5f26');
- assert.equal((await db.query('select content_markdown from gaas_vault_note_revisions')).rows[0].content_markdown,'Fonte anterior preservada');
- assert.equal((await db.query("select content_markdown from gaas_vault_notes where title='Outra'")).rows[0].content_markdown,'Intocada');
- assert.equal((await db.query('select count(*)::int n from gaas_vault_notes')).rows[0].n,2);
+ // As migrations editoriais da nota de Seguros (insurance_strategy_editorial e map_alignment) foram
+ // esvaziadas em 2026-11-10: o texto da nota não fica no repositório público. Já aplicadas em produção.
  }finally{await db.close();}
 });
