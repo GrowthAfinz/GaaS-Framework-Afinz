@@ -27,4 +27,4 @@ DEs: finalidade, estado, pasta/BU, sendable, grão, chave, campos, tipos, tamanh
 
 Automation: nome, BU/MID, frequência, ordem sequencial, origem/destino, ação, anotações, SQL vigente versus proposto, conferências e critérios antes de ativação. Documentação publicada não comprova implantação nem autoriza execução.
 
-Caso de referência: `docs/wiki-vault/05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md`. Fonte canônica no vault pai, mesmo caminho relativo. Ao revisar: editar a fonte, executar bundle/lint e sincronizar a projeção sem tombstones de inventário parcial. Não aplicar este modelo a todas as notas indiscriminadamente.
+Caso de referência: `05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md`, com fonte canônica no vault pai e cópia viva em `gaas_vault_notes`. O repositório é público e não guarda notas. Ao revisar: editar a fonte, executar bundle/lint e sincronizar o Supabase sem tombstones de inventário parcial. Não aplicar este modelo a todas as notas indiscriminadamente.

@@ -2,8 +2,10 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ReactMarkdown from 'react-markdown';
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { splitWikiSections, WikiMarkdownSections } from './WikiMarkdownSections';
+import { localVaultNote } from './testing/localVaultNote';
+
+const visaNote = localVaultNote('05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md');
 import { WikiCodeBlock } from './WikiDiagram';
 
 describe('Wiki strategy documents', () => {
@@ -27,8 +29,8 @@ describe('Wiki strategy documents', () => {
     expect(html).toContain('data-wiki-section');
     expect(html).not.toContain('<script>');
   });
-  it('ships the approved Visa title, current limits, proposals and complete expandable references', () => {
-    const doc = readFileSync(new URL('../../../docs/wiki-vault/05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md', import.meta.url), 'utf8');
+  it.skipIf(!visaNote)('ships the approved Visa title, current limits, proposals and complete expandable references', () => {
+    const doc = visaNote as string;
     expect(doc).toContain('title: Estratégia Pool de Ofertas Visa');
     expect(doc).toContain('Até 5.000 mensagens');
     expect(doc).toContain('Até 100.000 SMS');

@@ -9,6 +9,7 @@ import { FunnelStageLabel, GranularityToggle, SeriesConfigurator, StageMetricCel
 import { OnboardingFunnelWorkspace } from './OnboardingFunnelWorkspace';
 import { SerasaBiFunnelView, SerasaMarketplaceFunnelView } from './SerasaSourceFunnelView';
 import { useAppStore } from '../store/useAppStore';
+import { supabase } from '../services/supabaseClient';
 import { GrowthBetSourceContext, openGrowthBetSourceContext } from './growth-learning/growthLearningNavigation';
 import { RelatedGrowthBets } from './growth-learning/bets/RelatedGrowthBets';
 
@@ -56,22 +57,39 @@ const serasaSeriesOrder = new Map<string, number>([
 ]);
 
 const empty: Totals = { consultas: 0, aprovados: 0, pedidos: 0, bio: 0, docs: 0, assinatura: 0, emitidos: 0, bioNulls: 0 };
-const parseNumber = (v = '') => v.trim() === '' ? null : Number(v.replaceAll('.', '').replace(',', '.'));
 const formatNumber = (v: number) => v.toLocaleString('pt-BR');
 const percentage = (a: number, b: number) => b > 0 ? a / b * 100 : null;
 const percentageLabel = (v: number | null, digits = 1) => v == null ? '—' : `${v.toFixed(digits).replace('.', ',')}%`;
-const parseDate = (v: string) => { const [d, m, y] = v.split('/').map(Number); return new Date(y, m - 1, d, 12); };
+const parseIsoDate = (v: string) => { const [y, m, d] = v.split('-').map(Number); return new Date(y, m - 1, d, 12); };
 const shortDate = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 const shortWeekday = (d: Date) => d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toLowerCase();
 const fullWeekday = (d: Date) => d.toLocaleDateString('pt-BR', { weekday: 'long' });
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const delta = (current: number | null, previous: number | null) => current == null || previous == null || previous === 0 ? null : (current - previous) / previous * 100;
 
-function parseCsv(text: string): Row[] {
-  return text.split(/\r?\n/).slice(1).map(line => line.split(';'))
-    .filter(c => /^\d{2}\/\d{2}\/\d{4}$/.test(c[0] || ''))
-    .map(c => ({ date: parseDate(c[0]), consultas: parseNumber(c[1]) ?? 0, aprovados: parseNumber(c[2]) ?? 0, pedidos: parseNumber(c[3]) ?? 0, bio: parseNumber(c[4]), docs: parseNumber(c[5]) ?? 0, assinatura: parseNumber(c[6]), emitidos: parseNumber(c[7]) ?? 0 }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
+// Fonte: serasa_bi_neurotech_daily_funnel (RLS: membro aprovado). Antes vinha de um CSV público no Pages.
+type SerasaNeurotechDbRow = { data: string; consultas_neurotech: number | null; aprovados_neurotech: number | null; pedidos_confirmados: number | null; env_foto_biometria: number | null; env_documento: number | null; assinatura_cartao: number | null; total_emitidos: number | null };
+
+function serasaDbRowToRow(r: SerasaNeurotechDbRow): Row {
+  return { date: parseIsoDate(r.data), consultas: r.consultas_neurotech ?? 0, aprovados: r.aprovados_neurotech ?? 0, pedidos: r.pedidos_confirmados ?? 0, bio: r.env_foto_biometria, docs: r.env_documento ?? 0, assinatura: r.assinatura_cartao, emitidos: r.total_emitidos ?? 0 };
+}
+
+async function loadSerasaRows(): Promise<Row[]> {
+  const rows: SerasaNeurotechDbRow[] = [];
+  const pageSize = 1000;
+  for (let start = 0; ; start += pageSize) {
+    const { data, error } = await supabase
+      .from('serasa_bi_neurotech_daily_funnel')
+      .select('data, consultas_neurotech, aprovados_neurotech, pedidos_confirmados, env_foto_biometria, env_documento, assinatura_cartao, total_emitidos')
+      .order('data')
+      .range(start, start + pageSize - 1);
+    if (error) throw new Error('Fonte Serasa indisponível');
+    const page = (data ?? []) as SerasaNeurotechDbRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  if (!rows.length) throw new Error('Tabela do funil Serasa sem dados');
+  return rows.map(serasaDbRowToRow).sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
 function sum(rows: Row[]): Totals {
@@ -163,9 +181,11 @@ const SerasaFunnelView: React.FC<{ navigation: React.ReactNode }> = ({ navigatio
   const [hoverDetail, setHoverDetail] = useState<HoverDetail | null>(null);
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}data/serasa-funnel-daily.csv`)
-      .then(r => r.ok ? r.text() : Promise.reject(new Error('Fonte Serasa indisponível')))
-      .then(t => setRows(parseCsv(t))).catch(e => setError(e.message));
+    let cancelled = false;
+    loadSerasaRows()
+      .then(loaded => { if (!cancelled) setRows(loaded); })
+      .catch(e => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
   }, []);
 
   const lastDate = rows.at(-1)?.date;

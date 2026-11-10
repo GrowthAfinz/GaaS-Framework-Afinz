@@ -6,6 +6,8 @@ const [sourcePath, targetPath, lastClosedDate = '2026-07-23'] = process.argv.sli
 if (!sourcePath || !targetPath) {
   throw new Error('Uso: node scripts/generate-serasa-marketplace-seed.mjs <normalized.json> <migration.sql> [lastClosedDate]');
 }
+const publicRepoPath = p => typeof p === 'string' && /(^|[\\/])(supabase[\\/]migrations|public[\\/]data)([\\/]|$)/.test(p);
+if ([targetPath].some(publicRepoPath)) throw new Error('Repositório público: grave o SQL/CSV fora do repo (scratchpad) e aplique direto no Supabase. Não use supabase/migrations nem public/data para dado de negócio.');
 
 const rows = JSON.parse(await readFile(sourcePath, 'utf8'));
 const sourceHash = createHash('sha256').update(JSON.stringify(rows)).digest('hex');

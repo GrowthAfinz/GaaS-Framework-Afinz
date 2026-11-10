@@ -67,6 +67,10 @@ Para deck institucional, relatório, growth/KPIs ou **plano de mídias**: use
 `assets/afinz_template_institucional.pptx` (16:9, 13.33"×7.5", 22 layouts nomeados,
 slide master e logo oficial já embutidos).
 
+> Os `.pptx` desta pasta não ficam no repositório público. Se `assets/*.pptx` não existir no
+> disco, baixe do bucket privado do Supabase `repo-privado/2026-11-10/pptx/` (projeto
+> `mipiwxadnpwtcgfcedym`) para `assets/`. O arquivo continua ignorado pelo git.
+
 Para deck de **campanha comercial, parceria de marca ou ativação sazonal**: use a skill irmã
 **`afinz-pptx-campanha`**, que tem 12 layouts a mais, incluindo a capa temática. Invoque as
 duas juntas.

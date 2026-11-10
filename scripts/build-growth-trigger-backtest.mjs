@@ -24,13 +24,8 @@ const evaluate=(month,rows)=>crm.flatMap(op=>performanceRules.map(rule=>evaluate
 const matrix=['04','05','06','07','08','09'].flatMap(m=>evaluate('2026-'+m,snapshot.monthly));
 const triggers=matrix.filter(r=>r.state==='triggered');
 const september=matrix.filter(r=>r.period==='2026-09');
-const golden=[
-  ['B2C','Negados','Proprietaria','T1',934,589],['B2C','Negados','Proprietaria','T2',15.79,24.51],
-  ['B2C','Abandonados','Proprietaria','T1',210,41],['B2C','Aprovados_nao_convertidos','Proprietaria','T1',70,7],
-  ['B2C','Abandonados','Serasa','T2',3.25,5.77],['Plurix','CRM','Plurix','T1',118,342],
-  ['Plurix','Negados','Plurix','T1',76,279],['Plurix','Abandonados','Plurix','T1',18,55],
-  ['B2B2C','CRM','Bem Barato','T1',45,116],
-];
+// Valores esperados da spec ficam fora do repositório público (arquivo local ignorado pelo git).
+const golden=read('golden-september.json');
 const goldenComparisons=golden.map(([bu,segment,partner,family,expected,expectedMedian])=>{
   const op=crm.find(o=>o.scope.bu===bu&&o.scope.segment===segment&&o.scope.partner===partner);
   if(!op)throw new Error('Golden scope absent in inventory');

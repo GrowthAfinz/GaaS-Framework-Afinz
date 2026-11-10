@@ -45,6 +45,10 @@ instalável (30MB por skill) — instale as duas.
 
 ## O template
 
+> O `.pptx` não fica no repositório público. Se `assets/afinz_exemplo_campanha_visa_copa.pptx`
+> não existir no disco, baixe do bucket privado do Supabase `repo-privado/2026-11-10/pptx/`
+> (projeto `mipiwxadnpwtcgfcedym`) para `assets/`. O arquivo continua ignorado pelo git.
+
 `assets/afinz_exemplo_campanha_visa_copa.pptx` (16:9, 13.33"×7.5") é uma versão enxuta
 do deck original: mantém o slide master completo e os **34 layouts** (incluindo os 22
 que já existem em `afinz_template_institucional.pptx` — é o mesmo master estendido —

@@ -139,3 +139,36 @@ artifacts/report-live-async/golden/
 
 # Local insurance reference data and QA previews
 /artifacts/insurance-local/
+
+# Repositório público: notas, instruções de agente e dados da operação ficam fora do git.
+# Cópia viva das notas: Supabase gaas_vault_notes. Backup do que saiu: bucket privado repo-privado.
+/CLAUDE.md
+/AGENTS.md
+CLAUDE.local.md
+/docs/wiki-vault/
+/docs/vault/
+/docs/ontology/
+/docs/wiki-sync/manifest.json
+/docs/wiki-sync/publication-*.json
+/B2C_Originacao_DIARIA_2025.csv
+/test_sample.csv
+/artifacts/vai-de-visa/references/
+/.claude/skills/gaas-governanca-comunicacoes/outputs/
+/public/data/
+# Release 8: agregados reais, evidência certificada e saídas do backtest ficam locais.
+/docs/plans/learning-loop/release8/observed-aggregates.json
+/docs/plans/learning-loop/release8/backtest-results.json
+/docs/plans/learning-loop/release8/certified-evidence.json
+/docs/plans/learning-loop/release8/golden-september.json
+/docs/plans/learning-loop/RELEASE_8_BACKTEST_2026-04_a_09.md
+# Prints do app, e-mails renderizados e saídas de QA (podem mostrar dado real).
+/screenshots-publicado/
+/outputs/
+/artifacts/vai-de-visa/screenshots/
+/artifacts/vai-de-visa/previews/
+/artifacts/visa-creation-*/
+/artifacts/bem-barato-ruler-regression/
+/docs/design/*.png
+/docs/design/*.jpg
+# Templates e exemplos .pptx das skills: backup no bucket privado repo-privado/2026-11-10/pptx/.
+/.claude/skills/*/assets/*.pptx

@@ -1,9 +1,3 @@
 # SQL template literals are compared with JavaScript strings in contract tests.
 # Keep checkout bytes reproducible on Windows and Linux.
 *.sql text eol=lf
-
-# Wiki manifest hashes refer to exact source bytes, including original line endings.
-docs/wiki-vault/** -text -whitespace
-
-# Generated knowledge layers preserve source formatting.
-docs/ontology/** -whitespace

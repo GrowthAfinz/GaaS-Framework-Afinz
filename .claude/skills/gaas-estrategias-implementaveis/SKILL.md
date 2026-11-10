@@ -13,7 +13,7 @@ Esta skill registra a orientação de Pablo de 06/11/2026: conteúdo próximo de
 
 ## Referências e fontes
 
-1. Leia a nota Visa e os documentos do projeto tratado. No repositório, procure `docs/wiki-vault/05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md` como projeção de leitura e a nota canônica correspondente em `Afinz-CRM-Midia-Vault/`. Não editar a projeção para corrigir a fonte.
+1. Leia a nota Visa e os documentos do projeto tratado. A nota canônica fica em `Afinz-CRM-Midia-Vault/05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md` e a cópia viva em `gaas_vault_notes` no Supabase (mesmo `relative_path`). O repositório é público e não guarda notas. Não editar a cópia do Supabase para corrigir a fonte.
 2. Leia [references/modelo-visa.md](references/modelo-visa.md) para transferir o padrão para outra estratégia.
 3. Para Seguros, leia [references/seguros-e-compatibilidade.md](references/seguros-e-compatibilidade.md). Ela localiza fontes e conflitos; não substitui a verificação das versões atuais.
 4. As notas de DEs, automações e atividades são referências operacionais. Contratos conflitantes exigem explicitação da divergência; não resolver por omissão nem pelo documento mais antigo.
