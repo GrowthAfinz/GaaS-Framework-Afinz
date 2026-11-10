@@ -1,9 +1,11 @@
 import {describe,it,expect} from 'vitest';
-import {readFileSync} from 'node:fs';
 import {initialStrategy,moveBlock,exportStrategy,replaceStrategyDetail} from './strategyModel';
+import {localVaultNote} from '../testing/localVaultNote';
+const visaNote=localVaultNote('05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md');
+const segurosNote=localVaultNote('05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md');
 describe('strategy pilot document',()=>{
- it('imports the real Visa source without losing SQL, Mermaid or expanded technical contracts',()=>{
-  const content=readFileSync(new URL('../../../../docs/wiki-vault/05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md',import.meta.url),'utf8');
+ it.skipIf(!visaNote)('imports the real Visa source without losing SQL, Mermaid or expanded technical contracts',()=>{
+  const content=visaNote as string;
   const doc=initialStrategy({title:'Estratégia Pool de Ofertas Visa',content_markdown:content,relative_path:'05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md'});
   const exported=exportStrategy(doc);
   expect(doc.blocks[0].type).toBe('tasks');expect(doc.blocks.filter(b=>b.type==='markdown')).toHaveLength(13);
@@ -20,8 +22,8 @@ describe('strategy pilot document',()=>{
  });
 });
 
-it('imports insurance topics and diagrams with the insurance activity binding',()=>{
- const content=readFileSync(new URL('../../../../docs/wiki-vault/05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md',import.meta.url),'utf8');
+it.skipIf(!segurosNote)('imports insurance topics and diagrams with the insurance activity binding',()=>{
+ const content=segurosNote as string;
  const doc=initialStrategy({title:'Estratégia de Segmentação de Seguros',content_markdown:content,relative_path:'05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md'});
  expect(doc.blocks.find(b=>b.type==='tasks')?.title).toBe('Atividades: Construção e ativação de Seguros');
  expect(exportStrategy(doc).match(/```mermaid/g)).toHaveLength(3);

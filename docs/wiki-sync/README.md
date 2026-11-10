@@ -1,10 +1,11 @@
-# Snapshot completo da Wiki
+# Wiki: onde ficam as notas
 
-Espelho versionado das notas Markdown elegíveis do vault local do Pablo em `docs/wiki-vault/`.
-A Wiki viva permanece em Supabase; este diretório não é carregado pelo frontend.
-O manifesto guarda os hashes de conteúdo. Não editar os compilados para corrigir notas.
-Templates e configurações Obsidian não fazem parte da publicação.
+Este repositório é público e não guarda notas da Wiki, ontologia compilada nem instruções de agente.
 
-Origem local: `Afinz-CRM-Midia-Vault/`, externa à raiz deste repositório de aplicação.
-A publicação usa baseline, trava e uma transação para inventário completo sem exclusões.
-Para verificar o snapshot: `node scripts/export-vault-projection.mjs --vault docs/wiki-vault --batch-size 10000`.
+- Fonte canônica: vault Obsidian local `Afinz-CRM-Midia-Vault/`, fora deste repositório.
+- Cópia viva: Supabase, tabelas `gaas_vault_notes`, `gaas_vault_links` e `gaas_vault_note_revisions`.
+- Backup do espelho que existia aqui (até 2026-11-10): bucket privado `repo-privado` no Supabase.
+
+A publicação vault → Supabase continua com baseline, trava e uma transação para inventário completo sem exclusões.
+Os scripts em `tooling/` rodam a partir do vault local; os arquivos gerados (`docs/ontology/`, manifestos) ficam no `.gitignore`.
+Testes que validam conteúdo de nota real leem o vault local (`GAAS_VAULT_DIR` ou pasta irmã) e são pulados no CI.

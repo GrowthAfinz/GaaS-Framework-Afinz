@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {fixture} from './development-test-fixture.mjs';
 const migration=suffix=>readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(f=>f.endsWith(suffix)),'utf8');
 test('insurance plan preserves documentary scope, six launch gates and a dependency graph without cycles',async()=>{
@@ -28,7 +29,8 @@ test('insurance plan preserves documentary scope, six launch gates and a depende
  await db.exec(migration('_insurance_strategy_editorial.sql'));
  await db.exec(migration('_insurance_strategy_map_alignment.sql'));
  const note=(await db.query("select content_markdown from gaas_vault_notes where id='25931632-8994-4550-8333-290419fd9a15'")).rows[0];
- assert.equal(note.content_markdown,readFileSync('docs/wiki-vault/05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md','utf8'));
+ // A nota não fica mais no repositório público: o hash prova que a migration grava exatamente a versão aprovada.
+ assert.equal(createHash('sha256').update(note.content_markdown,'utf8').digest('hex'),'1aa09a86bb668dafbd8c6bd906d042f16976206c4a354bd4730fc0d191da5f26');
  assert.equal((await db.query('select content_markdown from gaas_vault_note_revisions')).rows[0].content_markdown,'Fonte anterior preservada');
  assert.equal((await db.query("select content_markdown from gaas_vault_notes where title='Outra'")).rows[0].content_markdown,'Intocada');
  assert.equal((await db.query('select count(*)::int n from gaas_vault_notes')).rows[0].n,2);

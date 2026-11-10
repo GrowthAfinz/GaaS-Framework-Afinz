@@ -139,3 +139,18 @@ artifacts/report-live-async/golden/
 
 # Local insurance reference data and QA previews
 /artifacts/insurance-local/
+
+# Repositório público: notas, instruções de agente e dados da operação ficam fora do git.
+# Cópia viva das notas: Supabase gaas_vault_notes. Backup do que saiu: bucket privado repo-privado.
+/CLAUDE.md
+/AGENTS.md
+CLAUDE.local.md
+/docs/wiki-vault/
+/docs/vault/
+/docs/ontology/
+/docs/wiki-sync/manifest.json
+/docs/wiki-sync/publication-*.json
+/B2C_Originacao_DIARIA_2025.csv
+/test_sample.csv
+/artifacts/vai-de-visa/references/
+/.claude/skills/gaas-governanca-comunicacoes/outputs/
