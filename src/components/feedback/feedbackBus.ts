@@ -1,4 +1,4 @@
-// Ponte leve entre as telas e o botão fixo "Feedback e melhoria".
+// Ponte leve entre as telas e o botão fixo "Declarar melhoria".
 import type { FeedbackTarget } from './feedbackModel';
 
 const OPEN_EVENT = 'gaas:feedback-open';

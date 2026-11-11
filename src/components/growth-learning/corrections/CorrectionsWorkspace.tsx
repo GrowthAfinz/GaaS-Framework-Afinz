@@ -112,7 +112,7 @@ export function CorrectionsWorkspace({ onCountChange }: { onCountChange?: (count
           <div className="flex flex-wrap items-start gap-4">
             <section aria-label="Fila de comentários" className="min-w-0 flex-[999_1_560px] overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="flex justify-between border-b border-slate-200 px-4 py-2 text-xs text-slate-500"><span>{visible.length} itens</span><span>Prioridade combinada primeiro</span></div>
-              {!visible.length && <div className="p-6 text-sm text-slate-500">Nada por aqui com estes filtros. Use o botão Feedback e melhoria em qualquer tela para abrir uma correção.</div>}
+              {!visible.length && <div className="p-6 text-sm text-slate-500">Nada por aqui com estes filtros. Use o botão Declarar melhoria, na borda direita de qualquer tela, para abrir uma correção.</div>}
               {visible.map(item => {
                 const active = selected?.id === item.id;
                 return (
