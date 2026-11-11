@@ -92,6 +92,23 @@ describe('modelo', () => {
     expect(goalPlan([{ card_id: 'c1', channel: 'SMS', monthly_volume: 10 }, { card_id: 'c1', channel: 'WPP', monthly_volume: 5 }], 'c1', ['SMS'])?.[0]).toBe(10);
     expect(goalPlan([], 'c1', ['SMS'])).toBeNull();
   });
+  it('vínculo manual passa na frente da regra e guarda de onde a regra mandaria', () => {
+    const mm = buildModel(board, rules, pillarFronts, plan, payload, [
+      { journey: 'JOR_NOVA', card_id: 'c2', front: null, group_label: null },
+      { journey: 'JOR_RECENCIA_X', card_id: null, front: 'Cobrança', group_label: null },
+    ]);
+    expect(mm.inboxLabel).toBe('A classificar');
+    const nova = mm.journeyInfo.get('JOR_NOVA')!;
+    expect(nova.item).toBe('card:c2');
+    expect(nova.ruleItem).toBe('group:A classificar');
+    expect(nova.manual).toBe(true);
+    expect(mm.journeyInfo.get('JOR_RECENCIA_X')!.item).toBe('group:Cobrança');
+    expect(mm.byItem.get('group:Cobrança')?.length).toBe(4);
+    expect(mm.pillars.find(p => p.key === 'p2')!.items.map(i => i.label)).toEqual(['Sem envio']);
+    expect(mm.groupForFront('Aquisição')).toBe('group:Sem campanha · Aquisição');
+    expect(mm.groupForFront(null)).toBe('group:A classificar');
+    expect(m.journeyInfo.get('JOR_COB_FATURA')).toMatchObject({ manual: false, pattern: 'COB', activities: 1 });
+  });
   it('projeção mensal começa no dia seguinte ao último dado', () => {
     const p = monthlyProjection(m, 300);
     expect(p[2]).toBeNull();

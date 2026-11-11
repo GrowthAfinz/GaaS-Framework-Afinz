@@ -231,3 +231,93 @@
 .cz-rules code{font-family:Consolas,"Cascadia Mono",monospace;font-size:11.5px;background:#f8fafc;border:1px solid #eef2f6;border-radius:4px;padding:1px 5px}
 .cz-err{color:#b91c1c;font-size:12px;min-height:16px;margin-top:4px}
 @media (max-width:1150px){.cz-strip{grid-template-columns:1fr}.cz-tbar{grid-template-columns:1fr;justify-items:start}.cz-tbar .r{justify-content:flex-start}}
+
+/* Mapeamento de jornadas */
+.cz-sub{display:inline-flex;border:1px solid var(--hair,#ebe6db);background:#fff;border-radius:2px}
+.cz-sub button{border:none;background:none;padding:4px 11px;font-size:12px;color:var(--ink2,#475569);display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.cz-sub button.on{background:#0f172a;color:#fff;font-weight:600}
+.cz-sub svg{width:13px;height:13px}
+.cz-vsep{width:1px;height:22px;background:var(--line,#e2e8f0)}
+.cz-ledger .warn b{color:#b45309}.cz-ledger .mv b{color:var(--accent)}
+.cz-mbar{display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap}
+.cz-mbar h3{margin:0;font-size:13.5px;font-weight:700}
+.cz-mbar .sort{font-size:11.5px;color:var(--ink3);display:inline-flex;gap:5px;align-items:center}
+.cz-mbar .sort svg{width:13px;height:13px}
+.cz-search{display:flex;align-items:center;gap:6px;border:1px solid var(--hair);border-radius:8px;padding:0 9px;height:30px;color:var(--ink3);background:#fff}
+.cz-search svg{width:14px;height:14px;flex:none}
+.cz-search input{border:none;outline:none;width:200px;font-size:12.5px;background:transparent;color:var(--ink)}
+.cz-map{display:flex;gap:12px;margin-top:12px;align-items:flex-start;overflow-x:auto;padding-bottom:70px}
+.cz-mcol{width:318px;flex:none;display:flex;flex-direction:column;gap:10px}
+.cz-mcol.inbox{width:300px;position:sticky;left:0;z-index:5}
+.cz-mH{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 13px 10px;position:relative;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.05),0 10px 26px -14px rgba(15,23,42,.14)}
+.cz-mH:before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--acc)}
+.cz-mH .r{display:flex;align-items:center;gap:8px}
+.cz-mH .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,white);flex:none}
+.cz-mH .ic svg{width:15px;height:15px}
+.cz-mH .t{font-size:15.5px;font-weight:700;letter-spacing:-.015em;white-space:nowrap}
+.cz-mH .s{font-size:11.5px;color:#64748b;margin-top:7px;line-height:1.4}
+.cz-mH .s b{color:#334155;font-weight:600}
+.cz-mH .bar{display:flex;height:5px;border-radius:5px;overflow:hidden;gap:2px;margin-top:7px;background:#f1f5f9}
+.cz-mH .bar i{display:block}
+.cz-mfr{background:rgba(255,255,255,.55);border:1px solid #e1e7ee;border-radius:14px;padding:8px}
+.cz-mfr.inbox{background:rgba(255,251,235,.75);border-color:#fde68a}
+.cz-mfr .fh{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #edf1f6;border-radius:10px;padding:7px 9px;font-weight:600;font-size:12.5px;width:100%;text-align:left;box-shadow:0 1px 1px rgba(15,23,42,.03)}
+.cz-mfr .fh .cv{width:13px;height:13px;color:var(--ink3);transition:transform .15s;flex:none}
+.cz-mfr.closed .fh .cv{transform:rotate(-90deg)}
+.cz-mfr .fh .meta{margin-left:auto;font-size:11px;color:var(--ink3);font-weight:500}
+.cz-mfr .fb{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.cz-mfr.inbox .fb{margin-top:0}
+.cz-mc{background:#fff;border:1px solid rgba(15,23,42,.10);border-radius:12px;padding:8px 8px 6px;position:relative;box-shadow:0 1px 2px rgba(15,23,42,.05),0 6px 16px -10px rgba(15,23,42,.18);transition:box-shadow .12s,border-color .12s}
+.cz-mc:after{content:"";position:absolute;left:-1px;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--acc)}
+.cz-mc.bucket{border-style:dashed;background:rgba(255,255,255,.75);box-shadow:none}
+.cz-mc.bucket:after{background:#d97706}
+.cz-mc.over{border-color:var(--accent);box-shadow:0 0 0 3px rgba(14,116,144,.18)}
+.cz-mc .ch{display:flex;align-items:center;gap:6px;padding:0 2px 5px 6px}
+.cz-mc .ch .bk{width:13px;height:13px;color:#d97706;flex:none}
+.cz-mc .ch .t{font-weight:700;font-size:12.5px;letter-spacing:-.01em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cz-mc.bucket .ch .t{color:#b45309;font-style:italic;font-weight:600}
+.cz-mc .ch .n{font-size:10.5px;color:var(--ink3);font-weight:600;white-space:nowrap}
+.cz-mc .cl{display:flex;flex-direction:column;gap:4px}
+.cz-mc .dz{border:1.5px dashed #d3dce6;border-radius:8px;color:#94a3b8;font-size:11px;text-align:center;padding:7px;margin-top:4px}
+.cz-mc .more{border:none;background:none;color:var(--accent);font-size:11.5px;padding:3px 6px;text-align:left}
+.cz-jc{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:6px;align-items:center;background:#fbfcfd;border:1px solid #edf1f6;border-radius:8px;padding:5px 7px 5px 4px;cursor:grab}
+.cz-jc[draggable="false"]{cursor:default}
+.cz-jc:hover{border-color:#cbd5e1;background:#fff}
+.cz-jc.drag{opacity:.35}
+.cz-jc.moved{border-color:#a5f3fc;background:#f0fdfe}
+.cz-jc .gr{width:12px;height:12px;color:#cbd5e1}
+.cz-jc .nm{font-family:Consolas,"Cascadia Mono",monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#0f172a}
+.cz-jc .act{opacity:0;border:none;background:none;color:var(--ink3);padding:0 2px;line-height:0}
+.cz-jc .act svg{width:13px;height:13px}
+.cz-jc:hover .act{opacity:1}.cz-jc .act:hover{color:var(--accent)}
+.cz-jc .mt{display:flex;gap:6px;align-items:center;font-size:10.5px;color:var(--ink3);grid-column:2/4;margin-top:1px;white-space:nowrap}
+.cz-jc .mt .chs{display:inline-flex;gap:2px}
+.cz-jc .mt b{color:#334155;font-weight:650}
+.cz-jc .mt .rec{font-weight:700;color:#15803d}
+.cz-jc .badge{font-size:9.5px;font-weight:700;border-radius:5px;padding:1px 5px;margin-left:auto}
+.cz-jc .badge.rule{background:#f1f5f9;color:#64748b}
+.cz-jc .badge.man{background:#ecfeff;color:var(--accent)}
+.cz-jc .badge.mv{background:var(--accent);color:#fff}
+.cz-mfr .emptyrow{border:1.5px dashed #d3dce6;background:rgba(255,255,255,.6);color:#64748b;border-radius:10px;padding:7px 10px;font-size:11.5px;text-align:left;display:flex;gap:6px;align-items:center;width:100%}
+.cz-mfr .emptyrow svg{width:13px;height:13px;flex:none}
+.cz-mfr .emptyrow span{margin-left:auto;color:#b6bdc9;font-size:10.5px}
+.cz-mfr .emptyrow:hover{background:#fff;color:var(--ink)}
+.cz-savebar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0f172a;color:#fff;border-radius:12px;padding:9px 10px 9px 16px;display:flex;gap:12px;align-items:center;font-size:13px;z-index:55;box-shadow:0 14px 34px rgba(15,23,42,.3)}
+.cz-savebar b{color:#a5f3fc}
+.cz-savebar button{border:1px solid #475569;background:none;color:#e2e8f0;border-radius:8px;padding:4px 10px;font-size:12px;display:inline-flex;gap:5px;align-items:center}
+.cz-savebar button.pri{background:#0e7490;border-color:#0e7490;color:#fff;font-weight:600}
+.cz-savebar .err{color:#fca5a5;font-size:12px}
+.cz-mpop{position:fixed;z-index:70;background:#fff;border:1px solid var(--line,#e2e8f0);border-radius:12px;box-shadow:0 16px 40px rgba(15,23,42,.2);width:340px;display:flex;flex-direction:column;max-height:420px;color:#0f172a;font-size:13px}
+.cz-mpop .hd{padding:10px 12px;border-bottom:1px solid #f3efe7}
+.cz-mpop .hd .nm{font-family:Consolas,monospace;font-size:11.5px;word-break:break-all;margin-top:2px}
+.cz-mpop .hd .rl{font-size:11px;color:#8a94a6;margin-top:3px}
+.cz-mpop .hd .back{margin-top:6px;border:1px solid #a5f3fc;background:#ecfeff;color:#0e7490;border-radius:6px;padding:3px 8px;font-size:11.5px}
+.cz-mpop .sr{margin:8px 12px 4px}
+.cz-mpop .sr input{width:100%}
+.cz-mpop .ls{overflow:auto;padding:4px 0 8px}
+.cz-mpop .gh{padding:6px 12px 2px;display:flex;gap:6px;align-items:center}
+.cz-mpop .op{display:flex;gap:8px;align-items:center;width:100%;border:none;background:none;text-align:left;padding:5px 12px 5px 22px;font-size:12.5px}
+.cz-mpop .op:hover{background:#fbf9f5}
+.cz-mpop .op.cur{color:#0e7490;font-weight:600}
+.cz-mpop .op small{margin-left:auto;color:#8a94a6;font-size:11px}
+.cz-mpop .op.bk{font-style:italic;color:#b45309}
