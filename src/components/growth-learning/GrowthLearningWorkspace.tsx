@@ -1,4 +1,5 @@
 import { TasksWorkspace } from './development/TasksWorkspace';
+import { StructureWorkspace } from './structure/StructureWorkspace';
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import {
   BookMarked,
@@ -8,6 +9,7 @@ import {
   MessageSquareWarning,
   ListChecks,
   Presentation,
+  SquareKanban,
   type LucideIcon,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -51,6 +53,7 @@ const SECTION_META: Record<
   outcomes: { label: "Outcomes", icon: CircleGauge },
   memory: { label: "Registros", icon: BookMarked },
   vault: { label: "Wiki", icon: Library },
+  structure: { label: "Estrutura CRM", icon: SquareKanban },
   corrections: { label: "Correções e melhorias", icon: MessageSquareWarning },
 };
 
@@ -136,9 +139,9 @@ export const GrowthLearningWorkspace: React.FC<
   };
 
   return (
-    <div className={section === "investigations" ? "min-h-[calc(100vh-5rem)] bg-white pb-4" : "min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 pb-4 sm:px-5"}>
+    <div className={section === "investigations" || section === "structure" ? "min-h-[calc(100vh-5rem)] bg-white pb-0" : "min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 pb-4 sm:px-5"}>
       <div
-        className={"learning-workspace mx-auto max-w-[1800px] "+(section === "investigations" ? "space-y-0" : "space-y-4")}
+        className={"learning-workspace mx-auto "+(section === "structure" ? "max-w-none space-y-0" : section === "investigations" ? "max-w-[1800px] space-y-0" : "max-w-[1800px] space-y-4")}
       >
         {/* Submenu colado no topo e na barra logo abaixo, separados só por uma linha */}
         <header className="overflow-hidden border-x border-b border-slate-200 bg-white">
@@ -167,7 +170,7 @@ export const GrowthLearningWorkspace: React.FC<
           </nav>
         </header>
 
-        {!LEDGER_SECTIONS.has(section) && section !== "vault" && section !== "investigations" && section !== "corrections" && (
+        {!LEDGER_SECTIONS.has(section) && section !== "vault" && section !== "investigations" && section !== "structure" && section !== "corrections" && (
           <div className="!mt-0 flex flex-wrap items-center justify-between gap-3 rounded-b-xl border border-t-0 border-slate-200 bg-white px-4 py-3">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
@@ -233,7 +236,7 @@ export const GrowthLearningWorkspace: React.FC<
             </div>
           </div>
         )}
-        {section === "investigations" ? <TasksWorkspace initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "feed" ? (
+        {section === "investigations" ? <TasksWorkspace initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "structure" ? <StructureWorkspace /> : section === "feed" ? (
           <GrowthFeedView
             periodStart={periodStart}
             periodEnd={periodEnd}
