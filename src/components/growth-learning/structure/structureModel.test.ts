@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ResultRow } from '../results/results.types';
-import { computeSignal, dropPosition, emptyFilters, historyOptions, isDrift, kpis, passes, toggleIsolate, uniqueRows, type StructureCard } from './structureModel';
+import { cadenceLabel, cardMetrics, cardTrend, computeSignal, dropPosition, emptyFilters, fmtPct, historyOptions, isDrift, kpis, passes, pillarSummary, toggleIsolate, uniqueRows, type StructureCard } from './structureModel';
 
 const row = (p: Partial<ResultRow>): ResultRow => ({
   id: Math.random().toString(36), date: '2026-11-01', domain: 'crm', bu: 'B2C', segment: 'Negados', partner: '', channel: 'WhatsApp',
@@ -77,5 +77,47 @@ describe('filtros e edição', () => {
     expect(historyOptions([row({ segment: 'B' }), row({ segment: 'A' }), row({ domain: 'renta', segment: 'Z' })], 'crm', 'segment')).toEqual(['A', 'B']);
     const r = row({ duplicateKey: 'k' });
     expect(uniqueRows([r, { ...r, id: 'other' }])).toHaveLength(1);
+  });
+});
+
+describe('janela do card', () => {
+  it('com disparo em 90 dias lê cartões, conversão, CAC e o mix de canais pela base', () => {
+    const rows = [
+      row({ date: '2026-11-05', primary: 30, spend: 300, crm: { actionable: 1000 }, channel: 'WhatsApp' }),
+      row({ date: '2026-10-20', primary: 10, spend: 100, crm: { actionable: 3000 }, channel: 'SMS' }),
+      row({ date: '2026-07-01', primary: 20 }),
+    ];
+    const s = computeSignal(card(), rows, TODAY);
+    expect(s.window).toMatchObject({ kind: '90d', primary: 40, base: 4000, cost: 400, dispatches: 2 });
+    expect(s.window?.channels.map(c => [c.channel, c.share])).toEqual([['SMS', 0.75], ['WhatsApp', 0.25]]);
+    expect(s.prev90).toBe(20);
+    expect(cardMetrics(s, 'aq').map(m => [m.label, m.value])).toEqual([['Cartões', '40'], ['Conv.', '1,0%'], ['CAC', 'R$ 10,00']]);
+    expect(cardTrend(s, TODAY).delta).toBe(1);
+  });
+  it('parada usa o último ciclo: 90 dias até o último envio, com os mesmos rótulos', () => {
+    const rows = [row({ date: '2026-06-10', primary: 5 }), row({ date: '2026-04-01', primary: 7 }), row({ date: '2026-01-01', primary: 100 })];
+    const s = computeSignal(card(), rows, TODAY);
+    expect(s.dispatches90).toBe(0);
+    expect(s.window).toMatchObject({ kind: 'cycle', until: '2026-06-10', primary: 12 });
+    expect(cardMetrics(s, 'aq').map(m => m.label)).toEqual(['Cartões', 'Conv.', 'CAC']);
+  });
+  it('rentabilização lê base, abertura e cliques; sem vínculo fica a medir', () => {
+    const renta = card({ data_scope: { domain: 'renta', scope: { journey: 'J1' } } });
+    const s = computeSignal(renta, [row({ domain: 'renta', journey: 'J1', secondary: 200, primary: 3, opens: 50, crm: undefined })], TODAY);
+    expect(cardMetrics(s, 'de').map(m => [m.label, m.value])).toEqual([['Base', '200'], ['Abertura', '25,0%'], ['Cliques', '3']]);
+    const none = computeSignal(card({ data_scope: null }), [], TODAY);
+    expect(none.window).toBeNull();
+    expect(cardMetrics(none, 'cs').every(m => m.value === 'n/d' && m.tone === 'na')).toBe(true);
+    expect(cardMetrics(none, 'aq').map(m => m.label)).toEqual(['Cartões', 'Conv.', 'CAC']);
+  });
+  it('formatos, cadência e resumo do pilar', () => {
+    expect(fmtPct(0.00015)).toBe('0,015%');
+    expect(fmtPct(0.0142)).toBe('1,4%');
+    expect(fmtPct(0.003)).toBe('0,30%');
+    expect(cadenceLabel(60)).toBe('Cadência diária');
+    expect(cadenceLabel(1)).toBe('Disparo único em 90d');
+    const c1 = card(), c2 = card({ id: 'c2', data_scope: null });
+    const signals = new Map([['c1', computeSignal(c1, [row({ date: '2026-11-08', primary: 10, spend: 50 })], TODAY)], ['c2', computeSignal(c2, [], TODAY)]]);
+    expect(pillarSummary([c1, c2], signals)).toMatchObject({ active: 1, stopped: 0, cards: 10, cac: 5 });
   });
 });

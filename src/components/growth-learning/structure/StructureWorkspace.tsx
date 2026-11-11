@@ -10,7 +10,7 @@ import { fetchResultsSnapshot } from '../results/resultsService';
 import type { ResultRow } from '../results/results.types';
 import { loadStructure, saveCard, saveLane, savePillar, type StructureBoard } from './structureService';
 import {
-  B2B2C_WITHOUT_CRM, BU_OPTIONS, MED_META, OBS_META, STATUS_META, computeSignal, dropPosition, emptyFilters, friendlyError, hasFilters, isDrift, kpis, passes, toggleIsolate, uniqueRows,
+  B2B2C_WITHOUT_CRM, BU_OPTIONS, MED_META, OBS_META, STATUS_META, computeSignal, dropPosition, emptyFilters, fmtInt, fmtMoney, friendlyError, hasFilters, isDrift, kpis, passes, pillarSummary, toggleIsolate, uniqueRows,
   type CardSignal, type DeclaredStatus, type Lens, type Measurement, type Observed, type QuickFilter, type StructureCard, type StructureFilters, type StructureLane, type StructurePillar,
 } from './structureModel';
 import { StatusDot, StructureCardView } from './StructureCardView';
@@ -18,7 +18,7 @@ import { StructureDrawer } from './StructureDrawer';
 import { useBoardViewport } from './useBoardViewport';
 import './structure.css';
 
-const W = 244;
+const W = 272;
 const PREFS_KEY = 'gaas.estrutura-crm.prefs';
 const BG_COLORS: [string, string][] = [['#f4f1ea', 'Papel'], ['#ece6d8', 'Areia'], ['#eef1f5', 'Névoa'], ['#e9efe6', 'Sálvia'], ['#efecf5', 'Lavanda'], ['#fafaf8', 'Gelo'], ['#e4e6ea', 'Concreto']];
 interface Prefs { lens: Lens; dense: boolean; mini: boolean; showMetric: boolean; collapsed: string[]; bg: string; legend: { docked: boolean; x: number; y: number } }
@@ -213,6 +213,8 @@ export function StructureWorkspace() {
     med: { title: 'Medição', entries: Object.entries(MED_META), set: filters.med as Set<string>, key: 'med' },
   };
   const dim = legendDims[prefs.lens];
+  const lensValue = (c: StructureCard) => (prefs.lens === 'st' ? c.declared_status : prefs.lens === 'med' ? c.measurement : sig(c.id).observed) as string;
+  const lensSwatch = (value: string) => (prefs.lens === 'st' ? STATUS_META[value as DeclaredStatus].color : prefs.lens === 'med' ? MED_META[value as Measurement].color : OBS_META[value as Observed].color) || '#cbd5e1';
   const countBy = (value: string) => cards.filter(c => (prefs.lens === 'st' ? c.declared_status : prefs.lens === 'med' ? c.measurement : sig(c.id).observed) === value).length;
   const lensDot = (value: string) => {
     const fake = { declared_status: (prefs.lens === 'st' ? value : 'bkl') as DeclaredStatus, measurement: (prefs.lens === 'med' ? value : 'n') as Measurement };
@@ -312,7 +314,9 @@ export function StructureWorkspace() {
           <div className="cs-board" style={{ gridTemplateColumns: template.join(' ') }}>
             {placed.map(({ pillar, col: c0, span }) => {
               const pl = lanesByPillar.get(pillar.id) || [];
-              const total = cards.filter(c => pl.some(l => l.id === c.lane_id)).length, shown = visible.filter(c => pl.some(l => l.id === c.lane_id)).length;
+              const pillarCards = cards.filter(c => pl.some(l => l.id === c.lane_id));
+              const total = pillarCards.length, shown = visible.filter(c => pl.some(l => l.id === c.lane_id)).length;
+              const sum = pillarSummary(pillarCards, signals);
               if (collapsed.has(pillar.id)) return (
                 <div key={pillar.id} className="cs-H collapsed" data-nopan data-mini={pillar.accent} style={{ gridColumn: `${c0} / span 1`, gridRow: '1 / span 3', ['--acc' as string]: pillar.accent }} title={`Expandir ${pillar.title}`}
                   onClick={() => setPrefs(p => ({ ...p, collapsed: p.collapsed.filter(x => x !== pillar.id) }))}>
@@ -321,10 +325,20 @@ export function StructureWorkspace() {
               );
               return (
                 <div key={pillar.id} className="cs-H" data-mini={pillar.accent} style={{ gridColumn: `${c0} / span ${span}`, gridRow: 1, ['--acc' as string]: pillar.accent }}>
-                  <button className="cs-icon" title="Recolher pilar" onClick={() => setPrefs(p => ({ ...p, collapsed: [...p.collapsed, pillar.id] }))}><PanelLeftClose /></button>
-                  <span data-nopan onDoubleClick={e => { if (editable) inlineEdit(e.currentTarget, v => void pillarPatch(pillar, { title: v }, 'Pilar renomeado')); }}>{pillar.title}</span>
-                  <span className="cs-n">· {shown === total ? total : `${shown} de ${total}`}</span>
-                  {editable && <button className="cs-icon" style={{ marginLeft: 'auto' }} aria-label="Ações do pilar" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('pillar', e.currentTarget, pillar.id)}><Ellipsis /></button>}
+                  <div className="cs-Hr">
+                    <button className="cs-icon cs-Hic" title="Recolher pilar" onClick={() => setPrefs(p => ({ ...p, collapsed: [...p.collapsed, pillar.id] }))}><PanelLeftClose /></button>
+                    <span className="cs-Ht" data-nopan onDoubleClick={e => { if (editable) inlineEdit(e.currentTarget, v => void pillarPatch(pillar, { title: v }, 'Pilar renomeado')); }}>{pillar.title}</span>
+                    <span className="cs-n">{shown === total ? total : `${shown} de ${total}`}</span>
+                    {editable && <button className="cs-icon" style={{ marginLeft: 'auto' }} aria-label="Ações do pilar" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('pillar', e.currentTarget, pillar.id)}><Ellipsis /></button>}
+                  </div>
+                  <div className="cs-Hs">
+                    {total} {total === 1 ? 'campanha' : 'campanhas'} · <b>{sum.active} {sum.active === 1 ? 'ativa' : 'ativas'}</b>
+                    {sum.cards != null ? <> · <b>{fmtInt(sum.cards)}</b> cartões 90d{sum.cac != null && <> · CAC <b>{fmtMoney(sum.cac)}</b></>}</> : sum.base > 0 ? <> · <b>{fmtInt(sum.base)}</b> base 90d</> : null}
+                    {sum.stopped > 0 && <> · {sum.stopped} {sum.stopped === 1 ? 'parada' : 'paradas'}</>}
+                  </div>
+                  <div className="cs-Hbar" title={`Composição por ${dim.title.toLowerCase()}`}>
+                    {dim.entries.map(([value, meta]) => { const n = pillarCards.filter(c => lensValue(c) === value).length; return n ? <i key={value} title={`${meta.label}: ${n}`} style={{ flex: n, background: lensSwatch(value) }} /> : null; })}
+                  </div>
                 </div>
               );
             })}
@@ -332,9 +346,11 @@ export function StructureWorkspace() {
               const all = cards.filter(c => c.lane_id === lane.id); const vis = all.filter(c => visibleIds.has(c.id));
               return (
                 <div key={'h' + lane.id} className="cs-S" style={{ gridColumn: `${c0} / span ${span}`, gridRow: 2 }}>
-                  <span data-nopan onDoubleClick={e => { if (editable) inlineEdit(e.currentTarget, v => void lanePatch(lane, { title: v }, 'Coluna renomeada')); }}>{lane.title}</span>
-                  <span className="cs-pill">{vis.length === all.length ? all.length : `${vis.length} de ${all.length}`}</span>
-                  {editable && <button className="cs-icon" aria-label="Ações da coluna" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('lane', e.currentTarget, lane.id)}><Ellipsis /></button>}
+                  <div className="cs-Si">
+                    <span data-nopan onDoubleClick={e => { if (editable) inlineEdit(e.currentTarget, v => void lanePatch(lane, { title: v }, 'Coluna renomeada')); }}>{lane.title}</span>
+                    <span className="cs-pill">{vis.length === all.length ? all.length : `${vis.length} de ${all.length}`}</span>
+                    {editable && <button className="cs-icon" aria-label="Ações da coluna" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('lane', e.currentTarget, lane.id)}><Ellipsis /></button>}
+                  </div>
                 </div>
               );
             })}
@@ -346,7 +362,7 @@ export function StructureWorkspace() {
                   onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDrag(d => (d ? { ...d, overLane: null, overCard: null } : d)); }}
                   onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDrag(null); if (id) void moveCard(id, lane.id, null); }}>
                   {vis.map(c => (
-                    <StructureCardView key={c.id} card={c} signal={sig(c.id)} metricKey={lane.metric_key} lens={prefs.lens} showMetric={prefs.showMetric} editable={editable}
+                    <StructureCardView key={c.id} card={c} signal={sig(c.id)} metricKey={lane.metric_key} lens={prefs.lens} showMetric={prefs.showMetric} editable={editable} today={today}
                       dropBefore={drag?.overCard === c.id && drag.id !== c.id} dragging={drag?.id === c.id}
                       onOpen={openCard} onRename={onRename} onMenu={onCardMenu} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOverCard={onDragOverCard} onDropCard={onDropCard} />
                   ))}

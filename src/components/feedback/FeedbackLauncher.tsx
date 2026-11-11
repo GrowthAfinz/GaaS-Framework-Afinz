@@ -203,10 +203,10 @@ export function FeedbackLauncher() {
           role="dialog"
           aria-modal="false"
           aria-labelledby="feedback-title"
-          className="fixed bottom-20 right-4 z-[9990] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl"
+          className="fixed right-14 top-1/2 z-[9990] max-h-[calc(100vh-2rem)] w-[min(420px,calc(100vw-5rem))] -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl"
         >
           <div className="flex items-center justify-between">
-            <h2 id="feedback-title" className="text-base font-bold text-slate-900">Feedback e melhoria</h2>
+            <h2 id="feedback-title" className="text-base font-bold text-slate-900">Declarar melhoria</h2>
             <button type="button" aria-label="Fechar" onClick={() => setOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={16} /></button>
           </div>
 
@@ -306,10 +306,11 @@ export function FeedbackLauncher() {
           type="button"
           onClick={() => (open ? setOpen(false) : start())}
           aria-expanded={open}
-          className="fixed bottom-4 right-4 z-[9989] flex min-h-11 items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-slate-800"
+          title="Declarar melhoria (Ctrl + Shift + F)"
+          className="fixed right-0 top-1/2 z-[9989] flex -translate-y-1/2 rotate-180 items-center gap-2 rounded-r-xl bg-slate-900 px-2 py-3.5 text-xs font-semibold tracking-wide text-white shadow-lg [writing-mode:vertical-rl] hover:bg-slate-800"
         >
-          <MessageSquareText size={16} aria-hidden="true" />
-          Feedback e melhoria
+          <MessageSquareText size={15} aria-hidden="true" className="rotate-180" />
+          Declarar melhoria
         </button>
       )}
     </div>

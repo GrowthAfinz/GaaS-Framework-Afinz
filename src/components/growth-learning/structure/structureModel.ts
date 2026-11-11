@@ -20,9 +20,24 @@ export interface StructureEvent { id: number; entity: 'pillar' | 'lane' | 'card'
 
 export interface JourneySignal { journey: string; channel: string; count: number; last: string; base: number }
 export interface MonthSignal { month: string; dispatches: number; primary: number; base: number }
+export interface ChannelShare { channel: string; base: number; share: number }
+/**
+ * Janela que o card lê: os últimos 90 dias quando houve disparo; senão o último ciclo,
+ * que são os 90 dias até o último envio. Assim todo card do pilar mostra as mesmas métricas.
+ */
+export interface CardWindow {
+  kind: '90d' | 'cycle'; until: string; dispatches: number;
+  primary: number | null; base: number | null; cost: number | null; opens: number | null;
+  /** Peso de cada canal na base da janela; uma jornada costuma usar vários canais. */
+  channels: ChannelShare[];
+}
 export interface CardSignal {
   observed: Observed; domain: 'crm' | 'renta' | null; lastDate: string | null; daysSince: number | null;
   dispatches90: number; primary90: number | null; base90: number | null; journeys: JourneySignal[]; monthly: MonthSignal[];
+  window: CardWindow | null;
+  /** Número principal dos 90 dias anteriores (cartões no CRM, base na rentabilização), para a tendência. */
+  prev90: number | null;
+  activeDays90: number;
 }
 
 export const STATUS_META: Record<DeclaredStatus, { label: string; hint: string; color: string | null; tint: string }> = {
@@ -70,7 +85,10 @@ export function uniqueRows(rows: ResultRow[]) {
 }
 
 export function computeSignal(card: Pick<StructureCard, 'data_scope'>, rows: ResultRow[], today: string): CardSignal {
-  const empty: CardSignal = { observed: 'unlinked', domain: null, lastDate: null, daysSince: null, dispatches90: 0, primary90: null, base90: null, journeys: [], monthly: [] };
+  const empty: CardSignal = {
+    observed: 'unlinked', domain: null, lastDate: null, daysSince: null, dispatches90: 0, primary90: null, base90: null, journeys: [], monthly: [],
+    window: null, prev90: null, activeDays90: 0,
+  };
   const config = scopeConfig(card.data_scope);
   if (!config) return empty;
   const matched = rows.filter(row => row.domain === config.domain && row.date && row.date <= today && matchesWikiAnalytics(row, config));
@@ -79,6 +97,9 @@ export function computeSignal(card: Pick<StructureCard, 'data_scope'>, rows: Res
   const daysSince = daysBetween(lastDate, today);
   const from = isoDay(new Date(Date.parse(today) - 90 * DAY));
   const recent = matched.filter(row => row.date > from);
+  const previous = matched.filter(row => row.date > isoDay(new Date(Date.parse(today) - 180 * DAY)) && row.date <= from);
+  const cycleFrom = isoDay(new Date(Date.parse(lastDate) - 90 * DAY));
+  const windowRows = recent.length ? recent : matched.filter(row => row.date > cycleFrom);
   const baseOf = (row: ResultRow) => (config.domain === 'crm' ? row.crm?.actionable ?? null : row.secondary) ?? 0;
   const sum = (list: ResultRow[], pick: (row: ResultRow) => number | null) => {
     const values = list.map(pick).filter((v): v is number => typeof v === 'number');
@@ -96,8 +117,21 @@ export function computeSignal(card: Pick<StructureCard, 'data_scope'>, rows: Res
     const m = months.get(month) || { month, dispatches: 0, primary: 0, base: 0 };
     m.dispatches += 1; m.primary += row.primary ?? 0; m.base += baseOf(row); months.set(month, m);
   }
+  const byChannel = new Map<string, number>();
+  for (const row of windowRows) { const ch = row.channel || 'Sem canal'; byChannel.set(ch, (byChannel.get(ch) || 0) + baseOf(row)); }
+  const channelTotal = [...byChannel.values()].reduce((a, b) => a + b, 0);
+  const win: CardWindow = {
+    kind: recent.length ? '90d' : 'cycle', until: lastDate, dispatches: windowRows.length,
+    primary: sum(windowRows, row => row.primary), base: sum(windowRows, row => baseOf(row)),
+    cost: sum(windowRows, row => row.spend), opens: sum(windowRows, row => row.opens ?? null),
+    channels: [...byChannel.entries()]
+      .map(([channel, base]) => ({ channel, base, share: channelTotal ? base / channelTotal : 1 / byChannel.size }))
+      .sort((a, b) => b.share - a.share),
+  };
+  const isCrm = config.domain === 'crm';
   return {
     observed: daysSince <= 30 ? 'on' : 'slow', domain: config.domain as 'crm' | 'renta', lastDate, daysSince,
+    window: win, prev90: sum(previous, row => (isCrm ? row.primary : baseOf(row))), activeDays90: new Set(recent.map(row => row.date)).size,
     dispatches90: recent.length, primary90: sum(recent, row => row.primary), base90: sum(recent, row => baseOf(row)),
     journeys: [...journeys.values()].sort((a, b) => b.last.localeCompare(a.last)),
     monthly: [...months.values()].sort((a, b) => a.month.localeCompare(b.month)).slice(-12),
@@ -171,6 +205,65 @@ export function historyOptions(rows: ResultRow[], domain: 'crm' | 'renta', field
 }
 
 export const fmtInt = (n: number | null | undefined) => (n == null ? 'n/d' : Math.round(n).toLocaleString('pt-BR'));
+export const fmtPct = (value: number | null | undefined) => {
+  if (value == null || !Number.isFinite(value)) return 'n/d';
+  const v = value * 100;
+  const digits = v > 0 && v < 0.1 ? 3 : v < 1 ? 2 : 1;
+  return v.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits }) + '%';
+};
+export const fmtMoney = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? 'n/d' : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+export const fmtShortDate = (iso: string | null | undefined) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(2, 4) : 'n/d');
+const ratio = (a: number | null | undefined, b: number | null | undefined) => (a == null || b == null || b === 0 ? null : a / b);
+
+/** Aquisição lê cartões; os demais pilares leem contato, que é o que a base de rentabilização registra. */
+export function isAcquisitionCard(signal: Pick<CardSignal, 'domain'>, metricKey: MetricKey) {
+  return signal.domain ? signal.domain === 'crm' : metricKey === 'aq';
+}
+export const METRIC_LABELS = { crm: ['Cartões', 'Conv.', 'CAC'], contact: ['Base', 'Abertura', 'Cliques'] } as const;
+
+export interface CardMetric { label: string; value: string; tone?: 'big' | 'na' }
+/** Três números fixos por pilar; muda só a janela (90 dias, último ciclo ou a medir). */
+export function cardMetrics(signal: CardSignal, metricKey: MetricKey): CardMetric[] {
+  const crm = isAcquisitionCard(signal, metricKey);
+  const labels = crm ? METRIC_LABELS.crm : METRIC_LABELS.contact;
+  const w = signal.window;
+  if (!w) return labels.map(label => ({ label, value: 'n/d', tone: 'na' as const }));
+  const values = crm
+    ? [fmtInt(w.primary), fmtPct(ratio(w.primary, w.base)), fmtMoney(ratio(w.cost, w.primary))]
+    : [fmtInt(w.base), fmtPct(ratio(w.opens, w.base)), fmtInt(w.primary)];
+  return labels.map((label, i): CardMetric => ({ label, value: values[i], tone: values[i] === 'n/d' ? 'na' : i === 0 ? 'big' : undefined }));
+}
+
+/** Cadência observada pelos dias com disparo nos últimos 90 dias. */
+export function cadenceLabel(activeDays90: number) {
+  if (activeDays90 >= 45) return 'Cadência diária';
+  if (activeDays90 >= 10) return 'Cadência semanal';
+  if (activeDays90 >= 5) return 'Cadência quinzenal';
+  if (activeDays90 >= 2) return 'Cadência mensal';
+  return 'Disparo único em 90d';
+}
+
+/** Tendência do número principal contra os 90 dias anteriores e série mensal (meses fechados). */
+export function cardTrend(signal: CardSignal, today: string) {
+  const crm = signal.domain === 'crm';
+  const cur = crm ? signal.primary90 : signal.base90;
+  const month = today.slice(0, 7);
+  const series = signal.monthly.filter(m => m.month < month).map(m => (crm ? m.primary : m.base)).slice(-8);
+  return { delta: cur != null && signal.prev90 ? (cur - signal.prev90) / signal.prev90 : null, series };
+}
+
+/** Resumo do pilar para o cabeçalho: ativas, cartões e CAC (aquisição) ou base impactada. */
+export function pillarSummary(cards: StructureCard[], signals: Map<string, CardSignal>) {
+  let active = 0, stopped = 0, crmCards: number | null = null, cost = 0, base = 0;
+  for (const c of cards) {
+    const s = signals.get(c.id); if (!s) continue;
+    if (s.observed === 'on') active += 1;
+    if (s.observed === 'slow') stopped += 1;
+    if (s.domain === 'crm' && s.primary90 != null) { crmCards = (crmCards ?? 0) + s.primary90; cost += s.window?.kind === '90d' ? s.window.cost ?? 0 : 0; }
+    else if (s.domain === 'renta') base += s.base90 ?? 0;
+  }
+  return { active, stopped, cards: crmCards, cac: crmCards ? cost / crmCards : null, base };
+}
 export function friendlyError(error: unknown) {
   const msg = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? error);
   if (msg.includes('revision_conflict')) return 'Alguém editou isto agora. Recarregue para ver a versão nova.';
