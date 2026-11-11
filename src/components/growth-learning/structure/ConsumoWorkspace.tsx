@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import {
-  ArrowDownRight, Bell, CalendarDays, ChartLine, Check, ChevronDown, ChevronRight, Info, Link2Off, Mail, Maximize2, MessageCircle, MessageSquare,
+  ArrowDownRight, Bell, CalendarDays, ChartColumn, ChartLine, Check, ChevronDown, ChevronRight, Info, Link2Off, Mail, Maximize2, MessageCircle, MessageSquare,
   Minimize2, PanelLeftClose, PanelLeftOpen, Receipt, Route, SlidersHorizontal, TrendingUp, TriangleAlert, X,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -13,6 +13,7 @@ import {
   goalPlan, itemAgg, metrics, monthLabel, monthlyProjection, periodFractions, planFor, presets, status, sum,
   type Agg, type Ch, type ConsumoModel, type Dispatch, type ItemDef, type Metrics, type Period, type PillarDef, type RawCh, type Tone,
 } from './consumoModel';
+import { JourneyMap, type MapStats } from './JourneyMap';
 import './consumo.css';
 
 const RAW_ICON: Record<RawCh, typeof Mail> = { EMAIL: Mail, PUSH: Bell, WPP: MessageCircle, SMS: MessageSquare };
@@ -75,6 +76,11 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
   const [focus, setFocus] = useState<Focus>(null);
   const [pop, setPop] = useState<'fr' | 'pe' | null>(null);
   const [drawer, setDrawer] = useState<string | null>(null);
+  const [sub, setSub] = useState<'consumo' | 'mapa'>(() => { try { return localStorage.getItem('gaas.consumo-sfmc.sub') === 'mapa' ? 'mapa' : 'consumo'; } catch { return 'consumo'; } });
+  const [mapStats, setMapStats] = useState<MapStats | null>(null);
+  const onStats = useCallback((st: MapStats) => setMapStats(prev => (prev && JSON.stringify(prev) === JSON.stringify(st) ? prev : st)), []);
+  useEffect(() => { try { localStorage.setItem('gaas.consumo-sfmc.sub', sub); } catch { /* preferência local */ } }, [sub]);
+  const reloadData = useCallback(async () => { setData(await loadConsumo()); }, []);
 
   const reload = useCallback(async () => {
     try { const [b, d] = await Promise.all([loadStructure(), loadConsumo()]); setBoard(b); setData(d); setError(''); }
@@ -91,7 +97,7 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const model = useMemo<ConsumoModel | null>(() => (board && data ? buildModel(board, data.rules, data.pillarFronts, data.plan, data.payload) : null), [board, data]);
+  const model = useMemo<ConsumoModel | null>(() => (board && data ? buildModel(board, data.rules, data.pillarFronts, data.plan, data.payload, data.journeyMap) : null), [board, data]);
   const allPresets = useMemo(() => (model ? presets(model) : []), [model]);
   const per: Period = period || (allPresets[0] ? { key: allPresets[0].key, from: allPresets[0].from, to: allPresets[0].to } : { key: 'contrato', from: 0, to: 0 });
   const aggs = useMemo(() => (model ? aggregate(model, per) : new Map<string, Agg>()), [model, per.from, per.to]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -259,6 +265,11 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
     <div className="cz-root">
       <div className="cz-bar">
         {modeSwitch}
+        <div className="cz-sub" role="tablist" aria-label="Visão do consumo">
+          <button role="tab" aria-selected={sub === 'consumo'} className={sub === 'consumo' ? 'on' : ''} onClick={() => setSub('consumo')}><ChartColumn />Consumo</button>
+          <button role="tab" aria-selected={sub === 'mapa'} className={sub === 'mapa' ? 'on' : ''} onClick={() => setSub('mapa')}><Route />Mapeamento</button>
+        </div>
+        <span className="cz-vsep" />
         <div className="cz-filt">
           <button className={`cz-fbtn${fronts.size ? ' act' : ''}${pop === 'fr' ? ' open' : ''}`} onClick={() => setPop(pop === 'fr' ? null : 'fr')}><Receipt />Frente <b>{!fronts.size ? 'todas' : fronts.size === 1 ? ([...fronts][0] === NO_FRONT ? 'sem frente' : [...fronts][0]) : `${fronts.size} selecionadas`}</b><ChevronDown /></button>
           {pop === 'fr' && frontPop}
@@ -267,17 +278,26 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
           <button className={`cz-fbtn${per.key !== 'contrato' ? ' act' : ''}${pop === 'pe' ? ' open' : ''}`} onClick={() => setPop(pop === 'pe' ? null : 'pe')}><CalendarDays />Período <b>{perLabel}</b><ChevronDown /></button>
           {pop === 'pe' && <PeriodPop model={model} per={per} presetsList={allPresets} onPick={p => { setPeriod(p); setPop(null); }} />}
         </div>
-        <div className="cz-ledger cz-num">
+        {sub === 'mapa' ? (
+          <div className="cz-ledger cz-num">
+            <div className="k"><small>Jornadas no período</small><b>{mapStats?.visible ?? ''}</b></div>
+            <div className="k"><small>Em campanhas</small><b>{mapStats?.inCampaign ?? ''}</b></div>
+            <div className="k warn"><small>Sem campanha</small><b>{mapStats?.noCampaign ?? ''}</b></div>
+            <div className="k warn"><small>A classificar</small><b>{mapStats?.inbox ?? ''}</b></div>
+            <div className="k mv"><small>Movidas</small><b>{mapStats?.moved ?? 0}</b></div>
+          </div>
+        ) : <div className="cz-ledger cz-num">
           <div className="k"><small>Contrato 12m</small><b>{fmtVol(TOT.tot)}</b></div>
           <div className="k"><small>{per.key === 'contrato' ? 'Realizado' : 'No período'}</small><b>{fmtVol(TOT.real)}{TOT.uso != null && <em>{fmtPct(TOT.uso)} do esperado</em>}</b></div>
           <div className="k"><small>Projeção {monthLabel(model.months[11])}</small><b>{fmtVol(TOT.proj)}</b></div>
           <div className="k"><small>Saldo</small><b className={TOT.saldo != null && TOT.saldo < 0 ? 'cz-neg' : 'cz-pos'}>{fmtVol(TOT.saldo)}</b></div>
-        </div>
+        </div>}
         <span className="cz-grow" />
         <span className="cz-src" title={data.payload.loaded_at ? `Carga em ${new Date(data.payload.loaded_at).toLocaleString('pt-BR')}` : ''}><i />Dinâmica BI até {ddmm(isoOf(model.last))} · contrato {monthLabel(model.months[0])} a {monthLabel(model.months[11])}</span>
       </div>
 
       <div className="cz-canvas">
+        {sub === 'mapa' ? <JourneyMap model={model} period={per} perLabel={perLabel} frOn={frOn} editable={editable} onSaved={reloadData} onStats={onStats} /> : (<>
         <div className="cz-strip">
           <div className="cz-box cz-chans">
             <div className="cz-chh"><span className="cz-lbl">Canal</span><span className="cz-lbl">Até {monthLabel(model.months[11])}</span><span className="cz-lbl">Real / esperado</span><span className="cz-lbl">Uso</span><span className="cz-lbl">Saldo</span></div>
@@ -363,6 +383,7 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
         <details className="cz-how"><summary><Info size={13} />Como ler esta visão</summary>
           <div>Tudo em envios, contados uma vez por activity, dia e canal; quando a mesma activity aparece em mais de uma jornada, o envio fica na jornada com mais volume. O período muda Esperado, Realizado e Uso; Ritmo, Projeção e Saldo olham o contrato inteiro. O contrato é por frente e canal, e cada pilar soma as frentes ligadas a ele. Campanha só tem meta própria quando alguém define. Linhas em laranja são envios que ainda não têm card no board. O vínculo envio → campanha segue as regras por nome de jornada. O relatório não separa WhatsApp Utility de Mkt.</div>
         </details>
+        </>)}
       </div>
       {drawer && <GoalDrawer key={drawer} model={model} itemKey={drawer} goals={goals} editable={editable} onClose={() => setDrawer(null)}
         onSaved={g => setData(d => d && { ...d, goals: g })} rules={data.rules} />}

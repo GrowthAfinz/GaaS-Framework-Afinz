@@ -15,6 +15,7 @@ async function fixture(){
   grant usage on schema public,auth to authenticated,anon,service_role;grant execute on function auth.uid(),public.gaas_vault_is_admin() to authenticated,service_role;`);
   await db.exec(mig('_crm_structure_board.sql'));
   await db.exec(mig('_crm_consumo_sfmc.sql'));
+  await db.exec(mig('_sfmc_journey_map.sql'));
   const as=async who=>db.exec(`reset role;select set_config('request.jwt.claim.sub','${who}',false);set role authenticated;`);
   await as(admin);
   const p=(await db.query(`select public.crm_structure_save_pillar(null,null,$1) r`,[JSON.stringify({title:'Aquisição'})])).rows[0].r;
@@ -80,5 +81,25 @@ test('regras e contrato validam o formato',async()=>{
     await assert.rejects(db.query("insert into sfmc_contract_plan values ('Aquisição','WPP','2026-08-01',10)"),/check/);
     await assert.rejects(db.query("insert into sfmc_contract_plan values ('Aquisição','SMS','2026-08-15',10)"),/check/);
     await db.query("insert into sfmc_contract_plan values ('Aquisição','WPPU','2026-08-01',10)");
+  }finally{await db.close();}
+});
+
+test('mapeamento manual: admin salva, troca, limpa e valida; outros só leem',async()=>{
+  const {db,as,c,one}=await fixture();try{
+    const save=items=>db.query('select public.sfmc_save_journey_map($1) n',[JSON.stringify(items)]);
+    assert.equal((await save([{journey:'JOR_A',card_id:c.id,front:'Aquisição'},{journey:'JOR_B',front:'Cobrança',group_label:'Cobrança'}])).rows[0].n,2);
+    assert.equal((await one('select count(*)::int n from sfmc_journey_map')).n,2);
+    await save([{journey:'JOR_A',front:null,group_label:'A classificar'}]);
+    const a=await one("select card_id, group_label from sfmc_journey_map where journey='JOR_A'");
+    assert.equal(a.card_id,null);assert.equal(a.group_label,'A classificar');
+    await save([{journey:'JOR_B',clear:true}]);
+    assert.equal((await one('select count(*)::int n from sfmc_journey_map')).n,1);
+    await assert.rejects(save([{journey:'JOR_C'}]),/check/);
+    await assert.rejects(save([{journey:' '}]),/sfmc_journey_map_invalid/);
+    await assert.rejects(save([{journey:'JOR_D',card_id:'0c5b0000-0000-4000-8000-0000000000ff'}]),/sfmc_goal_card_invalid/);
+    await as(other);
+    assert.equal((await one('select count(*)::int n from sfmc_journey_map')).n,1);
+    await assert.rejects(save([{journey:'JOR_E',group_label:'X y'}]),/crm_structure_access_denied/);
+    await assert.rejects(db.query("delete from sfmc_journey_map"),/permission denied/);
   }finally{await db.close();}
 });

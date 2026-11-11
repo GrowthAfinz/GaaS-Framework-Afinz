@@ -16,17 +16,21 @@ export const FORA = 'fora';
 export interface PlanRow { front: string; channel: PlanChannel; month: string; volume: number }
 export interface ConsumoRule { id: string; priority: number; pattern: string; front: string | null; card_id: string | null; group_label: string | null }
 export interface PillarFront { front: string; pillar_id: string | null; position: number }
+export interface JourneyMapRow { journey: string; card_id: string | null; front: string | null; group_label: string | null }
 export interface CardGoal { card_id: string; channel: Ch; monthly_volume: number }
 export type DispatchRow = [number, number, RawCh, string, number, number | null];
 export interface DispatchPayload { journeys: string[]; activities: string[]; rows: DispatchRow[]; last: string | null; loaded_at: string | null }
 
 export interface ItemDef { key: string; label: string; pillarKey: string; front: string | null; cardId: string | null; isGroup: boolean }
 export interface PillarDef { key: string; title: string; accent: string; fronts: string[]; items: ItemDef[] }
-export interface Dispatch { j: number; a: number; ch: RawCh; day: number; sent: number; dl: number | null; item: string }
+export interface Dispatch { j: number; a: number; ch: RawCh; day: number; sent: number; dl: number | null; item: string; jk: string }
+/** Uma jornada (ou activity sem jornada) e onde ela está: pela regra e, se houver, pelo vínculo manual. */
+export interface JourneyInfo { key: string; label: string; item: string; ruleItem: string; pattern: string | null; manual: boolean; activities: number }
 export interface ConsumoModel {
   start: string; months: string[]; daysTotal: number; last: number; rem: number;
   pillars: PillarDef[]; items: Map<string, ItemDef>; dispatches: Dispatch[]; byItem: Map<string, Dispatch[]>;
   journeys: string[]; activities: string[]; plan: Map<string, Record<PlanChannel, number[]>>; fronts: string[];
+  journeyInfo: Map<string, JourneyInfo>; inboxLabel: string; groupForFront: (front: string | null) => string;
 }
 
 const DAY = 86400000;
@@ -57,7 +61,7 @@ interface BoardInput {
   cards: { id: string; lane_id: string; title: string; position: number; archived: boolean }[];
 }
 
-export function buildModel(board: BoardInput, rules: ConsumoRule[], pillarFronts: PillarFront[], planRows: PlanRow[], payload: DispatchPayload): ConsumoModel {
+export function buildModel(board: BoardInput, rules: ConsumoRule[], pillarFronts: PillarFront[], planRows: PlanRow[], payload: DispatchPayload, journeyMap: JourneyMapRow[] = []): ConsumoModel {
   const months = [...new Set(planRows.map(p => p.month.slice(0, 10)))].sort();
   const start = months[0] || (payload.last ? payload.last.slice(0, 8) + '01' : '2026-08-01');
   while (months.length < 12) { const l = months[months.length - 1] || start; const d = new Date(t(l)); d.setUTCMonth(d.getUTCMonth() + 1); months.push(d.toISOString().slice(0, 10)); }
@@ -93,25 +97,47 @@ export function buildModel(board: BoardInput, rules: ConsumoRule[], pillarFronts
     if (!items.has(key)) items.set(key, { key, label, pillarKey: pillarOfFront(front), front, cardId: null, isGroup: true });
     return key;
   };
+  const catchAll = compiled.slice().reverse().find(c => !c.rule.card_id && !c.rule.front && c.rule.group_label && c.re.test('X_QUALQUER_COISA_123'));
+  const inboxLabel = catchAll?.rule.group_label || 'A classificar';
+  /** Balde "sem campanha" de uma frente: o grupo que as regras já usam para ela, ou um novo. */
+  const groupForFront = (front: string | null) => {
+    if (!front) return groupItem(inboxLabel, null);
+    const r = compiled.find(c => !c.rule.card_id && c.rule.front === front && c.rule.group_label);
+    return groupItem(r?.rule.group_label || `Sem campanha · ${front}`, front);
+  };
+  const manual = new Map(journeyMap.map(m => [m.journey, m]));
+  const toItem = (r: { card_id: string | null; front: string | null; group_label: string | null } | null) =>
+    r?.card_id && items.has('card:' + r.card_id) ? 'card:' + r.card_id
+      : r?.group_label ? groupItem(r.group_label, r.front ?? null)
+        : r ? groupForFront(r.front ?? null) : groupItem('Sem regra', null);
+  const journeyInfo = new Map<string, JourneyInfo>();
+  const acts = new Map<string, Set<number>>();
 
   const dispatches: Dispatch[] = [];
   const memo = new Map<string, string>();
   for (const [j, a, ch, iso, sent, dl] of payload.rows) {
     const day = dayOffset(start, iso);
     if (day < 0 || day >= daysTotal) continue;
-    const mk = j + '|' + a;
-    let item = memo.get(mk);
+    const jk = payload.journeys[j] || payload.activities[a] || '';
+    let item = memo.get(jk);
     if (!item) {
       const r = classify(payload.journeys[j] || '', payload.activities[a] || '', compiled);
-      item = r?.card_id && items.has('card:' + r.card_id) ? 'card:' + r.card_id
-        : groupItem(r?.group_label || (r ? 'Campanha arquivada' : 'Sem regra'), r?.front ?? null);
-      memo.set(mk, item);
+      const ruleItem = r?.card_id && !items.has('card:' + r.card_id) ? groupItem('Campanha arquivada', r.front) : toItem(r);
+      const m = manual.get(jk);
+      item = m ? toItem(m) : ruleItem;
+      memo.set(jk, item);
+      journeyInfo.set(jk, { key: jk, label: payload.journeys[j] || `(sem jornada) ${payload.activities[a]}`, item, ruleItem, pattern: r?.pattern ?? null, manual: Boolean(m), activities: 0 });
+      acts.set(jk, new Set());
     }
-    dispatches.push({ j, a, ch, day, sent: Number(sent) || 0, dl: dl == null ? null : Number(dl), item });
+    acts.get(jk)!.add(a);
+    dispatches.push({ j, a, ch, day, sent: Number(sent) || 0, dl: dl == null ? null : Number(dl), item, jk });
   }
   const byItem = new Map<string, Dispatch[]>();
   for (const d of dispatches) { const l = byItem.get(d.item); if (l) l.push(d); else byItem.set(d.item, [d]); }
 
+  // baldes de cada frente e o "a classificar" já existem para o mapeamento (sem envio não entram nos pilares)
+  for (const x of pf) groupForFront(x.front);
+  groupItem(inboxLabel, null);
   const defs: PillarDef[] = pillars.map(p => ({ key: p.id, title: p.title, accent: p.accent, fronts: pf.filter(x => x.pillar_id === p.id).map(x => x.front), items: [] }));
   const fora: PillarDef = { key: FORA, title: 'Fora do board', accent: '#64748B', fronts: pf.filter(x => !x.pillar_id || !pillars.some(p => p.id === x.pillar_id)).map(x => x.front), items: [] };
   for (const it of items.values()) {
@@ -120,7 +146,8 @@ export function buildModel(board: BoardInput, rules: ConsumoRule[], pillarFronts
   }
   const allPillars = [...defs, fora].filter(d => d.items.length || d.fronts.length);
   const fronts = [...pf.map(x => x.front), ...[...plan.keys()].filter(f => !pf.some(x => x.front === f))];
-  return { start, months, daysTotal, last, rem: daysTotal - 1 - last, pillars: allPillars, items, dispatches, byItem, journeys: payload.journeys, activities: payload.activities, plan, fronts };
+  for (const [k, info] of journeyInfo) info.activities = acts.get(k)?.size || 0;
+  return { start, months, daysTotal, last, rem: daysTotal - 1 - last, pillars: allPillars, items, dispatches, byItem, journeys: payload.journeys, activities: payload.activities, plan, fronts, journeyInfo, inboxLabel, groupForFront };
 }
 
 /* ---------- período e contrato ---------- */
