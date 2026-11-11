@@ -203,7 +203,7 @@ export function FeedbackLauncher() {
           role="dialog"
           aria-modal="false"
           aria-labelledby="feedback-title"
-          className="fixed right-14 top-1/2 z-[9990] max-h-[calc(100vh-2rem)] w-[min(420px,calc(100vw-5rem))] -translate-y-1/2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl"
+          className="fixed bottom-14 left-1/2 z-[9990] max-h-[calc(100vh-5rem)] w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl"
         >
           <div className="flex items-center justify-between">
             <h2 id="feedback-title" className="text-base font-bold text-slate-900">Declarar melhoria</h2>
@@ -307,10 +307,11 @@ export function FeedbackLauncher() {
           onClick={() => (open ? setOpen(false) : start())}
           aria-expanded={open}
           title="Declarar melhoria (Ctrl + Shift + F)"
-          className="fixed right-0 top-1/2 z-[9989] flex -translate-y-1/2 rotate-180 items-center gap-2 rounded-r-xl bg-slate-900 px-2 py-3.5 text-xs font-semibold tracking-wide text-white shadow-lg [writing-mode:vertical-rl] hover:bg-slate-800"
+          className={`fixed bottom-3 left-1/2 z-[9989] flex -translate-x-1/2 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold shadow-[0_6px_18px_rgba(15,23,42,.14)] backdrop-blur transition-colors ${open ? 'border-teal-300 bg-teal-50 text-teal-800' : 'border-slate-200 bg-white/95 text-slate-700 hover:border-teal-300 hover:text-teal-800'}`}
         >
-          <MessageSquareText size={15} aria-hidden="true" className="rotate-180" />
+          <MessageSquareText size={14} aria-hidden="true" className="text-teal-700" />
           Declarar melhoria
+          <kbd className="hidden rounded border border-slate-200 bg-slate-50 px-1.5 py-px font-sans text-[10px] font-medium text-slate-400 md:inline">Ctrl ⇧ F</kbd>
         </button>
       )}
     </div>

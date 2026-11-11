@@ -4,6 +4,9 @@ import { ArrowLeftRight, ChevronDown, Eye, EyeOff, GripVertical, Inbox, Link2Off
 import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
 import { friendlyError } from './structureModel';
 import { saveJourneyMap, type JourneyMapChange } from './consumoService';
+import { useBoardViewport } from './useBoardViewport';
+import { BoardMiniMap, BoardZoomBar, useBoardChrome } from './BoardNav';
+import './structure.css';
 import { FORA, RAW_COLOR, RAW_LABEL, addDays, ddmm, fmtVol, type ConsumoModel, type Dispatch, type ItemDef, type Period, type RawCh } from './consumoModel';
 
 export interface MapStats { visible: number; inCampaign: number; noCampaign: number; inbox: number; moved: number }
@@ -27,6 +30,21 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
   const [popQ, setPopQ] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const vp = useBoardViewport('gaas.consumo-sfmc.map.view');
+  const [showMini, setShowMini] = useState(() => { try { return localStorage.getItem('gaas.consumo-sfmc.map.mini') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('gaas.consumo-sfmc.map.mini', showMini ? '1' : '0'); } catch { /* preferência local */ } }, [showMini]);
+  const mini = useBoardChrome(vp, { ready: true, mini: showMini, minZoom: 0.6 });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const a = document.activeElement as HTMLElement | null;
+      if (a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable)) return;
+      if (e.key === '+' || e.key === '=') vp.zoomAt(1.15);
+      else if (e.key === '-') vp.zoomAt(1 / 1.15);
+      else if (e.key === '0') vp.fit();
+      else if (e.key === 'm' || e.key === 'M') setShowMini(v => !v);
+    };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, [vp]);
 
   const inboxKey = model.groupForFront(null);
   const byJ = useMemo(() => {
@@ -96,7 +114,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
     const info = model.journeyInfo.get(st.key)!; const moved = moves.has(st.key);
     const badge = moved ? ['mv', 'movida'] : info.manual ? ['man', 'manual'] : ['rule', 'regra'];
     return (
-      <div key={st.key} className={`cz-jc${moved ? ' moved' : ''}${dragging === st.key ? ' drag' : ''}`} draggable={editable}
+      <div key={st.key} className={`cz-jc${moved ? ' moved' : ''}${dragging === st.key ? ' drag' : ''}`} draggable={editable} data-nopan
         title={`${info.label}\n${info.manual ? 'Vínculo manual' : `Regra: ${info.pattern || 'nenhuma'}`}\nÚltimo envio: ${st.lastAll >= 0 ? ddmm(iso(st.lastAll)) : 'n/d'}`}
         onDragStart={e => { e.dataTransfer.setData('text/plain', st.key); e.dataTransfer.effectAllowed = 'move'; setDragging(st.key); }}
         onDragEnd={() => { setDragging(null); setOver(null); }}>
@@ -114,7 +132,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
   const box = (it: ItemDef, list: JStat[], accent: string, bucket: boolean) => {
     const mk = 'c' + it.key; const lim = more.has(mk) ? 9999 : 5; const tot = list.reduce((a, x) => a + x.s, 0);
     return (
-      <div key={it.key} className={`cz-mc${bucket ? ' bucket' : ''}${over === it.key ? ' over' : ''}`} style={{ ['--acc' as string]: accent }}
+      <div key={it.key} className={`cz-mc${bucket ? ' bucket' : ''}${over === it.key ? ' over' : ''}`} style={{ ['--acc' as string]: accent }} data-nopan
         onDragOver={e => { if (!editable) return; e.preventDefault(); if (over !== it.key) setOver(it.key); }}
         onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(o => (o === it.key ? null : o)); }}
         onDrop={e => { e.preventDefault(); setOver(null); const jk = e.dataTransfer.getData('text/plain'); if (jk) move(jk, it.key); }}>
@@ -132,9 +150,9 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
   const inboxIt = model.items.get(inboxKey)!;
   cols.push(
     <div key="inbox" className="cz-mcol inbox" style={{ ['--acc' as string]: '#d97706' }}>
-      <div className="cz-mH"><div className="r"><span className="ic"><Inbox /></span><span className="t">A classificar</span><span className="cz-pn">{(byItem.get(inboxKey) || []).length}</span></div>
+      <div className="cz-mH" data-mini="#d97706"><div className="r"><span className="ic"><Inbox /></span><span className="t">A classificar</span><span className="cz-pn">{(byItem.get(inboxKey) || []).length}</span></div>
         <div className="s">Jornadas sem frente nem campanha. Arraste para o lugar certo.</div></div>
-      <div className="cz-mfr inbox"><div className="fb">{box(inboxIt, byItem.get(inboxKey) || [], '#d97706', true)}</div></div>
+      <div className="cz-mfr inbox" data-mini=""><div className="fb">{box(inboxIt, byItem.get(inboxKey) || [], '#d97706', true)}</div></div>
     </div>,
   );
   const pillarDefs = [...model.pillars]; if (!pillarDefs.some(p => p.key === FORA)) pillarDefs.push({ key: FORA, title: 'Fora do board', accent: '#64748B', fronts: [], items: [] });
@@ -148,7 +166,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
     const mix = RAW_ORDER.map(c => all.reduce((a, x) => a + (byJ.get(x.key) || []).filter(d => d.ch === c && d.day >= period.from && d.day <= period.to).reduce((s, d) => s + d.sent, 0), 0));
     cols.push(
       <div key={p.key} className="cz-mcol" style={{ ['--acc' as string]: p.accent }}>
-        <div className="cz-mH"><div className="r"><span className="ic"><PanelLeftClose /></span><span className="t">{p.title}</span><span className="cz-pn">{all.length}</span></div>
+        <div className="cz-mH" data-mini={p.accent}><div className="r"><span className="ic"><PanelLeftClose /></span><span className="t">{p.title}</span><span className="cz-pn">{all.length}</span></div>
           <div className="s"><b>{all.length}</b> jornadas · <b>{fmtVol(tot)}</b> envios no período · {fronts.filter(Boolean).length} {fronts.filter(Boolean).length === 1 ? 'frente' : 'frentes'}</div>
           <div className="bar">{mix.map((v, i) => (v ? <i key={i} style={{ flex: v, background: RAW_COLOR[RAW_ORDER[i]] }} /> : null))}</div></div>
         {fronts.map(f => {
@@ -158,8 +176,8 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
           const fl = fIts.flatMap(listOf); const ft = fl.reduce((a, x) => a + x.s, 0);
           const withJ = cards.filter(c => c.l.length), noJ = cards.filter(c => !c.l.length); const ek = 'e' + fk; const showEmpty = more.has(ek);
           return (
-            <div key={fk} className={`cz-mfr${closed.has(fk) ? ' closed' : ''}`}>
-              <button className="fh" onClick={() => setClosed(s => { const n = new Set(s); if (n.has(fk)) n.delete(fk); else n.add(fk); return n; })}>
+            <div key={fk} className={`cz-mfr${closed.has(fk) ? ' closed' : ''}`} data-mini="">
+              <button className="fh" data-nopan onClick={() => setClosed(s => { const n = new Set(s); if (n.has(fk)) n.delete(fk); else n.add(fk); return n; })}>
                 <ChevronDown className="cv" />{f || 'Sem frente no contrato'}<span className="cz-cpill">{fl.length}</span><span className="meta">{fmtVol(ft)} env.</span></button>
               {!closed.has(fk) && <div className="fb">
                 {withJ.map(c => box(c.it, c.l, p.accent, false))}
@@ -193,7 +211,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
 
   return (
     <>
-      <div className="cz-box cz-mbar">
+      <div className="cz-mbar cz-mtool">
         <h3>Mapa de jornadas</h3><span className="cz-cnt">{visible} jornadas {showIn ? 'no mapa' : 'com envio'} · {perLabel}</span>
         <span className="sort"><SortDesc />mais recentes em cima</span>
         <span className="cz-grow" />
@@ -206,15 +224,21 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
           <button className="cz-btn" onClick={() => setClosed(new Set(pillarDefs.flatMap(p => [...p.fronts, null].map(f => p.key + '|' + f))))}><Minimize2 />Recolher tudo</button>
         </span>
       </div>
-      <div className="cz-map">{cols}</div>
+      <div ref={vp.canvasRef} className={`cs-canvas cz-mcanvas${vp.panning ? ' panning' : ''}`} {...vp.handlers}>
+        <div ref={vp.stageRef} className="cs-stage" style={{ transform: `translate(${Math.round(vp.view.x)}px,${Math.round(vp.view.y)}px) scale(${vp.view.z})` }}>
+          <div className="cz-map">{cols}</div>
+        </div>
+        <BoardZoomBar vp={vp} showMini={showMini} onToggleMini={() => setShowMini(v => !v)} />
+        {showMini && <BoardMiniMap vp={vp} mini={mini} />}
       {moves.size > 0 && (
-        <div className="cz-savebar">
+        <div className="cz-savebar" data-nopan>
           <span><b>{moves.size}</b> {moves.size === 1 ? 'jornada movida' : 'jornadas movidas'} sem salvar</span>
           <button onClick={() => setMoves(new Map())} disabled={saving}><Undo2 size={13} />Desfazer tudo</button>
           <button className="pri" onClick={() => void save()} disabled={saving}>{saving ? 'Salvando…' : 'Salvar mapeamento'}</button>
           {err && <span className="err">{err}</span>}
         </div>
       )}
+      </div>
       {pop && popInfo && (
         <div className="cz-mpop" style={{ left: pop.left, top: pop.top }}>
           <div className="hd"><div className="cz-lbl">Mover jornada</div><div className="nm">{popInfo.label}</div>
