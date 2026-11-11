@@ -296,8 +296,8 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
         <span className="cz-src" title={data.payload.loaded_at ? `Carga em ${new Date(data.payload.loaded_at).toLocaleString('pt-BR')}` : ''}><i />Dinâmica BI até {ddmm(isoOf(model.last))} · contrato {monthLabel(model.months[0])} a {monthLabel(model.months[11])}</span>
       </div>
 
+      {sub === 'mapa' ? <JourneyMap model={model} period={per} perLabel={perLabel} frOn={frOn} editable={editable} onSaved={reloadData} onStats={onStats} /> : (
       <div className="cz-canvas">
-        {sub === 'mapa' ? <JourneyMap model={model} period={per} perLabel={perLabel} frOn={frOn} editable={editable} onSaved={reloadData} onStats={onStats} /> : (<>
         <div className="cz-strip">
           <div className="cz-box cz-chans">
             <div className="cz-chh"><span className="cz-lbl">Canal</span><span className="cz-lbl">Até {monthLabel(model.months[11])}</span><span className="cz-lbl">Real / esperado</span><span className="cz-lbl">Uso</span><span className="cz-lbl">Saldo</span></div>
@@ -383,8 +383,7 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
         <details className="cz-how"><summary><Info size={13} />Como ler esta visão</summary>
           <div>Tudo em envios, contados uma vez por activity, dia e canal; quando a mesma activity aparece em mais de uma jornada, o envio fica na jornada com mais volume. O período muda Esperado, Realizado e Uso; Ritmo, Projeção e Saldo olham o contrato inteiro. O contrato é por frente e canal, e cada pilar soma as frentes ligadas a ele. Campanha só tem meta própria quando alguém define. Linhas em laranja são envios que ainda não têm card no board. O vínculo envio → campanha segue as regras por nome de jornada. O relatório não separa WhatsApp Utility de Mkt.</div>
         </details>
-        </>)}
-      </div>
+      </div>)}
       {drawer && <GoalDrawer key={drawer} model={model} itemKey={drawer} goals={goals} editable={editable} onClose={() => setDrawer(null)}
         onSaved={g => setData(d => d && { ...d, goals: g })} rules={data.rules} />}
     </div>

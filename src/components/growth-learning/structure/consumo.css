@@ -321,3 +321,12 @@
 .cz-mpop .op.cur{color:#0e7490;font-weight:600}
 .cz-mpop .op small{margin-left:auto;color:#8a94a6;font-size:11px}
 .cz-mpop .op.bk{font-style:italic;color:#b45309}
+
+/* Mapeamento no mesmo canvas do Board (papel pontilhado, arrastar e zoom) */
+.cz-mtool{background:#fff;border-bottom:1px solid var(--line,#e2e8f0);padding:6px 10px}
+.cz-mcanvas{background-color:#f4f1ea}
+.cz-mcanvas .cz-map{margin-top:0;overflow:visible;padding-bottom:0;width:max-content}
+.cz-mcanvas .cz-mcol.inbox{position:static}
+.cz-mcanvas .cz-mc,.cz-mcanvas .cz-jc{cursor:default}
+.cz-mcanvas .cz-jc[draggable="true"]{cursor:grab}
+.cz-mcanvas .cz-savebar{position:absolute;top:12px;bottom:auto}
