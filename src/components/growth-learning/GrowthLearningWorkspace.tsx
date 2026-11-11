@@ -1,5 +1,5 @@
 import { TasksWorkspace } from './development/TasksWorkspace';
-import { StructureWorkspace } from './structure/StructureWorkspace';
+import { EstruturaCrm } from './structure/EstruturaCrm';
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import {
   BookMarked,
@@ -236,7 +236,7 @@ export const GrowthLearningWorkspace: React.FC<
             </div>
           </div>
         )}
-        {section === "investigations" ? <TasksWorkspace initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "structure" ? <StructureWorkspace /> : section === "feed" ? (
+        {section === "investigations" ? <TasksWorkspace initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "structure" ? <EstruturaCrm /> : section === "feed" ? (
           <GrowthFeedView
             periodStart={periodStart}
             periodEnd={periodEnd}
