@@ -1,4 +1,4 @@
-export const GROWTH_LEARNING_SECTIONS = ['feed', 'vault', 'corrections', 'investigations', 'report-live', 'bets', 'outcomes', 'memory'] as const;
+export const GROWTH_LEARNING_SECTIONS = ['feed', 'vault', 'structure', 'corrections', 'investigations', 'report-live', 'bets', 'outcomes', 'memory'] as const;
 
 export type GrowthLearningSection = typeof GROWTH_LEARNING_SECTIONS[number];
 
