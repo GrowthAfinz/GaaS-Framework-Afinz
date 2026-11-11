@@ -43,7 +43,7 @@ function inlineEdit(el: HTMLElement | null, onSave: (value: string) => void) {
   el.onblur = () => done(true);
 }
 
-export function StructureWorkspace() {
+export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNode } = {}) {
   const { user } = useAuth();
   const [board, setBoard] = useState<StructureBoard | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -257,7 +257,7 @@ export function StructureWorkspace() {
   return (
     <div className={`cs-root${prefs.dense ? ' cs-dense' : ''}`}>
       <div className="cs-bar">
-        <h2 title={`${cards.length} campanhas · dados até ${dataUntil}`}>Estrutura CRM</h2>
+        {modeSwitch ? <span title={`${cards.length} campanhas · dados até ${dataUntil}`}>{modeSwitch}</span> : <h2 title={`${cards.length} campanhas · dados até ${dataUntil}`}>Estrutura CRM</h2>}
         <span className="cs-sep" />
         <button className={`cs-stat${filters.obs.has('on') ? ' on' : ''}`} title="Disparo nos últimos 30 dias" onClick={() => statKpi('on')}><Zap /><b>{k.active}</b><span className="lb">ativas</span></button>
         <button className={`cs-stat${filters.med.has('r') ? ' on' : ''}`} title="Têm fonte de resultado" onClick={() => statKpi('r')}><ChartLine /><b>{k.measured}</b><span className="lb">medem resultado</span></button>
