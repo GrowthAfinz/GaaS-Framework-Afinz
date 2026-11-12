@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import {
   ArrowDownRight, Bell, CalendarDays, ChartColumn, ChartLine, Check, ChevronDown, ChevronRight, Info, Link2Off, Mail, Maximize2, MessageCircle, MessageSquare,
-  Minimize2, PanelLeftClose, PanelLeftOpen, Receipt, Route, SlidersHorizontal, TrendingUp, TriangleAlert, X,
+  Minimize2, PanelLeftClose, PanelLeftOpen, Receipt, Route, SlidersHorizontal, Table, TrendingUp, TriangleAlert, X,
 } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { loadStructure, type StructureBoard } from './structureService';
 import { friendlyError } from './structureModel';
 import { loadConsumo, saveGoal, type ConsumoData } from './consumoService';
@@ -14,6 +14,10 @@ import {
   type Agg, type Ch, type ConsumoModel, type Dispatch, type ItemDef, type Metrics, type Period, type PillarDef, type RawCh, type Tone,
 } from './consumoModel';
 import { JourneyMap, type MapStats } from './JourneyMap';
+import { useBoardViewport } from './useBoardViewport';
+import { BoardMiniMap, BoardZoomBar, useBoardChrome } from './BoardNav';
+import { CumulativeLines, KpiStrip, MonthColumns, PanelHead, ProjCell, SaldoCell } from './ConsumoPanels';
+import './structure.css';
 import './consumo.css';
 
 const RAW_ICON: Record<RawCh, typeof Mail> = { EMAIL: Mail, PUSH: Bell, WPP: MessageCircle, SMS: MessageSquare };
@@ -29,10 +33,6 @@ function UsoCell({ x, empty }: { x: Metrics; empty?: string }) {
   if (x.uso == null) return <span className="cz-muted">{empty || ''}</span>;
   const [tone] = status(x);
   return <span className="cz-uso"><span className="tr"><span style={{ width: `${Math.min(100, (x.uso / 1.5) * 100)}%`, background: TONE_COLOR[tone] }} /><i /></span><b>{fmtPct(x.uso)}</b></span>;
-}
-function Saldo({ v }: { v: number | null }) {
-  if (v == null) return null;
-  return <span className={`cz-sal${v < 0 ? ' neg' : ''}`}>{v < 0 && <ArrowDownRight />}{fmtVol(v)}</span>;
 }
 function Spark({ values, color }: { values: number[]; color: string }) {
   const w = 56, h = 20, mx = Math.max(...values), mn = Math.min(...values);
@@ -81,6 +81,21 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
   const onStats = useCallback((st: MapStats) => setMapStats(prev => (prev && JSON.stringify(prev) === JSON.stringify(st) ? prev : st)), []);
   useEffect(() => { try { localStorage.setItem('gaas.consumo-sfmc.sub', sub); } catch { /* preferência local */ } }, [sub]);
   const reloadData = useCallback(async () => { setData(await loadConsumo()); }, []);
+  /* Visão geral no mesmo canvas do board: arrasta, Ctrl + zoom, minimapa. */
+  const boardReady = Boolean(board && data) && sub === 'consumo';
+  const vp = useBoardViewport('gaas.consumo-sfmc.view', boardReady);
+  const [showMini, setShowMini] = useState(() => { try { return localStorage.getItem('gaas.consumo-sfmc.mini') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('gaas.consumo-sfmc.mini', showMini ? '1' : '0'); } catch { /* preferência local */ } }, [showMini]);
+  const mini = useBoardChrome(vp, { ready: boardReady, mini: showMini, minZoom: 0.55 });
+  useEffect(() => {
+    if (!boardReady) return;
+    const onKey = (e: KeyboardEvent) => {
+      const a = document.activeElement as HTMLElement | null;
+      if (e.ctrlKey || e.metaKey || (a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable))) return;
+      if (e.key === '+' || e.key === '=') vp.zoomAt(1.15); else if (e.key === '-') vp.zoomAt(1 / 1.15); else if (e.key === '0') vp.fit(); else if (e.key === 'm' || e.key === 'M') setShowMini(v => !v);
+    };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, [boardReady, vp]);
 
   const reload = useCallback(async () => {
     try { const [b, d] = await Promise.all([loadStructure(), loadConsumo()]); setBoard(b); setData(d); setError(''); }
@@ -134,16 +149,20 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
     return { c, x, sofar: d.a.all, expToday };
   });
 
-  /* ---------- gráfico mês a mês ---------- */
+  /* ---------- gráficos: mês a mês e acumulado ---------- */
   const sd = scopeData(focus, chs);
-  const real = sd.a.m.map((v, i) => (model.months[i] <= isoOf(model.last) ? v : null));
+  const lastIso = isoOf(model.last);
+  const real = sd.a.m.map((v, i) => (model.months[i] <= lastIso ? v : null));
   const proj = monthlyProjection(model, sd.a.r30);
-  const tot = model.months.map((_, i) => (real[i] || 0) + (proj[i] || 0));
-  const over = tot.map((v, i) => (sd.plan[i] > 0 ? v > sd.plan[i] * 1.1 : v > 0));
-  const base = ch === 'ALL' ? '#334155' : CH_COLOR[ch];
-  const chartData = model.months.map((m, i) => ({ m: monthLabel(m), plano: sd.plan[i], real: real[i], proj: proj[i], over: over[i], tot: tot[i] }));
-  const nowLabel = monthLabel(model.months.find((m, i) => m <= isoOf(model.last) && (!model.months[i + 1] || model.months[i + 1] > isoOf(model.last))) || model.months[0]);
+  const base = ch === 'ALL' ? '#1e293b' : CH_COLOR[ch];
+  const labels = model.months.map(monthLabel);
+  const nowIdx = model.months.reduce((k, m, i) => (m <= lastIso ? i : k), 0);
   const fullFrac = periodFractions(model, 0, model.last);
+  const nowFrac = Math.max(0.05, Math.min(1, fullFrac[nowIdx] || 1));
+  const sx = metrics(sd.plan, sd.a, pf, model.rem);
+  let best = -1, bestR = 0;
+  for (let i = 0; i < nowIdx; i++) { const r = sd.plan[i] ? (real[i] || 0) / sd.plan[i] : 0; if (r > bestR) { bestR = r; best = i; } }
+  const futPlan = sd.plan.slice(nowIdx + 1), avgFut = futPlan.length ? sum(futPlan) / futPlan.length : 0;
   let worst = -1, wv = 0;
   sd.a.m.forEach((r, i) => { const p = sd.plan[i] * fullFrac[i]; if (fullFrac[i] > 0 && r - p > wv) { wv = r - p; worst = i; } });
   const projTot = sd.a.all + (sd.a.r30 / 30) * model.rem, planTot = sum(sd.plan);
@@ -156,7 +175,6 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
   else if (planTot > 0) insights.push(<span key="o">Sobra <b className="cz-pos">{fmtVol(planTot - projTot)}</b> em jul/27</span>);
   const focusLabel = focus ? (focus.front ? `${model.pillars.find(p => p.key === focus.pillar)?.title} · ${focus.front === NO_FRONT ? 'Sem frente' : focus.front}` : model.pillars.find(p => p.key === focus.pillar)?.title)
     : fronts.size ? (fronts.size === 1 ? [...fronts][0] : `${fronts.size} frentes`) : 'Todas as frentes';
-  const perMonths = model.months.map((m, i) => ({ m, i })).filter(({ i }) => pf[i] > 0);
 
   /* ---------- tabela ---------- */
   const rowsOut: React.ReactNode[] = [];
@@ -184,7 +202,7 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
           <span className="cz-pn" title={p.key === FORA ? `${items.length} grupos` : `${realItems} campanhas`}>{p.key === FORA ? items.length : realItems}</span>
           <span className="cz-pmix" title={mixT ? CHS.map((c, i) => `${CH_LABEL[c]} ${fmtPct(mixV[i] / mixT)}`).join(' · ') : 'Sem envio no período'}>{mixV.map((v, i) => (v ? <i key={i} style={{ flex: v, background: CH_COLOR[CHS[i]] }} /> : null))}</span>
           {focusBtn(p.key, null)}</div>
-        <div>{fmtVol(x.tot)}</div><div>{fmtVol(x.exp)}</div><div>{fmtVol(x.real)}</div><div><UsoCell x={x} empty="sem contrato" /></div><div>{fmtVol(x.r30)}</div><div>{fmtVol(x.proj)}</div><div><Saldo v={x.saldo} /></div><div className="st"><Stamp tone={status(x)[0]} text={status(x)[1]} /></div>
+        <div>{fmtVol(x.tot)}</div><div><ProjCell x={x} /></div><div className="mu">{fmtVol(x.exp)}</div><div>{fmtVol(x.real)}</div><div><UsoCell x={x} empty="sem contrato" /></div><div><SaldoCell v={x.saldo} /></div><div className="st"><Stamp tone={status(x)[0]} text={status(x)[1]} /></div>
       </div>,
     );
     if (pc) continue;
@@ -199,7 +217,7 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
         rowsOut.push(
           <div key={'f' + fk} className={`cz-row fr${fc ? ' closed' : ''}${isF(p.key, g) ? ' sel' : ''}`} onClick={() => toggle(closedFr, allFrontKeys, fk, setClosedFr)}>
             <div className="cz-nm"><span className="cz-fbox"><ChevronDown className="cz-chev" />{g === NO_FRONT ? 'Sem frente no contrato' : g}<span className="cz-cpill">{gi.length}</span></span>{focusBtn(p.key, g)}</div>
-            <div>{fmtVol(w.tot)}</div><div>{fmtVol(w.exp)}</div><div>{fmtVol(w.real)}</div><div><UsoCell x={w} empty="sem contrato" /></div><div>{fmtVol(w.r30)}</div><div>{fmtVol(w.proj)}</div><div><Saldo v={w.saldo} /></div><div className="st"><Stamp tone={status(w)[0]} text={status(w)[1]} /></div>
+            <div>{fmtVol(w.tot)}</div><div><ProjCell x={w} /></div><div className="mu">{fmtVol(w.exp)}</div><div>{fmtVol(w.real)}</div><div><UsoCell x={w} empty="sem contrato" /></div><div><SaldoCell v={w.saldo} /></div><div className="st"><Stamp tone={status(w)[0]} text={status(w)[1]} /></div>
           </div>,
         );
       }
@@ -223,9 +241,10 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
               {a.all > 0 && <Spark values={a.m.slice(0, Math.max(2, model.months.filter(m => m <= isoOf(model.last)).length))} color={p.accent} />}
             </div>
             <div>{gp ? fmtVol(y.tot) : !it.isGroup && p.key !== FORA ? <button className="cz-setmeta" onClick={e => { e.stopPropagation(); setDrawer(it.key); }}>+ meta</button> : null}</div>
-            <div>{gp ? fmtVol(y.exp) : null}</div>
+            <div>{a.all ? (gp ? <ProjCell x={y} /> : <span title={`Ritmo dos últimos 30 dias: ${fmtVol(y.r30)}`}>{fmtVol(y.proj)}</span>) : null}</div>
+            <div className="mu">{gp ? fmtVol(y.exp) : null}</div>
             <div>{isZero ? <span className="cz-muted">0</span> : fmtVol(y.real)}{!isZero && <div className="cz-share" title={`${fmtPct(share)} do pilar no período`}><span style={{ width: `${Math.min(100, share * 100)}%` }} /></div>}</div>
-            <div>{gp ? <UsoCell x={y} /> : null}</div><div>{a.r30 ? fmtVol(y.r30) : null}</div><div>{a.all ? fmtVol(y.proj) : null}</div><div>{gp ? <Saldo v={y.saldo} /> : null}</div>
+            <div>{gp ? <UsoCell x={y} /> : null}</div><div>{gp ? <SaldoCell v={y.saldo} /> : null}</div>
             <div className="st"><Stamp tone={st2[0]} text={st2[1]} /></div>
           </div>,
         );
@@ -286,103 +305,95 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
             <div className="k warn"><small>A classificar</small><b>{mapStats?.inbox ?? ''}</b></div>
             <div className="k mv"><small>Movidas</small><b>{mapStats?.moved ?? 0}</b></div>
           </div>
-        ) : <div className="cz-ledger cz-num">
-          <div className="k"><small>Contrato 12m</small><b>{fmtVol(TOT.tot)}</b></div>
-          <div className="k"><small>{per.key === 'contrato' ? 'Realizado' : 'No período'}</small><b>{fmtVol(TOT.real)}{TOT.uso != null && <em>{fmtPct(TOT.uso)} do esperado</em>}</b></div>
-          <div className="k"><small>Projeção {monthLabel(model.months[11])}</small><b>{fmtVol(TOT.proj)}</b></div>
-          <div className="k"><small>Saldo</small><b className={TOT.saldo != null && TOT.saldo < 0 ? 'cz-neg' : 'cz-pos'}>{fmtVol(TOT.saldo)}</b></div>
-        </div>}
+        ) : null}
         <span className="cz-grow" />
         <span className="cz-src" title={data.payload.loaded_at ? `Carga em ${new Date(data.payload.loaded_at).toLocaleString('pt-BR')}` : ''}><i />Dinâmica BI até {ddmm(isoOf(model.last))} · contrato {monthLabel(model.months[0])} a {monthLabel(model.months[11])}</span>
       </div>
 
       {sub === 'mapa' ? <JourneyMap model={model} period={per} perLabel={perLabel} frOn={frOn} editable={editable} onSaved={reloadData} onStats={onStats} /> : (
-      <div className="cz-canvas">
-        <div className="cz-strip">
-          <div className="cz-box cz-chans">
-            <div className="cz-chh"><span className="cz-lbl">Canal</span><span className="cz-lbl">Até {monthLabel(model.months[11])}</span><span className="cz-lbl">Real / esperado</span><span className="cz-lbl">Uso</span><span className="cz-lbl">Saldo</span></div>
-            {chanRows.map(({ c, x, sofar, expToday }) => {
-              const mx = Math.max(x.tot, x.proj) * 1.02 || 1; const w = (v: number) => Math.max(0, Math.min(100, (v / mx) * 100)); const tone = x.tot ? status(x)[0] : 'mute';
-              return (
-                <button key={c} className={`cz-chr${ch === c ? ' on' : ''}`} style={{ ['--c' as string]: CH_COLOR[c] }} title={`${CH_LABEL[c]}: projeção ${fmtVol(x.proj)} para ${fmtVol(x.tot)} contratados`} onClick={() => setCh(ch === c ? 'ALL' : c)}>
-                  <span className="nm"><span className="cz-dot" style={{ background: CH_COLOR[c] }} />{CH_LABEL[c]}{c === 'WPP' && <em>Mkt+Utility</em>}</span>
-                  <span className="cz-bl" style={{ display: 'block' }}>
-                    <span className="r" style={{ width: `${w(sofar)}%` }} />
-                    <span className="p" style={{ left: `${w(sofar)}%`, width: `${Math.max(0, w(Math.min(x.proj, x.tot)) - w(sofar))}%` }} />
-                    {x.proj > x.tot && <span className="o" style={{ left: `${w(x.tot)}%`, width: `${w(x.proj) - w(x.tot)}%` }} />}
-                    <span className="cap" style={{ left: `${w(x.tot)}%` }} /><span className="t" style={{ left: `${w(expToday)}%` }} />
-                  </span>
-                  <span className="rv">{fmtVol(x.real)} <small>/ {fmtVol(x.exp)}</small></span>
-                  <span style={{ color: TONE_COLOR[tone], fontWeight: 650 }}>{x.uso == null ? <span className="cz-muted">sem</span> : fmtPct(x.uso)}</span>
-                  <span className={x.saldo != null && x.saldo < 0 ? 'cz-neg' : ''} style={{ fontWeight: 600 }}>{x.tot ? fmtVol(x.saldo) : <span className="cz-muted">sem contrato</span>}</span>
-                </button>
-              );
-            })}
-            <div className="cz-chf"><span><i style={{ background: '#64748b' }} />real</span><span><i style={{ background: 'repeating-linear-gradient(-45deg,#64748b 0 2px,transparent 2px 4px)' }} />projeção</span><span><i style={{ background: 'repeating-linear-gradient(-45deg,#b91c1c 0 2px,transparent 2px 4px)' }} />passa do contrato</span><span><i style={{ width: 2, background: '#0f172a' }} />hoje</span><span style={{ marginLeft: 'auto' }}>real e uso: {perLabel}</span></div>
-          </div>
-          <div className="cz-box cz-chart">
-            <div className="hd">
-              <span className="ttl">Mês a mês: contrato vs envio <span className="cz-fx">{focusLabel} · {ch === 'ALL' ? 'todos os canais' : CH_LABEL[ch]}{focus && <button title="Voltar" onClick={() => setFocus(null)}><X /></button>}</span></span>
-              <span className="cz-ins cz-num">{insights}</span>
-            </div>
-            <div className="cz-cv">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
-                  <defs><pattern id="cz-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="6" fill={base} opacity=".55" /></pattern></defs>
-                  <CartesianGrid vertical={false} stroke="#f3efe7" />
-                  <XAxis dataKey="m" tick={{ fontSize: 10, fill: '#8a94a6' }} axisLine={false} tickLine={false} interval={0} />
-                  <YAxis tick={{ fontSize: 10, fill: '#8a94a6' }} axisLine={false} tickLine={false} width={52} tickFormatter={v => fmtVol(Number(v))} tickCount={4} />
-                  {per.key !== 'contrato' && perMonths.length > 0 && <ReferenceArea x1={monthLabel(perMonths[0].m)} x2={monthLabel(perMonths[perMonths.length - 1].m)} fill="#0e7490" fillOpacity={0.08} ifOverflow="extendDomain" />}
-                  <ReferenceLine x={nowLabel} stroke="#0f172a" strokeOpacity={0.45} strokeDasharray="2 3" />
-                  <Tooltip cursor={{ fill: 'rgba(15,23,42,.04)' }} contentStyle={{ background: '#0f172a', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12 }} labelStyle={{ color: '#fff', fontWeight: 600 }} itemStyle={{ color: '#fff' }}
-                    formatter={(v: unknown, name: unknown) => [fmtVol(Number(v)), String(name)]} />
-                  <Bar dataKey="real" name="Realizado" stackId="s" maxBarSize={34} isAnimationActive={false}>{chartData.map((d, i) => <Cell key={i} fill={d.over ? '#b91c1c' : base} />)}</Bar>
-                  <Bar dataKey="proj" name="Projeção" stackId="s" maxBarSize={34} isAnimationActive={false}>{chartData.map((d, i) => <Cell key={i} fill={d.over ? 'rgba(185,28,28,.28)' : 'url(#cz-hatch)'} />)}</Bar>
-                  <Line dataKey="plano" name="Contrato" type="stepAfter" stroke="#8a94a6" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="cz-lg"><span><i style={{ background: base }} />realizado</span><span><i style={{ background: '#b91c1c' }} />mês acima do contrato</span><span><i style={{ background: `repeating-linear-gradient(-45deg,${base} 0 2px,transparent 2px 4px)`, opacity: 0.6 }} />projeção pelo ritmo 30d</span><span><i style={{ height: 2, background: '#8a94a6' }} />contrato do mês</span>{per.key !== 'contrato' && <span><i style={{ background: 'rgba(14,116,144,.15)' }} />período</span>}<span style={{ marginLeft: 'auto' }}>Clique no ícone de gráfico de uma linha para ver ela aqui</span></div>
-          </div>
-        </div>
+      <div ref={vp.canvasRef} className={`cs-canvas czb-canvas${vp.panning ? ' panning' : ''}`} style={vp.gridStyle} {...vp.handlers}>
+        <div ref={vp.stageRef} className="cs-stage" style={{ transform: `translate(${Math.round(vp.view.x)}px,${Math.round(vp.view.y)}px) scale(${vp.view.z})` }}>
+          <div className="czb-grid">
+            <section className="czb-panel span3" data-nopan data-mini="" style={{ ['--acc' as string]: '#0e7490' }}>
+              <PanelHead acc="#0e7490" icon={<Receipt />} title={`Contrato SFMC até ${monthLabel(model.months[11])}`} sub={`${focusLabel} · ${ch === 'ALL' ? 'todos os canais' : CH_LABEL[ch]} · mesma leitura da tabela`} />
+              <KpiStrip x={TOT} endLabel={monthLabel(model.months[11])} expLabel={per.key === 'contrato' ? 'Esperado hoje' : 'Esperado no período'} lastLabel={ddmm(lastIso)} stamp={<Stamp tone={status(TOT)[0]} text={status(TOT)[1]} />} />
+            </section>
 
-        <div className="cz-box cz-tbl">
-          <div className="cz-tbar">
-            <div className="l"><h3>Por pilar e campanha</h3><span className="cz-cnt">{nItems} campanhas e grupos · envios · {perLabel}</span></div>
-            <div className="cz-seg">
-              <button className={ch === 'ALL' ? 'on' : ''} onClick={() => setCh('ALL')}>Todos os canais</button>
-              {CHS.map(c => <button key={c} className={ch === c ? 'on' : ''} onClick={() => setCh(c)}><span className="cz-dot" style={{ background: CH_COLOR[c] }} />{CH_LABEL[c]}</button>)}
-            </div>
-            <div className="r">
-              <button className={`cz-sw${showZero ? ' on' : ''}`} onClick={() => setShowZero(!showZero)}><i />Sem envio</button>
-              <span className="cz-btngrp">
-                <button className={`cz-btn${allOpen ? ' on' : ''}`} title="Abrir todos os pilares e frentes" onClick={() => { setClosed(new Set()); setClosedFr(new Set()); }}><Maximize2 />Expandir tudo</button>
-                <button className={`cz-btn${allClosed ? ' on' : ''}`} title="Recolher tudo" onClick={() => { setClosed(new Set(pillarKeys)); setClosedFr(new Set(allFrontKeys)); setOpenItems(new Set()); setOpenJ(new Set()); }}><Minimize2 />Recolher tudo</button>
-              </span>
-            </div>
+            <section className="czb-panel" data-nopan data-mini="" style={{ ['--acc' as string]: '#0e7490' }}>
+              <PanelHead acc="#0e7490" icon={<SlidersHorizontal />} title="Por canal" sub="clique para filtrar o board" />
+              <div className="czb-pb">
+                <div className="czb-ct czb-chead"><span>Canal</span><span>Contrato 12M</span><span>Projeção {monthLabel(model.months[11])}</span><span>{per.key === 'contrato' ? 'Esperado hoje' : 'Esperado'}</span><span>Consumido</span><span>Uso</span><span>Saldo</span><span>Situação</span></div>
+                {chanRows.map(({ c, x }) => (
+                  <button key={c} className={`czb-ct czb-crow${ch === c ? ' on' : ''}`} onClick={() => setCh(ch === c ? 'ALL' : c)}>
+                    <span className="nm"><span className="cz-dot" style={{ background: CH_COLOR[c] }} />{CH_LABEL[c]}{c === 'WPP' && <em>Mkt+Utility</em>}</span>
+                    <span>{x.tot ? fmtVol(x.tot) : <span className="cz-muted">sem</span>}</span><span><ProjCell x={x} /></span><span className="mu">{fmtVol(x.exp)}</span><span>{fmtVol(x.real)}</span>
+                    <span><UsoCell x={x} empty="sem contrato" /></span><span><SaldoCell v={x.saldo} /></span><span><Stamp tone={x.tot ? status(x)[0] : 'mute'} text={x.tot ? status(x)[1] : 'Sem contrato'} /></span>
+                  </button>
+                ))}
+                <div className="czb-lg"><span><i style={{ background: '#94a3b8' }} />projeção ÷ contrato</span><span><i style={{ background: TONE_COLOR.ok }} />uso no ritmo</span><span><i style={{ background: TONE_COLOR.info }} />abaixo do esperado</span><span><i style={{ background: TONE_COLOR.bad }} />acima</span><span><i style={{ width: 2, background: '#0f172a' }} />100% do esperado</span></div>
+                <div className="czb-note">{chanRows.filter(r => r.x.uso != null).map((r, k, arr) => <span key={r.c}><b>{CH_LABEL[r.c]}</b> {fmtPct(r.x.uso as number)} do esperado{k < arr.length - 1 ? ' · ' : '. '}</span>)}
+                  {(() => { const sob = chanRows.filter(r => r.x.saldo != null && r.x.saldo >= 0), est = chanRows.filter(r => r.x.saldo != null && r.x.saldo < 0);
+                    return <>{sob.length > 0 && <>Fecham {monthLabel(model.months[11])} com sobra: {sob.map(r => `${CH_LABEL[r.c]} (${fmtVol(r.x.saldo)})`).join(', ')}. </>}{est.length > 0 && <span className="cz-neg">Estouram: {est.map(r => `${CH_LABEL[r.c]} (${fmtVol(-(r.x.saldo as number))})`).join(', ')}.</span>}</>; })()}</div>
+              </div>
+            </section>
+
+            <section className="czb-panel" data-nopan data-mini="" style={{ ['--acc' as string]: '#334155' }}>
+              <PanelHead acc="#334155" icon={<ChartColumn />} title="Mês a mês: contrato x enviado" sub={<span className="cz-fx">{focusLabel} · {ch === 'ALL' ? 'todos os canais' : CH_LABEL[ch]}{focus && <button title="Voltar" onClick={() => setFocus(null)}><X /></button>}</span>} />
+              <div className="czb-pb">
+                <div className="czb-lg top"><span><i style={{ background: '#dbe3ec' }} />Contrato do mês</span><span><i style={{ background: base }} />Enviado</span><span><i className="hatch" />Projeção no ritmo de 30d ({fmtVol(sd.a.r30)}/mês)</span></div>
+                <MonthColumns labels={labels} plan={sd.plan} real={real} proj={proj} nowIdx={nowIdx} nowFrac={nowFrac} color={base} width={560} />
+                <div className="czb-note">{best >= 0 ? <>Maior mês fechado: <b>{labels[best]}</b> com <b>{fmtVol(real[best])}</b> de {fmtVol(sd.plan[best])} ({fmtPct(bestR)} do contrato do mês). </> : null}
+                  No ritmo dos últimos 30 dias, cada mês daqui pra frente fica em torno de <b>{fmtVol(sd.a.r30)}</b>{avgFut > 0 && <>, {fmtPct(sd.a.r30 / avgFut)} do contrato médio dos próximos meses</>}.</div>
+              </div>
+            </section>
+
+            <section className="czb-panel" data-nopan data-mini="" style={{ ['--acc' as string]: planTot > 0 && projTot > planTot ? '#b91c1c' : '#15803d' }}>
+              <PanelHead acc={planTot > 0 && projTot > planTot ? '#b91c1c' : '#15803d'} icon={<TrendingUp />} title={`Acumulado até ${monthLabel(model.months[11])}`} sub={<span className="cz-ins cz-num">{insights}</span>} />
+              <div className="czb-pb">
+                <div className="czb-lg top"><span><i style={{ background: '#94a3b8', height: 3 }} />Contrato acumulado</span><span><i style={{ background: '#1e293b', height: 3 }} />Consumido</span><span><i className="dash" />Projeção</span></div>
+                <CumulativeLines labels={labels} plan={sd.plan} real={real} proj={proj} nowIdx={nowIdx} nowFrac={nowFrac} width={400} />
+                <div className="czb-note">{per.key === 'contrato' ? 'Hoje' : perLabel}: <b>{fmtVol(sx.real)}</b> consumidos de <b>{fmtVol(sx.exp)}</b> esperados. No ritmo atual, o contrato fecha com <b>{fmtVol(projTot)}</b> usados{planTot > 0 && <> e <b className={projTot > planTot ? 'cz-neg' : 'cz-pos'}>{projTot > planTot ? `faltando ${fmtVol(projTot - planTot)}` : `${fmtVol(planTot - projTot)} sobrando`}</b></>}.</div>
+              </div>
+            </section>
+
+            <section className="czb-panel span3 cz-tbl" data-nopan data-mini="" style={{ ['--acc' as string]: '#0e7490' }}>
+              <PanelHead acc="#0e7490" icon={<Table />} title="Por pilar e campanha" sub={`${nItems} campanhas e grupos · envios · ${perLabel}`} right={<>
+                <div className="cz-seg">
+                  <button className={ch === 'ALL' ? 'on' : ''} onClick={() => setCh('ALL')}>Todos os canais</button>
+                  {CHS.map(c => <button key={c} className={ch === c ? 'on' : ''} onClick={() => setCh(c)}><span className="cz-dot" style={{ background: CH_COLOR[c] }} />{CH_LABEL[c]}</button>)}
+                </div>
+                <button className={`cz-sw${showZero ? ' on' : ''}`} onClick={() => setShowZero(!showZero)}><i />Sem envio</button>
+                <span className="cz-btngrp">
+                  <button className={`cz-btn${allOpen ? ' on' : ''}`} title="Abrir todos os pilares e frentes" onClick={() => { setClosed(new Set()); setClosedFr(new Set()); }}><Maximize2 />Expandir tudo</button>
+                  <button className={`cz-btn${allClosed ? ' on' : ''}`} title="Recolher tudo" onClick={() => { setClosed(new Set(pillarKeys)); setClosedFr(new Set(allFrontKeys)); setOpenItems(new Set()); setOpenJ(new Set()); }}><Minimize2 />Recolher tudo</button>
+                </span>
+              </>} />
+              <div className="cz-thead">
+                <div>Pilar · frente · campanha</div>
+                <div title="Envios previstos no contrato inteiro">Contrato 12M</div>
+                <div title="Tudo que saiu desde o início do contrato + ritmo dos últimos 30 dias até o fim. A barra mostra quanto do contrato isso usa">Projeção {monthLabel(model.months[11])}</div>
+                <div title="Parte do contrato prevista até hoje (ou no período escolhido), pela curva mensal do contrato">{per.key === 'contrato' ? 'Esperado hoje' : 'Esperado'}</div>
+                <div title="Envio real no período, sem repetir activity">Consumido</div>
+                <div title="Consumido ÷ esperado. O traço marca 100%">Uso</div>
+                <div title="Contrato 12M menos a projeção. ▼ = vai faltar">Saldo</div>
+                <div style={{ textAlign: 'left', paddingLeft: 14 }}>Situação</div>
+              </div>
+              {rowsOut}
+              <div className="cz-row tot">
+                <div className="cz-nm">Total{ch !== 'ALL' && ` · ${CH_LABEL[ch]}`}</div>
+                <div>{fmtVol(TOT.tot)}</div><div><ProjCell x={TOT} /></div><div className="mu">{fmtVol(TOT.exp)}</div><div>{fmtVol(TOT.real)}</div><div><UsoCell x={TOT} /></div><div><SaldoCell v={TOT.saldo} /></div><div className="st"><Stamp tone={status(TOT)[0]} text={status(TOT)[1]} /></div>
+              </div>
+              <div className="czb-foot">
+                <span>Ordem de leitura: quanto foi contratado → quanto vai usar até {monthLabel(model.months[11])} → quanto já deveria ter usado → quanto usou → se está no ritmo → quanto sobra.</span>
+                <details className="cz-how"><summary><Info size={13} />Como ler esta visão</summary>
+                  <div>Tudo em envios, contados uma vez por activity, dia e canal; quando a mesma activity aparece em mais de uma jornada, o envio fica na jornada com mais volume. O período muda Esperado, Consumido e Uso; Projeção e Saldo olham o contrato inteiro (ritmo dos últimos 30 dias ao passar o mouse na projeção). O contrato é por frente e canal, e cada pilar soma as frentes ligadas a ele. Campanha só tem meta própria quando alguém define. Linhas em laranja são envios que ainda não têm card no board. O vínculo envio → campanha segue as regras por nome de jornada. O relatório não separa WhatsApp Utility de Mkt.</div>
+                </details>
+              </div>
+            </section>
           </div>
-          <div className="cz-scroll"><div>
-            <div className="cz-thead">
-              <div>Pilar · frente · campanha</div>
-              <div title="Envios previstos no contrato inteiro">Contrato 12m</div>
-              <div title="Parte do contrato prevista para o período escolhido, pela curva mensal do contrato">Esperado</div>
-              <div title="Envio real no período escolhido, sem repetir activity">Realizado</div>
-              <div title="Realizado ÷ esperado no período. O traço marca 100%">Uso</div>
-              <div title="Envios dos últimos 30 dias do relatório">Ritmo 30d</div>
-              <div title="Tudo que saiu desde o início do contrato + ritmo dos últimos 30 dias até o fim do contrato">Projeção {monthLabel(model.months[11])}</div>
-              <div title="Contrato 12m menos a projeção. Negativo = vai estourar">Saldo</div>
-              <div style={{ textAlign: 'left', paddingLeft: 14 }}>Situação</div>
-            </div>
-            {rowsOut}
-            <div className="cz-row tot">
-              <div className="cz-nm">Total{ch !== 'ALL' && ` · ${CH_LABEL[ch]}`}</div>
-              <div>{fmtVol(TOT.tot)}</div><div>{fmtVol(TOT.exp)}</div><div>{fmtVol(TOT.real)}</div><div><UsoCell x={TOT} /></div><div>{fmtVol(TOT.r30)}</div><div>{fmtVol(TOT.proj)}</div><div><Saldo v={TOT.saldo} /></div><div className="st"><Stamp tone={status(TOT)[0]} text={status(TOT)[1]} /></div>
-            </div>
-          </div></div>
         </div>
-        <details className="cz-how"><summary><Info size={13} />Como ler esta visão</summary>
-          <div>Tudo em envios, contados uma vez por activity, dia e canal; quando a mesma activity aparece em mais de uma jornada, o envio fica na jornada com mais volume. O período muda Esperado, Realizado e Uso; Ritmo, Projeção e Saldo olham o contrato inteiro. O contrato é por frente e canal, e cada pilar soma as frentes ligadas a ele. Campanha só tem meta própria quando alguém define. Linhas em laranja são envios que ainda não têm card no board. O vínculo envio → campanha segue as regras por nome de jornada. O relatório não separa WhatsApp Utility de Mkt.</div>
-        </details>
+        <BoardZoomBar vp={vp} showMini={showMini} onToggleMini={() => setShowMini(v => !v)} />
+        {showMini && <BoardMiniMap vp={vp} mini={mini} />}
       </div>)}
       {drawer && <GoalDrawer key={drawer} model={model} itemKey={drawer} goals={goals} editable={editable} onClose={() => setDrawer(null)}
         onSaved={g => setData(d => d && { ...d, goals: g })} rules={data.rules} />}
