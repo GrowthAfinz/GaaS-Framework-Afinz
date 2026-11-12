@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { CalendarRange, FileText, FolderKanban, Layers, ListChecks, Plus, Users, X } from 'lucide-react';
+import { CalendarRange, FileText, FolderKanban, Layers, ListChecks, Plus, SquareKanban, Users, X } from 'lucide-react';
 import {
   FALLBACK_COLOR, WEEKDAYS, brDate, weekday,
   type DailyEntry, type DailyFrente, type DailyPartner, type DailyPerson, type DailyProject,
 } from './dailyModel';
 import { Avatar, tint } from './DailyPopovers';
-import { loadInitiatives, loadProjectEntries } from './dailyService';
+import { loadBoardCampaigns, loadInitiatives, loadProjectEntries, type BoardCampaign } from './dailyService';
 
 interface Props {
   project: DailyProject; frentes: DailyFrente[]; partners: DailyPartner[]; people: Map<string, DailyPerson>; canEdit: boolean; refreshKey: number;
@@ -16,11 +16,12 @@ interface Props {
 export function DailyProjectDrawer({ project, frentes, partners, people, canEdit, refreshKey, onSave, onClose, onAddToday, onOpenWiki }: Props) {
   const [entries, setEntries] = useState<DailyEntry[] | null>(null);
   const [initiatives, setInitiatives] = useState<{ id: string; title: string }[]>([]);
+  const [campaigns, setCampaigns] = useState<BoardCampaign[]>([]);
   const [name, setName] = useState(project.name);
   const [note, setNote] = useState(project.wiki_note);
   useEffect(() => { setName(project.name); setNote(project.wiki_note); }, [project]);
   useEffect(() => { let alive = true; setEntries(null); void loadProjectEntries(project.id).then(r => { if (alive) setEntries(r); }).catch(() => { if (alive) setEntries([]); }); return () => { alive = false; }; }, [project.id, refreshKey]);
-  useEffect(() => { void loadInitiatives().then(setInitiatives); }, []);
+  useEffect(() => { void loadInitiatives().then(setInitiatives); void loadBoardCampaigns().then(setCampaigns); }, []);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k); }, [onClose]);
 
   const frente = frentes.find(f => f.key === project.frente_key), color = frente?.color || FALLBACK_COLOR;
@@ -55,6 +56,14 @@ export function DailyProjectDrawer({ project, frentes, partners, people, canEdit
               <input value={note} disabled={!canEdit} placeholder="Caminho da nota, ex.: 05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md" onChange={e => setNote(e.target.value)} onBlur={() => { if (note.trim() !== project.wiki_note) void onSave({ wiki_note: note.trim() }); }} />
               {project.wiki_note && <button className="cs-btn" onClick={() => onOpenWiki(project.wiki_note)}>Abrir</button>}
             </span>
+            <span className="k"><SquareKanban />Campanha do board</span>
+            <select value={project.structure_card_id || ''} disabled={!canEdit} onChange={e => void onSave({ structure_card_id: e.target.value })}>
+              <option value="">Sem campanha na Estrutura CRM</option>
+              {project.structure_card_id && !campaigns.some(c => c.id === project.structure_card_id) && <option value={project.structure_card_id}>Campanha arquivada</option>}
+              {[...new Set(campaigns.map(c => c.path))].map(path => (
+                <optgroup key={path} label={path}>{campaigns.filter(c => c.path === path).map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</optgroup>
+              ))}
+            </select>
             <span className="k"><ListChecks />Iniciativa</span>
             <select value={project.initiative_id || ''} disabled={!canEdit} onChange={e => void onSave({ initiative_id: e.target.value })}>
               <option value="">Sem iniciativa em Tarefas e atividades</option>

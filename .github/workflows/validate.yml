@@ -47,7 +47,7 @@ jobs:
       - name: Portfolio report dependencies and Wiki review contracts
         run: npm run test:portfolio-knowledge
       - name: Development backlog and notification contracts
-        run: node --test scripts/test-development-backlog.mjs scripts/test-tasks-four-fronts.mjs scripts/test-initiative-workbench.mjs scripts/test-corrections-and-improvements.mjs scripts/test-wiki-seedlist.mjs scripts/test-wiki-strategy-pilot.mjs scripts/test-crm-structure.mjs scripts/test-crm-consumo.mjs scripts/test-daily-view.mjs scripts/test-notion-module.mjs
+        run: node --test scripts/test-development-backlog.mjs scripts/test-tasks-four-fronts.mjs scripts/test-initiative-workbench.mjs scripts/test-corrections-and-improvements.mjs scripts/test-wiki-seedlist.mjs scripts/test-wiki-strategy-pilot.mjs scripts/test-crm-structure.mjs scripts/test-crm-consumo.mjs scripts/test-daily-view.mjs scripts/test-notion-module.mjs scripts/test-structure-names.mjs
       - name: SFMC package ingestion SQL contracts
         run: npm run test:sfmc-package-sql
       - name: Content performance and automatic linkage SQL contracts

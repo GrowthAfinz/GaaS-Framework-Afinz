@@ -18,7 +18,7 @@ import {
 } from './dailyModel';
 import {
   loadB2c, loadCrm, loadDailyConfig, loadEarliestDay, loadEntries, loadFreshness, mergeProjects, saveEntry, saveOption, saveProject,
-  type DailyLoad,
+  type DailyLoad, loadBoardCampaigns,
 } from './dailyService';
 import { DailyCalendar, type DayMetric } from './DailyCalendar';
 import { DailyEntries, type Draft } from './DailyEntries';
@@ -63,6 +63,9 @@ export function DailyWorkspace() {
   const [drawer, setDrawer] = useState<string | null>(null);
   const [drawerKey, setDrawerKey] = useState(0);
   const [config, setConfig] = useState<ConfigTab | null>(null);
+  // Nome das campanhas do board ligadas aos projetos (Estrutura CRM).
+  const [campaigns, setCampaigns] = useState<Map<string, string>>(new Map());
+  useEffect(() => { void loadBoardCampaigns().then(cs => setCampaigns(new Map(cs.map(c => [c.id, c.title])))); }, []);
   const [toast, setToast] = useState<Toast>(null);
   const [scrollTo, setScrollTo] = useState<{ day: string; key: number } | null>(null);
   const [present, setPresent] = useState(false);
@@ -424,7 +427,7 @@ export function DailyWorkspace() {
           <div style={{ height: calHeight, display: 'flex' }}>
             <DailyEntries groups={groups} group={prefs.group} sort={prefs.sort} view={prefs.view} filters={filters} shown={listEntries.length} total={inList.length}
               monthsLoaded={listMonths} prevMonth={prevMonth} isCollapsed={k => (collapsed[k] !== undefined ? collapsed[k] : allCollapsed)} today={today} canEdit={canEdit} draft={draft}
-              projects={projects} frentes={frentes} partners={partners} tags={tags} people={people} b2c={b2c} filterLabels={filterLabels}
+              projects={projects} frentes={frentes} partners={partners} tags={tags} people={people} b2c={b2c} filterLabels={filterLabels} campaigns={campaigns}
               scrollToDay={scrollTo?.day || null} flashKey={scrollTo?.key || 0}
               onView={view => setPrefs(p => ({ ...p, view }))} onFilterPop={(key, el) => setPop({ kind: 'filter', key, anchor: anchorOf(el) })}
               onRemoveFilter={(key, v) => setFilters(f => ({ ...f, [key]: f[key].filter(x => x !== v) }))} onClear={() => setFilters(emptyDailyFilters())}

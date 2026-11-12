@@ -5,6 +5,8 @@ export interface DailyPartner { key: string; name: string; color: string; crm_ke
 export interface DailyTag { key: string; name: string; color: string; position: number; archived: boolean; revision: number }
 export interface DailyProject {
   id: string; name: string; frente_key: string; partner_keys: string[]; wiki_note: string; initiative_id: string | null;
+  /** Campanha do board da Estrutura CRM (ligação por id; renomear a campanha não solta o projeto). */
+  structure_card_id?: string | null;
   merged_into: string | null; archived: boolean; revision: number; created_at: string; updated_at: string;
 }
 export interface DailyEntry {
