@@ -1,17 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  Code,
-  Link,
-  Palette,
-} from 'lucide-react';
-import { NotionColor } from '../../types/notion';
+import React, { useEffect, useRef, useState } from 'react';
+import { Bold, Italic, Strikethrough, Code, Link, Palette } from 'lucide-react';
+import { Block, NotionColor } from '../../types/notion';
+import { toLocalPx } from '../../../../context/UIScaleContext';
 
+/**
+ * Barra de formatação sobre o texto selecionado num bloco (adição GaaS).
+ * Os blocos são texto puro, então a formatação vira marcação Markdown (a mesma da Wiki e do briefing
+ * para agentes) e a cor vale para o bloco inteiro.
+ */
 interface FormattingBarProps {
-  onApplyFormat: (format: string, value?: any) => void;
+  onUpdateBlock: (blockId: string, partial: Partial<Block>) => void;
 }
 
 const COLORS: { name: string; color: NotionColor; class: string }[] = [
@@ -27,97 +25,73 @@ const COLORS: { name: string; color: NotionColor; class: string }[] = [
   { name: 'Vermelho', color: 'red', class: 'text-red-500' },
 ];
 
-export const FormattingBar: React.FC<FormattingBarProps> = ({ onApplyFormat }) => {
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
-  const [showColorPicker, setShowColorPicker] = useState(false);
+type Field = HTMLTextAreaElement | HTMLInputElement;
+interface Target { el: Field; blockId: string; start: number; end: number }
+
+export const FormattingBar: React.FC<FormattingBarProps> = ({ onUpdateBlock }) => {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [showColors, setShowColors] = useState(false);
+  const target = useRef<Target | null>(null);
+  const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleSelectionChange = () => {
-      const selection = window.getSelection();
-      if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-        setPosition(null);
-        setShowColorPicker(false);
+    const check = () => {
+      const el = document.activeElement as Field | null;
+      const ok = el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (el as HTMLInputElement).type === 'text'));
+      const blockId = ok ? el!.closest<HTMLElement>('[data-block-id]')?.dataset.blockId : undefined;
+      if (!ok || !blockId || el!.selectionStart == null || el!.selectionStart === el!.selectionEnd) {
+        if (!barRef.current?.contains(document.activeElement)) { setPos(null); setShowColors(false); }
         return;
       }
-
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setPosition({
-          top: Math.max(10, rect.top + window.scrollY - 44),
-          left: Math.max(10, rect.left + window.scrollX + rect.width / 2 - 120),
-        });
-      }
+      target.current = { el: el!, blockId, start: el!.selectionStart!, end: el!.selectionEnd! };
+      const box = el!.getBoundingClientRect();
+      const root = el!.closest('.nt-root')?.getBoundingClientRect();
+      setPos({ top: toLocalPx(box.top - (root?.top || 0)) - 40, left: Math.max(8, toLocalPx(box.left - (root?.left || 0))) });
     };
-
-    document.addEventListener('selectionchange', handleSelectionChange);
-    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener('selectionchange', check);
+    document.addEventListener('mouseup', check);
+    document.addEventListener('keyup', check);
+    return () => { document.removeEventListener('selectionchange', check); document.removeEventListener('mouseup', check); document.removeEventListener('keyup', check); };
   }, []);
 
-  if (!position) return null;
+  if (!pos) return null;
+
+  const wrap = (before: string, after = before) => {
+    const t = target.current; if (!t) return;
+    const v = t.el.value, sel = v.slice(t.start, t.end);
+    const already = v.slice(t.start - before.length, t.start) === before && v.slice(t.end, t.end + after.length) === after;
+    const next = already
+      ? v.slice(0, t.start - before.length) + sel + v.slice(t.end + after.length)
+      : v.slice(0, t.start) + before + sel + after + v.slice(t.end);
+    onUpdateBlock(t.blockId, { content: next });
+    const s = already ? t.start - before.length : t.start + before.length;
+    requestAnimationFrame(() => { t.el.focus(); t.el.setSelectionRange(s, s + sel.length); });
+  };
+  const link = () => {
+    const url = window.prompt('Endereço do link (https://…)');
+    if (url && /^https?:\/\//i.test(url.trim())) wrap('[', `](${url.trim()})`);
+  };
+  const btn = 'p-1.5 rounded hover:bg-[var(--notion-hover)] transition-colors';
+  const keep = (e: React.MouseEvent) => e.preventDefault(); // não tira o foco do bloco
 
   return (
-    <div
-      style={{ top: `${position.top}px`, left: `${position.left}px` }}
-      className="fixed z-50 flex items-center gap-0.5 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 text-[var(--notion-text)] shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
-    >
-      <button
-        onClick={() => document.execCommand('bold', false)}
-        className="p-1.5 rounded hover:bg-[var(--notion-hover)] text-xs transition-colors"
-        title="Negrito (Ctrl+B)"
-      >
-        <Bold size={14} />
-      </button>
-      <button
-        onClick={() => document.execCommand('italic', false)}
-        className="p-1.5 rounded hover:bg-[var(--notion-hover)] text-xs transition-colors"
-        title="Itálico (Ctrl+I)"
-      >
-        <Italic size={14} />
-      </button>
-      <button
-        onClick={() => document.execCommand('underline', false)}
-        className="p-1.5 rounded hover:bg-[var(--notion-hover)] text-xs transition-colors"
-        title="Sublinhado (Ctrl+U)"
-      >
-        <Underline size={14} />
-      </button>
-      <button
-        onClick={() => document.execCommand('strikeThrough', false)}
-        className="p-1.5 rounded hover:bg-[var(--notion-hover)] text-xs transition-colors"
-        title="Tachado"
-      >
-        <Strikethrough size={14} />
-      </button>
-
-      <div className="h-4 w-px bg-[var(--notion-border)] mx-1" />
-
-      {/* Color picker */}
+    <div ref={barRef} onMouseDown={keep} style={{ top: pos.top, left: pos.left }}
+      className="absolute z-50 flex items-center gap-0.5 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-xl text-[var(--notion-text)]">
+      <button onClick={() => wrap('**')} className={btn} title="Negrito (**texto**)"><Bold size={14} /></button>
+      <button onClick={() => wrap('*')} className={btn} title="Itálico (*texto*)"><Italic size={14} /></button>
+      <button onClick={() => wrap('~~')} className={btn} title="Tachado (~~texto~~)"><Strikethrough size={14} /></button>
+      <button onClick={() => wrap('`')} className={btn} title="Código (`texto`)"><Code size={14} /></button>
+      <button onClick={link} className={btn} title="Link"><Link size={14} /></button>
+      <div className="w-px h-4 bg-[var(--notion-border)] mx-0.5" />
       <div className="relative">
-        <button
-          onClick={() => setShowColorPicker(!showColorPicker)}
-          className="flex items-center gap-1 p-1.5 rounded hover:bg-[var(--notion-hover)] text-xs transition-colors"
-          title="Cor e destaque"
-        >
-          <Palette size={14} />
-        </button>
-
-        {showColorPicker && (
-          <div className="absolute left-0 top-8 z-50 w-44 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] p-2 shadow-2xl">
-            <div className="text-[10px] font-semibold text-[var(--notion-text-muted)] uppercase px-1 pb-1">
-              Color
-            </div>
-            {COLORS.map((col) => (
-              <button
-                key={col.color}
-                onClick={() => {
-                  onApplyFormat('color', col.color);
-                  setShowColorPicker(false);
-                }}
-                className="flex items-center gap-2 w-full px-2 py-1 text-xs rounded hover:bg-[var(--notion-hover)] text-left"
-              >
-                <span className={`font-semibold ${col.class}`}>A</span>
-                <span className="text-[var(--notion-text)]">{col.name}</span>
+        <button onClick={() => setShowColors(!showColors)} className={btn} title="Cor do bloco"><Palette size={14} /></button>
+        {showColors && (
+          <div className="absolute left-0 top-8 z-50 w-40 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] p-1.5 shadow-2xl">
+            {COLORS.map((c) => (
+              <button key={c.color}
+                onClick={() => { const t = target.current; if (t) onUpdateBlock(t.blockId, { color: c.color === 'default' ? undefined : c.color }); setShowColors(false); }}
+                className="flex items-center gap-2 w-full px-2 py-1 text-xs rounded hover:bg-[var(--notion-hover)] text-left">
+                <span className={`font-semibold ${c.class}`}>A</span><span>{c.name}</span>
               </button>
             ))}
           </div>

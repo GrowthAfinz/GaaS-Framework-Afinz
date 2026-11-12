@@ -39,6 +39,8 @@ interface SidebarProps {
   onOpenTemplates: () => void;
   onImportMarkdown: (markdownText: string) => void;
   onOpenTrash: () => void;
+  /** Atalhos extras do GaaS (ex.: Investigações CRM). */
+  extraLinks?: { label: string; icon: React.ReactNode; onClick: () => void }[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -58,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenTemplates,
   onImportMarkdown,
   onOpenTrash,
+  extraLinks = [],
 }) => {
   const [expandedPages, setExpandedPages] = useState<Record<string, boolean>>({});
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -250,6 +253,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
           className="hidden"
         />
+        {extraLinks.map((l) => (
+          <button
+            key={l.label}
+            onClick={l.onClick}
+            className="flex items-center gap-2.5 w-full px-2 py-1 rounded-md text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors font-medium"
+          >
+            {l.icon}
+            <span>{l.label}</span>
+          </button>
+        ))}
       </div>
 
       <div className="h-px bg-[var(--notion-border)] mx-2 my-1" />

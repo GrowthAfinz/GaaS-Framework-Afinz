@@ -352,6 +352,7 @@ export const BlockItem: React.FC<BlockItemProps> = ({
   return (
     <div
       ref={blockRef}
+      data-block-id={block.id}
       draggable
       onDragStart={(e) => onDragStart && onDragStart(e, index)}
       onDragOver={(e) => onDragOver && onDragOver(e, index)}

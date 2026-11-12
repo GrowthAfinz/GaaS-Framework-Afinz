@@ -41,6 +41,7 @@ interface DatabaseViewProps {
   onAddView: (databaseId: string, name: string, type: DatabaseViewType) => void;
   onOpenRowPage: (pageId: string) => void;
   onUpdateView?: (databaseId: string, viewId: string, partial: Partial<DatabaseViewConfig>) => void;
+  onDeleteView?: (databaseId: string, viewId: string) => void;
   /** Chips de filtro rápido por uma propriedade (ex.: Frente). A seleção é de cada pessoa e fica no navegador. */
   quickFilter?: QuickFilterConfig;
 }
@@ -58,9 +59,11 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onAddView,
   onOpenRowPage,
   onUpdateView,
+  onDeleteView,
   quickFilter,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [showAddViewMenu, setShowAddViewMenu] = useState(false);
   const [menu, setMenu] = useState<null | 'filter' | 'sort' | 'group' | 'props'>(null);
   const [filterProp, setFilterProp] = useState<string | null>(null);
@@ -96,7 +99,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const qfSelected = qfSel ?? [...qfOptions.filter((n) => !quickFilter?.hiddenByDefault.includes(n)), EMPTY];
   const qfLockedByView = Boolean(quickFilter && (currentView.filters || []).some((f) => f.propertyId === quickFilter.propertyId));
   const qfActive = Boolean(qfProp) && !qfLockedByView;
-  const qfValue = (r: DatabaseRow) => String(r.properties[quickFilter?.propertyId || ''] || '') || EMPTY;
+  // Valor fora da lista (ex.: frente arquivada) cai em "Sem frente" para a tarefa nunca sumir.
+  const qfValue = (r: DatabaseRow) => { const v = String(r.properties[quickFilter?.propertyId || ''] || ''); return v && qfOptions.includes(v) ? v : EMPTY; };
   const filteredRows = useMemo(
     () => (qfActive ? viewRows.filter((r) => qfSelected.includes(qfValue(r))) : viewRows),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,19 +160,40 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       <div className="flex items-center justify-between border-b border-[var(--notion-border)] pb-1.5 flex-wrap gap-2">
         {/* View Switcher Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto">
-          {database.views.map((view) => (
-            <button
+          {database.views.map((view) => renaming === view.id ? (
+            <input
               key={view.id}
-              onClick={() => onSetView(database.id, view.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-                view.id === currentView.id
-                  ? 'border-b-2 border-blue-500 text-blue-500 font-semibold'
-                  : 'text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] hover:bg-[var(--notion-hover)]'
-              }`}
-            >
-              {getViewIcon(view.type)}
-              <span>{view.name}</span>
-            </button>
+              autoFocus
+              defaultValue={view.name}
+              onBlur={(e) => { const n = e.target.value.trim(); if (n && n !== view.name) onUpdateView?.(database.id, view.id, { name: n }); setRenaming(null); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setRenaming(null); }}
+              className="w-32 px-2 py-1 rounded border border-blue-500 bg-transparent text-xs focus:outline-none"
+            />
+          ) : (
+            <div key={view.id} className="group/tab relative flex items-center">
+              <button
+                onClick={() => onSetView(database.id, view.id)}
+                onDoubleClick={() => onUpdateView && setRenaming(view.id)}
+                title="Duplo clique para renomear"
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                  view.id === currentView.id
+                    ? 'border-b-2 border-blue-500 text-blue-500 font-semibold'
+                    : 'text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] hover:bg-[var(--notion-hover)]'
+                }`}
+              >
+                {getViewIcon(view.type)}
+                <span>{view.name}</span>
+              </button>
+              {onDeleteView && database.views.length > 1 && view.id === currentView.id && (
+                <button
+                  onClick={() => { if (window.confirm(`Excluir a visão "${view.name}"? Os itens continuam na base.`)) onDeleteView(database.id, view.id); }}
+                  className="opacity-0 group-hover/tab:opacity-100 -ml-1 p-0.5 rounded text-[var(--notion-text-muted)] hover:text-red-500"
+                  title="Excluir visão"
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </div>
           ))}
 
           {/* Add View Dropdown */}

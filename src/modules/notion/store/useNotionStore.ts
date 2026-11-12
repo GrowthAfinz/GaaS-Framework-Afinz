@@ -583,13 +583,8 @@ export function useNotion(initial: NotionWorkspace) {
           id: propId,
           name,
           type,
-          options:
-            type === 'select' || type === 'multi_select' || type === 'status'
-              ? [
-                  { id: generateId('opt'), name: 'Option 1', color: 'blue' },
-                  { id: generateId('opt'), name: 'Option 2', color: 'green' },
-                ]
-              : undefined,
+          // Sem opções de exemplo: elas são criadas direto na célula (adição GaaS).
+          options: type === 'select' || type === 'multi_select' || type === 'status' ? [] : undefined,
         };
 
         const updatedViews = db.views.map((v) => ({

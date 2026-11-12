@@ -29,6 +29,7 @@ interface TopbarProps {
   onExportJSON: () => void;
   onCreatePage?: () => void;
   onOpenAi?: () => void;
+  onOpenComments?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -42,6 +43,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onExportJSON,
   onCreatePage,
   onOpenAi,
+  onOpenComments,
 }) => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -170,7 +172,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             {showShareMenu && (
               <div className="absolute right-0 top-8 z-50 w-64 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] p-2 shadow-2xl backdrop-blur-md">
                 <div className="text-[10px] uppercase font-semibold text-[var(--notion-text-muted)] px-2 py-1">
-                  Share & Export
+                  Compartilhar e exportar
                 </div>
                 <button
                   onClick={handleCopyLink}
@@ -199,7 +201,7 @@ export const Topbar: React.FC<TopbarProps> = ({
 
           {/* Comment icon button */}
           <button
-            onClick={() => alert('Comments feature: You can leave comments on blocks using text selection!')}
+            onClick={onOpenComments}
             className="p-1.5 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors"
             title="Comentários da página"
           >
@@ -212,7 +214,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             className={`p-1.5 rounded hover:bg-[var(--notion-hover)] transition-colors ${
               page.isFavorite ? 'text-amber-500' : 'hover:text-[var(--notion-text)]'
             }`}
-            title={page.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+            title={page.isFavorite ? 'Tirar dos favoritos' : 'Adicionar aos favoritos'}
           >
             <Star size={14} fill={page.isFavorite ? 'currentColor' : 'none'} />
           </button>
@@ -231,7 +233,7 @@ export const Topbar: React.FC<TopbarProps> = ({
               <div className="absolute right-0 top-8 z-50 w-64 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] p-2 shadow-2xl backdrop-blur-md">
                 {/* Style Font Picker */}
                 <div className="px-2 py-1 text-[10px] uppercase font-semibold text-[var(--notion-text-muted)]">
-                  Style
+                  Estilo
                 </div>
                 <div className="grid grid-cols-3 gap-1 px-1 py-1 mb-2">
                   {[
@@ -286,7 +288,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                   }}
                   className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-red-500 hover:bg-red-500/10 rounded transition-colors"
                 >
-                  <Trash2 size={13} /> Delete page
+                  <Trash2 size={13} /> Mover para a lixeira
                 </button>
               </div>
             )}

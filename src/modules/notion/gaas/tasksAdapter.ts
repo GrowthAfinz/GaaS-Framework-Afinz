@@ -25,8 +25,10 @@ export const GAAS_FRONT_NAME = 'GaaS (SDD)';
 /** Equivalência com a coluna antiga das tarefas (workspace), usada para preencher e manter as duas em sincronia. */
 const FRONT_FROM_WORKSPACE: Record<string, string> = { acquisition: 'aq', monetization: 're', cross_sell: 'se', sdd: GAAS_FRONT };
 const WORKSPACE_FROM_FRONT: Record<string, Workspace> = { aq: 'acquisition', re: 'monetization', se: 'cross_sell', [GAAS_FRONT]: 'sdd' };
+/** Coluna antiga (workspace) para uma frente; frentes sem equivalente ficam em Aquisição. */
+export const workspaceOfFront = (key: string | null): Workspace => (key && WORKSPACE_FROM_FRONT[key]) || 'acquisition';
 /** Cor da frente (hex na Visão Daily) aproximada para a paleta do módulo. */
-function notionColor(hex: string): NotionColor {
+export function notionColor(hex: string): NotionColor {
   const h = hex.toLowerCase();
   const table: [NotionColor, number[]][] = [['blue', [2, 132, 199]], ['green', [13, 148, 136]], ['purple', [124, 58, 237]], ['orange', [234, 88, 12]], ['gray', [100, 116, 139]], ['red', [220, 38, 38]], ['yellow', [202, 138, 4]], ['pink', [219, 39, 119]], ['brown', [146, 64, 14]]];
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/.exec(h);
@@ -56,6 +58,8 @@ export function systemProperties(initiatives: Initiative[], fronts: BusinessFron
 export const SYSTEM_PROP_IDS = new Set(['prop_title', 'p_tipo', 'p_status', 'p_iniciativa', 'p_prioridade', 'p_responsavel', 'p_prazo', 'p_proxima']);
 /** Propriedades do módulo com regra própria (ficam nas linhas, mas são recalculadas e não podem ser removidas). */
 export const MODULE_PROP_IDS = new Set(['p_frente', 'p_projeto']);
+/** Propriedades cujas opções vêm de outra tela (criar opção grava lá). */
+export const SYNCED_PROPS = new Set(['p_frente', 'p_projeto', 'p_iniciativa']);
 
 export function defaultTaskViews(): DatabaseViewConfig[] {
   const all = ['p_frente', 'p_projeto', 'p_status', 'p_tipo', 'p_responsavel', 'p_prazo', 'p_prioridade', 'p_iniciativa', 'p_proxima'];

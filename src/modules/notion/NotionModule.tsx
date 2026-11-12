@@ -1,4 +1,5 @@
-import React, { useEffect, useCallback, useRef, useState } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 import { useNotion } from './store/useNotionStore';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -10,18 +11,22 @@ import { SearchModal } from './components/layout/SearchModal';
 import { TrashModal } from './components/layout/TrashModal';
 import { TemplatesModal } from './components/layout/TemplatesModal';
 import { RowPeekModal } from './components/database/RowPeekModal';
+import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
+import { PageComments } from './components/editor/PageComments';
+import { supabase } from '../../services/supabaseClient';
+import { saveInitiative } from '../../components/growth-learning/development/workService';
 import { AgentBriefModal, GaasSettingsModal } from './gaas/GaasPanels';
 import { useAuth } from '../../context/AuthContext';
-import { newWork, type WorkItem } from '../../components/growth-learning/development/workModel';
+import { newWork, type Initiative, type WorkItem } from '../../components/growth-learning/development/workModel';
 import { taskError } from '../../components/growth-learning/development/developmentService';
-import type { DatabaseRow, NotionWorkspace } from './types/notion';
+import type { DatabaseRow, NotionColor, NotionDatabase, NotionWorkspace, SelectOption } from './types/notion';
 import { createTask, diff, loadNotion, pushChanges, saveLocalPrefs, saveTask, snapshot, type NotionContext, type Snapshot } from './gaas/notionData';
-import { GAAS_FRONT_NAME, TASKS_DB, type DailyProjectRef, extraProps, frontOfProject, rowPatch, taskBlocks, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
+import { GAAS_FRONT, GAAS_FRONT_NAME, SYNCED_PROPS, SYSTEM_PROP_IDS, TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, notionColor, workspaceOfFront, extraProps, frontOfProject, rowPatch, taskBlocks, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
 import './notion.css';
 import 'katex/dist/katex.min.css';
 
 /** Módulo estilo Notion (base: notion-clone, MIT) ligado ao Supabase. Ocupa o espaço do contêiner. */
-export function NotionModule() {
+export function NotionModule({ onOpenInvestigations }: { onOpenInvestigations?: () => void } = {}) {
   const { user } = useAuth();
   const me = user?.id ?? null;
   const [state, setState] = useState<{ workspace: NotionWorkspace; ctx: NotionContext; seeded: boolean } | null>(null);
@@ -33,10 +38,10 @@ export function NotionModule() {
   useEffect(() => { load(); }, [load]);
   if (error) return <div className="nt-root flex h-full items-center justify-center gap-3 text-sm">{error}<button className="rounded-md border px-3 py-1.5" onClick={load}>Tentar de novo</button></div>;
   if (!state) return <div className="nt-root flex h-full items-center justify-center text-sm text-[var(--notion-text-muted)]">Carregando Testes e Tarefas…</div>;
-  return <NotionApp key={me || 'anon'} initial={state.workspace} ctx={state.ctx} seeded={state.seeded} />;
+  return <NotionApp key={me || 'anon'} initial={state.workspace} ctx={state.ctx} seeded={state.seeded} onOpenInvestigations={onOpenInvestigations} />;
 }
 
-function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: NotionContext; seeded: boolean }) {
+function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: NotionWorkspace; ctx: NotionContext; seeded: boolean; onOpenInvestigations?: () => void }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const {
     workspace,
@@ -180,9 +185,123 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     if (cancel) updateDatabaseRow(TASKS_DB, rowId, 'p_status', cancel);
   }, [deleteDatabaseRow, updateDatabaseRow]);
 
+  /* ---------- edição de propriedades, opções e visões (criar opção grava na tela de origem) ---------- */
+  const patchDb = useCallback((dbId: string, fn: (db: NotionDatabase) => NotionDatabase) =>
+    patchWorkspace(prev => (prev.databases[dbId] ? { ...prev, databases: { ...prev.databases, [dbId]: fn(prev.databases[dbId]) } } : prev)), [patchWorkspace]);
+  const pushOption = useCallback((dbId: string, propId: string, option: SelectOption, beforeId?: string) =>
+    patchDb(dbId, db => ({ ...db, properties: db.properties.map(p => {
+      if (p.id !== propId) return p;
+      const opts = p.options || [];
+      const at = beforeId ? opts.findIndex(o => o.id === beforeId) : -1;
+      return { ...p, options: at < 0 ? [...opts, option] : [...opts.slice(0, at), option, ...opts.slice(at)] };
+    }) })), [patchDb]);
+  const deleteView = useCallback((dbId: string, viewId: string) =>
+    patchDb(dbId, db => {
+      const views = db.views.filter(v => v.id !== viewId);
+      return views.length ? { ...db, views, currentViewId: db.currentViewId === viewId ? views[0].id : db.currentViewId } : db;
+    }), [patchDb]);
+  const editApi = useMemo<NotionEditApi>(() => {
+    const rowFront = (dbId: string, rowId?: string) => {
+      const db = latest.current.databases[dbId];
+      const row = rowId ? db?.rows.find(r => r.id === rowId) : undefined;
+      return db?.properties.find(p => p.id === 'p_frente')?.options?.find(o => o.name === row?.properties.p_frente)?.id ?? null;
+    };
+    const fail = (e: unknown, fallback: string): never => {
+      const m = e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : '';
+      if (/name_taken/.test(m)) throw new Error('Já existe um item com esse nome.');
+      if (/name_required/.test(m)) throw new Error('O nome precisa de pelo menos 2 letras.');
+      if (/access_denied|permission/.test(m)) throw new Error('Seu acesso não permite criar aqui.');
+      throw new Error(fallback);
+    };
+    return {
+      lockOf: (dbId, propId) => (dbId !== TASKS_DB ? null : SYNCED_PROPS.has(propId) ? 'synced' : SYSTEM_PROP_IDS.has(propId) ? 'fixed' : null),
+      createOption: async (dbId, propId, name, rowId) => {
+        const prop = latest.current.databases[dbId]?.properties.find(p => p.id === propId);
+        if (!prop) return null;
+        if (dbId === TASKS_DB && propId === 'p_frente') {
+          const { data, error } = await supabase.rpc('gaas_daily_save_option', { p_kind: 'frente', p_key: null, p_body: { name, short: name.slice(0, 2).toUpperCase() } });
+          if (error) fail(error, 'Não foi possível criar a frente.');
+          const f = data as BusinessFront;
+          ctx.fronts.push(f);
+          pushOption(dbId, propId, { id: f.key, name: f.name, color: notionColor(f.color) }, GAAS_FRONT);
+          return f.name;
+        }
+        if (dbId === TASKS_DB && propId === 'p_projeto') {
+          const fk = rowFront(dbId, rowId);
+          const frente = fk && fk !== GAAS_FRONT ? fk : ctx.fronts.find(f => f.key === 'op' && !f.archived)?.key || ctx.fronts.find(f => !f.archived)?.key;
+          if (!frente) throw new Error('Crie uma frente antes do projeto.');
+          const { data, error } = await supabase.rpc('gaas_daily_save_project', { p_id: null, p_revision: null, p_body: { name, frente_key: frente } });
+          if (error) fail(error, 'Não foi possível criar o projeto.');
+          const p = data as DailyProjectRef;
+          ctx.projects.push(p);
+          const color = notionColor(ctx.fronts.find(f => f.key === p.frente_key)?.color || '');
+          pushOption(dbId, propId, { id: p.id, name: p.name, color });
+          return p.name;
+        }
+        if (dbId === TASKS_DB && propId === 'p_iniciativa') {
+          if (!ctx.canEditTasks) throw new Error('Criar iniciativas requer acesso de edição.');
+          const fk = rowFront(dbId, rowId);
+          try {
+            const saved = await saveInitiative({ id: '', title: name, workspace: workspaceOfFront(fk), description: '', source_note: null, revision: 0 } as Initiative);
+            ctx.initiatives.push(saved);
+            pushOption(dbId, propId, { id: saved.id, name: saved.title, color: 'default' });
+            return saved.title;
+          } catch (e) { return fail(e, 'Não foi possível criar a iniciativa.'); }
+        }
+        if (dbId === TASKS_DB && SYSTEM_PROP_IDS.has(propId)) return null;
+        const colors: NotionColor[] = ['blue', 'green', 'purple', 'orange', 'pink', 'yellow', 'red', 'brown', 'gray'];
+        pushOption(dbId, propId, { id: 'opt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, color: colors[(prop.options || []).length % colors.length] });
+        return name;
+      },
+      removeOption: (dbId, propId, optionId) =>
+        patchDb(dbId, db => {
+          const name = db.properties.find(p => p.id === propId)?.options?.find(o => o.id === optionId)?.name;
+          return {
+            ...db,
+            properties: db.properties.map(p => (p.id === propId ? { ...p, options: (p.options || []).filter(o => o.id !== optionId) } : p)),
+            rows: db.rows.map(r => {
+              const v = r.properties[propId];
+              if (Array.isArray(v) && v.includes(name)) return { ...r, properties: { ...r.properties, [propId]: v.filter(x => x !== name) } };
+              if (v === name) return { ...r, properties: { ...r.properties, [propId]: '' } };
+              return r;
+            }),
+          };
+        }),
+      renameProperty: (dbId, propId, name) => patchDb(dbId, db => ({ ...db, properties: db.properties.map(p => (p.id === propId ? { ...p, name } : p)) })),
+      deleteProperty: (dbId, propId) =>
+        patchDb(dbId, db => ({
+          ...db,
+          properties: db.properties.filter(p => p.id !== propId),
+          rows: db.rows.map(r => { const { [propId]: _gone, ...rest } = r.properties; return { ...r, properties: rest }; }),
+          views: db.views.map(v => ({
+            ...v,
+            visiblePropertyIds: v.visiblePropertyIds.filter(id => id !== propId),
+            filters: (v.filters || []).filter(f => f.propertyId !== propId),
+            sorts: (v.sorts || []).filter(s => s.propertyId !== propId),
+            groupByPropertyId: v.groupByPropertyId === propId ? undefined : v.groupByPropertyId,
+            datePropertyId: v.datePropertyId === propId ? undefined : v.datePropertyId,
+          })),
+        })),
+    };
+  }, [ctx, patchDb, pushOption]);
+  const openComments = useCallback(() => {
+    const el = rootRef.current?.querySelector('#nt-comments');
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.querySelector('input')?.focus(); }
+    else showToast('Os comentários ficam nas páginas de conteúdo e dentro de cada tarefa.');
+  }, [showToast]);
+
   // Peak Modal State for clicking any card/row in a database
   const [peekPageId, setPeekPageId] = useState<string | null>(null);
   const [peekDatabaseId, setPeekDatabaseId] = useState<string | null>(null);
+
+  // Link da Fila e das notificações (?dev_task=<id>) abre a tarefa por cima da base.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('dev_task');
+    if (!id) return;
+    if (ctx.tasks.has(id)) { setActivePage(TASKS_PAGE); setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB); }
+    else showToast('Tarefa do link não encontrada neste acesso.');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Notion AI Assistant Modal State
   const [isAiOpen, setIsAiOpen] = useState(false);
@@ -229,6 +348,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           onSetView={setDatabaseView}
           onAddView={addDatabaseView}
           onUpdateView={updateDatabaseView}
+          onDeleteView={deleteView}
           onOpenRowPage={(pageId: string) => {
             setPeekPageId(pageId);
             setPeekDatabaseId(databaseId);
@@ -247,6 +367,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       setDatabaseView,
       addDatabaseView,
       updateDatabaseView,
+      deleteView,
     ]
   );
 
@@ -281,6 +402,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
   const textScaleClass = activePage.isSmallText ? 'text-xs' : 'text-sm';
 
   return (
+    <NotionEditContext.Provider value={editApi}>
     <div ref={rootRef} tabIndex={-1} className={`nt-root ${theme === 'dark' ? 'dark' : ''} relative flex h-full w-full overflow-hidden bg-[var(--notion-bg)] outline-none ${fontClass}`}>
       {/* Sidebar Navigation */}
       <Sidebar
@@ -300,6 +422,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         onOpenTemplates={() => setTemplatesOpen(true)}
         onImportMarkdown={importMarkdownPage}
         onOpenTrash={() => setTrashOpen(true)}
+        extraLinks={onOpenInvestigations ? [{ label: 'Investigações CRM', icon: <Search size={14} />, onClick: onOpenInvestigations }] : []}
       />
 
       {/* Main Page Workspace */}
@@ -313,6 +436,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           onArchivePage={() => archivePage(activePage.id)}
           onExportJSON={exportJSON}
           onOpenAi={() => setIsAiOpen(true)}
+          onOpenComments={openComments}
         />
 
         <div className={`flex-1 w-full ${widthClass} ${textScaleClass} transition-all duration-150`}>
@@ -335,7 +459,11 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
               {renderDatabase(activePage.databaseId)}
             </div>
           ) : (
-            /* Block List Editor */
+            <>
+            <div className="px-12 sm:px-24">
+              <PageComments id="nt-comments" comments={activePage.comments || []} me={activeUser} onChange={(comments) => updatePage(activePage.id, { comments })} />
+            </div>
+            {/* Block List Editor */}
             <BlockList
               pageId={activePage.id}
               blockIds={activePage.blockIds}
@@ -348,12 +476,13 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
               onMoveBlock={moveBlock}
               renderDatabase={renderDatabase}
             />
+            </>
           )}
         </div>
       </main>
 
       {/* Floating Selection Toolbar */}
-      <FormattingBar onApplyFormat={() => {}} />
+      <FormattingBar onUpdateBlock={updateBlock} />
 
       {/* Modals */}
       <SearchModal
@@ -421,6 +550,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       </div>
       {toast && <div className="absolute bottom-10 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg">{toast}</div>}
     </div>
+    </NotionEditContext.Provider>
   );
 }
 

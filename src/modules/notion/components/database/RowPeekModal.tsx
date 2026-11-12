@@ -29,6 +29,7 @@ import { BlockList } from '../editor/BlockList';
 import { PropertyCell } from './PropertyCell';
 import { EmojiPicker } from '../ui/EmojiPicker';
 import { CoverPicker } from '../ui/CoverPicker';
+import { PageComments } from '../editor/PageComments';
 
 export type PeekMode = 'center' | 'side';
 
@@ -78,10 +79,6 @@ export const RowPeekModal: React.FC<RowPeekModalProps> = ({
   const [peekMode, setPeekMode] = useState<PeekMode>('center');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showCoverPicker, setShowCoverPicker] = useState(false);
-  const [commentText, setCommentText] = useState('');
-  const [comments, setComments] = useState<
-    { id: string; user: NotionUser; text: string; time: string }[]
-  >([]);
 
   // Close on Escape key
   useEffect(() => {
@@ -109,20 +106,6 @@ export const RowPeekModal: React.FC<RowPeekModalProps> = ({
     }
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commentText.trim()) return;
-    setComments((prev) => [
-      ...prev,
-      {
-        id: 'c_' + Date.now(),
-        user: activeUser,
-        text: commentText.trim(),
-        time: 'Just now',
-      },
-    ]);
-    setCommentText('');
-  };
 
   const containerClasses =
     peekMode === 'center'
@@ -254,6 +237,8 @@ export const RowPeekModal: React.FC<RowPeekModalProps> = ({
                         property={prop}
                         value={row.properties[prop.id]}
                         users={users}
+                        databaseId={database.id}
+                        rowId={row.id}
                         onChange={(newVal) =>
                           onUpdateRow(database.id, row.id, prop.id, newVal)
                         }
@@ -264,44 +249,8 @@ export const RowPeekModal: React.FC<RowPeekModalProps> = ({
             </div>
           )}
 
-          {/* Page Discussion / Comments Bar */}
-          <div className="mb-6 pb-4 border-b border-[var(--notion-border)]">
-            <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-[var(--notion-text-muted)]">
-              <MessageSquare size={13} />
-              <span>Comentários</span>
-            </div>
-
-            {comments.map((c) => (
-              <div key={c.id} className="flex gap-2.5 mb-2.5 text-xs">
-                <span className="text-base leading-none">{c.user.avatar}</span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-[var(--notion-text)]">{c.user.name}</span>
-                    <span className="text-[10px] text-[var(--notion-text-muted)]">{c.time}</span>
-                  </div>
-                  <p className="text-[var(--notion-text)] mt-0.5">{c.text}</p>
-                </div>
-              </div>
-            ))}
-
-            <form onSubmit={handleAddComment} className="flex items-center gap-2">
-              <span className="text-sm">{activeUser.avatar}</span>
-              <input
-                type="text"
-                placeholder="Add a comment as Samir Sawarkar..."
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                className="flex-1 px-3 py-1.5 text-xs rounded-md bg-[var(--notion-card)] border border-[var(--notion-border)] text-[var(--notion-text)] placeholder-[var(--notion-text-muted)] focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                disabled={!commentText.trim()}
-                className="px-3 py-1.5 text-xs bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-medium rounded-md transition-colors"
-              >
-                Enviar
-              </button>
-            </form>
-          </div>
+          {/* Comentários da página (salvos) */}
+          <PageComments comments={page.comments || []} me={activeUser} onChange={(comments) => onUpdatePage(pageId, { comments })} />
 
           {/* Block Content Editor */}
           <div className="min-h-[250px]">

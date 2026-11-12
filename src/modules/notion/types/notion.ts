@@ -132,6 +132,8 @@ export interface NotionDatabase {
   rows: DatabaseRow[];
 }
 
+export interface PageComment { id: string; authorId: string; authorName: string; text: string; createdAt: string }
+
 export interface NotionPage {
   id: string;
   title: string;
@@ -149,6 +151,7 @@ export interface NotionPage {
   fontFamily?: 'sans' | 'serif' | 'mono';
   isSmallText?: boolean;
   isFullWidth?: boolean;
+  comments?: PageComment[]; // adição GaaS: comentários gravados na página
 }
 
 export interface NotionWorkspace {

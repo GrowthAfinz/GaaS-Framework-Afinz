@@ -1,3 +1,4 @@
+import { getLocalViewport, toLocalRect } from '../../context/UIScaleContext';
 import { TasksWorkspace } from './development/TasksWorkspace';
 import { EstruturaCrm } from './structure/EstruturaCrm';
 import { DailyWorkspace } from './daily/DailyWorkspace';
@@ -239,7 +240,7 @@ export const GrowthLearningWorkspace: React.FC<
             </div>
           </div>
         )}
-        {section === "investigations" ? <TasksWorkspace initialMonth={format(periodEnd,"yyyy-MM")}/> : section === "structure" ? <EstruturaCrm /> : section === "daily" ? <DailyWorkspace /> : section === "feed" ? (
+        {section === "investigations" ? <NotionPane initialMonth={format(periodEnd,"yyyy-MM")} /> : section === "structure" ? <EstruturaCrm /> : section === "daily" ? <DailyWorkspace /> : section === "feed" ? (
           <GrowthFeedView
             periodStart={periodStart}
             periodEnd={periodEnd}
@@ -281,3 +282,38 @@ export const GrowthLearningWorkspace: React.FC<
     </div>
   );
 };
+
+/* Testes e Tarefas: módulo estilo Notion, carregado sob demanda e ocupando a altura livre da tela. */
+const NotionModule = lazy(() => import("../../modules/notion/NotionModule").then((m) => ({ default: m.NotionModule })));
+function NotionPane({ initialMonth }: { initialMonth: string }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(640);
+  // Investigações CRM continuam na tela antiga (links com ?item= ou ?task_view=investigations caem nela).
+  const legacyUrl = () => { const p = new URLSearchParams(window.location.search); return p.has("item") || p.get("task_view") === "investigations"; };
+  const [legacy, setLegacy] = useState(legacyUrl);
+  const go = (on: boolean) => {
+    const p = new URLSearchParams(window.location.search);
+    if (on) p.set("task_view", "investigations"); else { p.delete("task_view"); p.delete("item"); p.delete("task_space"); }
+    window.history.pushState(null, "", `${window.location.pathname}?${p.toString()}`);
+    setLegacy(on);
+  };
+  React.useEffect(() => { const f = () => setLegacy(legacyUrl()); window.addEventListener("popstate", f); return () => window.removeEventListener("popstate", f); }, []);
+  if (legacy) return (
+    <div>
+      <button onClick={() => go(false)} className="m-3 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">← Voltar para Testes e Tarefas</button>
+      <TasksWorkspace initialMonth={initialMonth} />
+    </div>
+  );
+  React.useLayoutEffect(() => {
+    const fit = () => { if (ref.current) setHeight(Math.max(480, Math.floor(getLocalViewport().height - toLocalRect(ref.current.getBoundingClientRect()).top - 4))); };
+    fit(); window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+  return (
+    <div ref={ref} style={{ height }} className="border border-slate-200 border-t-0 bg-white">
+      <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-500">Carregando Testes e Tarefas…</div>}>
+        <NotionModule onOpenInvestigations={() => go(true)} />
+      </Suspense>
+    </div>
+  );
+}

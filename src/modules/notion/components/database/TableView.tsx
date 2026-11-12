@@ -19,6 +19,7 @@ import {
   PropertyType,
 } from '../../types/notion';
 import { PropertyCell } from './PropertyCell';
+import { PropertyHeader } from './PropertyHeader';
 
 interface TableViewProps {
   database: NotionDatabase;
@@ -86,10 +87,7 @@ export const TableView: React.FC<TableViewProps> = ({
           <tr className="divide-x divide-[var(--notion-border)] bg-[var(--notion-hover)]/60 text-[var(--notion-text-muted)] font-medium">
             {database.properties.map((prop) => (
               <th key={prop.id} className="px-3 py-2 min-w-[150px] whitespace-nowrap">
-                <div className="flex items-center gap-1.5">
-                  {getPropIcon(prop.type)}
-                  <span className="truncate">{prop.name}</span>
-                </div>
+                <PropertyHeader databaseId={database.id} property={prop} icon={getPropIcon(prop.type)} />
               </th>
             ))}
             {/* Add Property Column */}
@@ -109,7 +107,7 @@ export const TableView: React.FC<TableViewProps> = ({
                     className="absolute right-0 top-7 z-50 w-52 p-3 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xl text-left"
                   >
                     <div className="text-xs font-semibold text-[var(--notion-text-muted)] mb-2">
-                      New Property
+                      Nova propriedade
                     </div>
                     <input
                       type="text"
@@ -138,7 +136,7 @@ export const TableView: React.FC<TableViewProps> = ({
                       type="submit"
                       className="w-full py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                     >
-                      Create Property
+                      Criar propriedade
                     </button>
                   </form>
                 )}
@@ -161,6 +159,8 @@ export const TableView: React.FC<TableViewProps> = ({
                     property={prop}
                     value={row.properties[prop.id]}
                     users={users}
+                    databaseId={database.id}
+                    rowId={row.id}
                     onChange={(val) => onUpdateRow(row.id, prop.id, val)}
                     onOpenPage={prop.type === 'title' ? () => onOpenRowPage(row.pageId) : undefined}
                   />
@@ -188,10 +188,10 @@ export const TableView: React.FC<TableViewProps> = ({
           onClick={onAddRow}
           className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] font-medium transition-colors"
         >
-          <Plus size={14} /> New
+          <Plus size={14} /> Novo
         </button>
         <div>
-          <span>Count {filteredRows.length}</span>
+          <span>{filteredRows.length} {filteredRows.length === 1 ? 'item' : 'itens'}</span>
         </div>
       </div>
     </div>
