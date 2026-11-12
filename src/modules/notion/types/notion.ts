@@ -113,6 +113,7 @@ export interface DatabaseViewConfig {
   filters: DatabaseFilter[];
   cardSize?: 'small' | 'medium' | 'large'; // for gallery view
   datePropertyId?: string; // calendário: qual data posiciona os itens (adição GaaS)
+  hideEmptyGroups?: boolean; // quadro: esconde colunas sem itens (adição GaaS)
 }
 
 export interface DatabaseRow {

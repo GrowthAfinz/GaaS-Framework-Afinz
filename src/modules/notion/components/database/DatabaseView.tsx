@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Table as TableIcon,
   Kanban,
@@ -28,7 +28,7 @@ import { BoardView } from './BoardView';
 import { GalleryView } from './GalleryView';
 import { ListView } from './ListView';
 import { CalendarView } from './CalendarView';
-import { EMPTY, applyView } from './viewEngine';
+import { CHIP_COLORS, EMPTY, applyView } from './viewEngine';
 
 interface DatabaseViewProps {
   database: NotionDatabase;
@@ -41,7 +41,11 @@ interface DatabaseViewProps {
   onAddView: (databaseId: string, name: string, type: DatabaseViewType) => void;
   onOpenRowPage: (pageId: string) => void;
   onUpdateView?: (databaseId: string, viewId: string, partial: Partial<DatabaseViewConfig>) => void;
+  /** Chips de filtro rápido por uma propriedade (ex.: Frente). A seleção é de cada pessoa e fica no navegador. */
+  quickFilter?: QuickFilterConfig;
 }
+export interface QuickFilterConfig { propertyId: string; hiddenByDefault: string[]; storageKey: string }
+const readSel = (k: string): string[] | null => { try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as string[]) : null; } catch { return null; } };
 
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
   database,
@@ -54,6 +58,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onAddView,
   onOpenRowPage,
   onUpdateView,
+  quickFilter,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddViewMenu, setShowAddViewMenu] = useState(false);
@@ -79,10 +84,32 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   };
 
   // Filtros, ordenação e agrupamento ficam salvos na visão (valem para o time todo).
-  const filteredRows = useMemo(
+  const viewRows = useMemo(
     () => applyView(database.rows, currentView, database.properties, users, searchQuery),
     [database.rows, database.properties, currentView, users, searchQuery]
   );
+  // Filtro rápido (chips): por padrão tudo ligado, menos o que vem escondido (ex.: GaaS).
+  const qfProp = quickFilter ? database.properties.find((p) => p.id === quickFilter.propertyId) : undefined;
+  const qfOptions = qfProp?.options?.map((o) => o.name) || [];
+  const [qfSel, setQfSel] = useState<string[] | null>(() => (quickFilter ? readSel(quickFilter.storageKey) : null));
+  useEffect(() => { if (quickFilter && qfSel) { try { localStorage.setItem(quickFilter.storageKey, JSON.stringify(qfSel)); } catch { /* preferência local */ } } }, [qfSel, quickFilter]);
+  const qfSelected = qfSel ?? [...qfOptions.filter((n) => !quickFilter?.hiddenByDefault.includes(n)), EMPTY];
+  const qfLockedByView = Boolean(quickFilter && (currentView.filters || []).some((f) => f.propertyId === quickFilter.propertyId));
+  const qfActive = Boolean(qfProp) && !qfLockedByView;
+  const qfValue = (r: DatabaseRow) => String(r.properties[quickFilter?.propertyId || ''] || '') || EMPTY;
+  const filteredRows = useMemo(
+    () => (qfActive ? viewRows.filter((r) => qfSelected.includes(qfValue(r))) : viewRows),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewRows, qfActive, qfSelected.join('|')]
+  );
+  const qfCount = (name: string) => viewRows.filter((r) => qfValue(r) === name).length;
+  const qfToggle = (name: string, only: boolean) =>
+    setQfSel(only ? [name] : qfSelected.includes(name) ? qfSelected.filter((n) => n !== name) : [...qfSelected, name]);
+  const addRowWithQuick = (props: Record<string, any> = {}) => {
+    if (!qfActive || !quickFilter || props[quickFilter.propertyId]) return onAddRow(database.id, props);
+    const first = qfSelected.find((n) => n !== EMPTY);
+    return onAddRow(database.id, first ? { ...props, [quickFilter.propertyId]: first } : props);
+  };
   const patchView = (partial: Partial<DatabaseViewConfig>) => onUpdateView?.(database.id, currentView.id, partial);
   const filterable = database.properties.filter((p) => p.type !== 'title');
   const optionsOf = (pid: string): { value: string; label: string }[] => {
@@ -264,6 +291,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                       <span className="flex-1">{p.name}</span>{(currentView.type === 'board' ? groupPropId : datePropId) === p.id && <Check size={12} className="text-blue-600" />}
                     </button>
                   ))}
+                  {currentView.type === 'board' && (
+                    <button className={`${item} border-t border-[var(--notion-border)] mt-1`} onClick={() => patchView({ hideEmptyGroups: !currentView.hideEmptyGroups })}>
+                      <span className={`w-3.5 h-3.5 rounded border grid place-items-center ${currentView.hideEmptyGroups ? 'bg-blue-500 border-blue-500 text-white' : 'border-[var(--notion-border)]'}`}>{currentView.hideEmptyGroups && <Check size={10} />}</span>
+                      <span>Esconder colunas vazias</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -289,13 +322,37 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
           {/* New Row Button */}
           <button
-            onClick={() => onAddRow(database.id)}
+            onClick={() => addRowWithQuick()}
             className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white font-medium text-xs transition-colors shadow-xs"
           >
             <Plus size={14} /> Novo
           </button>
         </div>
       </div>
+
+      {qfProp && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs" data-quick-filter={qfProp.id}>
+          <span className="font-semibold text-[var(--notion-text-muted)] mr-0.5">{qfProp.name}:</span>
+          {qfLockedByView ? (
+            <span className="text-[var(--notion-text-muted)]">esta visão já filtra por {qfProp.name.toLowerCase()}</span>
+          ) : (
+            <>
+              <button onClick={() => setQfSel([...qfOptions, EMPTY])} className={`px-2 py-0.5 rounded-full border ${qfOptions.every((n) => qfSelected.includes(n)) ? 'bg-slate-800 text-white border-slate-800' : 'border-[var(--notion-border)] text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)]'}`}>Todas</button>
+              {[...(qfProp.options || []), { id: EMPTY, name: EMPTY, color: 'default' as const }].map((o) => {
+                const on = qfSelected.includes(o.name), n = qfCount(o.name);
+                if (o.name === EMPTY && !n) return null;
+                return (
+                  <button key={o.id} onClick={(e) => qfToggle(o.name, e.altKey || e.detail === 2)} title="Clique liga ou desliga. Duplo clique mostra só esta."
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border transition-colors ${on ? `${CHIP_COLORS[o.color]} border-transparent` : 'border-dashed border-[var(--notion-border)] text-[var(--notion-text-muted)] opacity-60 hover:opacity-100'}`}>
+                    <span className={on ? '' : 'line-through'}>{o.name === EMPTY ? `Sem ${qfProp.name.toLowerCase()}` : o.name}</span>
+                    <span className="tabular-nums opacity-70">{n}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
 
       {filters.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -316,7 +373,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           filteredRows={filteredRows}
           users={users}
           onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
-          onAddRow={() => onAddRow(database.id)}
+          onAddRow={() => addRowWithQuick()}
           onDeleteRow={(rId) => onDeleteRow(database.id, rId)}
           onAddProperty={(name, type) => onAddProperty(database.id, name, type)}
           onOpenRowPage={onOpenRowPage}
@@ -330,8 +387,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           groupPropId={groupPropId}
           visiblePropIds={visible}
           users={users}
+          hiddenValues={qfActive && groupPropId === quickFilter?.propertyId ? [...qfOptions, EMPTY].filter((n) => !qfSelected.includes(n)) : []}
+          hideEmpty={Boolean(currentView.hideEmptyGroups)}
           onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
-          onAddRow={(props) => onAddRow(database.id, props)}
+          onAddRow={(props) => addRowWithQuick(props)}
           onOpenRowPage={onOpenRowPage}
         />
       )}
@@ -340,7 +399,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         <GalleryView
           database={database}
           filteredRows={filteredRows}
-          onAddRow={() => onAddRow(database.id)}
+          onAddRow={() => addRowWithQuick()}
           onOpenRowPage={onOpenRowPage}
         />
       )}
@@ -349,7 +408,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         <ListView
           database={database}
           filteredRows={filteredRows}
-          onAddRow={() => onAddRow(database.id)}
+          onAddRow={() => addRowWithQuick()}
           onOpenRowPage={onOpenRowPage}
         />
       )}
@@ -360,7 +419,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           filteredRows={filteredRows}
           datePropId={datePropId}
           onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
-          onAddRow={(props) => onAddRow(database.id, props)}
+          onAddRow={(props) => addRowWithQuick(props)}
           onOpenRowPage={onOpenRowPage}
         />
       )}

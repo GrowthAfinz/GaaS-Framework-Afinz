@@ -14,6 +14,10 @@ interface BoardViewProps {
   onUpdateRow: (rowId: string, propertyId: string, value: any) => void;
   onAddRow: (initialProps?: Record<string, any>) => void;
   onOpenRowPage: (pageId: string) => void;
+  /** Valores do agrupamento que não viram coluna (ex.: frentes desligadas nos chips). '__vazio__' esconde a coluna "Sem ...". */
+  hiddenValues?: string[];
+  /** Esconde colunas sem itens. */
+  hideEmpty?: boolean;
 }
 
 interface Column { key: string; name: string; color: NotionColor; value: string }
@@ -27,6 +31,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
   onUpdateRow,
   onAddRow,
   onOpenRowPage,
+  hiddenValues = [],
+  hideEmpty = false,
 }) => {
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
@@ -72,13 +78,18 @@ export const BoardView: React.FC<BoardViewProps> = ({
     return <div className="p-4 text-xs text-[var(--notion-text-muted)]">Crie uma propriedade de seleção, status ou pessoa para agrupar o quadro.</div>;
   }
 
+  const rowsOf = (col: Column) =>
+    filteredRows.filter((r) => {
+      const v = String(r.properties[groupProp.id] ?? '');
+      return col.key === '__vazio__' ? !known.has(v) : v === col.value;
+    });
+  const shown = columns.filter((col) => !hiddenValues.includes(col.key === '__vazio__' ? '__vazio__' : col.value) && (!hideEmpty || rowsOf(col).length > 0));
+
   return (
     <div className="flex gap-4 overflow-x-auto pb-6 pt-1">
-      {columns.map((col) => {
-        const rowsInCol = filteredRows.filter((r) => {
-          const v = String(r.properties[groupProp.id] ?? '');
-          return col.key === '__vazio__' ? !known.has(v) : v === col.value;
-        });
+      {shown.length === 0 && <div className="p-4 text-xs text-[var(--notion-text-muted)]">Nada para mostrar com os filtros atuais.</div>}
+      {shown.map((col) => {
+        const rowsInCol = rowsOf(col);
 
         return (
           <div

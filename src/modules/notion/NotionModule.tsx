@@ -16,7 +16,7 @@ import { newWork, type WorkItem } from '../../components/growth-learning/develop
 import { taskError } from '../../components/growth-learning/development/developmentService';
 import type { DatabaseRow, NotionWorkspace } from './types/notion';
 import { createTask, diff, loadNotion, pushChanges, saveLocalPrefs, saveTask, snapshot, type NotionContext, type Snapshot } from './gaas/notionData';
-import { TASKS_DB, extraProps, rowPatch, taskBlocks, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
+import { GAAS_FRONT_NAME, TASKS_DB, type DailyProjectRef, extraProps, frontOfProject, rowPatch, taskBlocks, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
 import './notion.css';
 import 'katex/dist/katex.min.css';
 
@@ -109,9 +109,9 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       const reverted: { key: string; row: DatabaseRow }[] = [];
       for (const tc of changes.tasks) {
         const task = ctx.tasks.get(tc.taskId); if (!task) continue;
-        if (!ctx.canEditTasks) { showToast('Seu acesso permite ler as tarefas, mas não alterá-las.'); reverted.push({ key: tc.rowKey, row: serverRow(ws, task) }); continue; }
+        if (!ctx.canEditTasks) { showToast('Seu acesso permite ler as tarefas, mas não alterá-las.'); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects) }); continue; }
         try { const saved = await saveTask(task, tc.patch); ctx.tasks.set(saved.id, saved); }
-        catch (e) { showToast(taskError(e)); reverted.push({ key: tc.rowKey, row: serverRow(ws, task) }); }
+        catch (e) { showToast(taskError(e)); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects) }); }
       }
       const next = snapshot(ws);
       for (const r of reverted) { next.rows.set(r.key, JSON.stringify(r.row)); next.rowObjs.set(r.key, r.row); }
@@ -142,12 +142,16 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     if (!ctx.canEditTasks) { showToast('Criar tarefas requer acesso de edição.'); return ''; }
     const props = latest.current.databases[TASKS_DB].properties;
     const empty: DatabaseRow = { id: '', pageId: '', properties: {} };
-    const fields = rowPatch(empty, { id: '', pageId: '', properties: { ...initialProps, prop_title: initialProps.prop_title || 'Nova tarefa' } }, props, latest.current.users);
+    const front = initialProps.p_frente || frontOfProject(props, ctx.projects, initialProps.p_projeto) || props.find(p => p.id === 'p_frente')?.options?.find(o => o.name !== GAAS_FRONT_NAME)?.name || '';
+    const moduleProps: Record<string, unknown> = { p_frente: front, ...(initialProps.p_projeto ? { p_projeto: initialProps.p_projeto } : {}) };
+    const fields = rowPatch(empty, { id: '', pageId: '', properties: { ...initialProps, ...moduleProps, prop_title: initialProps.prop_title || 'Nova tarefa' } }, props, latest.current.users);
     const base = newWork(fields.workspace || 'sdd', fields.work_type || 'task');
     setStatus('saving');
     void createTask({ ...fields, title: fields.title || 'Nova tarefa' }, base).then(saved => {
       ctx.tasks.set(saved.id, saved);
-      const row = taskToRow(saved, props, latest.current.users);
+      // Linha de base sem frente/projeto guardados: assim a primeira sincronização grava esses dois no módulo.
+      const baseRow = taskToRow(saved, props, latest.current.users, {}, ctx.projects);
+      const row = taskToRow(saved, props, latest.current.users, moduleProps, ctx.projects);
       const blocks = taskBlocks(saved);
       const page = taskPage(saved, blocks);
       patchWorkspace(prev => {
@@ -155,13 +159,20 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         const next = { ...prev, pages: { ...prev.pages, [page.id]: page }, blocks: { ...prev.blocks, ...Object.fromEntries(blocks.map(b => [b.id, b])) }, databases: { ...prev.databases, [TASKS_DB]: { ...db, rows: [...db.rows, row] } } };
         const snap = baseline.current;
         snap.pages.set(page.id, JSON.stringify(page)); blocks.forEach(b => snap.blocks.set(b.id, JSON.stringify(b)));
-        snap.rows.set(TASKS_DB + '|' + row.id, JSON.stringify(row)); snap.rowObjs.set(TASKS_DB + '|' + row.id, JSON.parse(JSON.stringify(row)));
+        snap.rows.set(TASKS_DB + '|' + row.id, JSON.stringify(baseRow)); snap.rowObjs.set(TASKS_DB + '|' + row.id, JSON.parse(JSON.stringify(baseRow)));
         return next;
       });
       setPeekPageId(page.id); setPeekDatabaseId(TASKS_DB); setStatus('saved');
     }).catch(e => { setStatus('error'); showToast(taskError(e)); });
     return taskRowId('pending');
   }, [addRowToDatabase, ctx, patchWorkspace, showToast]);
+  const updateRow = useCallback((databaseId: string, rowId: string, propertyId: string, value: any) => {
+    updateDatabaseRow(databaseId, rowId, propertyId, value);
+    if (databaseId === TASKS_DB && propertyId === 'p_projeto') {
+      const front = frontOfProject(latest.current.databases[TASKS_DB].properties, ctx.projects, value);
+      if (front) updateDatabaseRow(databaseId, rowId, 'p_frente', front);
+    }
+  }, [ctx.projects, updateDatabaseRow]);
   const deleteRow = useCallback((databaseId: string, rowId: string) => {
     if (databaseId !== TASKS_DB) return deleteDatabaseRow(databaseId, rowId);
     if (!window.confirm('Cancelar esta tarefa? Ela continua no histórico com o status "Cancelada".')) return;
@@ -210,8 +221,9 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         <DatabaseView
           database={db}
           users={users}
-          onUpdateRow={updateDatabaseRow}
+          onUpdateRow={updateRow}
           onAddRow={addRow}
+          quickFilter={databaseId === TASKS_DB ? { propertyId: 'p_frente', hiddenByDefault: [GAAS_FRONT_NAME], storageKey: `gaas.notion.chips.${ctx.me || 'anon'}.${databaseId}` } : undefined}
           onDeleteRow={deleteRow}
           onAddProperty={addDatabaseProperty}
           onSetView={setDatabaseView}
@@ -227,8 +239,9 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     [
       workspace.databases,
       users,
-      updateDatabaseRow,
+      updateRow,
       addRow,
+      ctx.me,
       deleteRow,
       addDatabaseProperty,
       setDatabaseView,
@@ -387,7 +400,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           setActivePage(pId);
         }}
         onUpdatePage={updatePage}
-        onUpdateRow={updateDatabaseRow}
+        onUpdateRow={updateRow}
         onAddProperty={addDatabaseProperty}
         onUpdateBlock={updateBlock}
         onDeleteBlock={deleteBlock}
@@ -419,10 +432,10 @@ function withoutSeed(ws: NotionWorkspace): NotionWorkspace {
   const dbs = tasksDb ? { ...others, [TASKS_DB]: { ...tasksDb, title: '' } } : others;
   return { ...ws, pages, blocks, databases: dbs, rootPageIds: [] };
 }
-function serverRow(ws: NotionWorkspace, task: WorkItem): DatabaseRow {
+function serverRow(ws: NotionWorkspace, task: WorkItem, projects: DailyProjectRef[]): DatabaseRow {
   const db = ws.databases[TASKS_DB];
   const current = db.rows.find(r => r.id === taskRowId(task.id));
-  return taskToRow(task, db.properties, ws.users, current ? extraProps(current) : {});
+  return taskToRow(task, db.properties, ws.users, current ? extraProps(current) : {}, projects);
 }
 function replaceRows(ws: NotionWorkspace, rows: DatabaseRow[]): NotionWorkspace {
   const db = ws.databases[TASKS_DB];
