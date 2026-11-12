@@ -19,7 +19,9 @@ const opt = (id: string, name: string, color: NotionColor): SelectOption => ({ i
 
 /** Frentes de negócio vêm da Visão Daily (daily_frentes); o desenvolvimento do GaaS é uma opção à parte. */
 export interface BusinessFront { key: string; name: string; color: string; archived?: boolean }
-export interface DailyProjectRef { id: string; name: string; frente_key: string; initiative_id: string | null; archived?: boolean }
+export interface DailyProjectRef { id: string; name: string; frente_key: string; initiative_id: string | null; archived?: boolean; structure_card_id?: string | null }
+/** Campanha do board da Estrutura CRM (o projeto da Daily aponta para ela por id). */
+export interface BoardCampaignRef { id: string; title: string }
 export const GAAS_FRONT = 'gaas';
 export const GAAS_FRONT_NAME = 'GaaS (SDD)';
 /** Equivalência com a coluna antiga das tarefas (workspace), usada para preencher e manter as duas em sincronia. */
@@ -39,12 +41,13 @@ export function notionColor(hex: string): NotionColor {
 const dist = (a: number[], b: number[]) => a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0);
 
 /** Propriedades da base Tarefas. As de sistema espelham colunas da tarefa; Frente e Projeto ficam no módulo. */
-export function systemProperties(initiatives: Initiative[], fronts: BusinessFront[], projects: DailyProjectRef[]): DatabaseProperty[] {
+export function systemProperties(initiatives: Initiative[], fronts: BusinessFront[], projects: DailyProjectRef[], campaigns: BoardCampaignRef[] = []): DatabaseProperty[] {
   const frontColor = new Map(fronts.map(f => [f.key, notionColor(f.color)]));
   return [
     { id: 'prop_title', name: 'Nome', type: 'title' },
     { id: 'p_frente', name: 'Frente', type: 'select', options: [...fronts.filter(f => !f.archived).map(f => opt(f.key, f.name, frontColor.get(f.key) || 'gray')), opt(GAAS_FRONT, GAAS_FRONT_NAME, 'brown')] },
     { id: 'p_projeto', name: 'Projeto', type: 'select', options: projects.filter(p => !p.archived).map(p => opt(p.id, p.name, frontColor.get(p.frente_key) || 'gray')) },
+    { id: 'p_campanha', name: 'Campanha', type: 'select', options: campaigns.map(c => opt(c.id, c.title, 'default')) },
     { id: 'p_status', name: 'Status', type: 'status', options: Object.entries(TASK_STATUS).map(([k, v]) => opt(k, v, STATUS_COLOR[k] || 'gray')) },
     { id: 'p_tipo', name: 'Tipo', type: 'select', options: Object.entries(WORK_TYPES).map(([k, v]) => opt(k, v, TYPE_COLOR[k] || 'gray')) },
     { id: 'p_responsavel', name: 'Responsável', type: 'person' },
@@ -55,18 +58,18 @@ export function systemProperties(initiatives: Initiative[], fronts: BusinessFron
   ];
 }
 /** Propriedades que espelham colunas da tarefa (não são guardadas nas linhas do módulo). */
-export const SYSTEM_PROP_IDS = new Set(['prop_title', 'p_tipo', 'p_status', 'p_iniciativa', 'p_prioridade', 'p_responsavel', 'p_prazo', 'p_proxima']);
+export const SYSTEM_PROP_IDS = new Set(['prop_title', 'p_tipo', 'p_status', 'p_iniciativa', 'p_prioridade', 'p_responsavel', 'p_prazo', 'p_proxima', 'p_campanha']);
 /** Propriedades do módulo com regra própria (ficam nas linhas, mas são recalculadas e não podem ser removidas). */
 export const MODULE_PROP_IDS = new Set(['p_frente', 'p_projeto']);
 /** Propriedades cujas opções vêm de outra tela (criar opção grava lá). */
 export const SYNCED_PROPS = new Set(['p_frente', 'p_projeto', 'p_iniciativa']);
 
 export function defaultTaskViews(): DatabaseViewConfig[] {
-  const all = ['p_frente', 'p_projeto', 'p_status', 'p_tipo', 'p_responsavel', 'p_prazo', 'p_prioridade', 'p_iniciativa', 'p_proxima'];
+  const all = ['p_frente', 'p_projeto', 'p_campanha', 'p_status', 'p_tipo', 'p_responsavel', 'p_prazo', 'p_prioridade', 'p_iniciativa', 'p_proxima'];
   return [
     { id: 'v_quadro', name: 'Quadro por status', type: 'board', groupByPropertyId: 'p_status', visiblePropertyIds: ['p_frente', 'p_projeto', 'p_responsavel', 'p_prazo'], sorts: [], filters: [] },
     { id: 'v_frente', name: 'Por frente', type: 'board', groupByPropertyId: 'p_frente', visiblePropertyIds: ['p_projeto', 'p_status', 'p_responsavel'], sorts: [], filters: [] },
-    { id: 'v_projeto', name: 'Por projeto', type: 'board', groupByPropertyId: 'p_projeto', hideEmptyGroups: true, visiblePropertyIds: ['p_frente', 'p_status', 'p_responsavel'], sorts: [], filters: [] },
+    { id: 'v_projeto', name: 'Por projeto', type: 'board', groupByPropertyId: 'p_projeto', hideEmptyGroups: true, visiblePropertyIds: ['p_campanha', 'p_frente', 'p_status', 'p_responsavel'], sorts: [], filters: [] },
     { id: 'v_calendario', name: 'Calendário', type: 'calendar', datePropertyId: 'p_prazo', visiblePropertyIds: ['p_frente', 'p_status'], sorts: [], filters: [] },
     { id: 'v_tabela', name: 'Tabela', type: 'table', visiblePropertyIds: all, sorts: [], filters: [] },
     { id: 'v_sdd', name: 'SDD (GaaS)', type: 'board', groupByPropertyId: 'p_status', visiblePropertyIds: ['p_tipo', 'p_iniciativa', 'p_responsavel'], sorts: [], filters: [{ propertyId: 'p_frente', operator: 'equals', value: GAAS_FRONT_NAME }] },
@@ -82,11 +85,13 @@ const personId = (users: NotionUser[], name: string | null) => (name ? users.fin
  * (projeto da Visão Daily ligado à mesma iniciativa) e a frente vem do projeto ou da coluna antiga.
  */
 export function taskToRow(t: WorkItem, props: DatabaseProperty[], users: NotionUser[], extra: Record<string, unknown> = {}, projects: DailyProjectRef[] = []): DatabaseRow {
-  const storedProject = typeof extra.p_projeto === 'string' && extra.p_projeto ? extra.p_projeto : '';
+  // Frente e projeto ficam guardados pelo id (key da frente, id do projeto); nomes antigos guardados por texto ainda valem.
+  const nameOf = (propId: string, v: unknown) => (typeof v === 'string' && v ? label(props, propId, v) || v : '');
+  const storedProject = nameOf('p_projeto', extra.p_projeto);
   const inferred = !storedProject && t.initiative_id ? projects.find(p => p.initiative_id === t.initiative_id && !p.archived) : undefined;
   const projectName = storedProject || (inferred ? label(props, 'p_projeto', inferred.id) : '');
   const project = projects.find(p => label(props, 'p_projeto', p.id) === projectName);
-  const storedFront = typeof extra.p_frente === 'string' && extra.p_frente ? extra.p_frente : '';
+  const storedFront = nameOf('p_frente', extra.p_frente);
   const frontKey = project?.frente_key || FRONT_FROM_WORKSPACE[t.workspace] || '';
   return {
     id: taskRowId(t.id), pageId: taskRowId(t.id),
@@ -94,6 +99,7 @@ export function taskToRow(t: WorkItem, props: DatabaseProperty[], users: NotionU
       ...extra,
       prop_title: t.title,
       p_frente: storedFront || label(props, 'p_frente', frontKey), p_projeto: projectName,
+      p_campanha: project?.structure_card_id ? label(props, 'p_campanha', project.structure_card_id) : '',
       p_tipo: label(props, 'p_tipo', t.work_type), p_status: label(props, 'p_status', t.status),
       p_iniciativa: label(props, 'p_iniciativa', t.initiative_id), p_prioridade: label(props, 'p_prioridade', t.priority),
       p_responsavel: personId(users, t.owner_label), p_prazo: t.due_date || '', p_proxima: t.next_action || '',
@@ -120,6 +126,12 @@ export function rowPatch(before: DatabaseRow, after: DatabaseRow, props: Databas
 export function frontOfProject(props: DatabaseProperty[], projects: DailyProjectRef[], projectName: unknown): string | null {
   const p = projects.find(x => label(props, 'p_projeto', x.id) === projectName);
   return p ? label(props, 'p_frente', p.frente_key) || null : null;
+}
+/** Como as propriedades do módulo vão para o banco: frente e projeto pelo id, para renomear sem soltar. */
+export function storedExtra(extra: Record<string, unknown>, props: DatabaseProperty[]): Record<string, unknown> {
+  const out = { ...extra };
+  for (const id of ['p_frente', 'p_projeto']) if (typeof out[id] === 'string' && out[id]) out[id] = keyOf(props, id, out[id]) ?? out[id];
+  return out;
 }
 export const extraProps = (row: DatabaseRow) => Object.fromEntries(Object.entries(row.properties).filter(([k]) => !SYSTEM_PROP_IDS.has(k)));
 

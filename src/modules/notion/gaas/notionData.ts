@@ -3,7 +3,7 @@ import { supabase } from '../../../services/supabaseClient';
 import { loadWorkspace, saveWork } from '../../../components/growth-learning/development/workService';
 import { type Initiative, type WorkItem } from '../../../components/growth-learning/development/workModel';
 import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionUser, NotionWorkspace } from '../types/notion';
-import { TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, extraProps, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
+import { TASKS_DB, TASKS_PAGE, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
 
 export interface NotionContext {
   me: string | null; canEditTasks: boolean; tasks: Map<string, WorkItem>; initiatives: Initiative[]; fronts: BusinessFront[]; projects: DailyProjectRef[];
@@ -37,12 +37,13 @@ function seedPages(): { pages: NotionPage[]; blocks: Block[] } {
 }
 
 export async function loadNotion(me: string | null): Promise<Loaded> {
-  const [pages, blocks, dbs, rows, meta, people, work, frentesRes, projectsRes] = await Promise.all([
+  const [pages, blocks, dbs, rows, meta, people, work, frentesRes, projectsRes, cardsRes] = await Promise.all([
     supabase.from('nt_pages').select('id,data'), supabase.from('nt_blocks').select('id,page_id,data'),
     supabase.from('nt_databases').select('id,data'), supabase.from('nt_rows').select('id,database_id,data'),
     supabase.from('nt_meta').select('key,data'), supabase.rpc('gaas_daily_people'), loadWorkspace(),
     supabase.from('daily_frentes').select('key,name,color,archived,position').order('position'),
-    supabase.from('daily_projects').select('id,name,frente_key,initiative_id,archived').order('name'),
+    supabase.from('daily_projects').select('id,name,frente_key,initiative_id,archived,structure_card_id').order('name'),
+    supabase.from('crm_structure_cards').select('id,title').eq('archived', false).order('title'),
   ]);
   const err = pages.error || blocks.error || dbs.error || rows.error || meta.error;
   if (err) throw err;
@@ -51,6 +52,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
   // Frentes e projetos da Visão Daily; se a leitura falhar, o módulo abre só com a frente do GaaS.
   const fronts = (frentesRes.data || []) as BusinessFront[];
   const projects = (projectsRes.data || []) as DailyProjectRef[];
+  const campaigns = (cardsRes.error ? [] : cardsRes.data || []) as BoardCampaignRef[];
   const wsMeta = (meta.data || []).find(m => m.key === 'workspace')?.data as { rootPageIds?: string[] } | undefined;
   const seeded = !wsMeta;
 
@@ -63,7 +65,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
 
   // Base Tarefas: linhas vindas das tarefas; páginas e blocos guardados por cima dos gerados.
   const storedTasksDb = (dbs.data || []).find(d => d.id === TASKS_DB)?.data as Partial<NotionDatabase> | undefined;
-  const props = systemProperties(work.initiatives, fronts, projects);
+  const props = systemProperties(work.initiatives, fronts, projects, campaigns);
   const extra = new Map((rows.data || []).filter(r => r.database_id === TASKS_DB).map(r => [r.id, (r.data as { properties?: Record<string, unknown> }).properties || {}]));
   const taskRows: DatabaseRow[] = [];
   for (const t of work.tasks) {
@@ -132,7 +134,7 @@ export function diff(prev: Snapshot, ws: NotionWorkspace, props = ws.databases[T
         if (before && taskId) {
           const patch = rowPatch(before, r, props, ws.users);
           if (Object.keys(patch).length) tasks.push({ taskId, patch, rowKey: key });
-          if (JSON.stringify(extraProps(before)) !== JSON.stringify(extraProps(r))) up.rows.push({ id: r.id, database_id: d.id, data: { properties: extraProps(r) } });
+          if (JSON.stringify(extraProps(before)) !== JSON.stringify(extraProps(r))) up.rows.push({ id: r.id, database_id: d.id, data: { properties: storedExtra(extraProps(r), props) } });
         }
       } else up.rows.push({ id: r.id, database_id: d.id, data: r });
     }

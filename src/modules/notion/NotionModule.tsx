@@ -173,12 +173,18 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
     return taskRowId('pending');
   }, [addRowToDatabase, ctx, patchWorkspace, showToast]);
   const updateRow = useCallback((databaseId: string, rowId: string, propertyId: string, value: any) => {
+    if (databaseId === TASKS_DB && propertyId === 'p_campanha') { showToast('A campanha vem do projeto: troque o projeto ou ligue a campanha ao projeto na Visão Daily.'); return; }
     updateDatabaseRow(databaseId, rowId, propertyId, value);
     if (databaseId === TASKS_DB && propertyId === 'p_projeto') {
       const front = frontOfProject(latest.current.databases[TASKS_DB].properties, ctx.projects, value);
       if (front) updateDatabaseRow(databaseId, rowId, 'p_frente', front);
+      // A campanha acompanha o projeto (vem da ligação feita na Visão Daily).
+      const props = latest.current.databases[TASKS_DB].properties;
+      const optName = (pid: string, id?: string | null) => (id ? props.find(p => p.id === pid)?.options?.find(o => o.id === id)?.name || '' : '');
+      const proj = ctx.projects.find(p => optName('p_projeto', p.id) === value);
+      updateDatabaseRow(databaseId, rowId, 'p_campanha', optName('p_campanha', proj?.structure_card_id));
     }
-  }, [ctx.projects, updateDatabaseRow]);
+  }, [ctx.projects, updateDatabaseRow, showToast]);
   const deleteRow = useCallback((databaseId: string, rowId: string) => {
     if (databaseId !== TASKS_DB) return deleteDatabaseRow(databaseId, rowId);
     if (!window.confirm('Cancelar esta tarefa? Ela continua no histórico com o status "Cancelada".')) return;

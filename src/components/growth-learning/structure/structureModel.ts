@@ -274,5 +274,7 @@ export function friendlyError(error: unknown) {
   if (msg.includes('lane_not_empty')) return 'Arquive ou mova as campanhas da coluna antes.';
   if (msg.includes('pillar_not_empty')) return 'Arquive as colunas do pilar antes.';
   if (msg.includes('lane_invalid')) return 'A coluna escolhida não existe mais.';
+  if (msg.includes('sfmc_group_not_found')) return 'Esse balde é automático e não tem regra própria. Mova as jornadas para uma campanha ou crie a campanha.';
+  if (msg.includes('sfmc_group_name_invalid')) return 'Dê um nome com 2 a 80 letras.';
   return 'Não foi possível salvar. Tente de novo.';
 }

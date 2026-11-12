@@ -1,4 +1,5 @@
 import { supabase } from '../../../services/supabaseClient';
+import { saveCard } from './structureService';
 import type { CardGoal, Ch, ConsumoRule, DispatchPayload, JourneyMapRow, PillarFront, PlanRow } from './consumoModel';
 
 export interface ConsumoData { plan: PlanRow[]; rules: ConsumoRule[]; pillarFronts: PillarFront[]; goals: CardGoal[]; journeyMap: JourneyMapRow[]; payload: DispatchPayload }
@@ -39,4 +40,35 @@ export async function saveJourneyMap(changes: JourneyMapChange[]) {
     const { error } = await supabase.rpc('sfmc_save_journey_map', { p_items: changes.slice(i, i + 400) });
     if (error) throw error;
   }
+}
+
+/* Nomes no Mapeamento: campanha (card do board, liga por id) e grupo (texto das regras e do mapa manual). */
+export async function renameCampaign(cardId: string, title: string): Promise<void> {
+  const { data, error } = await supabase.from('crm_structure_cards').select('revision').eq('id', cardId).single();
+  if (error) throw error;
+  await saveCard(cardId, (data as { revision: number }).revision, { title });
+}
+export async function renameGroup(from: string, to: string): Promise<void> {
+  const { error } = await supabase.rpc('sfmc_rename_group', { p_from: from, p_to: to });
+  if (error) throw error;
+}
+export interface LaneOption { id: string; title: string; pillarId: string; pillarTitle: string }
+export async function loadLaneOptions(): Promise<LaneOption[]> {
+  const [lanes, pillars] = await Promise.all([
+    supabase.from('crm_structure_lanes').select('id,title,pillar_id,position').eq('archived', false).order('position'),
+    supabase.from('crm_structure_pillars').select('id,title,position').eq('archived', false).order('position'),
+  ]);
+  if (lanes.error) throw lanes.error;
+  if (pillars.error) throw pillars.error;
+  const order = new Map((pillars.data || []).map((p, i) => [p.id, i]));
+  const title = new Map((pillars.data || []).map(p => [p.id, p.title as string]));
+  return (lanes.data || []).filter(l => title.has(l.pillar_id))
+    .sort((a, b) => (order.get(a.pillar_id)! - order.get(b.pillar_id)!) || a.position - b.position)
+    .map(l => ({ id: l.id, title: l.title, pillarId: l.pillar_id, pillarTitle: title.get(l.pillar_id)! }));
+}
+/** Grupo vira campanha do board: cria o card na coluna escolhida e passa regras e vínculos do grupo para ele. */
+export async function promoteGroup(label: string, laneId: string, title: string): Promise<void> {
+  const card = await saveCard(null, null, { lane_id: laneId, title });
+  const { error } = await supabase.rpc('sfmc_promote_group', { p_label: label, p_card_id: card.id });
+  if (error) throw error;
 }

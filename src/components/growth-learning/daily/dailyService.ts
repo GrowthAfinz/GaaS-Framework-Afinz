@@ -80,6 +80,23 @@ export async function loadEarliestDay(): Promise<string | null> {
   return data?.[0]?.day ? String(data[0].day) : null;
 }
 
+/** Campanhas do board da Estrutura CRM, com o caminho pilar › coluna para a escolha no projeto. */
+export interface BoardCampaign { id: string; title: string; path: string }
+export async function loadBoardCampaigns(): Promise<BoardCampaign[]> {
+  const [cards, lanes, pillars] = await Promise.all([
+    supabase.from('crm_structure_cards').select('id,title,lane_id,position,archived').eq('archived', false).order('position'),
+    supabase.from('crm_structure_lanes').select('id,title,pillar_id,position').eq('archived', false),
+    supabase.from('crm_structure_pillars').select('id,title,position').eq('archived', false),
+  ]);
+  if (cards.error || lanes.error || pillars.error) return [];
+  const lane = new Map((lanes.data || []).map(l => [l.id, l]));
+  const pillar = new Map((pillars.data || []).map(p => [p.id, p]));
+  return (cards.data || []).filter(c => lane.has(c.lane_id)).map(c => {
+    const l = lane.get(c.lane_id)!; const p = pillar.get(l.pillar_id);
+    return { id: c.id, title: c.title, path: `${p?.title || ''} › ${l.title}`, order: (p?.position ?? 0) * 1e6 + l.position * 1e3 + c.position };
+  }).sort((a, b) => a.order - b.order).map(({ order: _o, ...c }) => c);
+}
+
 export async function loadInitiatives(): Promise<{ id: string; title: string }[]> {
   const { data, error } = await supabase.from('growth_work_initiatives').select('id,title').order('title');
   if (error) return [];

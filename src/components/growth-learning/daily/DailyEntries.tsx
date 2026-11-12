@@ -15,6 +15,8 @@ export interface Draft { day: string; projectId: string }
 interface Props {
   groups: EntryGroup[]; group: DailyGroup; sort: DailySort; view: DailyView; filters: DailyFilters; shown: number; total: number;
   monthsLoaded: string[]; prevMonth: string | null; isCollapsed: (key: string) => boolean; today: string; canEdit: boolean; draft: Draft | null;
+  /** Campanha do board por id (nome atual), para mostrar ao lado do projeto. */
+  campaigns?: Map<string, string>;
   projects: Map<string, DailyProject>; frentes: Map<string, DailyFrente>; partners: Map<string, DailyPartner>; tags: Map<string, DailyTag>; people: Map<string, DailyPerson>;
   b2c: Map<string, B2cDay>; filterLabels: { key: FilterKey; label: string; names: Map<string, string> }[]; scrollToDay: string | null; flashKey: number;
   onView: (v: DailyView) => void; onFilterPop: (key: FilterKey, el: HTMLElement) => void; onRemoveFilter: (key: FilterKey, value: string) => void; onClear: () => void;
@@ -194,7 +196,7 @@ export function DailyEntries(p: Props) {
             head = (
               <>
                 <span className="dv-pchip" style={tint(projectColor(g.key), 13)}><span>{pr?.name}</span></span>
-                <span className="m">{p.frentes.get(pr?.frente_key || '')?.name} · {days.length} {days.length === 1 ? 'dia' : 'dias'} · {brDate(days[0])} a {brDate(days[days.length - 1])}</span>
+                <span className="m">{p.frentes.get(pr?.frente_key || '')?.name}{pr?.structure_card_id && p.campaigns?.get(pr.structure_card_id) ? ` · campanha ${p.campaigns.get(pr.structure_card_id)}` : ''} · {days.length} {days.length === 1 ? 'dia' : 'dias'} · {brDate(days[0])} a {brDate(days[days.length - 1])}</span>
                 <button className="dv-ib sm add" title="Abrir projeto" onClick={ev => { ev.stopPropagation(); p.onOpenProject(g.key); }}><PanelRightOpen /></button>
                 {p.canEdit && <button className="dv-ib sm" title="Registrar hoje neste projeto" onClick={ev => { ev.stopPropagation(); p.onAdd(p.today, ev.currentTarget, g.key); }}><Plus /></button>}
               </>

@@ -310,7 +310,7 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
         <span className="cz-src" title={data.payload.loaded_at ? `Carga em ${new Date(data.payload.loaded_at).toLocaleString('pt-BR')}` : ''}><i />Dinâmica BI até {ddmm(isoOf(model.last))} · contrato {monthLabel(model.months[0])} a {monthLabel(model.months[11])}</span>
       </div>
 
-      {sub === 'mapa' ? <JourneyMap model={model} period={per} perLabel={perLabel} frOn={frOn} editable={editable} onSaved={reloadData} onStats={onStats} /> : (
+      {sub === 'mapa' ? <JourneyMap model={model} period={per} perLabel={perLabel} frOn={frOn} editable={editable} onSaved={reloadData} onNamesChanged={reload} onStats={onStats} /> : (
       <div ref={vp.canvasRef} className={`cs-canvas czb-canvas${vp.panning ? ' panning' : ''}`} style={vp.gridStyle} {...vp.handlers}>
         <div ref={vp.stageRef} className="cs-stage" style={{ transform: `translate(${Math.round(vp.view.x)}px,${Math.round(vp.view.y)}px) scale(${vp.view.z})` }}>
           <div className="czb-grid">
