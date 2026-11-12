@@ -23,6 +23,8 @@ interface Props {
   onEditBody: (e: DailyEntry, text: string) => void; onProjectPop: (e: DailyEntry, el: HTMLElement) => void; onTagPop: (e: DailyEntry, el: HTMLElement) => void;
   onRemoveTag: (e: DailyEntry, key: string) => void; onPeoplePop: (e: DailyEntry, el: HTMLElement) => void; onMenu: (e: DailyEntry, el: HTMLElement) => void;
   onContinue: (e: DailyEntry) => void; onOpenProject: (id: string) => void; onHoverProject: (id: string | null) => void;
+  dropDay: string | null; onDragEntry: (e: DailyEntry, ev: React.DragEvent) => void; onDragOverDay: (day: string, ev: React.DragEvent) => void;
+  onDropDay: (day: string, ev: React.DragEvent) => void; onDragEnd: () => void;
 }
 
 const VIEWS: [DailyView, string, React.ReactNode][] = [['today', 'Hoje', <Sun key="s" />], ['week', 'Esta semana', <CalendarRange key="c" />], ['mine', 'Que eu acompanho', <Eye key="e" />], ['all', 'Tudo', <List key="l" />]];
@@ -31,10 +33,13 @@ const GROUP_LABEL: Record<DailyGroup, string> = { day: 'dia', project: 'projeto'
 
 function inlineEdit(el: HTMLElement, onSave: (v: string) => void) {
   const old = el.textContent || '';
+  const row = el.closest<HTMLElement>('.dv-row');
+  if (row) row.draggable = false;
   el.contentEditable = 'true'; el.focus();
   const sel = window.getSelection(); const range = document.createRange(); range.selectNodeContents(el); range.collapse(false); sel?.removeAllRanges(); sel?.addRange(range);
   const done = (ok: boolean) => {
     el.contentEditable = 'false'; el.onblur = null; el.onkeydown = null;
+    if (row) row.draggable = true;
     const v = (el.innerText || '').trim();
     if (ok && v && v !== old.trim()) onSave(v); else el.textContent = old;
   };
@@ -83,7 +88,8 @@ export function DailyEntries(p: Props) {
     const resp = e.responsible_id ? p.people.get(e.responsible_id) : undefined;
     const fol = e.follower_ids.filter(id => id !== e.responsible_id).map(id => p.people.get(id)).filter(Boolean) as DailyPerson[];
     return (
-      <div key={e.id} className="dv-row" data-entry={e.id} onMouseEnter={() => p.onHoverProject(e.project_id)} onMouseLeave={() => p.onHoverProject(null)}>
+      <div key={e.id} className="dv-row" data-entry={e.id} onMouseEnter={() => p.onHoverProject(e.project_id)} onMouseLeave={() => p.onHoverProject(null)}
+        draggable={p.canEdit} onDragStart={ev => p.onDragEntry(e, ev)} onDragEnd={p.onDragEnd} title={p.canEdit ? 'Arraste para outro dia (Ctrl ao soltar copia)' : undefined}>
         <span className="bar" style={{ background: c }} />
         {showDate && <span className="date">{brDate(e.day)}</span>}
         <div className="body">
@@ -200,7 +206,8 @@ export function DailyEntries(p: Props) {
           return (
             <div key={g.key}>
               {monthHeader}
-              <div className="dv-gh" data-day={p.group === 'day' ? g.key : undefined} onClick={() => p.onToggle(g.key)}>
+              <div className={`dv-gh${p.group === 'day' && p.dropDay === g.key ? ' drop' : ''}`} data-day={p.group === 'day' ? g.key : undefined} onClick={() => p.onToggle(g.key)}
+                onDragOver={p.group === 'day' ? ev => p.onDragOverDay(g.key, ev) : undefined} onDrop={p.group === 'day' ? ev => p.onDropDay(g.key, ev) : undefined}>
                 {collapsed ? <ChevronRight /> : <ChevronDown />}{head}
               </div>
               {!collapsed && (p.group === 'day'

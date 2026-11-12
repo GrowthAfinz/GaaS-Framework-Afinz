@@ -14,6 +14,8 @@ interface Props {
   b2c: Map<string, B2cDay>; crm: Map<string, CrmCell[]>; metric: DayMetric; compact: boolean; hoverProject: string | null;
   onMonth: (delta: number | 'today') => void; onMetric: (m: DayMetric) => void; onSelectDay: (day: string) => void;
   onHoverProject: (id: string | null) => void; onHoverDay: (day: string | null, e?: React.MouseEvent) => void;
+  canDrag: boolean; dropDay: string | null; onDragBar: (projectId: string, day: string, e: React.DragEvent) => void;
+  onDragOverDay: (day: string, e: React.DragEvent) => void; onDropDay: (day: string, e: React.DragEvent) => void; onDragEnd: () => void;
 }
 
 export function DailyCalendar(p: Props) {
@@ -68,8 +70,10 @@ export function DailyCalendar(p: Props) {
             }
             const extra = ps.filter(x => !shown.some(r => r.includes(x))).length;
             return (
-              <button key={day} type="button" className={`dv-day${wd === 0 || wd === 6 ? ' we' : ''}${!inMonth ? ' out' : ''}${day === p.selected ? ' sel' : ''}`}
-                onClick={() => p.onSelectDay(day)} onMouseMove={e => p.onHoverDay(ps.length ? day : null, e)} onMouseLeave={() => p.onHoverDay(null)}>
+              <div key={day} role="button" tabIndex={0} className={`dv-day${wd === 0 || wd === 6 ? ' we' : ''}${!inMonth ? ' out' : ''}${day === p.selected ? ' sel' : ''}${day === p.dropDay ? ' drop' : ''}`}
+                onClick={() => p.onSelectDay(day)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.onSelectDay(day); } }}
+                onMouseMove={e => p.onHoverDay(ps.length ? day : null, e)} onMouseLeave={() => p.onHoverDay(null)}
+                onDragOver={e => p.onDragOverDay(day, e)} onDrop={e => p.onDropDay(day, e)}>
                 <div className="dv-dhd">
                   <span className={`dv-dn${day === p.today ? ' today' : !inMonth ? ' out' : ''}`}>{Number(day.slice(8))}</span>
                   {day > p.today && ps.length > 0 && <span className="dv-plan">planejado</span>}
@@ -84,7 +88,9 @@ export function DailyCalendar(p: Props) {
                   return (
                     <div key={ri} className="dv-slot">
                       <span className={`dv-pb${cl ? ' cl' : ''}${cr ? ' cr' : ''}${hl ? ' hl' : ''}${dim ? ' dim' : ''}`} style={{ ...tint(c, 16), borderLeft: cl ? 0 : `3px solid ${c}` }}
-                        onMouseEnter={() => p.onHoverProject(pid)} onMouseLeave={() => p.onHoverProject(null)}>
+                        onMouseEnter={() => p.onHoverProject(pid)} onMouseLeave={() => p.onHoverProject(null)}
+                        draggable={p.canDrag} onDragStart={e => { e.stopPropagation(); p.onDragBar(pid, day, e); }} onDragEnd={p.onDragEnd}
+                        title={p.canDrag ? 'Arraste para outro dia (Ctrl ao soltar copia)' : undefined}>
                         {!cl && <span>{p.projects.get(pid)?.name}</span>}
                         {!cl && n > 1 && <span style={{ opacity: 0.7, flex: 'none' }}>·{n}</span>}
                       </span>
@@ -92,7 +98,7 @@ export function DailyCalendar(p: Props) {
                   );
                 })}
                 {extra > 0 && <div className="dv-more">+{extra} projeto{extra > 1 ? 's' : ''}</div>}
-              </button>
+              </div>
             );
           });
         })}
@@ -102,6 +108,7 @@ export function DailyCalendar(p: Props) {
           <span key={f.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span className="dv-sw" style={{ ...tint(f.color, 16), borderLeft: `3px solid ${f.color}`, width: 12, height: 12 }} />{f.name}</span>
         ))}
         <span>barra contínua = mesmo projeto em dias seguidos</span>
+        {p.canDrag && <span>arraste barras e registros entre dias · Ctrl ao soltar copia</span>}
         {!useCrm && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span className="dv-rb"><span style={{ width: '70%', background: '#0f766e' }} /></span>dia acima da média do mês</span>}
         <span className="grow">{useCrm ? 'CRM conta pelo dia do disparo, não pelo dia da emissão' : 'passe o mouse no dia para ver os registros'}</span>
       </div>
