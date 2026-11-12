@@ -23,14 +23,14 @@ function seedPages(): { pages: NotionPage[]; blocks: Block[] } {
   const blocks: Block[] = [
     { id: 'blk_inicio_1', type: 'callout', icon: '👋', backgroundColor: 'blue', content: 'Este é o espaço do time no GaaS, no formato do Notion. Tarefas, specs, investigações e experimentos ficam na base Tarefas; cada linha abre como página.' },
     { id: 'blk_inicio_2', type: 'heading_2', content: 'Como usar' },
-    { id: 'blk_inicio_3', type: 'bulleted_list_item', content: 'Abra "Testes e Tarefas" na barra lateral e use os chips de frente no topo e troque de visão: por status, por frente, por projeto, calendário e tabela. O desenvolvimento do GaaS fica na visão SDD.' },
+    { id: 'blk_inicio_3', type: 'bulleted_list_item', content: 'Abra "Tarefas e atividades" na barra lateral e use os chips de frente no topo e troque de visão: por status, por frente, por projeto, calendário e tabela. O desenvolvimento do GaaS fica na visão SDD.' },
     { id: 'blk_inicio_4', type: 'bulleted_list_item', content: 'Clique numa tarefa para abrir a página dela; escreva no corpo com "/" para inserir blocos.' },
     { id: 'blk_inicio_5', type: 'bulleted_list_item', content: 'Conhecimento continua na Wiki: aqui ficam o trabalho e o registro de execução.' },
   ];
   return {
     pages: [
       { id: 'page_inicio', title: 'Início', icon: '🏠', parentId: null, createdAt: now, updatedAt: now, blockIds: blocks.map(b => b.id) },
-      { id: TASKS_PAGE, title: 'Testes e Tarefas', icon: '✅', parentId: null, createdAt: now, updatedAt: now, blockIds: [], databaseId: TASKS_DB, isFullWidth: true },
+      { id: TASKS_PAGE, title: 'Tarefas e atividades', icon: '✅', parentId: null, createdAt: now, updatedAt: now, blockIds: [], databaseId: TASKS_DB, isFullWidth: true },
     ],
     blocks,
   };
@@ -58,6 +58,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
   const blockMap: Record<string, Block> = {};
   if (seeded) { const s = seedPages(); s.pages.forEach(p => { pageMap[p.id] = p; }); s.blocks.forEach(b => { blockMap[b.id] = b; }); }
   for (const r of pages.data || []) pageMap[r.id] = r.data as NotionPage;
+  if (pageMap[TASKS_PAGE]?.title === 'Testes e Tarefas') pageMap[TASKS_PAGE] = { ...pageMap[TASKS_PAGE], title: 'Tarefas e atividades' };
   for (const r of blocks.data || []) blockMap[r.id] = r.data as Block;
 
   // Base Tarefas: linhas vindas das tarefas; páginas e blocos guardados por cima dos gerados.
@@ -83,7 +84,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
   const rootPageIds = [...(wsMeta?.rootPageIds || ['page_inicio', TASKS_PAGE]).filter(id => roots.includes(id)), ...roots.filter(id => !(wsMeta?.rootPageIds || ['page_inicio', TASKS_PAGE]).includes(id))];
   const active = readLocal<string>(activeKey(me), TASKS_PAGE);
   const workspace: NotionWorkspace = {
-    id: 'gaas', name: 'GaaS · Testes e Tarefas', icon: '✅', users, activeUserId: me && users.some(u => u.id === me) ? me : users[0]?.id || 'gaas-user',
+    id: 'gaas', name: 'GaaS · Tarefas e atividades', icon: '✅', users, activeUserId: me && users.some(u => u.id === me) ? me : users[0]?.id || 'gaas-user',
     pages: pageMap, blocks: blockMap, databases, rootPageIds,
     trashPageIds: Object.values(pageMap).filter(p => p.isArchived).map(p => p.id),
     favoritePageIds: readLocal<string[]>(favKey(me), [TASKS_PAGE]).filter(id => pageMap[id]),

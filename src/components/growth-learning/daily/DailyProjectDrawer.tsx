@@ -57,7 +57,7 @@ export function DailyProjectDrawer({ project, frentes, partners, people, canEdit
             </span>
             <span className="k"><ListChecks />Iniciativa</span>
             <select value={project.initiative_id || ''} disabled={!canEdit} onChange={e => void onSave({ initiative_id: e.target.value })}>
-              <option value="">Sem iniciativa em Testes e Tarefas</option>
+              <option value="">Sem iniciativa em Tarefas e atividades</option>
               {initiatives.map(i => <option key={i.id} value={i.id}>{i.title}</option>)}
             </select>
             <span className="k"><CalendarRange />Dias com registro</span>

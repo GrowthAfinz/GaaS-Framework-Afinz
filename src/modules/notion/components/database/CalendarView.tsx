@@ -23,6 +23,7 @@ interface CalendarViewProps {
   datePropId?: string;
   /** Arrastar um item para outro dia muda a data. */
   onUpdateRow?: (rowId: string, propertyId: string, value: any) => void;
+  readOnly?: boolean;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -32,6 +33,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onOpenRowPage,
   datePropId,
   onUpdateRow,
+  readOnly = false,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [dragRow, setDragRow] = useState<string | null>(null);
@@ -128,13 +130,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   {format(d, 'd')}
                 </span>
 
-                <button
+                {!readOnly && <button
                   onClick={() => onAddRow({ [dateKey]: dateStr })}
                   className="opacity-0 group-hover/day:opacity-100 p-0.5 text-[var(--notion-text-muted)] hover:text-blue-500 rounded"
                   title="Novo neste dia"
                 >
                   <Plus size={12} />
-                </button>
+                </button>}
               </div>
 
               {/* Items for this day */}

@@ -42,6 +42,9 @@ interface DatabaseViewProps {
   onOpenRowPage: (pageId: string) => void;
   onUpdateView?: (databaseId: string, viewId: string, partial: Partial<DatabaseViewConfig>) => void;
   onDeleteView?: (databaseId: string, viewId: string) => void;
+  onDuplicateRow?: (databaseId: string, rowId: string) => void;
+  /** Só leitura: mostra os dados e deixa mexer só em visões, filtros e agrupamento. */
+  readOnly?: boolean;
   /** Chips de filtro rápido por uma propriedade (ex.: Frente). A seleção é de cada pessoa e fica no navegador. */
   quickFilter?: QuickFilterConfig;
 }
@@ -60,6 +63,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onOpenRowPage,
   onUpdateView,
   onDeleteView,
+  onDuplicateRow,
+  readOnly = false,
   quickFilter,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,7 +202,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           ))}
 
           {/* Add View Dropdown */}
-          <div className="relative">
+          {!readOnly && <div className="relative">
             <button
               onClick={() => setShowAddViewMenu(!showAddViewMenu)}
               className="p-1 rounded text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
@@ -232,7 +237,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 ))}
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Search, Filter, Sort Controls */}
@@ -346,12 +351,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           </div>
 
           {/* New Row Button */}
-          <button
+          {!readOnly && <button
             onClick={() => addRowWithQuick()}
             className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white font-medium text-xs transition-colors shadow-xs"
           >
             <Plus size={14} /> Novo
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -400,6 +405,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
           onAddRow={() => addRowWithQuick()}
           onDeleteRow={(rId) => onDeleteRow(database.id, rId)}
+          onDuplicateRow={onDuplicateRow && !readOnly ? (rId) => onDuplicateRow(database.id, rId) : undefined}
+          readOnly={readOnly}
           onAddProperty={(name, type) => onAddProperty(database.id, name, type)}
           onOpenRowPage={onOpenRowPage}
         />
@@ -414,6 +421,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           users={users}
           hiddenValues={qfActive && groupPropId === quickFilter?.propertyId ? [...qfOptions, EMPTY].filter((n) => !qfSelected.includes(n)) : []}
           hideEmpty={Boolean(currentView.hideEmptyGroups)}
+          readOnly={readOnly}
           onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
           onAddRow={(props) => addRowWithQuick(props)}
           onOpenRowPage={onOpenRowPage}
@@ -443,7 +451,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           database={database}
           filteredRows={filteredRows}
           datePropId={datePropId}
-          onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
+          readOnly={readOnly}
+          onUpdateRow={readOnly ? undefined : (rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
           onAddRow={(props) => addRowWithQuick(props)}
           onOpenRowPage={onOpenRowPage}
         />

@@ -165,7 +165,7 @@ export const LEARNING_SECTION_LABELS: Record<string, string> = {
   feed: 'Fila',
   vault: 'Wiki',
   corrections: 'Correções e melhorias',
-  investigations: 'Testes e Tarefas',
+  investigations: 'Tarefas e atividades',
   'report-live': 'Report Live',
   bets: 'Apostas',
   outcomes: 'Outcomes',
