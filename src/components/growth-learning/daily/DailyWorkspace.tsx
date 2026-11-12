@@ -67,6 +67,8 @@ export function DailyWorkspace() {
   const [scrollTo, setScrollTo] = useState<{ day: string; key: number } | null>(null);
   const [present, setPresent] = useState(false);
   const [calHeight, setCalHeight] = useState(760);
+  const [dropDay, setDropDay] = useState<string | null>(null);
+  const dragging = useRef<{ ids: string[]; from: string } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<number>();
@@ -188,6 +190,52 @@ export function DailyWorkspace() {
       });
     } catch (err) { fail(err); }
   }, [fail, putEntry, showToast]);
+  /* ---------- arrastar entre dias ---------- */
+  const dropEntries = useCallback(async (ids: string[], from: string, day: string, copy: boolean) => {
+    const list = ids.map(id => all.find(e => e.id === id)).filter((e): e is DailyEntry => Boolean(e));
+    if (!list.length || (!copy && day === from)) return;
+    void ensureMonth(monthKey(day));
+    const label = (n: number, verb: string) => `${n} ${n === 1 ? 'registro' : 'registros'} ${verb} para ${WEEKDAYS[weekday(day)]}, ${brDate(day)}`;
+    try {
+      if (copy) {
+        const created: DailyEntry[] = [];
+        for (const e of list) {
+          const saved = await saveEntry(null, null, { day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids });
+          putEntry(saved); created.push(saved);
+        }
+        showToast(label(created.length, created.length === 1 ? 'copiado' : 'copiados'), async () => {
+          try { for (const c of created) putEntry(await saveEntry(c.id, c.revision, { deleted: true })); setToast(null); } catch (err) { fail(err); }
+        });
+      } else {
+        const moved: [DailyEntry, string][] = [];
+        for (const e of list) { const saved = await saveEntry(e.id, e.revision, { day }); putEntry(saved); moved.push([saved, e.day]); }
+        showToast(label(moved.length, moved.length === 1 ? 'movido' : 'movidos'), async () => {
+          try { for (const [m, back] of moved) putEntry(await saveEntry(m.id, m.revision, { day: back })); setToast(null); } catch (err) { fail(err); }
+        });
+      }
+      setSelected(day); setDrawerKey(k => k + 1);
+    } catch (err) { fail(err); }
+  }, [all, ensureMonth, fail, putEntry, showToast]);
+  const startDrag = (ids: string[], from: string, e: React.DragEvent) => {
+    if (!canEdit || !ids.length) { e.preventDefault(); return; }
+    dragging.current = { ids, from }; setTip(null); setPop(null);
+    e.dataTransfer.effectAllowed = 'copyMove';
+    e.dataTransfer.setData('text/plain', ids.join(','));
+    (e.currentTarget as HTMLElement).classList.add('dragging');
+  };
+  const overDay = (day: string, e: React.DragEvent) => {
+    if (!dragging.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = e.ctrlKey || e.altKey || e.metaKey ? 'copy' : 'move';
+    if (dropDay !== day) setDropDay(day);
+  };
+  const dropOnDay = (day: string, e: React.DragEvent) => {
+    const d = dragging.current; if (!d) return;
+    e.preventDefault(); dragging.current = null; setDropDay(null);
+    void dropEntries(d.ids, d.from, day, e.ctrlKey || e.altKey || e.metaKey);
+  };
+  const endDrag = () => { dragging.current = null; setDropDay(null); document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging')); };
+
   const createEntry = useCallback(async (d: Draft, text: string) => {
     try {
       const saved = await saveEntry(null, null, { day: d.day, project_id: d.projectId, body: text, responsible_id: me, follower_ids: [] });
@@ -368,7 +416,9 @@ export function DailyWorkspace() {
               partners={cfg?.partners || []} partnerFilter={filters.partners} b2c={b2c} crm={crm} metric={prefs.metric} compact={prefs.compact} hoverProject={hoverProject}
               onMonth={moveMonth} onMetric={metric => { setPrefs(p => ({ ...p, metric })); if (metric === 'b2c') setFilters(f => ({ ...f, partners: [] })); }}
               onSelectDay={goToDay} onHoverProject={setHoverProject}
-              onHoverDay={(day, e) => setTip(day && e ? { day, x: toLocalPx(e.clientX), y: toLocalPx(e.clientY) } : null)} />
+              onHoverDay={(day, e) => { if (!dragging.current) setTip(day && e ? { day, x: toLocalPx(e.clientX), y: toLocalPx(e.clientY) } : null); }}
+              canDrag={canEdit} dropDay={dropDay} onDragOverDay={overDay} onDropDay={dropOnDay} onDragEnd={endDrag}
+              onDragBar={(pid, day, e) => startDrag(calendarEntries.filter(x => x.day === day && x.project_id === pid).map(x => x.id), day, e)} />
           </div>
 
           <div style={{ height: calHeight, display: 'flex' }}>
@@ -389,7 +439,8 @@ export function DailyWorkspace() {
               onPeoplePop={(e, el) => setPop({ kind: 'people', entryId: e.id, anchor: anchorOf(el) })}
               onMenu={(e, el) => setPop({ kind: 'menu', entryId: e.id, anchor: anchorOf(el) })}
               onContinue={e => setDraft({ day: nextWorkday(e.day), projectId: e.project_id })}
-              onOpenProject={setDrawer} onHoverProject={setHoverProject} />
+              onOpenProject={setDrawer} onHoverProject={setHoverProject}
+              dropDay={dropDay} onDragEntry={(e, ev) => startDrag([e.id], e.day, ev)} onDragOverDay={overDay} onDropDay={dropOnDay} onDragEnd={endDrag} />
           </div>
         </div>
         <BoardZoomBar vp={vp} showMini={prefs.mini} onToggleMini={() => setPrefs(p => ({ ...p, mini: !p.mini }))}>
