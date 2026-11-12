@@ -13,6 +13,7 @@ import {
   ExternalLink,
   MessageSquare,
   Sparkles,
+  Copy,
 } from 'lucide-react';
 import {
   Block,
@@ -47,6 +48,7 @@ interface RowPeekModalProps {
   onClose: () => void;
   onOpenFullPage: (pageId: string) => void;
   onUpdatePage: (pageId: string, partial: Partial<NotionPage>) => void;
+  onDuplicate?: (databaseId: string, rowId: string) => void;
   onUpdateRow: (databaseId: string, rowId: string, propertyId: string, value: any) => void;
   onAddProperty?: (databaseId: string, name: string, type: PropertyType) => void;
   onUpdateBlock: (blockId: string, partial: Partial<Block>) => void;
@@ -67,6 +69,7 @@ export const RowPeekModal: React.FC<RowPeekModalProps> = ({
   onClose,
   onOpenFullPage,
   onUpdatePage,
+  onDuplicate,
   onUpdateRow,
   onAddProperty,
   onUpdateBlock,
@@ -136,6 +139,16 @@ export const RowPeekModal: React.FC<RowPeekModalProps> = ({
               <Maximize2 size={13} />
               <span className="font-medium">Abrir como página</span>
             </button>
+            {onDuplicate && database && row && (
+              <button
+                onClick={() => onDuplicate(database.id, row.id)}
+                className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors"
+                title="Duplicar"
+              >
+                <Copy size={13} />
+                <span className="font-medium">Duplicar</span>
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-1">

@@ -15,13 +15,14 @@ import { NotionEditContext, type NotionEditApi } from './components/database/edi
 import { PageComments } from './components/editor/PageComments';
 import { supabase } from '../../services/supabaseClient';
 import { saveInitiative } from '../../components/growth-learning/development/workService';
-import { AgentBriefModal, GaasSettingsModal } from './gaas/GaasPanels';
+import { GaasSettingsModal } from './gaas/GaasPanels';
 import { useAuth } from '../../context/AuthContext';
 import { newWork, type Initiative, type WorkItem } from '../../components/growth-learning/development/workModel';
 import { taskError } from '../../components/growth-learning/development/developmentService';
-import type { DatabaseRow, NotionColor, NotionDatabase, NotionWorkspace, SelectOption } from './types/notion';
+import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionWorkspace, SelectOption } from './types/notion';
+import { generateId } from './utils/id';
 import { createTask, diff, loadNotion, pushChanges, saveLocalPrefs, saveTask, snapshot, type NotionContext, type Snapshot } from './gaas/notionData';
-import { GAAS_FRONT, GAAS_FRONT_NAME, SYNCED_PROPS, SYSTEM_PROP_IDS, TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, notionColor, workspaceOfFront, extraProps, frontOfProject, rowPatch, taskBlocks, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
+import { GAAS_FRONT, GAAS_FRONT_NAME, SYNCED_PROPS, SYSTEM_PROP_IDS, TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, notionColor, workspaceOfFront, extraProps, frontOfProject, rowPatch, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
 import './notion.css';
 import 'katex/dist/katex.min.css';
 
@@ -33,11 +34,11 @@ export function NotionModule({ onOpenInvestigations }: { onOpenInvestigations?: 
   const [error, setError] = useState('');
   const load = useCallback(() => {
     setError('');
-    loadNotion(me).then(setState).catch(() => setError('Não foi possível carregar Testes e Tarefas. Confira a conexão e tente de novo.'));
+    loadNotion(me).then(setState).catch(() => setError('Não foi possível carregar Tarefas e atividades. Confira a conexão e tente de novo.'));
   }, [me]);
   useEffect(() => { load(); }, [load]);
   if (error) return <div className="nt-root flex h-full items-center justify-center gap-3 text-sm">{error}<button className="rounded-md border px-3 py-1.5" onClick={load}>Tentar de novo</button></div>;
-  if (!state) return <div className="nt-root flex h-full items-center justify-center text-sm text-[var(--notion-text-muted)]">Carregando Testes e Tarefas…</div>;
+  if (!state) return <div className="nt-root flex h-full items-center justify-center text-sm text-[var(--notion-text-muted)]">Carregando Tarefas e atividades…</div>;
   return <NotionApp key={me || 'anon'} initial={state.workspace} ctx={state.ctx} seeded={state.seeded} onOpenInvestigations={onOpenInvestigations} />;
 }
 
@@ -303,8 +304,95 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Notion AI Assistant Modal State
-  const [isAiOpen, setIsAiOpen] = useState(false);
+
+  /* ---------- duplicar página ou tarefa (cópia completa do corpo, com novos ids) ---------- */
+  const cloneBlocks = (ws: NotionWorkspace, ids: string[], out: Record<string, Block>): string[] =>
+    ids.filter(id => ws.blocks[id]).map(id => {
+      const b = ws.blocks[id], nid = generateId('blk');
+      out[nid] = { ...JSON.parse(JSON.stringify(b)), id: nid, ...(b.childrenIds ? { childrenIds: cloneBlocks(ws, b.childrenIds, out) } : {}) };
+      return nid;
+    });
+  const duplicateTask = useCallback((taskId: string) => {
+    const task = ctx.tasks.get(taskId);
+    if (!task) return;
+    if (!ctx.canEditTasks) { showToast('Duplicar tarefas requer acesso de edição.'); return; }
+    const ws = latest.current, db = ws.databases[TASKS_DB], src = db.rows.find(r => r.id === taskRowId(taskId));
+    const srcPage = ws.pages[taskRowId(taskId)];
+    setStatus('saving');
+    void createTask({ title: `${task.title} (cópia)` }, task).then(saved => {
+      ctx.tasks.set(saved.id, saved);
+      const props = latest.current.databases[TASKS_DB].properties;
+      const extra = src ? extraProps(src) : {};
+      const baseRow = taskToRow(saved, props, latest.current.users, {}, ctx.projects);
+      const row = taskToRow(saved, props, latest.current.users, extra, ctx.projects);
+      const blocks: Record<string, Block> = {};
+      const blockIds = cloneBlocks(latest.current, srcPage?.blockIds || [], blocks);
+      const page = { ...taskPage(saved, []), icon: srcPage?.icon || taskPage(saved, []).icon, blockIds };
+      patchWorkspace(prev => {
+        const d = prev.databases[TASKS_DB];
+        const at = d.rows.findIndex(r => r.id === src?.id);
+        const rows = at < 0 ? [...d.rows, row] : [...d.rows.slice(0, at + 1), row, ...d.rows.slice(at + 1)];
+        return { ...prev, pages: { ...prev.pages, [page.id]: page }, blocks: { ...prev.blocks, ...blocks }, databases: { ...prev.databases, [TASKS_DB]: { ...d, rows } } };
+      });
+      // Só a linha entra na foto de base: página, blocos e frente/projeto da cópia vão para o banco na próxima sincronização.
+      baseline.current.rows.set(TASKS_DB + '|' + row.id, JSON.stringify(baseRow));
+      baseline.current.rowObjs.set(TASKS_DB + '|' + row.id, JSON.parse(JSON.stringify(baseRow)));
+      setPeekPageId(page.id); setPeekDatabaseId(TASKS_DB); setStatus('saved');
+      showToast('Tarefa duplicada.');
+    }).catch(e => { setStatus('error'); showToast(taskError(e)); });
+  }, [ctx, patchWorkspace, showToast, baseline]);
+  const duplicatePage = useCallback((pageId: string) => {
+    const tid = taskIdOfRow(pageId);
+    if (tid) { duplicateTask(tid); return; }
+    const ws = latest.current;
+    if (ws.pages[pageId]?.databaseId === TASKS_DB) { showToast('A base de tarefas é única. Duplique as tarefas, uma a uma.'); return; }
+    const pages: Record<string, NotionPage> = {}, blocks: Record<string, Block> = {}, databases: Record<string, NotionDatabase> = {};
+    const now = new Date().toISOString();
+    const copy = (id: string, parentId: string | null, top: boolean): string => {
+      const p = ws.pages[id], nid = generateId('page');
+      let databaseId = p.databaseId;
+      if (p.databaseId && ws.databases[p.databaseId]) {
+        const src = ws.databases[p.databaseId], ndb = generateId('db');
+        const rows = src.rows.map(r => {
+          const rp = ws.pages[r.pageId];
+          const npid = rp ? generateId('page') : r.pageId;
+          if (rp) pages[npid] = { ...rp, id: npid, parentId: nid, blockIds: cloneBlocks(ws, rp.blockIds, blocks), createdAt: now, updatedAt: now, comments: [] };
+          return { ...r, id: generateId('row'), pageId: npid };
+        });
+        databases[ndb] = { ...JSON.parse(JSON.stringify(src)), id: ndb, rows };
+        databaseId = ndb;
+      }
+      pages[nid] = { ...p, id: nid, parentId, title: top ? `${p.title || 'Sem título'} (cópia)` : p.title, blockIds: cloneBlocks(ws, p.blockIds, blocks), databaseId, createdAt: now, updatedAt: now, isFavorite: false, comments: [] };
+      Object.values(ws.pages).filter(c => c.parentId === id && !c.isArchived && !taskIdOfRow(c.id)).forEach(c => copy(c.id, nid, false));
+      return nid;
+    };
+    if (!ws.pages[pageId]) return;
+    const nid = copy(pageId, ws.pages[pageId].parentId, true);
+    patchWorkspace(prev => {
+      const i = prev.rootPageIds.indexOf(pageId);
+      const rootPageIds = ws.pages[pageId].parentId ? prev.rootPageIds : i < 0 ? [...prev.rootPageIds, nid] : [...prev.rootPageIds.slice(0, i + 1), nid, ...prev.rootPageIds.slice(i + 1)];
+      return { ...prev, pages: { ...prev.pages, ...pages }, blocks: { ...prev.blocks, ...blocks }, databases: { ...prev.databases, ...databases }, rootPageIds };
+    });
+    setActivePage(nid);
+    showToast('Página duplicada.');
+  }, [duplicateTask, patchWorkspace, setActivePage, showToast]);
+
+  const duplicateRow = useCallback((dbId: string, rowId: string) => {
+    if (dbId === TASKS_DB) { const tid = taskIdOfRow(rowId); if (tid) duplicateTask(tid); return; }
+    const ws = latest.current, db = ws.databases[dbId], row = db?.rows.find(r => r.id === rowId);
+    if (!db || !row) return;
+    const blocks: Record<string, Block> = {}, now = new Date().toISOString();
+    const rp = ws.pages[row.pageId], npid = generateId('page'), nrid = generateId('row');
+    const title = `${String(row.properties.prop_title || rp?.title || 'Sem título')} (cópia)`;
+    const page: NotionPage | null = rp ? { ...rp, id: npid, title, blockIds: cloneBlocks(ws, rp.blockIds, blocks), createdAt: now, updatedAt: now, comments: [] } : null;
+    const nrow: DatabaseRow = { ...JSON.parse(JSON.stringify(row)), id: nrid, pageId: page ? npid : row.pageId, properties: { ...JSON.parse(JSON.stringify(row.properties)), prop_title: title } };
+    patchWorkspace(prev => {
+      const d = prev.databases[dbId], at = d.rows.findIndex(r => r.id === rowId);
+      return { ...prev, pages: page ? { ...prev.pages, [npid]: page } : prev.pages, blocks: { ...prev.blocks, ...blocks },
+        databases: { ...prev.databases, [dbId]: { ...d, rows: [...d.rows.slice(0, at + 1), nrow, ...d.rows.slice(at + 1)] } } };
+    });
+    showToast('Linha duplicada.');
+  }, [duplicateTask, patchWorkspace, showToast]);
 
   // Keyboard shortcut listener for Ctrl+K (Search) & Ctrl+J (Notion AI)
   useEffect(() => {
@@ -314,10 +402,6 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setSearchOpen(true);
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
-        e.preventDefault();
-        setIsAiOpen(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -349,6 +433,7 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
           onAddView={addDatabaseView}
           onUpdateView={updateDatabaseView}
           onDeleteView={deleteView}
+          onDuplicateRow={duplicateRow}
           onOpenRowPage={(pageId: string) => {
             setPeekPageId(pageId);
             setPeekDatabaseId(databaseId);
@@ -368,6 +453,7 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
       addDatabaseView,
       updateDatabaseView,
       deleteView,
+      duplicateRow,
     ]
   );
 
@@ -415,6 +501,7 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
         onSelectPage={setActivePage}
         onCreatePage={createPage}
         onArchivePage={archivePage}
+        onDuplicatePage={duplicatePage}
         onToggleFavorite={toggleFavorite}
         onSetActiveUser={setActiveUser}
         onOpenSearch={() => setSearchOpen(true)}
@@ -434,8 +521,8 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
           onUpdatePage={(partial) => updatePage(activePage.id, partial)}
           onToggleFavorite={() => toggleFavorite(activePage.id)}
           onArchivePage={() => archivePage(activePage.id)}
+          onDuplicatePage={() => duplicatePage(activePage.id)}
           onExportJSON={exportJSON}
-          onOpenAi={() => setIsAiOpen(true)}
           onOpenComments={openComments}
         />
 
@@ -529,6 +616,7 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
           setActivePage(pId);
         }}
         onUpdatePage={updatePage}
+        onDuplicate={(dbId, rowId) => duplicateRow(dbId, rowId)}
         onUpdateRow={updateRow}
         onAddProperty={addDatabaseProperty}
         onUpdateBlock={updateBlock}
@@ -538,11 +626,6 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
         onAddBlock={addBlock}
         onMoveBlock={moveBlock}
       />
-
-      {/* Briefing para os agentes (no lugar da "Notion AI" de texto fixo) */}
-      {isAiOpen && (
-        <AgentBriefModal page={activePage} workspace={workspace} tasks={ctx.tasks} initiatives={ctx.initiatives} onClose={() => setIsAiOpen(false)} />
-      )}
 
       {/* Estado do salvamento e avisos */}
       <div className="pointer-events-none absolute bottom-3 right-4 z-40 rounded-md bg-[var(--notion-card)] px-2 py-1 text-[11px] text-[var(--notion-text-muted)] shadow-sm">

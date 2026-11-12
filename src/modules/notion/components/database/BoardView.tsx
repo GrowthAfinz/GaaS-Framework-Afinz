@@ -18,6 +18,8 @@ interface BoardViewProps {
   hiddenValues?: string[];
   /** Esconde colunas sem itens. */
   hideEmpty?: boolean;
+  /** Só leitura: sem arrastar e sem criar. */
+  readOnly?: boolean;
 }
 
 interface Column { key: string; name: string; color: NotionColor; value: string }
@@ -33,6 +35,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   onOpenRowPage,
   hiddenValues = [],
   hideEmpty = false,
+  readOnly = false,
 }) => {
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
@@ -105,6 +108,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 <span className={`px-2 py-0.5 rounded text-xs font-semibold truncate ${CHIP_COLORS[col.color]}`}>{col.name}</span>
                 <span className="text-xs text-[var(--notion-text-muted)] font-medium">{rowsInCol.length}</span>
               </div>
+              {!readOnly && (
               <button
                 onClick={() => onAddRow({ [groupProp.id]: col.value })}
                 className="p-1 hover:bg-[var(--notion-hover)] rounded text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"
@@ -112,6 +116,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
               >
                 <Plus size={14} />
               </button>
+              )}
             </div>
 
             {/* Cards List */}
@@ -119,7 +124,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
               {rowsInCol.map((row) => (
                 <div
                   key={row.id}
-                  draggable
+                  draggable={!readOnly}
                   onDragStart={(e) => handleDragStart(e, row.id)}
                   onClick={() => onOpenRowPage(row.pageId)}
                   className={`group relative p-3 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xs hover:shadow-md transition-all cursor-pointer select-none ${draggedRowId === row.id ? 'opacity-50' : ''}`}
@@ -135,12 +140,12 @@ export const BoardView: React.FC<BoardViewProps> = ({
             </div>
 
             {/* Add Card Button */}
-            <button
+            {!readOnly && <button
               onClick={() => onAddRow({ [groupProp.id]: col.value })}
               className="flex items-center gap-1.5 mt-2 px-2 py-1.5 rounded hover:bg-[var(--notion-hover)] text-xs text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] transition-colors"
             >
               <Plus size={14} /> Novo
-            </button>
+            </button>}
           </div>
         );
       })}

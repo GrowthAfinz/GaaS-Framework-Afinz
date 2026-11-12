@@ -7,6 +7,7 @@ import {
   Share2,
   Download,
   Trash2,
+  Copy,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -30,6 +31,7 @@ interface TopbarProps {
   onCreatePage?: () => void;
   onOpenAi?: () => void;
   onOpenComments?: () => void;
+  onDuplicatePage?: () => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -44,6 +46,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onCreatePage,
   onOpenAi,
   onOpenComments,
+  onDuplicatePage,
 }) => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -281,6 +284,14 @@ export const Topbar: React.FC<TopbarProps> = ({
 
                 <div className="h-px bg-[var(--notion-border)] my-1" />
 
+                {onDuplicatePage && (
+                  <button
+                    onClick={() => { onDuplicatePage(); setShowMoreMenu(false); }}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-[var(--notion-text)] hover:bg-[var(--notion-hover)] rounded transition-colors"
+                  >
+                    <Copy size={13} /> Duplicar
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     onArchivePage();

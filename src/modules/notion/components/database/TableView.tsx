@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Plus,
   Trash2,
+  Copy,
   Type,
   Hash,
   Tag,
@@ -20,6 +21,7 @@ import {
 } from '../../types/notion';
 import { PropertyCell } from './PropertyCell';
 import { PropertyHeader } from './PropertyHeader';
+import { PropertyChip } from './viewEngine';
 
 interface TableViewProps {
   database: NotionDatabase;
@@ -28,6 +30,8 @@ interface TableViewProps {
   onUpdateRow: (rowId: string, propertyId: string, value: any) => void;
   onAddRow: () => void;
   onDeleteRow: (rowId: string) => void;
+  onDuplicateRow?: (rowId: string) => void;
+  readOnly?: boolean;
   onAddProperty: (name: string, type: PropertyType) => void;
   onOpenRowPage: (pageId: string) => void;
 }
@@ -39,6 +43,8 @@ export const TableView: React.FC<TableViewProps> = ({
   onUpdateRow,
   onAddRow,
   onDeleteRow,
+  onDuplicateRow,
+  readOnly = false,
   onAddProperty,
   onOpenRowPage,
 }) => {
@@ -91,7 +97,7 @@ export const TableView: React.FC<TableViewProps> = ({
               </th>
             ))}
             {/* Add Property Column */}
-            <th className="w-10 px-2 py-2 text-center">
+            {!readOnly && <th className="w-10 px-2 py-2 text-center">
               <div className="relative">
                 <button
                   onClick={() => setShowAddProp(!showAddProp)}
@@ -141,8 +147,8 @@ export const TableView: React.FC<TableViewProps> = ({
                   </form>
                 )}
               </div>
-            </th>
-            <th className="w-8" />
+            </th>}
+            {!readOnly && <th className="w-8" />}
           </tr>
         </thead>
 
@@ -155,7 +161,11 @@ export const TableView: React.FC<TableViewProps> = ({
             >
               {database.properties.map((prop) => (
                 <td key={prop.id} className="px-3 py-1.5 min-w-[150px]">
-                  <PropertyCell
+                  {readOnly ? (
+                    prop.type === 'title'
+                      ? <button onClick={() => onOpenRowPage(row.pageId)} className="text-left text-sm font-medium text-[var(--notion-text)] hover:underline">{String(row.properties[prop.id] || 'Sem título')}</button>
+                      : <div className="flex flex-wrap gap-1 text-[11px]"><PropertyChip prop={prop} value={row.properties[prop.id]} users={users} /></div>
+                  ) : <PropertyCell
                     property={prop}
                     value={row.properties[prop.id]}
                     users={users}
@@ -163,12 +173,17 @@ export const TableView: React.FC<TableViewProps> = ({
                     rowId={row.id}
                     onChange={(val) => onUpdateRow(row.id, prop.id, val)}
                     onOpenPage={prop.type === 'title' ? () => onOpenRowPage(row.pageId) : undefined}
-                  />
+                  />}
                 </td>
               ))}
-              <td className="w-10" />
+              {!readOnly && <td className="w-10" />}
               {/* Row Actions */}
-              <td className="w-8 text-center p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {!readOnly && <td className="w-8 text-center p-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                {onDuplicateRow && (
+                  <button onClick={() => onDuplicateRow(row.id)} className="p-1 rounded text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)]" title="Duplicar">
+                    <Copy size={13} />
+                  </button>
+                )}
                 <button
                   onClick={() => onDeleteRow(row.id)}
                   className="p-1 rounded text-red-500 hover:bg-red-500/10"
@@ -176,7 +191,7 @@ export const TableView: React.FC<TableViewProps> = ({
                 >
                   <Trash2 size={13} />
                 </button>
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>
@@ -184,12 +199,12 @@ export const TableView: React.FC<TableViewProps> = ({
 
       {/* Table Footer: Add Row & Stats */}
       <div className="flex items-center justify-between px-3 py-2 bg-[var(--notion-hover)]/30 border-t border-[var(--notion-border)] text-xs text-[var(--notion-text-muted)]">
-        <button
+        {readOnly ? <span /> : <button
           onClick={onAddRow}
           className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] font-medium transition-colors"
         >
           <Plus size={14} /> Novo
-        </button>
+        </button>}
         <div>
           <span>{filteredRows.length} {filteredRows.length === 1 ? 'item' : 'itens'}</span>
         </div>

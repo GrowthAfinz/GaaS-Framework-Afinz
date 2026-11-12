@@ -49,10 +49,10 @@ const SECTION_META: Record<
     icon: LucideIcon;
   }
 > = {
-  investigations: { label: "Testes e Tarefas", icon: ListChecks },
+  investigations: { label: "Tarefas e atividades", icon: ListChecks },
   feed: { label: "Fila", icon: Inbox },
   "report-live": { label: "Report Live", icon: Presentation },
-  bets: { label: "Apostas", icon: ListChecks },
+  bets: { label: "Apostas e Registros", icon: ListChecks },
   outcomes: { label: "Outcomes", icon: CircleGauge },
   memory: { label: "Registros", icon: BookMarked },
   vault: { label: "Wiki", icon: Library },
@@ -61,7 +61,8 @@ const SECTION_META: Record<
   corrections: { label: "Correções e melhorias", icon: MessageSquareWarning },
 };
 
-const SECTIONS = GROWTH_LEARNING_SECTIONS.map((id) => ({
+// Outcomes e Registros entraram na página única de Apostas e Registros; os links antigos continuam caindo nela.
+const SECTIONS = GROWTH_LEARNING_SECTIONS.filter((id) => id !== "outcomes" && id !== "memory").map((id) => ({
   id,
   ...SECTION_META[id],
 }));
@@ -143,9 +144,9 @@ export const GrowthLearningWorkspace: React.FC<
   };
 
   return (
-    <div className={section === "investigations" || section === "structure" || section === "daily" ? "min-h-[calc(100vh-5rem)] bg-white pb-0" : "min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 pb-4 sm:px-5"}>
+    <div className={section === "investigations" || section === "structure" || section === "daily" || LEDGER_SECTIONS.has(section) ? "min-h-[calc(100vh-5rem)] bg-white pb-0" : "min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 pb-4 sm:px-5"}>
       <div
-        className={"learning-workspace mx-auto "+(section === "structure" || section === "daily" ? "max-w-none space-y-0" : section === "investigations" ? "max-w-[1800px] space-y-0" : "max-w-[1800px] space-y-4")}
+        className={"learning-workspace mx-auto "+(section === "structure" || section === "daily" ? "max-w-none space-y-0" : section === "investigations" || LEDGER_SECTIONS.has(section) ? "max-w-[1800px] space-y-0" : "max-w-[1800px] space-y-4")}
       >
         {/* Submenu colado no topo e na barra logo abaixo, separados só por uma linha */}
         <header className="overflow-hidden border-x border-b border-slate-200 bg-white">
@@ -246,12 +247,8 @@ export const GrowthLearningWorkspace: React.FC<
             periodEnd={periodEnd}
             onCountChange={setFeedCount}
           />
-        ) : section === "bets" ? (
-          <GrowthBetsView onCountChange={setBetCount} />
-        ) : section === "outcomes" ? (
-          <GrowthOutcomesView onCountChange={setOutcomeCount} />
-        ) : section === "memory" ? (
-          <GrowthMemoryView onCountChange={setMemoryCount} />
+        ) : LEDGER_SECTIONS.has(section) ? (
+          <LedgerPane section={section as "bets" | "outcomes" | "memory"} onCount={setBetCount} legacy={{ setOutcomeCount, setMemoryCount }} />
         ) : section === "vault" ? (
           <div className="!mt-0">
             <Suspense
@@ -283,7 +280,7 @@ export const GrowthLearningWorkspace: React.FC<
   );
 };
 
-/* Testes e Tarefas: módulo estilo Notion, carregado sob demanda e ocupando a altura livre da tela. */
+/* Tarefas e atividades: módulo estilo Notion, carregado sob demanda e ocupando a altura livre da tela. */
 const NotionModule = lazy(() => import("../../modules/notion/NotionModule").then((m) => ({ default: m.NotionModule })));
 function NotionPane({ initialMonth }: { initialMonth: string }) {
   const ref = React.useRef<HTMLDivElement>(null);
@@ -300,7 +297,7 @@ function NotionPane({ initialMonth }: { initialMonth: string }) {
   React.useEffect(() => { const f = () => setLegacy(legacyUrl()); window.addEventListener("popstate", f); return () => window.removeEventListener("popstate", f); }, []);
   if (legacy) return (
     <div>
-      <button onClick={() => go(false)} className="m-3 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">← Voltar para Testes e Tarefas</button>
+      <button onClick={() => go(false)} className="m-3 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">← Voltar para Tarefas e atividades</button>
       <TasksWorkspace initialMonth={initialMonth} />
     </div>
   );
@@ -311,8 +308,43 @@ function NotionPane({ initialMonth }: { initialMonth: string }) {
   }, []);
   return (
     <div ref={ref} style={{ height }} className="border border-slate-200 border-t-0 bg-white">
-      <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-500">Carregando Testes e Tarefas…</div>}>
+      <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-500">Carregando Tarefas e atividades…</div>}>
         <NotionModule onOpenInvestigations={() => go(true)} />
+      </Suspense>
+    </div>
+  );
+}
+
+/* Apostas e Registros: página única (só leitura) no visual do módulo. ?legacy=1 abre a tela antiga para atualizar. */
+const LoopLedger = lazy(() => import("../../modules/notion/gaas/LoopLedger").then((m) => ({ default: m.LoopLedger })));
+function LedgerPane({ section, onCount, legacy }: {
+  section: "bets" | "outcomes" | "memory"; onCount: (n: number) => void;
+  legacy: { setOutcomeCount: (n: number | null) => void; setMemoryCount: (n: number | null) => void };
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(640);
+  React.useLayoutEffect(() => {
+    const fit = () => { if (ref.current) setHeight(Math.max(480, Math.floor(getLocalViewport().height - toLocalRect(ref.current.getBoundingClientRect()).top - 4))); };
+    fit(); window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+  const isLegacy = new URLSearchParams(window.location.search).get("legacy") === "1";
+  const move = (p: URLSearchParams) => { window.history.pushState(null, "", `${window.location.pathname}?${p.toString()}`); window.dispatchEvent(new PopStateEvent("popstate")); };
+  const back = () => { const p = new URLSearchParams(window.location.search); p.delete("legacy"); p.delete("item"); p.set("section", "bets"); move(p); };
+  const openLegacy = (kind: "bet" | "outcome" | "memory", id: string) => {
+    const p = new URLSearchParams(window.location.search);
+    p.set("section", kind === "bet" ? "bets" : kind === "outcome" ? "outcomes" : "memory"); p.set("item", id); p.set("legacy", "1"); move(p);
+  };
+  if (isLegacy) return (
+    <div className="space-y-3 pt-3">
+      <button onClick={back} className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">← Voltar para Apostas e Registros</button>
+      {section === "bets" ? <GrowthBetsView onCountChange={() => undefined} /> : section === "outcomes" ? <GrowthOutcomesView onCountChange={legacy.setOutcomeCount} /> : <GrowthMemoryView onCountChange={legacy.setMemoryCount} />}
+    </div>
+  );
+  return (
+    <div ref={ref} style={{ height }} className="border border-slate-200 border-t-0 bg-white">
+      <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-500">Carregando Apostas e Registros…</div>}>
+        <LoopLedger key={section} initialView={section} initialItem={readGrowthLearningItem(window.location.search)} onCount={onCount} onOpenLegacy={openLegacy} />
       </Suspense>
     </div>
   );

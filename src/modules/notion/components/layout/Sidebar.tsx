@@ -6,6 +6,7 @@ import {
   Search,
   Settings,
   Trash2,
+  Copy,
   Star,
   FileText,
   ChevronsLeft,
@@ -32,6 +33,7 @@ interface SidebarProps {
   onSelectPage: (pageId: string) => void;
   onCreatePage: (parentId?: string | null) => void;
   onArchivePage: (pageId: string) => void;
+  onDuplicatePage?: (pageId: string) => void;
   onToggleFavorite: (pageId: string) => void;
   onSetActiveUser?: (userId: string) => void;
   onOpenSearch: () => void;
@@ -53,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectPage,
   onCreatePage,
   onArchivePage,
+  onDuplicatePage,
   onToggleFavorite,
   onSetActiveUser,
   onOpenSearch,
@@ -130,6 +133,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Plus size={12} />
             </button>
+            {onDuplicatePage && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDuplicatePage(page.id); }}
+                className="p-0.5 rounded hover:bg-[var(--notion-active)] text-[var(--notion-text-muted)]"
+                title="Duplicar"
+              >
+                <Copy size={12} />
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();

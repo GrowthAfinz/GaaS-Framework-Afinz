@@ -18,7 +18,7 @@ describe('tag de página', () => {
     expect(resolvePage('?view=learning&section=results').pageLabel).toBe('Wiki');
   });
   it('outras abas usam o nome da página', () => {
-    expect(resolvePage('?view=learning&section=investigations').pageLabel).toBe('Testes e Tarefas');
+    expect(resolvePage('?view=learning&section=investigations').pageLabel).toBe('Tarefas e atividades');
     expect(resolvePage('?view=learning&section=records').pageLabel).toBe('Registros');
     expect(resolvePage('?view=midia-paga')).toEqual({ surface: 'midia-paga', pageLabel: 'Mídia Paga' });
     expect(resolvePage('').pageLabel).toBe('Launch Planner');
