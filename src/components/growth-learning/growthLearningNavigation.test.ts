@@ -29,7 +29,7 @@ describe('growth learning navigation contract', () => {
     expect(params.has('task_view')).toBe(false);
   });
   it('places Wiki next to the queue and preserves the operational sequence', () => {
-    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'structure', 'corrections', 'investigations', 'report-live', 'bets', 'outcomes', 'memory']);
+    expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'daily', 'structure', 'corrections', 'investigations', 'report-live', 'bets', 'outcomes', 'memory']);
   });
   it('defaults an absent or invalid section to the system feed', () => {
     expect(readGrowthLearningSection('')).toBe('feed');
