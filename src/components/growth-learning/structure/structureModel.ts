@@ -67,6 +67,8 @@ export const BU_COLORS: Record<string, string> = {
 export const BU_OPTIONS = ['B2C', 'Plurix', 'B2B2C', 'Bem Barato', 'Dia', 'Super Nosso', 'Seguros'];
 export const B2B2C_WITHOUT_CRM = ['RD', 'Saúde', 'RM', 'Nosso Pay'];
 export const METRIC_LABEL: Record<MetricKey, string> = { aq: 'cartões em 90d', de: 'base impactada em 90d', re: 'base impactada em 90d', cs: 'base impactada em 90d', en: 'base impactada em 90d' };
+/** Largura de cada coluna do quadro (o esqueleto de carregamento usa a mesma). */
+export const BOARD_COL_W = 272;
 const ACTIVE: DeclaredStatus[] = ['rec', 'con', 'mat'];
 const DAY = 86_400_000;
 

@@ -3,9 +3,11 @@ import type React from 'react';
 import { toLocalPx } from '../../../context/UIScaleContext';
 
 export interface BoardView { x: number; y: number; z: number }
-export const ZOOM_MIN = 0.35;
-export const ZOOM_MAX = 1.6;
-const MARGIN = 80;
+export const ZOOM_MIN = 0.1;
+export const ZOOM_MAX = 2.5;
+/** Área livre em volta do quadro: dá para arrastar para longe dos pilares, mas sempre sobra este tanto do conteúdo à vista. */
+const KEEP_VISIBLE = 160;
+const GRID = 20;
 
 function readView(key: string): BoardView | null {
   try {
@@ -16,7 +18,7 @@ function readView(key: string): BoardView | null {
 
 /** Quadro navegável: arrastar o fundo move, Ctrl+roda/pinça dá zoom no cursor, roda rola.
  * Mouse e retângulos vêm em px físicos; o transform é escrito em px locais (zoom global do app). */
-export function useBoardViewport(storageKey: string) {
+export function useBoardViewport(storageKey: string, active = true) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const stored = useRef(readView(storageKey));
@@ -29,8 +31,9 @@ export function useBoardViewport(storageKey: string) {
     if (!canvas || !stage) return v;
     const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v.z));
     const cw = canvas.clientWidth, ch = canvas.clientHeight, w = stage.offsetWidth * z, h = stage.offsetHeight * z;
-    const x = w <= cw ? Math.min(Math.max(v.x, 0), cw - w) : Math.min(MARGIN, Math.max(v.x, cw - w - MARGIN));
-    const y = h <= ch ? Math.min(Math.max(v.y, 0), Math.max(0, ch - h)) : Math.min(MARGIN, Math.max(v.y, ch - h - MARGIN));
+    const keepX = Math.min(KEEP_VISIBLE, w, cw / 2), keepY = Math.min(KEEP_VISIBLE, h, ch / 2);
+    const x = Math.min(cw - keepX, Math.max(v.x, keepX - w));
+    const y = Math.min(ch - keepY, Math.max(v.y, keepY - h));
     return { x, y, z };
   }, []);
   const setView = useCallback((v: BoardView | ((prev: BoardView) => BoardView)) => {
@@ -78,18 +81,31 @@ export function useBoardViewport(storageKey: string) {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const p = localPoint(e.clientX, e.clientY);
-        zoomAt(Math.exp(-e.deltaY * 0.0022), p.x, p.y);
+        zoomAt(Math.exp(-e.deltaY * 0.0012), p.x, p.y);
       } else if (e.shiftKey) setView(v => ({ ...v, x: v.x - toLocalPx(e.deltaY) }));
       else setView(v => ({ ...v, x: v.x - toLocalPx(e.deltaX), y: v.y - toLocalPx(e.deltaY) }));
     };
     // Rolagem programática (focus, scrollIntoView) não pode deslocar o conteúdo transformado.
     const onScroll = () => { if (canvas.scrollTop || canvas.scrollLeft) { canvas.scrollTop = 0; canvas.scrollLeft = 0; } };
+    // Ctrl/Cmd + "+", "-" e "0" dão zoom no quadro (e não na página), como no explorador de jornadas.
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || !canvas.isConnected || !canvas.offsetParent) return;
+      const a = document.activeElement as HTMLElement | null;
+      if (a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable)) return;
+      if (e.key === '+' || e.key === '=') zoomAt(1.15);
+      else if (e.key === '-' || e.key === '_') zoomAt(1 / 1.15);
+      else if (e.key === '0') fit();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('scroll', onScroll);
     const onResize = () => setView(v => v);
     window.addEventListener('resize', onResize);
-    return () => { canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onResize); };
-  }, [setView, zoomAt]);
+    return () => { window.removeEventListener('keydown', onKey); canvas.removeEventListener('wheel', onWheel); canvas.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onResize); };
+    // `active` religa roda e atalhos quando o canvas aparece (ex.: depois da tela de carregamento).
+  }, [setView, zoomAt, fit, active]);
 
   useEffect(() => {
     const t = window.setTimeout(() => { try { localStorage.setItem(storageKey, JSON.stringify(view)); } catch { /* preferência local */ } }, 300);
@@ -128,8 +144,11 @@ export function useBoardViewport(storageKey: string) {
     if (dx || dy) setView(v => ({ ...v, x: v.x + dx, y: v.y + dy }));
   };
 
+  /** Pontilhado do fundo acompanha arrasto e zoom, para a área livre parecer parte do quadro. */
+  const gridStyle: React.CSSProperties = { backgroundPosition: `${Math.round(view.x)}px ${Math.round(view.y)}px`, backgroundSize: `${GRID * view.z}px ${GRID * view.z}px` };
+
   return {
-    canvasRef, stageRef, view, setView, zoomAt, fit, reveal, panning, hadStoredView: Boolean(stored.current),
+    canvasRef, stageRef, view, setView, zoomAt, fit, reveal, panning, gridStyle, hadStoredView: Boolean(stored.current),
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onDragOver: onDragOverEdge },
   };
 }

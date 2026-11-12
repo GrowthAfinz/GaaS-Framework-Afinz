@@ -44,12 +44,16 @@ export function BoardZoomBar({ vp, showMini, onToggleMini, children }: { vp: Vie
 }
 
 export function BoardMiniMap({ vp, mini }: { vp: Viewport; mini: MiniState }) {
-  const s = 200 / Math.max(1, mini.w), h = Math.max(40, Math.min(120, mini.h * s)), z = vp.view.z, c = vp.canvasRef.current;
-  const go = (e: React.PointerEvent<HTMLDivElement>) => { if (!c) return; const r = e.currentTarget.getBoundingClientRect(); const mx = toLocalPx(e.clientX - r.left) / s, my = toLocalPx(e.clientY - r.top) / s; vp.setView(v => ({ ...v, x: -(mx * v.z - c.clientWidth / 2), y: -(my * v.z - c.clientHeight / 2) })); };
+  const z = vp.view.z, c = vp.canvasRef.current;
+  // O minimapa cobre o quadro e a área visível juntos: quem foi para a área livre continua se vendo no mapa.
+  const vx = -vp.view.x / z, vy = -vp.view.y / z, vw = (c?.clientWidth || 0) / z, vh = (c?.clientHeight || 0) / z;
+  const minX = Math.min(0, vx), minY = Math.min(0, vy), spanX = Math.max(mini.w, vx + vw) - minX, spanY = Math.max(mini.h, vy + vh) - minY;
+  const s = Math.min(200 / Math.max(1, spanX), 130 / Math.max(1, spanY)), h = Math.max(40, spanY * s);
+  const go = (e: React.PointerEvent<HTMLDivElement>) => { if (!c) return; const r = e.currentTarget.getBoundingClientRect(); const mx = toLocalPx(e.clientX - r.left) / s + minX, my = toLocalPx(e.clientY - r.top) / s + minY; vp.setView(v => ({ ...v, x: -(mx * v.z - c.clientWidth / 2), y: -(my * v.z - c.clientHeight / 2) })); };
   return (
     <div className="cs-mini" data-nopan style={{ height: h }} onPointerDown={e => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ponteiro sem captura */ } go(e); }} onPointerMove={e => { if (e.buttons) go(e); }}>
-      {mini.blocks.map((b, i) => <i key={i} style={{ left: b.x * s, top: b.y * s, width: b.w * s, height: b.c ? 3 : b.h * s, background: b.c || 'rgba(15,23,42,.10)' }} />)}
-      {c && <div className="cs-mview" style={{ left: (-vp.view.x / z) * s, top: (-vp.view.y / z) * s, width: (c.clientWidth / z) * s, height: (c.clientHeight / z) * s }} />}
+      {mini.blocks.map((b, i) => <i key={i} style={{ left: (b.x - minX) * s, top: (b.y - minY) * s, width: b.w * s, height: b.c ? 3 : b.h * s, background: b.c || 'rgba(15,23,42,.10)' }} />)}
+      {c && <div className="cs-mview" style={{ left: (vx - minX) * s, top: (vy - minY) * s, width: vw * s, height: vh * s }} />}
     </div>
   );
 }

@@ -207,3 +207,28 @@
 .cs-toast button{background:none;border:1px solid #475569;color:#a5f3fc;border-radius:6px;padding:3px 9px}
 @media (max-width:1500px){.cs-stat .lb{display:none}}
 @media (max-width:1180px){.cs-bar{flex-wrap:wrap}}
+
+/* carregamento: esqueleto do quadro e cards esperando os disparos */
+.cs-sk{display:block;border-radius:5px;background:linear-gradient(90deg,#e9eef4 25%,#f6f8fb 40%,#e9eef4 60%);background-size:300% 100%;animation:cs-shimmer 1.3s ease-in-out infinite}
+@keyframes cs-shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+@media (prefers-reduced-motion:reduce){.cs-sk{animation:none}}
+.cs-sk-v{height:14px;width:72%;margin-top:4px}
+.cs-sk-line{height:8px;width:62%;margin-top:1px}
+.cs-sk-chip{width:62px;height:19px;padding:0}
+.cs-sk-ins{height:30px;width:100%;border-radius:8px}
+.cs-win.err{color:#b91c1c}
+.cs-Hs .cs-sk{display:inline-block;width:150px;height:10px;vertical-align:-1px}
+.cs-stat .cs-sk{display:inline-block;width:14px;height:12px;vertical-align:-1px}
+.cs-skel{pointer-events:none}
+.cs-skel .cs-H{min-height:104px}
+.cs-skel .cs-H .cs-sk:first-child{width:46%;height:16px;margin-top:4px}
+.cs-skel .cs-H .cs-sk+.cs-sk{width:82%;height:10px;margin-top:14px}
+.cs-skel .cs-H .cs-sk+.cs-sk+.cs-sk{width:100%;height:5px;margin-top:10px}
+.cs-skel .cs-Si .cs-sk{width:70%;height:12px;margin-top:3px}
+.cs-skel .cs-card{cursor:default;transform:none}
+.cs-skel .cs-card .cs-sk{margin-bottom:9px}
+.cs-skel-msg{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:6;background:#fff;border:1px solid var(--cs-line);border-radius:12px;padding:12px 18px;font-size:13px;color:#334155;display:flex;gap:10px;align-items:center;box-shadow:0 10px 30px -12px rgba(15,23,42,.3)}
+.cs-skel-msg i{width:16px;height:16px;border-radius:50%;border:2px solid #cbd5e1;border-top-color:#0e7490;animation:cs-spin .8s linear infinite}
+@keyframes cs-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.cs-skel-msg i{animation:none}}
+
