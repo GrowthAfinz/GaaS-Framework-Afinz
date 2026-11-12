@@ -54,6 +54,8 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 
 interface Props {
   card: StructureCard; signal: CardSignal; metricKey: MetricKey; lens: Lens; showMetric: boolean; editable: boolean; today: string;
+  /** Estado da leitura dos disparos. Enquanto não chega, card ligado a dados mostra carregando em vez de "a medir". */
+  dataState: 'loading' | 'ok' | 'error';
   dropBefore: boolean; dragging: boolean;
   onOpen: (id: string) => void; onRename: (id: string, el: HTMLElement) => void; onMenu: (id: string, anchor: HTMLElement) => void;
   onDragStart: (e: React.DragEvent, id: string) => void; onDragEnd: () => void; onDragOverCard: (e: React.DragEvent, id: string) => void; onDropCard: (e: React.DragEvent, id: string) => void;
@@ -61,18 +63,25 @@ interface Props {
 
 function StructureCardViewBase(p: Props) {
   const { card, signal } = p;
-  const drift = isDrift(card, signal);
+  const pending = card.data_scope != null && p.dataState !== 'ok';
+  const loading = pending && p.dataState === 'loading';
+  const failed = pending && p.dataState === 'error';
+  const drift = !pending && isDrift(card, signal);
   const w = signal.window;
   const metrics = cardMetrics(signal, p.metricKey);
   const channels = w?.channels.filter(c => c.channel !== 'Sem canal') || [];
 
-  const due = signal.observed === 'on' || signal.observed === 'slow'
+  const due = loading ? <span className="cs-chip cs-sk cs-sk-chip" aria-hidden="true" />
+    : failed ? <span className="cs-chip none" title="Não foi possível ler os disparos"><Link2Off />sem dados</span>
+    : signal.observed === 'on' || signal.observed === 'slow'
     ? <span className={`cs-chip ${signal.observed === 'on' ? 'ok' : 'stale'}`} title={`Último disparo em ${fmtShortDate(signal.lastDate)}`}><Clock />{signal.observed === 'on' ? `há ${signal.daysSince}d` : `parada ${signal.daysSince}d`}</span>
     : <span className="cs-chip none" title={OBS_META[signal.observed].hint}><Link2Off />{signal.observed === 'none' ? 'sem disparo' : 'sem vínculo'}</span>;
   const initials = card.owner.split(/\s+/).filter(Boolean).map(x => x[0]).join('').slice(0, 2).toUpperCase();
 
   let insight: React.ReactNode;
   if (card.external_note) insight = <div className="cs-note warn"><Info />{card.external_note}</div>;
+  else if (loading) insight = <div className="cs-sk cs-sk-ins" aria-hidden="true" />;
+  else if (failed) insight = <div className="cs-note warn"><Info />Não foi possível ler os disparos agora</div>;
   else if (w?.kind === '90d') {
     const trend = cardTrend(signal, p.today);
     if (trend.series.length >= 3) {
@@ -94,7 +103,7 @@ function StructureCardViewBase(p: Props) {
     <div
       className={`cs-card${card.declared_status === 'pon' ? ' dashed' : ''}${p.dropBefore ? ' drop-before' : ''}${p.dragging ? ' dragging' : ''}`}
       style={{ ['--t' as string]: cardTint(p.lens, card, signal), ['--s' as string]: lensColor(p.lens, card, signal) }}
-      data-nopan data-card={card.id} draggable={p.editable} tabIndex={0} role="button" aria-label={`Abrir ${card.title}`}
+      data-nopan data-card={card.id} draggable={p.editable} tabIndex={0} role="button" aria-label={`Abrir ${card.title}`} aria-busy={loading || undefined}
       onClick={e => { if (!(e.target as Element).closest('.cs-tools')) p.onOpen(card.id); }}
       onKeyDown={e => { if (e.key === 'Enter') p.onOpen(card.id); }}
       onDragStart={e => p.onDragStart(e, card.id)} onDragEnd={p.onDragEnd}
@@ -120,12 +129,17 @@ function StructureCardViewBase(p: Props) {
       </div>
       {p.showMetric && (
         <div className="cs-met">
-          {w?.kind === '90d' ? <div className="cs-win on">Últimos 90 dias</div>
+          {loading ? <div className="cs-win">Lendo disparos…</div>
+            : failed ? <div className="cs-win err">Disparos indisponíveis</div>
+            : w?.kind === '90d' ? <div className="cs-win on">Últimos 90 dias</div>
             : w ? <div className="cs-win cyc">Último ciclo<em>90d até {fmtShortDate(w.until)}</em></div>
               : <div className="cs-win">A medir</div>}
-          <div className="cs-g">{metrics.map(m => <div key={m.label}><small>{m.label}</small><b className={m.tone || ''}>{m.value}</b></div>)}</div>
+          <div className="cs-g">{metrics.map(m => <div key={m.label}><small>{m.label}</small>{loading ? <span className="cs-sk cs-sk-v" aria-hidden="true" /> : <b className={m.tone || ''}>{m.value}</b>}</div>)}</div>
           <div className="cs-mx">
-            {channels.length ? (<>
+            {loading ? (<>
+              <div className="cs-mbar cs-sk" aria-hidden="true" />
+              <div className="cs-mlg"><span className="cs-sk cs-sk-line" aria-hidden="true" /></div>
+            </>) : channels.length ? (<>
               <div className="cs-mbar">{channels.map(c => <i key={c.channel} style={{ flex: c.share, background: channelMeta(c.channel).color }} />)}</div>
               <div className="cs-mlg">{channels.map(c => <span key={c.channel}><i style={{ background: channelMeta(c.channel).color }} />{c.channel} <b>{c.share < 0.01 ? '<1' : Math.round(c.share * 100)}%</b></span>)}</div>
             </>) : (<>

@@ -38,6 +38,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
     const onKey = (e: KeyboardEvent) => {
       const a = document.activeElement as HTMLElement | null;
       if (a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey) return;
       if (e.key === '+' || e.key === '=') vp.zoomAt(1.15);
       else if (e.key === '-') vp.zoomAt(1 / 1.15);
       else if (e.key === '0') vp.fit();
@@ -224,7 +225,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
           <button className="cz-btn" onClick={() => setClosed(new Set(pillarDefs.flatMap(p => [...p.fronts, null].map(f => p.key + '|' + f))))}><Minimize2 />Recolher tudo</button>
         </span>
       </div>
-      <div ref={vp.canvasRef} className={`cs-canvas cz-mcanvas${vp.panning ? ' panning' : ''}`} {...vp.handlers}>
+      <div ref={vp.canvasRef} className={`cs-canvas cz-mcanvas${vp.panning ? ' panning' : ''}`} style={vp.gridStyle} {...vp.handlers}>
         <div ref={vp.stageRef} className="cs-stage" style={{ transform: `translate(${Math.round(vp.view.x)}px,${Math.round(vp.view.y)}px) scale(${vp.view.z})` }}>
           <div className="cz-map">{cols}</div>
         </div>

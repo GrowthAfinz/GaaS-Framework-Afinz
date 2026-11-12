@@ -10,16 +10,17 @@ import { fetchResultsSnapshot } from '../results/resultsService';
 import type { ResultRow } from '../results/results.types';
 import { loadStructure, saveCard, saveLane, savePillar, type StructureBoard } from './structureService';
 import {
-  B2B2C_WITHOUT_CRM, BU_OPTIONS, MED_META, OBS_META, STATUS_META, computeSignal, dropPosition, emptyFilters, fmtInt, fmtMoney, friendlyError, hasFilters, isDrift, kpis, passes, pillarSummary, toggleIsolate, uniqueRows,
+  B2B2C_WITHOUT_CRM, BOARD_COL_W, BU_OPTIONS, MED_META, OBS_META, STATUS_META, computeSignal, dropPosition, emptyFilters, fmtInt, fmtMoney, friendlyError, hasFilters, isDrift, kpis, passes, pillarSummary, toggleIsolate, uniqueRows,
   type CardSignal, type DeclaredStatus, type Lens, type Measurement, type Observed, type QuickFilter, type StructureCard, type StructureFilters, type StructureLane, type StructurePillar,
 } from './structureModel';
 import { StatusDot, StructureCardView } from './StructureCardView';
+import { StructureSkeleton } from './StructureSkeleton';
 import { StructureDrawer } from './StructureDrawer';
 import { useBoardViewport } from './useBoardViewport';
 import { BoardMiniMap, BoardZoomBar, useBoardChrome } from './BoardNav';
 import './structure.css';
 
-const W = 272;
+const W = BOARD_COL_W;
 const PREFS_KEY = 'gaas.estrutura-crm.prefs';
 const BG_COLORS: [string, string][] = [['#f4f1ea', 'Papel'], ['#ece6d8', 'Areia'], ['#eef1f5', 'Névoa'], ['#e9efe6', 'Sálvia'], ['#efecf5', 'Lavanda'], ['#fafaf8', 'Gelo'], ['#e4e6ea', 'Concreto']];
 interface Prefs { lens: Lens; dense: boolean; mini: boolean; showMetric: boolean; collapsed: string[]; bg: string; legend: { docked: boolean; x: number; y: number } }
@@ -59,7 +60,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   const [toast, setToast] = useState<Toast>(null);
   const [addingLane, setAddingLane] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; overCard: string | null; overLane: string | null } | null>(null);
-  const vp = useBoardViewport('gaas.estrutura-crm.view');
+  const vp = useBoardViewport('gaas.estrutura-crm.view', Boolean(board));
   const toastTimer = useRef<number>();
   const today = useMemo(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()), []);
 
@@ -167,6 +168,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
       if (e.key === 'Escape') { setMenu(null); setDrawer(null); }
       else if (e.key === '/') { e.preventDefault(); document.getElementById('cs-q')?.focus({ preventScroll: true }); }
       else if ((e.key === 'n' || e.key === 'N') && editable) { e.preventDefault(); setDrawer({ mode: 'create', laneId: null }); }
+      else if (e.ctrlKey || e.metaKey) return;
       else if (e.key === '+' || e.key === '=') vp.zoomAt(1.15);
       else if (e.key === '-') vp.zoomAt(1 / 1.15);
       else if (e.key === '0') vp.fit();
@@ -232,7 +234,9 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   const onCardMenu = useCallback((id: string, anchor: HTMLElement) => openMenu('card', anchor, id), []);
 
   if (loadError) return <div className="cs-root" style={{ padding: 24 }}><p className="cs-err">{loadError}</p><button className="cs-btn" onClick={() => void reload()}>Tentar de novo</button></div>;
-  if (!board) return <div className="cs-root" style={{ padding: 24, color: '#64748b' }}>Carregando a Estrutura CRM…</div>;
+  if (!board) return <StructureSkeleton modeSwitch={modeSwitch} background={prefs.bg} />;
+  /** Números que dependem dos disparos: piscam enquanto carregam e viram n/d se a leitura falhar. */
+  const rowDep = (n: React.ReactNode) => (rowsState === 'ok' ? n : rowsState === 'loading' ? <span className="cs-sk" aria-label="carregando" /> : 'n/d');
 
   const menuCard = menu?.kind === 'card' ? cards.find(c => c.id === menu.id) : undefined;
   const menuLane = menu?.kind === 'lane' ? board.lanes.find(l => l.id === menu.id) : undefined;
@@ -244,13 +248,13 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
       <div className="cs-bar">
         {modeSwitch ? <span title={`${cards.length} campanhas · dados até ${dataUntil}`}>{modeSwitch}</span> : <h2 title={`${cards.length} campanhas · dados até ${dataUntil}`}>Estrutura CRM</h2>}
         <span className="cs-sep" />
-        <button className={`cs-stat${filters.obs.has('on') ? ' on' : ''}`} title="Disparo nos últimos 30 dias" onClick={() => statKpi('on')}><Zap /><b>{k.active}</b><span className="lb">ativas</span></button>
+        <button className={`cs-stat${filters.obs.has('on') ? ' on' : ''}`} title="Disparo nos últimos 30 dias" onClick={() => statKpi('on')}><Zap /><b>{rowDep(k.active)}</b><span className="lb">ativas</span></button>
         <button className={`cs-stat${filters.med.has('r') ? ' on' : ''}`} title="Têm fonte de resultado" onClick={() => statKpi('r')}><ChartLine /><b>{k.measured}</b><span className="lb">medem resultado</span></button>
-        <button className={`cs-stat${filters.quick === 'drift' ? ' on' : ''}`} title="Declaradas ativas sem disparo recente" onClick={() => statKpi('drift')}><TriangleAlert /><b>{k.drift}</b><span className="lb">divergem</span></button>
+        <button className={`cs-stat${filters.quick === 'drift' ? ' on' : ''}`} title="Declaradas ativas sem disparo recente" onClick={() => statKpi('drift')}><TriangleAlert /><b>{rowDep(k.drift)}</b><span className="lb">divergem</span></button>
         <button className={`cs-stat${filters.med.has('n') ? ' on' : ''}`} title="Nenhuma fonte mapeada" onClick={() => statKpi('n')}><DatabaseZap /><b>{k.noSource}</b><span className="lb">sem fonte</span></button>
-        <button className={`cs-stat${filters.quick === 'parada' ? ' on' : ''}`} title="Sem disparo há mais de 30 dias" onClick={() => statKpi('parada')}><CirclePause /><b>{k.stopped}</b><span className="lb">paradas</span></button>
+        <button className={`cs-stat${filters.quick === 'parada' ? ' on' : ''}`} title="Sem disparo há mais de 30 dias" onClick={() => statKpi('parada')}><CirclePause /><b>{rowDep(k.stopped)}</b><span className="lb">paradas</span></button>
         <button className={`cs-stat${filters.quick === 'unlinked' ? ' on' : ''}`} title="Ainda não ligadas aos disparos" onClick={() => statKpi('unlinked')}><Link2 /><b>{k.unlinked}</b><span className="lb">sem vínculo</span></button>
-        {k.drift > 0 && <button className="cs-alert" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('alert', e.currentTarget)}><TriangleAlert size={13} />{k.drift}</button>}
+        {rowsState === 'ok' && k.drift > 0 && <button className="cs-alert" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('alert', e.currentTarget)}><TriangleAlert size={13} />{k.drift}</button>}
         {rowsState === 'loading' && <span className="cs-readonly">Lendo disparos…</span>}
         {rowsState === 'error' && <span className="cs-readonly" style={{ color: '#b91c1c' }}>Disparos indisponíveis</span>}
         <span className="cs-grow" />
@@ -271,7 +275,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
         </div>
       )}
 
-      <div ref={vp.canvasRef} className={`cs-canvas${vp.panning ? ' panning' : ''}`} style={{ backgroundColor: prefs.bg }} {...vp.handlers}>
+      <div ref={vp.canvasRef} className={`cs-canvas${vp.panning ? ' panning' : ''}`} style={{ backgroundColor: prefs.bg, ...vp.gridStyle }} {...vp.handlers}>
         <div ref={vp.stageRef} className={`cs-stage${prefs.legend.docked ? ' legdock' : ''}`} style={{ transform: `translate(${Math.round(vp.view.x)}px,${Math.round(vp.view.y)}px) scale(${vp.view.z})` }}>
           <div className={`cs-legend${legLive ? ' dragging' : ''}`} data-nopan style={{ left: legPos.x, top: legPos.y }}>
             <h5
@@ -293,7 +297,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
                 {lensDot(value)}<span><b>{meta.label}</b><span className="s">{meta.hint}</span></span><span className="c">{countBy(value)}</span>
               </button>
             ))}
-            {prefs.lens === 'st' && <button className={`cs-lg${filters.quick === 'drift' ? ' on' : ''}`} onClick={() => setFilter({ quick: filters.quick === 'drift' ? null : 'drift' })}><TriangleAlert size={15} color="#b45309" /><span><b>Divergência</b><span className="s">Declarado não bate com os dados</span></span><span className="c">{k.drift}</span></button>}
+            {prefs.lens === 'st' && <button className={`cs-lg${filters.quick === 'drift' ? ' on' : ''}`} onClick={() => setFilter({ quick: filters.quick === 'drift' ? null : 'drift' })}><TriangleAlert size={15} color="#b45309" /><span><b>Divergência</b><span className="s">Declarado não bate com os dados</span></span><span className="c">{rowDep(k.drift)}</span></button>}
           </div>
 
           <div className="cs-board" style={{ gridTemplateColumns: template.join(' ') }}>
@@ -317,9 +321,12 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
                     {editable && <button className="cs-icon" style={{ marginLeft: 'auto' }} aria-label="Ações do pilar" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('pillar', e.currentTarget, pillar.id)}><Ellipsis /></button>}
                   </div>
                   <div className="cs-Hs">
-                    {total} {total === 1 ? 'campanha' : 'campanhas'} · <b>{sum.active} {sum.active === 1 ? 'ativa' : 'ativas'}</b>
-                    {sum.cards != null ? <> · <b>{fmtInt(sum.cards)}</b> cartões 90d{sum.cac != null && <> · CAC <b>{fmtMoney(sum.cac)}</b></>}</> : sum.base > 0 ? <> · <b>{fmtInt(sum.base)}</b> base 90d</> : null}
-                    {sum.stopped > 0 && <> · {sum.stopped} {sum.stopped === 1 ? 'parada' : 'paradas'}</>}
+                    {total} {total === 1 ? 'campanha' : 'campanhas'}
+                    {rowsState !== 'ok' ? <> · {rowDep(null)}</> : (<>
+                      {' · '}<b>{sum.active} {sum.active === 1 ? 'ativa' : 'ativas'}</b>
+                      {sum.cards != null ? <> · <b>{fmtInt(sum.cards)}</b> cartões 90d{sum.cac != null && <> · CAC <b>{fmtMoney(sum.cac)}</b></>}</> : sum.base > 0 ? <> · <b>{fmtInt(sum.base)}</b> base 90d</> : null}
+                      {sum.stopped > 0 && <> · {sum.stopped} {sum.stopped === 1 ? 'parada' : 'paradas'}</>}
+                    </>)}
                   </div>
                   <div className="cs-Hbar" title={`Composição por ${dim.title.toLowerCase()}`}>
                     {dim.entries.map(([value, meta]) => { const n = pillarCards.filter(c => lensValue(c) === value).length; return n ? <i key={value} title={`${meta.label}: ${n}`} style={{ flex: n, background: lensSwatch(value) }} /> : null; })}
@@ -347,7 +354,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
                   onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDrag(d => (d ? { ...d, overLane: null, overCard: null } : d)); }}
                   onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDrag(null); if (id) void moveCard(id, lane.id, null); }}>
                   {vis.map(c => (
-                    <StructureCardView key={c.id} card={c} signal={sig(c.id)} metricKey={lane.metric_key} lens={prefs.lens} showMetric={prefs.showMetric} editable={editable} today={today}
+                    <StructureCardView key={c.id} card={c} signal={sig(c.id)} metricKey={lane.metric_key} lens={prefs.lens} showMetric={prefs.showMetric} editable={editable} today={today} dataState={rowsState}
                       dropBefore={drag?.overCard === c.id && drag.id !== c.id} dragging={drag?.id === c.id}
                       onOpen={openCard} onRename={onRename} onMenu={onCardMenu} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOverCard={onDragOverCard} onDropCard={onDropCard} />
                   ))}
