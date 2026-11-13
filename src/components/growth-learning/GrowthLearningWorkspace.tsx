@@ -20,6 +20,8 @@ import { ReportLiveCard } from "../relatorio/ReportLiveCard";
 import {
   GROWTH_LEARNING_SECTIONS,
   GrowthLearningSection,
+  type GrowthWorkspace,
+  workspaceOfSection,
   openGrowthLearningSection,
   readGrowthLearningSection,
 } from "./growthLearningNavigation";
@@ -40,6 +42,8 @@ const VaultWorkspace = lazy(() =>
 interface GrowthLearningWorkspaceProps {
   periodStart: Date;
   periodEnd: Date;
+  /** Operação (Planejamento) mostra Fila, Visão Daily, Estrutura CRM e Tarefas; o Loop mostra o resto. */
+  workspace?: GrowthWorkspace;
 }
 
 const SECTION_META: Record<
@@ -66,13 +70,15 @@ const SECTIONS = GROWTH_LEARNING_SECTIONS.filter((id) => id !== "outcomes" && id
   id,
   ...SECTION_META[id],
 }));
+const WORKSPACE_LABEL: Record<GrowthWorkspace, string> = { operacao: "Áreas da Operação", learning: "Áreas do Loop de Memória" };
 
 /** Apostas, Outcomes e Registros trazem o próprio cabeçalho, no desenho das Estratégias da Wiki. */
 const LEDGER_SECTIONS = new Set<GrowthLearningSection>(["bets", "outcomes", "memory"]);
 
 export const GrowthLearningWorkspace: React.FC<
   GrowthLearningWorkspaceProps
-> = ({ periodStart: initialStart, periodEnd: initialEnd }) => {
+> = ({ periodStart: initialStart, periodEnd: initialEnd, workspace = "learning" }) => {
+  const sections = SECTIONS.filter((item) => workspaceOfSection(item.id) === workspace);
   const readPeriod = (key: string, fallback: Date) => {
     const value = new URLSearchParams(window.location.search).get(key);
     return value &&
@@ -106,7 +112,7 @@ export const GrowthLearningWorkspace: React.FC<
     );
   };
   const [section, setSection] = useState<GrowthLearningSection>(() =>
-    readGrowthLearningSection(window.location.search),
+    readGrowthLearningSection(window.location.search, workspace),
   );
   const [feedCount, setFeedCount] = useState<number | null>(null);
   const [betCount, setBetCount] = useState<number | null>(null);
@@ -116,17 +122,18 @@ export const GrowthLearningWorkspace: React.FC<
   const [correctionsCount, setCorrectionsCount] = useState<number | null>(null);
 
   useEffect(() => {
+    if (workspace !== "learning") return;
     const refresh = () => void countOpenFeedback().then(setCorrectionsCount).catch(() => setCorrectionsCount(null));
     refresh();
     return onFeedbackChanged(refresh);
-  }, []);
+  }, [workspace]);
 
   useEffect(() => {
     const syncSection = () =>
-      setSection(readGrowthLearningSection(window.location.search));
+      setSection(readGrowthLearningSection(window.location.search, workspace));
     window.addEventListener("popstate", syncSection);
     return () => window.removeEventListener("popstate", syncSection);
-  }, []);
+  }, [workspace]);
 
   const selectSection = (next: GrowthLearningSection) => {
     setSection(next);
@@ -152,9 +159,9 @@ export const GrowthLearningWorkspace: React.FC<
         <header className="overflow-hidden border-x border-b border-slate-200 bg-white">
           <nav
             className="flex gap-1 overflow-x-auto px-3 sm:px-5"
-            aria-label="Áreas do Loop de Memória"
+            aria-label={WORKSPACE_LABEL[workspace]}
           >
-            {SECTIONS.map(({ id, label, icon: Icon }) => (
+            {sections.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 type="button"

@@ -1,12 +1,15 @@
 import type { MouseEvent } from 'react';
 import type { ViewSettings } from '../types/framework';
+import { workspaceOfSearch } from '../components/growth-learning/growthLearningNavigation';
 
 export type TabId = ViewSettings['abaAtual'];
 
-export const DEFAULT_TAB: TabId = 'launch';
+/** O GaaS abre em Planejamento > Operação (Visão Daily) desde 13/11/2026. */
+export const DEFAULT_TAB: TabId = 'operacao';
 
 // Valor de ?view= de cada aba. Igual ao id, exceto o Loop de Memória, que já usava ?view=learning.
 const TAB_SLUGS: Record<TabId, string> = {
+  operacao: 'operacao',
   launch: 'launch',
   resultados: 'resultados',
   jornada: 'jornada',
@@ -33,9 +36,28 @@ const SLUG_TO_TAB = new Map<string, TabId>(
   (Object.entries(TAB_SLUGS) as [TabId, string][]).map(([tab, slug]) => [slug, tab]),
 );
 
+const LEARNING_TABS = new Set<TabId>(['operacao', 'aprendizado-growth']);
+
 export function readTabFromSearch(search: string): TabId {
   const slug = new URLSearchParams(search).get('view');
-  return (slug && SLUG_TO_TAB.get(slug)) || DEFAULT_TAB;
+  // O Diário de Bordo saiu do app; link antigo cai na Operação.
+  if (slug === 'diario') return 'operacao';
+  const tab = slug ? SLUG_TO_TAB.get(slug) : undefined;
+  if (!tab) return DEFAULT_TAB;
+  return LEARNING_TABS.has(tab) ? resolveLearningTab(tab, search) : tab;
+}
+
+/**
+ * Operação e Loop de Memória dividem o mesmo workspace: quem manda é a seção da URL.
+ * Assim link antigo (?view=learning&section=daily) e atalho que pede o Loop para
+ * abrir a Fila caem na aba certa.
+ */
+export function resolveLearningTab(tab: TabId, search: string): TabId {
+  if (tab === 'diario') return 'operacao';
+  if (!LEARNING_TABS.has(tab)) return tab;
+  const workspace = workspaceOfSearch(search);
+  if (!workspace) return tab;
+  return workspace === 'operacao' ? 'operacao' : 'aprendizado-growth';
 }
 
 export function buildTabSearch(tab: TabId): string {

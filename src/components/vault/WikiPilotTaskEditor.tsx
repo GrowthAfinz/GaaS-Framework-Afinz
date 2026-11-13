@@ -53,7 +53,7 @@ export function WikiPilotTaskEditor({ draft, original, setDraft, busy, initialFi
       <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
         <button type="submit" className="min-h-10 rounded-md bg-cyan-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? 'Salvando…' : 'Salvar atividade'}</button>
         <button type="button" className="min-h-10 rounded-md px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100" onClick={onClose}>Cancelar</button>
-        {draft.id && <a href={`?view=learning&section=investigations&dev_task=${draft.id}`} className="min-h-10 content-center text-xs text-cyan-800 underline" onClick={e => { if (JSON.stringify(draft) !== JSON.stringify(original)) { e.preventDefault(); } }}>Abrir em Testes e Tarefas</a>}
+        {draft.id && <a href={`?view=operacao&section=investigations&dev_task=${draft.id}`} className="min-h-10 content-center text-xs text-cyan-800 underline" onClick={e => { if (JSON.stringify(draft) !== JSON.stringify(original)) { e.preventDefault(); } }}>Abrir em Testes e Tarefas</a>}
       </div>
       {JSON.stringify(draft) !== JSON.stringify(original) && <p className="text-xs text-slate-500">Há alterações não salvas. Salve ou cancele antes de abrir em Testes e Tarefas.</p>}
     </fieldset>

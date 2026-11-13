@@ -27,7 +27,32 @@ export interface GrowthBetSourceContext {
   verificationView: string;
 }
 
+/** Seções que moraram no Loop e foram para Planejamento > Operação (13/11/2026), na ordem das abas. */
+export const OPERATION_SECTIONS = ['feed', 'daily', 'structure', 'investigations'] as const satisfies readonly GrowthLearningSection[];
+export type GrowthWorkspace = 'operacao' | 'learning';
+
 const SECTION_SET = new Set<string>(GROWTH_LEARNING_SECTIONS);
+const OPERATION_SET = new Set<string>(OPERATION_SECTIONS);
+
+export function workspaceOfSection(section: GrowthLearningSection): GrowthWorkspace {
+  return OPERATION_SET.has(section) ? 'operacao' : 'learning';
+}
+
+/** Valor de ?view= de uma seção: as da Operação têm aba própria, o resto continua no Loop. */
+function viewSlugOf(section: GrowthLearningSection): string {
+  return workspaceOfSection(section) === 'operacao' ? 'operacao' : 'learning';
+}
+
+function normalizeSection(raw: string | null): GrowthLearningSection | null {
+  const section = raw === 'records' ? 'memory' : raw === 'results' ? 'vault' : raw;
+  return section && SECTION_SET.has(section) ? section as GrowthLearningSection : null;
+}
+
+/** Aba dona da URL quando ela traz uma seção do Loop ou da Operação; null se não traz nenhuma. */
+export function workspaceOfSearch(search: string): GrowthWorkspace | null {
+  const section = normalizeSection(new URLSearchParams(search).get('section'));
+  return section ? workspaceOfSection(section) : null;
+}
 const CONTEXT_SURFACE_SET = new Set<string>(GROWTH_CONTEXT_SURFACES);
 const CONTEXT_FRONT_SET = new Set<string>(['crm_acquisition', 'paid_media', 'b2c_origin']);
 const CONTEXT_ACTION = 'contextual-bet';
@@ -43,14 +68,20 @@ function clearContextParams(params: URLSearchParams): void {
 }
 
 export function isGrowthLearningView(search: string): boolean {
-  return new URLSearchParams(search).get('view') === 'learning';
+  const view = new URLSearchParams(search).get('view');
+  return view === 'learning' || view === 'operacao';
 }
 
-export function readGrowthLearningSection(search: string): GrowthLearningSection {
-  const section = new URLSearchParams(search).get('section');
-  if (section === 'records') return 'memory';
-  if (section === 'results') return 'vault';
-  return section && SECTION_SET.has(section) ? section as GrowthLearningSection : 'feed';
+/**
+ * Seção ativa. Com `workspace`, só aceita seções daquela aba; sem seção válida cai na
+ * Visão Daily (Operação) ou na Wiki (Loop).
+ */
+export function readGrowthLearningSection(search: string, workspace?: GrowthWorkspace): GrowthLearningSection {
+  const params = new URLSearchParams(search);
+  const section = normalizeSection(params.get('section'));
+  const ws = workspace ?? (section ? workspaceOfSection(section) : params.get('view') === 'learning' ? 'learning' : 'operacao');
+  if (section && workspaceOfSection(section) === ws) return section;
+  return ws === 'operacao' ? 'daily' : 'vault';
 }
 
 export function buildResultsWikiSearch(currentSearch: string): string {
@@ -67,7 +98,7 @@ export function buildGrowthLearningSearch(
   currentSearch: string,
 ): string {
   const params = new URLSearchParams(currentSearch);
-  params.set('view', 'learning');
+  params.set('view', viewSlugOf(section));
   if(section !== 'vault'){params.delete('wiki_ai');params.delete('ai_objective');}
   params.set('section', section);
   params.delete('item');
@@ -89,7 +120,8 @@ export function buildReportsOutputSearch(currentSearch: string): string {
 export function hasGrowthLearningRouteContext(search: string): boolean {
   const params = new URLSearchParams(search);
   const section = params.get('section');
-  return params.get('view') === 'learning' || Boolean(section && SECTION_SET.has(section));
+  const view = params.get('view');
+  return view === 'learning' || view === 'operacao' || Boolean(section && SECTION_SET.has(section));
 }
 
 function updateBrowserSearch(search: string): void {
@@ -106,7 +138,7 @@ export function readGrowthLearningItem(search: string): string | null {
 
 export function buildGrowthLearningItemSearch(itemId: string | null, currentSearch: string): string {
   const params = new URLSearchParams(currentSearch);
-  params.set('view', 'learning');
+  params.set('view', viewSlugOf('feed'));
   params.delete('wiki_ai');params.delete('ai_objective');
   params.set('section', 'feed');
   if (itemId) params.set('item', itemId);
@@ -122,7 +154,7 @@ export function buildGrowthLearningSectionItemSearch(
   currentSearch: string,
 ): string {
   const params = new URLSearchParams(currentSearch);
-  params.set('view', 'learning');
+  params.set('view', viewSlugOf(section));
   if(section !== 'vault'){params.delete('wiki_ai');params.delete('ai_objective');}
   params.set('section', section);
   if (itemId) params.set('item', itemId);

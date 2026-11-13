@@ -15,6 +15,7 @@ import {
 } from './structureModel';
 import { StatusDot, StructureCardView } from './StructureCardView';
 import { StructureSkeleton } from './StructureSkeleton';
+import { BoardColorButton } from './BoardBackground';
 import { StructureDrawer } from './StructureDrawer';
 import { useBoardViewport } from './useBoardViewport';
 import { BoardMiniMap, BoardZoomBar, useBoardChrome } from './BoardNav';
@@ -22,12 +23,11 @@ import './structure.css';
 
 const W = BOARD_COL_W;
 const PREFS_KEY = 'gaas.estrutura-crm.prefs';
-const BG_COLORS: [string, string][] = [['#f4f1ea', 'Papel'], ['#ece6d8', 'Areia'], ['#eef1f5', 'Névoa'], ['#e9efe6', 'Sálvia'], ['#efecf5', 'Lavanda'], ['#fafaf8', 'Gelo'], ['#e4e6ea', 'Concreto']];
-interface Prefs { lens: Lens; dense: boolean; mini: boolean; showMetric: boolean; collapsed: string[]; bg: string; legend: { docked: boolean; x: number; y: number } }
-const DEFAULT_PREFS: Prefs = { lens: 'st', dense: false, mini: true, showMetric: true, collapsed: [], bg: '#f4f1ea', legend: { docked: true, x: 14, y: 14 } };
+interface Prefs { lens: Lens; dense: boolean; mini: boolean; showMetric: boolean; collapsed: string[]; legend: { docked: boolean; x: number; y: number } }
+const DEFAULT_PREFS: Prefs = { lens: 'st', dense: false, mini: true, showMetric: true, collapsed: [], legend: { docked: true, x: 14, y: 14 } };
 function readPrefs(): Prefs { try { return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return DEFAULT_PREFS; } }
 
-type MenuState = { kind: 'card' | 'lane' | 'pillar' | 'filters' | 'bg' | 'alert' | 'more'; id?: string; rect: { left: number; right: number; bottom: number } } | null;
+type MenuState = { kind: 'card' | 'lane' | 'pillar' | 'filters' | 'alert' | 'more'; id?: string; rect: { left: number; right: number; bottom: number } } | null;
 type DrawerState = { mode: 'view'; id: string } | { mode: 'create'; laneId: string | null } | null;
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 
@@ -234,7 +234,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   const onCardMenu = useCallback((id: string, anchor: HTMLElement) => openMenu('card', anchor, id), []);
 
   if (loadError) return <div className="cs-root" style={{ padding: 24 }}><p className="cs-err">{loadError}</p><button className="cs-btn" onClick={() => void reload()}>Tentar de novo</button></div>;
-  if (!board) return <StructureSkeleton modeSwitch={modeSwitch} background={prefs.bg} />;
+  if (!board) return <StructureSkeleton modeSwitch={modeSwitch} />;
   /** Números que dependem dos disparos: piscam enquanto carregam e viram n/d se a leitura falhar. */
   const rowDep = (n: React.ReactNode) => (rowsState === 'ok' ? n : rowsState === 'loading' ? <span className="cs-sk" aria-label="carregando" /> : 'n/d');
 
@@ -263,7 +263,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
         <span className="cs-seg">{(['st', 'obs', 'med'] as Lens[]).map(l => <button key={l} className={prefs.lens === l ? 'on' : ''} onClick={() => setPrefs(p => ({ ...p, lens: l }))}>{{ st: 'Declarado', obs: 'Observado', med: 'Medição' }[l]}</button>)}</span>
         <select className="cs-sel" value={filters.bu} aria-label="Filtrar por BU" onChange={e => setFilter({ bu: e.target.value })}><option value="">Todas as BUs</option>{[...BU_OPTIONS, ...B2B2C_WITHOUT_CRM].map(b => <option key={b}>{b}</option>)}</select>
         <button className="cs-btn" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('filters', e.currentTarget)}><SlidersHorizontal />Filtros{(showFora || showArchived || !prefs.showMetric) && <span className="cs-count">{[showFora, showArchived, !prefs.showMetric].filter(Boolean).length}</span>}</button>
-        <button className="cs-btn" title="Cor do fundo do quadro" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('bg', e.currentTarget)}><span className="cs-swatch" style={{ background: prefs.bg }} /></button>
+        <BoardColorButton />
         <button className="cs-icon" aria-label="Mais opções" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('more', e.currentTarget)}><Ellipsis /></button>
         {editable && <button className="cs-btn pri" onClick={() => setDrawer({ mode: 'create', laneId: null })}><Plus />Campanha</button>}
       </div>
@@ -275,7 +275,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
         </div>
       )}
 
-      <div ref={vp.canvasRef} className={`cs-canvas${vp.panning ? ' panning' : ''}`} style={{ backgroundColor: prefs.bg, ...vp.gridStyle }} {...vp.handlers}>
+      <div ref={vp.canvasRef} className={`cs-canvas${vp.panning ? ' panning' : ''}`} style={vp.gridStyle} {...vp.handlers}>
         <div ref={vp.stageRef} className={`cs-stage${prefs.legend.docked ? ' legdock' : ''}`} style={{ transform: `translate(${Math.round(vp.view.x)}px,${Math.round(vp.view.y)}px) scale(${vp.view.z})` }}>
           <div className={`cs-legend${legLive ? ' dragging' : ''}`} data-nopan style={{ left: legPos.x, top: legPos.y }}>
             <h5
@@ -422,11 +422,6 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
             <label className="row2">Arquivadas ({archived.length})<input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} /></label>
             <label className="row2">Minimapa<input type="checkbox" checked={prefs.mini} onChange={e => setPrefs(p => ({ ...p, mini: e.target.checked }))} /></label>
             <div className="sec">JANELA</div><div className="row2" style={{ color: '#64748b' }}>Números dos últimos 90 dias · dados até {dataUntil}</div>
-          </>)}
-          {menu.kind === 'bg' && (<>
-            <div className="sec">COR DO FUNDO DO QUADRO</div>
-            <div className="cs-colors">{BG_COLORS.map(([c, n]) => <button key={c} className={prefs.bg === c ? 'on' : ''} onClick={() => setPrefs(p => ({ ...p, bg: c }))}><span style={{ background: c }} />{n}</button>)}</div>
-            <label className="row2">Outra cor<input type="color" value={prefs.bg} onChange={e => setPrefs(p => ({ ...p, bg: e.target.value }))} /></label>
           </>)}
           {menu.kind === 'alert' && (
             <div style={{ padding: '6px 8px', maxWidth: 340, fontSize: 13, lineHeight: 1.45 }}>

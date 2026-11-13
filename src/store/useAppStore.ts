@@ -5,7 +5,7 @@ import { get, set, del } from 'idb-keyval'; // IndexedDB
 import { FrameworkRow, ViewSettings, Goal, JournalEntry, FilterState, Activity } from '../types/framework';
 import { B2CDataRow, AlertConfig } from '../types/b2c';
 import { DailyAdMetrics, Budget } from '../schemas/paid-media';
-import { pushTabUrl } from '../services/tabNavigation';
+import { DEFAULT_TAB, pushTabUrl, resolveLearningTab } from '../services/tabNavigation';
 
 // Custom Storage Adapter using IDB-Keyval
 const storage: StateStorage = {
@@ -107,7 +107,7 @@ export const useAppStore = create<AppState>()(
 
             viewSettings: {
                 periodo: { inicio: '', fim: '' }, // Should be initialized with current month
-                abaAtual: 'launch',
+                abaAtual: DEFAULT_TAB,
                 filtrosGlobais: INITIAL_FILTERS,
                 modoTempoJornada: 'diario',
                 perspective: 'crm',
@@ -164,7 +164,9 @@ export const useAppStore = create<AppState>()(
                 }
             })),
 
-            setTab: (tab) => {
+            setTab: (requested) => {
+                // Operação e Loop dividem seções: a seção já gravada na URL decide qual das duas abre.
+                const tab = typeof window === 'undefined' ? requested : resolveLearningTab(requested, window.location.search);
                 pushTabUrl(tab);
                 set((state) => ({
                     viewSettings: { ...state.viewSettings, abaAtual: tab }
@@ -225,7 +227,7 @@ export const useAppStore = create<AppState>()(
             partialize: (state) => ({
                 // Select fields to persist (ONLY UI STATE)
                 journal: state.journal, // Ideally this moves to Supabase too (Fase 3)
-                viewSettings: { ...state.viewSettings, abaAtual: 'launch', perspective: 'crm', frente: 'aquisicao' }, // Reverte para launch, CRM e Aquisição ao iniciar
+                viewSettings: { ...state.viewSettings, abaAtual: DEFAULT_TAB, perspective: 'crm', frente: 'aquisicao' }, // Reverte para a aba inicial, CRM e Aquisição ao iniciar
                 alertConfig: state.alertConfig
             }),
             onRehydrateStorage: () => (state) => {

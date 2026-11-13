@@ -20,7 +20,7 @@ function SkeletonCard() {
 }
 
 /** Primeira carga da Estrutura CRM: o quadro aparece no formato final, com blocos cinza, até a configuração chegar. */
-export function StructureSkeleton({ modeSwitch, background }: { modeSwitch?: React.ReactNode; background: string }) {
+export function StructureSkeleton({ modeSwitch }: { modeSwitch?: React.ReactNode }) {
   const canvas = useRef<HTMLDivElement>(null);
   // Mesma altura do quadro real: vai até o pé da janela.
   useLayoutEffect(() => {
@@ -47,7 +47,7 @@ export function StructureSkeleton({ modeSwitch, background }: { modeSwitch?: Rea
         {Array.from({ length: 6 }, (_, i) => <span key={i} className="cs-stat"><span className="cs-sk" style={{ width: 70 }} /></span>)}
         <span className="cs-grow" />
       </div>
-      <div ref={canvas} className="cs-canvas" style={{ backgroundColor: background }}>
+      <div ref={canvas} className="cs-canvas">
         <div className="cs-skel-msg" role="status"><i aria-hidden="true" />Carregando a Estrutura CRM…</div>
         <div className="cs-stage legdock" style={{ transform: 'none' }}>
           <div className="cs-legend" style={{ left: 14, top: 14 }}>

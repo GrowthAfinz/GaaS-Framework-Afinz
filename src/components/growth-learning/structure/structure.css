@@ -33,7 +33,7 @@
 .cs-chip button{border:none;background:none;color:inherit;padding:0 3px}
 .cs-readonly{font-size:11.5px;color:var(--cs-ink2);background:#f1f5f9;padding:3px 8px}
 
-.cs-canvas{position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background-color:#f4f1ea;
+.cs-canvas{position:relative;overflow:hidden;cursor:grab;user-select:none;touch-action:none;background-color:var(--board-bg,#f4f1ea);
   background-image:radial-gradient(rgba(15,23,42,.12) 1px,transparent 1px);background-size:20px 20px}
 .cs-canvas.panning,.cs-canvas.panning *{cursor:grabbing!important}
 .cs-stage{position:absolute;left:0;top:0;transform-origin:0 0;padding:14px 14px 90px;width:max-content;will-change:transform}
@@ -170,6 +170,7 @@
 .cs-menu button svg{width:14px;height:14px}
 .cs-menu hr{border:none;border-top:1px solid var(--cs-line);margin:4px 0}
 .cs-menu .row2{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;font-size:13px}
+.cs-bgmenu{--cs-accent:#0e7490;--cs-accentbg:#ecfeff;--cs-ink:#0f172a;--cs-ink3:#94a3b8;--cs-line:#e2e8f0;--cs-line2:#cbd5e1;color:var(--cs-ink)}
 .cs-colors{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:4px 6px}
 .cs-colors button span{width:18px;height:18px;border:1px solid rgba(15,23,42,.18);display:inline-block}
 .cs-colors button.on{background:var(--cs-accentbg);color:var(--cs-accent)}

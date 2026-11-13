@@ -1,5 +1,6 @@
 // Correções e melhorias: modelo puro (sem Supabase nem DOM), testado em feedbackModel.test.ts.
 import { readTabFromSearch, type TabId } from '../../services/tabNavigation';
+import { readGrowthLearningSection } from '../growth-learning/growthLearningNavigation';
 
 export type FeedbackKind = 'knowledge' | 'app_adjustment' | 'question';
 export type FeedbackStatus =
@@ -163,6 +164,8 @@ export const FRONTS = ['Aquisição CRM', 'Rentabilização CRM', 'Cross-sell CR
 
 export const LEARNING_SECTION_LABELS: Record<string, string> = {
   feed: 'Fila',
+  daily: 'Visão Daily',
+  structure: 'Estrutura CRM',
   vault: 'Wiki',
   corrections: 'Correções e melhorias',
   investigations: 'Tarefas e atividades',
@@ -187,6 +190,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   relatorio: 'Relatórios | Aquisição',
   'relatorio-seguros': 'Relatórios | Seguros',
   'aprendizado-growth': 'Loop de Memória',
+  operacao: 'Operação',
   comunicacoes: 'Comunicações',
   'comunicacoes-cadastro': 'Cadastro e Templates',
   'comunicacoes-performance': 'Performance do Conteúdo',
@@ -202,9 +206,9 @@ export const TAB_LABELS: Record<TabId, string> = {
 export function resolvePage(search: string): { surface: string; pageLabel: string } {
   const params = new URLSearchParams(search);
   const tab = readTabFromSearch(search);
-  if (tab === 'aprendizado-growth') {
-    const section = params.get('section') === 'records' ? 'memory' : params.get('section') === 'results' ? 'vault' : params.get('section') || 'feed';
-    return { surface: section, pageLabel: LEARNING_SECTION_LABELS[section] || 'Loop de Memória' };
+  if (tab === 'aprendizado-growth' || tab === 'operacao') {
+    const section = readGrowthLearningSection(search, tab === 'operacao' ? 'operacao' : 'learning');
+    return { surface: section, pageLabel: LEARNING_SECTION_LABELS[section] || TAB_LABELS[tab] || 'Loop de Memória' };
   }
   return { surface: tab, pageLabel: TAB_LABELS[tab] || 'GaaS' };
 }

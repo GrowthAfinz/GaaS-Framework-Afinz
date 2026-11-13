@@ -14,6 +14,8 @@ import {
   readGrowthLearningItem,
   readGrowthBetSourceContext,
   readGrowthBetSourceContextFromBeliefSnapshot,
+  OPERATION_SECTIONS,
+  workspaceOfSearch,
 } from './growthLearningNavigation';
 
 describe('growth learning navigation contract', () => {
@@ -31,9 +33,26 @@ describe('growth learning navigation contract', () => {
   it('places Wiki next to the queue and preserves the operational sequence', () => {
     expect(GROWTH_LEARNING_SECTIONS).toEqual(['feed', 'vault', 'daily', 'structure', 'corrections', 'investigations', 'report-live', 'bets', 'outcomes', 'memory']);
   });
-  it('defaults an absent or invalid section to the system feed', () => {
-    expect(readGrowthLearningSection('')).toBe('feed');
-    expect(readGrowthLearningSection('?view=learning&section=unknown')).toBe('feed');
+  it('defaults an absent or invalid section to Visão Daily in Operação and to the Wiki in the Loop', () => {
+    expect(readGrowthLearningSection('')).toBe('daily');
+    expect(readGrowthLearningSection('?view=operacao')).toBe('daily');
+    expect(readGrowthLearningSection('?view=learning&section=unknown')).toBe('vault');
+    expect(readGrowthLearningSection('?view=learning')).toBe('vault');
+  });
+  it('keeps each workspace inside its own sections', () => {
+    expect(OPERATION_SECTIONS).toEqual(['feed', 'daily', 'structure', 'investigations']);
+    expect(readGrowthLearningSection('?view=learning&section=daily', 'learning')).toBe('vault');
+    expect(readGrowthLearningSection('?view=operacao&section=vault', 'operacao')).toBe('daily');
+    expect(readGrowthLearningSection('?view=learning&section=feed', 'operacao')).toBe('feed');
+    expect(workspaceOfSearch('?view=learning&section=structure')).toBe('operacao');
+    expect(workspaceOfSearch('?view=learning&section=records')).toBe('learning');
+    expect(workspaceOfSearch('?view=launch')).toBeNull();
+  });
+  it('builds Operação links with their own view', () => {
+    expect(new URLSearchParams(buildGrowthLearningSearch('daily', '?view=learning&section=vault')).get('view')).toBe('operacao');
+    expect(new URLSearchParams(buildGrowthLearningItemSearch('event-1', '?view=learning&section=vault')).get('view')).toBe('operacao');
+    expect(new URLSearchParams(buildGrowthLearningSectionItemSearch('investigations', 'crm-1', '')).get('view')).toBe('operacao');
+    expect(new URLSearchParams(buildGrowthLearningSearch('vault', '?view=operacao&section=daily')).get('view')).toBe('learning');
   });
   it('redirects old results links into the Wiki rather than another workspace', () => {
     expect(readGrowthLearningSection('?view=learning&section=results')).toBe('vault');
