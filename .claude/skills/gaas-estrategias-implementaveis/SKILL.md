@@ -1,6 +1,6 @@
 ---
 name: gaas-estrategias-implementaveis
-description: Criar ou revisar notas de estratégia do GaaS com narrativa enciclopédica, fluxos detalhados e fichas suficientes para implementação, usando a página Visa como modelo. Usar para estruturar estratégia, documentação operacional e mockups dessas notas; complementar a skill geral de produto, sem substituir copy de campanha ou análise de resultados.
+description: Criar ou revisar notas de estratégia do GaaS com regras à vista em texto enxuto, fluxos detalhados e fichas recolhíveis com 100% do necessário para implementação, usando a página Visa como modelo. Usar para estruturar estratégia, documentação operacional e mockups dessas notas; complementar a skill geral de produto, sem substituir copy de campanha ou análise de resultados.
 ---
 
 # Estratégias implementáveis no GaaS
@@ -9,7 +9,7 @@ description: Criar ou revisar notas de estratégia do GaaS com narrativa enciclo
 
 A nota deve permitir ao time entender a estratégia, discutir suas decisões e preparar sua implementação sem depender de uma explicação oral do autor. A página **Estratégia Pool de Ofertas Visa** é o modelo de referência de narrativa, profundidade, gráficos e apresentação. Usar somente a aparência do leitor não atende ao pedido.
 
-Esta skill registra a orientação de Pablo de 06/11/2026: conteúdo próximo de uma enciclopédia, sem slogans ou frases clichês, com o máximo de detalhe relevante e aprofundamento por minimizações. Modularidade significa separar módulos conectados por identidades e dependências; não reduzir o projeto a cartões genéricos.
+Esta skill registra a orientação de Pablo de 06/11/2026: conteúdo próximo de uma enciclopédia, sem slogans ou frases clichês, com o máximo de detalhe relevante e aprofundamento por minimizações. Em 13/11/2026 Pablo ajustou: a nota não pode ser massante. A camada visível é enxuta e direta; a camada recolhível guarda 100% dos dados úteis para implementação e das regras. Modularidade significa separar módulos conectados por identidades e dependências; não reduzir o projeto a cartões genéricos.
 
 ## Referências e fontes
 
@@ -26,7 +26,14 @@ Usar parágrafos conectados, termos definidos antes do uso, títulos descritivos
 
 Evitar frases como “Duas entradas. Um percurso.”, “Da fonte à jornada.”, “Conectando oportunidades.”, “Inteligência que transforma.” e substituições equivalentes de conteúdo por slogan. Exemplo de título adequado: “Fluxo técnico da automação processos_seguros”. Remover a frase vazia, não apenas reformulá-la.
 
-Não impor um limite curto ao documento. Detalhes que sustentam implementação ficam acessíveis em fichas recolhíveis. Uma síntese não substitui SQL, campos, condições, exceções e validações disponíveis nas fontes.
+### Camada visível enxuta, camada recolhível completa
+
+- **À vista:** definição, estado, regras e exceções, público e critérios, ciclo, orquestração, frentes de liberação, medição e pendências. Frases curtas, tabelas para comparar, sem repetir a mesma regra em várias seções.
+- **Em `:::details`:** fluxo completo com contratos, mapa técnico, fichas de DE campo a campo, passo a passo de atividades, configuração, SQL, configuração de jornada, validação, critérios de aceite e monitoramento. Nada disso é cortado; só fica recolhido.
+- **Uma nota só.** Não mover detalhe técnico para nota anexa criada para esvaziar a estratégia.
+- **Sem texto padrão repetido.** Fichas com as mesmas linhas em todos os itens viram uma tabela de regras comuns mais a tabela do que é próprio de cada item.
+- **Sem duplicar outra nota.** Conteúdo que já existe completo em outra nota (por exemplo SQL e inventário em `04-Operacao/`) vira link com uma linha do que está lá, só depois de conferir por script que o conteúdo é idêntico.
+- **Conferência antes de entregar uma versão enxuta:** comparar por script a nota anterior com a nova (identificadores em código, linhas de tabela, wikilinks e números). Todo item ausente precisa estar reescrito com o mesmo conteúdo, consolidado numa tabela de regras comuns ou presente na nota linkada. Guardar a versão anterior como backup em `outputs/`.
 
 ## Módulos articulados
 
@@ -67,6 +74,8 @@ Não inventar campos, tipos, nomes, BU/MID, schedules, SQL ou valores para compl
 
 Índice lateral por tópicos; no celular, índice expansível. Minimizações escondem profundidade, não removem conteúdo. Setas e lápis são ações separadas. Edição, inclusão, exclusão, ordenação, restauração e histórico devem respeitar os contratos existentes e suas permissões. Remover da nota não equivale a apagar um registro de tarefa.
 
+**Como o app monta a página** (`src/components/vault/strategy/strategyModel.ts`): cada `## ` vira um bloco; o resumo do topo são os 2 primeiros parágrafos antes do primeiro `##` (3 na nota de Seguros), então eles precisam se sustentar sozinhos. Visa e Seguros recebem automaticamente o bloco de Atividades pelo `relative_path`, que não pode mudar. `:::details Título` vira bloco recolhível editável; não colocar `###` repetindo o título logo depois.
+
 O botão de adicionar usa tratamento neutro, sem verde chamativo. Manter a identidade do GaaS, a leitura contínua e a posição da nota ao navegar no índice. Referências externas e detalhes técnicos devem permanecer consultáveis.
 
 ## Entrega e aprovação
@@ -74,5 +83,13 @@ O botão de adicionar usa tratamento neutro, sem verde chamativo. Manter a ident
 Quando criar ou alterar a estrutura narrativa/visual dessas páginas, apresentar primeiro um mockup com texto e detalhes técnicos representativos. A validação precisa cobrir **narrativa, profundidade, diagramas e interação**, não apenas cores. Distinguir visual ilustrativo de conteúdo disponível, sem tratar o mockup como especificação técnica homologada.
 
 Na etapa de mockup, criar apenas materiais locais de revisão e a skill solicitada. Não alterar a página viva, dados, permissões, main ou deploy. A aprovação anterior de outra direção não autoriza a nova proposta. Após a validação do usuário, implementar somente o escopo aprovado, comparar com a referência e seguir os checks/deploy autorizados do projeto.
+
+## Publicação na Wiki e versão de trabalho
+
+Editar o arquivo do vault não muda a página. A Wiki só muda depois do sync, e o sync só acontece com "pode sincronizar" (ou autorização equivalente) explícito do Pablo; publicar só as notas do escopo, nunca as outras que estiverem diferentes no `vault_lint`.
+
+O app pode guardar uma **versão de trabalho** própria da estratégia em `gaas_wiki_pilot_documents` (histórico em `gaas_wiki_pilot_revisions`), criada quando alguém edita, reordena ou mexe nas atividades pela página. Quando ela existe, a página mostra essa versão, não a fonte: depois do sync aparece o aviso "A fonte do vault mudou", a edição fica travada e "Reconhecer fonte e preservar edição" **mantém a versão de trabalho**, sem adotar o texto novo. Antes de publicar, consultar se existe linha para a nota (`select d.revision, d.source_hash, n.content_hash from gaas_wiki_pilot_documents d join gaas_vault_notes n on n.id=d.note_id where n.relative_path = '...'`). Sem linha, a página é montada direto da fonte e o sync basta. Com linha, avisar o Pablo antes de sincronizar e combinar como a nova fonte entra na versão de trabalho.
+
+Depois de editar a nota: preservar o fim de linha da nota (LF ou CRLF), rodar `python scripts/bundle_vault.py` e `python scripts/vault_lint.py`, sincronizar quando autorizado e conferir a página publicada.
 
 Ao concluir a revisão, perguntar: “Outro profissional consegue montar e conferir a operação com o documento e suas referências? Se não, quais definições e evidências ainda faltam?” Uma lacuna explícita com seu efeito é mais útil que uma falsa especificação completa.
