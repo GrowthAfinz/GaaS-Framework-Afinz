@@ -152,6 +152,7 @@ export interface NotionPage {
   isSmallText?: boolean;
   isFullWidth?: boolean;
   comments?: PageComment[]; // adição GaaS: comentários gravados na página
+  taskFronts?: string[]; // adição GaaS: página da base Tarefas presa a estas frentes (keys da Visão Daily)
 }
 
 export interface NotionWorkspace {

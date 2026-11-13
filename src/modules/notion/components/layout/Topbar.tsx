@@ -16,8 +16,10 @@ import {
   MessageSquare,
   Clock,
   Sparkles,
+  Palette,
 } from 'lucide-react';
 import { NotionPage, NotionWorkspace } from '../../types/notion';
+import { NOTION_TONES, type NotionTone } from '../../gaas/tones';
 
 interface TopbarProps {
   page: NotionPage;
@@ -32,6 +34,9 @@ interface TopbarProps {
   onOpenAi?: () => void;
   onOpenComments?: () => void;
   onDuplicatePage?: () => void;
+  /** Tom de fundo (adição GaaS). Sem onSetTone, o botão não aparece (ex.: modo escuro). */
+  tone?: NotionTone;
+  onSetTone?: (tone: NotionTone) => void;
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
@@ -47,8 +52,11 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenAi,
   onOpenComments,
   onDuplicatePage,
+  tone = 'padrao',
+  onSetTone,
 }) => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showToneMenu, setShowToneMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -210,6 +218,45 @@ export const Topbar: React.FC<TopbarProps> = ({
           >
             <MessageSquare size={14} />
           </button>
+
+          {/* Tom de fundo (adição GaaS) */}
+          {onSetTone && (
+            <div className="relative">
+              <button
+                onClick={() => setShowToneMenu(!showToneMenu)}
+                className="p-1.5 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors"
+                title="Tom do fundo"
+                aria-label="Tom do fundo"
+                aria-expanded={showToneMenu}
+              >
+                <Palette size={14} />
+              </button>
+              {showToneMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowToneMenu(false)} />
+                  <div className="absolute right-0 top-8 z-50 w-56 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-modal-bg)] p-2 shadow-2xl">
+                    <div className="px-1 pb-1.5 text-[10px] uppercase font-semibold text-[var(--notion-text-muted)]">Tom do fundo</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {NOTION_TONES.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => onSetTone(t.id)}
+                          className={`flex flex-col items-center gap-1 rounded-md p-1.5 text-[11px] transition-colors hover:bg-[var(--notion-hover)] ${tone === t.id ? 'ring-1 ring-blue-500 text-[var(--notion-text)]' : 'text-[var(--notion-text-muted)]'}`}
+                          aria-pressed={tone === t.id}
+                        >
+                          <span className="relative block h-8 w-full rounded border border-black/10" style={{ background: t.bg }}>
+                            <span className="absolute bottom-1 left-1.5 right-1.5 top-2.5 rounded-sm border border-black/5" style={{ background: t.card }} />
+                          </span>
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="px-1 pt-2 text-[10px] leading-snug text-[var(--notion-text-muted)]">Vale só pra você, neste navegador. No modo escuro o fundo não muda.</p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Favorite Star */}
           <button

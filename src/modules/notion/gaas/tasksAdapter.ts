@@ -72,8 +72,43 @@ export function defaultTaskViews(): DatabaseViewConfig[] {
     { id: 'v_projeto', name: 'Por projeto', type: 'board', groupByPropertyId: 'p_projeto', hideEmptyGroups: true, visiblePropertyIds: ['p_campanha', 'p_frente', 'p_status', 'p_responsavel'], sorts: [], filters: [] },
     { id: 'v_calendario', name: 'Calendário', type: 'calendar', datePropertyId: 'p_prazo', visiblePropertyIds: ['p_frente', 'p_status'], sorts: [], filters: [] },
     { id: 'v_tabela', name: 'Tabela', type: 'table', visiblePropertyIds: all, sorts: [], filters: [] },
-    { id: 'v_sdd', name: 'SDD (GaaS)', type: 'board', groupByPropertyId: 'p_status', visiblePropertyIds: ['p_tipo', 'p_iniciativa', 'p_responsavel'], sorts: [], filters: [{ propertyId: 'p_frente', operator: 'equals', value: GAAS_FRONT_NAME }] },
   ];
+}
+/** A antiga visão "SDD (GaaS)" saiu da base: o SDD agora tem página própria. */
+const RETIRED_VIEWS = new Set(['v_sdd']);
+
+/* ---------- páginas da base Tarefas por frente ---------- */
+/** Página de tarefas presa a um grupo de frentes. A Geral (TASKS_PAGE) mostra todas as frentes de negócio, sem o SDD. */
+export interface TaskPageDef { id: string; title: string; icon: string; fronts: string[]; section: 'frentes' | 'dev' }
+export const SDD_PAGE = 'page_tarefas_sdd';
+/** Agrupamento das frentes da Visão Daily em páginas. Aquisição junta Meio de funil (tudo que mira emissão de cartão). */
+const FRONT_GROUPS: Omit<TaskPageDef, 'section'>[] = [
+  { id: 'page_tarefas_aquisicao', title: 'Tarefas | Aquisição', icon: '🚀', fronts: ['aq', 'me'] },
+  { id: 'page_tarefas_rentabilizacao', title: 'Tarefas | Rentabilização', icon: '💰', fronts: ['re'] },
+  { id: 'page_tarefas_seguros', title: 'Tarefas | Seguros', icon: '🛡️', fronts: ['se'] },
+  { id: 'page_tarefas_operacao', title: 'Tarefas | Operação', icon: '⚙️', fronts: ['op'] },
+];
+/** Páginas de frente a partir das frentes ativas; frente nova sem grupo ganha página própria. O SDD fica por último. */
+export function taskPageDefs(fronts: BusinessFront[]): TaskPageDef[] {
+  const active = fronts.filter(f => !f.archived);
+  const has = new Set(active.map(f => f.key));
+  const grouped = new Set(FRONT_GROUPS.flatMap(g => g.fronts));
+  const out: TaskPageDef[] = [];
+  for (const g of FRONT_GROUPS) {
+    const keys = g.fronts.filter(k => has.has(k));
+    if (keys.length) out.push({ ...g, fronts: keys, section: 'frentes' });
+  }
+  for (const f of active) if (!grouped.has(f.key)) out.push({ id: `page_tarefas_f_${f.key}`, title: `Tarefas | ${f.name}`, icon: '📌', fronts: [f.key], section: 'frentes' });
+  out.push({ id: SDD_PAGE, title: 'Tarefas | SDD (GaaS)', icon: '🛠️', fronts: [GAAS_FRONT], section: 'dev' });
+  return out;
+}
+/** Página gerada; o que o time mudar (título, ícone, capa) fica guardado por cima, mas a ligação com a base não muda. */
+export function taskScopePage(def: TaskPageDef, stored?: NotionPage): NotionPage {
+  const now = new Date().toISOString();
+  return {
+    createdAt: now, updatedAt: now, blockIds: [], title: def.title, icon: def.icon, ...(stored || {}),
+    id: def.id, parentId: null, databaseId: TASKS_DB, taskFronts: def.fronts, isFullWidth: stored?.isFullWidth ?? true, isArchived: false,
+  };
 }
 
 const label = (props: DatabaseProperty[], id: string, key: string | null | undefined) => props.find(p => p.id === id)?.options?.find(o => o.id === key)?.name ?? '';
@@ -168,7 +203,8 @@ export function taskPage(t: WorkItem, blocks: Block[], stored?: NotionPage): Not
 
 export function tasksDatabase(props: DatabaseProperty[], rows: DatabaseRow[], stored?: Partial<NotionDatabase>): NotionDatabase {
   const userProps = (stored?.properties || []).filter(p => !SYSTEM_PROP_IDS.has(p.id) && !MODULE_PROP_IDS.has(p.id));
-  const views = stored?.views?.length ? stored.views : defaultTaskViews();
+  const kept = (stored?.views || []).filter(v => !RETIRED_VIEWS.has(v.id));
+  const views = kept.length ? kept : defaultTaskViews();
   return {
     id: TASKS_DB, title: stored?.title || 'Tarefas', description: stored?.description ?? 'O que o time leva na daily, por frente de negócio e projeto. Cada linha é uma página.',
     properties: [...props, ...userProps], views, currentViewId: views.some(v => v.id === stored?.currentViewId) ? (stored!.currentViewId as string) : views[0].id, rows,

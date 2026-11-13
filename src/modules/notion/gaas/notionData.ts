@@ -3,10 +3,12 @@ import { supabase } from '../../../services/supabaseClient';
 import { loadWorkspace, saveWork } from '../../../components/growth-learning/development/workService';
 import { type Initiative, type WorkItem } from '../../../components/growth-learning/development/workModel';
 import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionUser, NotionWorkspace } from '../types/notion';
-import { TASKS_DB, TASKS_PAGE, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
+import { TASKS_DB, TASKS_PAGE, type TaskPageDef, taskPageDefs, taskScopePage, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
 
 export interface NotionContext {
   me: string | null; canEditTasks: boolean; tasks: Map<string, WorkItem>; initiatives: Initiative[]; fronts: BusinessFront[]; projects: DailyProjectRef[];
+  /** Páginas da base Tarefas presas a frentes (geradas das frentes da Visão Daily, fixas na lateral). */
+  taskPages: TaskPageDef[];
 }
 export interface Loaded { workspace: NotionWorkspace; ctx: NotionContext; seeded: boolean }
 
@@ -23,7 +25,7 @@ function seedPages(): { pages: NotionPage[]; blocks: Block[] } {
   const blocks: Block[] = [
     { id: 'blk_inicio_1', type: 'callout', icon: '👋', backgroundColor: 'blue', content: 'Este é o espaço do time no GaaS, no formato do Notion. Tarefas, specs, investigações e experimentos ficam na base Tarefas; cada linha abre como página.' },
     { id: 'blk_inicio_2', type: 'heading_2', content: 'Como usar' },
-    { id: 'blk_inicio_3', type: 'bulleted_list_item', content: 'Abra "Tarefas e atividades" na barra lateral e use os chips de frente no topo e troque de visão: por status, por frente, por projeto, calendário e tabela. O desenvolvimento do GaaS fica na visão SDD.' },
+    { id: 'blk_inicio_3', type: 'bulleted_list_item', content: 'Na seção Frentes da barra lateral, "Tarefas | Geral" mostra todas as frentes de CRM e cada frente tem sua página. Troque de visão: por status, por frente, por projeto, calendário e tabela. O desenvolvimento do GaaS fica em "Tarefas | SDD (GaaS)".' },
     { id: 'blk_inicio_4', type: 'bulleted_list_item', content: 'Clique numa tarefa para abrir a página dela; escreva no corpo com "/" para inserir blocos.' },
     { id: 'blk_inicio_5', type: 'bulleted_list_item', content: 'Conhecimento continua na Wiki: aqui ficam o trabalho e o registro de execução.' },
   ];
@@ -81,8 +83,12 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
     databases[d.id] = { ...(d.data as NotionDatabase), rows: (rows.data || []).filter(r => r.database_id === d.id).map(r => r.data as DatabaseRow) };
   }
   if (!pageMap[TASKS_PAGE]) pageMap[TASKS_PAGE] = seedPages().pages[1];
+  // Páginas por frente: geradas a cada carga; o que foi guardado (título, ícone) fica por cima.
+  const taskPages = taskPageDefs(fronts);
+  for (const def of taskPages) pageMap[def.id] = taskScopePage(def, pageMap[def.id]);
+  const fixed = new Set(taskPages.map(d => d.id));
 
-  const roots = Object.values(pageMap).filter(p => !p.parentId && !p.isArchived).map(p => p.id);
+  const roots = Object.values(pageMap).filter(p => !p.parentId && !p.isArchived && !fixed.has(p.id)).map(p => p.id);
   const rootPageIds = [...(wsMeta?.rootPageIds || ['page_inicio', TASKS_PAGE]).filter(id => roots.includes(id)), ...roots.filter(id => !(wsMeta?.rootPageIds || ['page_inicio', TASKS_PAGE]).includes(id))];
   const active = readLocal<string>(activeKey(me), TASKS_PAGE);
   const workspace: NotionWorkspace = {
@@ -92,7 +98,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
     favoritePageIds: readLocal<string[]>(favKey(me), [TASKS_PAGE]).filter(id => pageMap[id]),
     activePageId: pageMap[active] ? active : TASKS_PAGE,
   };
-  return { workspace, ctx: { me, canEditTasks: work.canEdit, tasks, initiatives: work.initiatives, fronts, projects }, seeded };
+  return { workspace, ctx: { me, canEditTasks: work.canEdit, tasks, initiatives: work.initiatives, fronts, projects, taskPages }, seeded };
 }
 
 /* ---------- foto e diferença ---------- */
