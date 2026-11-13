@@ -21,7 +21,9 @@ describe('tag de página', () => {
     expect(resolvePage('?view=learning&section=investigations').pageLabel).toBe('Tarefas e atividades');
     expect(resolvePage('?view=learning&section=records').pageLabel).toBe('Registros');
     expect(resolvePage('?view=midia-paga')).toEqual({ surface: 'midia-paga', pageLabel: 'Mídia Paga' });
-    expect(resolvePage('').pageLabel).toBe('Launch Planner');
+    expect(resolvePage('').pageLabel).toBe('Visão Daily');
+    expect(resolvePage('?view=launch').pageLabel).toBe('Launch Planner');
+    expect(resolvePage('?view=learning&section=daily')).toEqual({ surface: 'daily', pageLabel: 'Visão Daily' });
   });
 });
 

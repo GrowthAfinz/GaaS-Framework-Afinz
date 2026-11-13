@@ -14,6 +14,7 @@ import {
   type Agg, type Ch, type ConsumoModel, type Dispatch, type ItemDef, type Metrics, type Period, type PillarDef, type RawCh, type Tone,
 } from './consumoModel';
 import { JourneyMap, type MapStats } from './JourneyMap';
+import { BoardColorButton } from './BoardBackground';
 import { useBoardViewport } from './useBoardViewport';
 import { BoardMiniMap, BoardZoomBar, useBoardChrome } from './BoardNav';
 import { CumulativeLines, KpiStrip, MonthColumns, PanelHead, ProjCell, SaldoCell } from './ConsumoPanels';
@@ -61,7 +62,8 @@ function Timeline({ list, from, to }: { list: Dispatch[]; from: number; to: numb
   );
 }
 
-export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }) {
+/** Consumo SFMC e Mapeamento SFMC: mesma carga, abas separadas (13/11/2026), cada uma com os próprios filtros. */
+export function ConsumoWorkspace({ modeSwitch, sub }: { modeSwitch: React.ReactNode; sub: 'consumo' | 'mapa' }) {
   const [board, setBoard] = useState<StructureBoard | null>(null);
   const [data, setData] = useState<ConsumoData | null>(null);
   const [error, setError] = useState('');
@@ -76,10 +78,8 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
   const [focus, setFocus] = useState<Focus>(null);
   const [pop, setPop] = useState<'fr' | 'pe' | null>(null);
   const [drawer, setDrawer] = useState<string | null>(null);
-  const [sub, setSub] = useState<'consumo' | 'mapa'>(() => { try { return localStorage.getItem('gaas.consumo-sfmc.sub') === 'mapa' ? 'mapa' : 'consumo'; } catch { return 'consumo'; } });
   const [mapStats, setMapStats] = useState<MapStats | null>(null);
   const onStats = useCallback((st: MapStats) => setMapStats(prev => (prev && JSON.stringify(prev) === JSON.stringify(st) ? prev : st)), []);
-  useEffect(() => { try { localStorage.setItem('gaas.consumo-sfmc.sub', sub); } catch { /* preferência local */ } }, [sub]);
   const reloadData = useCallback(async () => { setData(await loadConsumo()); }, []);
   /* Visão geral no mesmo canvas do board: arrasta, Ctrl + zoom, minimapa. */
   const boardReady = Boolean(board && data) && sub === 'consumo';
@@ -284,10 +284,6 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
     <div className="cz-root">
       <div className="cz-bar">
         {modeSwitch}
-        <div className="cz-sub" role="tablist" aria-label="Visão do consumo">
-          <button role="tab" aria-selected={sub === 'consumo'} className={sub === 'consumo' ? 'on' : ''} onClick={() => setSub('consumo')}><ChartColumn />Consumo</button>
-          <button role="tab" aria-selected={sub === 'mapa'} className={sub === 'mapa' ? 'on' : ''} onClick={() => setSub('mapa')}><Route />Mapeamento</button>
-        </div>
         <span className="cz-vsep" />
         <div className="cz-filt">
           <button className={`cz-fbtn${fronts.size ? ' act' : ''}${pop === 'fr' ? ' open' : ''}`} onClick={() => setPop(pop === 'fr' ? null : 'fr')}><Receipt />Frente <b>{!fronts.size ? 'todas' : fronts.size === 1 ? ([...fronts][0] === NO_FRONT ? 'sem frente' : [...fronts][0]) : `${fronts.size} selecionadas`}</b><ChevronDown /></button>
@@ -307,6 +303,7 @@ export function ConsumoWorkspace({ modeSwitch }: { modeSwitch: React.ReactNode }
           </div>
         ) : null}
         <span className="cz-grow" />
+        <BoardColorButton className="cz-fbtn cz-bgbtn" />
         <span className="cz-src" title={data.payload.loaded_at ? `Carga em ${new Date(data.payload.loaded_at).toLocaleString('pt-BR')}` : ''}><i />Dinâmica BI até {ddmm(isoOf(model.last))} · contrato {monthLabel(model.months[0])} a {monthLabel(model.months[11])}</span>
       </div>
 

@@ -9,6 +9,7 @@ import {
     PieChart,
     LayoutDashboard,
     BookOpen,
+    CalendarCheck,
     ClipboardList,
     FolderOpen,
     GitBranch,
@@ -201,8 +202,8 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             title: 'Planejamento',
             direct: false,
             items: [
+                { id: 'operacao', label: 'Operação', icon: CalendarCheck, onClick: () => { openGrowthLearningSection('daily'); navigateToTab('operacao'); } },
                 { id: 'launch', label: 'Launch Planner', icon: Calendar, onClick: () => navigateToTab('launch') },
-                { id: 'diario', label: 'Diario de Bordo', icon: BookOpen, onClick: () => navigateToTab('diario') },
             ]
         },
         {
@@ -251,10 +252,12 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             .filter(item => canSeeTab(item.id))
             .map(item => ({
                 ...item,
-                // O item do Loop abre na seção vault, então o link aponta pra ela também.
+                // Loop abre na Wiki e Operação na Visão Daily, então o link aponta pra seção também.
                 href: item.id === 'aprendizado-growth'
                     ? tabHref(item.id, buildGrowthLearningSearch('vault', ''))
-                    : tabHref(item.id),
+                    : item.id === 'operacao'
+                        ? tabHref(item.id, buildGrowthLearningSearch('daily', ''))
+                        : tabHref(item.id),
             }))
     })).filter(group => group.items.length > 0);
 
@@ -273,11 +276,11 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
         >
             {/* ── LEFT: Brand ────────────────────────────────────────── */}
             <a
-                href={tabHref('launch')}
-                onClick={onTabLinkClick(() => navigateToTab('launch'))}
+                href={tabHref('operacao', buildGrowthLearningSearch('daily', ''))}
+                onClick={onTabLinkClick(() => { openGrowthLearningSection('daily'); navigateToTab('operacao'); })}
                 className="shrink-0 flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
                 style={{ fontFamily: "Calibri, 'Trebuchet MS', sans-serif" }}
-                title="Voltar para Launch Planner"
+                title="Voltar para a Visão Daily"
             >
                 <AfinzLogo height={28} />
                 <div className="flex items-center gap-2">

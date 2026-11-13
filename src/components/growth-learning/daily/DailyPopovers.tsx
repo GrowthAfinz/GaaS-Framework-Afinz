@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { Check, FolderPlus, Plus, Search, Settings2 } from 'lucide-react';
 import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
-import { FALLBACK_COLOR, initials, personColor, type DailyFrente, type DailyPerson, type DailyProject, type DailyTag } from './dailyModel';
+import { FALLBACK_COLOR, brDate, initials, personColor, type DailyFrente, type DailyPerson, type DailyProject, type DailyTag } from './dailyModel';
 
 export interface Anchor { left: number; right: number; top: number; bottom: number }
 export const anchorOf = (el: Element): Anchor => toLocalRect(el.getBoundingClientRect());
@@ -127,7 +127,7 @@ export function PeoplePicker({ people, me, responsible, followers, subject, onCh
         })}
         {!list.length && <div className="dv-empty">Ninguém encontrado.</div>}
       </div>
-      <div className="ft">Quem acompanha aparece no filtro "Que eu acompanho".</div>
+      <div className="ft">Quem acompanha aparece com o avatar ao lado do registro.</div>
     </>
   );
 }
@@ -170,14 +170,20 @@ export function MenuList({ items, title }: { items: MenuItem[]; title?: string }
   );
 }
 
-export function DayPicker({ value, title, shortcuts, onPick }: { value: string; title: string; shortcuts: [string, string][]; onPick: (day: string) => void }) {
+export function DayPicker({ value, title, shortcuts, onPick, confirmLabel }: { value: string; title: string; shortcuts: [string, string][]; onPick: (day: string) => void; confirmLabel?: string }) {
+  // Com confirmLabel a data digitada só vale no botão: digitar o ano dispara datas intermediárias válidas.
+  const [picked, setPicked] = useState(value);
   return (
     <div style={{ padding: 12 }}>
       <div className="lbl" style={{ padding: '0 0 6px' }}>{title}</div>
-      <input type="date" defaultValue={value} onChange={e => { if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) onPick(e.target.value); }} />
+      <input type="date" defaultValue={value} onChange={e => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) return;
+        if (confirmLabel) setPicked(e.target.value); else onPick(e.target.value);
+      }} onKeyDown={e => { if (confirmLabel && e.key === 'Enter' && picked) onPick(picked); }} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
         {shortcuts.map(([label, day]) => <button key={label} className="cs-btn" style={{ height: 26, fontSize: 11.5 }} onClick={() => onPick(day)}>{label}</button>)}
       </div>
+      {confirmLabel && <button className="cs-btn pri" style={{ height: 28, fontSize: 12, marginTop: 10, width: '100%', justifyContent: 'center' }} onClick={() => onPick(picked)}>{confirmLabel} {brDate(picked)}</button>}
     </div>
   );
 }

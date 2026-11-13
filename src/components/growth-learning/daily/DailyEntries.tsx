@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type React from 'react';
 import {
-  ArrowDownUp, CalendarRange, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CornerDownRight, Ellipsis, Eye, History, LayoutList,
+  ArrowDownUp, CalendarRange, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CornerDownRight, Ellipsis, History, LayoutList,
   List, NotebookPen, PanelRightOpen, Plus, Sun, Tag as TagIcon, UserPlus, X,
 } from 'lucide-react';
 import {
@@ -29,9 +29,11 @@ interface Props {
   onDropDay: (day: string, ev: React.DragEvent) => void; onDragEnd: () => void;
 }
 
-const VIEWS: [DailyView, string, React.ReactNode][] = [['today', 'Hoje', <Sun key="s" />], ['week', 'Esta semana', <CalendarRange key="c" />], ['mine', 'Que eu acompanho', <Eye key="e" />], ['all', 'Tudo', <List key="l" />]];
+// "Que eu acompanho" saiu da barra em 13/11/2026; a visão continua no modelo só para não quebrar preferência antiga.
+const VIEWS: [DailyView, string, React.ReactNode][] = [['today', 'Hoje', <Sun key="s" />], ['week', 'Esta semana', <CalendarRange key="c" />], ['all', 'Tudo', <List key="l" />]];
 const plural = (n: number, one: string, many: string) => `${fmtInt(n)} ${n === 1 ? one : many}`;
 const GROUP_LABEL: Record<DailyGroup, string> = { day: 'dia', project: 'projeto', frente: 'frente' };
+const GROUP_TITLE: Record<DailyGroup, string> = { day: 'Dia', project: 'Projeto', frente: 'Frente' };
 
 function inlineEdit(el: HTMLElement, onSave: (v: string) => void) {
   const old = el.textContent || '';
@@ -134,6 +136,10 @@ export function DailyEntries(p: Props) {
     return <span key={list[0].project_id} className="dv-tag" style={{ ...tint(projectColor(list[0].project_id), 13), fontWeight: 600 }}>{pr?.name}{list.length > 1 ? ` ·${list.length}` : ''}</span>;
   });
 
+  // Em ordem crescente o mês anterior entra no topo da lista, então o botão fica lá também.
+  const olderButton = p.prevMonth
+    ? <button className="cs-btn" style={{ margin: '0 auto' }} onClick={p.onMore}><History size={14} />Ver registros de {MONTHS[Number(p.prevMonth.slice(5)) - 1]}</button>
+    : null;
   let lastMonth = '';
   return (
     <section className="dv-P" style={{ ['--pacc' as string]: '#7c3aed', width: 640 }} data-nopan data-mini="#7c3aed">
@@ -145,8 +151,14 @@ export function DailyEntries(p: Props) {
         <button className="dv-ib" title="Expandir todos" onClick={() => p.onAll(false)}><ChevronsUpDown /></button>
         <button className="dv-ib" title="Recolher todos" onClick={() => p.onAll(true)}><ChevronsDownUp /></button>
       </div>
-      <div className="dv-views">
-        {VIEWS.map(([k, label, icon]) => <button key={k} className={`dv-vw${p.view === k ? ' on' : ''}`} onClick={() => p.onView(k)}>{icon}{label}</button>)}
+      <div className="dv-tools">
+        <div className="dv-seg" role="tablist" aria-label="Período dos registros">
+          {VIEWS.map(([k, label, icon]) => <button key={k} role="tab" aria-selected={p.view === k} className={p.view === k ? 'on' : ''} onClick={() => p.onView(k)}>{icon}{label}</button>)}
+        </div>
+        <span className="dv-tools-r">
+          <button className="dv-fp" title={`Ordem: ${p.sort === 'desc' ? 'mais recentes primeiro' : 'mais antigos primeiro'}`} onClick={ev => p.onSortPop(ev.currentTarget)}><ArrowDownUp />{p.sort === 'desc' ? 'Recentes' : 'Antigos'}</button>
+          <button className="dv-fp" title={`Agrupar registros por ${GROUP_LABEL[p.group]}`} onClick={ev => p.onGroupPop(ev.currentTarget)}><LayoutList />{GROUP_TITLE[p.group]}</button>
+        </span>
       </div>
       <div className="dv-fbar">
         {p.filterLabels.map(f => (
@@ -154,10 +166,6 @@ export function DailyEntries(p: Props) {
             {f.label}{p.filters[f.key].length > 0 && <b>{p.filters[f.key].length}</b>}<ChevronDown />
           </button>
         ))}
-        <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <button className="dv-fp" onClick={ev => p.onSortPop(ev.currentTarget)}><ArrowDownUp />{p.sort === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro'}</button>
-          <button className="dv-fp" onClick={ev => p.onGroupPop(ev.currentTarget)}><LayoutList />Agrupar: <b>{GROUP_LABEL[p.group]}</b></button>
-        </span>
       </div>
       {(activeChips.length > 0 || p.filters.q.trim()) && (
         <div className="dv-active">
@@ -168,6 +176,7 @@ export function DailyEntries(p: Props) {
         </div>
       )}
       <div ref={listRef} className="dv-list" data-wheel-own>
+        {p.sort === 'asc' && p.prevMonth && <div className="dv-foot top">{olderButton}</div>}
         {p.draft && <DraftRow draft={p.draft} project={p.projects.get(p.draft.projectId)} color={projectColor(p.draft.projectId)} onSave={p.onDraftSave} onCancel={p.onDraftCancel} />}
         {p.groups.map(g => {
           const collapsed = p.isCollapsed(g.key);
@@ -220,9 +229,7 @@ export function DailyEntries(p: Props) {
         })}
         {!p.groups.length && !p.draft && <div className="dv-foot">{p.total ? 'Nenhum registro com esses filtros.' : 'Nenhum registro neste período. Use "+ Registro de hoje" para começar.'}</div>}
         <div className="dv-foot">
-          {p.prevMonth
-            ? <button className="cs-btn" style={{ margin: '0 auto' }} onClick={p.onMore}><History size={14} />Ver registros de {MONTHS[Number(p.prevMonth.slice(5)) - 1]}</button>
-            : <span>Início do histórico.</span>}
+          {p.prevMonth ? (p.sort === 'asc' ? null : olderButton) : <span>Início do histórico.</span>}
         </div>
       </div>
     </section>

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import {
-  ArrowDownUp, CalendarArrowUp, CalendarDays, CornerDownRight, CreditCard, Database, FolderInput, FolderKanban, Layers, Pencil, Plus,
+  ArrowDownUp, CalendarArrowUp, CalendarDays, Copy, CornerDownRight, CreditCard, Database, FolderInput, FolderKanban, Layers, Pencil, Plus,
   Presentation, Rows3, Search, Send, Settings2, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { toLocalPx } from '../../../context/UIScaleContext';
 import { BoardMiniMap, BoardZoomBar, useBoardChrome } from '../structure/BoardNav';
+import { BoardColorButton } from '../structure/BoardBackground';
 import { useBoardViewport } from '../structure/useBoardViewport';
 import '../structure/structure.css';
 import './daily.css';
@@ -28,12 +29,21 @@ import { DayPicker, MenuList, MultiFilter, PeoplePicker, Popover, ProjectPicker,
 
 interface Prefs { metric: DayMetric; compact: boolean; mini: boolean; group: DailyGroup; sort: DailySort; view: DailyView }
 const PREFS_KEY = 'gaas.visao-daily.prefs';
-const DEFAULT_PREFS: Prefs = { metric: 'b2c', compact: false, mini: true, group: 'day', sort: 'desc', view: 'all' };
-const readPrefs = (): Prefs => { try { return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return DEFAULT_PREFS; } };
+const DEFAULT_PREFS: Prefs = { metric: 'b2c', compact: false, mini: true, group: 'day', sort: 'asc', view: 'all' };
+/**
+ * Decisão do Pablo (13/11/2026): a tela sempre abre com os mais antigos primeiro e os dias recolhidos;
+ * trocar a ordem vale só até sair. "Que eu acompanho" saiu da barra, então preferência antiga vira "Tudo".
+ */
+const readPrefs = (): Prefs => {
+  let stored: Partial<Prefs> = {};
+  try { stored = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { /* preferência local */ }
+  const prefs = { ...DEFAULT_PREFS, ...stored, sort: DEFAULT_PREFS.sort };
+  return prefs.view === 'mine' ? { ...prefs, view: 'all' } : prefs;
+};
 
 type Pop =
   | { kind: 'filter'; key: FilterKey; anchor: Anchor } | { kind: 'sort'; anchor: Anchor } | { kind: 'group'; anchor: Anchor }
-  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'move'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
+  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'move' | 'copy'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 const FILTER_LABELS: [FilterKey, string][] = [['frentes', 'Frente'], ['projects', 'Projeto'], ['partners', 'Parceiro'], ['people', 'Pessoa'], ['tags', 'Tag']];
 
@@ -55,7 +65,7 @@ export function DailyWorkspace() {
   const [prefs, setPrefs] = useState<Prefs>(readPrefs);
   const [filters, setFilters] = useState<DailyFilters>(emptyDailyFilters);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [allCollapsed, setAllCollapsed] = useState(false);
+  const [allCollapsed, setAllCollapsed] = useState(true);
   const [hoverProject, setHoverProject] = useState<string | null>(null);
   const [tip, setTip] = useState<{ day: string; x: number; y: number } | null>(null);
   const [pop, setPop] = useState<Pop | null>(null);
@@ -239,6 +249,24 @@ export function DailyWorkspace() {
   };
   const endDrag = () => { dragging.current = null; setDropDay(null); document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging')); };
 
+  /** Copia um registro para outro dia e já abre o texto da cópia para editar. */
+  const copyEntry = useCallback(async (e: DailyEntry, day: string) => {
+    try {
+      const saved = await saveEntry(null, null, { day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids });
+      putEntry(saved); goToDay(day); setDrawerKey(k => k + 1);
+      showToast(`Registro copiado para ${WEEKDAYS[weekday(day)]}, ${brDate(day)}`, async () => {
+        try { putEntry(await saveEntry(saved.id, saved.revision, { deleted: true })); setToast(null); } catch (err) { fail(err); }
+      });
+      // A linha da cópia só existe depois que o dia abre na lista (às vezes um mês novo carrega antes).
+      let tries = 0;
+      const edit = () => {
+        const el = document.querySelector<HTMLElement>(`[data-entry="${saved.id}"] .txt`);
+        if (el) { el.click(); return; }
+        if (++tries < 20) window.setTimeout(edit, 100);
+      };
+      window.setTimeout(edit, 60);
+    } catch (err) { fail(err); }
+  }, [fail, goToDay, putEntry, showToast]);
   const createEntry = useCallback(async (d: Draft, text: string) => {
     try {
       const saved = await saveEntry(null, null, { day: d.day, project_id: d.projectId, body: text, responsible_id: me, follower_ids: [] });
@@ -332,12 +360,17 @@ export function DailyWorkspace() {
       return <Popover anchor={pop.anchor} width={260} onClose={close}><DayPicker value={e.day} title="Mover para o dia" shortcuts={[['Hoje', today], ['Próximo dia útil', nextWorkday(e.day)], ['+1 semana', addDays(e.day, 7)]]}
         onPick={day => { close(); if (day !== e.day) { void patchEntry(e, { day }, `Movido para ${brDate(day)}`); goToDay(day); } }} /></Popover>;
     }
+    if (pop.kind === 'copy') {
+      return <Popover anchor={pop.anchor} width={260} onClose={close}><DayPicker value={e.day} title="Copiar para o dia" shortcuts={[['Hoje', today], ['Próximo dia útil', nextWorkday(e.day)], ['+1 semana', addDays(e.day, 7)]]}
+        confirmLabel="Copiar para" onPick={day => { close(); void copyEntry(e, day); }} /></Popover>;
+    }
     return (
       <Popover anchor={pop.anchor} width={250} onClose={close}>
         <MenuList items={[
           { icon: <Pencil />, label: 'Editar texto', onClick: () => { close(); window.setTimeout(() => (document.querySelector(`[data-entry="${e.id}"] .txt`) as HTMLElement | null)?.click(), 0); } },
           { icon: <FolderInput />, label: 'Mover para outro projeto', onClick: () => setPop({ kind: 'project', entryId: e.id, anchor: pop.anchor }) },
           { icon: <CalendarArrowUp />, label: 'Mudar o dia', onClick: () => setPop({ kind: 'move', entryId: e.id, anchor: pop.anchor }) },
+          ...(canEdit ? [{ icon: <Copy />, label: 'Copiar para outro dia', onClick: () => setPop({ kind: 'copy', entryId: e.id, anchor: pop.anchor }) }] : []),
           { icon: <CornerDownRight />, label: 'Continuar no próximo dia útil', onClick: () => { close(); setDraft({ day: nextWorkday(e.day), projectId: e.project_id }); } },
           { icon: <FolderKanban />, label: 'Abrir projeto', onClick: () => { close(); setDrawer(e.project_id); } },
           { icon: <Trash2 />, label: 'Excluir registro', danger: true, onClick: () => { close(); void deleteEntry(e); } },
@@ -377,11 +410,12 @@ export function DailyWorkspace() {
         <span className="cs-grow" />
         {cfg && !canEdit && <span className="cs-readonly">Somente leitura</span>}
         <label className="cs-search dv-hide-present"><Search size={14} /><input type="search" placeholder="Buscar projeto ou registro" value={filters.q} onChange={e => setFilters(f => ({ ...f, q: e.target.value }))} /></label>
+        <span className="dv-hide-present"><BoardColorButton /></span>
         <button className="cs-btn" onClick={togglePresent}><Presentation />{present ? 'Sair da apresentação' : 'Apresentar'}</button>
         {canEdit && <button className="cs-btn pri dv-hide-present" onClick={e => openAdd(today, e.currentTarget)}><Plus />Registro de hoje</button>}
       </div>
 
-      <div ref={vp.canvasRef} className={`cs-canvas${vp.panning ? ' panning' : ''}`} style={{ backgroundColor: '#f4f1ea', ...vp.gridStyle, ...(present ? { flex: 1 } : {}) }} {...vp.handlers}>
+      <div ref={vp.canvasRef} className={`cs-canvas${vp.panning ? ' panning' : ''}`} style={{ ...vp.gridStyle, ...(present ? { flex: 1 } : {}) }} {...vp.handlers}>
         <div ref={vp.stageRef} className="cs-stage dv-stage" style={{ transform: `translate(${Math.round(vp.view.x)}px,${Math.round(vp.view.y)}px) scale(${vp.view.z})` }}>
           <section className="dv-P dv-leg" style={{ ['--pacc' as string]: '#64748b' }} data-nopan data-mini="#94a3b8">
             <h5><FolderKanban />Projetos do mês

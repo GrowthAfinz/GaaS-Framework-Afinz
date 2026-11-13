@@ -26,7 +26,7 @@ export function LoopAttention({placement='feed',goalNotice,onCountChange}:{place
  const run=async(fn:()=>Promise<unknown>)=>{setBusy(true);try{await fn();await load();setError('');}catch(e){setError(e instanceof Error?e.message:'Não foi possível concluir.');}finally{setBusy(false);}};
  const prefer=(i:LoopItem,action:string,until?:string)=>void run(()=>preferAttention(i.id,action,until));
  const open=(i:LoopItem)=>{setSelected(i);void preferAttention(i.id,'read').catch(()=>{});};
- const go=(route:string)=>{const url=new URL(route,location.href);if(url.origin!==location.origin||url.searchParams.get('view')!=='learning')return;window.history.pushState({},'',location.pathname+url.search);setView('aprendizado-growth');window.dispatchEvent(new PopStateEvent('popstate'));setSelected(null);};
+ const go=(route:string)=>{const url=new URL(route,location.href);if(url.origin!==location.origin||!['learning','operacao'].includes(url.searchParams.get('view')||''))return;window.history.pushState({},'',location.pathname+url.search);setView('aprendizado-growth');window.dispatchEvent(new PopStateEvent('popstate'));setSelected(null);};
  const startNote=async(i:LoopItem)=>{setEditing(true);const snapshot=await fetchKnowledgeSnapshot();setNotes(snapshot.notes.filter(n=>noteMatchesAttention(i,n)));};
  const pickNote=(path:string)=>{const note=notes.find(n=>n.relative_path===path);setNotePath(path);setBaseHash(note?.content_hash||'');setMarkdown(note&&selected?note.content_markdown+defaultNoteAppend(selected):'');};
  const selectedBody=selected?attentionBody(selected):null;

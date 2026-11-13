@@ -28,8 +28,8 @@ export const NAV_CONFIG: NavGroup[] = [
     {
         title: 'PLANEJAMENTO',
         items: [
+            { id: 'operacao', label: 'Operação', icon: Calendar },
             { id: 'launch', label: 'Launch Planner', icon: Calendar },
-            { id: 'diario', label: 'Diário de Bordo', icon: BookOpen },
         ]
     },
     {
