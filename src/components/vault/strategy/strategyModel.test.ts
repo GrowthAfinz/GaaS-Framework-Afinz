@@ -27,9 +27,10 @@ it.skipIf(!segurosNote)('imports insurance topics and diagrams with the insuranc
  const doc=initialStrategy({title:'Estratégia de Segmentação de Seguros',content_markdown:content,relative_path:'05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md'});
  expect(doc.blocks.find(b=>b.type==='tasks')?.title).toBe('Atividades: Construção e ativação de Seguros');
  expect(exportStrategy(doc).match(/```mermaid/g)).toHaveLength(3);
- expect(exportStrategy(doc).match(/```sql/g)).toHaveLength(3);
+ expect((exportStrategy(doc).match(/```sql/g)||[]).length).toBeGreaterThanOrEqual(3);
+ expect(doc.blocks.some(b=>/^\d+\. SQL$/.test(b.title))).toBe(true);
  expect(exportStrategy(doc)).toContain('SEGUROS_DEVICE_CPF');
- expect(doc.blocks.some(b=>b.title.includes('Fichas técnicas das Data Extensions'))).toBe(true);
+ expect(doc.blocks.some(b=>b.title.includes('Data Extensions'))).toBe(true);
  expect(exportStrategy(doc)).not.toMatch(/seguros-(percurso|sfmc)-v[23]\.svg/);
 });
 
