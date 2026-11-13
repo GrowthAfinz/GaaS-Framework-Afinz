@@ -21,10 +21,18 @@ const note = (status: string, extra = '') => ({
 const never = () => new Promise<never>(() => {});
 
 describe('Wiki strategy reading controls', () => {
-  it('offers a page-level control to collapse every section', () => {
+  it('opens with every section collapsed and offers to expand them all', () => {
     const html = renderToStaticMarkup(<WikiStrategyDocument note={note('proposto')} loader={never} />);
-    expect(html).toContain('Recolher seções');
-    expect(html).not.toContain('Expandir seções');
+    expect(html).toContain('Expandir seções');
+    expect(html).not.toContain('Recolher seções');
+    expect(html).toContain('aria-label="Abrir Contexto"');
+    expect(html).toContain('aria-label="Abrir Escopo"');
+    expect(html).not.toContain('aria-expanded="true"');
+  });
+
+  it('offers a download of the page as Markdown at the top', () => {
+    const html = renderToStaticMarkup(<WikiStrategyDocument note={note('proposto')} loader={never} />);
+    expect(html).toContain('Baixar .md');
   });
 
   it('does not repeat the document status next to a badge that already shows it', () => {

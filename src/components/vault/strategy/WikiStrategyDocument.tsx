@@ -21,8 +21,13 @@ import { supabase } from '../../../services/supabaseClient';
 
 type EditDraft = { kind:'block'; block:StrategyBlock; isNew:boolean; after?:string; fragment?:DetailAnchor } | {kind:'header';title:string;summary:string};
 const cleanTitle = (s:string)=>s.replace(/^\d+\.\s*/, '');
-const defaultClosed=(note:VaultNote)=>new Set(initialStrategy(note).blocks.filter(b=>b.id==='visao-geral'||/fichas? t[eé]cnicas?|onde isso fica|automation|refer[eê]ncias t[eé]cnicas/i.test(b.title)).map(b=>b.id));
-const closedKey=(noteId:string)=>'gaas-wiki-closed:'+noteId;
+// Every section starts collapsed; the summary at the top stays visible (decision of 13/11/2026).
+const allBlockIds=(doc:StrategyDocument)=>new Set(doc.blocks.map(b=>b.id));
+const defaultClosed=(note:VaultNote)=>allBlockIds(initialStrategy(note));
+// v2: the default changed to "all collapsed", so preferences saved under the old default are ignored once.
+const closedKey=(noteId:string)=>'gaas-wiki-closed-v2:'+noteId;
+const hasStoredClosed=(noteId:string)=>{try{return localStorage.getItem(closedKey(noteId))!==null;}catch{return false;}};
+const saveMarkdown=(text:string,fileName:string)=>{const url=URL.createObjectURL(new Blob([text],{type:'text/markdown;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=fileName;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),0);};
 // Remember which sections each reader collapsed, per note. Storage may be unavailable; fall back to the editorial default.
 const readClosed=(note:VaultNote):Set<string>=>{try{const raw=localStorage.getItem(closedKey(note.id));const ids:unknown=raw?JSON.parse(raw):null;if(Array.isArray(ids))return new Set(ids.filter((id):id is string=>typeof id==='string'));}catch{/* Storage unavailable. */}return defaultClosed(note);};
 const TRANSIENT_MESSAGE_MS=4000;
@@ -43,6 +48,7 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const [canEdit,setCanEdit]=useState(false),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [edit,setEdit]=useState<EditDraft|null>(null),[preview,setPreview]=useState(false),[taskDirty,setTaskDirty]=useState(false);
  const [closed,setClosed]=useState<Set<string>>(()=>readClosed(note)),[active,setActive]=useState('visao-geral'),[query,setQuery]=useState('');
+ const [closedPreferenceStored]=useState(()=>hasStoredClosed(note.id));
  const manualActiveUntil=useRef(0);
  // The index is shown whole, never in its own scroll box. When it is taller than the
  // screen, a negative sticky top lets it travel with the page until its last item is
@@ -71,10 +77,10 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const docStatus=source.status||'a-validar';
  const stateLabel=/PREPARAÇÃO/.test(sourceOperation)?'Em preparação':source.status||'Em revisão';
  const request=useRef<{body:string;id:string}|null>(null);
- useEffect(()=>{let active=true;setLoading(true);void loader(note.id).then(next=>{if(!active)return;setSource(next.source);setHead(next.head);setDoc(next.head?.document||initialStrategy(next.source));setCanEdit(next.canEdit);setError('');setRevisionWarning(false);
+ useEffect(()=>{let active=true;setLoading(true);void loader(note.id).then(next=>{if(!active)return;setSource(next.source);setHead(next.head);setDoc(next.head?.document||initialStrategy(next.source));if(!closedPreferenceStored)setClosed(allBlockIds(next.head?.document||initialStrategy(next.source)));setCanEdit(next.canEdit);setError('');setRevisionWarning(false);
  const key=next.viewerId?'gaas-wiki-draft:'+next.viewerId+':'+note.id:null;setDraftKey(key);
  if(key){try{const cached=JSON.parse(sessionStorage.getItem(key)||'null');if(cached?.edit && ['header','block'].includes(cached.edit.kind)){setEdit(cached.edit);setRecoveredStale(cached.revision!==(next.head?.revision||0));setMessage('Rascunho recuperado desta sessão. Revise antes de salvar.');}}catch{/* Storage unavailable: editing remains usable. */}}
- }).catch(()=>{if(active){setError('Não foi possível consultar a versão de trabalho. A fonte está disponível para leitura.');setCanEdit(false);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[note.id,loader,retry]);
+ }).catch(()=>{if(active){setError('Não foi possível consultar a versão de trabalho. A fonte está disponível para leitura.');setCanEdit(false);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[note.id,loader,retry,closedPreferenceStored]);
  useEffect(()=>{const warn=(e:BeforeUnloadEvent)=>{if(dirty){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
  useEffect(()=>{if(edit)editorRef.current?.querySelector<HTMLInputElement>('input')?.focus();},[edit?.kind,edit?.kind==='block'?edit.block.id:'header']);
  useEffect(()=>{if(historyOpen){dialog.current?.showModal();let active=true;void historyLoader(note.id).then(rows=>{if(active){setRevisions(rows);setHistoryError('');}}).catch(()=>{if(active)setHistoryError('Histórico indisponível. Feche e abra para tentar novamente.');});return()=>{active=false;};}},[historyOpen,note.id,historyLoader]);
@@ -129,7 +135,9 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const locateEditor=()=>{const target=edit?.kind==='block'?document.getElementById(edit.block.id):document.getElementById('strategy-header');if(edit?.kind==='block')setClosed(c=>{const next=new Set(c);next.delete(edit.block.id);return next;});requestAnimationFrame(()=>{target?.scrollIntoView({block:'start'});editorRef.current?.querySelector<HTMLInputElement>('input')?.focus({preventScroll:true});});};
  const jump=(id:string)=>{manualActiveUntil.current=Date.now()+1000;setQuery('');setMobileIndex(false);setActive(id);setClosed(c=>{const next=new Set(c);next.delete(id);return next;});requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));};
  const closeHistory=()=>{dialog.current?.close();setHistoryOpen(false);setSelectedRevision(null);setReconciling(false);focusBack();};
- const download=()=>{const working=edit?.kind==='header'?{...doc,title:edit.title,summary:edit.summary}:edit?.kind==='block'?{...doc,blocks:(edit.isNew||!doc.blocks.some(b=>b.id===edit.block.id))?[...doc.blocks,edit.block]:doc.blocks.map(b=>{if(b.id!==edit.block.id)return b;if(!edit.fragment)return edit.block;try{return {...b,content:replaceStrategyDetail(b.content,edit.fragment,edit.block.title,edit.block.content)};}catch{return {...b,content:b.content+'\n\n### Rascunho recuperado: '+edit.block.title+'\n\n'+edit.block.content};}})}:doc;const blob=new Blob([exportStrategy(working)],{type:'text/markdown;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=source.relative_path.split('/').pop()?.replace(/\.md$/,'-trabalho.md')||'estrategia-trabalho.md';a.click();URL.revokeObjectURL(url);};
+ const download=()=>{const working=edit?.kind==='header'?{...doc,title:edit.title,summary:edit.summary}:edit?.kind==='block'?{...doc,blocks:(edit.isNew||!doc.blocks.some(b=>b.id===edit.block.id))?[...doc.blocks,edit.block]:doc.blocks.map(b=>{if(b.id!==edit.block.id)return b;if(!edit.fragment)return edit.block;try{return {...b,content:replaceStrategyDetail(b.content,edit.fragment,edit.block.title,edit.block.content)};}catch{return {...b,content:b.content+'\n\n### Rascunho recuperado: '+edit.block.title+'\n\n'+edit.block.content};}})}:doc;saveMarkdown(exportStrategy(working),source.relative_path.split('/').pop()?.replace(/\.md$/,'-trabalho.md')||'estrategia-trabalho.md');};
+ // Without a working version or an open edit, the page is the vault source itself: download it whole, frontmatter included.
+ const downloadPage=()=>{if(!head&&!edit)saveMarkdown(source.content_markdown,source.relative_path.split('/').pop()||'estrategia.md');else download();};
  const editor=(draft:EditDraft)=><div ref={editorRef} className="strategy-editor"><form onSubmit={e=>{e.preventDefault();saveEdit();}}><fieldset disabled={busy}>
   <label>{draft.kind==='header'?'Título da nota':draft.fragment?'Título da ficha':'Título da seção'}<input required value={draft.kind==='header'?draft.title:draft.block.title} onChange={e=>setEdit(draft.kind==='header'?{...draft,title:e.target.value}:{...draft,block:{...draft.block,title:e.target.value}})}/></label>
   <div className="strategy-editor-tabs"><button type="button" aria-pressed={!preview} onClick={()=>setPreview(false)}>Conteúdo</button><button type="button" aria-pressed={preview} onClick={()=>setPreview(true)}>Prévia</button></div>
@@ -146,6 +154,7 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
    <header id="strategy-header" className="strategy-header"><div className="strategy-breadcrumb"><button onClick={()=>{if(!protect()){if(onHome)onHome();else window.location.assign('?view=learning&section=vault&wiki_topic=strategies');}}}>Wiki</button><ChevronRight size={12}/><span>Estratégias</span></div><div className="strategy-page-actions">
     {collapsible.length>1&&<button type="button" aria-pressed={allClosed} onClick={toggleAll}>{allClosed?<><ChevronsUpDown size={17}/>Expandir seções</>:<><ChevronsDownUp size={17}/>Recolher seções</>}</button>}
     <button disabled={busy} onClick={e=>{opener.current=e.currentTarget;setHistoryOpen(true);}}><History size={17}/>Histórico</button>
+    <button type="button" onClick={downloadPage} title="Baixar esta página em Markdown"><Download size={17}/>Baixar .md</button>
     {canEdit&&<button className="strategy-primary" disabled={locked||sourceChanged} onClick={e=>add('text',undefined,e.currentTarget)}><Plus size={17}/>Adicionar seção</button>}
    </div>
    <div className="strategy-title"><h1>{doc.title}</h1>{canEdit&&<button className="strategy-icon" disabled={locked||sourceChanged} aria-label="Editar título e apresentação" onClick={e=>startEdit({kind:'header',title:doc.title,summary:doc.summary},e.currentTarget)}><Pencil size={15}/></button>}</div>
