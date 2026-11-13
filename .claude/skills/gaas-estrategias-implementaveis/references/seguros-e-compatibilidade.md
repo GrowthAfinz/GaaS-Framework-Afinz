@@ -4,7 +4,7 @@ Estas são referências documentais consultadas em 06/11/2026, não prova do est
 
 ## Fontes no vault
 
-- `05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md`: decisões de 06/11; mensal por produto e trigger MCC; coexistência assimétrica; parâmetros independentes de intervalo entre produtos e inatividade; formulário suspende oferta, posse confirmada encerra aquisição.
+- `05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md`: decisões de 06/11; mensal por produto e trigger MCC; coexistência assimétrica; parâmetros independentes de intervalo entre produtos e inatividade; formulário suspende oferta, posse confirmada encerra aquisição. Desde 13/11 em versão enxuta: regras à vista, contratos de DE, passos, jornadas e validação em blocos recolhíveis; SQLs e inventário de 04/11 consultados por link em `Automacao-Processos-Seguros.md`.
 - `04-Operacao/Automacao-Processos-Seguros.md`: integração Athena/S3, passos nomeados, estruturas propostas e SQLs do desenho de 04/11. Mesmo os passos 1–5 exigem reconfirmação de ativação no documento.
 - `02-Entidades-Dados/SFMC/DE-MAPA_SEGUROS.md`: grão por CPF, campos de posse e suas lacunas; semântica das flags precisa de validação.
 - `02-Entidades-Dados/SFMC/DE-MAPA_MCC.md`: grão por conta, agregados de 12 meses; atualização sob demanda a confirmar; última data não identifica cada compra.

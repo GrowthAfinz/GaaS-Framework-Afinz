@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "origin": "codex",
   "agents": [
     "codex",
@@ -13,7 +13,7 @@
     "Documentação"
   ],
   "owner": "Time GaaS Afinz",
-  "last_validated": "2026-11-07",
+  "last_validated": "2026-11-13",
   "compatibility": "Modelo editorial e implementação local verificados nesta entrega; uso no SFMC exige homologação própria.",
   "license": "Distribuição pública autorizada pelo titular; sem concessão adicional de licença"
 }
