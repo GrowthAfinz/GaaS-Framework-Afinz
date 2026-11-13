@@ -26,6 +26,28 @@
     --notion-modal-bg: #252525;
   }
 
+/* Tons de fundo (adição GaaS, só no modo claro): fundo tingido e cards um pouco mais escuros, para contraste sutil. */
+.nt-root:not(.dark)[data-tone="areia"] {
+    --notion-bg: #f6f4ef; --notion-sidebar-bg: #eeebe3; --notion-card: #efebe3; --notion-modal-bg: #f6f4ef;
+    --notion-border: rgba(80, 66, 40, 0.12);
+  }
+.nt-root:not(.dark)[data-tone="nevoa"] {
+    --notion-bg: #f3f5f8; --notion-sidebar-bg: #e9edf2; --notion-card: #e9edf2; --notion-modal-bg: #f3f5f8;
+    --notion-border: rgba(30, 50, 80, 0.11);
+  }
+.nt-root:not(.dark)[data-tone="pedra"] {
+    --notion-bg: #f2f2f0; --notion-sidebar-bg: #e8e8e5; --notion-card: #e8e8e4; --notion-modal-bg: #f2f2f0;
+    --notion-border: rgba(55, 53, 47, 0.12);
+  }
+.nt-root:not(.dark)[data-tone="salvia"] {
+    --notion-bg: #f2f5f2; --notion-sidebar-bg: #e7ece7; --notion-card: #e6ebe6; --notion-modal-bg: #f2f5f2;
+    --notion-border: rgba(40, 70, 50, 0.12);
+  }
+.nt-root:not(.dark)[data-tone="ardosia"] {
+    --notion-bg: #e9ecef; --notion-sidebar-bg: #dfe3e7; --notion-card: #dce1e6; --notion-modal-bg: #eef0f2;
+    --notion-border: rgba(30, 45, 65, 0.13);
+  }
+
 .nt-root {
     background-color: var(--notion-bg);
     color: var(--notion-text);

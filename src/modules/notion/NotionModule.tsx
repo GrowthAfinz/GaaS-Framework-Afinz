@@ -22,7 +22,8 @@ import { taskError } from '../../components/growth-learning/development/developm
 import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionWorkspace, SelectOption } from './types/notion';
 import { generateId } from './utils/id';
 import { createTask, diff, loadNotion, pushChanges, saveLocalPrefs, saveTask, snapshot, type NotionContext, type Snapshot } from './gaas/notionData';
-import { GAAS_FRONT, GAAS_FRONT_NAME, SYNCED_PROPS, SYSTEM_PROP_IDS, TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, notionColor, workspaceOfFront, extraProps, frontOfProject, rowPatch, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
+import { readTone, saveTone, type NotionTone } from './gaas/tones';
+import { SDD_PAGE, GAAS_FRONT, GAAS_FRONT_NAME, SYNCED_PROPS, SYSTEM_PROP_IDS, TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, notionColor, workspaceOfFront, extraProps, frontOfProject, rowPatch, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
 import './notion.css';
 import 'katex/dist/katex.min.css';
 
@@ -301,11 +302,36 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
   const [peekPageId, setPeekPageId] = useState<string | null>(null);
   const [peekDatabaseId, setPeekDatabaseId] = useState<string | null>(null);
 
-  // Link da Fila e das notificações (?dev_task=<id>) abre a tarefa por cima da base.
+  /* ---------- páginas por frente (fixas na lateral) e tom do fundo ---------- */
+  const fixedPageIds = useMemo(() => new Set([TASKS_PAGE, ...ctx.taskPages.map(d => d.id)]), [ctx.taskPages]);
+  const sidebarSections = useMemo(() => [
+    { title: 'Frentes', placement: 'top' as const, pageIds: [TASKS_PAGE, ...ctx.taskPages.filter(d => d.section === 'frentes').map(d => d.id)] },
+    { title: 'Desenvolvimento', placement: 'bottom' as const, pageIds: ctx.taskPages.filter(d => d.section === 'dev').map(d => d.id) },
+  ], [ctx.taskPages]);
+  const archiveGuarded = useCallback((pageId: string) => {
+    if (fixedPageIds.has(pageId)) { showToast('Esta página é fixa: ela vem das frentes da Visão Daily.'); return; }
+    archivePage(pageId);
+  }, [archivePage, fixedPageIds, showToast]);
+  const [tone, setToneState] = useState<NotionTone>(readTone);
+  const setTone = useCallback((t: NotionTone) => { setToneState(t); saveTone(t); }, []);
+  // Visão escolhida em cada página da base Tarefas: de cada pessoa, para uma página não trocar a visão da outra.
+  const viewsKey = `gaas.notion.pageviews.${ctx.me || 'anon'}`;
+  const [viewByPage, setViewByPage] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem(viewsKey) || '{}'); } catch { return {}; } });
+  useEffect(() => { try { localStorage.setItem(viewsKey, JSON.stringify(viewByPage)); } catch { /* preferência local */ } }, [viewByPage, viewsKey]);
+  /** Página onde a tarefa aparece: a da frente dela; sem página própria, a Geral. */
+  const pageOfTask = useCallback((taskId: string) => {
+    const db = latest.current.databases[TASKS_DB];
+    const name = db?.rows.find(r => r.id === taskRowId(taskId))?.properties.p_frente;
+    const key = db?.properties.find(p => p.id === 'p_frente')?.options?.find(o => o.name === name)?.id;
+    if (key === GAAS_FRONT) return SDD_PAGE;
+    return ctx.taskPages.find(d => key && d.fronts.includes(key))?.id || TASKS_PAGE;
+  }, [ctx.taskPages]);
+
+  // Link da Fila e das notificações (?dev_task=<id>) abre a tarefa por cima da página da frente dela.
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('dev_task');
     if (!id) return;
-    if (ctx.tasks.has(id)) { setActivePage(TASKS_PAGE); setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB); }
+    if (ctx.tasks.has(id)) { setActivePage(pageOfTask(id)); setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB); }
     else showToast('Tarefa do link não encontrada neste acesso.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -416,8 +442,48 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
 
   // Database renderer helper for embedding database views into any block or page
   const renderDatabase = useCallback(
-    (databaseId: string) => {
-      const db = workspace.databases[databaseId];
+    (databaseId: string, pageId?: string) => {
+      const raw = workspace.databases[databaseId];
+      if (raw && databaseId === TASKS_DB) {
+        // Página por frente: só as tarefas das frentes dela. Geral (ou base embutida): todas as frentes de negócio, sem o SDD.
+        const page = pageId ? workspace.pages[pageId] : undefined;
+        const frontOpts = raw.properties.find(p => p.id === 'p_frente')?.options || [];
+        const scope = (page?.taskFronts ? frontOpts.filter(o => page.taskFronts!.includes(o.id)) : frontOpts.filter(o => o.id !== GAAS_FRONT)).map(o => o.name);
+        const known = new Set(frontOpts.map(o => o.name));
+        const rows = raw.rows.filter(r => {
+          const v = String(r.properties.p_frente || '');
+          return v && known.has(v) ? scope.includes(v) : !page?.taskFronts; // sem frente (ou arquivada) só na Geral
+        });
+        const single = scope.length <= 1;
+        const kept = single ? raw.views.filter(v => v.groupByPropertyId !== 'p_frente') : raw.views;
+        const views = kept.length ? kept : raw.views;
+        const viewKey = pageId || 'embutida';
+        const pick = viewByPage[viewKey];
+        const currentViewId = views.some(v => v.id === pick) ? pick : views.some(v => v.id === raw.currentViewId) ? raw.currentViewId : views[0].id;
+        const db = { ...raw, rows, views, currentViewId };
+        return (
+          <DatabaseView
+            key={viewKey}
+            database={db}
+            users={users}
+            onUpdateRow={updateRow}
+            onAddRow={(id, props = {}) => addRow(id, props.p_frente || !scope.length ? props : { ...props, p_frente: scope[0] })}
+            quickFilter={{ propertyId: 'p_frente', hiddenByDefault: [], scope, storageKey: `gaas.notion.chips.${ctx.me || 'anon'}.${!pageId || pageId === TASKS_PAGE ? databaseId : pageId}` }}
+            onDeleteRow={deleteRow}
+            onAddProperty={addDatabaseProperty}
+            onSetView={(_db, viewId) => setViewByPage(prev => ({ ...prev, [viewKey]: viewId }))}
+            onAddView={(id, name, type) => { addDatabaseView(id, name, type); setViewByPage(prev => { const { [viewKey]: _old, ...rest } = prev; return rest; }); }}
+            onUpdateView={updateDatabaseView}
+            onDeleteView={deleteView}
+            onDuplicateRow={duplicateRow}
+            onOpenRowPage={(rowPageId: string) => {
+              setPeekPageId(rowPageId);
+              setPeekDatabaseId(databaseId);
+            }}
+          />
+        );
+      }
+      const db = raw;
       if (!db) {
         return (
           <div className="p-4 rounded-lg border border-[var(--notion-border)] text-xs text-[var(--notion-text-muted)] bg-[var(--notion-hover)]">
@@ -432,7 +498,6 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
           users={users}
           onUpdateRow={updateRow}
           onAddRow={addRow}
-          quickFilter={databaseId === TASKS_DB ? { propertyId: 'p_frente', hiddenByDefault: [GAAS_FRONT_NAME], storageKey: `gaas.notion.chips.${ctx.me || 'anon'}.${databaseId}` } : undefined}
           onDeleteRow={deleteRow}
           onAddProperty={addDatabaseProperty}
           onSetView={setDatabaseView}
@@ -449,6 +514,8 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
     },
     [
       workspace.databases,
+      workspace.pages,
+      viewByPage,
       users,
       updateRow,
       addRow,
@@ -495,7 +562,7 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
 
   return (
     <NotionEditContext.Provider value={editApi}>
-    <div ref={rootRef} tabIndex={-1} className={`nt-root ${theme === 'dark' ? 'dark' : ''} relative flex h-full w-full overflow-hidden bg-[var(--notion-bg)] outline-none ${fontClass}`}>
+    <div ref={rootRef} tabIndex={-1} data-tone={tone} className={`nt-root ${theme === 'dark' ? 'dark' : ''} relative flex h-full w-full overflow-hidden bg-[var(--notion-bg)] outline-none ${fontClass}`}>
       {/* Sidebar Navigation */}
       <Sidebar
         workspace={workspace}
@@ -506,8 +573,9 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
         onToggleCollapse={() => setSidebarCollapsed(!isSidebarCollapsed)}
         onSelectPage={setActivePage}
         onCreatePage={createPage}
-        onArchivePage={archivePage}
+        onArchivePage={archiveGuarded}
         onDuplicatePage={duplicatePage}
+        sections={sidebarSections}
         onToggleFavorite={toggleFavorite}
         onSetActiveUser={setActiveUser}
         onOpenSearch={() => setSearchOpen(true)}
@@ -526,7 +594,9 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
           onSelectPage={setActivePage}
           onUpdatePage={(partial) => updatePage(activePage.id, partial)}
           onToggleFavorite={() => toggleFavorite(activePage.id)}
-          onArchivePage={() => archivePage(activePage.id)}
+          onArchivePage={() => archiveGuarded(activePage.id)}
+          tone={tone}
+          onSetTone={theme === 'dark' ? undefined : setTone}
           onDuplicatePage={() => duplicatePage(activePage.id)}
           onExportJSON={exportJSON}
           onOpenComments={openComments}
@@ -549,7 +619,7 @@ function NotionApp({ initial, ctx, seeded, onOpenInvestigations }: { initial: No
           {/* Full Page Database Check (if this page is a dedicated database) */}
           {activePage.databaseId ? (
             <div className="px-12 pb-24">
-              {renderDatabase(activePage.databaseId)}
+              {renderDatabase(activePage.databaseId, activePage.id)}
             </div>
           ) : (
             <>

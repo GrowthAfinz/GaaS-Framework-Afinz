@@ -48,7 +48,11 @@ interface DatabaseViewProps {
   /** Chips de filtro rápido por uma propriedade (ex.: Frente). A seleção é de cada pessoa e fica no navegador. */
   quickFilter?: QuickFilterConfig;
 }
-export interface QuickFilterConfig { propertyId: string; hiddenByDefault: string[]; storageKey: string }
+export interface QuickFilterConfig {
+  propertyId: string; hiddenByDefault: string[]; storageKey: string;
+  /** Valores que a página mostra (as linhas já chegam filtradas). Com um valor só, os chips somem. */
+  scope?: string[];
+}
 const readSel = (k: string): string[] | null => { try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as string[]) : null; } catch { return null; } };
 
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
@@ -98,10 +102,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   );
   // Filtro rápido (chips): por padrão tudo ligado, menos o que vem escondido (ex.: GaaS).
   const qfProp = quickFilter ? database.properties.find((p) => p.id === quickFilter.propertyId) : undefined;
-  const qfOptions = qfProp?.options?.map((o) => o.name) || [];
+  const qfAll = qfProp?.options?.map((o) => o.name) || [];
+  const qfScope = quickFilter?.scope;
+  const qfOptions = qfScope ? qfAll.filter((n) => qfScope.includes(n)) : qfAll;
+  const qfChips = qfOptions.length > 1;
   const [qfSel, setQfSel] = useState<string[] | null>(() => (quickFilter ? readSel(quickFilter.storageKey) : null));
   useEffect(() => { if (quickFilter && qfSel) { try { localStorage.setItem(quickFilter.storageKey, JSON.stringify(qfSel)); } catch { /* preferência local */ } } }, [qfSel, quickFilter]);
-  const qfSelected = qfSel ?? [...qfOptions.filter((n) => !quickFilter?.hiddenByDefault.includes(n)), EMPTY];
+  // A seleção guardada pode ter valores que esta página não mostra (ex.: a frente do SDD, que saiu da Geral).
+  const qfStored = qfSel?.filter((n) => n === EMPTY || qfOptions.includes(n));
+  const qfSelected = qfStored && (qfStored.some((n) => n !== EMPTY) || !qfSel?.length)
+    ? qfStored
+    : [...qfOptions.filter((n) => !quickFilter?.hiddenByDefault.includes(n)), EMPTY];
   const qfLockedByView = Boolean(quickFilter && (currentView.filters || []).some((f) => f.propertyId === quickFilter.propertyId));
   const qfActive = Boolean(qfProp) && !qfLockedByView;
   // Valor fora da lista (ex.: frente arquivada) cai em "Sem frente" para a tarefa nunca sumir.
@@ -360,7 +371,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         </div>
       </div>
 
-      {qfProp && (
+      {qfProp && qfChips && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs" data-quick-filter={qfProp.id}>
           <span className="font-semibold text-[var(--notion-text-muted)] mr-0.5">{qfProp.name}:</span>
           {qfLockedByView ? (
@@ -368,7 +379,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           ) : (
             <>
               <button onClick={() => setQfSel([...qfOptions, EMPTY])} className={`px-2 py-0.5 rounded-full border ${qfOptions.every((n) => qfSelected.includes(n)) ? 'bg-slate-800 text-white border-slate-800' : 'border-[var(--notion-border)] text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)]'}`}>Todas</button>
-              {[...(qfProp.options || []), { id: EMPTY, name: EMPTY, color: 'default' as const }].map((o) => {
+              {[...(qfProp.options || []).filter((o) => qfOptions.includes(o.name)), { id: EMPTY, name: EMPTY, color: 'default' as const }].map((o) => {
                 const on = qfSelected.includes(o.name), n = qfCount(o.name);
                 if (o.name === EMPTY && !n) return null;
                 return (
@@ -419,7 +430,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           groupPropId={groupPropId}
           visiblePropIds={visible}
           users={users}
-          hiddenValues={qfActive && groupPropId === quickFilter?.propertyId ? [...qfOptions, EMPTY].filter((n) => !qfSelected.includes(n)) : []}
+          hiddenValues={groupPropId === quickFilter?.propertyId ? [...qfAll.filter((n) => !qfOptions.includes(n)), ...(qfActive ? [...qfOptions, EMPTY].filter((n) => !qfSelected.includes(n)) : [])] : []}
           hideEmpty={Boolean(currentView.hideEmptyGroups)}
           readOnly={readOnly}
           onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}

@@ -43,6 +43,8 @@ interface SidebarProps {
   onOpenTrash: () => void;
   /** Atalhos extras do GaaS (ex.: Investigações CRM). */
   extraLinks?: { label: string; icon: React.ReactNode; onClick: () => void }[];
+  /** Seções fixas do GaaS, iguais para o time (ex.: Frentes). "top" vem antes de Páginas, "bottom" depois. */
+  sections?: { title: string; pageIds: string[]; placement: 'top' | 'bottom' }[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -64,7 +66,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onImportMarkdown,
   onOpenTrash,
   extraLinks = [],
+  sections = [],
 }) => {
+  const fixedIds = new Set(sections.flatMap((s) => s.pageIds));
   const [expandedPages, setExpandedPages] = useState<Record<string, boolean>>({});
   const [showUserMenu, setShowUserMenu] = useState(false);
   const mdInputRef = React.useRef<HTMLInputElement>(null);
@@ -142,16 +146,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Copy size={12} />
               </button>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onArchivePage(page.id);
-              }}
-              className="p-0.5 rounded hover:bg-red-500/10 text-red-400"
-              title="Mover para a lixeira"
-            >
-              <Trash2 size={12} />
-            </button>
+            {!fixedIds.has(page.id) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onArchivePage(page.id);
+                }}
+                className="p-0.5 rounded hover:bg-red-500/10 text-red-400"
+                title="Mover para a lixeira"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -167,10 +173,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .filter((p) => p && !p.isArchived);
 
   const rootPages = workspace.rootPageIds
+    .filter((id) => !fixedIds.has(id))
     .map((id) => workspace.pages[id])
     .filter((p) => p && !p.isArchived);
 
-  const recentPages = rootPages.slice(0, 5);
+  const renderSection = (s: { title: string; pageIds: string[] }) => {
+    const pages = s.pageIds.map((id) => workspace.pages[id]).filter((p) => p && !p.isArchived);
+    if (!pages.length) return null;
+    return (
+      <div key={s.title}>
+        <div className="px-2.5 pb-1 text-[10px] font-bold text-[var(--notion-text-muted)] uppercase tracking-wider">
+          {s.title}
+        </div>
+        {pages.map((page) => renderPageItem(page, 0))}
+      </div>
+    );
+  };
 
   if (isCollapsed) {
     return (
@@ -291,13 +309,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Recents */}
-        <div>
-          <div className="px-2.5 pb-1 text-[10px] font-bold text-[var(--notion-text-muted)] uppercase tracking-wider">
-            Recentes
-          </div>
-          {recentPages.map((page) => renderPageItem(page, 0))}
-        </div>
+        {/* Seções fixas do time (ex.: Frentes). "Recentes" saiu: repetia as primeiras páginas da lista. */}
+        {sections.filter((s) => s.placement === 'top').map(renderSection)}
 
         {/* Private Section */}
         <div>
@@ -313,6 +326,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {rootPages.map((page) => renderPageItem(page, 0))}
         </div>
+
+        {sections.filter((s) => s.placement === 'bottom').map(renderSection)}
       </div>
 
       {/* 4. Bottom Footer: Active User & Settings */}
