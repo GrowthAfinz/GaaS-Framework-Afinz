@@ -55,7 +55,8 @@ export function preparePilotSave(task: WorkItem, original?: WorkItem): WorkItem 
   return { ...task, title: task.title.trim(), acceptance_criteria: criteria, completed_criteria: criteriaChanged ? [] : task.completed_criteria, dependencies, links: task.links.map(l => ({ ...l, label: l.label.trim(), url: l.url.trim() })) };
 }
 
-export const pilotTaskGroup = (task: WorkItem): PilotGroup => pilotGroup(task.task_key) || (Object.prototype.hasOwnProperty.call(PILOT_GROUPS, task.details.wiki_pilot_group) ? task.details.wiki_pilot_group as PilotGroup : 'prepare');
+/** A group chosen on the page wins over the seeded stage, so activities can be moved between stages. */
+export const pilotTaskGroup = (task: WorkItem): PilotGroup => (Object.prototype.hasOwnProperty.call(PILOT_GROUPS, task.details.wiki_pilot_group) ? task.details.wiki_pilot_group as PilotGroup : undefined) || pilotGroup(task.task_key) || 'prepare';
 export function activePilotProgress(tasks: WorkItem[]) {
  const preparation=tasks.filter(t=>['built','prepare'].includes(pilotTaskGroup(t)));
  const validation=tasks.filter(t=>pilotTaskGroup(t)==='validate');

@@ -6,4 +6,12 @@
 .pilot-toast{animation:pilot-reveal .2s ease-out}
 .pilot-check-mark{animation:pilot-pop .22s ease-out}
 .pilot-progress{transition:width .45s cubic-bezier(.2,.8,.2,1)}
-@media(prefers-reduced-motion:reduce){.pilot-panel,.pilot-pop,.pilot-toast,.pilot-check-mark{animation:none}.pilot-progress{transition:none}}
+@keyframes pilot-nudge{0%,100%{transform:none}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+.pilot-nudge{animation:pilot-nudge .36s ease-in-out}
+/* Modo edição: a linha de inserção mostra onde a atividade arrastada vai cair. */
+.pilot-edit-row::before,.pilot-edit-row::after{content:'';position:absolute;left:2.25rem;right:.5rem;height:2px;border-radius:2px;background:#0d9488;opacity:0;transition:opacity .1s}
+.pilot-edit-row::before{top:-1px}.pilot-edit-row::after{bottom:-1px}
+.pilot-drop-before::before,.pilot-drop-after::after{opacity:1}
+.pilot-editing{box-shadow:0 0 0 3px rgba(13,148,136,.08)}
+.pilot-edit-bar{background:linear-gradient(90deg,rgba(240,253,250,.9),rgba(255,255,255,0))}
+@media(prefers-reduced-motion:reduce){.pilot-panel,.pilot-pop,.pilot-toast,.pilot-check-mark,.pilot-nudge{animation:none}.pilot-progress{transition:none}}
