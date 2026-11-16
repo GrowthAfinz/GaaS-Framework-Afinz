@@ -40,6 +40,13 @@ function Markdown({content,onOpen,onEditPart,editDisabled}:{content:string;onOpe
  return <WikiMarkdownSections content={markdown} onEditPart={onEditPart} editDisabled={editDisabled} render={part=><ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={vaultUrlTransform} components={{td:({children})=>{const value=textOf(children).trim();const state=value==='✓'?'ok':(value==='✗'||value==='×'||value==='X'||value==='x')?'missing':null;return <td>{state?<span className={'strategy-asset-status strategy-asset-status--'+state} aria-label={state==='ok'?'URL informada':'URL não informada'}>{children}</span>:children}</td>;},table:({children})=><div className="strategy-table" role="region" aria-label="Tabela da estratégia" tabIndex={0}><table>{children}</table></div>,h2:heading(2),h3:heading(3),h4:heading(4),h5:heading(5),h6:heading(6),pre:WikiCodeBlock,a:({href,children})=>href?.startsWith('vault:')?<a href={'?view=learning&section=vault&wiki_path='+href.slice(6)} onClick={e=>{if(onOpen){e.preventDefault();onOpen(decodeURIComponent(href.slice(6)));}}}>{children}</a>:<a href={href} target={href?.startsWith('https:')?'_blank':undefined} rel="noopener noreferrer">{children}</a>}}>{part}</ReactMarkdown>}/>;
 }
 
+/** Section title edited in place: Enter or blur saves, Esc restores. */
+function SectionTitleInput({value,onCommit,disabled}:{value:string;onCommit:(next:string)=>Promise<boolean>;disabled?:boolean}){
+ const [draft,setDraft]=useState(value);const saving=useRef(false);
+ useEffect(()=>{setDraft(value);},[value]);
+ const commit=async()=>{const next=draft.trim();if(saving.current||next===value.trim())return setDraft(value);if(next.length<3){setDraft(value);return;}saving.current=true;try{if(!(await onCommit(next)))setDraft(value);}finally{saving.current=false;}};
+ return <input className="strategy-title-input" aria-label="Título da seção" value={draft} readOnly={disabled} onChange={e=>setDraft(e.target.value)} onBlur={()=>void commit()} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}if(e.key==='Escape'){e.stopPropagation();setDraft(value);const field=e.currentTarget;requestAnimationFrame(()=>field.blur());}}}/>;
+}
 const INDEX_HIDDEN_KEY='gaas-wiki-strategy-index-hidden';
 const readIndexHidden=()=>{try{return localStorage.getItem(INDEX_HIDDEN_KEY)==='1';}catch{return false;}};
 
@@ -49,7 +56,7 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
 }) {
  const [source,setSource]=useState(note),[head,setHead]=useState<StrategyHead|null>(null),[doc,setDoc]=useState(()=>initialStrategy(note));
  const [canEdit,setCanEdit]=useState(false),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
- const [edit,setEdit]=useState<EditDraft|null>(null),[preview,setPreview]=useState(false),[taskDirty,setTaskDirty]=useState(false);
+ const [organizing,setOrganizing]=useState(false),[edit,setEdit]=useState<EditDraft|null>(null),[preview,setPreview]=useState(false),[taskDirty,setTaskDirty]=useState(false);
  const [closed,setClosed]=useState<Set<string>>(()=>readClosed(note)),[active,setActive]=useState('visao-geral'),[query,setQuery]=useState('');
  const [closedPreferenceStored]=useState(()=>hasStoredClosed(note.id));
  const manualActiveUntil=useRef(0);
@@ -85,7 +92,7 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const request=useRef<{body:string;id:string}|null>(null);
  useEffect(()=>{let active=true;setLoading(true);void loader(note.id).then(next=>{if(!active)return;setSource(next.source);setHead(next.head);setDoc(next.head?.document||initialStrategy(next.source));if(!closedPreferenceStored)setClosed(allBlockIds(next.head?.document||initialStrategy(next.source)));setCanEdit(next.canEdit);setError('');setRevisionWarning(false);
  const key=next.viewerId?'gaas-wiki-draft:'+next.viewerId+':'+note.id:null;setDraftKey(key);
- if(key){try{const cached=JSON.parse(sessionStorage.getItem(key)||'null');if(cached?.edit && ['header','block'].includes(cached.edit.kind)){setEdit(cached.edit);setRecoveredStale(cached.revision!==(next.head?.revision||0));setMessage('Rascunho recuperado desta sessão. Revise antes de salvar.');}}catch{/* Storage unavailable: editing remains usable. */}}
+ if(key){try{const cached=JSON.parse(sessionStorage.getItem(key)||'null');if(cached?.edit && ['header','block'].includes(cached.edit.kind) && cached.edit.block?.type!=='tasks'){setEdit(cached.edit);setRecoveredStale(cached.revision!==(next.head?.revision||0));setMessage('Rascunho recuperado desta sessão. Revise antes de salvar.');}}catch{/* Storage unavailable: editing remains usable. */}}
  }).catch(()=>{if(active){setError('Não foi possível consultar a versão de trabalho. A fonte está disponível para leitura.');setCanEdit(false);}}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[note.id,loader,retry,closedPreferenceStored]);
  useEffect(()=>{const warn=(e:BeforeUnloadEvent)=>{if(dirty){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
  useEffect(()=>{if(edit)editorRef.current?.querySelector<HTMLInputElement>('input')?.focus();},[edit?.kind,edit?.kind==='block'?edit.block.id:'header']);
@@ -113,12 +120,12 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
  const focusBack=()=>requestAnimationFrame(()=>opener.current?.isConnected&&opener.current.focus({preventScroll:true}));
  const startEdit=(value:EditDraft,element?:HTMLElement)=>{if(protect())return;opener.current=element||null;setEdit(value);setPreview(false);setMessage('');setError('');};
  const cancel=()=>{setEdit(null);setError('');setMessage('Edição cancelada.');focusBack();};
- const persist=async(next:StrategyDocument,reason:string,reconcile=false,keepDraft=false)=>{
+ const persist=async(next:StrategyDocument,reason:string,reconcile=false,keepDraft=false,quiet=false)=>{
   if(!canEdit||busy)throw new Error('wiki_pilot_access_denied');
   const body=JSON.stringify({next,revision:head?.revision||0,sourceHash:source.content_hash,reconcile});
   if(request.current?.body!==body)request.current={body,id:crypto.randomUUID()};
   setBusy(true);setError('');
-  try{const saved=await writer(note.id,head?.revision||0,source.content_hash||'',next,reason,request.current.id,reconcile);setHead(saved);setDoc(saved.document);if(!keepDraft)setEdit(null);setMessage('Alteração salva no histórico.');setRevisionWarning(false);request.current=null;focusBack();return saved;}
+  try{const saved=await writer(note.id,head?.revision||0,source.content_hash||'',next,reason,request.current.id,reconcile);setHead(saved);setDoc(saved.document);if(!keepDraft)setEdit(null);if(!quiet)setMessage('Alteração salva no histórico.');setRevisionWarning(false);request.current=null;focusBack();return saved;}
   catch(e){setError(strategyError(e));if(String((e as {message?:string})?.message).includes('revision_conflict'))setRevisionWarning(true);
  if(String((e as {message?:string})?.message).includes('source_conflict'))void loader(note.id).then(fresh=>setSource(fresh.source)).catch(()=>{});throw e;}
   finally{setBusy(false);}
@@ -177,10 +184,11 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
    {message&&<p role="status" className="strategy-feedback">{message}</p>}
    {doc.blocks.map((block,index)=>{
     const matches=!query||(block.title+' '+block.content).toLocaleLowerCase().includes(query.toLocaleLowerCase())||block.type==='tasks';
+    const organizingBlock=organizing&&block.type==='tasks'&&canEdit&&!sourceChanged;
     const isClosed=closed.has(block.id)&&!query&&!(edit?.kind==='block'&&edit.block.id===block.id)&&!(taskDirty&&block.type==='tasks');
     return <section key={block.id} id={block.id} hidden={!matches} className={'strategy-block '+(block.type==='tasks'?'strategy-task-block':'')}>
-     <div className="strategy-block-heading"><button aria-label={`${isClosed?'Abrir':'Recolher'} ${cleanTitle(block.title)}`} aria-expanded={!isClosed} onClick={()=>{if(!isClosed&&protectedIds.has(block.id)){setMessage('Esta seção tem uma edição em andamento. Salve ou cancele para recolhê-la; as outras seções continuam acessíveis.');return;}setClosed(c=>toggleStrategySection(c,block.id,protectedIds));}} className="strategy-section-toggle">{isClosed?<ChevronRight size={16}/>:<ChevronDown size={16}/>}<h2>{cleanTitle(block.title)}</h2></button>
-      {canEdit&&<div className="strategy-block-actions"><button className="strategy-icon" disabled={locked||sourceChanged} aria-label={`Editar ${cleanTitle(block.title)}`} onClick={e=>startEdit({kind:'block',block:{...block},isNew:false},e.currentTarget)}><Pencil size={15}/></button>
+     <div className="strategy-block-heading">{organizingBlock?<SectionTitleInput value={block.title} disabled={busy} onCommit={title=>persist({...doc,blocks:doc.blocks.map(b=>b.id===block.id?{...b,title}:b)},'Renomear seção: '+title,false,true,true).then(()=>true,()=>false)}/>:<button aria-label={`${isClosed?'Abrir':'Recolher'} ${cleanTitle(block.title)}`} aria-expanded={!isClosed} onClick={()=>{if(!isClosed&&protectedIds.has(block.id)){setMessage('Esta seção tem uma edição em andamento. Salve ou cancele para recolhê-la; as outras seções continuam acessíveis.');return;}setClosed(c=>toggleStrategySection(c,block.id,protectedIds));}} className="strategy-section-toggle">{isClosed?<ChevronRight size={16}/>:<ChevronDown size={16}/>}<h2>{cleanTitle(block.title)}</h2></button>}
+      {canEdit&&<div className="strategy-block-actions">{block.type==='tasks'?organizingBlock?<button className="strategy-done" disabled={busy} onClick={()=>setOrganizing(false)}><Check size={14}/>Concluir</button>:<button className="strategy-icon" disabled={locked||sourceChanged} aria-label={`Editar ${cleanTitle(block.title)}`} title="Editar atividades" onClick={()=>{if(protect())return;opener.current=null;setClosed(c=>{const next=new Set(c);next.delete(block.id);return next;});setOrganizing(true);}}><Pencil size={15}/></button>:<button className="strategy-icon" disabled={locked||sourceChanged} aria-label={`Editar ${cleanTitle(block.title)}`} onClick={e=>startEdit({kind:'block',block:{...block},isNew:false},e.currentTarget)}><Pencil size={15}/></button>}
        <details className="strategy-menu"><summary aria-label={`Ações de ${cleanTitle(block.title)}`} className="strategy-icon"><MoreHorizontal size={17}/></summary><div>
         <button disabled={locked||sourceChanged||block.type==='tasks'} onClick={()=>apply({...doc,blocks:[...doc.blocks.slice(0,index+1),{...block,id:'block-'+crypto.randomUUID(),title:block.title+' (cópia)'},...doc.blocks.slice(index+1)]},'Duplicar seção')}><Copy size={14}/>Duplicar</button>
         <button disabled={locked||sourceChanged||index===0} onClick={()=>apply(moveBlock(doc,block.id,-1),'Mover seção para cima')}><ArrowUp size={14}/>Mover para cima</button>
@@ -190,7 +198,7 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
      </div>
      {deleteTarget===block.id&&<div role="alert" className="strategy-notice">Excluir esta seção da nota? O conteúdo fica no histórico.<button disabled={locked} onClick={()=>{setDeleteTarget(null);apply({...doc,blocks:doc.blocks.filter(b=>b.id!==block.id)},'Excluir seção: '+block.title);}}>Excluir seção</button><button onClick={()=>setDeleteTarget(null)}>Cancelar exclusão</button></div>}
      <div hidden={isClosed}>
-      {edit?.kind==='block'&&edit.block.id===block.id&&!edit.isNew?editor(edit):block.type==='tasks'&&hasVisaActivities(source)?<WikiPilotChecklist {...taskProps} insurance={source.relative_path==='05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md'} initiallyOpen layout={doc.taskLayout} documentBusy={busy||Boolean(edit)||sourceChanged} onDirtyChange={notifyTaskDirty} onLayoutChange={canEdit?async layout=>{await persist({...doc,taskLayout:layout},'Reorganizar atividades da nota');}:undefined}/>:<div className="strategy-prose"><Markdown content={block.content} onOpen={onOpen} onEditPart={canEdit?part=>editDetail(block,part):undefined} editDisabled={locked||sourceChanged}/></div>}
+      {edit?.kind==='block'&&edit.block.id===block.id&&!edit.isNew?editor(edit):block.type==='tasks'&&hasVisaActivities(source)?<WikiPilotChecklist {...taskProps} insurance={source.relative_path==='05-Estrategia/Estrategia-de-Segmentacao-de-Seguros.md'} initiallyOpen layout={doc.taskLayout} documentBusy={busy||Boolean(edit)||sourceChanged} onDirtyChange={notifyTaskDirty} editing={organizingBlock} onEditingChange={setOrganizing} note={block.content} onNoteChange={canEdit?async content=>{await persist({...doc,blocks:doc.blocks.map(b=>b.id===block.id?{...b,content}:b)},'Editar nota das atividades',false,true,true);}:undefined} onLayoutChange={canEdit?async (layout,reason)=>{await persist({...doc,taskLayout:layout},reason||'Reorganizar atividades da nota',false,true,true);}:undefined}/>:<div className="strategy-prose"><Markdown content={block.content} onOpen={onOpen} onEditPart={canEdit?part=>editDetail(block,part):undefined} editDisabled={locked||sourceChanged}/></div>}
       {canEdit&&<div className="strategy-add-block"><details className="strategy-menu"><summary><Plus size={16}/>Adicionar bloco</summary><div><button disabled={locked||sourceChanged} onClick={e=>add('text',block.id,e.currentTarget)}>Texto</button><button disabled={locked||sourceChanged} onClick={e=>add('table',block.id,e.currentTarget)}>Tabela</button><button disabled={locked||sourceChanged} onClick={e=>add('diagram',block.id,e.currentTarget)}>Diagrama</button></div></details></div>}
      </div>
      {edit?.kind==='block'&&edit.isNew&&edit.after===block.id&&editor(edit)}

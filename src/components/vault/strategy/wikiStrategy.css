@@ -170,3 +170,11 @@
 .strategy-asset-status{font-weight:700;font-size:15px}
 .strategy-asset-status--ok{color:#087f5b}
 .strategy-asset-status--missing{color:#bc3b3b}
+/* Edição das atividades no lugar: título da seção vira campo e o bloco ganha moldura. */
+.strategy-title-input{flex:1;min-width:0;font-size:23px;font-weight:650;letter-spacing:-.35px;line-height:1.25;color:#17212b;border:1px solid transparent;border-radius:8px;padding:2px 8px;margin-left:-9px;background:transparent;outline:none;transition:border-color .15s,background-color .15s,box-shadow .15s}
+.strategy-title-input:hover{border-color:#d7dfe2;background:#fff}
+.strategy-title-input:focus{border-color:#0e7490;background:#fff;box-shadow:0 0 0 3px rgba(14,116,144,.15)}
+.strategy-done{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border:0;border-radius:8px;background:#0f766e;color:#fff;font-size:12px;font-weight:600;transition:background-color .15s}
+.strategy-done:hover{background:#115e59}.strategy-done:disabled{opacity:.55}
+.strategy-task-block .pilot-checklist.pilot-editing{border:1px solid #99f6e4;border-radius:12px;overflow:hidden}
+.strategy-task-block .pilot-editing .pilot-checklist-note,.strategy-task-block .pilot-editing>div>div{padding-left:12px;padding-right:12px}

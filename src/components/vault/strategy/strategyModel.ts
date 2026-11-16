@@ -1,7 +1,9 @@
 import type { VaultNote } from '../vaultTypes';
 export const STRATEGY_PATH = '05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md';
 export interface StrategyBlock { id: string; type: 'markdown' | 'tasks'; title: string; content: string }
-export interface TaskLayout { hidden: string[]; order: string[] }
+export interface TaskGroup { key: string; label: string }
+/** Groups are optional: absent, the activity list uses its built-in stages. */
+export interface TaskLayout { hidden: string[]; order: string[]; groups?: TaskGroup[] }
 export interface StrategyDocument { title: string; summary: string; blocks: StrategyBlock[]; taskLayout: TaskLayout }
 export interface StrategyHead { note_id: string; revision: number; source_hash: string; source_markdown: string; document: StrategyDocument; updated_at: string; updated_by: string }
 export interface StrategyRevision extends Omit<StrategyHead, 'updated_at' | 'updated_by'> { actor_id: string; created_at: string; reason: string }
