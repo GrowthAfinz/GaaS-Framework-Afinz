@@ -3279,11 +3279,61 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         }
         return [...groups].sort(([, a], [, b]) => a.title.localeCompare(b.title, 'pt-BR'));
     }, [candidates, campaignByCandidate]);
+    const [reviewCollision, setReviewCollision] = useState('');
+    const collisionGroups = useMemo(() => {
+        const occurrences = new Map<string, UpdateCandidate[]>();
+        const candidatesByJourney = new Map<string, UpdateCandidate[]>();
+        for (const candidate of candidates) {
+            if (candidate.domain !== 'rentabilizacao') continue;
+            const journeyKey = JSON.stringify([candidate.channel, candidate.journey]);
+            const journeyRows = candidatesByJourney.get(journeyKey) ?? [];
+            journeyRows.push(candidate);
+            candidatesByJourney.set(journeyKey, journeyRows);
+            if (candidate.status !== 'conflict') continue;
+            const rows = occurrences.get(candidate.dispatchSignature) ?? [];
+            rows.push(candidate);
+            occurrences.set(candidate.dispatchSignature, rows);
+        }
+        const groups = new Map<string, {
+            channel: Channel; journeys: string[]; occurrences: number; equal: number;
+            keys: Set<string>; activities: Set<string>; sample: UpdateCandidate[]; first: string; last: string;
+        }>();
+        for (const rows of occurrences.values()) {
+            const channel = rows[0].channel;
+            const journeys = [...new Set(rows.flatMap(row => [row.journey, ...(row.conflictJourneys ?? [])]))].sort();
+            const key = JSON.stringify([channel, journeys]);
+            const group = groups.get(key) ?? {
+                channel, journeys, occurrences: 0, equal: 0, keys: new Set<string>(),
+                activities: new Set<string>(), sample: rows, first: rows[0].date, last: rows[0].date,
+            };
+            const metrics = new Set(rows.map(row => JSON.stringify([row.sent, row.delivered, row.opens, row.clicks])));
+            group.occurrences += 1;
+            if (rows.length === journeys.length && rows.length > 1 && metrics.size === 1) group.equal += 1;
+            for (const row of rows) {
+                group.keys.add(row.key);
+                group.activities.add(row.activityName);
+            }
+            if (rows[0].date < group.first) group.first = rows[0].date;
+            if (rows[0].date > group.last) group.last = rows[0].date;
+            groups.set(key, group);
+        }
+        return [...groups].map(([key, group]) => ({
+            key, ...group,
+            exclusive: group.journeys.map(journey => ({
+                journey,
+                count: (candidatesByJourney.get(JSON.stringify([group.channel, journey])) ?? []).filter(row =>
+                    group.activities.has(row.activityName) && !occurrences.has(row.dispatchSignature)
+                ).length,
+            })),
+        })).sort((a, b) => b.occurrences - a.occurrences);
+    }, [candidates]);
+    const activeCollision = collisionGroups.find(group => group.key === reviewCollision);
     const filteredCandidates = useMemo(() => {
         const term = normalizeKey(reviewSearchTerm);
         const [periodStart, periodEnd] = reviewStartDate && reviewEndDate && reviewStartDate > reviewEndDate
             ? [reviewEndDate, reviewStartDate]
             : [reviewStartDate, reviewEndDate];
+        if (activeCollision) return candidates.filter(candidate => activeCollision.keys.has(candidate.key));
         return visibleCampaignCandidates.filter((candidate) => {
             const statusMatches = candidateFilterKey(candidate) === statusFilter;
             if (!statusMatches) return false;
@@ -3307,7 +3357,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
             return haystack.includes(term);
         });
-    }, [visibleCampaignCandidates, campaignByCandidate, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
+    }, [candidates, visibleCampaignCandidates, activeCollision, campaignByCandidate, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
     const sortedCandidates = useMemo(() => {
         const sortKey = reviewSortByMode[reviewMode];
         const valueFor = (candidate: UpdateCandidate): string | number => {
@@ -3498,6 +3548,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setReviewJourney('');
             setReviewChannel('');
             setReviewFront('');
+            setReviewCollision('');
             const reviewed = processed.candidates.map(candidate =>
                 isBulkApprovalEligible(candidate)
                     ? { ...applyApprovalDefaults(candidate), accepted: true }
@@ -4319,6 +4370,43 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             )}
                         </div>
 
+                        {collisionGroups.length > 0 && (
+                            <section className="space-y-2 border-b px-6 py-3 text-xs" aria-label="Colisões de jornadas">
+                                <label className="flex flex-wrap items-center gap-2 font-semibold">
+                                    Revisão em grupo
+                                    <select className="max-w-full rounded border px-2 py-1" value={reviewCollision} onChange={event => {
+                                        setReviewCollision(event.target.value);
+                                        setReviewCampaign('');
+                                        setReviewJourney('');
+                                        setReviewChannel('');
+                                        setReviewFront('');
+                                        setReviewPage(1);
+                                    }}>
+                                        <option value="">Escolher grupo ({collisionGroups.length})</option>
+                                        {collisionGroups.map(group => <option key={group.key} value={group.key}>
+                                            {`${group.channel} · ${group.occurrences} ocorrências · ${group.journeys.join(' / ')}`}
+                                        </option>)}
+                                    </select>
+                                </label>
+                                {activeCollision && (
+                                    <div className="space-y-2 rounded border bg-slate-50 p-3">
+                                        <p>{activeCollision.occurrences} ocorrências em {activeCollision.activities.size} Activities.
+                                            {' '}{activeCollision.equal} com métricas coincidentes. Período de {activeCollision.first} a {activeCollision.last}.</p>
+                                        <ul>{activeCollision.exclusive.map(({ journey, count }) =>
+                                            <li key={journey}>{journey} · {count} ocorrências exclusivas nas Activities do grupo</li>
+                                        )}</ul>
+                                        <p className="font-semibold">Amostra de {activeCollision.sample[0].date} · {activeCollision.sample[0].activityName}</p>
+                                        <table className="w-full text-left">
+                                            <thead><tr><th>Jornada</th><th>Enviados</th><th>Entregues</th><th>Aberturas / Leituras</th><th>Cliques</th></tr></thead>
+                                            <tbody>{activeCollision.sample.map(row => <tr key={row.key}>
+                                                <td>{row.journey}</td><td>{row.sent ?? '—'}</td><td>{row.delivered ?? '—'}</td>
+                                                <td>{row.opens ?? '—'}</td><td>{row.clicks ?? '—'}</td>
+                                            </tr>)}</tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </section>
+                        )}
                         <section className="space-y-2 border-b px-6 py-3" aria-label="Campanhas no arquivo">
                             {mappingUnavailable && <p role="status" className="text-xs text-amber-700">Mapeamento indisponível. A revisão dos disparos continua disponível.</p>}
                             <div className="flex flex-wrap gap-2 text-xs">
