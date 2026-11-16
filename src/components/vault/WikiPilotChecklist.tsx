@@ -9,7 +9,7 @@ import { WikiPilotTaskEditor } from './WikiPilotTaskEditor';
 import type { TaskLayout } from './strategy/strategyModel';
 
 const icon = 'inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-cyan-50 hover:text-cyan-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700 disabled:opacity-40 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11';
-const groupsInitial: Record<string, boolean> = { built: false, prepare: true, validate: false, later: false };
+const groupsInitial: Record<string, boolean> = { built: false, prepare: false, validate: false, later: false };
 
 /** Note-bound work plans use the same records, revision checks and history as Testes e Tarefas. */
 export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork, historyLoader = taskHistory, layout, onLayoutChange, onDirtyChange, documentBusy = false, initiallyOpen = false, insurance = false }: { insurance?: boolean; layout?: TaskLayout; onLayoutChange?: (layout: TaskLayout) => Promise<void>; onDirtyChange?: (dirty: boolean) => void; documentBusy?: boolean; initiallyOpen?: boolean; loader?: typeof loadPilotTasks; writer?: typeof saveWork; historyLoader?: typeof taskHistory }) {

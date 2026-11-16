@@ -27,7 +27,8 @@ describe('Wiki strategy reading controls', () => {
     expect(html).not.toContain('Recolher seções');
     expect(html).toContain('aria-label="Abrir Contexto"');
     expect(html).toContain('aria-label="Abrir Escopo"');
-    expect(html).not.toContain('aria-expanded="true"');
+    expect(html).toMatch(/aria-label="Abrir Contexto" aria-expanded="false"/);
+    expect(html).toMatch(/aria-label="Abrir Escopo" aria-expanded="false"/);
   });
 
   it('offers a download of the page as Markdown at the top', () => {
