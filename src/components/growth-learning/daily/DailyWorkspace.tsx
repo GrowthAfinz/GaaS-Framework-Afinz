@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import {
-  ArrowDownUp, CalendarArrowUp, CalendarDays, Copy, CornerDownRight, CreditCard, Database, FolderInput, FolderKanban, Layers, Pencil, Plus,
+  ArrowDownUp, CalendarArrowUp, CalendarDays, CalendarSearch, Copy, CornerDownRight, CreditCard, Database, FolderInput, FolderKanban, KanbanSquare, Layers, Link2, Pencil, Plus,
   Presentation, Rows3, Search, Send, Settings2, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
@@ -13,23 +13,27 @@ import '../structure/structure.css';
 import './daily.css';
 import {
   FALLBACK_COLOR, WEEKDAYS, addDays, brDate, crmForDay, emptyDailyFilters, entryVisible, fmtInt, friendlyDailyError, groupEntries, monthEnd,
-  monthKey, monthStart, nextWorkday, previousMonthKey, projectMonthStats, recentProjects, saoPauloToday, toggleIsolate, weekRange, weekday,
+  monthKey, monthStart, nextWorkday, previousMonthKey, projectMonthStats, recentProjects, saoPauloToday, staleProjects, toggleIsolate, weekRange, weekday, workdaysBetween,
   type B2cDay, type CrmCell, type DailyEntry, type DailyFilters, type DailyFrente, type DailyGroup, type DailyPartner, type DailyProject,
   type DailySort, type DailyTag, type DailyView, type FilterKey,
 } from './dailyModel';
 import {
   loadB2c, loadCrm, loadDailyConfig, loadEarliestDay, loadEntries, loadFreshness, mergeProjects, saveEntry, saveOption, saveProject,
-  type DailyLoad, loadBoardCampaigns,
+  type DailyLoad, loadBoardCampaigns, loadEntriesLite, loadInitiativesFull, loadWorkMentions, loadWorks, saveWork,
+  type DailyInitiative, type DailyWork, type EntryLite,
 } from './dailyService';
-import { DailyCalendar, type DayMetric } from './DailyCalendar';
+import { DailyCalendar, type CalendarMode, type DayPin } from './DailyCalendar';
+import { DailyDayModal } from './DailyDayModal';
+import { DailyKanbanModal, WorkPicker, boardName, dailyBoards, statusLabel } from './DailyKanban';
+import { workspaceLabel, type Workspace } from '../development/workModel';
 import { DailyEntries, type Draft } from './DailyEntries';
 import { DailyProjectDrawer } from './DailyProjectDrawer';
 import { DailyConfigModal, type ConfigTab } from './DailyConfigModal';
 import { DayPicker, MenuList, MultiFilter, PeoplePicker, Popover, ProjectPicker, TagPicker, anchorOf, type Anchor, type FilterOption } from './DailyPopovers';
 
-interface Prefs { metric: DayMetric; compact: boolean; mini: boolean; group: DailyGroup; sort: DailySort; view: DailyView }
+interface Prefs { mode: CalendarMode; compact: boolean; mini: boolean; group: DailyGroup; sort: DailySort; view: DailyView }
 const PREFS_KEY = 'gaas.visao-daily.prefs';
-const DEFAULT_PREFS: Prefs = { metric: 'b2c', compact: false, mini: true, group: 'day', sort: 'asc', view: 'all' };
+const DEFAULT_PREFS: Prefs = { mode: 'topics', compact: false, mini: true, group: 'day', sort: 'asc', view: 'all' };
 /**
  * Decisão do Pablo (13/11/2026): a tela sempre abre com os mais antigos primeiro e os dias recolhidos;
  * trocar a ordem vale só até sair. "Que eu acompanho" saiu da barra, então preferência antiga vira "Tudo".
@@ -37,13 +41,16 @@ const DEFAULT_PREFS: Prefs = { metric: 'b2c', compact: false, mini: true, group:
 const readPrefs = (): Prefs => {
   let stored: Partial<Prefs> = {};
   try { stored = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch { /* preferência local */ }
-  const prefs = { ...DEFAULT_PREFS, ...stored, sort: DEFAULT_PREFS.sort };
+  // "metric" (Emissões B2C | Cartões CRM) virou "mode" (Tópicos | Resultados) em 16/11/2026.
+  const { metric: _old, ...rest } = stored as Partial<Prefs> & { metric?: string };
+  const prefs: Prefs = { ...DEFAULT_PREFS, ...rest, sort: DEFAULT_PREFS.sort };
+  if (prefs.mode !== 'topics' && prefs.mode !== 'results') prefs.mode = 'topics';
   return prefs.view === 'mine' ? { ...prefs, view: 'all' } : prefs;
 };
 
 type Pop =
   | { kind: 'filter'; key: FilterKey; anchor: Anchor } | { kind: 'sort'; anchor: Anchor } | { kind: 'group'; anchor: Anchor }
-  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'move' | 'copy'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
+  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'move' | 'copy' | 'work'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 const FILTER_LABELS: [FilterKey, string][] = [['frentes', 'Frente'], ['projects', 'Projeto'], ['partners', 'Parceiro'], ['people', 'Pessoa'], ['tags', 'Tag']];
 
@@ -77,6 +84,19 @@ export function DailyWorkspace() {
   const [campaigns, setCampaigns] = useState<Map<string, string>>(new Map());
   useEffect(() => { void loadBoardCampaigns().then(cs => setCampaigns(new Map(cs.map(c => [c.id, c.title])))); }, []);
   const [toast, setToast] = useState<Toast>(null);
+  // Destaque de um dia só, modal do dia e kanban (16/11/2026).
+  const [pin, setPin] = useState<DayPin | null>(null);
+  const [dayModal, setDayModal] = useState<DayPin | null>(null);
+  const [kanban, setKanban] = useState<{ boardId: string; focusWorkId: string | null } | null>(null);
+  const [works, setWorks] = useState<DailyWork[]>([]);
+  const [initiativeList, setInitiativeList] = useState<DailyInitiative[]>([]);
+  const [mentionsRaw, setMentionsRaw] = useState<EntryLite[]>([]);
+  const [recentRaw, setRecentRaw] = useState<EntryLite[]>([]);
+  const reloadWorks = useCallback(async () => {
+    const [w, i, m] = await Promise.all([loadWorks().catch(() => [] as DailyWork[]), loadInitiativesFull().catch(() => [] as DailyInitiative[]), loadWorkMentions().catch(() => [] as EntryLite[])]);
+    setWorks(w); setInitiativeList(i); setMentionsRaw(m);
+  }, []);
+  useEffect(() => { void reloadWorks(); void loadEntriesLite(addDays(today, -90), today).then(setRecentRaw).catch(() => undefined); }, [reloadWorks, today]);
   const [scrollTo, setScrollTo] = useState<{ day: string; key: number } | null>(null);
   const [present, setPresent] = useState(false);
   const [calHeight, setCalHeight] = useState(760);
@@ -116,6 +136,13 @@ export function DailyWorkspace() {
   }, [reloadConfig]);
   const calMonth = `${ym.y}-${String(ym.m).padStart(2, '0')}`;
   useEffect(() => { void ensureMonth(calMonth); }, [calMonth, ensureMonth]);
+  // A comparação com o mesmo dia da semana olha até 4 semanas para trás: carrega o mês anterior também.
+  useEffect(() => { if (prefs.mode === 'results') void ensureMonth(previousMonthKey(calMonth)); }, [prefs.mode, calMonth, ensureMonth]);
+  useEffect(() => {
+    if (!pin || dayModal || kanban) return;
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setPin(null); };
+    document.addEventListener('keydown', key); return () => document.removeEventListener('keydown', key);
+  }, [pin, dayModal, kanban]);
   useEffect(() => { listMonths.forEach(mk => void ensureMonth(mk)); }, [listMonths, ensureMonth]);
   const reloadEntries = useCallback(async () => {
     const months = [...loaded.current]; loaded.current.clear();
@@ -144,9 +171,22 @@ export function DailyWorkspace() {
   const groups = useMemo(() => groupEntries(listEntries, prefs.group, prefs.sort, projects, frenteOrder), [listEntries, prefs.group, prefs.sort, projects, frenteOrder]);
   const prevMonth = useMemo(() => { const p = previousMonthKey(listMonths[listMonths.length - 1]); return earliest && p >= monthKey(earliest) ? p : null; }, [listMonths, earliest]);
   const projectColor = useCallback((id: string) => frentes.get(projects.get(id)?.frente_key || '')?.color || FALLBACK_COLOR, [frentes, projects]);
-  const monthStats = useMemo(() => projectMonthStats(all, calMonth), [all, calMonth]);
+  const projectNames = useMemo(() => new Map([...projects.values()].map(p => [p.id, p.name])), [projects]);
+  const monthStats = useMemo(() => projectMonthStats(all, calMonth, projectNames), [all, calMonth, projectNames]);
+  const worksById = useMemo(() => new Map(works.map(w => [w.id, w])), [works]);
+  const initiatives = useMemo(() => new Map(initiativeList.map(i => [i.id, i])), [initiativeList]);
+  const boards = useMemo(() => dailyBoards(initiativeList, cfg?.projects || []), [initiativeList, cfg]);
+  /** Registros leves recentes + o que já está carregado (que vale mais, porque reflete as edições da sessão). */
+  const mergeLite = useCallback((raw: EntryLite[], filter: (e: DailyEntry) => boolean) => {
+    const m = new Map(raw.map(e => [e.id, e]));
+    for (const e of all) { if (filter(e)) m.set(e.id, { id: e.id, day: e.day, project_id: e.project_id, body: e.body, work_ids: e.work_ids || [] }); else m.delete(e.id); }
+    return [...m.values()];
+  }, [all]);
+  const mentions = useMemo(() => mergeLite(mentionsRaw, e => (e.work_ids || []).length > 0), [mergeLite, mentionsRaw]);
+  const stale = useMemo(() => staleProjects(cfg?.projects || [], works, mergeLite(recentRaw, () => true), today), [cfg, works, mergeLite, recentRaw, today]);
   const monthB2c = useMemo(() => [...b2c.values()].filter(d => monthKey(d.day) === calMonth).reduce((a, d) => a + (d.emissions || 0), 0), [b2c, calMonth]);
   const monthCrm = useMemo(() => [...crm.entries()].filter(([d]) => monthKey(d) === calMonth).reduce((a, [, cells]) => a + (crmForDay(cells, cfg?.partners || [], filters.partners) || 0), 0), [crm, calMonth, cfg, filters.partners]);
+  const staleOutside = useMemo(() => [...stale.entries()].filter(([id]) => !monthStats.some(s => s.projectId === id) && projects.has(id)), [stale, monthStats, projects]);
   const monthFrentes = useMemo(() => new Set(monthStats.map(s => projects.get(s.projectId)?.frente_key).filter(Boolean)).size, [monthStats, projects]);
 
   useLayoutEffect(() => {
@@ -302,6 +342,50 @@ export function DailyWorkspace() {
     } catch (err) { fail(err); return null; }
   }, [fail]);
 
+  /* ---------- destaque, modal do dia e kanban ---------- */
+  /** Mostra um tópico de um dia no calendário (só aquele dia). Clicar de novo no mesmo tópico desliga. */
+  const pinTopic = useCallback((day: string, projectId: string) => {
+    setPin(cur => (cur && cur.day === day && cur.projectId === projectId ? null : { day, projectId }));
+    setYm({ y: Number(day.slice(0, 4)), m: Number(day.slice(5, 7)) });
+    setSelected(day);
+  }, []);
+  const openDay = useCallback((day: string, projectId: string) => {
+    void ensureMonth(monthKey(day));
+    setTip(null); setPop(null); setDayModal({ day, projectId }); setPin({ day, projectId });
+    setYm({ y: Number(day.slice(0, 4)), m: Number(day.slice(5, 7)) });
+  }, [ensureMonth]);
+  const closeDay = useCallback(() => { setDayModal(null); setPin(null); }, []);
+  const openKanban = useCallback((boardId: string, focusWorkId: string | null) => { setPop(null); setKanban({ boardId, focusWorkId }); }, []);
+  const saveWorkFromBoard = useCallback(async (w: DailyWork | null, body: Record<string, unknown>) => {
+    const saved = await saveWork(w?.id ?? null, w?.revision ?? null, body);
+    setWorks(list => (list.some(x => x.id === saved.id) ? list.map(x => (x.id === saved.id ? { ...x, ...saved } : x)) : [saved, ...list]));
+    showToast(w ? `"${saved.title}" foi para ${statusLabel(saved.status)}` : `Trabalho "${saved.title}" criado`);
+    return saved;
+  }, [showToast]);
+  const toggleWork = useCallback((e: DailyEntry, workId: string) => {
+    const cur = e.work_ids || [], on = cur.includes(workId), w = worksById.get(workId);
+    void patchEntry(e, { work_ids: on ? cur.filter(x => x !== workId) : [...cur, workId] }, on ? 'Trabalho desligado do registro' : `Registro ligado a "${w?.title || 'trabalho'}"`);
+  }, [patchEntry, worksById]);
+  /** Cria um trabalho na iniciativa do projeto com o texto do registro e já liga os dois. */
+  const createWorkFromEntry = useCallback(async (e: DailyEntry) => {
+    setPop(null);
+    const pr = projects.get(e.project_id), ini = pr?.initiative_id ? initiatives.get(pr.initiative_id) : undefined;
+    if (!ini) { showToast('Ligue o projeto a uma iniciativa (página do projeto) antes de criar trabalho.'); return; }
+    const text = e.body.replace(/\s+/g, ' ').trim();
+    const title = (text.length > 120 ? text.slice(0, 117).trimEnd() + '…' : text).padEnd(5, '.');
+    try {
+      const saved = await saveWork(null, null, {
+        title, initiative_id: ini.id, workspace: ini.workspace, area: workspaceLabel(ini.workspace as Workspace),
+        owner_label: e.responsible_id ? people.get(e.responsible_id)?.name || null : null,
+        description: `Criado a partir do registro de ${brDate(e.day)} na Visão Daily (${pr?.name}).`,
+      });
+      setWorks(list => [saved, ...list]);
+      const linked = await saveEntry(e.id, e.revision, { work_ids: [...(e.work_ids || []), saved.id] });
+      putEntry(linked);
+      showToast(`Trabalho criado em ${ini.title} e ligado ao registro`);
+    } catch (err) { fail(err); }
+  }, [fail, initiatives, people, projects, putEntry, showToast]);
+
   /* ---------- popovers ---------- */
   const entryOf = (id: string) => all.find(e => e.id === id);
   const openAdd = (day: string, el: HTMLElement, projectId?: string) => {
@@ -352,6 +436,11 @@ export function DailyWorkspace() {
         onCreate={async name => { const k = await saveOpt('tag', null, { name }); if (k) void patchEntry(e, { tag_keys: [...e.tag_keys, k] }, `Tag #${name} criada`); }}
         onConfig={() => { close(); setConfig('tag'); }} /></Popover>;
     }
+    if (pop.kind === 'work') {
+      const ini = projects.get(e.project_id)?.initiative_id || null;
+      return <Popover anchor={pop.anchor} width={340} onClose={close}><WorkPicker works={works} initiativeId={ini} initiatives={initiatives} selected={e.work_ids || []} today={today}
+        onToggle={id => toggleWork(e, id)} onCreate={ini ? () => void createWorkFromEntry(e) : undefined} /></Popover>;
+    }
     if (pop.kind === 'people') {
       return <Popover anchor={pop.anchor} width={330} onClose={close}><PeoplePicker people={cfg.people} me={me} responsible={e.responsible_id} followers={e.follower_ids} subject={e.body}
         onChange={(r, f) => void patchEntry(e, { responsible_id: r, follower_ids: f }, 'Pessoas atualizadas')} /></Popover>;
@@ -373,6 +462,9 @@ export function DailyWorkspace() {
           ...(canEdit ? [{ icon: <Copy />, label: 'Copiar para outro dia', onClick: () => setPop({ kind: 'copy', entryId: e.id, anchor: pop.anchor }) }] : []),
           { icon: <CornerDownRight />, label: 'Continuar no próximo dia útil', onClick: () => { close(); setDraft({ day: nextWorkday(e.day), projectId: e.project_id }); } },
           { icon: <FolderKanban />, label: 'Abrir projeto', onClick: () => { close(); setDrawer(e.project_id); } },
+          { icon: <CalendarSearch />, label: 'Abrir o dia', onClick: () => { close(); openDay(e.day, e.project_id); } },
+          ...(canEdit ? [{ icon: <Link2 />, label: 'Ligar a trabalho', onClick: () => setPop({ kind: 'work', entryId: e.id, anchor: pop.anchor }) }] : []),
+          ...(projects.get(e.project_id)?.initiative_id ? [{ icon: <KanbanSquare />, label: 'Abrir kanban da frente', onClick: () => { close(); openKanban(projects.get(e.project_id)!.initiative_id as string, (e.work_ids || [])[0] || null); } }] : []),
           { icon: <Trash2 />, label: 'Excluir registro', danger: true, onClick: () => { close(); void deleteEntry(e); } },
         ]} />
       </Popover>
@@ -427,15 +519,31 @@ export function DailyWorkspace() {
             ) : monthStats.length ? monthStats.map(s => {
               const pr = projects.get(s.projectId); if (!pr) return null;
               const on = filters.projects.includes(s.projectId), off = filters.projects.length > 0 && !on;
+              const st = stale.get(s.projectId), idle = s.last <= today ? workdaysBetween(s.last, today) : 0;
               return (
                 <button key={s.projectId} className={`dv-lg${on ? ' on' : off ? ' off' : ''}`} onMouseEnter={() => setHoverProject(s.projectId)} onMouseLeave={() => setHoverProject(null)}
                   onClick={e => setFilters(f => ({ ...f, projects: toggleIsolate(f.projects, s.projectId, e.shiftKey || e.ctrlKey || e.metaKey) }))}>
                   <span className="dv-sw" style={{ background: projectColor(s.projectId) }} />
-                  <span style={{ minWidth: 0 }}><b>{pr.name}</b><span className="s">último registro {brDate(s.last)}</span></span>
+                  <span style={{ minWidth: 0 }}><b>{pr.name}</b>
+                    <span className="s">último registro {brDate(s.last)}{!st && idle > 3 ? ` · há ${idle} dias úteis` : ''}</span>
+                    {st && <span className="dv-stale" title={`${st.active} trabalho(s) em execução e nenhum registro há ${st.idle} dias úteis`}>parado há {st.idle} dias úteis</span>}
+                  </span>
                   <span className="c">{s.days}d</span>
                 </button>
               );
             }) : <div className="dv-empty">Nenhum registro neste mês.</div>}
+            {staleOutside.length > 0 && <div className="dv-sec">Parados fora do mês</div>}
+            {staleOutside.map(([id, st]) => (
+              <button key={id} className="dv-lg" onClick={() => setDrawer(id)} title="Abrir projeto">
+                <span className="dv-sw" style={{ background: projectColor(id) }} />
+                <span style={{ minWidth: 0 }}><b>{projects.get(id)!.name}</b><span className="dv-stale">parado há {st.idle} dias úteis</span></span>
+              </button>
+            ))}
+            {boards.length > 0 && <div className="dv-sec">Kanban por frente</div>}
+            {boards.map(b => {
+              const open = works.filter(w => w.initiative_id === b.id && !['concluida', 'cancelada'].includes(w.status)).length;
+              return <button key={b.id} className="dv-lg" onClick={() => openKanban(b.id, null)} title={b.title}><KanbanSquare size={13} style={{ color: '#64748b', flex: 'none' }} /><b>{boardName(b)}</b><span className="c">{open}</span></button>;
+            })}
             {cfg && cfg.frentes.length > 0 && <div className="dv-sec">Frentes</div>}
             {cfg?.frentes.filter(f => !f.archived).map(f => {
               const n = new Set(monthStats.filter(s => projects.get(s.projectId)?.frente_key === f.key).map(s => s.projectId)).size;
@@ -450,9 +558,9 @@ export function DailyWorkspace() {
 
           <div ref={calRef}>
             <DailyCalendar y={ym.y} m={ym.m} today={today} selected={selected} entries={calendarEntries} projects={projects} frentes={frentes}
-              partners={cfg?.partners || []} partnerFilter={filters.partners} b2c={b2c} crm={crm} metric={prefs.metric} compact={prefs.compact} hoverProject={hoverProject}
-              onMonth={moveMonth} onMetric={metric => { setPrefs(p => ({ ...p, metric })); if (metric === 'b2c') setFilters(f => ({ ...f, partners: [] })); }}
-              onSelectDay={goToDay} onHoverProject={setHoverProject}
+              partners={cfg?.partners || []} partnerFilter={filters.partners} b2c={b2c} crm={crm} mode={prefs.mode} compact={prefs.compact} hoverProject={hoverProject} pin={pin}
+              onMonth={moveMonth} onMode={mode => setPrefs(p => ({ ...p, mode }))}
+              onSelectDay={day => { setPin(null); goToDay(day); }} onTopic={openDay} onHoverProject={setHoverProject}
               onHoverDay={(day, e) => { if (!dragging.current) setTip(day && e ? { day, x: toLocalPx(e.clientX), y: toLocalPx(e.clientY) } : null); }}
               canDrag={canEdit} dropDay={dropDay} onDragOverDay={overDay} onDropDay={dropOnDay} onDragEnd={endDrag}
               onDragBar={(pid, day, e) => startDrag(calendarEntries.filter(x => x.day === day && x.project_id === pid).map(x => x.id), day, e)} />
@@ -477,6 +585,8 @@ export function DailyWorkspace() {
               onMenu={(e, el) => setPop({ kind: 'menu', entryId: e.id, anchor: anchorOf(el) })}
               onContinue={e => setDraft({ day: nextWorkday(e.day), projectId: e.project_id })}
               onOpenProject={setDrawer} onHoverProject={setHoverProject}
+              pin={pin} onPin={pinTopic} works={worksById} onOpenWork={w => { if (w.initiative_id) openKanban(w.initiative_id, w.id); }}
+              onWorkPop={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })}
               dropDay={dropDay} onDragEntry={(e, ev) => startDrag([e.id], e.day, ev)} onDragOverDay={overDay} onDropDay={dropOnDay} onDragEnd={endDrag} />
           </div>
         </div>
@@ -503,6 +613,20 @@ export function DailyWorkspace() {
           onSave={body => saveProjectProps(projects.get(drawer)!, body)} onClose={() => setDrawer(null)}
           onAddToday={() => { setDraft({ day: today, projectId: drawer }); setDrawer(null); }}
           onOpenWiki={note => window.open(`${window.location.pathname}?view=learning&section=vault&wiki_path=${encodeURIComponent(note)}`, '_blank', 'noopener')} />
+      )}
+      {dayModal && cfg && (
+        <DailyDayModal day={dayModal.day} focusProject={dayModal.projectId} today={today} entries={all.filter(e => e.day === dayModal.day || entryVisible(e, ctx, true))}
+          projects={projects} frentes={frentes} partners={partners} tags={tags} people={people} works={worksById} initiatives={initiatives} stale={stale}
+          b2c={b2c.get(dayModal.day)} crm={crm.get(dayModal.day) || []} canEdit={canEdit}
+          onClose={closeDay} onDay={openDay} onFocus={pid => setPin({ day: dayModal.day, projectId: pid })}
+          onKanban={openKanban} onOpenProject={id => setDrawer(id)}
+          onLinkWork={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })} onCreateWork={e => void createWorkFromEntry(e)} />
+      )}
+      {kanban && (
+        <DailyKanbanModal boards={boards.some(b => b.id === kanban.boardId) ? boards : [...boards, ...initiativeList.filter(i => i.id === kanban.boardId)]}
+          boardId={kanban.boardId} focusWorkId={kanban.focusWorkId} works={works} mentions={mentions} projects={projects} partners={cfg?.partners || []} today={today} canEdit={canEdit}
+          onBoard={id => setKanban({ boardId: id, focusWorkId: null })} onClose={() => { setKanban(null); void reloadWorks(); }} onSave={saveWorkFromBoard}
+          onOpenDay={(day, pid) => { setKanban(null); openDay(day, pid); }} />
       )}
       {config && cfg && (
         <DailyConfigModal tab={config} projects={cfg.projects} frentes={cfg.frentes} partners={cfg.partners} tags={cfg.tags} canEdit={canEdit}

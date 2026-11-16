@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type React from 'react';
 import {
   ArrowDownUp, CalendarRange, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, CornerDownRight, Ellipsis, History, LayoutList,
-  List, NotebookPen, PanelRightOpen, Plus, Sun, Tag as TagIcon, UserPlus, X,
+  Link2, List, NotebookPen, PanelRightOpen, Plus, Sun, Tag as TagIcon, UserPlus, X,
 } from 'lucide-react';
 import {
   FALLBACK_COLOR, MONTHS, WEEKDAYS, brDate, clusterByProject, fmtInt, weekday,
@@ -10,6 +10,9 @@ import {
   type DailyProject, type DailySort, type DailyTag, type DailyView, type EntryGroup, type FilterKey,
 } from './dailyModel';
 import { Avatar, tint } from './DailyPopovers';
+import type { DayPin } from './DailyCalendar';
+import type { DailyWork } from './dailyService';
+import { StatusPill } from './DailyKanban';
 
 export interface Draft { day: string; projectId: string }
 interface Props {
@@ -27,6 +30,9 @@ interface Props {
   onContinue: (e: DailyEntry) => void; onOpenProject: (id: string) => void; onHoverProject: (id: string | null) => void;
   dropDay: string | null; onDragEntry: (e: DailyEntry, ev: React.DragEvent) => void; onDragOverDay: (day: string, ev: React.DragEvent) => void;
   onDropDay: (day: string, ev: React.DragEvent) => void; onDragEnd: () => void;
+  /** Tópico destacado no calendário (só aquele dia) e o clique que liga/desliga o destaque. */
+  pin: DayPin | null; onPin: (day: string, projectId: string) => void;
+  works: Map<string, DailyWork>; onOpenWork: (w: DailyWork) => void; onWorkPop: (e: DailyEntry, el: HTMLElement) => void;
 }
 
 // "Que eu acompanho" saiu da barra em 13/11/2026; a visão continua no modelo só para não quebrar preferência antiga.
@@ -107,6 +113,13 @@ export function DailyEntries(p: Props) {
           )}
           <div className="txt" title={p.canEdit ? 'Clique para editar' : undefined}
             onClick={ev => { if (p.canEdit && ev.currentTarget.contentEditable !== 'true') inlineEdit(ev.currentTarget, v => p.onEditBody(e, v)); }}>{e.body}</div>
+          {(e.work_ids || []).length > 0 && (
+            <div className="dv-rw">
+              {(e.work_ids || []).map(id => p.works.get(id)).filter((w): w is DailyWork => Boolean(w)).map(w => (
+                <button key={w.id} className="dv-dw sm" title={`${w.title}: abrir no kanban`} onClick={() => p.onOpenWork(w)}><StatusPill status={w.status} small /><span className="t">{w.title}</span></button>
+              ))}
+            </div>
+          )}
           {e.tag_keys.length > 0 && (
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
               {e.tag_keys.map(k => { const t = p.tags.get(k); return t ? <button key={k} className="dv-tag" style={tint(t.color, 12)} disabled={!p.canEdit} onClick={() => p.onRemoveTag(e, k)} title="Remover tag">#{t.name}{p.canEdit && <span className="x">×</span>}</button> : null; })}
@@ -117,6 +130,7 @@ export function DailyEntries(p: Props) {
           {p.canEdit && (
             <span className="tools">
               <button className="dv-ib sm" title="Adicionar tag" onClick={ev => p.onTagPop(e, ev.currentTarget)}><TagIcon /></button>
+              <button className="dv-ib sm" title="Ligar a trabalho do kanban" onClick={ev => p.onWorkPop(e, ev.currentTarget)}><Link2 /></button>
               <button className="dv-ib sm" title="Continuar no próximo dia útil" onClick={() => p.onContinue(e)}><CornerDownRight /></button>
               <button className="dv-ib sm" title="Abrir projeto" onClick={() => p.onOpenProject(e.project_id)}><PanelRightOpen /></button>
               <button className="dv-ib sm" title="Mais ações" onClick={ev => p.onMenu(e, ev.currentTarget)}><Ellipsis /></button>
@@ -131,14 +145,21 @@ export function DailyEntries(p: Props) {
     );
   };
 
+  // Clicar num tópico do dia acende só aquele dia no calendário (decisão de 16/11/2026); clicar de novo apaga.
   const projectSummary = (entries: DailyEntry[]) => clusterByProject(entries).map(list => {
-    const pr = p.projects.get(list[0].project_id);
-    return <span key={list[0].project_id} className="dv-tag" style={{ ...tint(projectColor(list[0].project_id), 13), fontWeight: 600 }}>{pr?.name}{list.length > 1 ? ` ·${list.length}` : ''}</span>;
+    const pid = list[0].project_id, day = list[0].day, pr = p.projects.get(pid);
+    const on = p.pin?.day === day && p.pin.projectId === pid;
+    return (
+      <button key={pid} type="button" className={`dv-tag dv-topic${on ? ' on' : ''}`} style={{ ...tint(projectColor(pid), 13), fontWeight: 600, ['--bc' as string]: projectColor(pid) }}
+        title={on ? 'Tirar o destaque do calendário' : 'Destacar este dia no calendário'} onClick={ev => { ev.stopPropagation(); p.onPin(day, pid); }}>
+        {pr?.name}{list.length > 1 ? ` ·${list.length}` : ''}
+      </button>
+    );
   });
 
   // Em ordem crescente o mês anterior entra no topo da lista, então o botão fica lá também.
   const olderButton = p.prevMonth
-    ? <button className="cs-btn" style={{ margin: '0 auto' }} onClick={p.onMore}><History size={14} />Ver registros de {MONTHS[Number(p.prevMonth.slice(5)) - 1]}</button>
+    ? <button className="dv-fp dv-older" title={`Carregar também os registros de ${MONTHS[Number(p.prevMonth.slice(5)) - 1]}`} onClick={p.onMore}><History />+ {MONTHS[Number(p.prevMonth.slice(5)) - 1]}</button>
     : null;
   let lastMonth = '';
   return (
@@ -158,6 +179,7 @@ export function DailyEntries(p: Props) {
         <span className="dv-tools-r">
           <button className="dv-fp" title={`Ordem: ${p.sort === 'desc' ? 'mais recentes primeiro' : 'mais antigos primeiro'}`} onClick={ev => p.onSortPop(ev.currentTarget)}><ArrowDownUp />{p.sort === 'desc' ? 'Recentes' : 'Antigos'}</button>
           <button className="dv-fp" title={`Agrupar registros por ${GROUP_LABEL[p.group]}`} onClick={ev => p.onGroupPop(ev.currentTarget)}><LayoutList />{GROUP_TITLE[p.group]}</button>
+          {olderButton}
         </span>
       </div>
       <div className="dv-fbar">
@@ -176,7 +198,6 @@ export function DailyEntries(p: Props) {
         </div>
       )}
       <div ref={listRef} className="dv-list" data-wheel-own>
-        {p.sort === 'asc' && p.prevMonth && <div className="dv-foot top">{olderButton}</div>}
         {p.draft && <DraftRow draft={p.draft} project={p.projects.get(p.draft.projectId)} color={projectColor(p.draft.projectId)} onSave={p.onDraftSave} onCancel={p.onDraftCancel} />}
         {p.groups.map(g => {
           const collapsed = p.isCollapsed(g.key);
@@ -229,7 +250,7 @@ export function DailyEntries(p: Props) {
         })}
         {!p.groups.length && !p.draft && <div className="dv-foot">{p.total ? 'Nenhum registro com esses filtros.' : 'Nenhum registro neste período. Use "+ Registro de hoje" para começar.'}</div>}
         <div className="dv-foot">
-          {p.prevMonth ? (p.sort === 'asc' ? null : olderButton) : <span>Início do histórico.</span>}
+          {p.prevMonth ? null : <span>Início do histórico.</span>}
         </div>
       </div>
     </section>

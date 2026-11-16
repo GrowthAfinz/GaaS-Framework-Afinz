@@ -11,6 +11,8 @@ export interface DailyProject {
 }
 export interface DailyEntry {
   id: string; day: string; project_id: string; body: string; tag_keys: string[]; responsible_id: string | null; follower_ids: string[];
+  /** Trabalhos de Tarefas e atividades citados neste registro (growth_development_tasks.id). */
+  work_ids?: string[];
   position: number; source: 'app' | 'planilha'; deleted_at: string | null; revision: number; created_at: string; updated_at: string;
 }
 export interface DailyPerson { id: string; name: string }
@@ -152,10 +154,120 @@ export function recentProjects(entries: DailyEntry[], day: string, workdays = 2)
   return out;
 }
 export interface ProjectMonthStat { projectId: string; days: number; last: string }
-export function projectMonthStats(entries: DailyEntry[], month: string): ProjectMonthStat[] {
+/**
+ * Projetos com registro no mês. Decisão do Pablo (16/11/2026): o último registro mais antigo fica em cima,
+ * para a daily começar pelo que esfriou. Empate vai por nome (passe `names`) e depois por id.
+ */
+export function projectMonthStats(entries: DailyEntry[], month: string, names?: Map<string, string>): ProjectMonthStat[] {
   const m = new Map<string, Set<string>>();
   for (const e of entries) if (monthKey(e.day) === month) m.set(e.project_id, (m.get(e.project_id) || new Set()).add(e.day));
-  return [...m.entries()].map(([projectId, s]) => ({ projectId, days: s.size, last: [...s].sort().pop() as string })).sort((a, b) => b.days - a.days || b.last.localeCompare(a.last));
+  const name = (id: string) => names?.get(id) || id;
+  return [...m.entries()].map(([projectId, s]) => ({ projectId, days: s.size, last: [...s].sort().pop() as string }))
+    .sort((a, b) => a.last.localeCompare(b.last) || name(a.projectId).localeCompare(name(b.projectId), 'pt-BR'));
+}
+
+/** Dias úteis (seg a sex) entre `from` e `to`, sem contar `from`. Zero quando `to` não é depois de `from`. */
+export function workdaysBetween(from: string, to: string): number {
+  let n = 0, d = from;
+  while (d < to) { d = addDays(d, 1); if (!isWeekend(d)) n++; }
+  return n;
+}
+
+/* ---------- resultados do dia ---------- */
+/**
+ * Linhas do modo Resultados, pela chave canônica de parceiro dos disparos (activities.parceiro_canonico).
+ * Serasa fica em linha própria: é canal específico (marketplace por API) e só se lê junto do B2C em
+ * contextos como carrinho abandonado (decisão do Pablo, 16/11/2026).
+ */
+export const RESULT_LINES: { key: string; label: string; crm: string[] }[] = [
+  { key: 'plurix', label: 'CRM Plurix', crm: ['Plurix'] },
+  { key: 'dia', label: 'CRM Dia', crm: ['Dia'] },
+  { key: 'bem-barato', label: 'CRM Bem Barato', crm: ['Bem Barato'] },
+  { key: 'b2c', label: 'CRM B2C', crm: ['Proprietaria'] },
+  { key: 'serasa', label: 'CRM Serasa', crm: ['Serasa'] },
+];
+export const TOTAL_B2C_KEY = 'total-b2c';
+export interface ResultValue { key: string; label: string; value: number; total?: boolean }
+/**
+ * Resultado agrupado de um dia. Parceiro com cartões e sem linha própria (ex.: Super Nosso) ganha linha
+ * genérica; N/A fica de fora. `only` limita às chaves CRM escolhidas no filtro de parceiro.
+ * O Total B2C (originação) já contém o CRM B2C: nunca somar as linhas para um total geral.
+ */
+export function dayResults(cells: CrmCell[], b2c: B2cDay | undefined, only?: Set<string> | null): ResultValue[] {
+  const by = new Map<string, number>();
+  for (const c of cells) by.set(c.partner, (by.get(c.partner) || 0) + c.cards);
+  const known = new Set(RESULT_LINES.flatMap(l => l.crm));
+  const lines: ResultValue[] = RESULT_LINES.filter(l => !only || l.crm.some(k => only.has(k)))
+    .map(l => ({ key: l.key, label: l.label, value: l.crm.reduce((a, k) => a + (by.get(k) || 0), 0) }));
+  for (const [partner, value] of by) if (!known.has(partner) && partner !== 'N/A' && value > 0 && (!only || only.has(partner))) lines.push({ key: 'crm:' + partner, label: 'CRM ' + partner, value });
+  const out = lines.filter(l => l.value > 0);
+  if (b2c?.emissions != null) out.push({ key: TOTAL_B2C_KEY, label: 'Total B2C', value: b2c.emissions, total: true });
+  return out;
+}
+/**
+ * Todas as linhas que emitem cartão, mesmo zeradas (pedido do Pablo, 16/11/2026): visão compacta de todas
+ * as frentes. `extra` = chaves CRM de parceiros cadastrados ou vistos no mês que não têm linha fixa.
+ * Total B2C sem dado na fonte vem com `missing` (mostra 0 apagado e avisa no tooltip).
+ */
+export function dayResultsAll(cells: CrmCell[], b2c: B2cDay | undefined, extra: string[] = [], only?: Set<string> | null): (ResultValue & { missing?: boolean })[] {
+  const by = new Map<string, number>();
+  for (const c of cells) by.set(c.partner, (by.get(c.partner) || 0) + c.cards);
+  const known = new Set(RESULT_LINES.flatMap(l => l.crm));
+  const lines: (ResultValue & { missing?: boolean })[] = RESULT_LINES.filter(l => !only || l.crm.some(k => only.has(k)))
+    .map(l => ({ key: l.key, label: l.label, value: l.crm.reduce((a, k) => a + (by.get(k) || 0), 0) }));
+  const extras = new Set([...extra, ...[...by.keys()].filter(k => (by.get(k) || 0) > 0)]);
+  for (const partner of [...extras].sort()) if (!known.has(partner) && partner !== 'N/A' && (!only || only.has(partner))) lines.push({ key: 'crm:' + partner, label: 'CRM ' + partner, value: by.get(partner) || 0 });
+  lines.push({ key: TOTAL_B2C_KEY, label: 'Total B2C', value: b2c?.emissions ?? 0, total: true, missing: b2c?.emissions == null });
+  return lines;
+}
+/** Valor de uma linha num dia, para a média de comparação. null = sem dado naquele dia. */
+export function resultValue(key: string, cells: CrmCell[] | undefined, b2c: B2cDay | undefined): number | null {
+  if (key === TOTAL_B2C_KEY) return b2c?.emissions ?? null;
+  if (!cells) return null;
+  const line = RESULT_LINES.find(l => l.key === key);
+  const keys = line ? line.crm : key.startsWith('crm:') ? [key.slice(4)] : [];
+  return cells.reduce((a, c) => a + (keys.includes(c.partner) ? c.cards : 0), 0);
+}
+export interface WeekdayCompare { avg: number; weeks: number; delta: number | null }
+/**
+ * Compara um dia com a média do mesmo dia da semana nas `weeks` semanas anteriores (só semanas com dado).
+ * delta = variação relativa; null quando a média é zero ou não há semana com dado.
+ */
+export function weekdayCompare(day: string, value: number, valueOf: (d: string) => number | null, weeks = 4): WeekdayCompare {
+  const prev: number[] = [];
+  for (let i = 1; i <= weeks; i++) { const v = valueOf(addDays(day, -7 * i)); if (v != null) prev.push(v); }
+  if (!prev.length) return { avg: 0, weeks: 0, delta: null };
+  const avg = prev.reduce((a, b) => a + b, 0) / prev.length;
+  return { avg, weeks: prev.length, delta: avg > 0 ? value / avg - 1 : null };
+}
+
+/* ---------- projeto parado ---------- */
+export interface WorkLite { id: string; initiative_id: string | null; status: string }
+export interface StaleInfo { idle: number; last: string; active: number }
+/**
+ * Projeto "parado": tem trabalho Em execução e ninguém cita o projeto na Daily há `minIdle` dias úteis ou mais.
+ * Trabalho em execução citado por registros pertence aos projetos que o citaram; o que nunca foi citado
+ * pertence a todos os projetos da iniciativa (vale para a iniciativa inteira).
+ * `lastDay` = último registro do projeto até hoje (registros futuros, planejados, não contam como andamento).
+ */
+export function staleProjects(projects: DailyProject[], works: WorkLite[], recent: Pick<DailyEntry, 'project_id' | 'day' | 'work_ids'>[], today: string, minIdle = 5): Map<string, StaleInfo> {
+  const running = works.filter(w => w.status === 'em_execucao');
+  const citedBy = new Map<string, Set<string>>();
+  for (const e of recent) for (const w of e.work_ids || []) citedBy.set(w, (citedBy.get(w) || new Set()).add(e.project_id));
+  const last = new Map<string, string>();
+  for (const e of recent) if (e.day <= today && (last.get(e.project_id) || '') < e.day) last.set(e.project_id, e.day);
+  const out = new Map<string, StaleInfo>();
+  for (const p of projects) {
+    if (p.archived || p.merged_into) continue;
+    const active = running.filter(w => (citedBy.has(w.id) ? citedBy.get(w.id)!.has(p.id) : Boolean(p.initiative_id) && w.initiative_id === p.initiative_id)).length;
+    if (!active) continue;
+    // Sem registro na janela carregada: projeto dormente, não "parado" (evita acender projeto antigo).
+    const l = last.get(p.id);
+    if (!l) continue;
+    const idle = workdaysBetween(l, today);
+    if (idle >= minIdle) out.set(p.id, { idle, last: l, active });
+  }
+  return out;
 }
 
 /* ---------- erros ---------- */

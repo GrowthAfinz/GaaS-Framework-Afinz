@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDays, clusterByProject, crmForDay, emptyDailyFilters, entryVisible, groupEntries, initials, monthGrid, nextWorkday, packWeek,
-  prevWorkday, projectMonthStats, recentProjects, toggleIsolate, weekRange,
+  prevWorkday, projectMonthStats, recentProjects, toggleIsolate, weekRange, dayResults, dayResultsAll, resultValue, weekdayCompare, staleProjects, workdaysBetween,
   type DailyEntry, type DailyPartner, type DailyProject,
 } from './dailyModel';
 
@@ -98,5 +98,51 @@ describe('agrupamento da lista', () => {
     const l = [entry('2026-11-13', 'p1'), entry('2026-11-12', 'p2'), entry('2026-11-08', 'p2')];
     expect(recentProjects(l, '2026-11-16')).toEqual(['p1', 'p2']);
     expect(projectMonthStats(l, '2026-11')[0]).toEqual({ projectId: 'p2', days: 2, last: '2026-11-12' });
+  });
+});
+
+describe('pedidos de 16/11: ordem, resultados, comparação e parado', () => {
+  it('projetos do mês: último registro mais antigo em cima, empate por nome', () => {
+    const l = [entry('2026-11-13', 'b'), entry('2026-11-05', 'c'), entry('2026-11-05', 'a'), entry('2026-11-02', 'a')];
+    const names = new Map([['a', 'Zeta'], ['b', 'Beta'], ['c', 'Alfa']]);
+    expect(projectMonthStats(l, '2026-11', names).map(s => s.projectId)).toEqual(['c', 'a', 'b']);
+  });
+  it('dias úteis entre duas datas', () => {
+    expect(workdaysBetween('2026-11-13', '2026-11-16')).toBe(1);
+    expect(workdaysBetween('2026-11-09', '2026-11-16')).toBe(5);
+    expect(workdaysBetween('2026-11-16', '2026-11-16')).toBe(0);
+  });
+  it('resultados do dia: Serasa à parte, parceiro novo ganha linha, N/A fora e Total B2C sem somar', () => {
+    const cells = [
+      { day: 'd', partner: 'Plurix', cards: 150, proposals: 0 }, { day: 'd', partner: 'Plurix', cards: 6, proposals: 0 },
+      { day: 'd', partner: 'Proprietaria', cards: 20, proposals: 0 }, { day: 'd', partner: 'Serasa', cards: 1, proposals: 0 },
+      { day: 'd', partner: 'Super Nosso', cards: 3, proposals: 0 }, { day: 'd', partner: 'N/A', cards: 9, proposals: 0 }, { day: 'd', partner: 'Dia', cards: 0, proposals: 0 },
+    ];
+    const r = dayResults(cells, { day: 'd', emissions: 300, proposals: 900 });
+    expect(r.map(x => [x.key, x.value])).toEqual([['plurix', 156], ['b2c', 20], ['serasa', 1], ['crm:Super Nosso', 3], ['total-b2c', 300]]);
+    expect(dayResults(cells, undefined, new Set(['Plurix'])).map(x => x.key)).toEqual(['plurix']);
+    expect(resultValue('b2c', cells, undefined)).toBe(20);
+    expect(resultValue('total-b2c', cells, undefined)).toBeNull();
+  });
+  it('modo Resultados mostra todas as frentes, inclusive zeradas e sem dado', () => {
+    const r = dayResultsAll([{ day: 'd', partner: 'Plurix', cards: 4, proposals: 0 }], undefined, ['Super Nosso']);
+    expect(r.map(x => [x.key, x.value])).toEqual([['plurix', 4], ['dia', 0], ['bem-barato', 0], ['b2c', 0], ['serasa', 0], ['crm:Super Nosso', 0], ['total-b2c', 0]]);
+    expect(r[r.length - 1].missing).toBe(true);
+  });
+  it('compara com a média do mesmo dia da semana, ignorando semanas sem dado', () => {
+    const vals: Record<string, number | null> = { '2026-11-09': 100, '2026-11-02': null, '2026-10-26': 200, '2026-10-19': 300 };
+    const c = weekdayCompare('2026-11-16', 300, d => vals[d] ?? null);
+    expect(c.weeks).toBe(3); expect(c.avg).toBe(200); expect(c.delta).toBeCloseTo(0.5);
+    expect(weekdayCompare('2026-11-16', 10, () => null).delta).toBeNull();
+  });
+  it('parado: trabalho em execução e projeto sem registro há 5 dias úteis', () => {
+    const ps = [{ ...project('seg'), initiative_id: 'ini' }, { ...project('cel'), initiative_id: 'ini' }, { ...project('novo'), initiative_id: 'ini' }];
+    const works = [{ id: 'w1', initiative_id: 'ini', status: 'em_execucao' }, { id: 'w2', initiative_id: 'ini', status: 'backlog' }];
+    const recent = [{ project_id: 'seg', day: '2026-11-06', work_ids: [] }, { project_id: 'cel', day: '2026-11-13', work_ids: [] }, { project_id: 'cel', day: '2026-11-20', work_ids: [] }];
+    const s = staleProjects(ps, works, recent, '2026-11-16');
+    expect([...s.keys()]).toEqual(['seg']); expect(s.get('seg')).toEqual({ idle: 6, last: '2026-11-06', active: 1 });
+    // trabalho citado só pelo Celular deixa de valer para os outros projetos da iniciativa
+    const cited = [...recent, { project_id: 'cel', day: '2026-11-03', work_ids: ['w1'] }];
+    expect(staleProjects(ps, works, cited, '2026-11-16').size).toBe(0);
   });
 });
