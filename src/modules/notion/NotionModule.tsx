@@ -459,6 +459,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           <DatabaseView
             key={viewKey}
             database={db}
+            layoutKey={`gaas.notion.columns.${ctx.me || 'anon'}.${viewKey}`}
             users={users}
             onUpdateRow={updateRow}
             onAddRow={(id, props = {}) => addRow(id, props.p_frente || !scope.length ? props : { ...props, p_frente: scope[0] })}

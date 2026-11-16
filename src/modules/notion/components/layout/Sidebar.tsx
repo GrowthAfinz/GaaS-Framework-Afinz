@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ChevronRight,
+  ClipboardList,
   ChevronDown,
   Plus,
   Search,
@@ -118,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="w-2.5" />
             )}
 
-            <span className="shrink-0 text-xs">{page.icon || '📄'}</span>
+            <span className="shrink-0 text-xs">{<ClipboardList size={13} aria-hidden="true" />}</span>
             <span className="truncate">{page.title || 'Sem título'}</span>
           </div>
 
@@ -255,7 +256,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onOpenTemplates}
           className="flex items-center gap-2.5 w-full px-2 py-1 rounded-md text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors font-medium"
         >
-          <Sparkles size={14} className="text-amber-500" />
+          <Sparkles size={14} aria-hidden="true" />
           <span>Modelos</span>
         </button>
 
@@ -319,7 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-[var(--notion-text)] truncate">
-                {activeUser?.name || workspace.name}
+                {activeUser?.name || 'Perfil'}
               </div>
             </div>
             <ChevronDown size={12} className="text-[var(--notion-text-muted)] shrink-0" />

@@ -19,12 +19,18 @@ import {
   NotionUser,
   PropertyType,
 } from '../../types/notion';
+import { useColumnLayout } from './columnLayout';
+import { ColumnControls, ResizeColumn } from './ColumnControls';
+import { InlineTextCell } from './InlineTextCell';
+import { GripVertical, Pin } from 'lucide-react';
 import { PropertyCell } from './PropertyCell';
 import { PropertyHeader } from './PropertyHeader';
 import { PropertyChip } from './viewEngine';
 
 interface TableViewProps {
   database: NotionDatabase;
+  layoutKey?: string;
+  visiblePropertyIds?: string[];
   filteredRows: DatabaseRow[];
   users?: NotionUser[];
   onUpdateRow: (rowId: string, propertyId: string, value: any) => void;
@@ -38,6 +44,8 @@ interface TableViewProps {
 
 export const TableView: React.FC<TableViewProps> = ({
   database,
+  layoutKey,
+  visiblePropertyIds,
   filteredRows,
   users = [],
   onUpdateRow,
@@ -51,6 +59,25 @@ export const TableView: React.FC<TableViewProps> = ({
   const [showAddProp, setShowAddProp] = useState(false);
   const [newPropName, setNewPropName] = useState('');
   const [newPropType, setNewPropType] = useState<PropertyType>('text');
+
+  const layout = useColumnLayout(layoutKey);
+  const movable = database.properties.filter(prop => !layoutKey || prop.type === 'title' || !visiblePropertyIds?.length || visiblePropertyIds.includes(prop.id));
+  const title = movable.find(prop => prop.type === 'title');
+  const columns = layoutKey ? [
+    ...movable.filter(prop => prop === title),
+    ...layout.order.flatMap(id => movable.filter(prop => prop.id === id && prop !== title)),
+    ...movable.filter(prop => prop !== title && !layout.order.includes(prop.id)),
+  ] : movable;
+  const widthOf = (id: string) => layout.widths[id] ?? (id === title?.id ? 340 : 164);
+  const move = (id: string, target: string) => {
+    if (id === title?.id || target === title?.id || id === target) return;
+    const order = columns.map(prop => prop.id);
+    const targetIndex = order.indexOf(target);
+    if (targetIndex < 0 || !order.includes(id)) return;
+    order.splice(order.indexOf(id), 1);
+    order.splice(targetIndex, 0, id);
+    layout.reorder(order);
+  };
 
   const handleAddPropSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,14 +113,27 @@ export const TableView: React.FC<TableViewProps> = ({
   };
 
   return (
-    <div className="w-full overflow-x-auto border border-[var(--notion-border)] rounded-md bg-[var(--notion-card)] shadow-xs">
-      <table className="min-w-full divide-y divide-[var(--notion-border)] border-collapse text-left text-xs">
+    <div>
+    {layoutKey && <ColumnControls columns={columns.map(prop => ({
+      id: prop.id, label: prop.name, width: widthOf(prop.id), fixed: prop === title,
+    }))} onResize={layout.resize} onMove={move} onReset={layout.reset} />}
+    <div className={`w-full overflow-x-auto border border-[var(--notion-border)] rounded-md bg-[var(--notion-card)] shadow-xs ${layoutKey ? 'nt-task-grid' : ''}`}>
+      <table className={`text-left text-xs ${layoutKey ? 'table-fixed border-separate border-spacing-0' : 'min-w-full divide-y divide-[var(--notion-border)] border-collapse'}`}
+        style={layoutKey ? { width: columns.reduce((sum, prop) => sum + widthOf(prop.id), readOnly ? 0 : 88) } : undefined}>
         {/* Header Row */}
         <thead>
           <tr className="divide-x divide-[var(--notion-border)] bg-[var(--notion-hover)]/60 text-[var(--notion-text-muted)] font-medium">
-            {database.properties.map((prop) => (
-              <th key={prop.id} className="px-3 py-2 min-w-[150px] whitespace-nowrap">
-                <PropertyHeader databaseId={database.id} property={prop} icon={getPropIcon(prop.type)} />
+            {columns.map((prop) => (
+              <th key={prop.id} className={layoutKey ? `nt-grid-header relative px-3 py-2 ${prop === title ? 'nt-pinned' : ''}` : 'px-3 py-2 min-w-[150px] whitespace-nowrap'}
+                style={layoutKey ? { width: widthOf(prop.id) } : undefined}
+                onDragOver={layoutKey && prop !== title ? event => { if (event.dataTransfer.types.includes('application/x-gaas-column')) event.preventDefault(); } : undefined}
+                onDrop={layoutKey ? event => { const id = event.dataTransfer.getData('application/x-gaas-column'); if (id) { event.preventDefault(); move(id, prop.id); } } : undefined}>
+                <div className="flex min-w-0 items-center gap-1">
+                  {layoutKey && (prop === title ? <Pin size={12} /> : <span draggable className="nt-column-grip" title="Arraste para mover"
+                    onDragStart={event => { event.dataTransfer.setData('application/x-gaas-column', prop.id); event.dataTransfer.effectAllowed = 'move'; }}><GripVertical size={14} /></span>)}
+                  <PropertyHeader databaseId={database.id} property={prop} icon={getPropIcon(prop.type)} />
+                </div>
+                {layoutKey && <ResizeColumn label={prop.name} width={widthOf(prop.id)} onResize={width => layout.resize(prop.id, width)} />}
               </th>
             ))}
             {/* Add Property Column */}
@@ -159,16 +199,22 @@ export const TableView: React.FC<TableViewProps> = ({
               key={row.id}
               className="group divide-x divide-[var(--notion-border)] hover:bg-[var(--notion-hover)]/30 transition-colors"
             >
-              {database.properties.map((prop) => (
-                <td key={prop.id} className="px-3 py-1.5 min-w-[150px]">
+              {columns.map((prop) => (
+                <td key={prop.id} className={layoutKey ? `px-3 py-1.5 ${prop === title ? 'nt-pinned' : ''}` : 'px-3 py-1.5 min-w-[150px]'}>
                   {readOnly ? (
                     prop.type === 'title'
                       ? <button onClick={() => onOpenRowPage(row.pageId)} className="text-left text-sm font-medium text-[var(--notion-text)] hover:underline">{String(row.properties[prop.id] || 'Sem título')}</button>
                       : <div className="flex flex-wrap gap-1 text-[11px]"><PropertyChip prop={prop} value={row.properties[prop.id]} users={users} /></div>
+                  ) : layoutKey && ['title', 'text', 'number', 'email', 'phone'].includes(prop.type) ? (
+                    <InlineTextCell label={prop.name} value={String(row.properties[prop.id] ?? '')}
+                      number={prop.type === 'number'}
+                      onCommit={value => onUpdateRow(row.id, prop.id, prop.type === 'number' && value !== '' ? Number(value) : value)}
+                      onOpen={prop.type === 'title' ? () => onOpenRowPage(row.pageId) : undefined} />
                   ) : <PropertyCell
                     property={prop}
                     value={row.properties[prop.id]}
                     users={users}
+                    compact={Boolean(layoutKey)}
                     databaseId={database.id}
                     rowId={row.id}
                     onChange={(val) => onUpdateRow(row.id, prop.id, val)}
@@ -209,6 +255,7 @@ export const TableView: React.FC<TableViewProps> = ({
           <span>{filteredRows.length} {filteredRows.length === 1 ? 'item' : 'itens'}</span>
         </div>
       </div>
+    </div>
     </div>
   );
 };

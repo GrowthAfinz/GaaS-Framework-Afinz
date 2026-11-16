@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -12,6 +12,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
+import { CellPopover } from './CellPopover';
 import { useNotionEdit } from './editContext';
 import { DatabaseProperty, NotionColor, NotionUser } from '../../types/notion';
 
@@ -24,6 +25,7 @@ interface PropertyCellProps {
   /** Base e linha da célula: permitem criar opção nova (adição GaaS). */
   databaseId?: string;
   rowId?: string;
+  compact?: boolean;
 }
 
 const COLOR_CLASSES: Record<NotionColor, string> = {
@@ -47,7 +49,10 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
   onOpenPage,
   databaseId,
   rowId,
+  compact = false,
 }) => {
+  const anchor = useRef<HTMLButtonElement>(null);
+  const close = () => setShowDropdown(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
   switch (property.type) {
@@ -76,9 +81,20 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
     case 'person': {
       const assignedUser = users.find((u) => u.id === value);
 
+      const picker = showDropdown && (
+        <div className={compact ? 'p-1' : 'absolute left-0 top-7 z-50 w-52 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-xl'}>
+          <div className="px-2 py-1 text-[10px] font-semibold uppercase text-[var(--notion-text-muted)]">Responsável</div>
+          <button type="button" onClick={() => { onChange(''); close(); }} className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-[var(--notion-hover)]">Sem responsável</button>
+          {users.map(user => <button key={user.id} type="button" onClick={() => { onChange(user.id); close(); }}
+            className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-[var(--notion-hover)]">
+            <span className="truncate">{user.name}</span>{value === user.id && <Check size={12} />}
+          </button>)}
+        </div>
+      );
       return (
         <div className="relative">
           <button
+            type="button" ref={anchor} aria-expanded={showDropdown}
             onClick={() => setShowDropdown(!showDropdown)}
             className="flex items-center gap-1.5 max-w-full px-1.5 py-0.5 rounded text-xs hover:bg-[var(--notion-hover)] transition-colors"
           >
@@ -95,45 +111,7 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
             <ChevronDown size={11} className="text-[var(--notion-text-muted)] shrink-0 ml-auto" />
           </button>
 
-          {showDropdown && (
-            <div className="absolute left-0 top-7 z-50 w-52 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-xl">
-              <div className="text-[10px] uppercase font-semibold text-[var(--notion-text-muted)] px-2 py-1">
-                Responsável
-              </div>
-              <button
-                onClick={() => {
-                  onChange('');
-                  setShowDropdown(false);
-                }}
-                className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-[var(--notion-hover)] text-[var(--notion-text-muted)]"
-              >
-                <span>Sem responsável</span>
-              </button>
-              {users.map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => {
-                    onChange(u.id);
-                    setShowDropdown(false);
-                  }}
-                  className="flex items-center justify-between w-full px-2 py-1.5 text-xs rounded hover:bg-[var(--notion-hover)] text-left"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm">{u.avatar || '👤'}</span>
-                    <div className="min-w-0">
-                      <div className="truncate text-[var(--notion-text)] font-medium">
-                        {u.name}
-                      </div>
-                      <div className="text-[10px] text-[var(--notion-text-muted)] truncate">
-                        {u.role}
-                      </div>
-                    </div>
-                  </div>
-                  {value === u.id && <Check size={12} className="text-blue-500 shrink-0" />}
-                </button>
-              ))}
-            </div>
-          )}
+          {compact && showDropdown && anchor.current ? <CellPopover anchor={anchor.current} onClose={close}>{picker}</CellPopover> : picker}
         </div>
       );
     }
@@ -156,35 +134,35 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
       const options = property.options || [];
       const multi = property.type === 'multi_select';
       const selectedNames: string[] = multi ? (Array.isArray(value) ? value : []) : value ? [String(value)] : [];
+      const picker = showDropdown && <OptionsMenu
+        property={property} databaseId={databaseId} rowId={rowId} selected={selectedNames} multi={multi} embedded={compact}
+        onPick={name => {
+          if (multi) onChange(selectedNames.includes(name) ? selectedNames.filter(item => item !== name) : [...selectedNames, name]);
+          else { onChange(name); close(); }
+        }}
+        onClear={() => { onChange(multi ? [] : ''); close(); }}
+        onClose={close}
+      />;
       return (
         <div className="relative flex flex-wrap items-center gap-1">
           <button
+            type="button" ref={anchor} aria-expanded={showDropdown}
             onClick={() => setShowDropdown(!showDropdown)}
             className="flex flex-wrap items-center gap-1 max-w-full px-1 py-0.5 rounded text-xs transition-colors hover:bg-[var(--notion-hover)]"
           >
             {selectedNames.length ? selectedNames.map((name) => {
               const opt = options.find((o) => o.name === name);
+              if (compact) return <span key={name} title={name} className="flex min-w-0 items-center gap-1.5">
+                {property.type === 'status' && <span className={`nt-status-dot nt-dot-${opt?.color || 'gray'}`} />}
+                <span className="truncate">{name}</span>
+              </span>;
               return (
                 <span key={name} className={`px-2 py-0.5 rounded-md font-medium truncate max-w-[180px] ${COLOR_CLASSES[opt?.color || 'gray']}`}>{name}</span>
               );
             }) : <span className="text-[var(--notion-text-muted)]/50">Vazio</span>}
             <ChevronDown size={11} className="text-[var(--notion-text-muted)] shrink-0" />
           </button>
-          {showDropdown && (
-            <OptionsMenu
-              property={property}
-              databaseId={databaseId}
-              rowId={rowId}
-              selected={selectedNames}
-              multi={multi}
-              onPick={(name) => {
-                if (multi) onChange(selectedNames.includes(name) ? selectedNames.filter((n) => n !== name) : [...selectedNames, name]);
-                else { onChange(name); setShowDropdown(false); }
-              }}
-              onClear={() => { onChange(multi ? [] : ''); setShowDropdown(false); }}
-              onClose={() => setShowDropdown(false)}
-            />
-          )}
+          {compact && showDropdown && anchor.current ? <CellPopover anchor={anchor.current} onClose={close}>{picker}</CellPopover> : picker}
         </div>
       );
     }
@@ -197,7 +175,8 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
             type="date"
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
-            className="bg-transparent text-xs text-[var(--notion-text)] focus:outline-none cursor-pointer"
+            aria-label={property.name}
+            className="min-w-0 max-w-full bg-transparent text-xs text-[var(--notion-text)] focus:outline-none cursor-pointer"
           />
         </div>
       );
@@ -257,10 +236,11 @@ const OptionsMenu: React.FC<{
   rowId?: string;
   selected: string[];
   multi: boolean;
+  embedded?: boolean;
   onPick: (name: string) => void;
   onClear: () => void;
   onClose: () => void;
-}> = ({ property, databaseId, rowId, selected, multi, onPick, onClear, onClose }) => {
+}> = ({ property, databaseId, rowId, selected, multi, embedded, onPick, onClear, onClose }) => {
   const edit = useNotionEdit();
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -283,8 +263,8 @@ const OptionsMenu: React.FC<{
   };
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute left-0 top-7 z-50 w-60 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-lg text-xs">
+      {!embedded && <div className="fixed inset-0 z-40" onClick={onClose} />}
+      <div className={embedded ? 'p-1 text-xs' : 'absolute left-0 top-7 z-50 w-60 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-lg text-xs'}>
         <input
           autoFocus
           value={q}

@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 import { DatabaseRow, NotionColor, NotionDatabase, NotionUser } from '../../types/notion';
+import { PropertyCell } from './PropertyCell';
+import { ColumnControls, ResizeColumn } from './ColumnControls';
+import { useColumnLayout } from './columnLayout';
 import { CHIP_COLORS, PropertyChip } from './viewEngine';
 
 interface BoardViewProps {
   database: NotionDatabase;
+  layoutKey?: string;
+  projectList?: boolean;
   filteredRows: DatabaseRow[];
   /** Propriedade que define as colunas (select, status ou pessoa). Adição GaaS: antes era sempre o primeiro status. */
   groupPropId?: string;
@@ -26,6 +31,8 @@ interface Column { key: string; name: string; color: NotionColor; value: string 
 
 export const BoardView: React.FC<BoardViewProps> = ({
   database,
+  layoutKey,
+  projectList = false,
   filteredRows,
   groupPropId,
   visiblePropIds = [],
@@ -38,6 +45,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
   readOnly = false,
 }) => {
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
+  const layout = useColumnLayout(layoutKey);
+  const [openEmpty, setOpenEmpty] = useState<Record<string, boolean>>({});
   const [overCol, setOverCol] = useState<string | null>(null);
 
   const groupProp =
@@ -65,13 +74,14 @@ export const BoardView: React.FC<BoardViewProps> = ({
     e.dataTransfer.effectAllowed = 'move';
   };
   const handleDragOver = (e: React.DragEvent, key: string) => {
+    if (!draggedRowId) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (overCol !== key) setOverCol(key);
   };
   const handleDrop = (e: React.DragEvent, col: Column) => {
     e.preventDefault();
-    const rowId = draggedRowId || e.dataTransfer.getData('text/plain');
+    const rowId = draggedRowId;
     if (rowId && groupProp) onUpdateRow(rowId, groupProp.id, col.value);
     setDraggedRowId(null);
     setOverCol(null);
@@ -88,26 +98,67 @@ export const BoardView: React.FC<BoardViewProps> = ({
     });
   const shown = columns.filter((col) => !hiddenValues.includes(col.key === '__vazio__' ? '__vazio__' : col.value) && (!hideEmpty || rowsOf(col).length > 0));
 
+  const widthOf = (key: string) => layout.widths[key] ?? 248;
+  const titleKey = database.properties.find(prop => prop.type === 'title')?.id ?? 'prop_title';
+  const status = database.properties.find(prop => prop.id === 'p_status');
+  const deadline = database.properties.find(prop => prop.id === 'p_prazo');
+  const priority = database.properties.find(prop => prop.id === 'p_prioridade');
+  const completed = status?.options?.find(option => option.id === 'concluida')?.name ?? 'Concluída';
+
+  if (projectList) return (
+    <div className="nt-projects">
+      {!shown.length && <p className="px-3 py-4 text-sm">Nenhuma tarefa com os filtros atuais.</p>}
+      {shown.map(column => {
+        const rows = rowsOf(column);
+        const done = rows.filter(row => row.properties.p_status === completed).length;
+        return <details key={column.key} open>
+          <summary><ChevronDown size={15} /><strong>{column.name}</strong>
+            <progress max={rows.length || 1} value={done} aria-label={`Progresso de ${column.name}`} />
+            <span>{done} de {rows.length} concluídas</span>
+          </summary>
+          {rows.map(row => <div key={row.id} className="nt-project-row">
+            <button type="button" className="nt-cell-value" onClick={() => onOpenRowPage(row.pageId)}>{row.properties[titleKey] || 'Sem título'}</button>
+            {[status, deadline, priority].filter((prop): prop is NonNullable<typeof prop> => Boolean(prop)).map(prop =>
+              readOnly ? <PropertyChip key={prop.id} prop={prop} value={row.properties[prop.id]} users={users} /> :
+                <PropertyCell compact key={prop.id} property={prop} value={row.properties[prop.id]} users={users} databaseId={database.id} rowId={row.id}
+                  onChange={value => onUpdateRow(row.id, prop.id, value)} />)}
+          </div>)}
+        </details>;
+      })}
+    </div>
+  );
+
   return (
-    <div className="nt-board flex gap-3 overflow-x-auto pb-6 pt-1">
+    <div>
+    {layoutKey && <ColumnControls columns={shown.map(col => ({ id: col.key, label: col.name, width: widthOf(col.key) }))}
+      onResize={layout.resize} onReset={layout.reset} />}
+    <div className={`nt-board flex gap-3 overflow-x-auto pb-6 pt-1 ${layoutKey ? 'nt-task-board' : ''}`}>
       {shown.length === 0 && <div className="p-4 text-xs text-[var(--notion-text-muted)]">Nada para mostrar com os filtros atuais.</div>}
       {shown.map((col) => {
         const rowsInCol = rowsOf(col);
+        const empty = Boolean(layoutKey && !rowsInCol.length);
+        const collapsed = empty && !openEmpty[col.key];
 
         return (
           <div
             key={col.key}
+            style={layoutKey ? { width: widthOf(col.key), flex: `0 0 ${widthOf(col.key)}px` } : undefined}
             onDragOver={(e) => handleDragOver(e, col.key)}
             onDragLeave={() => setOverCol(null)}
             onDrop={(e) => handleDrop(e, col)}
-            className={`nt-board-column flex flex-col shrink-0 w-72 rounded-xl bg-[var(--notion-hover)]/40 p-2.5 border transition-colors ${overCol === col.key ? 'border-blue-400 bg-blue-500/5' : 'border-[var(--notion-border)]'}`}
+            className={`nt-board-column relative ${collapsed ? 'nt-lane-collapsed' : ''} flex flex-col shrink-0 w-72 rounded-xl bg-[var(--notion-hover)]/40 p-2.5 border transition-colors ${overCol === col.key ? 'border-blue-400 bg-blue-500/5' : 'border-[var(--notion-border)]'}`}
           >
             {/* Column Header */}
-            <div className="flex items-center justify-between mb-3 px-1">
+            <div className="nt-lane-head relative flex items-center justify-between px-1">
               <div className="flex items-center gap-2 min-w-0">
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold truncate ${CHIP_COLORS[col.color]}`}>{col.name}</span>
+                {layoutKey ? <><span className={`nt-status-dot nt-dot-${col.color}`} /><span className="truncate text-xs font-semibold">{col.name}</span></> :
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold truncate ${CHIP_COLORS[col.color]}`}>{col.name}</span>}
                 <span className="text-xs text-[var(--notion-text-muted)] font-medium">{rowsInCol.length}</span>
               </div>
+              <div className="flex items-center gap-1 pr-2">
+                {empty && <button type="button" className="rounded p-1 hover:bg-[var(--notion-hover)]"
+                  aria-label={`Mostrar ou recolher ${col.name}`} aria-expanded={!collapsed}
+                  onClick={() => setOpenEmpty(prev => ({ ...prev, [col.key]: !prev[col.key] }))}><ChevronDown size={14} /></button>}
               {!readOnly && (
               <button
                 onClick={() => onAddRow({ [groupProp.id]: col.value })}
@@ -117,19 +168,24 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 <Plus size={14} />
               </button>
               )}
+              </div>
+              {layoutKey && <ResizeColumn label={col.name} width={widthOf(col.key)} onResize={width => layout.resize(col.key, width)} />}
             </div>
 
             {/* Cards List */}
-            <div className="space-y-2 flex-1 min-h-[100px]">
+            <div hidden={collapsed} className="space-y-2 flex-1 min-h-[56px] pt-2">
               {rowsInCol.map((row) => (
                 <div
                   key={row.id}
                   draggable={!readOnly}
                   onDragStart={(e) => handleDragStart(e, row.id)}
+                  onDragEnd={() => { setDraggedRowId(null); setOverCol(null); }}
+                  role="button" tabIndex={0}
+                  onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenRowPage(row.pageId); } }}
                   onClick={() => onOpenRowPage(row.pageId)}
                   className={`group relative p-3 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xs hover:shadow-md transition-all cursor-pointer select-none ${draggedRowId === row.id ? 'opacity-50' : ''}`}
                 >
-                  <div className="text-sm font-medium text-[var(--notion-text)] leading-snug">{row.properties.prop_title || 'Sem título'}</div>
+                  <div className="text-sm font-medium text-[var(--notion-text)] leading-snug">{row.properties[titleKey] || 'Sem título'}</div>
                   {cardProps.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5 text-[11px] mt-2">
                       {cardProps.map((p) => <PropertyChip key={p.id} prop={p} value={row.properties[p.id]} users={users} />)}
@@ -140,7 +196,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
             </div>
 
             {/* Add Card Button */}
-            {!readOnly && <button
+            {!readOnly && !collapsed && <button
               onClick={() => onAddRow({ [groupProp.id]: col.value })}
               className="flex items-center gap-1.5 mt-2 px-2 py-1.5 rounded hover:bg-[var(--notion-hover)] text-xs text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] transition-colors"
             >
@@ -149,6 +205,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
           </div>
         );
       })}
+    </div>
     </div>
   );
 };

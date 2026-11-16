@@ -186,3 +186,71 @@
         box-shadow: var(--notion-shadow);
     }
 }
+
+.nt-tasks {
+  --nt-panel: color-mix(in srgb, var(--notion-sidebar-bg) 82%, #6297af 18%);
+  --nt-line: color-mix(in srgb, var(--notion-sidebar-bg) 65%, var(--notion-border));
+  --nt-accent: #087785;
+}
+.nt-tasks.dark { --nt-accent: #75d6df; --nt-panel: #27333a; }
+.nt-tasks:not(.dark)[data-tone="padrao"] {
+  --notion-bg: #f3f7fa;
+  --notion-sidebar-bg: #eaf2f5;
+}
+.nt-tasks .nt-database-heading .nt-page-heading { padding-top: 12px; }
+.nt-tasks .nt-database-heading .nt-page-heading > div:has(button.group\/icon) { display: none; }
+.nt-tasks .nt-database-heading .nt-page-heading > div:first-child { margin-bottom: 2px; }
+.nt-tasks .nt-column-menu { position: relative; width: max-content; margin: 0 0 8px auto; z-index: 24; font-size: 12px; }
+.nt-tasks .nt-column-menu summary { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 9px; border: 1px solid var(--nt-line); border-radius: 5px; background: var(--notion-card); }
+.nt-tasks .nt-column-panel { position: absolute; right: 0; top: calc(100% + 4px); width: min(300px, 80vw); max-height: 360px; overflow: auto; padding: 8px; border: 1px solid var(--nt-line); border-radius: 6px; background: var(--notion-card); box-shadow: var(--notion-shadow); }
+.nt-tasks .nt-column-setting { display: flex; gap: 4px; align-items: center; padding: 3px 0; }
+.nt-tasks .nt-column-setting label { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.nt-tasks .nt-column-setting label span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.nt-tasks .nt-column-setting input { width: 64px; border: 1px solid var(--nt-line); border-radius: 4px; background: transparent; padding-inline: 4px; }
+.nt-tasks .nt-column-setting button, .nt-tasks .nt-column-reset { padding: 2px 6px; border-radius: 4px; background: var(--notion-sidebar-bg); }
+.nt-tasks .nt-column-setting button:disabled { opacity: .35; }
+.nt-tasks .nt-column-reset { margin-top: 8px; }
+.nt-tasks .nt-column-resize { position: absolute; inset: 0 0 0 auto; width: 10px; cursor: col-resize; touch-action: none; z-index: 1; }
+.nt-tasks .nt-column-resize::after { content: ''; position: absolute; inset: 15% 4px; border-right: 1px solid var(--nt-line); }
+.nt-tasks .nt-column-resize:is(:hover,:focus-visible,:active)::after { border-right: 2px solid var(--nt-accent); }
+.nt-tasks .nt-column-grip { cursor: grab; color: var(--notion-text-muted); }
+.nt-tasks .nt-task-grid { max-height: min(570px, 64vh); overflow: auto; border-color: var(--nt-line); }
+.nt-tasks .nt-task-grid th { position: sticky; top: 0; z-index: 2; background: var(--nt-panel); padding-right: 13px; }
+.nt-tasks .nt-task-grid td, .nt-tasks .nt-task-grid th { border-bottom: 1px solid var(--nt-line); border-inline-color: var(--nt-line); }
+.nt-tasks .nt-task-grid .nt-pinned { position: sticky; left: 0; z-index: 1; background: var(--notion-card); box-shadow: 1px 0 var(--nt-line); }
+.nt-tasks .nt-task-grid th.nt-pinned { z-index: 3; background: var(--nt-panel); }
+.nt-tasks .nt-inline-cell { display: flex; align-items: center; gap: 4px; min-height: 28px; }
+.nt-tasks .nt-cell-value { display: -webkit-box; flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.nt-tasks .nt-inline-cell input { width: 100%; min-width: 0; border: 1px solid var(--nt-accent); border-radius: 4px; background: var(--notion-card); padding: 2px 4px; }
+.nt-tasks .nt-open-task { flex: none; padding: 4px; color: var(--notion-text-muted); }
+.nt-tasks .nt-cell-value:is(:hover,:focus-visible), .nt-tasks .nt-open-task:is(:hover,:focus-visible) { color: var(--nt-accent); }
+.nt-tasks .nt-task-board { align-items: flex-start; }
+.nt-tasks .nt-task-board .nt-board-column { min-width: 0; min-height: 0; border-color: var(--nt-line); border-radius: 7px; background: var(--nt-panel); }
+.nt-tasks .nt-task-board .nt-board-column:nth-child(even) { background: color-mix(in srgb, var(--nt-panel) 84%, #84a991 16%); }
+.nt-tasks .nt-task-board .nt-board-column:has(.nt-column-resize:active) { outline: 1px solid var(--nt-accent); }
+.nt-tasks .nt-task-board .nt-board-column:has([draggable="true"]) { align-self: stretch; }
+.nt-tasks .nt-task-board [draggable="true"] { border-color: var(--nt-line); }
+.nt-tasks .nt-status-dot { background: #8396a4; width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.nt-tasks .nt-dot-blue { background: #3976b0; }
+.nt-tasks .nt-dot-green { background: #228266; }
+.nt-tasks .nt-dot-red { background: #b84d4f; }
+.nt-tasks .nt-dot-yellow, .nt-tasks .nt-dot-orange { background: #a96c1d; }
+.nt-tasks .nt-dot-purple { background: #7953a4; }
+.nt-tasks .nt-projects { display: grid; gap: 12px; }
+.nt-tasks .nt-projects details { border: 1px solid var(--nt-line); border-radius: 6px; background: var(--notion-card); }
+.nt-tasks .nt-projects summary { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 8px 12px; background: var(--nt-panel); cursor: pointer; font-size: 13px; }
+.nt-tasks .nt-projects details:not([open]) summary svg { transform: rotate(-90deg); }
+.nt-tasks .nt-projects progress { width: 100px; height: 6px; accent-color: var(--nt-accent); margin-left: auto; }
+.nt-tasks .nt-project-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 140px)); align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--nt-line); font-size: 13px; }
+.nt-tasks .nt-calendar-weekend { background: color-mix(in srgb, var(--notion-card) 80%, #89b6a3 20%); }
+.nt-tasks .nt-calendar-today { outline: 1px solid var(--nt-accent); outline-offset: -1px; }
+.nt-tasks .nt-calendar-undated { padding: 6px 12px; border-bottom: 1px solid var(--nt-line); font-size: 12px; }
+.nt-tasks .nt-calendar-undated button { color: var(--nt-accent); text-align: left; padding: 3px; }
+.nt-tasks .nt-calendar-undated ul { max-height: 160px; overflow: auto; }
+@media (max-width: 640px) {
+  .nt-tasks .nt-project-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.nt-tasks .nt-cell-popover-layer { position: fixed; inset: 0; z-index: 80; }
+.nt-tasks .nt-cell-popover { position: fixed; overflow: auto; border: 1px solid var(--nt-line); border-radius: 6px; background: var(--notion-card); box-shadow: 0 6px 24px #18273926; }
+.nt-tasks .nt-task-board .nt-board-column.nt-lane-collapsed { align-self: flex-start; }
+.nt-tasks .nt-task-grid [aria-expanded] { flex-wrap: nowrap; }

@@ -16,6 +16,7 @@ import { DatabaseRow, NotionDatabase } from '../../types/notion';
 
 interface CalendarViewProps {
   database: NotionDatabase;
+  taskCalendar?: boolean;
   filteredRows: DatabaseRow[];
   onAddRow: (initialProps?: Record<string, any>) => void;
   onOpenRowPage: (pageId: string) => void;
@@ -28,6 +29,7 @@ interface CalendarViewProps {
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   database,
+  taskCalendar = false,
   filteredRows,
   onAddRow,
   onOpenRowPage,
@@ -36,14 +38,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   readOnly = false,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showUndated, setShowUndated] = useState(false);
   const [dragRow, setDragRow] = useState<string | null>(null);
   const [overDay, setOverDay] = useState<string | null>(null);
   const dateKey = datePropId || database.properties.find((p) => p.type === 'date')?.id || 'prop_due';
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -59,8 +62,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+  const titleKey = database.properties.find(prop => prop.type === 'title')?.id ?? 'prop_title';
+  const undated = filteredRows.filter(row => !row.properties[dateKey]);
+
   return (
-    <div className="w-full border border-[var(--notion-border)] rounded-lg bg-[var(--notion-card)] overflow-hidden shadow-xs">
+    <div className="nt-calendar w-full border border-[var(--notion-border)] rounded-lg bg-[var(--notion-card)] overflow-hidden shadow-xs">
       {/* Calendar Header Controls */}
       <div className="flex items-center justify-between p-3 border-b border-[var(--notion-border)] bg-[var(--notion-hover)]/30">
         <div className="flex items-center gap-2">
@@ -78,12 +84,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={prevMonth}
+            aria-label="Mês anterior"
             className="p-1 rounded hover:bg-[var(--notion-hover)] text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"
           >
             <ChevronLeft size={16} />
           </button>
           <button
             onClick={nextMonth}
+            aria-label="Próximo mês"
             className="p-1 rounded hover:bg-[var(--notion-hover)] text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"
           >
             <ChevronRight size={16} />
@@ -91,10 +99,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       </div>
 
+      {taskCalendar && undated.length > 0 && <div className="nt-calendar-undated">
+        <button type="button" aria-expanded={showUndated} onClick={() => setShowUndated(value => !value)}>Sem prazo · {undated.length}</button>
+        {showUndated && <ul>{undated.map(row => <li key={row.id}><button type="button" onClick={() => onOpenRowPage(row.pageId)}>{row.properties[titleKey] || 'Sem título'}</button></li>)}</ul>}
+      </div>}
       {/* Weekdays header */}
       <div className="grid grid-cols-7 border-b border-[var(--notion-border)] bg-[var(--notion-hover)]/50 text-center text-xs font-semibold text-[var(--notion-text-muted)] py-1.5">
-        {weekDays.map((d) => (
-          <div key={d}>{d}</div>
+        {weekDays.map((d, index) => (
+          <div key={d} className={index === 0 || index === 6 ? 'nt-calendar-weekend' : undefined}>{d}</div>
         ))}
       </div>
 
@@ -115,7 +127,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               onDragOver={(e) => { if (!dragRow) return; e.preventDefault(); if (overDay !== dateStr) setOverDay(dateStr); }}
               onDragLeave={() => setOverDay(null)}
               onDrop={(e) => { e.preventDefault(); if (dragRow && onUpdateRow) onUpdateRow(dragRow, dateKey, dateStr); setDragRow(null); setOverDay(null); }}
-              className={`min-h-[100px] p-1.5 flex flex-col justify-between group/day transition-colors ${
+              className={`nt-calendar-day ${d.getDay() === 0 || d.getDay() === 6 ? 'nt-calendar-weekend' : ''} ${isToday ? 'nt-calendar-today' : ''} min-h-[100px] p-1.5 flex flex-col justify-between group/day transition-colors ${
                 isCurrentMonth ? 'bg-transparent' : 'bg-[var(--notion-hover)]/20 opacity-50'
               } ${overDay === dateStr ? 'bg-blue-500/10 ring-2 ring-inset ring-blue-400' : ''} hover:bg-[var(--notion-hover)]/30`}
             >
@@ -123,7 +135,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 <span
                   className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
                     isToday
-                      ? 'bg-blue-500 text-white font-bold'
+                      ? 'bg-teal-700 text-white font-bold'
                       : 'text-[var(--notion-text-muted)]'
                   }`}
                 >
@@ -147,10 +159,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     draggable={Boolean(onUpdateRow)}
                     onDragStart={(e) => { setDragRow(r.id); e.dataTransfer.setData('text/plain', r.id); e.dataTransfer.effectAllowed = 'move'; }}
                     onDragEnd={() => { setDragRow(null); setOverDay(null); }}
+                    role="button" tabIndex={0}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenRowPage(r.pageId); } }}
                     onClick={() => onOpenRowPage(r.pageId)}
                     className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200 truncate cursor-pointer hover:opacity-80"
                   >
-                    {r.properties.prop_title || 'Sem título'}
+                    {r.properties[titleKey] || 'Sem título'}
                   </div>
                 ))}
               </div>

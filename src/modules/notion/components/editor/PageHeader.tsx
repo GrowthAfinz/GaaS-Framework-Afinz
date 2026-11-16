@@ -19,7 +19,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ page, onUpdate, onEnterT
   const hasIcon = !!page.icon;
 
   return (
-    <div className="relative mb-6 group/header nt-page-header">
+    <div className={`relative mb-6 group/header nt-page-header ${page.databaseId ? 'nt-database-heading' : ''}`}>
       {/* Page Cover Image */}
       {hasCover && (
         <div className="relative w-full h-52 overflow-hidden group/cover">
