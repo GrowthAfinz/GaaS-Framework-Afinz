@@ -3,7 +3,7 @@ import type { Activity } from '../../types/framework';
 vi.mock('../../store/useAppStore', () => ({ useAppStore: vi.fn() }));
 vi.mock('../../services/dataService', () => ({ dataService: {} }));
 vi.mock('../../services/intelligentUpdateService', () => ({ intelligentUpdateService: {} }));
-import { processDinamicaBI } from './IntelligentFrameworkUpdate';
+import { processDinamicaBI, processRentabilizacaoDinamicaBI } from './IntelligentFrameworkUpdate';
 
 const activityName = 'plu_car_plx_aqs_wpp_car_carrinho21dplurix_20260924';
 const header = ['journeyname (whatsapp)', 'activity_name', 'Date', 'sent', 'delivered', 'read',
@@ -144,4 +144,19 @@ describe('intelligent importer cart audience and BI aliases', () => {
         expect(b.subgrupo).toBe('Abandonados D-21 A D>7');
         expect(b.status).not.toBe('conflict');
     });
+});
+
+it('preserves both rentabilizacao journeys and their metrics when the dispatch signature collides', () => {
+    const result = processRentabilizacaoDinamicaBI([
+        ['journeyname (whatsapp)', 'activity_name', 'Date', 'sent', 'delivered', 'read'],
+        ['JOR_RENT_COBRANCA_SET26', 'cobranca_wpp', '25/09/2026', '100', '95', '50'],
+        ['JOR_RENT_COBRANCA_OUT26', 'cobranca_wpp', '25/09/2026', '200', '190', '80'],
+    ]);
+
+    expect(result.candidates).toHaveLength(2);
+    expect(new Set(result.candidates.map(candidate => candidate.key)).size).toBe(2);
+    expect(result.candidates).toEqual(expect.arrayContaining([
+        expect.objectContaining({ journey: 'JOR_RENT_COBRANCA_SET26', delivered: 95, status: 'conflict', accepted: false }),
+        expect.objectContaining({ journey: 'JOR_RENT_COBRANCA_OUT26', delivered: 190, status: 'conflict', accepted: false }),
+    ]));
 });

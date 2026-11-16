@@ -1383,41 +1383,6 @@ const collapseAbandonedCartDuplicates = (rows: MetricRow[]) => {
     return [...result, ...grouped.values()];
 };
 
-const rentRenamedJourneyScore = (row: MetricRow) => {
-    const journeyKey = normalizeKey(row.journey);
-    let score = journeyPeriodRank(row.journey) * 10;
-    if (journeyKey.includes('teste')) score -= 100000;
-    if (hasDispatchVolume(row)) score += 5;
-    if (hasConversionMetric(row) || hasEngagementMetric(row)) score += 2;
-    return score;
-};
-
-const collapseRentRenamedDuplicates = (rows: MetricRow[]) => {
-    const groups = new Map<string, MetricRow[]>();
-    rows.forEach((row) => {
-        const list = groups.get(row.dispatchSignature);
-        if (list) list.push(row); else groups.set(row.dispatchSignature, [row]);
-    });
-
-    const result: MetricRow[] = [];
-    groups.forEach((group) => {
-        const uniqueJourneys = Array.from(new Set(group.map((row) => normalizeKey(row.journey)).filter(Boolean)));
-        if (uniqueJourneys.length <= 1) {
-            result.push(...group);
-            return;
-        }
-
-        const ranked = [...group].sort((left, right) => {
-            const scoreDiff = rentRenamedJourneyScore(right) - rentRenamedJourneyScore(left);
-            if (scoreDiff !== 0) return scoreDiff;
-            return normalizeKey(right.journey).localeCompare(normalizeKey(left.journey));
-        });
-        const winnerJourney = normalizeKey(ranked[0]?.journey);
-        result.push(...group.filter((row) => normalizeKey(row.journey) === winnerJourney));
-    });
-    return result;
-};
-
 const propagateGroupEmissions = (candidates: UpdateCandidate[]): UpdateCandidate[] => {
     const groups = new Map<string, UpdateCandidate[]>();
     candidates.forEach((candidate) => {
@@ -2089,7 +2054,7 @@ interface RentHistoryIndex {
     byToken: Map<string, SuggestionBucket>;
     global: SuggestionBucket;
     existingSignatures: Set<string>;
-    bySignature: Map<string, Record<string, any>>;
+    bySignature: Map<string, Record<string, any>[]>;
     rowCount: number;
 }
 
@@ -2142,7 +2107,9 @@ const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryInd
         const taxonomy = inferRentabilizacaoContext(journey, activityName);
         const dispatchSignature = buildDispatchSignature(activityName, rawCanal, row['Data de Disparo']);
         index.existingSignatures.add(dispatchSignature);
-        if (!index.bySignature.has(dispatchSignature)) index.bySignature.set(dispatchSignature, row);
+        const matches = index.bySignature.get(dispatchSignature) ?? [];
+        matches.push(row);
+        index.bySignature.set(dispatchSignature, matches);
         if (journeyKey) {
             addRawRowToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), row);
             addRawRowToBucket(bucketFor(index.byJourney, journeyKey), row);
@@ -2247,14 +2214,20 @@ const suggestRentFields = (
 
 const buildRentabilizacaoCandidate = (
     metric: MetricRow,
-    importedKeyCount: Map<string, number>,
+    importedJourneys: Map<string, Set<string>>,
     history: RentHistoryIndex
 ): UpdateCandidate => {
     const taxonomy = inferRentabilizacaoTaxonomy(metric);
     const fieldSuggestions = suggestRentFields(metric, history, taxonomy);
-    const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
+    const historicalRows = history.bySignature.get(metric.dispatchSignature) ?? [];
+    const conflictJourneys = [...new Set([
+        ...(importedJourneys.get(metric.dispatchSignature) ?? []),
+        ...historicalRows.map(row => String(row.jornada ?? '').trim()),
+    ].filter(journey => journey && normalizeKey(journey) !== normalizeKey(metric.journey)))];
+    const hasCollision = conflictJourneys.length > 0 || historicalRows.length > 1
+        || historicalRows.some(row => !normalizeKey(row.jornada));
     // Ja existe na tabela rentabilizacao_activities (mesma activity+canal+data)?
-    const existingRow = history.bySignature.get(metric.dispatchSignature);
+    const existingRow = hasCollision ? undefined : historicalRows[0];
     const existsInBase = Boolean(existingRow);
     const refreshDetails = rentMetricRefreshDetails(metric, existingRow);
     const hasMetricRefresh = refreshDetails.length > 0;
@@ -2262,8 +2235,8 @@ const buildRentabilizacaoCandidate = (
     const missingDispatchVolume = !hasDispatchVolume(metric);
     const status: CandidateStatus = missingCritical
         ? 'error'
-        : duplicateCount > 1
-            ? 'duplicate'
+        : hasCollision
+            ? 'conflict'
             : missingDispatchVolume
                 ? 'ignored'
                 : existsInBase
@@ -2277,8 +2250,8 @@ const buildRentabilizacaoCandidate = (
         matchCount: 0,
         fieldToReview: missingCritical
             ? 'Chave'
-            : duplicateCount > 1
-                ? 'Duplicidade'
+            : hasCollision
+                ? 'Jornada em conflito'
                 : missingDispatchVolume
                     ? 'Disparo sem volume acionavel'
                     : existsInBase
@@ -2292,8 +2265,8 @@ const buildRentabilizacaoCandidate = (
         confidence: hasMetricRefresh ? 100 : status === 'ready' ? 86 : 0,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
-            : duplicateCount > 1
-                ? 'mais de uma linha no arquivo com a mesma chave'
+            : hasCollision
+                ? 'Mesma Activity, canal e data em jornadas diferentes'
                 : missingDispatchVolume
                     ? 'Base Total e Base Acionavel precisam ser maiores que zero'
                     : existsInBase
@@ -2315,13 +2288,14 @@ const buildRentabilizacaoCandidate = (
         promocional: taxonomy.promocional ?? 'N/A',
         ordemDisparo: inferOrdemDisparo(metric.activityName),
         suggestions: fieldSuggestions,
-        conflictJourneys: [],
-        conflictReason: undefined,
+        conflictJourneys,
+        conflictReason: hasCollision ? 'Confirmar a identidade do disparo antes de aplicar.' : undefined,
+        auditRequired: hasCollision,
         metricRefresh: hasMetricRefresh,
     };
 };
 
-const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex): ProcessResult => {
+export const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex = emptyRentHistoryIndex()): ProcessResult => {
     const warnings: string[] = [];
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
     const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
@@ -2355,31 +2329,20 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
         warnings.push(`${ignoredOutOfScope} linhas JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo rentabilizacao.`);
     }
 
-    const canonicalRows = collapseRentRenamedDuplicates(scopedRows);
-    const collapsedRenamedRows = scopedRows.length - canonicalRows.length;
-    if (collapsedRenamedRows > 0) {
-        warnings.push(`${collapsedRenamedRows} linhas de rentabilizacao foram consolidadas por renomeacao de jornada.`);
-    }
-
     const metricMap = new Map<string, MetricRow>();
-    canonicalRows.forEach((row) => {
+    const importedJourneys = new Map<string, Set<string>>();
+    for (const row of scopedRows) {
+        const journeys = importedJourneys.get(row.dispatchSignature) ?? new Set<string>();
+        journeys.add(row.journey);
+        importedJourneys.set(row.dispatchSignature, journeys);
         mergeMetric(metricMap, {
             ...row,
-            key: row.dispatchSignature,
+            key: JSON.stringify([row.dispatchSignature, normalizeKey(row.journey)]),
         });
-    });
+    }
     const metrics = Array.from(metricMap.values());
-    const importedSignatureJourneys = canonicalRows.reduce((map, row) => {
-        if (!map.has(row.dispatchSignature)) map.set(row.dispatchSignature, new Set<string>());
-        map.get(row.dispatchSignature)!.add(normalizeKey(row.journey));
-        return map;
-    }, new Map<string, Set<string>>());
-    const importedKeyCount = Array.from(importedSignatureJourneys.entries()).reduce((map, [signature, journeys]) => {
-        map.set(signature, journeys.size);
-        return map;
-    }, new Map<string, number>());
     const candidates = metrics
-        .map((row) => buildRentabilizacaoCandidate(row, importedKeyCount, history))
+        .map(row => buildRentabilizacaoCandidate(row, importedJourneys, history))
         .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status));
     const ignoredExisting = candidates.filter((candidate) => candidate.status === 'ignored').length;
     const tsv = candidates
