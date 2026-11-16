@@ -21,7 +21,20 @@ export function InlineTextCell({ label, value, onCommit, onOpen, number }: {
           setDraft(null);
         }}
         onKeyDown={event => {
-          if (event.nativeEvent.isComposing || (event.key !== 'Enter' && event.key !== 'Escape')) return;
+          if (event.nativeEvent.isComposing) return;
+          if (event.key === 'Tab') {
+            const cell = event.currentTarget.closest('td');
+            const cells = Array.from(cell?.closest('tbody')?.querySelectorAll<HTMLTableCellElement>('td[data-task-cell]') ?? []);
+            const index = cells.indexOf(cell as HTMLTableCellElement);
+            const next = index < 0 ? undefined : cells[index + (event.shiftKey ? -1 : 1)];
+            const target = next?.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled])');
+            if (target) {
+              event.preventDefault();
+              target.focus();
+            }
+            return;
+          }
+          if (event.key !== 'Enter' && event.key !== 'Escape') return;
           event.preventDefault();
           cancelled.current = event.key === 'Escape';
           event.currentTarget.blur();

@@ -200,7 +200,7 @@ export const TableView: React.FC<TableViewProps> = ({
               className="group divide-x divide-[var(--notion-border)] hover:bg-[var(--notion-hover)]/30 transition-colors"
             >
               {columns.map((prop) => (
-                <td key={prop.id} className={layoutKey ? `px-3 py-1.5 ${prop === title ? 'nt-pinned' : ''}` : 'px-3 py-1.5 min-w-[150px]'}>
+                <td key={prop.id} data-task-cell={layoutKey ? true : undefined} className={layoutKey ? `px-3 py-1.5 ${prop === title ? 'nt-pinned' : ''}` : 'px-3 py-1.5 min-w-[150px]'}>
                   {readOnly ? (
                     prop.type === 'title'
                       ? <button onClick={() => onOpenRowPage(row.pageId)} className="text-left text-sm font-medium text-[var(--notion-text)] hover:underline">{String(row.properties[prop.id] || 'Sem título')}</button>
