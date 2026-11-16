@@ -1,0 +1,5 @@
+/* Fluxos Mermaid da Wiki: fundo pontilhado discreto atrás do mapa e abertura suave em tela cheia. */
+.wiki-diagram-surface{background-color:#fbfcfc;background-image:radial-gradient(#dde5e7 1px,transparent 1px);background-size:18px 18px}
+@keyframes wiki-diagram-open{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+.wiki-diagram-dialog[open]{animation:wiki-diagram-open .16s ease-out}
+@media(prefers-reduced-motion:reduce){.wiki-diagram-dialog[open]{animation:none}}
