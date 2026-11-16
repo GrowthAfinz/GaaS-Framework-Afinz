@@ -105,3 +105,84 @@
 .nt-root ::selection {
   background: rgba(46, 170, 220, 0.28);
 }
+
+/* Tarefas usa a mesma densidade e os tons frios das outras abas de Planejamento. */
+.nt-tasks {
+    --nt-page-gutter: clamp(12px, 2vw, 28px);
+}
+
+.nt-tasks.nt-wiki-font {
+    font-family: inherit;
+}
+
+.nt-tasks.font-serif {
+    font-family: Georgia, serif;
+}
+
+.nt-tasks.font-mono {
+    font-family: Consolas, monospace;
+}
+
+.nt-tasks:not(.dark)[data-tone] {
+    --notion-text: #111b2b;
+    --notion-text-muted: #344559;
+    --notion-card: #fff;
+    --notion-border: #8492a3;
+}
+
+.nt-tasks:not(.dark)[data-tone="padrao"] {
+    --notion-sidebar-bg: #f4f8fb;
+}
+
+.nt-tasks:not(.dark)[data-tone^="#"] {
+    --notion-bg: color-mix(in srgb, white 76%, var(--notion-custom-bg));
+    --notion-sidebar-bg: color-mix(in srgb, white 88%, var(--notion-custom-bg));
+}
+
+.nt-tasks.dark {
+    --notion-text: #f1f5f9;
+    --notion-text-muted: #c0cad7;
+    --notion-border: #687583;
+}
+
+.nt-tasks .nt-page-inset {
+    padding-inline: var(--nt-page-gutter);
+}
+
+.nt-tasks .nt-page-header {
+    margin-bottom: 14px;
+}
+
+.nt-tasks .nt-page-heading textarea {
+    font-size: clamp(1.4rem, 2vw, 1.8rem);
+}
+
+.nt-tasks .nt-page-heading button.group\/icon {
+    width: 44px;
+    height: 44px;
+    font-size: 28px;
+}
+
+.nt-tasks .nt-page-heading:has(button.group\/icon) > div:has(button.group\/icon) {
+    margin-top: 0;
+    margin-bottom: 4px;
+}
+
+.nt-tasks .nt-board {
+    container-type: inline-size;
+}
+
+.nt-tasks .nt-board-column {
+    flex: 1 0 13rem;
+    min-width: min(13rem, 90cqw);
+    min-height: 10rem;
+}
+
+@media (max-width: 640px) {
+    .nt-tasks .nt-sidebar-expanded {
+        position: absolute;
+        inset: 0 auto 0 0;
+        z-index: 35;
+        box-shadow: var(--notion-shadow);
+    }
+}

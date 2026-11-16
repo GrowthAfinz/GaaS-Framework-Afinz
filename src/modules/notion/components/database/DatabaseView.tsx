@@ -252,7 +252,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         </div>
 
         {/* Search, Filter, Sort Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Search Input */}
           <div className="flex items-center gap-1.5 px-2 py-1 rounded border border-[var(--notion-border)] bg-[var(--notion-hover)]/50 text-xs">
             <Search size={13} className="text-[var(--notion-text-muted)]" />
@@ -364,7 +364,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           {/* New Row Button */}
           {!readOnly && <button
             onClick={() => addRowWithQuick()}
-            className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white font-medium text-xs transition-colors shadow-xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-700 hover:bg-cyan-800 text-white font-medium text-xs transition-colors shadow-xs"
           >
             <Plus size={14} /> Novo
           </button>}

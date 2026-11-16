@@ -49,7 +49,7 @@ export const BlockList: React.FC<BlockListProps> = ({
   };
 
   return (
-    <div className="px-12 pb-32">
+    <div className="nt-page-inset px-12 pb-32">
       <div className="space-y-0.5">
         {blockIds.map((blockId, idx) => {
           const block = blocks[blockId];

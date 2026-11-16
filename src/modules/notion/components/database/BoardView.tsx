@@ -89,7 +89,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const shown = columns.filter((col) => !hiddenValues.includes(col.key === '__vazio__' ? '__vazio__' : col.value) && (!hideEmpty || rowsOf(col).length > 0));
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-6 pt-1">
+    <div className="nt-board flex gap-3 overflow-x-auto pb-6 pt-1">
       {shown.length === 0 && <div className="p-4 text-xs text-[var(--notion-text-muted)]">Nada para mostrar com os filtros atuais.</div>}
       {shown.map((col) => {
         const rowsInCol = rowsOf(col);
@@ -100,7 +100,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
             onDragOver={(e) => handleDragOver(e, col.key)}
             onDragLeave={() => setOverCol(null)}
             onDrop={(e) => handleDrop(e, col)}
-            className={`flex flex-col shrink-0 w-72 rounded-lg bg-[var(--notion-hover)]/40 p-2.5 border transition-colors ${overCol === col.key ? 'border-blue-400 bg-blue-500/5' : 'border-[var(--notion-border)]'}`}
+            className={`nt-board-column flex flex-col shrink-0 w-72 rounded-xl bg-[var(--notion-hover)]/40 p-2.5 border transition-colors ${overCol === col.key ? 'border-blue-400 bg-blue-500/5' : 'border-[var(--notion-border)]'}`}
           >
             {/* Column Header */}
             <div className="flex items-center justify-between mb-3 px-1">

@@ -1,5 +1,5 @@
 /** Tons de fundo do módulo (só no modo claro). As cores ficam no notion.css, em [data-tone]; aqui só a lista e a preferência. */
-export type NotionTone = 'padrao' | 'areia' | 'nevoa' | 'pedra' | 'salvia' | 'ardosia';
+export type NotionTone = `#${string}` | 'padrao' | 'areia' | 'nevoa' | 'pedra' | 'salvia' | 'ardosia';
 
 /** bg e card são só para desenhar a amostra no seletor; precisam bater com o notion.css. */
 export const NOTION_TONES: { id: NotionTone; name: string; bg: string; card: string }[] = [
@@ -13,12 +13,12 @@ export const NOTION_TONES: { id: NotionTone; name: string; bg: string; card: str
 
 const TONE_KEY = 'gaas.notion.tone';
 /** Preferência de cada pessoa, guardada no navegador (como o modo claro/escuro). */
-export function readTone(): NotionTone {
+export function readTone(userId: string | null): NotionTone {
   try {
-    const v = localStorage.getItem(TONE_KEY);
-    return NOTION_TONES.some(t => t.id === v) ? (v as NotionTone) : 'padrao';
+    const v = localStorage.getItem(`${TONE_KEY}.${userId || 'anon'}`) ?? localStorage.getItem(TONE_KEY);
+    return v && (NOTION_TONES.some(t => t.id === v) || /^#[0-9a-f]{6}$/i.test(v)) ? (v as NotionTone) : 'padrao';
   } catch { return 'padrao'; }
 }
-export function saveTone(tone: NotionTone): void {
-  try { localStorage.setItem(TONE_KEY, tone); } catch { /* preferência local */ }
+export function saveTone(userId: string | null, tone: NotionTone): void {
+  try { localStorage.setItem(`${TONE_KEY}.${userId || 'anon'}`, tone); } catch { /* preferência local */ }
 }

@@ -153,7 +153,7 @@ export const GrowthLearningWorkspace: React.FC<
   return (
     <div className={section === "investigations" || section === "structure" || section === "daily" || LEDGER_SECTIONS.has(section) ? "min-h-[calc(100vh-5rem)] bg-white pb-0" : "min-h-[calc(100vh-5rem)] bg-slate-50/70 px-3 pb-4 sm:px-5"}>
       <div
-        className={"learning-workspace mx-auto "+(section === "structure" || section === "daily" ? "max-w-none space-y-0" : section === "investigations" || LEDGER_SECTIONS.has(section) ? "max-w-[1800px] space-y-0" : "max-w-[1800px] space-y-4")}
+        className={"learning-workspace mx-auto "+(section === "structure" || section === "daily" || section === "investigations" ? "max-w-none space-y-0" : LEDGER_SECTIONS.has(section) ? "max-w-[1800px] space-y-0" : "max-w-[1800px] space-y-4")}
       >
         {/* Submenu colado no topo e na barra logo abaixo, separados só por uma linha */}
         <header className="overflow-hidden border-x border-b border-slate-200 bg-white">
@@ -295,28 +295,28 @@ function NotionPane({ initialMonth }: { initialMonth: string }) {
   // Investigações CRM continuam na tela antiga (links com ?item= ou ?task_view=investigations caem nela).
   const legacyUrl = () => { const p = new URLSearchParams(window.location.search); return p.has("item") || p.get("task_view") === "investigations"; };
   const [legacy, setLegacy] = useState(legacyUrl);
-  const go = (on: boolean) => {
+  const backToTasks = () => {
     const p = new URLSearchParams(window.location.search);
-    if (on) p.set("task_view", "investigations"); else { p.delete("task_view"); p.delete("item"); p.delete("task_space"); }
+    p.delete("task_view"); p.delete("item"); p.delete("task_space");
     window.history.pushState(null, "", `${window.location.pathname}?${p.toString()}`);
-    setLegacy(on);
+    setLegacy(false);
   };
   React.useEffect(() => { const f = () => setLegacy(legacyUrl()); window.addEventListener("popstate", f); return () => window.removeEventListener("popstate", f); }, []);
+  React.useLayoutEffect(() => {
+    const fit = () => { if (ref.current) setHeight(Math.max(360, Math.floor(getLocalViewport().height - toLocalRect(ref.current.getBoundingClientRect()).top - 4))); };
+    fit(); window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [legacy]);
   if (legacy) return (
     <div>
-      <button onClick={() => go(false)} className="m-3 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">← Voltar para Tarefas e atividades</button>
+      <button onClick={backToTasks} className="m-3 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">← Voltar para Tarefas e atividades</button>
       <TasksWorkspace initialMonth={initialMonth} />
     </div>
   );
-  React.useLayoutEffect(() => {
-    const fit = () => { if (ref.current) setHeight(Math.max(480, Math.floor(getLocalViewport().height - toLocalRect(ref.current.getBoundingClientRect()).top - 4))); };
-    fit(); window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, []);
   return (
     <div ref={ref} style={{ height }} className="border border-slate-200 border-t-0 bg-white">
       <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-500">Carregando Tarefas e atividades…</div>}>
-        <NotionModule onOpenInvestigations={() => go(true)} />
+        <NotionModule />
       </Suspense>
     </div>
   );

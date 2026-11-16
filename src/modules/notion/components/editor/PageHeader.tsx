@@ -19,7 +19,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ page, onUpdate, onEnterT
   const hasIcon = !!page.icon;
 
   return (
-    <div className="relative mb-6 group/header">
+    <div className="relative mb-6 group/header nt-page-header">
       {/* Page Cover Image */}
       {hasCover && (
         <div className="relative w-full h-52 overflow-hidden group/cover">
@@ -89,7 +89,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ page, onUpdate, onEnterT
       )}
 
       {/* Action Buttons row (Add icon, Add cover) when not already present */}
-      <div className="px-12 pt-4">
+      <div className="nt-page-inset nt-page-heading px-12 pt-4">
         <div className="flex items-center gap-3 opacity-0 group-hover/header:opacity-100 transition-opacity mb-2 text-xs text-[var(--notion-text-muted)]">
           {!hasIcon && (
             <button
@@ -132,7 +132,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ page, onUpdate, onEnterT
             </button>
 
             {showEmojiPicker && (
-              <div className="absolute left-0 top-20 z-50">
+              <div className="absolute left-0 top-full z-50">
                 <EmojiPicker
                   currentIcon={page.icon}
                   onSelect={(icon) => onUpdate({ icon })}

@@ -41,10 +41,8 @@ interface SidebarProps {
   onOpenTemplates: () => void;
   onImportMarkdown: (markdownText: string) => void;
   onOpenTrash: () => void;
-  /** Atalhos extras do GaaS (ex.: Investigações CRM). */
-  extraLinks?: { label: string; icon: React.ReactNode; onClick: () => void }[];
   /** Seções fixas do GaaS, iguais para o time (ex.: Frentes). "top" vem antes de Páginas, "bottom" depois. */
-  sections?: { title: string; pageIds: string[]; placement: 'top' | 'bottom' }[];
+  sections?: { title: string; pageIds: string[]; placement: 'top' | 'bottom'; defaultExpanded?: boolean }[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -65,11 +63,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenTemplates,
   onImportMarkdown,
   onOpenTrash,
-  extraLinks = [],
   sections = [],
 }) => {
   const fixedIds = new Set(sections.flatMap((s) => s.pageIds));
   const [expandedPages, setExpandedPages] = useState<Record<string, boolean>>({});
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [showUserMenu, setShowUserMenu] = useState(false);
   const mdInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -177,17 +175,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .map((id) => workspace.pages[id])
     .filter((p) => p && !p.isArchived);
 
-  const renderSection = (s: { title: string; pageIds: string[] }) => {
-    const pages = s.pageIds.map((id) => workspace.pages[id]).filter((p) => p && !p.isArchived);
-    if (!pages.length) return null;
+  const renderSection = (title: string, pages: NotionPage[], defaultExpanded: boolean, action?: React.ReactNode) => {
+    const expanded = expandedSections[title] ?? defaultExpanded;
     return (
-      <div key={s.title}>
-        <div className="px-2.5 pb-1 text-[10px] font-bold text-[var(--notion-text-muted)] uppercase tracking-wider">
-          {s.title}
+      <div key={title}>
+        <div className="flex items-center gap-1 px-1 pb-1">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpandedSections(prev => ({ ...prev, [title]: !(prev[title] ?? defaultExpanded) }))}
+            className="flex flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] font-bold uppercase tracking-wide text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
+          >
+            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {title}
+          </button>
+          {action}
         </div>
-        {pages.map((page) => renderPageItem(page, 0))}
+        {expanded && pages.map(page => renderPageItem(page, 0))}
       </div>
     );
+  };
+
+  const renderFixedSection = (section: NonNullable<SidebarProps['sections']>[number]) => {
+    const pages = section.pageIds.map(id => workspace.pages[id]).filter(page => page && !page.isArchived);
+    return pages.length ? renderSection(section.title, pages, section.defaultExpanded ?? false) : null;
   };
 
   if (isCollapsed) {
@@ -205,31 +216,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside className="relative flex flex-col h-full w-60 shrink-0 bg-[var(--notion-sidebar-bg)] border-r border-[var(--notion-border)] select-none">
-      {/* 1. Top Search Bar (matching screenshot: Search or ask Ctrl+K) */}
-      <div className="p-2 border-b border-[var(--notion-border)]">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="flex items-center justify-center h-5 w-5 rounded bg-blue-500 text-white font-bold text-[10px]">
-              {workspace.icon || '⚡'}
-            </span>
-            <span className="text-xs font-semibold text-[var(--notion-text)] truncate">
-              {workspace.name}
-            </span>
-          </div>
-
-          <button
-            onClick={onToggleCollapse}
-            className="p-1 rounded text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)]"
-            title="Recolher barra lateral"
-          >
-            <ChevronsLeft size={15} />
-          </button>
-        </div>
-
+    <aside className="nt-sidebar-expanded relative flex flex-col h-full w-60 shrink-0 bg-[var(--notion-sidebar-bg)] border-r border-[var(--notion-border)] select-none">
+      <div className="flex items-center gap-1.5 border-b border-[var(--notion-border)] p-2">
         <button
           onClick={onOpenSearch}
-          className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-hover)]/40 hover:bg-[var(--notion-hover)] text-xs text-[var(--notion-text-muted)] transition-colors"
+          className="flex items-center justify-between min-w-0 flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-hover)]/40 hover:bg-[var(--notion-hover)] text-xs text-[var(--notion-text-muted)] transition-colors"
         >
           <div className="flex items-center gap-2">
             <Search size={13} />
@@ -238,6 +229,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-[var(--notion-card)] border border-[var(--notion-border)]">
             Ctrl+K
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="rounded p-1 text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
+          title="Recolher barra lateral"
+          aria-label="Recolher barra lateral"
+        >
+          <ChevronsLeft size={15} />
         </button>
       </div>
 
@@ -283,51 +283,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
           className="hidden"
         />
-        {extraLinks.map((l) => (
-          <button
-            key={l.label}
-            onClick={l.onClick}
-            className="flex items-center gap-2.5 w-full px-2 py-1 rounded-md text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors font-medium"
-          >
-            {l.icon}
-            <span>{l.label}</span>
-          </button>
-        ))}
       </div>
 
       <div className="h-px bg-[var(--notion-border)] mx-2 my-1" />
 
-      {/* 3. Scrollable Tree: Favorites, Recents, Private */}
-      <div className="flex-1 overflow-y-auto px-1 py-1 space-y-4">
-        {/* Favorites */}
-        {favoritePages.length > 0 && (
-          <div>
-            <div className="px-2.5 pb-1 text-[10px] font-bold text-[var(--notion-text-muted)] uppercase tracking-wider">
-              Favoritos
-            </div>
-            {favoritePages.map((page) => renderPageItem(page, 0))}
-          </div>
-        )}
-
-        {/* Seções fixas do time (ex.: Frentes). "Recentes" saiu: repetia as primeiras páginas da lista. */}
-        {sections.filter((s) => s.placement === 'top').map(renderSection)}
-
-        {/* Private Section */}
-        <div>
-          <div className="flex items-center justify-between px-2.5 pb-1 text-[10px] font-bold text-[var(--notion-text-muted)] uppercase tracking-wider">
-            <span>Páginas</span>
-            <button
-              onClick={() => onCreatePage(null)}
-              className="p-0.5 rounded hover:bg-[var(--notion-hover)]"
-              title="Nova página"
-            >
-              <Plus size={12} />
-            </button>
-          </div>
-          {rootPages.map((page) => renderPageItem(page, 0))}
-        </div>
-
-        {sections.filter((s) => s.placement === 'bottom').map(renderSection)}
+      <div className="flex-1 space-y-2 overflow-y-auto px-1 py-1">
+        {renderSection('Favoritos', favoritePages, true)}
+        {sections.filter(section => section.placement === 'top').map(renderFixedSection)}
+        {renderSection('Páginas', rootPages, false, (
+          <button
+            type="button"
+            onClick={() => {
+              onCreatePage(null);
+              setExpandedSections(prev => ({ ...prev, Páginas: true }));
+            }}
+            className="mr-1 rounded p-1 text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
+            title="Nova página"
+            aria-label="Nova página"
+          >
+            <Plus size={13} />
+          </button>
+        ))}
+        {sections.filter(section => section.placement === 'bottom').map(renderFixedSection)}
       </div>
 
       {/* 4. Bottom Footer: Active User & Settings */}

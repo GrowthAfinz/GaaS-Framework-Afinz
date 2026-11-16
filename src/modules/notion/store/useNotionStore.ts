@@ -29,7 +29,7 @@ export function useNotion(initial: NotionWorkspace) {
     if (saved === 'dark' || saved === 'light') return saved;
     return 'light';
   });
-  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(() => window.matchMedia('(max-width: 640px)').matches);
   const [isSearchOpen, setSearchOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [isTrashOpen, setTrashOpen] = useState(false);
