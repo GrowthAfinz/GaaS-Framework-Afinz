@@ -31,6 +31,7 @@ import { CalendarView } from './CalendarView';
 import { CHIP_COLORS, EMPTY, applyView } from './viewEngine';
 
 interface DatabaseViewProps {
+  layoutKey?: string;
   database: NotionDatabase;
   users?: NotionUser[];
   onUpdateRow: (databaseId: string, rowId: string, propertyId: string, value: any) => void;
@@ -57,6 +58,7 @@ const readSel = (k: string): string[] | null => { try { const v = localStorage.g
 
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
   database,
+  layoutKey,
   users = [],
   onUpdateRow,
   onAddRow,
@@ -158,19 +160,20 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
   return (
     <div className="my-6 space-y-3">
-      {/* Database Title Bar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-xl font-bold tracking-tight text-[var(--notion-text)]">
-            {database.title}
-          </h3>
-          {database.description && (
-            <p className="text-xs text-[var(--notion-text-muted)] mt-0.5">
-              {database.description}
-            </p>
-          )}
+      {!layoutKey && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold tracking-tight text-[var(--notion-text)]">
+              {database.title}
+            </h3>
+            {database.description && (
+              <p className="text-xs text-[var(--notion-text-muted)] mt-0.5">
+                {database.description}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* View Tabs & Action Bar */}
       <div className="flex items-center justify-between border-b border-[var(--notion-border)] pb-1.5 flex-wrap gap-2">
@@ -193,7 +196,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
                 title="Duplo clique para renomear"
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap ${
                   view.id === currentView.id
-                    ? 'border-b-2 border-blue-500 text-blue-500 font-semibold'
+                    ? 'border-b-2 border-teal-700 text-teal-800 dark:text-teal-300 font-semibold'
                     : 'text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] hover:bg-[var(--notion-hover)]'
                 }`}
               >
@@ -252,7 +255,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         </div>
 
         {/* Search, Filter, Sort Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Search Input */}
           <div className="flex items-center gap-1.5 px-2 py-1 rounded border border-[var(--notion-border)] bg-[var(--notion-hover)]/50 text-xs">
             <Search size={13} className="text-[var(--notion-text-muted)]" />
@@ -364,7 +367,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           {/* New Row Button */}
           {!readOnly && <button
             onClick={() => addRowWithQuick()}
-            className="flex items-center gap-1 px-2.5 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white font-medium text-xs transition-colors shadow-xs"
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-700 hover:bg-cyan-800 text-white font-medium text-xs transition-colors shadow-xs"
           >
             <Plus size={14} /> Novo
           </button>}
@@ -410,6 +413,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       {/* Render Active View */}
       {currentView.type === 'table' && (
         <TableView
+          key={`${layoutKey}.${currentView.id}`}
+          layoutKey={layoutKey && `${layoutKey}.${currentView.id}`}
+          visiblePropertyIds={visible}
           database={database}
           filteredRows={filteredRows}
           users={users}
@@ -425,6 +431,9 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
       {currentView.type === 'board' && (
         <BoardView
+          key={`${layoutKey}.${currentView.id}.${groupPropId}`}
+          layoutKey={layoutKey && `${layoutKey}.${currentView.id}.${groupPropId}`}
+          projectList={Boolean(layoutKey && currentView.id === 'v_projeto' && groupPropId === 'p_projeto')}
           database={database}
           filteredRows={filteredRows}
           groupPropId={groupPropId}
@@ -459,6 +468,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
 
       {currentView.type === 'calendar' && (
         <CalendarView
+          taskCalendar={Boolean(layoutKey)}
           database={database}
           filteredRows={filteredRows}
           datePropId={datePropId}

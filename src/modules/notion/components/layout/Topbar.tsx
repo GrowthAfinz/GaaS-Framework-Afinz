@@ -9,28 +9,22 @@ import {
   Trash2,
   Copy,
   Check,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
   X,
   MessageSquare,
   Clock,
   Sparkles,
   Palette,
 } from 'lucide-react';
-import { NotionPage, NotionWorkspace } from '../../types/notion';
+import { NotionPage } from '../../types/notion';
 import { NOTION_TONES, type NotionTone } from '../../gaas/tones';
 
 interface TopbarProps {
   page: NotionPage;
-  workspace: NotionWorkspace;
-  openTabIds?: string[];
-  onSelectPage: (pageId: string) => void;
   onUpdatePage: (partial: Partial<NotionPage>) => void;
   onToggleFavorite: () => void;
   onArchivePage: () => void;
   onExportJSON: () => void;
-  onCreatePage?: () => void;
+  onExportMarkdown?: () => void;
   onOpenAi?: () => void;
   onOpenComments?: () => void;
   onDuplicatePage?: () => void;
@@ -41,14 +35,11 @@ interface TopbarProps {
 
 export const Topbar: React.FC<TopbarProps> = ({
   page,
-  workspace,
-  openTabIds = ['page_v9', 'page_ramp', 'page_second_brain'],
-  onSelectPage,
   onUpdatePage,
   onToggleFavorite,
   onArchivePage,
   onExportJSON,
-  onCreatePage,
+  onExportMarkdown,
   onOpenAi,
   onOpenComments,
   onDuplicatePage,
@@ -60,14 +51,6 @@ export const Topbar: React.FC<TopbarProps> = ({
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Build breadcrumb trail
-  const breadcrumbs: NotionPage[] = [];
-  let curr: NotionPage | undefined = page;
-  while (curr) {
-    breadcrumbs.unshift(curr);
-    curr = curr.parentId ? workspace.pages[curr.parentId] : undefined;
-  }
-
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopiedLink(true);
@@ -76,89 +59,8 @@ export const Topbar: React.FC<TopbarProps> = ({
 
   const currentFont = page.fontFamily || 'sans';
 
-  // Ensure current page is in the tabs
-  const tabs = Array.from(new Set([...openTabIds, page.id]))
-    .map((id) => workspace.pages[id])
-    .filter(Boolean);
-
   return (
-    <header className="sticky top-0 z-30 flex flex-col border-b border-[var(--notion-border)] bg-[var(--notion-bg)]/95 backdrop-blur-md select-none">
-      {/* 1. Notion Desktop Tab Bar (matching user screenshot) */}
-      <div className="flex items-center justify-between h-9 px-2 bg-[var(--notion-sidebar-bg)] border-b border-[var(--notion-border)] text-xs">
-        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-none">
-          {/* History Nav */}
-          <div className="flex items-center gap-0.5 pr-1.5 border-r border-[var(--notion-border)] text-[var(--notion-text-muted)]">
-            <button className="p-1 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)]">
-              <ChevronLeft size={14} />
-            </button>
-            <button className="p-1 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)]">
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          {/* Page Tabs */}
-          <div className="flex items-center gap-1">
-            {tabs.map((tab) => {
-              const isActive = tab.id === page.id;
-              return (
-                <div
-                  key={tab.id}
-                  onClick={() => onSelectPage(tab.id)}
-                  className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-t-md text-xs font-medium cursor-pointer transition-colors max-w-[160px] ${
-                    isActive
-                      ? 'bg-[var(--notion-bg)] text-[var(--notion-text)] font-semibold shadow-xs'
-                      : 'text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)]'
-                  }`}
-                >
-                  <span className="text-xs shrink-0">{tab.icon || '📄'}</span>
-                  <span className="truncate">{tab.title || 'Sem título'}</span>
-                </div>
-              );
-            })}
-
-            {/* Plus Tab */}
-            {onCreatePage && (
-              <button
-                onClick={onCreatePage}
-                className="p-1 rounded hover:bg-[var(--notion-hover)] text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"
-                title="Nova aba"
-              >
-                <Plus size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Page Action Bar */}
-      <div className="flex items-center justify-between h-10 px-4">
-        {/* Left: Breadcrumbs Trail */}
-        <div className="flex items-center gap-1 text-xs text-[var(--notion-text-muted)] min-w-0 pr-4">
-          {breadcrumbs.map((b, idx) => {
-            const isLast = idx === breadcrumbs.length - 1;
-            return (
-              <React.Fragment key={b.id}>
-                {idx > 0 && <span className="text-[var(--notion-text-muted)]/40">/</span>}
-                <button
-                  onClick={() => onSelectPage(b.id)}
-                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] truncate transition-colors ${
-                    isLast ? 'text-[var(--notion-text)] font-semibold' : ''
-                  }`}
-                >
-                  <span>{b.icon || '📄'}</span>
-                  <span className="truncate max-w-[140px]">{b.title || 'Sem título'}</span>
-                </button>
-              </React.Fragment>
-            );
-          })}
-        </div>
-
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1 text-xs text-[var(--notion-text-muted)]">
-          <span className="text-[11px] text-[var(--notion-text-muted)]/70 hidden sm:inline mr-2">
-            Editado agora
-          </span>
-
+    <header className="sticky top-0 z-30 flex min-h-10 flex-wrap items-center justify-end gap-1 border-b border-[var(--notion-border)] bg-[var(--notion-sidebar-bg)] px-3 py-1 text-xs text-[var(--notion-text-muted)] select-none">
           {/* Notion AI Button */}
           {onOpenAi && (
             <button
@@ -168,6 +70,12 @@ export const Topbar: React.FC<TopbarProps> = ({
             >
               <Sparkles size={13} className="text-purple-500" />
               <span>Briefing para agentes</span>
+            </button>
+          )}
+
+          {onExportMarkdown && (
+            <button type="button" onClick={onExportMarkdown} title="Exportar página em Markdown" className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--notion-border)] px-2 py-1 font-semibold hover:bg-[var(--notion-hover)]">
+              <Download size={14} /> <span>Exportar .md</span>
             </button>
           )}
 
@@ -251,6 +159,10 @@ export const Topbar: React.FC<TopbarProps> = ({
                         </button>
                       ))}
                     </div>
+                    <label className="mt-2 flex items-center justify-between gap-2 border-t border-[var(--notion-border)] px-1 pt-2 text-xs">
+                      Cor personalizada
+                      <input type="color" className="h-7 w-10 cursor-pointer" value={tone.startsWith('#') ? tone : NOTION_TONES.find(t => t.id === tone)?.bg ?? '#ffffff'} onChange={event => onSetTone(event.currentTarget.value as NotionTone)} />
+                    </label>
                     <p className="px-1 pt-2 text-[10px] leading-snug text-[var(--notion-text-muted)]">Vale só pra você, neste navegador. No modo escuro o fundo não muda.</p>
                   </div>
                 </>
@@ -351,8 +263,6 @@ export const Topbar: React.FC<TopbarProps> = ({
               </div>
             )}
           </div>
-        </div>
-      </div>
     </header>
   );
 };
