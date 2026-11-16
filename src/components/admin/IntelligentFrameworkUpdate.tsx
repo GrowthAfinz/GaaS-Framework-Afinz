@@ -3409,7 +3409,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             selectedKeys.has(candidate.key)
             && canUploadCandidate(candidate)
         ), [candidates, selectedKeys]);
-    const copyCandidates = selectedCandidatesForCopy.length > 0 ? selectedCandidatesForCopy : exportableCandidates;
+    const copyCandidates = selectedCandidatesForCopy;
     // Disparos que ja existem na base (matchedActivity) ou em conflito (nome antigo do BI,
     // colisao, renomeacao) nao devem virar linha nova no Excel: a gravacao deles e UPDATE
     // ou revisao manual, nunca append. Excluidos da copia TSV por padrao.
@@ -3419,11 +3419,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             .map(buildExcelRow).join('\n'),
         [copyCandidates]
     );
-    const uploadCandidates = useMemo(() => {
-        const source = exportableCandidates.length > 0 ? exportableCandidates : selectedCandidatesForCopy;
-        return source.map((candidate) => ({ ...applyApprovalDefaults(candidate), accepted: true }));
-    }, [exportableCandidates, selectedCandidatesForCopy]);
-    const uploadUsesSelection = exportableCandidates.length === 0 && selectedCandidatesForCopy.length > 0;
+    const uploadCandidates = useMemo(() =>
+        selectedCandidatesForCopy.filter(candidate => candidate.accepted),
+        [selectedCandidatesForCopy]
+    );
     const uploadBlocks = useMemo(() => {
         const unique = new Set<SourceBlock>();
         uploadCandidates.forEach((candidate) => candidate.sourceBlocks.forEach((block) => unique.add(block)));
@@ -3523,16 +3522,20 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setReviewJourney('');
             setReviewChannel('');
             setReviewFront('');
-            setResult(processed);
+            const reviewed = processed.candidates.map(candidate =>
+                isBulkApprovalEligible(candidate)
+                    ? { ...applyApprovalDefaults(candidate), accepted: true }
+                    : candidate
+            );
+            setResult({
+                ...processed,
+                candidates: reviewed,
+                tsv: reviewed.filter(candidate => candidate.accepted).map(buildExcelRow).join('\n'),
+            });
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewPage(1);
             setStatusFilter('new_dispatch');
-            const cards = new Set(mapping?.board.cards.filter(card => !card.archived).map(card => card.id));
-            setSelectedKeys(new Set(processed.candidates.filter(candidate => {
-                const mapped = mapping?.manual.get(candidate.journey || candidate.activityName);
-                return candidate.domain === 'rentabilizacao' && candidate.status === 'ready'
-                    && !candidate.auditRequired && Boolean(mapped?.card_id && cards.has(mapped.card_id));
-            }).map(candidate => candidate.key)));
+            setSelectedKeys(new Set(reviewed.filter(candidate => candidate.accepted).map(candidate => candidate.key)));
             setReviewOpen(true);
         } catch (error: any) {
             const debug = {
@@ -3631,6 +3634,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     };
 
     const acceptCandidate = (key: string) => {
+        toggleCandidateSelection(key, true);
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
@@ -3679,6 +3683,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     };
 
     const acceptHighConfidence = () => {
+        setSelectedKeys(current => new Set([...current, ...candidates.filter(isBulkApprovalEligible).map(candidate => candidate.key)]));
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
@@ -3827,7 +3832,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         const candidatesForRun = result.candidates.map((candidate) =>
             uploadKeys.has(candidate.key)
                 ? { ...applyApprovalDefaults(candidate), accepted: true }
-                : candidate
+                : { ...candidate, accepted: false }
         );
         setResult((current) => current ? {
             ...current,
@@ -4772,12 +4777,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <div className="text-xs text-cyan-700">destino: rentabilizacao_activities</div>
                                 </div>
                             </div>
-
-                            {uploadUsesSelection && (
-                                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs text-blue-800">
-                                    Nenhuma linha aceita foi encontrada. As {uploadCandidates.length} linhas selecionadas serão aprovadas e enviadas neste upload.
-                                </div>
-                            )}
 
                             <div className="rounded-xl border border-slate-200 px-3 py-3 text-xs text-slate-600">
                                 <div className="font-bold text-slate-900">Conteúdo do upload</div>
