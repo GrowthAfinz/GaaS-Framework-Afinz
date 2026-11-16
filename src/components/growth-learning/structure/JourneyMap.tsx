@@ -1,3 +1,4 @@
+import Papa from 'papaparse';
 import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import { ArrowLeftRight, ChevronDown, Eye, EyeOff, GripVertical, Inbox, Link2Off, Maximize2, Minimize2, PanelLeftClose, Pencil, Search, SortDesc, SquarePlus, Undo2 } from 'lucide-react';
@@ -20,6 +21,37 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
   /** Recarrega board e envios (nome de campanha e campanha nova vêm do board). */
   onNamesChanged?: () => Promise<void>;
 }) {
+  const [reviewRows, setReviewRows] = useState<Array<{ jornada: string; canais: string; campanha_sugerida: string }>>([]);
+  const [reviewSearch, setReviewSearch] = useState('');
+  const [reviewPage, setReviewPage] = useState(0);
+  const [reviewError, setReviewError] = useState('');
+  const reviewTerm = reviewSearch.trim().toLocaleLowerCase('pt-BR');
+  const filteredReview = reviewRows.filter(row =>
+    [row.jornada, row.campanha_sugerida, row.canais].some(value => value.toLocaleLowerCase('pt-BR').includes(reviewTerm))
+  );
+
+  async function loadReviewCsv(file: File) {
+    try {
+      const parsed = Papa.parse<{ jornada: string; canais: string; campanha_sugerida: string }>(
+        await file.text(), { header: true, delimiter: ';', skipEmptyLines: 'greedy' }
+      );
+      if (parsed.errors.length || !parsed.meta.fields?.includes('jornada')) throw new Error('Use o CSV com a coluna jornada.');
+      const unique = new Map<string, typeof reviewRows[number]>();
+      for (const row of parsed.data) {
+        const journey = row.jornada?.trim();
+        if (journey) unique.set(journey, {
+          jornada: journey, canais: row.canais?.trim() ?? '', campanha_sugerida: row.campanha_sugerida?.trim() ?? '',
+        });
+      }
+      if (!unique.size) throw new Error('Nenhuma jornada encontrada no arquivo.');
+      setReviewRows([...unique.values()]);
+      setReviewSearch('');
+      setReviewPage(0);
+      setReviewError('');
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : 'Falha ao ler o arquivo.');
+    }
+  }
   const [q, setQ] = useState('');
   const [onlyGap, setOnlyGap] = useState(false);
   const [showIn, setShowIn] = useState(false);
@@ -259,11 +291,49 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
 
   return (
     <>
+      {reviewRows.length > 0 && <section className="m-3 space-y-2 rounded border bg-white p-3" aria-label="Jornadas para validação">
+        <div className="flex flex-wrap items-center gap-3">
+          <strong>Jornadas para validação · {filteredReview.length} de {reviewRows.length}</strong>
+          <input className="rounded border px-2 py-1" aria-label="Buscar na lista para validação"
+            placeholder="Buscar jornada ou campanha" value={reviewSearch} onChange={event => {
+              setReviewSearch(event.target.value);
+              setReviewPage(0);
+            }} />
+          <button type="button" onClick={() => setReviewRows([])}>Fechar lista</button>
+        </div>
+        <div className="max-h-64 overflow-auto">
+          <table className="w-full text-left text-xs">
+            <thead><tr><th>Jornada</th><th>Canais</th><th>Campanha sugerida</th><th>Vínculo atual</th></tr></thead>
+            <tbody>{filteredReview.slice(reviewPage * 25, (reviewPage + 1) * 25).map(row => {
+              const info = model.journeyInfo.get(row.jornada);
+              const linked = info && model.items.get(info.item);
+              return <tr key={row.jornada} className="border-t">
+                <td className="py-1">{row.jornada}</td><td>{row.canais || '—'}</td>
+                <td>{row.campanha_sugerida || 'A definir'}</td><td>{linked?.label || 'Sem vínculo no recorte'}</td>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
+        <div className="flex gap-3 text-xs">
+          <button type="button" disabled={reviewPage === 0} onClick={() => setReviewPage(page => page - 1)}>Anterior</button>
+          <button type="button" disabled={(reviewPage + 1) * 25 >= filteredReview.length} onClick={() => setReviewPage(page => page + 1)}>Próxima</button>
+        </div>
+      </section>}
+
       <div className="cz-mbar cz-mtool">
         <h3>Mapa de jornadas</h3><span className="cz-cnt">{visible} jornadas {showIn ? 'no mapa' : 'com envio'} · {perLabel}</span>
         <span className="sort"><SortDesc />mais recentes em cima</span>
         <span className="cz-grow" />
         {!editable && <span className="cz-hint">Somente leitura</span>}
+        <label className="cz-search">
+          <span>Carregar lista para revisão</span>
+          <input type="file" accept=".csv,text/csv" onChange={event => {
+            const file = event.currentTarget.files?.[0];
+            if (file) void loadReviewCsv(file);
+            event.currentTarget.value = '';
+          }} />
+        </label>
+        {reviewError && <span role="alert">{reviewError}</span>}
         <label className="cz-search"><Search /><input placeholder="Buscar jornada" value={q} onChange={e => setQ(e.target.value)} /></label>
         <button className={`cz-sw${onlyGap ? ' on' : ''}`} onClick={() => setOnlyGap(!onlyGap)}><i />Só sem campanha</button>
         <button className={`cz-sw${showIn ? ' on' : ''}`} onClick={() => setShowIn(!showIn)}><i />Sem envio no período</button>
