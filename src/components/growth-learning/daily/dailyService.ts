@@ -102,3 +102,59 @@ export async function loadInitiatives(): Promise<{ id: string; title: string }[]
   if (error) return [];
   return (data || []) as { id: string; title: string }[];
 }
+
+/* ---------- Kanban e disparos (16/11/2026) ---------- */
+export interface DailyWork {
+  id: string; task_key: string; title: string; status: string; priority: string; owner_label: string | null; due_date: string | null;
+  next_action: string; initiative_id: string | null; work_type: string; workspace: string; blocked_reason: string | null; revision: number; updated_at?: string;
+}
+export interface DailyInitiative { id: string; title: string; workspace: string; source_note: string | null }
+const WORK_COLS = 'id,task_key,title,status,priority,owner_label,due_date,next_action,initiative_id,work_type,workspace,blocked_reason,revision,updated_at';
+
+export async function loadWorks(): Promise<DailyWork[]> {
+  const { data, error } = await supabase.from('growth_development_tasks').select(WORK_COLS).order('updated_at', { ascending: false }).limit(2000);
+  if (error) throw error;
+  return (data || []) as DailyWork[];
+}
+export async function loadInitiativesFull(): Promise<DailyInitiative[]> {
+  const { data, error } = await supabase.from('growth_work_initiatives').select('id,title,workspace,source_note').order('title');
+  if (error) throw error;
+  return (data || []) as DailyInitiative[];
+}
+/** Salva um trabalho pelo RPC de Tarefas (as regras de bloqueio, critérios e evidência continuam valendo). */
+export const saveWork = (id: string | null, revision: number | null, body: Record<string, unknown>) =>
+  rpc<DailyWork>('growth_save_development_task', { p_id: id, p_revision: revision, p_body: body });
+
+/** Registros leves de um período (para "parado" e menções nos cards), sem o mês inteiro em memória. */
+export interface EntryLite { id: string; day: string; project_id: string; body: string; work_ids: string[] }
+export async function loadEntriesLite(start: string, end: string): Promise<EntryLite[]> {
+  const { data, error } = await supabase.from('daily_entries').select('id,day,project_id,body,work_ids').is('deleted_at', null).gte('day', start).lte('day', end).limit(5000);
+  if (error) throw error;
+  return (data || []).map(r => ({ ...r, day: String(r.day), work_ids: (r.work_ids || []) as string[] })) as EntryLite[];
+}
+/** Todos os registros que citam algum trabalho (para o card mostrar a última menção). */
+export async function loadWorkMentions(): Promise<EntryLite[]> {
+  const { data, error } = await supabase.from('daily_entries').select('id,day,project_id,body,work_ids').is('deleted_at', null).neq('work_ids', '{}').order('day', { ascending: false }).limit(3000);
+  if (error) throw error;
+  return (data || []).map(r => ({ ...r, day: String(r.day), work_ids: (r.work_ids || []) as string[] })) as EntryLite[];
+}
+
+export interface Dispatch {
+  id: string; name: string; journey: string; channel: string; bu: string; partner: string; segment: string;
+  base: number | null; cards: number; proposals: number; at: string;
+}
+/** Disparos CRM de um dia (fuso de São Paulo), mais cartões primeiro. */
+export async function loadDispatches(day: string): Promise<Dispatch[]> {
+  const next = addDaysIso(day, 1);
+  const { data, error } = await supabase.from('activities')
+    .select('id,"Activity name / Taxonomia",jornada,"Canal","BU",parceiro_canonico,"Segmento","Base Acionável","Cartões Gerados","Propostas","Data de Disparo"')
+    .gte('Data de Disparo', `${day}T00:00:00-03:00`).lt('Data de Disparo', `${next}T00:00:00-03:00`).limit(500);
+  if (error) throw error;
+  const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
+  return ((data || []) as Record<string, unknown>[]).map(r => ({
+    id: String(r.id), name: String(r['Activity name / Taxonomia'] || ''), journey: String(r.jornada || ''), channel: String(r['Canal'] || ''),
+    bu: String(r['BU'] || ''), partner: String(r.parceiro_canonico || 'N/A'), segment: String(r['Segmento'] || ''),
+    base: num(r['Base Acionável']), cards: num(r['Cartões Gerados']) || 0, proposals: num(r['Propostas']) || 0, at: String(r['Data de Disparo'] || ''),
+  })).sort((a, b) => b.cards - a.cards || (b.base || 0) - (a.base || 0));
+}
+function addDaysIso(day: string, n: number): string { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
