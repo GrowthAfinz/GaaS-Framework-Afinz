@@ -1,0 +1,9 @@
+/* Movimento curto das atividades da Wiki: abrir detalhe, menu e marcar como concluída. */
+@keyframes pilot-reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes pilot-pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.15);opacity:1}100%{transform:scale(1)}}
+.pilot-panel{animation:pilot-reveal .18s ease-out}
+.pilot-pop{animation:pilot-reveal .12s ease-out;transform-origin:top right}
+.pilot-toast{animation:pilot-reveal .2s ease-out}
+.pilot-check-mark{animation:pilot-pop .22s ease-out}
+.pilot-progress{transition:width .45s cubic-bezier(.2,.8,.2,1)}
+@media(prefers-reduced-motion:reduce){.pilot-panel,.pilot-pop,.pilot-toast,.pilot-check-mark{animation:none}.pilot-progress{transition:none}}

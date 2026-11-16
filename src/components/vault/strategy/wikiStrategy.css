@@ -60,12 +60,11 @@
 .strategy-prose details{box-shadow:none!important;margin:8px 0;border-color:#e2e7e9}
 .strategy-prose details summary{background:#f9fbfb;padding:10px 12px;font-size:13px;font-weight:500}
 .strategy-prose figure{border-color:#e0e5e8;box-shadow:none}
-.strategy-task-block>div>section[aria-label^="Atividades: Construção"]{border:0;margin:0}
-.strategy-task-block section[aria-label^="Atividades: Construção"]>div:first-child{display:none}
-.strategy-task-block section[aria-label^="Atividades: Construção"]>div:nth-child(2)>div:first-child{padding:0 0 8px;font-size:12px}
-.strategy-task-block section[aria-label^="Atividades: Construção"] article>div:first-child{padding:5px 0}
-.strategy-task-block section[aria-label^="Atividades: Construção"] article>div:first-child>button span:first-child{font-size:14px}
-.strategy-task-block section[aria-label^="Atividades: Construção"]>div:nth-child(2)>p:last-child{font-size:11px;padding:10px 0;color:#839098}
+/* Atividades dentro da estratégia: sem moldura nem cabeçalho próprio (a seção já tem título). */
+.strategy-task-block .pilot-checklist{border:0;margin:0;overflow:visible}
+.strategy-task-block .pilot-checklist-head{display:none}
+.strategy-task-block .pilot-checklist-toolbar{padding:0 0 12px}
+.strategy-task-block .pilot-checklist-note{font-size:11px;padding:10px 0;color:#839098}
 .strategy-editor{border-left:2px solid #007c80;background:#f8fbfa;padding:18px;margin:12px 0;grid-column:1/-1}
 .strategy-editor fieldset{border:0;min-width:0;padding:0}
 .strategy-editor label{display:block;font-size:13px;font-weight:600;color:#52646d}
@@ -93,12 +92,9 @@
 .strategy-history section>button{display:inline-flex;gap:7px;padding:9px 12px;border:1px solid #c6d1d5;background:white}
 @media(min-width:1500px){.wiki-strategy{grid-template-columns:260px minmax(0,1fr)}.strategy-main{padding:26px 36px}}
 @media(max-width:1000px){.wiki-strategy{grid-template-columns:190px minmax(0,1fr)}.strategy-main{padding:20px}.strategy-nav{padding:20px 12px}.strategy-title h1{font-size:28px}.strategy-header{display:block}.strategy-page-actions{margin:10px 0;justify-content:flex-start}.strategy-section-toggle h2{font-size:21px}}
-@media(max-width:680px){.wiki-strategy{display:block}.strategy-nav{position:static;padding:14px;border-right:0;border-bottom:1px solid #d7dfe2}.strategy-nav nav{display:none}.strategy-nav>.strategy-help{display:none}.strategy-search{margin:0}.strategy-main{padding:18px 14px}.strategy-title h1{font-size:27px}.strategy-meta{font-size:11px;gap:7px}.strategy-section-toggle h2{font-size:20px}.strategy-page-actions{justify-content:space-between;gap:8px}.strategy-footer{display:block}.strategy-icon,.strategy-page-actions>button,.strategy-editor-actions button,.strategy-menu>div>button{min-height:44px}.strategy-icon{min-width:38px}.strategy-editor{padding:12px}.strategy-prose table{display:block;overflow-x:auto}.strategy-prose{font-size:14px}.strategy-task-block section article>div:first-child{column-gap:4px;grid-template-columns:2.25rem minmax(0,1fr) 4.5rem}.strategy-menu>div{width:190px}}
+@media(max-width:680px){.wiki-strategy{display:block}.strategy-nav{position:static;padding:14px;border-right:0;border-bottom:1px solid #d7dfe2}.strategy-nav nav{display:none}.strategy-nav>.strategy-help{display:none}.strategy-search{margin:0}.strategy-main{padding:18px 14px}.strategy-title h1{font-size:27px}.strategy-meta{font-size:11px;gap:7px}.strategy-section-toggle h2{font-size:20px}.strategy-page-actions{justify-content:space-between;gap:8px}.strategy-footer{display:block}.strategy-icon,.strategy-page-actions>button,.strategy-editor-actions button,.strategy-menu>div>button{min-height:44px}.strategy-icon{min-width:38px}.strategy-editor{padding:12px}.strategy-prose table{display:block;overflow-x:auto}.strategy-prose{font-size:14px}.strategy-menu>div{width:190px}}
 @media(prefers-reduced-motion:reduce){.wiki-strategy *{scroll-behavior:auto!important;transition:none!important}}
 @media(min-width:1001px){.wiki-strategy{grid-template-columns:280px minmax(0,1fr)}}
-.strategy-task-block section[aria-label^="Atividades: Construção"] article>div:first-child{padding-top:3px;padding-bottom:3px}
-.strategy-task-block section article>div:first-child>button{min-height:34px}
-.strategy-task-block section article>div:first-child>label{min-height:36px}
 .strategy-source-status{border-bottom:1px solid #dce3e6;font-size:12px;color:#6d7a81;padding:9px 0}.strategy-source-status>summary{cursor:pointer}.strategy-footer-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .strategy-source-status{position:relative;border:0;padding:0;font-size:12px}.strategy-source-status>summary{color:#68777e}.strategy-source-status>.strategy-prose{position:absolute;left:0;top:100%;z-index:30;background:white;border:1px solid #c5d0d3;padding:14px;width:min(620px,65vw);box-shadow:0 4px 12px #15222b0b}.strategy-header{padding-bottom:18px}.strategy-main{padding-top:18px}.strategy-title{margin-top:8px}
 
@@ -163,8 +159,14 @@
 .strategy-main{max-width:none}
 .strategy-summary{max-width:none!important}
 .strategy-prose :is(p,ul,ol,blockquote,h2,h3,h4,h5,h6){max-width:none}
-.strategy-index-toggle{margin-right:8px!important;padding:5px 8px!important;border:1px solid #cbdcdd!important;min-height:34px;color:#006c70!important}
-.strategy-index-toggle:hover{background:#edf6f4!important}
+/* Recolher o índice: botão no topo do índice; recolhido, vira uma aba fixa que acompanha a leitura. */
+.strategy-nav-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-6px -6px 12px 0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#7a8790}
+.strategy-nav-collapse,.strategy-index-reopen{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid transparent;background:transparent;color:#53626d;transition:background-color .15s,color .15s,border-color .15s}
+.strategy-nav-collapse:hover,.strategy-index-reopen:hover{background:#edf6f4;color:#006c70;border-color:#cbdcdd}
+.strategy-index-dock{position:sticky;top:12px;height:0;z-index:30}
+.strategy-index-reopen{position:absolute;left:-44px;top:0;border-color:#cbdcdd;background:#fff;color:#006c70;box-shadow:0 1px 2px rgba(15,23,42,.06)}
+.wiki-strategy--index-hidden .strategy-main{padding-left:64px}
+@media(max-width:680px){.strategy-nav-head{display:none}.strategy-index-dock{display:none}.wiki-strategy--index-hidden .strategy-main{padding-left:14px}.wiki-strategy--index-hidden .strategy-nav[hidden]{display:block!important}}
 .strategy-asset-status{font-weight:700;font-size:15px}
 .strategy-asset-status--ok{color:#087f5b}
 .strategy-asset-status--missing{color:#bc3b3b}
