@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, Children, isValidElement, type ReactNode, type ComponentProps } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, History, MoreHorizontal, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, History, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { VaultNote } from '../vaultTypes';
@@ -40,6 +40,9 @@ function Markdown({content,onOpen,onEditPart,editDisabled}:{content:string;onOpe
  return <WikiMarkdownSections content={markdown} onEditPart={onEditPart} editDisabled={editDisabled} render={part=><ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={vaultUrlTransform} components={{td:({children})=>{const value=textOf(children).trim();const state=value==='✓'?'ok':(value==='✗'||value==='×'||value==='X'||value==='x')?'missing':null;return <td>{state?<span className={'strategy-asset-status strategy-asset-status--'+state} aria-label={state==='ok'?'URL informada':'URL não informada'}>{children}</span>:children}</td>;},table:({children})=><div className="strategy-table" role="region" aria-label="Tabela da estratégia" tabIndex={0}><table>{children}</table></div>,h2:heading(2),h3:heading(3),h4:heading(4),h5:heading(5),h6:heading(6),pre:WikiCodeBlock,a:({href,children})=>href?.startsWith('vault:')?<a href={'?view=learning&section=vault&wiki_path='+href.slice(6)} onClick={e=>{if(onOpen){e.preventDefault();onOpen(decodeURIComponent(href.slice(6)));}}}>{children}</a>:<a href={href} target={href?.startsWith('https:')?'_blank':undefined} rel="noopener noreferrer">{children}</a>}}>{part}</ReactMarkdown>}/>;
 }
 
+const INDEX_HIDDEN_KEY='gaas-wiki-strategy-index-hidden';
+const readIndexHidden=()=>{try{return localStorage.getItem(INDEX_HIDDEN_KEY)==='1';}catch{return false;}};
+
 export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,writer=saveStrategy,historyLoader=strategyHistory,taskProps}: {
  note:VaultNote; onOpen?:(target:string)=>void; onHome?:()=>void;loader?:typeof loadStrategy;writer?:typeof saveStrategy;historyLoader?:typeof strategyHistory;
  taskProps?:Pick<ComponentProps<typeof WikiPilotChecklist>,'loader'|'writer'|'historyLoader'>;
@@ -62,7 +65,10 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
   place(); const observer=new ResizeObserver(place); observer.observe(nav); if(nav.parentElement) observer.observe(nav.parentElement); window.addEventListener('resize',place);
   return ()=>{ observer.disconnect(); window.removeEventListener('resize',place); };
  },[]);
- const [mobileIndex,setMobileIndex]=useState(false),[indexHidden,setIndexHidden]=useState(false);
+ const [mobileIndex,setMobileIndex]=useState(false),[indexHidden,setIndexHidden]=useState(readIndexHidden);
+ // Reading preference shared by every strategy note: once collapsed, the index stays out of the way.
+ const toggleIndex=()=>setIndexHidden(hidden=>{const next=!hidden;try{localStorage.setItem(INDEX_HIDDEN_KEY,next?'1':'0');}catch{/* Storage unavailable. */}return next;});
+ useEffect(()=>{const key=(e:KeyboardEvent)=>{const target=e.target instanceof Element?e.target:null;if(e.key!=='['||e.ctrlKey||e.metaKey||e.altKey||target?.closest('input,textarea,select,[contenteditable="true"]'))return;e.preventDefault();toggleIndex();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[]);
  const [historyOpen,setHistoryOpen]=useState(false),[revisions,setRevisions]=useState<StrategyRevision[]>([]),[selectedRevision,setSelectedRevision]=useState<StrategyRevision|null>(null),[historyError,setHistoryError]=useState('');
  const [reconciling,setReconciling]=useState(false),[retry,setRetry]=useState(0),[revisionWarning,setRevisionWarning]=useState(false);
  const [deleteTarget,setDeleteTarget]=useState<string|null>(null),[draftKey,setDraftKey]=useState<string|null>(null),[recoveredStale,setRecoveredStale]=useState(false);
@@ -146,12 +152,13 @@ export function WikiStrategyDocument({note,onOpen,onHome,loader=loadStrategy,wri
   <div className="strategy-editor-actions"><button className="strategy-primary" type="submit">{busy?'Salvando…':'Salvar alterações'}</button><button type="button" onClick={cancel}>Cancelar</button></div>
  </fieldset></form></div>;
  return <div className={'wiki-strategy'+(indexHidden?' wiki-strategy--index-hidden':'')} onClickCapture={e=>{const button=(e.target as HTMLElement).closest('.strategy-menu button');button?.closest('details')?.removeAttribute('open');}} aria-label={doc.title+' · estratégia colaborativa'} aria-busy={loading||busy}>
-  <aside ref={navRef} className="strategy-nav" hidden={indexHidden}><button type="button" className="strategy-mobile-index" aria-expanded={mobileIndex} aria-controls="strategy-document-index" onClick={()=>setMobileIndex(!mobileIndex)}>Nesta estratégia <ChevronDown size={16}/></button><label className="strategy-search"><Search size={16}/><input aria-label="Buscar nesta nota" placeholder="Buscar nesta nota" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+  <aside ref={navRef} className="strategy-nav" hidden={indexHidden}><div className="strategy-nav-head"><span>Nesta página</span><button type="button" className="strategy-nav-collapse" aria-label="Recolher índice" title="Recolher índice ( [ )" aria-expanded={true} aria-controls="strategy-document-index" onClick={toggleIndex}><PanelLeftClose size={16}/></button></div><button type="button" className="strategy-mobile-index" aria-expanded={mobileIndex} aria-controls="strategy-document-index" onClick={()=>setMobileIndex(!mobileIndex)}>Nesta estratégia <ChevronDown size={16}/></button><label className="strategy-search"><Search size={16}/><input aria-label="Buscar nesta nota" placeholder="Buscar nesta nota" value={query} onChange={e=>setQuery(e.target.value)}/></label>
    <nav id="strategy-document-index" className={mobileIndex?'is-open':''} aria-label="Índice da estratégia"><button className={active==='visao-geral'?'is-active':''} onClick={()=>{manualActiveUntil.current=Date.now()+1000;setQuery('');setMobileIndex(false);setActive('visao-geral');document.getElementById('strategy-header')?.scrollIntoView();}}>Visão geral</button>{doc.blocks.filter(b=>b.id!=='visao-geral').map(b=><button key={b.id} className={active===b.id?'is-active':''} onClick={()=>jump(b.id)}>{navTitle(b)}</button>)}</nav>
    <p className="strategy-help">{head?'Versão de trabalho · r'+head.revision:'Fonte do vault'}<br/>{canEdit?'Alterações recuperáveis no histórico.':'Leitura · edição conforme permissões atuais.'}</p>
   </aside>
   <main className="strategy-main">
-   <header id="strategy-header" className="strategy-header"><div className="strategy-breadcrumb"><button type="button" className="strategy-index-toggle" aria-expanded={!indexHidden} aria-controls="strategy-document-index" onClick={()=>setIndexHidden(v=>!v)}>{indexHidden?'Mostrar índice':'Recolher índice'}</button><button onClick={()=>{if(!protect()){if(onHome)onHome();else window.location.assign('?view=learning&section=vault&wiki_topic=strategies');}}}>Wiki</button><ChevronRight size={12}/><span>Estratégias</span></div><div className="strategy-page-actions">
+   {indexHidden&&<div className="strategy-index-dock"><button type="button" className="strategy-index-reopen" aria-label="Mostrar índice" title="Mostrar índice ( [ )" aria-expanded={false} onClick={toggleIndex}><PanelLeftOpen size={16}/></button></div>}
+   <header id="strategy-header" className="strategy-header"><div className="strategy-breadcrumb"><button onClick={()=>{if(!protect()){if(onHome)onHome();else window.location.assign('?view=learning&section=vault&wiki_topic=strategies');}}}>Wiki</button><ChevronRight size={12}/><span>Estratégias</span></div><div className="strategy-page-actions">
     {doc.blocks.some(b=>b.type==='tasks')&&<button type="button" onClick={()=>{const block=doc.blocks.find(b=>b.type==='tasks');if(!block)return;if(!closed.has(block.id)&&protectedIds.has(block.id)){setMessage('Salve ou cancele a edição da atividade antes de recolher.');return;}setClosed(c=>toggleStrategySection(c,block.id,protectedIds));}}>{closed.has(doc.blocks.find(b=>b.type==='tasks')!.id)?'Mostrar atividades':'Recolher atividades'}</button>}
     {collapsible.length>1&&<button type="button" aria-pressed={allClosed} onClick={toggleAll}>{allClosed?<><ChevronsUpDown size={17}/>Expandir seções</>:<><ChevronsDownUp size={17}/>Recolher seções</>}</button>}
     <button disabled={busy} onClick={e=>{opener.current=e.currentTarget;setHistoryOpen(true);}}><History size={17}/>Histórico</button>
