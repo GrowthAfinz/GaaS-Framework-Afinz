@@ -1465,8 +1465,10 @@ const buildCandidate = (
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     const importedJourneys = importedSignatureJourneys.get(metric.dispatchSignature) ?? new Set<string>();
     const historicalSignatureMatches = historyIndex.byDispatchSignature.get(metric.dispatchSignature) ?? [];
-    const compatibleHistoricalMatches = historicalSignatureMatches.filter(
-        (activity) => isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
+    const compatibleHistoricalMatches = historicalSignatureMatches.filter(activity =>
+        isStandardOptOutResponse(metric.activityName)
+            ? normalizeKey(metric.journey) === normalizeKey(canonicalActivityJourney(activity))
+            : isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
     );
     const renamedHistoricalMatches = compatibleHistoricalMatches.length > 0 || isStandardOptOutResponse(metric.activityName)
         ? []
@@ -1543,7 +1545,7 @@ const buildCandidate = (
     // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
     const fileJourneys = Array.from(new Set([metric.journey, ...Array.from(importedJourneys)])).filter(journey =>
         Boolean(journey) && (!isStandardOptOutResponse(metric.activityName)
-            || acquisitionJourneyIdentity(journey) === acquisitionJourneyIdentity(metric.journey)));
+            || normalizeKey(journey) === normalizeKey(metric.journey)));
     const canonicalRoles = electCanonicalJourney(fileJourneys, historyIndex.knownJourneys, metric.activityName);
     const myRole = canonicalRoles.get(normalizeKey(metric.journey));
     const fileSuperseded = myRole === 'superseded';
@@ -1851,6 +1853,17 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
         const candidates = (anchorsByAttributionKey.get(attributionKey(row)) ?? [])
             .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
             .filter((item) => item.diff >= 0 && item.diff <= 2);
+
+        // A resposta padrão é reutilizada. Só vincula métricas à execução da mesma
+        // jornada, incluindo a safra do nome, quando há uma âncora inequívoca.
+        if (isStandardOptOutResponse(row.activityName)) {
+            const journey = normalizeKey(row.journey);
+            if (!journey) return undefined;
+            const exact = candidates.filter(item => normalizeKey(item.candidate.journey) === journey);
+            const sameDay = exact.filter(item => item.diff === 0);
+            if (sameDay.length === 1) return sameDay[0].candidate;
+            return sameDay.length === 0 && exact.length === 1 ? exact[0].candidate : undefined;
+        }
 
         // Preferir ancora com a MESMA jornada do PERF. Sem isso, quando o BI duplica
         // a mesma activity+canal+data em jornadas diferentes (ex: ABRI26 e MAIO26),

@@ -27,6 +27,21 @@ describe('intelligent importer cart audience and BI aliases', () => {
         const c = processDinamicaBI([header,external],[]).candidates[0];
         expect(c).toMatchObject({ finalized:31, assisted:0, independent:0 });
     });
+    it('does not attach opt-out performance from another safra to the only available dispatch', () => {
+        const name = 'afz_car_vis_aqs_wpp_apr_resposta_optout_pontual';
+        const september = 'JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_SET26';
+        const october = 'JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_OUT26';
+        const source = row(september, name);
+        source[6] = october;
+
+        const result = processDinamicaBI([header, source], []);
+
+        expect(result.candidates).toHaveLength(1);
+        expect(result.candidates[0].journey).toBe(september);
+        expect(result.candidates[0].finalized).toBeUndefined();
+        expect(result.insights.orphanPerformanceRows).toBe(1);
+    });
+
     it('keeps standard opt-out replies separate across journeys, including similar names', () => {
         const name = 'afz_car_vis_aqs_wpp_apr_resposta_optout_pontual';
         const j1 = 'JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_SET26';
