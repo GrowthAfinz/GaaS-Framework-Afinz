@@ -1,3 +1,6 @@
+import { loadStructure } from '../growth-learning/structure/structureService';
+import { supabase } from '../../services/supabaseClient';
+import { classify, compileRules } from '../growth-learning/structure/consumoModel';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Papa from 'papaparse';
@@ -135,6 +138,20 @@ interface MetricRow {
     assisted?: number;
     independent?: number;
     dispatchSignature: string;
+}
+
+async function loadImportCampaigns() {
+    const [board, maps, rules] = await Promise.all([
+        loadStructure(),
+        supabase.from('sfmc_journey_map').select('journey,card_id,front,group_label').order('journey'),
+        supabase.from('sfmc_consumo_rules').select('id,priority,pattern,front,card_id,group_label').order('priority'),
+    ]);
+    if (maps.error || rules.error) throw maps.error || rules.error;
+    return {
+        board,
+        manual: new Map((maps.data ?? []).map(row => [row.journey, row])),
+        rules: compileRules(rules.data ?? []),
+    };
 }
 
 interface UpdateCandidate extends MetricRow {
@@ -3221,7 +3238,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setFlowChooserOpen(false);
     }, [activeFlow]);
 
-    const candidates = result?.candidates ?? [];
+    const candidates = useMemo(() => result?.candidates ?? [], [result]);
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
     const isRentReview = (result?.domain ?? activeFlow) === 'rentabilizacao';
     // A tabela permanece compacta, mas o drawer permite revisar todas as dimensoes
@@ -3250,12 +3267,48 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         return Math.round(measurable.reduce((sum, candidate) => sum + candidate.confidence, 0) / measurable.length);
     }, [activeCandidates]);
 
+    const [importMapping, setImportMapping] = useState<Awaited<ReturnType<typeof loadImportCampaigns>> | null>(null);
+    const [mappingUnavailable, setMappingUnavailable] = useState(false);
+    const [reviewCampaign, setReviewCampaign] = useState('');
+    const [reviewJourney, setReviewJourney] = useState('');
+    const [reviewChannel, setReviewChannel] = useState('');
+    const [reviewFront, setReviewFront] = useState('');
+    const campaignByCandidate = useMemo(() => {
+        const cards = new Map(importMapping?.board.cards.filter(card => !card.archived).map(card => [card.id, card]));
+        const lanes = new Map(importMapping?.board.lanes.map(lane => [lane.id, lane]));
+        const pillars = new Map(importMapping?.board.pillars.map(pillar => [pillar.id, pillar.title]));
+        return new Map(candidates.map(candidate => {
+            const manual = importMapping?.manual.get(candidate.journey || candidate.activityName);
+            const rule = manual ?? (importMapping && classify(candidate.journey, candidate.activityName, importMapping.rules));
+            const card = rule?.card_id ? cards.get(rule.card_id) : undefined;
+            const front = rule?.front || pillars.get(lanes.get(card?.lane_id ?? '')?.pillar_id ?? '') || '';
+            const title = card?.title || rule?.group_label || front || 'Sem campanha mapeada';
+            const key = card?.id || JSON.stringify([front, title]);
+            return [candidate.key, { key, title, front, origin: manual ? 'Vínculo aprovado' : rule?.card_id ? 'Regra do Consumo SFMC' : '' }] as const;
+        }));
+    }, [candidates, importMapping]);
+    const visibleCampaignCandidates = useMemo(() => candidates.filter(candidate =>
+        (!reviewCampaign || campaignByCandidate.get(candidate.key)?.key === reviewCampaign)
+        && (!reviewJourney || candidate.journey === reviewJourney)
+        && (!reviewChannel || candidate.channel === reviewChannel)
+        && (!reviewFront || campaignByCandidate.get(candidate.key)?.front === reviewFront)
+    ), [candidates, campaignByCandidate, reviewCampaign, reviewJourney, reviewChannel, reviewFront]);
+    const campaignRows = useMemo(() => {
+        const groups = new Map<string, { title: string; front: string; rows: UpdateCandidate[] }>();
+        for (const candidate of candidates) {
+            const campaign = campaignByCandidate.get(candidate.key)!;
+            const group = groups.get(campaign.key) ?? { ...campaign, rows: [] };
+            group.rows.push(candidate);
+            groups.set(campaign.key, group);
+        }
+        return [...groups].sort(([, a], [, b]) => a.title.localeCompare(b.title, 'pt-BR'));
+    }, [candidates, campaignByCandidate]);
     const filteredCandidates = useMemo(() => {
         const term = normalizeKey(reviewSearchTerm);
         const [periodStart, periodEnd] = reviewStartDate && reviewEndDate && reviewStartDate > reviewEndDate
             ? [reviewEndDate, reviewStartDate]
             : [reviewStartDate, reviewEndDate];
-        return candidates.filter((candidate) => {
+        return visibleCampaignCandidates.filter((candidate) => {
             const statusMatches = candidateFilterKey(candidate) === statusFilter;
             if (!statusMatches) return false;
             if (periodStart && candidate.date < periodStart) return false;
@@ -3263,6 +3316,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             if (!term) return true;
 
             const haystack = normalizeKey([
+                campaignByCandidate.get(candidate.key)?.title,
+                campaignByCandidate.get(candidate.key)?.front,
+                ...(candidate.conflictJourneys ?? []),
                 candidate.journey,
                 candidate.activityName,
                 candidate.channel,
@@ -3275,7 +3331,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
             return haystack.includes(term);
         });
-    }, [candidates, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
+    }, [visibleCampaignCandidates, campaignByCandidate, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
     const sortedCandidates = useMemo(() => {
         const sortKey = reviewSortByMode[reviewMode];
         const valueFor = (candidate: UpdateCandidate): string | number => {
@@ -3460,11 +3516,23 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setProcessingStage('reviewing');
             await nextFrame();
             await sleep(40);
+            const mapping = await loadImportCampaigns().catch(() => null);
+            setImportMapping(mapping);
+            setMappingUnavailable(mapping === null);
+            setReviewCampaign('');
+            setReviewJourney('');
+            setReviewChannel('');
+            setReviewFront('');
             setResult(processed);
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewPage(1);
             setStatusFilter('new_dispatch');
-            setSelectedKeys(new Set());
+            const cards = new Set(mapping?.board.cards.filter(card => !card.archived).map(card => card.id));
+            setSelectedKeys(new Set(processed.candidates.filter(candidate => {
+                const mapped = mapping?.manual.get(candidate.journey || candidate.activityName);
+                return candidate.domain === 'rentabilizacao' && candidate.status === 'ready'
+                    && !candidate.auditRequired && Boolean(mapped?.card_id && cards.has(mapped.card_id));
+            }).map(candidate => candidate.key)));
             setReviewOpen(true);
         } catch (error: any) {
             const debug = {
@@ -4270,6 +4338,79 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             )}
                         </div>
 
+                        <section className="space-y-2 border-b px-6 py-3" aria-label="Campanhas no arquivo">
+                            {mappingUnavailable && <p role="status" className="text-xs text-amber-700">Mapeamento indisponível. A revisão dos disparos continua disponível.</p>}
+                            <div className="flex flex-wrap gap-2 text-xs">
+                                <select aria-label="Frente" value={reviewFront} onChange={event => {
+                                    setReviewFront(event.target.value);
+                                    setReviewCampaign('');
+                                    setReviewJourney('');
+                                    setReviewPage(1);
+                                }}>
+                                    <option value="">Todas as frentes</option>
+                                    {[...new Set(campaignRows.map(([, group]) => group.front).filter(Boolean))].sort().map(front => <option key={front}>{front}</option>)}
+                                </select>
+                                <select aria-label="Campanha" value={reviewCampaign} onChange={event => {
+                                    setReviewCampaign(event.target.value);
+                                    setReviewJourney('');
+                                    setReviewPage(1);
+                                }}>
+                                    <option value="">Todas as campanhas</option>
+                                    {campaignRows.filter(([, group]) => !reviewFront || group.front === reviewFront).map(([key, group]) => <option key={key} value={key}>{group.title}{group.front && group.front !== group.title ? ` · ${group.front}` : ''}</option>)}
+                                </select>
+                                <select aria-label="Jornada" value={reviewJourney} onChange={event => { setReviewJourney(event.target.value); setReviewPage(1); }}>
+                                    <option value="">Todas as jornadas</option>
+                                    {[...new Set(candidates.filter(row => !reviewCampaign || campaignByCandidate.get(row.key)?.key === reviewCampaign).map(row => row.journey))].filter(Boolean).sort().map(journey => <option key={journey}>{journey}</option>)}
+                                </select>
+                                <select aria-label="Canal" value={reviewChannel} onChange={event => { setReviewChannel(event.target.value); setReviewPage(1); }}>
+                                    <option value="">Todos os canais</option>
+                                    {[...new Set(candidates.map(row => row.channel))].sort().map(channel => <option key={channel}>{channel}</option>)}
+                                </select>
+                            </div>
+                            <div className="max-h-40 overflow-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="sticky top-0 bg-white">
+                                        <tr><th>Sel.</th><th>Campanha</th><th>Vínculo</th><th>Frente</th><th>Período recebido</th><th>Jornadas</th><th>Novos</th><th>Atualizações</th><th>Ignorar</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {campaignRows.filter(([key, group]) => (!reviewCampaign || reviewCampaign === key) && (!reviewFront || group.front === reviewFront) &&
+                                            (!reviewSearchTerm || group.rows.some(row => normalizeKey([group.title, group.front, row.journey, row.activityName, ...(row.conflictJourneys ?? [])].join(' ')).includes(normalizeKey(reviewSearchTerm))))).map(([key, group]) => (
+                                            <tr key={key} className="border-t">
+                                                <td className="w-10"><input type="checkbox" aria-label={`Selecionar disparos filtrados de ${group.title}`}
+                                                    disabled={!filteredCandidates.some(row => campaignByCandidate.get(row.key)?.key === key && canUploadCandidate(row))}
+                                                    checked={filteredCandidates.some(row => campaignByCandidate.get(row.key)?.key === key && canUploadCandidate(row))
+                                                        && filteredCandidates.every(row => campaignByCandidate.get(row.key)?.key !== key || !canUploadCandidate(row) || selectedKeys.has(row.key))}
+                                                    onChange={event => {
+                                                        const checked = event.target.checked;
+                                                        setSelectedKeys(previous => {
+                                                            const next = new Set(previous);
+                                                            for (const row of filteredCandidates) {
+                                                                if (campaignByCandidate.get(row.key)?.key !== key || !canUploadCandidate(row)) continue;
+                                                                if (checked) next.add(row.key);
+                                                                else next.delete(row.key);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    }} /></td>
+                                                <td className="py-1"><button type="button" className="text-cyan-800 underline" onClick={() => {
+                                                    setReviewCampaign(key);
+                                                    setReviewJourney('');
+                                                    setReviewPage(1);
+                                                }}>{group.title}</button></td>
+                                                <td>{[...new Set(group.rows.map(row => campaignByCandidate.get(row.key)?.origin).filter(Boolean))].join(' · ') || '—'}</td>
+                                                <td>{group.front || '—'}</td>
+                                                <td>{group.rows.reduce((first, row) => row.date < first ? row.date : first, group.rows[0].date)} a {group.rows.reduce((last, row) => row.date > last ? row.date : last, group.rows[0].date)}</td>
+                                                <td>{new Set(group.rows.map(row => row.journey).filter(Boolean)).size}</td>
+                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'new_dispatch').length}</td>
+                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'update_dispatch').length}</td>
+                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'ignore').length}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
                         <div className={`flex flex-col gap-2 border-b px-6 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
                             selectedKeys.size > 0 ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600'
                         }`}>
@@ -4288,7 +4429,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         className="h-4 w-4 rounded border-slate-300"
                                     />
                                     {selectedKeys.size > 0
-                                        ? `${selectedKeys.size} selecionados`
+                                        ? `${selectedKeys.size} selecionados · ${selectedKeys.size - filteredCandidates.filter(candidate => selectedKeys.has(candidate.key)).length} fora do filtro`
                                         : `Selecionar todos os ${filteredCandidates.length} filtrados`}
                                 </label>
                                 <div className="flex flex-wrap gap-2">
