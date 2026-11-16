@@ -43,7 +43,9 @@ function paint(svg: SVGSVGElement): DiagramTone[] {
     cluster.querySelectorAll('.cluster-label text, .cluster-label tspan').forEach(text => set(text, { fill: tone.title, 'font-weight': '700', 'letter-spacing': '.02em' }));
   });
   svg.querySelectorAll('g.node').forEach(node => {
-    const label = node.textContent || '';
+    // Multi-line labels are separate tspans; join them with spaces so words from different lines do not merge.
+    const words = [...node.querySelectorAll('tspan')].filter(t => !t.querySelector('tspan')).map(t => t.textContent || '');
+    const label = (words.length ? words.join(' ') : node.textContent || '').replace(/\s+/g, ' ');
     const shapes = node.querySelectorAll(':scope > rect, :scope > polygon, :scope > path, :scope > circle, :scope > ellipse, :scope > g > rect, :scope > g > polygon, :scope > g > path');
     const isDecision = Boolean(node.querySelector('polygon')) || /question|diamond|rhombus/.test(node.getAttribute('class') || '');
     const toneKey = diagramTone(label, isDecision);
