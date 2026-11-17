@@ -21,26 +21,35 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
   /** Recarrega board e envios (nome de campanha e campanha nova vêm do board). */
   onNamesChanged?: () => Promise<void>;
 }) {
-  const [reviewRows, setReviewRows] = useState<Array<{ jornada: string; canais: string; campanha_sugerida: string }>>([]);
+  const [reviewRows, setReviewRows] = useState<Array<{ jornada: string; canais: string; campanha_sugerida: string; frente: string; status: string }>>([]);
   const [reviewSearch, setReviewSearch] = useState('');
   const [reviewPage, setReviewPage] = useState(0);
   const [reviewError, setReviewError] = useState('');
   const reviewTerm = reviewSearch.trim().toLocaleLowerCase('pt-BR');
   const filteredReview = reviewRows.filter(row =>
-    [row.jornada, row.campanha_sugerida, row.canais].some(value => value.toLocaleLowerCase('pt-BR').includes(reviewTerm))
+    [row.jornada, row.campanha_sugerida, row.canais, row.frente, row.status].some(value => value.toLocaleLowerCase('pt-BR').includes(reviewTerm))
   );
 
   async function loadReviewCsv(file: File) {
     try {
-      const parsed = Papa.parse<{ jornada: string; canais: string; campanha_sugerida: string }>(
-        await file.text(), { header: true, delimiter: ';', skipEmptyLines: 'greedy' }
-      );
+      const content = (await file.text()).replace(/^\uFEFF/, '');
+      const parsed = Papa.parse<Record<string, string>>(content, {
+        header: true,
+        delimiter: content.split(/\r?\n/, 1)[0].includes('\t') ? '\t' : ';',
+        skipEmptyLines: 'greedy',
+        transformHeader: value => value.trim().toLocaleLowerCase('pt-BR'),
+      });
       if (parsed.errors.length || !parsed.meta.fields?.includes('jornada')) throw new Error('Use o CSV com a coluna jornada.');
       const unique = new Map<string, typeof reviewRows[number]>();
       for (const row of parsed.data) {
         const journey = row.jornada?.trim();
+        const front = (row.frente || row['frente sugerida'] || '').trim().replace(/^Ativação de portifólio$/i, 'Ativação de portfólio');
+        const excluded = front.toLowerCase() === 'deixar de fora' || /excluída da visão operacional/i.test(row.status ?? '');
         if (journey) unique.set(journey, {
-          jornada: journey, canais: row.canais?.trim() ?? '', campanha_sugerida: row.campanha_sugerida?.trim() ?? '',
+          jornada: journey, canais: row.canais?.trim() ?? '', campanha_sugerida: (row.campanha_sugerida || row['campanha ou grupo'] || '').trim(),
+          frente: front.toLowerCase() === 'deixar de fora' ? '' : front,
+          status: excluded ? 'Excluída da visão operacional' : front.toLowerCase() === 'a classificar'
+            ? 'Em revisão' : /^ok$/i.test(row.status?.trim() ?? '') ? 'Validado' : row.status?.trim() || 'Em revisão',
         });
       }
       if (!unique.size) throw new Error('Nenhuma jornada encontrada no arquivo.');
@@ -56,6 +65,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
   const [onlyGap, setOnlyGap] = useState(false);
   const [showIn, setShowIn] = useState(false);
   const [moves, setMoves] = useState<Map<string, string>>(new Map());
+  const [openPillars, setOpenPillars] = useState<Set<string>>(new Set());
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [more, setMore] = useState<Set<string>>(new Set());
   const [over, setOver] = useState<string | null>(null);
@@ -244,12 +254,19 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
     const listOf = (it: ItemDef) => byItem.get(it.key) || [];
     const all = its.flatMap(listOf); const tot = all.reduce((a, x) => a + x.s, 0);
     const mix = RAW_ORDER.map(c => all.reduce((a, x) => a + (byJ.get(x.key) || []).filter(d => d.ch === c && d.day >= period.from && d.day <= period.to).reduce((s, d) => s + d.sent, 0), 0));
+    const pillarOpen = openPillars.has(p.key);
     cols.push(
       <div key={p.key} className="cz-mcol" style={{ ['--acc' as string]: p.accent }}>
-        <div className="cz-mH" data-mini={p.accent}><div className="r"><span className="ic"><PanelLeftClose /></span><span className="t">{p.title}</span><span className="cz-pn">{all.length}</span></div>
+        <button type="button" className="cz-mH w-full text-left" data-mini={p.accent} data-nopan
+          aria-expanded={pillarOpen} onClick={() => setOpenPillars(current => {
+            const next = new Set(current);
+            if (next.has(p.key)) next.delete(p.key);
+            else next.add(p.key);
+            return next;
+          })}><div className="r"><span className="ic"><PanelLeftClose /></span><span className="t">{p.title}</span><span className="cz-pn">{all.length}</span><ChevronDown size={14} className={pillarOpen ? "" : "-rotate-90"} /></div>
           <div className="s"><b>{all.length}</b> jornadas · <b>{fmtVol(tot)}</b> envios no período · {fronts.filter(Boolean).length} {fronts.filter(Boolean).length === 1 ? 'frente' : 'frentes'}</div>
-          <div className="bar">{mix.map((v, i) => (v ? <i key={i} style={{ flex: v, background: RAW_COLOR[RAW_ORDER[i]] }} /> : null))}</div></div>
-        {fronts.map(f => {
+          <div className="bar">{mix.map((v, i) => (v ? <i key={i} style={{ flex: v, background: RAW_COLOR[RAW_ORDER[i]] }} /> : null))}</div></button>
+        {pillarOpen && fronts.map(f => {
           const fk = p.key + '|' + f; const fIts = its.filter(it => (f ? it.front === f : !it.front || !p.fronts.includes(it.front)));
           const cards = fIts.filter(it => !it.isGroup).map(it => ({ it, l: listOf(it) })).sort((a, b) => (b.l[0]?.last ?? -2) - (a.l[0]?.last ?? -2));
           const buckets = fIts.filter(it => it.isGroup);
@@ -303,13 +320,15 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
         </div>
         <div className="max-h-64 overflow-auto">
           <table className="w-full text-left text-xs">
-            <thead><tr><th>Jornada</th><th>Canais</th><th>Campanha sugerida</th><th>Vínculo atual</th></tr></thead>
+            <thead><tr><th>Jornada</th><th>Canais</th><th>Frente proposta</th><th>Campanha ou grupo</th><th>Status proposto</th><th>Vínculo atual</th></tr></thead>
             <tbody>{filteredReview.slice(reviewPage * 25, (reviewPage + 1) * 25).map(row => {
               const info = model.journeyInfo.get(row.jornada);
               const linked = info && model.items.get(info.item);
               return <tr key={row.jornada} className="border-t">
                 <td className="py-1">{row.jornada}</td><td>{row.canais || '—'}</td>
-                <td>{row.campanha_sugerida || 'A definir'}</td><td>{linked?.label || 'Sem vínculo no recorte'}</td>
+                <td>{row.frente || 'A definir'}</td><td>{row.campanha_sugerida || 'A definir'}</td>
+                <td>{row.status}{row.status === 'Excluída da visão operacional' && <div>Conta no Consumo SFMC</div>}</td>
+                <td>{linked?.label || 'Sem vínculo no recorte'}</td>
               </tr>;
             })}</tbody>
           </table>
@@ -327,7 +346,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
         {!editable && <span className="cz-hint">Somente leitura</span>}
         <label className="cz-search">
           <span>Carregar lista para revisão</span>
-          <input type="file" accept=".csv,text/csv" onChange={event => {
+          <input type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" onChange={event => {
             const file = event.currentTarget.files?.[0];
             if (file) void loadReviewCsv(file);
             event.currentTarget.value = '';
@@ -338,8 +357,8 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
         <button className={`cz-sw${onlyGap ? ' on' : ''}`} onClick={() => setOnlyGap(!onlyGap)}><i />Só sem campanha</button>
         <button className={`cz-sw${showIn ? ' on' : ''}`} onClick={() => setShowIn(!showIn)}><i />Sem envio no período</button>
         <span className="cz-btngrp">
-          <button className="cz-btn" onClick={() => setClosed(new Set())}><Maximize2 />Expandir tudo</button>
-          <button className="cz-btn" onClick={() => setClosed(new Set(pillarDefs.flatMap(p => [...p.fronts, null].map(f => p.key + '|' + f))))}><Minimize2 />Recolher tudo</button>
+          <button className="cz-btn" onClick={() => { setOpenPillars(new Set(pillarDefs.map(p => p.key))); setClosed(new Set()); }}><Maximize2 />Expandir tudo</button>
+          <button className="cz-btn" onClick={() => setOpenPillars(new Set())}><Minimize2 />Recolher tudo</button>
         </span>
       </div>
       <div ref={vp.canvasRef} className={`cs-canvas cz-mcanvas${vp.panning ? ' panning' : ''}`} style={vp.gridStyle} {...vp.handlers}>
