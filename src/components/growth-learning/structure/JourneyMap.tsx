@@ -65,6 +65,7 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
   const [onlyGap, setOnlyGap] = useState(false);
   const [showIn, setShowIn] = useState(false);
   const [moves, setMoves] = useState<Map<string, string>>(new Map());
+  const [openPillars, setOpenPillars] = useState<Set<string>>(new Set());
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [more, setMore] = useState<Set<string>>(new Set());
   const [over, setOver] = useState<string | null>(null);
@@ -253,12 +254,19 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
     const listOf = (it: ItemDef) => byItem.get(it.key) || [];
     const all = its.flatMap(listOf); const tot = all.reduce((a, x) => a + x.s, 0);
     const mix = RAW_ORDER.map(c => all.reduce((a, x) => a + (byJ.get(x.key) || []).filter(d => d.ch === c && d.day >= period.from && d.day <= period.to).reduce((s, d) => s + d.sent, 0), 0));
+    const pillarOpen = openPillars.has(p.key);
     cols.push(
       <div key={p.key} className="cz-mcol" style={{ ['--acc' as string]: p.accent }}>
-        <div className="cz-mH" data-mini={p.accent}><div className="r"><span className="ic"><PanelLeftClose /></span><span className="t">{p.title}</span><span className="cz-pn">{all.length}</span></div>
+        <button type="button" className="cz-mH w-full text-left" data-mini={p.accent} data-nopan
+          aria-expanded={pillarOpen} onClick={() => setOpenPillars(current => {
+            const next = new Set(current);
+            if (next.has(p.key)) next.delete(p.key);
+            else next.add(p.key);
+            return next;
+          })}><div className="r"><span className="ic"><PanelLeftClose /></span><span className="t">{p.title}</span><span className="cz-pn">{all.length}</span><ChevronDown size={14} className={pillarOpen ? "" : "-rotate-90"} /></div>
           <div className="s"><b>{all.length}</b> jornadas · <b>{fmtVol(tot)}</b> envios no período · {fronts.filter(Boolean).length} {fronts.filter(Boolean).length === 1 ? 'frente' : 'frentes'}</div>
-          <div className="bar">{mix.map((v, i) => (v ? <i key={i} style={{ flex: v, background: RAW_COLOR[RAW_ORDER[i]] }} /> : null))}</div></div>
-        {fronts.map(f => {
+          <div className="bar">{mix.map((v, i) => (v ? <i key={i} style={{ flex: v, background: RAW_COLOR[RAW_ORDER[i]] }} /> : null))}</div></button>
+        {pillarOpen && fronts.map(f => {
           const fk = p.key + '|' + f; const fIts = its.filter(it => (f ? it.front === f : !it.front || !p.fronts.includes(it.front)));
           const cards = fIts.filter(it => !it.isGroup).map(it => ({ it, l: listOf(it) })).sort((a, b) => (b.l[0]?.last ?? -2) - (a.l[0]?.last ?? -2));
           const buckets = fIts.filter(it => it.isGroup);
@@ -349,8 +357,8 @@ export function JourneyMap({ model, period, perLabel, frOn, editable, onSaved, o
         <button className={`cz-sw${onlyGap ? ' on' : ''}`} onClick={() => setOnlyGap(!onlyGap)}><i />Só sem campanha</button>
         <button className={`cz-sw${showIn ? ' on' : ''}`} onClick={() => setShowIn(!showIn)}><i />Sem envio no período</button>
         <span className="cz-btngrp">
-          <button className="cz-btn" onClick={() => setClosed(new Set())}><Maximize2 />Expandir tudo</button>
-          <button className="cz-btn" onClick={() => setClosed(new Set(pillarDefs.flatMap(p => [...p.fronts, null].map(f => p.key + '|' + f))))}><Minimize2 />Recolher tudo</button>
+          <button className="cz-btn" onClick={() => { setOpenPillars(new Set(pillarDefs.map(p => p.key))); setClosed(new Set()); }}><Maximize2 />Expandir tudo</button>
+          <button className="cz-btn" onClick={() => setOpenPillars(new Set())}><Minimize2 />Recolher tudo</button>
         </span>
       </div>
       <div ref={vp.canvasRef} className={`cs-canvas cz-mcanvas${vp.panning ? ' panning' : ''}`} style={vp.gridStyle} {...vp.handlers}>
