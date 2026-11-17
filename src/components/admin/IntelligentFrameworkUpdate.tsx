@@ -3545,7 +3545,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             await nextFrame();
             await sleep(40);
             const mapping = await loadImportCampaigns().catch(() => null);
-            const mappedJourneys = new Set(mapping?.exactRentCards.keys());
+            const mappedJourneys = new Set<string>(mapping?.exactRentCards.keys());
             const processedResult = safeProcessDinamicaBI(matrix, activities, activeFlow, rentHistory, mappedJourneys);
             if (!processedResult.result) {
                 const debug = {
