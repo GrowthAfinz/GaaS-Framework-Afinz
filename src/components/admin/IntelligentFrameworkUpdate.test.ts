@@ -160,3 +160,20 @@ it('preserves both rentabilizacao journeys and their metrics when the dispatch s
         expect.objectContaining({ journey: 'JOR_RENT_COBRANCA_OUT26', delivered: 190, status: 'conflict', accepted: false }),
     ]));
 });
+
+it('reads descriptive activity names only for explicitly mapped rentabilizacao journeys', () => {
+    const journey = 'JOR_VBSS_PROMO_DO_MES';
+    const matrix = [
+        ['journeyname (e-mail)', 'activityname', 'DATA', 'Soma de Send', 'Soma de Delivered', 'Soma de Unique_Opens', 'Soma de Unique_Clicks'],
+        [journey, 'Promoção TEM Outubro 2026 VBSS', '16/10/2026', '101', '99', '20', '2'],
+        ['JOR_VBSS_TESTE', 'Descritivo sem vínculo', '16/10/2026', '3', '3', '1', '0'],
+    ];
+
+    const result = processRentabilizacaoDinamicaBI(matrix, undefined, new Set([journey.toLowerCase()]));
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+        journey, activityName: 'Promoção TEM Outubro 2026 VBSS',
+        sent: 101, delivered: 99, opens: 20, clicks: 2,
+    });
+});

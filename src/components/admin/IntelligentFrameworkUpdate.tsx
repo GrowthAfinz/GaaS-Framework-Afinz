@@ -147,8 +147,23 @@ async function loadImportCampaigns() {
         supabase.from('sfmc_consumo_rules').select('id,priority,pattern,front,card_id,group_label').order('priority'),
     ]);
     if (maps.error || rules.error) throw maps.error || rules.error;
+    const exactRentCards = new Map<string, string>();
+    const ambiguous = new Set<string>();
+    for (const card of board.cards) {
+        const scope = card.data_scope;
+        if (card.archived || scope?.domain !== 'renta') continue;
+        const rules = [scope.scope, ...(scope.any_of ?? [])];
+        for (const rule of rules) {
+            if (!rule?.journey || Object.keys(rule).length !== 1 || (scope.scope && Object.keys(scope.scope).some(field => field !== 'journey'))) continue;
+            const key = normalizeKey(rule.journey);
+            if (exactRentCards.has(key) && exactRentCards.get(key) !== card.id) ambiguous.add(key);
+            exactRentCards.set(key, card.id);
+        }
+    }
+    ambiguous.forEach(key => exactRentCards.delete(key));
     return {
         board,
+        exactRentCards,
         manual: new Map((maps.data ?? []).map(row => [row.journey, row])),
         rules: compileRules(rules.data ?? []),
     };
@@ -814,7 +829,8 @@ const readBlockRows = (
         assisted?: number;
         independent?: number;
         channel?: number;
-    }
+    },
+    mappedJourneys?: ReadonlySet<string>
 ) => {
     if (!start) return [];
     const rows: MetricRow[] = [];
@@ -822,7 +838,8 @@ const readBlockRows = (
     for (let row = start.row + 1; row < matrix.length; row += 1) {
         const rawJourney = getCell(matrix, row, start.col + offsets.journey);
         const activityName = getCell(matrix, row, start.col + offsets.activity);
-        const journey = canonicalAcquisitionJourney(rawJourney, activityName);
+        const explicitlyMapped = mappedJourneys?.has(normalizeKey(rawJourney));
+        const journey = explicitlyMapped ? rawJourney.trim() : canonicalAcquisitionJourney(rawJourney, activityName);
         const date = toDateKey(getCell(matrix, row, start.col + offsets.date));
         const rowChannel = offsets.channel !== undefined
             ? normalizeChannel(getCell(matrix, row, start.col + offsets.channel))
@@ -830,7 +847,7 @@ const readBlockRows = (
 
         if (!activityName && !journey && !date) continue;
         if (!activityName || !journey || !date || rowChannel === 'Indefinido') continue;
-        if (!looksLikeActivityName(activityName) || !looksLikeDate(getCell(matrix, row, start.col + offsets.date))) continue;
+        if ((!explicitlyMapped && !looksLikeActivityName(activityName)) || !looksLikeDate(getCell(matrix, row, start.col + offsets.date))) continue;
 
         const key = buildNoveltyKey(journey, activityName, rowChannel, date);
         const dispatchSignature = buildDispatchSignature(activityName, rowChannel, date);
@@ -2295,7 +2312,7 @@ const buildRentabilizacaoCandidate = (
     };
 };
 
-export const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex = emptyRentHistoryIndex()): ProcessResult => {
+export const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex = emptyRentHistoryIndex(), mappedJourneys?: ReadonlySet<string>): ProcessResult => {
     const warnings: string[] = [];
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
     const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
@@ -2304,16 +2321,16 @@ export const processRentabilizacaoDinamicaBI = (matrix: string[][], history: Ren
 
     const whatsappRows = readBlockRows(matrix, whatsappStart, 'rentabilizacao', 'WhatsApp', 'whatsapp', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5,
-    });
+    }, mappedJourneys);
     const emailRows = readBlockRows(matrix, emailStart, 'rentabilizacao', 'E-mail', 'email', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5, clicks: 6,
-    });
+    }, mappedJourneys);
     const smsRows = readBlockRows(matrix, smsStart, 'rentabilizacao', 'SMS', 'sms', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
-    });
+    }, mappedJourneys);
     const pushRows = readBlockRows(matrix, pushStart, 'rentabilizacao', 'Push', 'push', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
-    });
+    }, mappedJourneys);
 
     const blocks: BlockSummary[] = [
         { key: 'whatsapp', label: 'WhatsApp', detected: Boolean(whatsappStart), rows: whatsappRows.length },
@@ -2500,10 +2517,11 @@ const mergeBlockSummaries = (left: BlockSummary[], right: BlockSummary[]): Block
 const processTotalCrmDinamicaBI = (
     matrix: string[][],
     activities: Activity[],
-    rentHistory: RentHistoryIndex
+    rentHistory: RentHistoryIndex,
+    mappedJourneys?: ReadonlySet<string>
 ): ProcessResult => {
     const aquisicao = processDinamicaBI(matrix, activities);
-    const rentabilizacao = processRentabilizacaoDinamicaBI(matrix, rentHistory);
+    const rentabilizacao = processRentabilizacaoDinamicaBI(matrix, rentHistory, mappedJourneys);
     const candidates = [...aquisicao.candidates, ...rentabilizacao.candidates]
         .sort((a, b) =>
             a.date.localeCompare(b.date)
@@ -2602,14 +2620,15 @@ const safeProcessDinamicaBI = (
     matrix: string[][],
     activities: Activity[],
     domain: UpdateFlow,
-    rentHistory: RentHistoryIndex
+    rentHistory: RentHistoryIndex,
+    mappedJourneys?: ReadonlySet<string>
 ): { result: ProcessResult | null; error?: ParseDebugInfo } => {
     try {
         return {
             result: domain === 'total_crm'
-                ? processTotalCrmDinamicaBI(matrix, activities, rentHistory)
+                ? processTotalCrmDinamicaBI(matrix, activities, rentHistory, mappedJourneys)
                 : domain === 'rentabilizacao'
-                    ? processRentabilizacaoDinamicaBI(matrix, rentHistory)
+                    ? processRentabilizacaoDinamicaBI(matrix, rentHistory, mappedJourneys)
                     : processDinamicaBI(matrix, activities),
         };
     } catch (error: any) {
@@ -3256,11 +3275,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         return new Map(candidates.map(candidate => {
             const manual = importMapping?.manual.get(candidate.journey || candidate.activityName);
             const rule = manual ?? (importMapping && classify(candidate.journey, candidate.activityName, importMapping.rules));
-            const card = rule?.card_id ? cards.get(rule.card_id) : undefined;
+            const exactCardId = importMapping?.exactRentCards.get(normalizeKey(candidate.journey));
+            const cardId = manual ? manual.card_id : exactCardId || rule?.card_id;
+            const card = cardId ? cards.get(cardId) : undefined;
             const front = rule?.front || pillars.get(lanes.get(card?.lane_id ?? '')?.pillar_id ?? '') || '';
             const title = card?.title || rule?.group_label || front || 'Sem campanha mapeada';
             const key = card?.id || JSON.stringify([front, title]);
-            return [candidate.key, { key, title, front, origin: manual ? 'Vínculo aprovado' : rule?.card_id ? 'Regra do Consumo SFMC' : '' }] as const;
+            return [candidate.key, { key, title, front, origin: manual ? 'Vínculo aprovado' : exactCardId ? 'Vínculo no Board Campanhas' : rule?.card_id ? 'Regra do Consumo SFMC' : '' }] as const;
         }));
     }, [candidates, importMapping]);
     const visibleCampaignCandidates = useMemo(() => candidates.filter(candidate =>
@@ -3517,13 +3538,15 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     const historyRows = await intelligentUpdateService.fetchDomainHistory('rentabilizacao');
                     rentHistory = buildRentHistoryIndex(historyRows);
                 } catch (fetchError) {
-                    console.warn('[Atualizacao Inteligente] Falha ao carregar historico de rentabilizacao', fetchError);
+                    throw new Error('Não foi possível conferir o histórico de Rentabilização. Tente carregar o arquivo novamente.');
                 }
             }
             setProcessingStage('detecting');
             await nextFrame();
             await sleep(40);
-            const processedResult = safeProcessDinamicaBI(matrix, activities, activeFlow, rentHistory);
+            const mapping = await loadImportCampaigns().catch(() => null);
+            const mappedJourneys = new Set(mapping?.exactRentCards.keys());
+            const processedResult = safeProcessDinamicaBI(matrix, activities, activeFlow, rentHistory, mappedJourneys);
             if (!processedResult.result) {
                 const debug = {
                     ...processedResult.error,
@@ -3541,7 +3564,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setProcessingStage('reviewing');
             await nextFrame();
             await sleep(40);
-            const mapping = await loadImportCampaigns().catch(() => null);
             setImportMapping(mapping);
             setMappingUnavailable(mapping === null);
             setReviewCampaign('');
