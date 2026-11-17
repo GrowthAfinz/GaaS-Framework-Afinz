@@ -3,7 +3,7 @@ import type { Activity } from '../../types/framework';
 vi.mock('../../store/useAppStore', () => ({ useAppStore: vi.fn() }));
 vi.mock('../../services/dataService', () => ({ dataService: {} }));
 vi.mock('../../services/intelligentUpdateService', () => ({ intelligentUpdateService: {} }));
-import { processDinamicaBI } from './IntelligentFrameworkUpdate';
+import { processDinamicaBI, processRentabilizacaoDinamicaBI } from './IntelligentFrameworkUpdate';
 
 const activityName = 'plu_car_plx_aqs_wpp_car_carrinho21dplurix_20260924';
 const header = ['journeyname (whatsapp)', 'activity_name', 'Date', 'sent', 'delivered', 'read',
@@ -27,6 +27,21 @@ describe('intelligent importer cart audience and BI aliases', () => {
         const c = processDinamicaBI([header,external],[]).candidates[0];
         expect(c).toMatchObject({ finalized:31, assisted:0, independent:0 });
     });
+    it('does not attach opt-out performance from another safra to the only available dispatch', () => {
+        const name = 'afz_car_vis_aqs_wpp_apr_resposta_optout_pontual';
+        const september = 'JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_SET26';
+        const october = 'JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_OUT26';
+        const source = row(september, name);
+        source[6] = october;
+
+        const result = processDinamicaBI([header, source], []);
+
+        expect(result.candidates).toHaveLength(1);
+        expect(result.candidates[0].journey).toBe(september);
+        expect(result.candidates[0].finalized).toBeUndefined();
+        expect(result.insights.orphanPerformanceRows).toBe(1);
+    });
+
     it('keeps standard opt-out replies separate across journeys, including similar names', () => {
         const name = 'afz_car_vis_aqs_wpp_apr_resposta_optout_pontual';
         const j1 = 'JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_SET26';
@@ -128,5 +143,37 @@ describe('intelligent importer cart audience and BI aliases', () => {
         const b = processDinamicaBI([header, row(b2c, b2cName)], []).candidates[0];
         expect(b.subgrupo).toBe('Abandonados D-21 A D>7');
         expect(b.status).not.toBe('conflict');
+    });
+});
+
+it('preserves both rentabilizacao journeys and their metrics when the dispatch signature collides', () => {
+    const result = processRentabilizacaoDinamicaBI([
+        ['journeyname (whatsapp)', 'activity_name', 'Date', 'sent', 'delivered', 'read'],
+        ['JOR_RENT_COBRANCA_SET26', 'cobranca_wpp', '25/09/2026', '100', '95', '50'],
+        ['JOR_RENT_COBRANCA_OUT26', 'cobranca_wpp', '25/09/2026', '200', '190', '80'],
+    ]);
+
+    expect(result.candidates).toHaveLength(2);
+    expect(new Set(result.candidates.map(candidate => candidate.key)).size).toBe(2);
+    expect(result.candidates).toEqual(expect.arrayContaining([
+        expect.objectContaining({ journey: 'JOR_RENT_COBRANCA_SET26', delivered: 95, status: 'conflict', accepted: false }),
+        expect.objectContaining({ journey: 'JOR_RENT_COBRANCA_OUT26', delivered: 190, status: 'conflict', accepted: false }),
+    ]));
+});
+
+it('reads descriptive activity names only for explicitly mapped rentabilizacao journeys', () => {
+    const journey = 'JOR_VBSS_PROMO_DO_MES';
+    const matrix = [
+        ['journeyname (e-mail)', 'activityname', 'DATA', 'Soma de Send', 'Soma de Delivered', 'Soma de Unique_Opens', 'Soma de Unique_Clicks'],
+        [journey, 'Promoção TEM Outubro 2026 VBSS', '16/10/2026', '101', '99', '20', '2'],
+        ['JOR_VBSS_TESTE', 'Descritivo sem vínculo', '16/10/2026', '3', '3', '1', '0'],
+    ];
+
+    const result = processRentabilizacaoDinamicaBI(matrix, undefined, new Set([journey.toLowerCase()]));
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+        journey, activityName: 'Promoção TEM Outubro 2026 VBSS',
+        sent: 101, delivered: 99, opens: 20, clicks: 2,
     });
 });

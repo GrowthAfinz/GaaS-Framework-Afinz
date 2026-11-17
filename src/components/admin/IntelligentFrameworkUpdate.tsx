@@ -1,3 +1,6 @@
+import { loadStructure } from '../growth-learning/structure/structureService';
+import { supabase } from '../../services/supabaseClient';
+import { classify, compileRules } from '../growth-learning/structure/consumoModel';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Papa from 'papaparse';
@@ -135,6 +138,35 @@ interface MetricRow {
     assisted?: number;
     independent?: number;
     dispatchSignature: string;
+}
+
+async function loadImportCampaigns() {
+    const [board, maps, rules] = await Promise.all([
+        loadStructure(),
+        supabase.from('sfmc_journey_map').select('journey,card_id,front,group_label').order('journey'),
+        supabase.from('sfmc_consumo_rules').select('id,priority,pattern,front,card_id,group_label').order('priority'),
+    ]);
+    if (maps.error || rules.error) throw maps.error || rules.error;
+    const exactRentCards = new Map<string, string>();
+    const ambiguous = new Set<string>();
+    for (const card of board.cards) {
+        const scope = card.data_scope;
+        if (card.archived || scope?.domain !== 'renta') continue;
+        const rules = [scope.scope, ...(scope.any_of ?? [])];
+        for (const rule of rules) {
+            if (!rule?.journey || Object.keys(rule).length !== 1 || (scope.scope && Object.keys(scope.scope).some(field => field !== 'journey'))) continue;
+            const key = normalizeKey(rule.journey);
+            if (exactRentCards.has(key) && exactRentCards.get(key) !== card.id) ambiguous.add(key);
+            exactRentCards.set(key, card.id);
+        }
+    }
+    ambiguous.forEach(key => exactRentCards.delete(key));
+    return {
+        board,
+        exactRentCards,
+        manual: new Map((maps.data ?? []).map(row => [row.journey, row])),
+        rules: compileRules(rules.data ?? []),
+    };
 }
 
 interface UpdateCandidate extends MetricRow {
@@ -797,7 +829,8 @@ const readBlockRows = (
         assisted?: number;
         independent?: number;
         channel?: number;
-    }
+    },
+    mappedJourneys?: ReadonlySet<string>
 ) => {
     if (!start) return [];
     const rows: MetricRow[] = [];
@@ -805,7 +838,8 @@ const readBlockRows = (
     for (let row = start.row + 1; row < matrix.length; row += 1) {
         const rawJourney = getCell(matrix, row, start.col + offsets.journey);
         const activityName = getCell(matrix, row, start.col + offsets.activity);
-        const journey = canonicalAcquisitionJourney(rawJourney, activityName);
+        const explicitlyMapped = mappedJourneys?.has(normalizeKey(rawJourney));
+        const journey = explicitlyMapped ? rawJourney.trim() : canonicalAcquisitionJourney(rawJourney, activityName);
         const date = toDateKey(getCell(matrix, row, start.col + offsets.date));
         const rowChannel = offsets.channel !== undefined
             ? normalizeChannel(getCell(matrix, row, start.col + offsets.channel))
@@ -813,7 +847,7 @@ const readBlockRows = (
 
         if (!activityName && !journey && !date) continue;
         if (!activityName || !journey || !date || rowChannel === 'Indefinido') continue;
-        if (!looksLikeActivityName(activityName) || !looksLikeDate(getCell(matrix, row, start.col + offsets.date))) continue;
+        if ((!explicitlyMapped && !looksLikeActivityName(activityName)) || !looksLikeDate(getCell(matrix, row, start.col + offsets.date))) continue;
 
         const key = buildNoveltyKey(journey, activityName, rowChannel, date);
         const dispatchSignature = buildDispatchSignature(activityName, rowChannel, date);
@@ -1366,41 +1400,6 @@ const collapseAbandonedCartDuplicates = (rows: MetricRow[]) => {
     return [...result, ...grouped.values()];
 };
 
-const rentRenamedJourneyScore = (row: MetricRow) => {
-    const journeyKey = normalizeKey(row.journey);
-    let score = journeyPeriodRank(row.journey) * 10;
-    if (journeyKey.includes('teste')) score -= 100000;
-    if (hasDispatchVolume(row)) score += 5;
-    if (hasConversionMetric(row) || hasEngagementMetric(row)) score += 2;
-    return score;
-};
-
-const collapseRentRenamedDuplicates = (rows: MetricRow[]) => {
-    const groups = new Map<string, MetricRow[]>();
-    rows.forEach((row) => {
-        const list = groups.get(row.dispatchSignature);
-        if (list) list.push(row); else groups.set(row.dispatchSignature, [row]);
-    });
-
-    const result: MetricRow[] = [];
-    groups.forEach((group) => {
-        const uniqueJourneys = Array.from(new Set(group.map((row) => normalizeKey(row.journey)).filter(Boolean)));
-        if (uniqueJourneys.length <= 1) {
-            result.push(...group);
-            return;
-        }
-
-        const ranked = [...group].sort((left, right) => {
-            const scoreDiff = rentRenamedJourneyScore(right) - rentRenamedJourneyScore(left);
-            if (scoreDiff !== 0) return scoreDiff;
-            return normalizeKey(right.journey).localeCompare(normalizeKey(left.journey));
-        });
-        const winnerJourney = normalizeKey(ranked[0]?.journey);
-        result.push(...group.filter((row) => normalizeKey(row.journey) === winnerJourney));
-    });
-    return result;
-};
-
 const propagateGroupEmissions = (candidates: UpdateCandidate[]): UpdateCandidate[] => {
     const groups = new Map<string, UpdateCandidate[]>();
     candidates.forEach((candidate) => {
@@ -1448,8 +1447,10 @@ const buildCandidate = (
     const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
     const importedJourneys = importedSignatureJourneys.get(metric.dispatchSignature) ?? new Set<string>();
     const historicalSignatureMatches = historyIndex.byDispatchSignature.get(metric.dispatchSignature) ?? [];
-    const compatibleHistoricalMatches = historicalSignatureMatches.filter(
-        (activity) => isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
+    const compatibleHistoricalMatches = historicalSignatureMatches.filter(activity =>
+        isStandardOptOutResponse(metric.activityName)
+            ? normalizeKey(metric.journey) === normalizeKey(canonicalActivityJourney(activity))
+            : isSameJourneyFamily(metric.journey, canonicalActivityJourney(activity))
     );
     const renamedHistoricalMatches = compatibleHistoricalMatches.length > 0 || isStandardOptOutResponse(metric.activityName)
         ? []
@@ -1526,7 +1527,7 @@ const buildCandidate = (
     // (antigo + novo). Elege a jornada canonica; as demais viram conflito.
     const fileJourneys = Array.from(new Set([metric.journey, ...Array.from(importedJourneys)])).filter(journey =>
         Boolean(journey) && (!isStandardOptOutResponse(metric.activityName)
-            || acquisitionJourneyIdentity(journey) === acquisitionJourneyIdentity(metric.journey)));
+            || normalizeKey(journey) === normalizeKey(metric.journey)));
     const canonicalRoles = electCanonicalJourney(fileJourneys, historyIndex.knownJourneys, metric.activityName);
     const myRole = canonicalRoles.get(normalizeKey(metric.journey));
     const fileSuperseded = myRole === 'superseded';
@@ -1835,6 +1836,17 @@ const consolidateOperationalRows = (dispatchRows: MetricRow[], performanceRows: 
             .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
             .filter((item) => item.diff >= 0 && item.diff <= 2);
 
+        // A resposta padrão é reutilizada. Só vincula métricas à execução da mesma
+        // jornada, incluindo a safra do nome, quando há uma âncora inequívoca.
+        if (isStandardOptOutResponse(row.activityName)) {
+            const journey = normalizeKey(row.journey);
+            if (!journey) return undefined;
+            const exact = candidates.filter(item => normalizeKey(item.candidate.journey) === journey);
+            const sameDay = exact.filter(item => item.diff === 0);
+            if (sameDay.length === 1) return sameDay[0].candidate;
+            return sameDay.length === 0 && exact.length === 1 ? exact[0].candidate : undefined;
+        }
+
         // Preferir ancora com a MESMA jornada do PERF. Sem isso, quando o BI duplica
         // a mesma activity+canal+data em jornadas diferentes (ex: ABRI26 e MAIO26),
         // todas as linhas PERF caem na primeira ancora e a jornada canonica fica com
@@ -2059,7 +2071,7 @@ interface RentHistoryIndex {
     byToken: Map<string, SuggestionBucket>;
     global: SuggestionBucket;
     existingSignatures: Set<string>;
-    bySignature: Map<string, Record<string, any>>;
+    bySignature: Map<string, Record<string, any>[]>;
     rowCount: number;
 }
 
@@ -2112,7 +2124,9 @@ const buildRentHistoryIndex = (rows: Array<Record<string, any>>): RentHistoryInd
         const taxonomy = inferRentabilizacaoContext(journey, activityName);
         const dispatchSignature = buildDispatchSignature(activityName, rawCanal, row['Data de Disparo']);
         index.existingSignatures.add(dispatchSignature);
-        if (!index.bySignature.has(dispatchSignature)) index.bySignature.set(dispatchSignature, row);
+        const matches = index.bySignature.get(dispatchSignature) ?? [];
+        matches.push(row);
+        index.bySignature.set(dispatchSignature, matches);
         if (journeyKey) {
             addRawRowToBucket(bucketFor(index.byJourneyChannel, `${journeyKey}|${channel}`), row);
             addRawRowToBucket(bucketFor(index.byJourney, journeyKey), row);
@@ -2217,14 +2231,20 @@ const suggestRentFields = (
 
 const buildRentabilizacaoCandidate = (
     metric: MetricRow,
-    importedKeyCount: Map<string, number>,
+    importedJourneys: Map<string, Set<string>>,
     history: RentHistoryIndex
 ): UpdateCandidate => {
     const taxonomy = inferRentabilizacaoTaxonomy(metric);
     const fieldSuggestions = suggestRentFields(metric, history, taxonomy);
-    const duplicateCount = importedKeyCount.get(metric.key) ?? 0;
+    const historicalRows = history.bySignature.get(metric.dispatchSignature) ?? [];
+    const conflictJourneys = [...new Set([
+        ...(importedJourneys.get(metric.dispatchSignature) ?? []),
+        ...historicalRows.map(row => String(row.jornada ?? '').trim()),
+    ].filter(journey => journey && normalizeKey(journey) !== normalizeKey(metric.journey)))];
+    const hasCollision = conflictJourneys.length > 0 || historicalRows.length > 1
+        || historicalRows.some(row => !normalizeKey(row.jornada));
     // Ja existe na tabela rentabilizacao_activities (mesma activity+canal+data)?
-    const existingRow = history.bySignature.get(metric.dispatchSignature);
+    const existingRow = hasCollision ? undefined : historicalRows[0];
     const existsInBase = Boolean(existingRow);
     const refreshDetails = rentMetricRefreshDetails(metric, existingRow);
     const hasMetricRefresh = refreshDetails.length > 0;
@@ -2232,8 +2252,8 @@ const buildRentabilizacaoCandidate = (
     const missingDispatchVolume = !hasDispatchVolume(metric);
     const status: CandidateStatus = missingCritical
         ? 'error'
-        : duplicateCount > 1
-            ? 'duplicate'
+        : hasCollision
+            ? 'conflict'
             : missingDispatchVolume
                 ? 'ignored'
                 : existsInBase
@@ -2247,8 +2267,8 @@ const buildRentabilizacaoCandidate = (
         matchCount: 0,
         fieldToReview: missingCritical
             ? 'Chave'
-            : duplicateCount > 1
-                ? 'Duplicidade'
+            : hasCollision
+                ? 'Jornada em conflito'
                 : missingDispatchVolume
                     ? 'Disparo sem volume acionavel'
                     : existsInBase
@@ -2262,8 +2282,8 @@ const buildRentabilizacaoCandidate = (
         confidence: hasMetricRefresh ? 100 : status === 'ready' ? 86 : 0,
         basis: missingCritical
             ? 'journey, canal ou data ausente'
-            : duplicateCount > 1
-                ? 'mais de uma linha no arquivo com a mesma chave'
+            : hasCollision
+                ? 'Mesma Activity, canal e data em jornadas diferentes'
                 : missingDispatchVolume
                     ? 'Base Total e Base Acionavel precisam ser maiores que zero'
                     : existsInBase
@@ -2285,13 +2305,14 @@ const buildRentabilizacaoCandidate = (
         promocional: taxonomy.promocional ?? 'N/A',
         ordemDisparo: inferOrdemDisparo(metric.activityName),
         suggestions: fieldSuggestions,
-        conflictJourneys: [],
-        conflictReason: undefined,
+        conflictJourneys,
+        conflictReason: hasCollision ? 'Confirmar a identidade do disparo antes de aplicar.' : undefined,
+        auditRequired: hasCollision,
         metricRefresh: hasMetricRefresh,
     };
 };
 
-const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex): ProcessResult => {
+export const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex = emptyRentHistoryIndex(), mappedJourneys?: ReadonlySet<string>): ProcessResult => {
     const warnings: string[] = [];
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
     const emailStart = findCell(matrix, ['journeyname (e-mail)', 'journeyname (email)']);
@@ -2300,16 +2321,16 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
 
     const whatsappRows = readBlockRows(matrix, whatsappStart, 'rentabilizacao', 'WhatsApp', 'whatsapp', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5,
-    });
+    }, mappedJourneys);
     const emailRows = readBlockRows(matrix, emailStart, 'rentabilizacao', 'E-mail', 'email', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4, opens: 5, clicks: 6,
-    });
+    }, mappedJourneys);
     const smsRows = readBlockRows(matrix, smsStart, 'rentabilizacao', 'SMS', 'sms', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
-    });
+    }, mappedJourneys);
     const pushRows = readBlockRows(matrix, pushStart, 'rentabilizacao', 'Push', 'push', {
         journey: 0, activity: 1, date: 2, sent: 3, delivered: 4,
-    });
+    }, mappedJourneys);
 
     const blocks: BlockSummary[] = [
         { key: 'whatsapp', label: 'WhatsApp', detected: Boolean(whatsappStart), rows: whatsappRows.length },
@@ -2325,31 +2346,20 @@ const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistor
         warnings.push(`${ignoredOutOfScope} linhas JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo rentabilizacao.`);
     }
 
-    const canonicalRows = collapseRentRenamedDuplicates(scopedRows);
-    const collapsedRenamedRows = scopedRows.length - canonicalRows.length;
-    if (collapsedRenamedRows > 0) {
-        warnings.push(`${collapsedRenamedRows} linhas de rentabilizacao foram consolidadas por renomeacao de jornada.`);
-    }
-
     const metricMap = new Map<string, MetricRow>();
-    canonicalRows.forEach((row) => {
+    const importedJourneys = new Map<string, Set<string>>();
+    for (const row of scopedRows) {
+        const journeys = importedJourneys.get(row.dispatchSignature) ?? new Set<string>();
+        journeys.add(row.journey);
+        importedJourneys.set(row.dispatchSignature, journeys);
         mergeMetric(metricMap, {
             ...row,
-            key: row.dispatchSignature,
+            key: JSON.stringify([row.dispatchSignature, normalizeKey(row.journey)]),
         });
-    });
+    }
     const metrics = Array.from(metricMap.values());
-    const importedSignatureJourneys = canonicalRows.reduce((map, row) => {
-        if (!map.has(row.dispatchSignature)) map.set(row.dispatchSignature, new Set<string>());
-        map.get(row.dispatchSignature)!.add(normalizeKey(row.journey));
-        return map;
-    }, new Map<string, Set<string>>());
-    const importedKeyCount = Array.from(importedSignatureJourneys.entries()).reduce((map, [signature, journeys]) => {
-        map.set(signature, journeys.size);
-        return map;
-    }, new Map<string, number>());
     const candidates = metrics
-        .map((row) => buildRentabilizacaoCandidate(row, importedKeyCount, history))
+        .map(row => buildRentabilizacaoCandidate(row, importedJourneys, history))
         .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status));
     const ignoredExisting = candidates.filter((candidate) => candidate.status === 'ignored').length;
     const tsv = candidates
@@ -2507,10 +2517,11 @@ const mergeBlockSummaries = (left: BlockSummary[], right: BlockSummary[]): Block
 const processTotalCrmDinamicaBI = (
     matrix: string[][],
     activities: Activity[],
-    rentHistory: RentHistoryIndex
+    rentHistory: RentHistoryIndex,
+    mappedJourneys?: ReadonlySet<string>
 ): ProcessResult => {
     const aquisicao = processDinamicaBI(matrix, activities);
-    const rentabilizacao = processRentabilizacaoDinamicaBI(matrix, rentHistory);
+    const rentabilizacao = processRentabilizacaoDinamicaBI(matrix, rentHistory, mappedJourneys);
     const candidates = [...aquisicao.candidates, ...rentabilizacao.candidates]
         .sort((a, b) =>
             a.date.localeCompare(b.date)
@@ -2609,14 +2620,15 @@ const safeProcessDinamicaBI = (
     matrix: string[][],
     activities: Activity[],
     domain: UpdateFlow,
-    rentHistory: RentHistoryIndex
+    rentHistory: RentHistoryIndex,
+    mappedJourneys?: ReadonlySet<string>
 ): { result: ProcessResult | null; error?: ParseDebugInfo } => {
     try {
         return {
             result: domain === 'total_crm'
-                ? processTotalCrmDinamicaBI(matrix, activities, rentHistory)
+                ? processTotalCrmDinamicaBI(matrix, activities, rentHistory, mappedJourneys)
                 : domain === 'rentabilizacao'
-                    ? processRentabilizacaoDinamicaBI(matrix, rentHistory)
+                    ? processRentabilizacaoDinamicaBI(matrix, rentHistory, mappedJourneys)
                     : processDinamicaBI(matrix, activities),
         };
     } catch (error: any) {
@@ -3221,7 +3233,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setFlowChooserOpen(false);
     }, [activeFlow]);
 
-    const candidates = result?.candidates ?? [];
+    const candidates = useMemo(() => result?.candidates ?? [], [result]);
     const activeCandidates = candidates.filter((candidate) => candidate.status !== 'ignored');
     const isRentReview = (result?.domain ?? activeFlow) === 'rentabilizacao';
     // A tabela permanece compacta, mas o drawer permite revisar todas as dimensoes
@@ -3250,12 +3262,100 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         return Math.round(measurable.reduce((sum, candidate) => sum + candidate.confidence, 0) / measurable.length);
     }, [activeCandidates]);
 
+    const [importMapping, setImportMapping] = useState<Awaited<ReturnType<typeof loadImportCampaigns>> | null>(null);
+    const [mappingUnavailable, setMappingUnavailable] = useState(false);
+    const [reviewCampaign, setReviewCampaign] = useState('');
+    const [reviewJourney, setReviewJourney] = useState('');
+    const [reviewChannel, setReviewChannel] = useState('');
+    const [reviewFront, setReviewFront] = useState('');
+    const campaignByCandidate = useMemo(() => {
+        const cards = new Map(importMapping?.board.cards.filter(card => !card.archived).map(card => [card.id, card]));
+        const lanes = new Map(importMapping?.board.lanes.map(lane => [lane.id, lane]));
+        const pillars = new Map(importMapping?.board.pillars.map(pillar => [pillar.id, pillar.title]));
+        return new Map(candidates.map(candidate => {
+            const manual = importMapping?.manual.get(candidate.journey || candidate.activityName);
+            const rule = manual ?? (importMapping && classify(candidate.journey, candidate.activityName, importMapping.rules));
+            const exactCardId = importMapping?.exactRentCards.get(normalizeKey(candidate.journey));
+            const cardId = manual ? manual.card_id : exactCardId || rule?.card_id;
+            const card = cardId ? cards.get(cardId) : undefined;
+            const front = rule?.front || pillars.get(lanes.get(card?.lane_id ?? '')?.pillar_id ?? '') || '';
+            const title = card?.title || rule?.group_label || front || 'Sem campanha mapeada';
+            const key = card?.id || JSON.stringify([front, title]);
+            return [candidate.key, { key, title, front, origin: manual ? 'Vínculo aprovado' : exactCardId ? 'Vínculo no Board Campanhas' : rule?.card_id ? 'Regra do Consumo SFMC' : '' }] as const;
+        }));
+    }, [candidates, importMapping]);
+    const visibleCampaignCandidates = useMemo(() => candidates.filter(candidate =>
+        (!reviewCampaign || campaignByCandidate.get(candidate.key)?.key === reviewCampaign)
+        && (!reviewJourney || candidate.journey === reviewJourney)
+        && (!reviewChannel || candidate.channel === reviewChannel)
+        && (!reviewFront || campaignByCandidate.get(candidate.key)?.front === reviewFront)
+    ), [candidates, campaignByCandidate, reviewCampaign, reviewJourney, reviewChannel, reviewFront]);
+    const campaignRows = useMemo(() => {
+        const groups = new Map<string, { title: string; front: string; rows: UpdateCandidate[] }>();
+        for (const candidate of candidates) {
+            const campaign = campaignByCandidate.get(candidate.key)!;
+            const group = groups.get(campaign.key) ?? { ...campaign, rows: [] };
+            group.rows.push(candidate);
+            groups.set(campaign.key, group);
+        }
+        return [...groups].sort(([, a], [, b]) => a.title.localeCompare(b.title, 'pt-BR'));
+    }, [candidates, campaignByCandidate]);
+    const [reviewCollision, setReviewCollision] = useState('');
+    const collisionGroups = useMemo(() => {
+        const occurrences = new Map<string, UpdateCandidate[]>();
+        const candidatesByJourney = new Map<string, UpdateCandidate[]>();
+        for (const candidate of candidates) {
+            if (candidate.domain !== 'rentabilizacao') continue;
+            const journeyKey = JSON.stringify([candidate.channel, candidate.journey]);
+            const journeyRows = candidatesByJourney.get(journeyKey) ?? [];
+            journeyRows.push(candidate);
+            candidatesByJourney.set(journeyKey, journeyRows);
+            if (candidate.status !== 'conflict') continue;
+            const rows = occurrences.get(candidate.dispatchSignature) ?? [];
+            rows.push(candidate);
+            occurrences.set(candidate.dispatchSignature, rows);
+        }
+        const groups = new Map<string, {
+            channel: Channel; journeys: string[]; occurrences: number; equal: number;
+            keys: Set<string>; activities: Set<string>; sample: UpdateCandidate[]; first: string; last: string;
+        }>();
+        for (const rows of occurrences.values()) {
+            const channel = rows[0].channel;
+            const journeys = [...new Set(rows.flatMap(row => [row.journey, ...(row.conflictJourneys ?? [])]))].sort();
+            const key = JSON.stringify([channel, journeys]);
+            const group = groups.get(key) ?? {
+                channel, journeys, occurrences: 0, equal: 0, keys: new Set<string>(),
+                activities: new Set<string>(), sample: rows, first: rows[0].date, last: rows[0].date,
+            };
+            const metrics = new Set(rows.map(row => JSON.stringify([row.sent, row.delivered, row.opens, row.clicks])));
+            group.occurrences += 1;
+            if (rows.length === journeys.length && rows.length > 1 && metrics.size === 1) group.equal += 1;
+            for (const row of rows) {
+                group.keys.add(row.key);
+                group.activities.add(row.activityName);
+            }
+            if (rows[0].date < group.first) group.first = rows[0].date;
+            if (rows[0].date > group.last) group.last = rows[0].date;
+            groups.set(key, group);
+        }
+        return [...groups].map(([key, group]) => ({
+            key, ...group,
+            exclusive: group.journeys.map(journey => ({
+                journey,
+                count: (candidatesByJourney.get(JSON.stringify([group.channel, journey])) ?? []).filter(row =>
+                    group.activities.has(row.activityName) && !occurrences.has(row.dispatchSignature)
+                ).length,
+            })),
+        })).sort((a, b) => b.occurrences - a.occurrences);
+    }, [candidates]);
+    const activeCollision = collisionGroups.find(group => group.key === reviewCollision);
     const filteredCandidates = useMemo(() => {
         const term = normalizeKey(reviewSearchTerm);
         const [periodStart, periodEnd] = reviewStartDate && reviewEndDate && reviewStartDate > reviewEndDate
             ? [reviewEndDate, reviewStartDate]
             : [reviewStartDate, reviewEndDate];
-        return candidates.filter((candidate) => {
+        if (activeCollision) return candidates.filter(candidate => activeCollision.keys.has(candidate.key));
+        return visibleCampaignCandidates.filter((candidate) => {
             const statusMatches = candidateFilterKey(candidate) === statusFilter;
             if (!statusMatches) return false;
             if (periodStart && candidate.date < periodStart) return false;
@@ -3263,6 +3363,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             if (!term) return true;
 
             const haystack = normalizeKey([
+                campaignByCandidate.get(candidate.key)?.title,
+                campaignByCandidate.get(candidate.key)?.front,
+                ...(candidate.conflictJourneys ?? []),
                 candidate.journey,
                 candidate.activityName,
                 candidate.channel,
@@ -3275,7 +3378,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
             return haystack.includes(term);
         });
-    }, [candidates, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
+    }, [candidates, visibleCampaignCandidates, activeCollision, campaignByCandidate, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
     const sortedCandidates = useMemo(() => {
         const sortKey = reviewSortByMode[reviewMode];
         const valueFor = (candidate: UpdateCandidate): string | number => {
@@ -3353,7 +3456,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             selectedKeys.has(candidate.key)
             && canUploadCandidate(candidate)
         ), [candidates, selectedKeys]);
-    const copyCandidates = selectedCandidatesForCopy.length > 0 ? selectedCandidatesForCopy : exportableCandidates;
+    const copyCandidates = selectedCandidatesForCopy;
     // Disparos que ja existem na base (matchedActivity) ou em conflito (nome antigo do BI,
     // colisao, renomeacao) nao devem virar linha nova no Excel: a gravacao deles e UPDATE
     // ou revisao manual, nunca append. Excluidos da copia TSV por padrao.
@@ -3363,11 +3466,10 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             .map(buildExcelRow).join('\n'),
         [copyCandidates]
     );
-    const uploadCandidates = useMemo(() => {
-        const source = exportableCandidates.length > 0 ? exportableCandidates : selectedCandidatesForCopy;
-        return source.map((candidate) => ({ ...applyApprovalDefaults(candidate), accepted: true }));
-    }, [exportableCandidates, selectedCandidatesForCopy]);
-    const uploadUsesSelection = exportableCandidates.length === 0 && selectedCandidatesForCopy.length > 0;
+    const uploadCandidates = useMemo(() =>
+        selectedCandidatesForCopy.filter(candidate => candidate.accepted),
+        [selectedCandidatesForCopy]
+    );
     const uploadBlocks = useMemo(() => {
         const unique = new Set<SourceBlock>();
         uploadCandidates.forEach((candidate) => candidate.sourceBlocks.forEach((block) => unique.add(block)));
@@ -3436,13 +3538,15 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                     const historyRows = await intelligentUpdateService.fetchDomainHistory('rentabilizacao');
                     rentHistory = buildRentHistoryIndex(historyRows);
                 } catch (fetchError) {
-                    console.warn('[Atualizacao Inteligente] Falha ao carregar historico de rentabilizacao', fetchError);
+                    throw new Error('Não foi possível conferir o histórico de Rentabilização. Tente carregar o arquivo novamente.');
                 }
             }
             setProcessingStage('detecting');
             await nextFrame();
             await sleep(40);
-            const processedResult = safeProcessDinamicaBI(matrix, activities, activeFlow, rentHistory);
+            const mapping = await loadImportCampaigns().catch(() => null);
+            const mappedJourneys = new Set<string>(mapping?.exactRentCards.keys());
+            const processedResult = safeProcessDinamicaBI(matrix, activities, activeFlow, rentHistory, mappedJourneys);
             if (!processedResult.result) {
                 const debug = {
                     ...processedResult.error,
@@ -3460,11 +3564,27 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setProcessingStage('reviewing');
             await nextFrame();
             await sleep(40);
-            setResult(processed);
+            setImportMapping(mapping);
+            setMappingUnavailable(mapping === null);
+            setReviewCampaign('');
+            setReviewJourney('');
+            setReviewChannel('');
+            setReviewFront('');
+            setReviewCollision('');
+            const reviewed = processed.candidates.map(candidate =>
+                isBulkApprovalEligible(candidate)
+                    ? { ...applyApprovalDefaults(candidate), accepted: true }
+                    : candidate
+            );
+            setResult({
+                ...processed,
+                candidates: reviewed,
+                tsv: reviewed.filter(candidate => candidate.accepted).map(buildExcelRow).join('\n'),
+            });
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewPage(1);
             setStatusFilter('new_dispatch');
-            setSelectedKeys(new Set());
+            setSelectedKeys(new Set(reviewed.filter(candidate => candidate.accepted).map(candidate => candidate.key)));
             setReviewOpen(true);
         } catch (error: any) {
             const debug = {
@@ -3563,6 +3683,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     };
 
     const acceptCandidate = (key: string) => {
+        toggleCandidateSelection(key, true);
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
@@ -3611,6 +3732,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     };
 
     const acceptHighConfidence = () => {
+        setSelectedKeys(current => new Set([...current, ...candidates.filter(isBulkApprovalEligible).map(candidate => candidate.key)]));
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
@@ -3759,7 +3881,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         const candidatesForRun = result.candidates.map((candidate) =>
             uploadKeys.has(candidate.key)
                 ? { ...applyApprovalDefaults(candidate), accepted: true }
-                : candidate
+                : { ...candidate, accepted: false }
         );
         setResult((current) => current ? {
             ...current,
@@ -4270,6 +4392,116 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             )}
                         </div>
 
+                        {collisionGroups.length > 0 && (
+                            <section className="space-y-2 border-b px-6 py-3 text-xs" aria-label="Colisões de jornadas">
+                                <label className="flex flex-wrap items-center gap-2 font-semibold">
+                                    Revisão em grupo
+                                    <select className="max-w-full rounded border px-2 py-1" value={reviewCollision} onChange={event => {
+                                        setReviewCollision(event.target.value);
+                                        setReviewCampaign('');
+                                        setReviewJourney('');
+                                        setReviewChannel('');
+                                        setReviewFront('');
+                                        setReviewPage(1);
+                                    }}>
+                                        <option value="">Escolher grupo ({collisionGroups.length})</option>
+                                        {collisionGroups.map(group => <option key={group.key} value={group.key}>
+                                            {`${group.channel} · ${group.occurrences} ocorrências · ${group.journeys.join(' / ')}`}
+                                        </option>)}
+                                    </select>
+                                </label>
+                                {activeCollision && (
+                                    <div className="space-y-2 rounded border bg-slate-50 p-3">
+                                        <p>{activeCollision.occurrences} ocorrências em {activeCollision.activities.size} Activities.
+                                            {' '}{activeCollision.equal} com métricas coincidentes. Período de {activeCollision.first} a {activeCollision.last}.</p>
+                                        <ul>{activeCollision.exclusive.map(({ journey, count }) =>
+                                            <li key={journey}>{journey} · {count} ocorrências exclusivas nas Activities do grupo</li>
+                                        )}</ul>
+                                        <p className="font-semibold">Amostra de {activeCollision.sample[0].date} · {activeCollision.sample[0].activityName}</p>
+                                        <table className="w-full text-left">
+                                            <thead><tr><th>Jornada</th><th>Enviados</th><th>Entregues</th><th>Aberturas / Leituras</th><th>Cliques</th></tr></thead>
+                                            <tbody>{activeCollision.sample.map(row => <tr key={row.key}>
+                                                <td>{row.journey}</td><td>{row.sent ?? '—'}</td><td>{row.delivered ?? '—'}</td>
+                                                <td>{row.opens ?? '—'}</td><td>{row.clicks ?? '—'}</td>
+                                            </tr>)}</tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </section>
+                        )}
+                        <section className="space-y-2 border-b px-6 py-3" aria-label="Campanhas no arquivo">
+                            {mappingUnavailable && <p role="status" className="text-xs text-amber-700">Mapeamento indisponível. A revisão dos disparos continua disponível.</p>}
+                            <div className="flex flex-wrap gap-2 text-xs">
+                                <select aria-label="Frente" value={reviewFront} onChange={event => {
+                                    setReviewFront(event.target.value);
+                                    setReviewCampaign('');
+                                    setReviewJourney('');
+                                    setReviewPage(1);
+                                }}>
+                                    <option value="">Todas as frentes</option>
+                                    {[...new Set(campaignRows.map(([, group]) => group.front).filter(Boolean))].sort().map(front => <option key={front}>{front}</option>)}
+                                </select>
+                                <select aria-label="Campanha" value={reviewCampaign} onChange={event => {
+                                    setReviewCampaign(event.target.value);
+                                    setReviewJourney('');
+                                    setReviewPage(1);
+                                }}>
+                                    <option value="">Todas as campanhas</option>
+                                    {campaignRows.filter(([, group]) => !reviewFront || group.front === reviewFront).map(([key, group]) => <option key={key} value={key}>{group.title}{group.front && group.front !== group.title ? ` · ${group.front}` : ''}</option>)}
+                                </select>
+                                <select aria-label="Jornada" value={reviewJourney} onChange={event => { setReviewJourney(event.target.value); setReviewPage(1); }}>
+                                    <option value="">Todas as jornadas</option>
+                                    {[...new Set(candidates.filter(row => !reviewCampaign || campaignByCandidate.get(row.key)?.key === reviewCampaign).map(row => row.journey))].filter(Boolean).sort().map(journey => <option key={journey}>{journey}</option>)}
+                                </select>
+                                <select aria-label="Canal" value={reviewChannel} onChange={event => { setReviewChannel(event.target.value); setReviewPage(1); }}>
+                                    <option value="">Todos os canais</option>
+                                    {[...new Set(candidates.map(row => row.channel))].sort().map(channel => <option key={channel}>{channel}</option>)}
+                                </select>
+                            </div>
+                            <div className="max-h-40 overflow-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="sticky top-0 bg-white">
+                                        <tr><th>Sel.</th><th>Campanha</th><th>Vínculo</th><th>Frente</th><th>Período recebido</th><th>Jornadas</th><th>Novos</th><th>Atualizações</th><th>Ignorar</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {campaignRows.filter(([key, group]) => (!reviewCampaign || reviewCampaign === key) && (!reviewFront || group.front === reviewFront) &&
+                                            (!reviewSearchTerm || group.rows.some(row => normalizeKey([group.title, group.front, row.journey, row.activityName, ...(row.conflictJourneys ?? [])].join(' ')).includes(normalizeKey(reviewSearchTerm))))).map(([key, group]) => (
+                                            <tr key={key} className="border-t">
+                                                <td className="w-10"><input type="checkbox" aria-label={`Selecionar disparos filtrados de ${group.title}`}
+                                                    disabled={!filteredCandidates.some(row => campaignByCandidate.get(row.key)?.key === key && canUploadCandidate(row))}
+                                                    checked={filteredCandidates.some(row => campaignByCandidate.get(row.key)?.key === key && canUploadCandidate(row))
+                                                        && filteredCandidates.every(row => campaignByCandidate.get(row.key)?.key !== key || !canUploadCandidate(row) || selectedKeys.has(row.key))}
+                                                    onChange={event => {
+                                                        const checked = event.target.checked;
+                                                        setSelectedKeys(previous => {
+                                                            const next = new Set(previous);
+                                                            for (const row of filteredCandidates) {
+                                                                if (campaignByCandidate.get(row.key)?.key !== key || !canUploadCandidate(row)) continue;
+                                                                if (checked) next.add(row.key);
+                                                                else next.delete(row.key);
+                                                            }
+                                                            return next;
+                                                        });
+                                                    }} /></td>
+                                                <td className="py-1"><button type="button" className="text-cyan-800 underline" onClick={() => {
+                                                    setReviewCampaign(key);
+                                                    setReviewJourney('');
+                                                    setReviewPage(1);
+                                                }}>{group.title}</button></td>
+                                                <td>{[...new Set(group.rows.map(row => campaignByCandidate.get(row.key)?.origin).filter(Boolean))].join(' · ') || '—'}</td>
+                                                <td>{group.front || '—'}</td>
+                                                <td>{group.rows.reduce((first, row) => row.date < first ? row.date : first, group.rows[0].date)} a {group.rows.reduce((last, row) => row.date > last ? row.date : last, group.rows[0].date)}</td>
+                                                <td>{new Set(group.rows.map(row => row.journey).filter(Boolean)).size}</td>
+                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'new_dispatch').length}</td>
+                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'update_dispatch').length}</td>
+                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'ignore').length}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
                         <div className={`flex flex-col gap-2 border-b px-6 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
                             selectedKeys.size > 0 ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600'
                         }`}>
@@ -4288,7 +4520,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         className="h-4 w-4 rounded border-slate-300"
                                     />
                                     {selectedKeys.size > 0
-                                        ? `${selectedKeys.size} selecionados`
+                                        ? `${selectedKeys.size} selecionados · ${selectedKeys.size - filteredCandidates.filter(candidate => selectedKeys.has(candidate.key)).length} fora do filtro`
                                         : `Selecionar todos os ${filteredCandidates.length} filtrados`}
                                 </label>
                                 <div className="flex flex-wrap gap-2">
@@ -4631,12 +4863,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <div className="text-xs text-cyan-700">destino: rentabilizacao_activities</div>
                                 </div>
                             </div>
-
-                            {uploadUsesSelection && (
-                                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs text-blue-800">
-                                    Nenhuma linha aceita foi encontrada. As {uploadCandidates.length} linhas selecionadas serão aprovadas e enviadas neste upload.
-                                </div>
-                            )}
 
                             <div className="rounded-xl border border-slate-200 px-3 py-3 text-xs text-slate-600">
                                 <div className="font-bold text-slate-900">Conteúdo do upload</div>
