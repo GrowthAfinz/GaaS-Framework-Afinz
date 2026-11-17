@@ -95,7 +95,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
     return m;
   }, [board]);
   const laneOptions = useMemo(() => pillars.flatMap(p => (lanesByPillar.get(p.id) || []).map(l => ({ ...l, pillar: p }))), [pillars, lanesByPillar]);
-  const cards = useMemo(() => (board?.cards || []).filter(c => !c.archived && laneOptions.some(l => l.id === c.lane_id)).sort((a, b) => a.position - b.position), [board, laneOptions]);
+  const cards = useMemo(() => (board?.cards || []).filter(c => !c.archived && (prefs.lens !== 'st' || !c.data_scope?.observed_only) && laneOptions.some(l => l.id === c.lane_id)).sort((a, b) => a.position - b.position), [board, laneOptions, prefs.lens]);
   const archived = useMemo(() => (board?.cards || []).filter(c => c.archived), [board]);
   const signals = useMemo(() => new Map<string, CardSignal>(cards.map(c => [c.id, computeSignal(c, rows, today)])), [cards, rows, today]);
   const sig = useCallback((id: string) => signals.get(id) || computeSignal({ data_scope: null }, [], today), [signals, today]);
@@ -150,6 +150,9 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   let col = 1;
   for (const p of pillars) {
     const ls = lanesByPillar.get(p.id) || [];
+    if (prefs.lens === 'st' && ls.length > 0
+      && board?.cards.some(c => !c.archived && ls.some(l => l.id === c.lane_id))
+      && !cards.some(c => ls.some(l => l.id === c.lane_id))) continue;
     if (collapsed.has(p.id)) { template.push('46px'); placed.push({ pillar: p, col, span: 1, lanes: [] }); col += 1; continue; }
     const start = col; const lanes = [];
     for (const l of ls) { const span = l.wide ? 2 : 1; for (let s = 0; s < span; s++) template.push(`${W}px`); lanes.push({ lane: l, col, span }); col += span; }

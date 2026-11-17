@@ -8,7 +8,7 @@ export type MetricKey = 'aq' | 'de' | 're' | 'cs' | 'en';
 export type Lens = 'st' | 'obs' | 'med';
 export type QuickFilter = 'drift' | 'parada' | 'unlinked' | null;
 
-export interface DataScope { domain: 'crm' | 'renta'; scope?: Record<string, string>; any_of?: Record<string, string>[] }
+export interface DataScope { domain: 'crm' | 'renta'; observed_only?: boolean; scope?: Record<string, string>; any_of?: Record<string, string>[] }
 export interface StructurePillar { id: string; title: string; accent: string; position: number; archived: boolean; revision: number }
 export interface StructureLane { id: string; pillar_id: string; title: string; metric_key: MetricKey; wide: boolean; position: number; archived: boolean; revision: number }
 export interface StructureCard {
