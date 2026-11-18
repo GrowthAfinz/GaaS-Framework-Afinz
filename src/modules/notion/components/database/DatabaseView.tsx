@@ -23,6 +23,7 @@ import {
   NotionUser,
   PropertyType,
 } from '../../types/notion';
+import { PropertyHeader } from './PropertyHeader';
 import { TableView } from './TableView';
 import { BoardView } from './BoardView';
 import { GalleryView } from './GalleryView';
@@ -32,6 +33,7 @@ import { CHIP_COLORS, EMPTY, applyView } from './viewEngine';
 
 interface DatabaseViewProps {
   layoutKey?: string;
+  creditBases?: boolean;
   database: NotionDatabase;
   users?: NotionUser[];
   onUpdateRow: (databaseId: string, rowId: string, propertyId: string, value: any) => void;
@@ -59,6 +61,7 @@ const readSel = (k: string): string[] | null => { try { const v = localStorage.g
 export const DatabaseView: React.FC<DatabaseViewProps> = ({
   database,
   layoutKey,
+  creditBases = false,
   users = [],
   onUpdateRow,
   onAddRow,
@@ -152,6 +155,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const groupable = database.properties.filter((p) => ['select', 'status', 'person'].includes(p.type));
   const dateProps = database.properties.filter((p) => p.type === 'date');
   const groupPropId = currentView.groupByPropertyId || groupable.find((p) => p.type === 'status')?.id || groupable[0]?.id;
+  const groupProperty = groupable.find(p => p.id === groupPropId);
   const datePropId = currentView.datePropertyId || dateProps[0]?.id;
   const visible = currentView.visiblePropertyIds || [];
   const menuBox = 'absolute right-0 top-8 z-50 w-64 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-lg text-xs max-h-80 overflow-y-auto';
@@ -178,7 +182,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
       {/* View Tabs & Action Bar */}
       <div className="flex items-center justify-between border-b border-[var(--notion-border)] pb-1.5 flex-wrap gap-2">
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-1">
           {database.views.map((view) => renaming === view.id ? (
             <input
               key={view.id}
@@ -261,7 +265,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             <Search size={13} className="text-[var(--notion-text-muted)]" />
             <input
               type="text"
-              placeholder="Buscar…"
+              placeholder={creditBases ? 'Buscar pedido' : 'Buscar…'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-28 sm:w-36 bg-transparent focus:outline-none text-[var(--notion-text)] placeholder-[var(--notion-text-muted)]"
@@ -349,7 +353,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           {/* Propriedades visíveis */}
           <div className="relative">
             <button onClick={() => setMenu(menu === 'props' ? null : 'props')} className={toolBtn(false)} title="Propriedades visíveis">
-              <MoreHorizontal size={12} />
+              <MoreHorizontal size={12} /><span>Colunas</span>
             </button>
             {menu === 'props' && (
               <div className={menuBox}>
@@ -364,12 +368,17 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
             )}
           </div>
 
+          {creditBases && !readOnly && groupProperty?.options && (
+            <PropertyHeader databaseId={database.id} property={groupProperty}
+              icon={null} buttonLabel="Editar etapas" />
+          )}
+
           {/* New Row Button */}
           {!readOnly && <button
             onClick={() => addRowWithQuick()}
             className="flex items-center gap-1 px-2.5 py-1 rounded bg-cyan-700 hover:bg-cyan-800 text-white font-medium text-xs transition-colors shadow-xs"
           >
-            <Plus size={14} /> Novo
+            <Plus size={14} /> {creditBases ? 'Novo pedido' : 'Novo'}
           </button>}
         </div>
       </div>
@@ -442,6 +451,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           hiddenValues={groupPropId === quickFilter?.propertyId ? [...qfAll.filter((n) => !qfOptions.includes(n)), ...(qfActive ? [...qfOptions, EMPTY].filter((n) => !qfSelected.includes(n)) : [])] : []}
           hideEmpty={Boolean(currentView.hideEmptyGroups)}
           readOnly={readOnly}
+          creditBases={creditBases}
           onUpdateRow={(rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}
           onAddRow={(props) => addRowWithQuick(props)}
           onOpenRowPage={onOpenRowPage}

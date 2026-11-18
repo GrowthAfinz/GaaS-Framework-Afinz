@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   ChevronRight,
-  ClipboardList,
   ChevronDown,
   Plus,
   Search,
@@ -119,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="w-2.5" />
             )}
 
-            <span className="shrink-0 text-xs">{<ClipboardList size={13} aria-hidden="true" />}</span>
+            {page.icon && <span className="shrink-0 text-xs" aria-hidden="true">{page.icon}</span>}
             <span className="truncate">{page.title || 'Sem título'}</span>
           </div>
 

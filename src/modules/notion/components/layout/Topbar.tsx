@@ -10,7 +10,6 @@ import {
   Copy,
   Check,
   X,
-  MessageSquare,
   Clock,
   Sparkles,
   Palette,
@@ -26,7 +25,6 @@ interface TopbarProps {
   onExportJSON: () => void;
   onExportMarkdown?: () => void;
   onOpenAi?: () => void;
-  onOpenComments?: () => void;
   onDuplicatePage?: () => void;
   /** Tom de fundo (adição GaaS). Sem onSetTone, o botão não aparece (ex.: modo escuro). */
   tone?: NotionTone;
@@ -41,7 +39,6 @@ export const Topbar: React.FC<TopbarProps> = ({
   onExportJSON,
   onExportMarkdown,
   onOpenAi,
-  onOpenComments,
   onDuplicatePage,
   tone = 'padrao',
   onSetTone,
@@ -117,15 +114,6 @@ export const Topbar: React.FC<TopbarProps> = ({
               </div>
             )}
           </div>
-
-          {/* Comment icon button */}
-          <button
-            onClick={onOpenComments}
-            className="p-1.5 rounded hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors"
-            title="Comentários da página"
-          >
-            <MessageSquare size={14} />
-          </button>
 
           {/* Tom de fundo (adição GaaS) */}
           {onSetTone && (

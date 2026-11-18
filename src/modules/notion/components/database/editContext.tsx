@@ -1,3 +1,4 @@
+import type { NotionColor } from '../../types/notion';
 import { createContext, useContext } from 'react';
 
 /**
@@ -10,6 +11,7 @@ export type PropertyLock = 'fixed' | 'synced' | null;
 export interface NotionEditApi {
   lockOf: (databaseId: string, propertyId: string) => PropertyLock;
   createOption: (databaseId: string, propertyId: string, name: string, rowId?: string) => Promise<string | null>;
+  editOption?: (databaseId: string, propertyId: string, optionId: string, changes: { name?: string; color?: NotionColor; offset?: -1 | 1 }) => void;
   removeOption: (databaseId: string, propertyId: string, optionId: string) => void;
   renameProperty: (databaseId: string, propertyId: string, name: string) => void;
   deleteProperty: (databaseId: string, propertyId: string) => void;

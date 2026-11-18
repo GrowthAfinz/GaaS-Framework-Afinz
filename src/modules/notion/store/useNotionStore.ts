@@ -125,7 +125,7 @@ export function useNotion(initial: NotionWorkspace) {
   }, []);
 
   const createPage = useCallback(
-    (parentId: string | null = null, title: string = 'Sem título', icon: string = '📄') => {
+    (parentId: string | null = null, title: string = 'Sem título', icon: string = '') => {
       const newPageId = generateId('page');
       const firstBlockId = generateId('blk');
 
@@ -443,8 +443,8 @@ export function useNotion(initial: NotionWorkspace) {
 
       if (newType === 'table' && !block.tableData) {
         updated.tableData = [
-          ['Header 1', 'Header 2', 'Header 3'],
-          ['Data 1', 'Data 2', 'Data 3'],
+          ['', '', ''],
+          ['', '', ''],
         ];
         updated.hasHeaderRow = true;
       }
@@ -468,9 +468,8 @@ export function useNotion(initial: NotionWorkspace) {
 
   // Database operations
   const addRowToDatabase = useCallback(
-    (databaseId: string, initialProps: Record<string, any> = {}) => {
+    (databaseId: string, initialProps: Record<string, any> = {}, newPageId = generateId('page_row')) => {
       const newRowId = generateId('row');
-      const newPageId = generateId('page_row');
 
       setWorkspace((prev) => {
         const db = prev.databases[databaseId];
@@ -488,7 +487,6 @@ export function useNotion(initial: NotionWorkspace) {
         const newPage: NotionPage = {
           id: newPageId,
           title: newRow.properties.prop_title,
-          icon: '📄',
           parentId: prev.activePageId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -712,6 +710,7 @@ export function useNotion(initial: NotionWorkspace) {
       title: data.pageTitle,
       icon: data.icon,
       cover: data.cover,
+      databaseId: data.database?.id,
       parentId: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
