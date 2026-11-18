@@ -3,7 +3,7 @@ import type { Activity } from '../../types/framework';
 vi.mock('../../store/useAppStore', () => ({ useAppStore: vi.fn() }));
 vi.mock('../../services/dataService', () => ({ dataService: {} }));
 vi.mock('../../services/intelligentUpdateService', () => ({ intelligentUpdateService: {} }));
-import { processDinamicaBI, processRentabilizacaoDinamicaBI } from './IntelligentFrameworkUpdate';
+import { matchesReviewCollection, processDinamicaBI, processRentabilizacaoDinamicaBI } from './IntelligentFrameworkUpdate';
 
 const activityName = 'plu_car_plx_aqs_wpp_car_carrinho21dplurix_20260924';
 const header = ['journeyname (whatsapp)', 'activity_name', 'Date', 'sent', 'delivered', 'read',
@@ -176,4 +176,20 @@ it('reads descriptive activity names only for explicitly mapped rentabilizacao j
         journey, activityName: 'Promoção TEM Outubro 2026 VBSS',
         sent: 101, delivered: 99, opens: 20, clicks: 2,
     });
+});
+
+it('shows selected new dispatches and metric updates together regardless of the status tab', () => {
+    const selected = new Set(['new', 'update']);
+    const rows = [
+        { key: 'new', status: 'new' as const, metricRefresh: false },
+        { key: 'update', status: 'ready' as const, metricRefresh: true },
+        { key: 'other', status: 'ready' as const, metricRefresh: true },
+    ];
+    expect(rows.filter(row => matchesReviewCollection(row, selected, 'selected', 'new_dispatch')).map(row => row.key))
+        .toEqual(['new', 'update']);
+    selected.delete('update');
+    expect(rows.filter(row => matchesReviewCollection(row, selected, 'selected', 'update_dispatch')).map(row => row.key))
+        .toEqual(['new']);
+    expect(rows.filter(row => matchesReviewCollection(row, selected, 'status', 'update_dispatch')).map(row => row.key))
+        .toEqual(['update', 'other']);
 });

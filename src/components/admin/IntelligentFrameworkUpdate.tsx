@@ -1,3 +1,4 @@
+import { ImportCampaignTree } from './ImportCampaignTree';
 import { loadStructure } from '../growth-learning/structure/structureService';
 import { supabase } from '../../services/supabaseClient';
 import { classify, compileRules } from '../growth-learning/structure/consumoModel';
@@ -207,6 +208,16 @@ const candidateAction = (candidate: UpdateCandidate): 'atualizar' | 'novo' | 'ig
     if (!canUploadCandidate(candidate)) return 'ignorar';
     return candidate.metricRefresh || candidate.matchedActivity ? 'atualizar' : 'novo';
 };
+
+export function matchesReviewCollection(
+    candidate: Pick<UpdateCandidate, 'key' | 'status' | 'metricRefresh' | 'matchedActivity'>,
+    selectedKeys: ReadonlySet<string>,
+    collection: 'selected' | 'all' | 'status',
+    status: CandidateFilter,
+) {
+    if (collection === 'selected') return selectedKeys.has(candidate.key);
+    return collection === 'all' || candidateFilterKey(candidate as UpdateCandidate) === status;
+}
 
 const candidateFilterKey = (candidate: UpdateCandidate): CandidateFilter => {
     const action = candidateAction(candidate);
@@ -3300,6 +3311,27 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         }
         return [...groups].sort(([, a], [, b]) => a.title.localeCompare(b.title, 'pt-BR'));
     }, [candidates, campaignByCandidate]);
+    const [previousFocus, setPreviousFocus] = useState<{ front: string; campaign: string; journey: string } | null>(null);
+    const [reviewCollection, setReviewCollection] = useState<'selected' | 'all' | 'status'>('selected');
+    const openSelected = () => {
+        setReviewCollection('selected');
+        setReviewCollision('');
+        setReviewCampaign('');
+        setReviewJourney('');
+        setReviewChannel('');
+        setReviewFront('');
+        setReviewSearchTerm('');
+        setReviewStartDate('');
+        setReviewEndDate('');
+        setReviewPage(1);
+    };
+    const treeCampaigns = useMemo(() => campaignRows.map(([key, group]) => ({
+        key, title: group.title, front: group.front,
+        rows: group.rows.map(row => ({
+            key: row.key, journey: row.journey, date: row.date,
+            eligible: canUploadCandidate(row), operation: candidateFilterKey(row),
+        })),
+    })), [campaignRows]);
     const [reviewCollision, setReviewCollision] = useState('');
     const collisionGroups = useMemo(() => {
         const occurrences = new Map<string, UpdateCandidate[]>();
@@ -3356,8 +3388,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             : [reviewStartDate, reviewEndDate];
         if (activeCollision) return candidates.filter(candidate => activeCollision.keys.has(candidate.key));
         return visibleCampaignCandidates.filter((candidate) => {
-            const statusMatches = candidateFilterKey(candidate) === statusFilter;
-            if (!statusMatches) return false;
+            if (!matchesReviewCollection(candidate, selectedKeys, reviewCollection, statusFilter)) return false;
             if (periodStart && candidate.date < periodStart) return false;
             if (periodEnd && candidate.date > periodEnd) return false;
             if (!term) return true;
@@ -3378,7 +3409,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
             return haystack.includes(term);
         });
-    }, [candidates, visibleCampaignCandidates, activeCollision, campaignByCandidate, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
+    }, [candidates, visibleCampaignCandidates, activeCollision, campaignByCandidate, reviewCollection, selectedKeys, statusFilter, reviewSearchTerm, reviewStartDate, reviewEndDate]);
     const sortedCandidates = useMemo(() => {
         const sortKey = reviewSortByMode[reviewMode];
         const valueFor = (candidate: UpdateCandidate): string | number => {
@@ -3571,6 +3602,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setReviewChannel('');
             setReviewFront('');
             setReviewCollision('');
+            setReviewCollection('selected');
+            setPreviousFocus(null);
             const reviewed = processed.candidates.map(candidate =>
                 isBulkApprovalEligible(candidate)
                     ? { ...applyApprovalDefaults(candidate), accepted: true }
@@ -4193,6 +4226,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <X size={18} />
                                 </button>
                             </div>
+                            <details className="mt-2">
+                                <summary className="cursor-pointer text-xs text-slate-600">Resumo do arquivo · {result.insights.uniqueJourneys} jornadas · {result.insights.classificationConflicts} conflitos</summary>
                             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
                                 <strong>{result.insights.rawRows.toLocaleString('pt-BR')} linhas</strong> da Dinâmica BI foram consolidadas em{' '}
                                 <strong>{result.insights.uniqueJourneys} jornadas</strong>,{' '}
@@ -4216,6 +4251,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+                            </details>
                         </header>
 
                         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3">
@@ -4367,11 +4403,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         key={status}
                                         type="button"
                                         onClick={() => {
+                                            setReviewCollection('status');
+                                            setReviewCollision('');
                                             setStatusFilter(status);
                                             setReviewPage(1);
                                         }}
                                         className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                                            statusFilter === status
+                                            reviewCollection === 'status' && !reviewCollision && statusFilter === status
                                                 ? 'border-cyan-600 bg-cyan-50 text-cyan-700'
                                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                                         }`}
@@ -4393,9 +4431,11 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         </div>
 
                         {collisionGroups.length > 0 && (
-                            <section className="space-y-2 border-b px-6 py-3 text-xs" aria-label="Colisões de jornadas">
+                            <details className="space-y-2 border-b px-6 py-2 text-xs" open={Boolean(reviewCollision)}>
+                                <summary className="cursor-pointer font-semibold">Conflitos por grupo ({collisionGroups.length})</summary>
+                            <section className="space-y-2" aria-label="Colisões de jornadas">
                                 <label className="flex flex-wrap items-center gap-2 font-semibold">
-                                    Revisão em grupo
+                                    Conflitos por grupo
                                     <select className="max-w-full rounded border px-2 py-1" value={reviewCollision} onChange={event => {
                                         setReviewCollision(event.target.value);
                                         setReviewCampaign('');
@@ -4428,92 +4468,66 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                 )}
                             </section>
+                            </details>
                         )}
-                        <section className="space-y-2 border-b px-6 py-3" aria-label="Campanhas no arquivo">
-                            {mappingUnavailable && <p role="status" className="text-xs text-amber-700">Mapeamento indisponível. A revisão dos disparos continua disponível.</p>}
-                            <div className="flex flex-wrap gap-2 text-xs">
-                                <select aria-label="Frente" value={reviewFront} onChange={event => {
-                                    setReviewFront(event.target.value);
-                                    setReviewCampaign('');
-                                    setReviewJourney('');
-                                    setReviewPage(1);
-                                }}>
-                                    <option value="">Todas as frentes</option>
-                                    {[...new Set(campaignRows.map(([, group]) => group.front).filter(Boolean))].sort().map(front => <option key={front}>{front}</option>)}
-                                </select>
-                                <select aria-label="Campanha" value={reviewCampaign} onChange={event => {
-                                    setReviewCampaign(event.target.value);
-                                    setReviewJourney('');
-                                    setReviewPage(1);
-                                }}>
-                                    <option value="">Todas as campanhas</option>
-                                    {campaignRows.filter(([, group]) => !reviewFront || group.front === reviewFront).map(([key, group]) => <option key={key} value={key}>{group.title}{group.front && group.front !== group.title ? ` · ${group.front}` : ''}</option>)}
-                                </select>
-                                <select aria-label="Jornada" value={reviewJourney} onChange={event => { setReviewJourney(event.target.value); setReviewPage(1); }}>
-                                    <option value="">Todas as jornadas</option>
-                                    {[...new Set(candidates.filter(row => !reviewCampaign || campaignByCandidate.get(row.key)?.key === reviewCampaign).map(row => row.journey))].filter(Boolean).sort().map(journey => <option key={journey}>{journey}</option>)}
-                                </select>
-                                <select aria-label="Canal" value={reviewChannel} onChange={event => { setReviewChannel(event.target.value); setReviewPage(1); }}>
-                                    <option value="">Todos os canais</option>
-                                    {[...new Set(candidates.map(row => row.channel))].sort().map(channel => <option key={channel}>{channel}</option>)}
-                                </select>
-                            </div>
-                            <div className="max-h-40 overflow-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="sticky top-0 bg-white">
-                                        <tr><th>Sel.</th><th>Campanha</th><th>Vínculo</th><th>Frente</th><th>Período recebido</th><th>Jornadas</th><th>Novos</th><th>Atualizações</th><th>Ignorar</th></tr>
-                                    </thead>
-                                    <tbody>
-                                        {campaignRows.filter(([key, group]) => (!reviewCampaign || reviewCampaign === key) && (!reviewFront || group.front === reviewFront) &&
-                                            (!reviewSearchTerm || group.rows.some(row => normalizeKey([group.title, group.front, row.journey, row.activityName, ...(row.conflictJourneys ?? [])].join(' ')).includes(normalizeKey(reviewSearchTerm))))).map(([key, group]) => (
-                                            <tr key={key} className="border-t">
-                                                <td className="w-10"><input type="checkbox" aria-label={`Selecionar disparos filtrados de ${group.title}`}
-                                                    disabled={!filteredCandidates.some(row => campaignByCandidate.get(row.key)?.key === key && canUploadCandidate(row))}
-                                                    checked={filteredCandidates.some(row => campaignByCandidate.get(row.key)?.key === key && canUploadCandidate(row))
-                                                        && filteredCandidates.every(row => campaignByCandidate.get(row.key)?.key !== key || !canUploadCandidate(row) || selectedKeys.has(row.key))}
-                                                    onChange={event => {
-                                                        const checked = event.target.checked;
-                                                        setSelectedKeys(previous => {
-                                                            const next = new Set(previous);
-                                                            for (const row of filteredCandidates) {
-                                                                if (campaignByCandidate.get(row.key)?.key !== key || !canUploadCandidate(row)) continue;
-                                                                if (checked) next.add(row.key);
-                                                                else next.delete(row.key);
-                                                            }
-                                                            return next;
-                                                        });
-                                                    }} /></td>
-                                                <td className="py-1"><button type="button" className="text-cyan-800 underline" onClick={() => {
-                                                    setReviewCampaign(key);
-                                                    setReviewJourney('');
-                                                    setReviewPage(1);
-                                                }}>{group.title}</button></td>
-                                                <td>{[...new Set(group.rows.map(row => campaignByCandidate.get(row.key)?.origin).filter(Boolean))].join(' · ') || '—'}</td>
-                                                <td>{group.front || '—'}</td>
-                                                <td>{group.rows.reduce((first, row) => row.date < first ? row.date : first, group.rows[0].date)} a {group.rows.reduce((last, row) => row.date > last ? row.date : last, group.rows[0].date)}</td>
-                                                <td>{new Set(group.rows.map(row => row.journey).filter(Boolean)).size}</td>
-                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'new_dispatch').length}</td>
-                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'update_dispatch').length}</td>
-                                                <td>{group.rows.filter(row => candidateFilterKey(row) === 'ignore').length}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-
+                        <div className="flex flex-wrap items-center gap-2 border-b bg-white px-6 py-3">
+                            <button type="button" aria-pressed={reviewCollection === 'selected' && !reviewCollision}
+                                className={'rounded-lg border px-3 py-2 text-xs font-bold ' + (reviewCollection === 'selected' && !reviewCollision ? 'border-cyan-600 bg-cyan-50 text-cyan-800' : '')}
+                                onClick={openSelected}>Selecionados ({selectedKeys.size})</button>
+                            <button type="button" aria-pressed={reviewCollection === 'all' && !reviewCollision}
+                                className={'rounded-lg border px-3 py-2 text-xs font-bold ' + (reviewCollection === 'all' && !reviewCollision ? 'border-cyan-600 bg-cyan-50 text-cyan-800' : '')}
+                                onClick={() => { setReviewCollection('all'); setReviewCollision(''); setReviewPage(1); }}>Todos os disparos</button>
+                            {(reviewFront || reviewCampaign || reviewJourney) && <span className="text-xs text-slate-600">
+                                {reviewJourney || campaignRows.find(([key]) => key === reviewCampaign)?.[1].title || reviewFront}
+                                <button type="button" className="ml-2 text-cyan-800 underline" onClick={() => {
+                                    setReviewFront(''); setReviewCampaign(''); setReviewJourney(''); setReviewPage(1);
+                                }}>Limpar foco</button>
+                            </span>}
+                            {previousFocus && <button type="button" className="text-xs text-cyan-800 underline" onClick={() => {
+                                setReviewFront(previousFocus.front); setReviewCampaign(previousFocus.campaign); setReviewJourney(previousFocus.journey);
+                                setPreviousFocus(null); setReviewCollision(''); setReviewPage(1);
+                            }}>Voltar ao foco anterior</button>}
+                            {mappingUnavailable && <p role="status" className="text-xs text-amber-700">Mapeamento indisponível. Revisão por disparo disponível.</p>}
+                            <select className="ml-auto rounded border p-2 text-xs" aria-label="Canal" value={reviewChannel} onChange={event => { setReviewChannel(event.target.value); setReviewPage(1); }}>
+                                <option value="">Todos os canais</option>
+                                {[...new Set(candidates.map(row => row.channel))].sort().map(channel => <option key={channel}>{channel}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                            <ImportCampaignTree campaigns={treeCampaigns} selected={selectedKeys}
+                                focusedCampaign={reviewCampaign} focusedJourney={reviewJourney}
+                                onFocus={(front, campaign, journey) => {
+                                    setPreviousFocus({ front: reviewFront, campaign: reviewCampaign, journey: reviewJourney });
+                                    setReviewFront(front); setReviewCampaign(campaign); setReviewJourney(journey);
+                                    setReviewCollision(''); setReviewPage(1);
+                                }}
+                                onSelection={(keys, action) => setSelectedKeys(current => {
+                                    const next = action === 'only' ? new Set<string>() : new Set(current);
+                                    for (const key of keys) {
+                                        if (action === 'remove') next.delete(key);
+                                        else next.add(key);
+                                    }
+                                    return next;
+                                })} />
+                            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                         <div className={`flex flex-col gap-2 border-b px-6 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
                             selectedKeys.size > 0 ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600'
                         }`}>
                                 <label className="inline-flex items-center gap-2 font-bold">
                                     <input
                                         type="checkbox"
-                                        checked={filteredCandidates.length > 0 && filteredCandidates.every((candidate) => selectedKeys.has(candidate.key))}
+                                        ref={input => {
+                                            if (!input) return;
+                                            const eligible = filteredCandidates.filter(canUploadCandidate);
+                                            const selected = eligible.filter(candidate => selectedKeys.has(candidate.key)).length;
+                                            input.indeterminate = selected > 0 && selected < eligible.length;
+                                        }}
+                                        checked={filteredCandidates.some(canUploadCandidate) && filteredCandidates.filter(canUploadCandidate).every(candidate => selectedKeys.has(candidate.key))}
                                         onChange={() => {
-                                            const allSelected = filteredCandidates.length > 0 && filteredCandidates.every((candidate) => selectedKeys.has(candidate.key));
+                                            const allSelected = filteredCandidates.some(canUploadCandidate) && filteredCandidates.filter(canUploadCandidate).every(candidate => selectedKeys.has(candidate.key));
                                             setSelectedKeys((current) => {
                                                 const next = new Set(current);
-                                                filteredCandidates.forEach((candidate) => allSelected ? next.delete(candidate.key) : next.add(candidate.key));
+                                                filteredCandidates.filter(canUploadCandidate).forEach((candidate) => allSelected ? next.delete(candidate.key) : next.add(candidate.key));
                                                 return next;
                                             });
                                         }}
@@ -4524,6 +4538,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         : `Selecionar todos os ${filteredCandidates.length} filtrados`}
                                 </label>
                                 <div className="flex flex-wrap gap-2">
+                                    <button type="button" onClick={openSelected} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-blue-700">Ver todos os selecionados</button>
                                     {selectedKeys.size > 0 && (
                                         <button
                                             type="button"
@@ -4566,7 +4581,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
 
                         <div className="flex flex-col gap-2 border-b border-slate-200 bg-white px-6 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
                             <span>
-                                Mostrando {pagedCandidates.length} de {filteredCandidates.length} candidatos{reviewSearchTerm ? ` para "${reviewSearchTerm}"` : ' neste filtro'}. A revisao carrega em paginas para manter a tela responsiva.
+                                {reviewCollection === 'selected' && !reviewCollision ? 'Seleção' : 'Lista'} · Mostrando {pagedCandidates.length} de {filteredCandidates.length} candidatos{reviewSearchTerm ? ` para "${reviewSearchTerm}"` : ' neste filtro'}. A revisao carrega em paginas para manter a tela responsiva.
                             </span>
                             <div className="flex items-center gap-2">
                                 <button
@@ -4760,16 +4775,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 </tbody>
                             </table>
                         </main>
+                            </div>
+                        </div>
 
                         <footer className="flex flex-col gap-3 border-t border-slate-200 bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="text-xs text-slate-500">
-                                {selectedCandidatesForCopy.length > 0
-                                    ? `${selectedCandidatesForCopy.length} linhas selecionadas. Se não houver aceitas, elas serão usadas no upload.`
-                                    : exportableCandidates.length > 0 && blockingCount > 0
-                                        ? `${exportableCandidates.length} linhas aceitas; ${blockingCount} pendentes ficam fora da atualizacao.`
-                                        : blockingCount > 0
-                                            ? `${blockingCount} linhas ainda precisam de aceite, edicao ou ignorar.`
-                                        : `${exportableCandidates.length} linhas prontas para Excel e base de dados.`}
+                                {selectedKeys.size} selecionados · {uploadCandidates.length} aprovados para gravar.
+                                {selectedCandidatesForCopy.length > uploadCandidates.length && ' Há selecionados que ainda precisam de aprovação.'}
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <button
