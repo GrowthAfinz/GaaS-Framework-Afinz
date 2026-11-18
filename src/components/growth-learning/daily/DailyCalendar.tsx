@@ -39,6 +39,16 @@ export function DailyCalendar(p: Props) {
     for (const e of p.entries) c.set(e.day + '|' + e.project_id, (c.get(e.day + '|' + e.project_id) || 0) + 1);
     return c;
   }, [p.entries]);
+  /** BU/parceiro escolhido nos registros do dia (ex.: "Topo de Funil Aquisição · Plurix"). */
+  const partnersByDayProject = useMemo(() => {
+    const names = new Map(p.partners.map(x => [x.key, x.name]));
+    const m = new Map<string, string[]>();
+    for (const e of p.entries) for (const k of e.partner_keys || []) {
+      const key = e.day + '|' + e.project_id, list = m.get(key) || [], n = names.get(k);
+      if (n && !list.includes(n)) m.set(key, [...list, n]);
+    }
+    return m;
+  }, [p.entries, p.partners]);
   const month = `${p.y}-${String(p.m).padStart(2, '0')}`;
   const results = p.mode === 'results';
   const only = useMemo(() => {
@@ -144,6 +154,7 @@ export function DailyCalendar(p: Props) {
                       if (!pid) return <div key={ri} className="dv-slot" />;
                       const cl = i > 0 && present[i - 1].includes(pid), cr = i < 6 && present[i + 1].includes(pid);
                       const c = color(pid), n = countByDayProject.get(day + '|' + pid) || 0;
+                      const parts = partnersByDayProject.get(day + '|' + pid) || [];
                       const pinned = pinnedDay && p.pin?.projectId === pid;
                       const hl = !p.pin && p.hoverProject === pid, dim = p.pin ? !pinned : Boolean(p.hoverProject) && !hl;
                       return (
@@ -152,8 +163,8 @@ export function DailyCalendar(p: Props) {
                             onMouseEnter={() => p.onHoverProject(pid)} onMouseLeave={() => p.onHoverProject(null)}
                             onClick={e => { e.stopPropagation(); p.onTopic(day, pid); }}
                             draggable={p.canDrag} onDragStart={e => { e.stopPropagation(); p.onDragBar(pid, day, e); }} onDragEnd={p.onDragEnd}
-                            title={`${p.projects.get(pid)?.name || ''}: clique para ver o dia${p.canDrag ? ' · arraste para outro dia (Ctrl ao soltar copia)' : ''}`}>
-                            <span>{p.projects.get(pid)?.name}</span>
+                            title={`${p.projects.get(pid)?.name || ''}${parts.length ? ` · ${parts.join(', ')}` : ''}: clique para ver o dia${p.canDrag ? ' · arraste para outro dia (Ctrl ao soltar copia)' : ''}`}>
+                            <span>{p.projects.get(pid)?.name}{parts.length ? ` · ${parts.join(', ')}` : ''}</span>
                             {n > 1 && <span style={{ opacity: 0.7, flex: 'none' }}>·{n}</span>}
                           </button>
                         </div>
