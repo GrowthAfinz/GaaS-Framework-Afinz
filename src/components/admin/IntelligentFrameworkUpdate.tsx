@@ -209,6 +209,16 @@ const candidateAction = (candidate: UpdateCandidate): 'atualizar' | 'novo' | 'ig
     return candidate.metricRefresh || candidate.matchedActivity ? 'atualizar' : 'novo';
 };
 
+export function matchesReviewCollection(
+    candidate: Pick<UpdateCandidate, 'key' | 'status' | 'metricRefresh' | 'matchedActivity'>,
+    selectedKeys: ReadonlySet<string>,
+    collection: 'selected' | 'all' | 'status',
+    status: CandidateFilter,
+) {
+    if (collection === 'selected') return selectedKeys.has(candidate.key);
+    return collection === 'all' || candidateFilterKey(candidate as UpdateCandidate) === status;
+}
+
 const candidateFilterKey = (candidate: UpdateCandidate): CandidateFilter => {
     const action = candidateAction(candidate);
     if (action === 'atualizar') return 'update_dispatch';
@@ -3378,9 +3388,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             : [reviewStartDate, reviewEndDate];
         if (activeCollision) return candidates.filter(candidate => activeCollision.keys.has(candidate.key));
         return visibleCampaignCandidates.filter((candidate) => {
-            if (reviewCollection === 'selected' && !selectedKeys.has(candidate.key)) return false;
-            const statusMatches = reviewCollection !== 'status' || candidateFilterKey(candidate) === statusFilter;
-            if (!statusMatches) return false;
+            if (!matchesReviewCollection(candidate, selectedKeys, reviewCollection, statusFilter)) return false;
             if (periodStart && candidate.date < periodStart) return false;
             if (periodEnd && candidate.date > periodEnd) return false;
             if (!term) return true;
