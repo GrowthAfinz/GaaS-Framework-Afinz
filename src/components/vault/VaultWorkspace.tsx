@@ -1,3 +1,4 @@
+import { QuestionRow, QuestionTableContext, isQuestionTable } from './QuestionToTask';
 import { WikiDataBlocks, useWikiDataIndex } from './WikiDataBlocks';
 import { WikiConnections } from './graph/WikiConnections';
 import { withTimeout } from './graph/wikiGraphService';
@@ -343,7 +344,14 @@ export function VaultWorkspace({ onCountChange }: { onCountChange?: (count: numb
             ul: ({ children }) => <ul className="my-3 list-disc space-y-1 pl-6">{children}</ul>,
             ol: ({ children }) => <ol className="my-3 list-decimal space-y-1 pl-6">{children}</ol>,
             blockquote: ({ children }) => <blockquote className="my-4 border-l-4 border-cyan-300 bg-cyan-50/50 px-4 py-2 text-slate-600">{children}</blockquote>,
-            table: ({ children }) => <div className="my-5 overflow-x-auto"><table className="w-full border-collapse text-xs">{children}</table></div>,
+            table: ({ node, children }) => {
+              const box = <div className="my-5 overflow-x-auto"><table className="w-full border-collapse text-xs">{children}</table></div>;
+              // Perguntas em aberto: cada linha ganha "Virar Tarefa" (a pergunta continua na nota).
+              return isQuestionTable(node as never) && selected?.relative_path
+                ? <QuestionTableContext.Provider value={{ notePath: selected.relative_path, domain: String((selected.frontmatter as Record<string, unknown> | undefined)?.dominio || '') }}>{box}</QuestionTableContext.Provider>
+                : box;
+            },
+            tr: ({ node, children }) => <QuestionRow node={node as never}>{children}</QuestionRow>,
             th: ({ children }) => <th className="border border-slate-200 bg-slate-50 px-3 py-2 text-left font-semibold">{children}</th>,
             td: ({ children }) => <td className="border border-slate-200 px-3 py-2 align-top">{children}</td>,
             pre: WikiCodeBlock,

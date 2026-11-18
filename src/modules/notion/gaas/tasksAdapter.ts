@@ -81,7 +81,11 @@ export function defaultTaskViews(): DatabaseViewConfig[] {
 /** Garante as três visões padrão na frente das personalizadas, sem apagar visão criada pelo time. */
 export function withStandardViews(views: DatabaseViewConfig[]): DatabaseViewConfig[] {
   const defaults = defaultTaskViews();
-  const standard = STANDARD_VIEW_IDS.map(id => views.find(v => v.id === id) || defaults.find(v => v.id === id)!);
+  const standard = STANDARD_VIEW_IDS.map(id => views.find(v => v.id === id) || defaults.find(v => v.id === id)!).map(v => {
+    // Uma vez só: o Quadro passa a mostrar "Sub Tarefas x/y" no card; se o time esconder depois, fica escondido.
+    const seen = (v as DatabaseViewConfig & { subtasksShown?: boolean }).subtasksShown;
+    return v.id === 'v_quadro' && !seen ? { ...v, visiblePropertyIds: v.visiblePropertyIds.includes('p_subtarefas') ? v.visiblePropertyIds : [...v.visiblePropertyIds, 'p_subtarefas'], subtasksShown: true } as DatabaseViewConfig : v;
+  });
   return [...standard, ...views.filter(v => !STANDARD_VIEW_IDS.includes(v.id))];
 }
 /** A antiga visão "SDD (GaaS)" saiu da base: o SDD agora tem página própria. */

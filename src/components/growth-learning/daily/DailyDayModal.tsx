@@ -16,6 +16,7 @@ interface Props {
   onClose: () => void; onDay: (day: string, projectId: string) => void; onFocus: (projectId: string) => void;
   onKanban: (initiativeId: string, workId: string | null) => void; onOpenProject: (projectId: string) => void;
   onLinkWork: (e: DailyEntry, el: HTMLElement) => void; onCreateWork: (e: DailyEntry) => void;
+  onOpenTask?: (id: string) => void;
 }
 
 /** Modal claro do dia: tópicos à esquerda (o clicado primeiro e aberto), disparos CRM do dia à direita. */
@@ -116,7 +117,7 @@ export function DailyDayModal(p: Props) {
                         {linked.length > 0 && (
                           <div className="works">
                             {linked.map(w => (
-                              <button key={w.id} className="dv-dw" title="Abrir esta Tarefa no kanban" onClick={() => w.initiative_id && p.onKanban(w.initiative_id, w.id)}>
+                              <button key={w.id} className="dv-dw" title="Abrir esta Tarefa" onClick={() => (p.onOpenTask ? p.onOpenTask(w.id) : w.initiative_id && p.onKanban(w.initiative_id, w.id))}>
                                 <StatusPill status={w.status} small /><span className="t">{w.title}</span>
                                 {w.owner_label && <span className="o">{w.owner_label}</span>}
                                 {w.due_date && <span className={`o${isOverdue(w, p.today) ? ' late' : ''}`}><CalendarClock />{brDate(w.due_date)}</span>}
@@ -127,7 +128,7 @@ export function DailyDayModal(p: Props) {
                         {p.canEdit && (
                           <div className="acts">
                             <button className="dv-link" onClick={ev => p.onLinkWork(e, ev.currentTarget)}><Link2 size={12} />Vincular a Tarefa…</button>
-                            {pr?.initiative_id && <button className="dv-link" onClick={() => p.onCreateWork(e)}><Plus size={12} />Criar Tarefa</button>}
+                            <button className="dv-link" onClick={() => p.onCreateWork(e)}><Plus size={12} />Criar Tarefa</button>
                           </div>
                         )}
                       </div>

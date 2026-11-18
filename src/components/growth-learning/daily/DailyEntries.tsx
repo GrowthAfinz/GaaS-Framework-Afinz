@@ -14,7 +14,8 @@ import type { DayPin } from './DailyCalendar';
 import type { DailyWork } from './dailyService';
 import { StatusPill } from './DailyKanban';
 
-export interface Draft { day: string; projectId: string }
+/** Rascunho de registro. "Continuar no próximo dia útil" leva os vínculos e o BU/parceiro (é o mesmo trabalho). */
+export interface Draft { day: string; projectId: string; workIds?: string[]; partnerKeys?: string[] }
 interface Props {
   groups: EntryGroup[]; group: DailyGroup; sort: DailySort; view: DailyView; filters: DailyFilters; shown: number; total: number;
   monthsLoaded: string[]; prevMonth: string | null; isCollapsed: (key: string) => boolean; today: string; canEdit: boolean; draft: Draft | null;
@@ -108,7 +109,7 @@ export function DailyEntries(p: Props) {
               <button className="dv-pchip" style={tint(c, 13)} disabled={!p.canEdit} title={p.canEdit ? 'Trocar projeto' : undefined} onClick={ev => p.onProjectPop(e, ev.currentTarget)}>
                 <span>{pr?.name || 'Projeto removido'}</span>{p.canEdit && <ChevronDown />}
               </button>
-              {(pr?.partner_keys || []).slice(0, 3).map(k => { const pa = p.partners.get(k); return pa ? <span key={k} className="dv-tag" style={tint(pa.color, 9)}>{pa.name}</span> : null; })}
+              {((e.partner_keys || []).length ? e.partner_keys || [] : pr?.partner_keys || []).slice(0, 3).map(k => { const pa = p.partners.get(k); return pa ? <span key={k} className="dv-tag" title={(e.partner_keys || []).length ? 'BU/parceiro deste registro' : 'BU/parceiro do projeto'} style={tint(pa.color, (e.partner_keys || []).length ? 16 : 9)}>{pa.name}</span> : null; })}
             </div>
           )}
           <div className="txt" title={p.canEdit ? 'Clique para editar' : undefined}
@@ -116,7 +117,7 @@ export function DailyEntries(p: Props) {
           {(e.work_ids || []).length > 0 && (
             <div className="dv-rw">
               {(e.work_ids || []).map(id => p.works.get(id)).filter((w): w is DailyWork => Boolean(w)).map(w => (
-                <button key={w.id} className="dv-dw sm" title={`${w.title}: abrir no kanban`} onClick={() => p.onOpenWork(w)}><StatusPill status={w.status} small /><span className="t">{w.title}</span></button>
+                <button key={w.id} className="dv-dw sm" title={`Abrir a Tarefa ${w.title}`} onClick={() => p.onOpenWork(w)}><StatusPill status={w.status} small /><span className="t">{w.title}</span></button>
               ))}
             </div>
           )}

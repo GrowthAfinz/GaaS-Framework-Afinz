@@ -13,6 +13,8 @@ export interface DailyEntry {
   id: string; day: string; project_id: string; body: string; tag_keys: string[]; responsible_id: string | null; follower_ids: string[];
   /** Trabalhos de Tarefas e atividades citados neste registro (growth_development_tasks.id). */
   work_ids?: string[];
+  /** BU/parceiro do registro (opcional). Vazio = vale o do projeto. */
+  partner_keys?: string[];
   position: number; source: 'app' | 'planilha'; deleted_at: string | null; revision: number; created_at: string; updated_at: string;
 }
 /** Pessoa do trabalho: tem conta no GaaS ou é só um nome (decisão de 17/11/2026). */
@@ -72,7 +74,7 @@ export function entryVisible(e: DailyEntry, ctx: VisibilityContext, ignoreView =
   if (!p) return false;
   if (f.frentes.length && !f.frentes.includes(p.frente_key)) return false;
   if (f.projects.length && !f.projects.includes(p.id)) return false;
-  if (f.partners.length && !p.partner_keys.some(k => f.partners.includes(k))) return false;
+  if (f.partners.length && !((e.partner_keys || []).length ? e.partner_keys || [] : p.partner_keys).some(k => f.partners.includes(k))) return false;
   if (f.people.length && !f.people.some(u => e.responsible_id === u || e.follower_ids.includes(u))) return false;
   if (f.tags.length && !e.tag_keys.some(t => f.tags.includes(t))) return false;
   if (f.q.trim()) {
