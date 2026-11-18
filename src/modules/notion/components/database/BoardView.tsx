@@ -48,6 +48,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   readOnly = false,
 }) => {
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
+  const [dragFrom, setDragFrom] = useState<string | null>(null);
   const layout = useColumnLayout(layoutKey);
   const [openEmpty, setOpenEmpty] = useState<Record<string, boolean>>({});
   const [overCol, setOverCol] = useState<string | null>(null);
@@ -63,7 +64,13 @@ export const BoardView: React.FC<BoardViewProps> = ({
     ? users.map((u) => ({ key: u.id, name: u.name, color: 'default' as NotionColor, value: u.id }))
     : (groupProp.options || []).map((o) => ({ key: o.id, name: o.name, color: o.color, value: o.name }));
   const known = new Set(columns.map((c) => c.value));
-  const hasEmpty = filteredRows.some((r) => !known.has(String(r.properties[groupProp?.id || ''] ?? '')));
+  /** Valores do agrupamento na linha: lista (seleção múltipla, ex.: Tarefa em vários projetos) ou um só. */
+  const valuesOf = (r: { properties: Record<string, unknown> }) => {
+    const v = r.properties[groupProp?.id || ''];
+    return Array.isArray(v) ? v.map(String) : v == null || v === '' ? [] : [String(v)];
+  };
+  const multi = groupProp?.type === 'multi_select';
+  const hasEmpty = filteredRows.some((r) => !valuesOf(r).some(v => known.has(v)));
   if (groupProp && (hasEmpty || groupProp.type === 'person')) columns.unshift({ key: '__vazio__', name: `Sem ${groupProp.name.toLowerCase()}`, color: 'gray', value: '' });
 
   const cardProps = visiblePropIds
@@ -71,8 +78,9 @@ export const BoardView: React.FC<BoardViewProps> = ({
     .map((id) => database.properties.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
-  const handleDragStart = (e: React.DragEvent, rowId: string) => {
+  const handleDragStart = (e: React.DragEvent, rowId: string, fromCol?: Column) => {
     setDraggedRowId(rowId);
+    setDragFrom(fromCol?.value ?? null);
     e.dataTransfer.setData('text/plain', rowId);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -85,8 +93,17 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const handleDrop = (e: React.DragEvent, col: Column) => {
     e.preventDefault();
     const rowId = draggedRowId;
-    if (rowId && groupProp) onUpdateRow(rowId, groupProp.id, col.value);
+    if (rowId && groupProp) {
+      if (multi) {
+        // Seleção múltipla: arrastar troca só o valor da coluna de origem; a linha continua nas outras.
+        const row = filteredRows.find(r => r.id === rowId);
+        const current = row ? valuesOf(row) : [];
+        const next = col.key === '__vazio__' ? [] : [...current.filter(v => v !== dragFrom && v !== col.value), col.value];
+        onUpdateRow(rowId, groupProp.id, next);
+      } else onUpdateRow(rowId, groupProp.id, col.value);
+    }
     setDraggedRowId(null);
+    setDragFrom(null);
     setOverCol(null);
   };
 
@@ -96,8 +113,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
   const rowsOf = (col: Column) =>
     filteredRows.filter((r) => {
-      const v = String(r.properties[groupProp.id] ?? '');
-      return col.key === '__vazio__' ? !known.has(v) : v === col.value;
+      const vs = valuesOf(r);
+      return col.key === '__vazio__' ? !vs.some(v => known.has(v)) : vs.includes(col.value);
     });
   const shown = columns.filter((col) => !hiddenValues.includes(col.key === '__vazio__' ? '__vazio__' : col.value) && (!hideEmpty || rowsOf(col).length > 0));
 
@@ -164,7 +181,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                   onClick={() => setOpenEmpty(prev => ({ ...prev, [col.key]: !prev[col.key] }))}><ChevronDown size={14} /></button>}
               {!readOnly && (
               <button
-                onClick={() => onAddRow({ [groupProp.id]: col.value })}
+                onClick={() => onAddRow({ [groupProp.id]: multi && col.key !== '__vazio__' ? [col.value] : col.key === '__vazio__' && multi ? [] : col.value })}
                 className="p-1 hover:bg-[var(--notion-hover)] rounded text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"
                 title="Novo nesta coluna"
               >
@@ -181,7 +198,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 <div key={row.id} className="rounded-md bg-[var(--notion-card)]">
                   <div
                     draggable={!readOnly}
-                    onDragStart={(e) => handleDragStart(e, row.id)}
+                    onDragStart={(e) => handleDragStart(e, row.id, col)}
                     onDragEnd={() => { setDraggedRowId(null); setOverCol(null); }}
                     role="button" tabIndex={0}
                     onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpenRowPage(row.pageId); } }}
@@ -215,7 +232,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
             {/* Add Card Button */}
             {!readOnly && !collapsed && <button
-              onClick={() => onAddRow({ [groupProp.id]: col.value })}
+              onClick={() => onAddRow({ [groupProp.id]: multi && col.key !== '__vazio__' ? [col.value] : col.key === '__vazio__' && multi ? [] : col.value })}
               className="flex items-center gap-1.5 mt-2 px-2 py-1.5 rounded hover:bg-[var(--notion-hover)] text-xs text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] transition-colors"
             >
               <Plus size={14} /> Novo

@@ -116,9 +116,9 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       const reverted: { key: string; row: DatabaseRow }[] = [];
       for (const tc of changes.tasks) {
         const task = ctx.tasks.get(tc.taskId); if (!task) continue;
-        if (!ctx.canEditTasks) { showToast('Seu acesso permite ler as tarefas, mas não alterá-las.'); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects) }); continue; }
+        if (!ctx.canEditTasks) { showToast('Seu acesso permite ler as tarefas, mas não alterá-las.'); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects, ctx.initiatives) }); continue; }
         try { const saved = await saveTask(task, tc.patch); ctx.tasks.set(saved.id, saved); }
-        catch (e) { showToast(taskError(e)); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects) }); }
+        catch (e) { showToast(taskError(e)); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects, ctx.initiatives) }); }
       }
       const next = snapshot(ws);
       for (const r of reverted) { next.rows.set(r.key, JSON.stringify(r.row)); next.rowObjs.set(r.key, r.row); }
@@ -173,9 +173,9 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     setStatus('saving');
     void createTask({ ...fields, title: fields.title || 'Nova tarefa' }, base).then(saved => {
       ctx.tasks.set(saved.id, saved);
-      // Linha de base sem frente/projeto guardados: assim a primeira sincronização grava esses dois no módulo.
-      const baseRow = taskToRow(saved, props, latest.current.users, {}, ctx.projects);
-      const row = taskToRow(saved, props, latest.current.users, moduleProps, ctx.projects);
+      // Frente, projetos e BU/parceiro já foram gravados na própria Tarefa.
+      const baseRow = taskToRow(saved, props, latest.current.users, {}, ctx.projects, ctx.initiatives);
+      const row = baseRow;
       const blocks = taskBlocks(saved);
       const page = taskPage(saved, blocks);
       patchWorkspace(prev => {
@@ -211,7 +211,8 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       // A campanha acompanha o projeto (vem da ligação feita na Visão Daily).
       const props = latest.current.databases[TASKS_DB].properties;
       const optName = (pid: string, id?: string | null) => (id ? props.find(p => p.id === pid)?.options?.find(o => o.id === id)?.name || '' : '');
-      const proj = ctx.projects.find(p => optName('p_projeto', p.id) === value);
+      const first = Array.isArray(value) ? value[0] : value;
+      const proj = ctx.projects.find(p => optName('p_projeto', p.id) === first);
       updateDatabaseRow(databaseId, rowId, 'p_campanha', optName('p_campanha', proj?.structure_card_id));
     }
   }, [ctx.projects, updateDatabaseRow, showToast]);
@@ -271,6 +272,13 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           ctx.fronts.push(f);
           pushOption(dbId, propId, { id: f.key, name: f.name, color: notionColor(f.color) }, GAAS_FRONT);
           return f.name;
+        }
+        if (dbId === TASKS_DB && propId === 'p_parceiro') {
+          const { data, error } = await supabase.rpc('gaas_daily_save_option', { p_kind: 'partner', p_key: null, p_body: { name } });
+          if (error) fail(error, 'Não foi possível criar o BU/parceiro.');
+          const partner = data as { key: string; name: string; color: string };
+          pushOption(dbId, propId, { id: partner.key, name: partner.name, color: notionColor(partner.color) });
+          return partner.name;
         }
         if (dbId === TASKS_DB && propId === 'p_projeto') {
           const fk = rowFront(dbId, rowId);
@@ -439,8 +447,8 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       ctx.tasks.set(saved.id, saved);
       const props = latest.current.databases[TASKS_DB].properties;
       const extra = src ? extraProps(src) : {};
-      const baseRow = taskToRow(saved, props, latest.current.users, {}, ctx.projects);
-      const row = taskToRow(saved, props, latest.current.users, extra, ctx.projects);
+      const baseRow = taskToRow(saved, props, latest.current.users, {}, ctx.projects, ctx.initiatives);
+      const row = taskToRow(saved, props, latest.current.users, extra, ctx.projects, ctx.initiatives);
       const blocks: Record<string, Block> = {};
       const blockIds = cloneBlocks(latest.current, srcPage?.blockIds || [], blocks);
       const page = { ...taskPage(saved, []), icon: srcPage?.icon || taskPage(saved, []).icon, blockIds };
@@ -807,10 +815,10 @@ function withoutSeed(ws: NotionWorkspace): NotionWorkspace {
   const dbs = tasksDb ? { ...others, [TASKS_DB]: { ...tasksDb, title: '' } } : others;
   return { ...ws, pages, blocks, databases: dbs, rootPageIds: [] };
 }
-function serverRow(ws: NotionWorkspace, task: WorkItem, projects: DailyProjectRef[]): DatabaseRow {
+function serverRow(ws: NotionWorkspace, task: WorkItem, projects: DailyProjectRef[], initiatives: Initiative[] = []): DatabaseRow {
   const db = ws.databases[TASKS_DB];
   const current = db.rows.find(r => r.id === taskRowId(task.id));
-  return taskToRow(task, db.properties, ws.users, current ? extraProps(current) : {}, projects);
+  return taskToRow(task, db.properties, ws.users, current ? extraProps(current) : {}, projects, initiatives);
 }
 function replaceRows(ws: NotionWorkspace, rows: DatabaseRow[]): NotionWorkspace {
   const db = ws.databases[TASKS_DB];

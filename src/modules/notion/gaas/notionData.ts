@@ -3,7 +3,7 @@ import { supabase } from '../../../services/supabaseClient';
 import { loadWorkspace, saveWork } from '../../../components/growth-learning/development/workService';
 import { type Initiative, type WorkItem } from '../../../components/growth-learning/development/workModel';
 import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionUser, NotionWorkspace } from '../types/notion';
-import { TASKS_DB, TASKS_PAGE, type TaskPageDef, taskPageDefs, taskScopePage, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
+import { TASKS_DB, TASKS_PAGE, type TaskPageDef, taskPageDefs, taskScopePage, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, type PartnerRef, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
 
 export interface NotionContext {
   me: string | null; canEditTasks: boolean; tasks: Map<string, WorkItem>; initiatives: Initiative[]; fronts: BusinessFront[]; projects: DailyProjectRef[];
@@ -39,13 +39,14 @@ function seedPages(): { pages: NotionPage[]; blocks: Block[] } {
 }
 
 export async function loadNotion(me: string | null): Promise<Loaded> {
-  const [pages, blocks, dbs, rows, meta, people, work, frentesRes, projectsRes, cardsRes] = await Promise.all([
+  const [pages, blocks, dbs, rows, meta, people, work, frentesRes, projectsRes, cardsRes, partnersRes] = await Promise.all([
     supabase.from('nt_pages').select('id,data'), supabase.from('nt_blocks').select('id,page_id,data'),
     supabase.from('nt_databases').select('id,data'), supabase.from('nt_rows').select('id,database_id,data'),
     supabase.from('nt_meta').select('key,data'), supabase.rpc('gaas_work_people'), loadWorkspace(),
     supabase.from('daily_frentes').select('key,name,color,archived,position').order('position'),
     supabase.from('daily_projects').select('id,name,frente_key,initiative_id,archived,structure_card_id').order('name'),
     supabase.from('crm_structure_cards').select('id,title').eq('archived', false).order('title'),
+    supabase.from('daily_partners').select('key,name,color,archived').order('position'),
   ]);
   const err = pages.error || blocks.error || dbs.error || rows.error || meta.error;
   if (err) throw err;
@@ -67,7 +68,8 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
 
   // Base Tarefas: linhas vindas das tarefas; páginas e blocos guardados por cima dos gerados.
   const storedTasksDb = (dbs.data || []).find(d => d.id === TASKS_DB)?.data as Partial<NotionDatabase> | undefined;
-  const props = systemProperties(work.initiatives, fronts, projects, campaigns);
+  const partners = (partnersRes.error ? [] : partnersRes.data || []) as PartnerRef[];
+  const props = systemProperties(work.initiatives, fronts, projects, campaigns, partners);
   const extra = new Map((rows.data || []).filter(r => r.database_id === TASKS_DB).map(r => [r.id, (r.data as { properties?: Record<string, unknown> }).properties || {}]));
   const taskRows: DatabaseRow[] = [];
   for (const t of work.tasks) {
@@ -75,7 +77,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
     gen.forEach(b => { if (!blockMap[b.id]) blockMap[b.id] = b; });
     const id = taskRowId(t.id);
     pageMap[id] = taskPage(t, gen, pageMap[id]);
-    taskRows.push(taskToRow(t, props, users, extra.get(id), projects));
+    taskRows.push(taskToRow(t, props, users, extra.get(id), projects, work.initiatives));
   }
   const databases: Record<string, NotionDatabase> = { [TASKS_DB]: tasksDatabase(props, taskRows, storedTasksDb) };
   for (const d of dbs.data || []) {
