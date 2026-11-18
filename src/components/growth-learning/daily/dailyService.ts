@@ -9,7 +9,7 @@ export async function loadDailyConfig(): Promise<DailyLoad> {
     supabase.from('daily_partners').select('*').order('position'),
     supabase.from('daily_tags').select('*').order('position'),
     supabase.from('daily_projects').select('*').order('name'),
-    supabase.rpc('gaas_daily_people'),
+    supabase.rpc('gaas_work_people'),
   ]);
   const error = frentes.error || partners.error || tags.error || projects.error;
   if (error) throw error;
@@ -60,6 +60,12 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   if (error) throw error;
   return data as T;
 }
+/** Cria, renomeia ou arquiva pessoa só com nome. */
+export const saveWorkPerson = (id: string | null, revision: number | null, body: Record<string, unknown>) =>
+  rpc<DailyPerson & { archived: boolean }>('gaas_work_save_person', { p_id: id, p_revision: revision, p_body: body });
+/** Liga a pessoa só com nome a uma conta (registros e Tarefas passam a apontar para a conta). */
+export const linkWorkPerson = (person: string, member: string) =>
+  rpc<{ daily_entries: number; tasks: number }>('gaas_work_link_person', { p_person: person, p_member: member });
 export const saveEntry = (id: string | null, revision: number | null, body: Record<string, unknown>) =>
   rpc<DailyEntry>('gaas_daily_save_entry', { p_id: id, p_revision: revision, p_body: body });
 export const saveProject = (id: string | null, revision: number | null, body: Record<string, unknown>) =>

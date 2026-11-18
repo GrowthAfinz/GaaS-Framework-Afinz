@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import { Archive, ArchiveRestore, Plus, X } from 'lucide-react';
-import { FALLBACK_COLOR, type DailyFrente, type DailyPartner, type DailyProject, type DailyTag } from './dailyModel';
+import { FALLBACK_COLOR, type DailyFrente, type DailyPartner, type DailyPerson, type DailyProject, type DailyTag } from './dailyModel';
 
-export type ConfigTab = 'project' | 'frente' | 'partner' | 'tag';
+export type ConfigTab = 'project' | 'frente' | 'partner' | 'tag' | 'people';
 const CRM_PARTNERS = ['Proprietaria', 'Serasa', 'Plurix', 'Bem Barato', 'Dia', 'Super Nosso'];
 interface Props {
   tab: ConfigTab; projects: DailyProject[]; frentes: DailyFrente[]; partners: DailyPartner[]; tags: DailyTag[]; canEdit: boolean;
@@ -11,8 +11,12 @@ interface Props {
   onSaveProject: (p: DailyProject | null, body: Record<string, unknown>) => Promise<void>;
   onMerge: (from: DailyProject, into: DailyProject) => Promise<void>;
   onSaveOption: (kind: 'frente' | 'partner' | 'tag', key: string | null, body: Record<string, unknown>) => Promise<void>;
+  /** Pessoas: quem tem conta e quem é só um nome. */
+  people?: DailyPerson[];
+  onSavePerson?: (person: DailyPerson | null, body: Record<string, unknown>) => Promise<void>;
+  onLinkPerson?: (person: DailyPerson, memberId: string) => Promise<void>;
 }
-const TABS: [ConfigTab, string][] = [['project', 'Projetos'], ['frente', 'Frentes'], ['partner', 'Parceiros'], ['tag', 'Tags']];
+const TABS: [ConfigTab, string][] = [['project', 'Projetos'], ['frente', 'Frentes'], ['partner', 'Parceiros'], ['tag', 'Tags'], ['people', 'Pessoas']];
 
 /** Nome salvo ao sair do campo; Enter confirma e Esc desfaz. */
 function NameInput({ value, disabled, onSave, autoFocus }: { value: string; disabled: boolean; onSave: (v: string) => void; autoFocus?: boolean }) {
@@ -55,6 +59,30 @@ export function DailyConfigModal(p: Props) {
         {archiveBtn(x.archived, () => void p.onSaveProject(x, { archived: !x.archived }))}
       </div>
     ));
+  } else if (p.tab === 'people') {
+    const people = p.people || [];
+    const members = people.filter(x => x.has_account !== false);
+    rows = people.map(x => x.has_account === false ? (
+      <div key={x.id} className="dv-crow">
+        <span className="dv-av guest" title="Sem conta no GaaS" style={{ width: 26, height: 26, flex: 'none' }}>{x.name.slice(0, 1).toUpperCase()}</span>
+        <NameInput value={x.name} disabled={!p.canEdit} autoFocus={fresh === x.id} onSave={v => void p.onSavePerson?.(x, { name: v })} />
+        <select value="" disabled={!p.canEdit || !members.length} style={{ width: 190, color: '#64748b' }} title="Quando a pessoa ganhar conta, ligue o nome à conta" onChange={e => {
+          const m = members.find(o => o.id === e.target.value);
+          if (m && window.confirm(`Ligar "${x.name}" à conta de ${m.name}? Registros e Tarefas de "${x.name}" passam para a conta.`)) void p.onLinkPerson?.(x, m.id);
+          e.target.value = '';
+        }}>
+          <option value="">Ligar à conta…</option>
+          {members.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        {archiveBtn(false, () => { if (window.confirm(`Arquivar "${x.name}"? Some da lista; registros antigos continuam com o nome.`)) void p.onSavePerson?.(x, { archived: true }); })}
+      </div>
+    ) : (
+      <div key={x.id} className="dv-crow">
+        <span className="dv-av" style={{ width: 26, height: 26, flex: 'none', background: '#0e7490' }}>{x.name.slice(0, 1).toUpperCase()}</span>
+        <span className="grow" style={{ padding: '6px 2px' }}>{x.name}</span>
+        <span style={{ fontSize: 12, color: '#64748b' }}>com conta</span>
+      </div>
+    ));
   } else {
     const kind = p.tab;
     const list: (DailyFrente | DailyPartner | DailyTag)[] = kind === 'frente' ? p.frentes : kind === 'partner' ? p.partners : p.tags;
@@ -76,7 +104,10 @@ export function DailyConfigModal(p: Props) {
   }
 
   const add = async () => {
-    if (p.tab === 'project') {
+    if (p.tab === 'people') {
+      let n = 1; while ((p.people || []).some(x => x.name === `Nova pessoa ${n}`)) n++;
+      await p.onSavePerson?.(null, { name: `Nova pessoa ${n}` });
+    } else if (p.tab === 'project') {
       const frente = p.frentes.find(f => !f.archived);
       if (!frente) { window.alert('Crie uma frente antes do primeiro projeto.'); p.onTab('frente'); return; }
       let n = 1; while (p.projects.some(x => !x.archived && x.name === `Novo projeto ${n}`)) n++;
@@ -89,9 +120,9 @@ export function DailyConfigModal(p: Props) {
   };
   useEffect(() => {
     if (fresh !== '__last__') return;
-    const list = p.tab === 'project' ? p.projects.filter(x => x.name.startsWith('Novo projeto')).map(x => x.id) : (p.tab === 'frente' ? p.frentes : p.tab === 'partner' ? p.partners : p.tags).filter(x => /^Nov[oa] /.test(x.name)).map(x => x.key);
+    const list = p.tab === 'people' ? (p.people || []).filter(x => x.name.startsWith('Nova pessoa')).map(x => x.id) : p.tab === 'project' ? p.projects.filter(x => x.name.startsWith('Novo projeto')).map(x => x.id) : (p.tab === 'frente' ? p.frentes : p.tab === 'partner' ? p.partners : p.tags).filter(x => /^Nov[oa] /.test(x.name)).map(x => x.key);
     if (list.length) setFresh(list[list.length - 1]);
-  }, [fresh, p.tab, p.projects, p.frentes, p.partners, p.tags]);
+  }, [fresh, p.tab, p.projects, p.frentes, p.partners, p.tags, p.people]);
 
   return (
     <div className="dv-modal" onPointerDown={e => { if (e.target === e.currentTarget) p.onClose(); }}>
@@ -108,7 +139,7 @@ export function DailyConfigModal(p: Props) {
           {rows.length ? rows : <div className="dv-empty">Nada cadastrado ainda.</div>}
           {p.canEdit && <button className="dv-add" onClick={() => void add()}><Plus />Adicionar</button>}
         </div>
-        <div className="mf">Projeto herda a cor da frente. "Juntar com" move os registros para outro projeto e arquiva o de origem. Parceiro com dado CRM entra no número de cartões do calendário.</div>
+        <div className="mf">Projeto herda a cor da frente. "Juntar com" move os registros para outro projeto e arquiva o de origem. Parceiro com dado CRM entra no número de cartões do calendário. Pessoa sem conta entra só com o nome e pode ser ligada à conta depois.</div>
       </div>
     </div>
   );

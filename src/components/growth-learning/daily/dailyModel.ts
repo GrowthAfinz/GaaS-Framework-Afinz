@@ -15,7 +15,8 @@ export interface DailyEntry {
   work_ids?: string[];
   position: number; source: 'app' | 'planilha'; deleted_at: string | null; revision: number; created_at: string; updated_at: string;
 }
-export interface DailyPerson { id: string; name: string }
+/** Pessoa do trabalho: tem conta no GaaS ou é só um nome (decisão de 17/11/2026). */
+export interface DailyPerson { id: string; name: string; has_account?: boolean; revision?: number }
 export interface B2cDay { day: string; emissions: number | null; proposals: number | null }
 export interface CrmCell { day: string; partner: string; cards: number; proposals: number }
 

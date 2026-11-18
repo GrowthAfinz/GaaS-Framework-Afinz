@@ -15,11 +15,11 @@ import './daily.css';
 import {
   FALLBACK_COLOR, WEEKDAYS, addDays, brDate, crmForDay, emptyDailyFilters, entryVisible, fmtInt, friendlyDailyError, groupEntries, monthEnd,
   monthKey, monthStart, nextWorkday, previousMonthKey, projectMonthStats, recentProjects, saoPauloToday, staleProjects, toggleIsolate, weekRange, weekday, workdaysBetween,
-  type B2cDay, type CrmCell, type DailyEntry, type DailyFilters, type DailyFrente, type DailyGroup, type DailyPartner, type DailyProject,
+  type B2cDay, type CrmCell, type DailyEntry, type DailyFilters, type DailyFrente, type DailyGroup, type DailyPartner, type DailyPerson, type DailyProject,
   type DailySort, type DailyTag, type DailyView, type FilterKey,
 } from './dailyModel';
 import {
-  loadB2c, loadCrm, loadDailyConfig, loadEarliestDay, loadEntries, loadFreshness, mergeProjects, saveEntry, saveOption, saveProject,
+  loadB2c, loadCrm, loadDailyConfig, loadEarliestDay, loadEntries, loadFreshness, mergeProjects, saveEntry, saveOption, saveProject, saveWorkPerson, linkWorkPerson,
   type DailyLoad, loadBoardCampaigns, loadEntriesLite, loadInitiativesFull, loadWorkMentions, loadWorks, saveWork,
   type DailyInitiative, type DailyWork, type EntryLite,
 } from './dailyService';
@@ -316,6 +316,38 @@ export function DailyWorkspace() {
       putEntry(saved); setDraft(null); goToDay(saved.day); setDrawerKey(k => k + 1); showToast('Registro salvo');
     } catch (err) { fail(err); }
   }, [fail, goToDay, me, putEntry, showToast]);
+  /** Renomeia, arquiva ou cria pessoa só com nome (aba Pessoas da configuração). */
+  const savePersonProps = useCallback(async (person: DailyPerson | null, body: Record<string, unknown>) => {
+    try {
+      const saved = await saveWorkPerson(person?.id ?? null, person?.revision ?? null, body);
+      setCfg(c => c && { ...c, people: saved.archived ? c.people.filter(x => x.id !== saved.id)
+        : (c.people.some(x => x.id === saved.id) ? c.people.map(x => (x.id === saved.id ? { ...x, name: saved.name, revision: saved.revision } : x)) : [...c.people, { id: saved.id, name: saved.name, has_account: false, revision: saved.revision }]) });
+    } catch (err) {
+      const m = String((err as { message?: string })?.message || '');
+      showToast(m.includes('person_name_taken') ? 'Já existe alguém com esse nome na lista.' : m.includes('revision_conflict') ? 'Alguém mudou essa pessoa antes de você. Reabra a configuração.' : 'Não foi possível salvar a pessoa.');
+    }
+  }, [showToast]);
+  /** Quando a pessoa ganha conta: registros e Tarefas passam a apontar para a conta. */
+  const linkPerson = useCallback(async (person: DailyPerson, memberId: string) => {
+    try {
+      const r = await linkWorkPerson(person.id, memberId);
+      setCfg(c => c && { ...c, people: c.people.filter(x => x.id !== person.id) });
+      await reloadEntries(); void reloadWorks();
+      showToast(`${person.name} ligada à conta: ${r.daily_entries} registro(s) e ${r.tasks} Tarefa(s) atualizados`);
+    } catch { showToast('Não foi possível ligar a pessoa à conta.'); }
+  }, [showToast, reloadWorks, reloadEntries]);
+  /** Pessoa só com nome: entra na lista na hora e já pode ser responsável ou seguidora. */
+  const createPerson = useCallback(async (name: string): Promise<string | null> => {
+    try {
+      const saved = await saveWorkPerson(null, null, { name });
+      setCfg(c => c && { ...c, people: [...c.people, { id: saved.id, name: saved.name, has_account: false, revision: saved.revision }].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')) });
+      showToast(`${saved.name} entrou na lista (sem conta no GaaS)`);
+      return saved.id;
+    } catch (err) {
+      showToast(String((err as { message?: string })?.message || '').includes('person_name_taken') ? 'Já existe alguém com esse nome na lista.' : 'Não foi possível adicionar a pessoa.');
+      return null;
+    }
+  }, [showToast]);
   const putProject = (saved: DailyProject) => setCfg(c => c && { ...c, projects: c.projects.some(p => p.id === saved.id) ? c.projects.map(p => (p.id === saved.id ? saved : p)) : [...c.projects, saved] });
   const createProject = useCallback(async (name: string): Promise<string | null> => {
     const frente = cfg?.frentes.find(f => !f.archived);
@@ -446,7 +478,8 @@ export function DailyWorkspace() {
     }
     if (pop.kind === 'people') {
       return <Popover anchor={pop.anchor} width={330} onClose={close}><PeoplePicker people={cfg.people} me={me} responsible={e.responsible_id} followers={e.follower_ids} subject={e.body}
-        onChange={(r, f) => void patchEntry(e, { responsible_id: r, follower_ids: f }, 'Pessoas atualizadas')} /></Popover>;
+        onChange={(r, f) => void patchEntry(e, { responsible_id: r, follower_ids: f }, 'Pessoas atualizadas')}
+        onCreate={createPerson} /></Popover>;
     }
     if (pop.kind === 'move') {
       return <Popover anchor={pop.anchor} width={260} onClose={close}><DayPicker value={e.day} title="Mover para o dia" shortcuts={[['Hoje', today], ['Próximo dia útil', nextWorkday(e.day)], ['+1 semana', addDays(e.day, 7)]]}
@@ -640,7 +673,8 @@ export function DailyWorkspace() {
       {config && cfg && (
         <DailyConfigModal tab={config} projects={cfg.projects} frentes={cfg.frentes} partners={cfg.partners} tags={cfg.tags} canEdit={canEdit}
           onTab={setConfig} onClose={() => setConfig(null)} onSaveProject={saveProjectProps} onMerge={merge}
-          onSaveOption={async (kind, key, body) => { await saveOpt(kind, key, body); }} />
+          onSaveOption={async (kind, key, body) => { await saveOpt(kind, key, body); }}
+          people={cfg.people} onSavePerson={savePersonProps} onLinkPerson={linkPerson} />
       )}
       {toast && <div className="cs-toast">{toast.text}{toast.undo && <button onClick={() => void toast.undo?.()}>Desfazer</button>}</div>}
     </div>
