@@ -3,6 +3,7 @@ import type React from 'react';
 import {
   ArrowDownUp, CalendarArrowUp, CalendarDays, CalendarSearch, Copy, CornerDownRight, CreditCard, Database, FolderInput, FolderKanban, KanbanSquare, Layers, Link2, Pencil, Plus,
   Presentation, Rows3, Search, Send, Settings2, Trash2,
+  Ellipsis,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { toLocalPx } from '../../../context/UIScaleContext';
@@ -50,7 +51,7 @@ const readPrefs = (): Prefs => {
 
 type Pop =
   | { kind: 'filter'; key: FilterKey; anchor: Anchor } | { kind: 'sort'; anchor: Anchor } | { kind: 'group'; anchor: Anchor }
-  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'move' | 'copy' | 'work'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
+  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'more' | 'move' | 'copy' | 'work'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 const FILTER_LABELS: [FilterKey, string][] = [['frentes', 'Frente'], ['projects', 'Projeto'], ['partners', 'Parceiro'], ['people', 'Pessoa'], ['tags', 'Tag']];
 
@@ -294,7 +295,9 @@ export function DailyWorkspace() {
     try {
       const saved = await saveEntry(null, null, { day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids });
       putEntry(saved); goToDay(day); setDrawerKey(k => k + 1);
-      showToast(`Registro copiado para ${WEEKDAYS[weekday(day)]}, ${brDate(day)}`, async () => {
+      // A cópia nunca leva o vínculo com Tarefas: duplicar não pode criar trabalho nem citação por acidente.
+      const linked = (e.work_ids || []).length ? ' (sem o vínculo com a Tarefa; vincule de novo se for o mesmo trabalho)' : '';
+      showToast(`Registro copiado para ${WEEKDAYS[weekday(day)]}, ${brDate(day)}${linked}`, async () => {
         try { putEntry(await saveEntry(saved.id, saved.revision, { deleted: true })); setToast(null); } catch (err) { fail(err); }
       });
       // A linha da cópia só existe depois que o dia abre na lista (às vezes um mês novo carrega antes).
@@ -359,18 +362,18 @@ export function DailyWorkspace() {
   const saveWorkFromBoard = useCallback(async (w: DailyWork | null, body: Record<string, unknown>) => {
     const saved = await saveWork(w?.id ?? null, w?.revision ?? null, body);
     setWorks(list => (list.some(x => x.id === saved.id) ? list.map(x => (x.id === saved.id ? { ...x, ...saved } : x)) : [saved, ...list]));
-    showToast(w ? `"${saved.title}" foi para ${statusLabel(saved.status)}` : `Trabalho "${saved.title}" criado`);
+    showToast(w ? `"${saved.title}" foi para ${statusLabel(saved.status)}` : `Tarefa "${saved.title}" criada`);
     return saved;
   }, [showToast]);
   const toggleWork = useCallback((e: DailyEntry, workId: string) => {
     const cur = e.work_ids || [], on = cur.includes(workId), w = worksById.get(workId);
-    void patchEntry(e, { work_ids: on ? cur.filter(x => x !== workId) : [...cur, workId] }, on ? 'Trabalho desligado do registro' : `Registro ligado a "${w?.title || 'trabalho'}"`);
+    void patchEntry(e, { work_ids: on ? cur.filter(x => x !== workId) : [...cur, workId] }, on ? 'Registro desvinculado da Tarefa' : `Registro vinculado a "${w?.title || 'Tarefa'}"`);
   }, [patchEntry, worksById]);
   /** Cria um trabalho na iniciativa do projeto com o texto do registro e já liga os dois. */
   const createWorkFromEntry = useCallback(async (e: DailyEntry) => {
     setPop(null);
     const pr = projects.get(e.project_id), ini = pr?.initiative_id ? initiatives.get(pr.initiative_id) : undefined;
-    if (!ini) { showToast('Ligue o projeto a uma iniciativa (página do projeto) antes de criar trabalho.'); return; }
+    if (!ini) { showToast('Ligue o projeto a uma iniciativa (página do projeto) antes de criar Tarefa.'); return; }
     const text = e.body.replace(/\s+/g, ' ').trim();
     const title = (text.length > 120 ? text.slice(0, 117).trimEnd() + '…' : text).padEnd(5, '.');
     try {
@@ -382,7 +385,7 @@ export function DailyWorkspace() {
       setWorks(list => [saved, ...list]);
       const linked = await saveEntry(e.id, e.revision, { work_ids: [...(e.work_ids || []), saved.id] });
       putEntry(linked);
-      showToast(`Trabalho criado em ${ini.title} e ligado ao registro`);
+      showToast(`Tarefa criada em ${ini.title} e vinculada ao registro`);
     } catch (err) { fail(err); }
   }, [fail, initiatives, people, projects, putEntry, showToast]);
 
@@ -455,18 +458,24 @@ export function DailyWorkspace() {
     }
     return (
       <Popover anchor={pop.anchor} width={250} onClose={close}>
-        <MenuList items={[
-          { icon: <Pencil />, label: 'Editar texto', onClick: () => { close(); window.setTimeout(() => (document.querySelector(`[data-entry="${e.id}"] .txt`) as HTMLElement | null)?.click(), 0); } },
-          { icon: <FolderInput />, label: 'Mover para outro projeto', onClick: () => setPop({ kind: 'project', entryId: e.id, anchor: pop.anchor }) },
-          { icon: <CalendarArrowUp />, label: 'Mudar o dia', onClick: () => setPop({ kind: 'move', entryId: e.id, anchor: pop.anchor }) },
-          ...(canEdit ? [{ icon: <Copy />, label: 'Copiar para outro dia', onClick: () => setPop({ kind: 'copy', entryId: e.id, anchor: pop.anchor }) }] : []),
-          { icon: <CornerDownRight />, label: 'Continuar no próximo dia útil', onClick: () => { close(); setDraft({ day: nextWorkday(e.day), projectId: e.project_id }); } },
-          { icon: <FolderKanban />, label: 'Abrir projeto', onClick: () => { close(); setDrawer(e.project_id); } },
-          { icon: <CalendarSearch />, label: 'Abrir o dia', onClick: () => { close(); openDay(e.day, e.project_id); } },
-          ...(canEdit ? [{ icon: <Link2 />, label: 'Ligar a trabalho', onClick: () => setPop({ kind: 'work', entryId: e.id, anchor: pop.anchor }) }] : []),
-          ...(projects.get(e.project_id)?.initiative_id ? [{ icon: <KanbanSquare />, label: 'Abrir kanban da frente', onClick: () => { close(); openKanban(projects.get(e.project_id)!.initiative_id as string, (e.work_ids || [])[0] || null); } }] : []),
-          { icon: <Trash2 />, label: 'Excluir registro', danger: true, onClick: () => { close(); void deleteEntry(e); } },
-        ]} />
+        {pop.kind === 'more' ? (
+          <MenuList title="Mais ações" items={[
+            { icon: <FolderInput />, label: 'Mover para outro projeto', onClick: () => setPop({ kind: 'project', entryId: e.id, anchor: pop.anchor }) },
+            { icon: <CalendarArrowUp />, label: 'Mudar o dia', onClick: () => setPop({ kind: 'move', entryId: e.id, anchor: pop.anchor }) },
+            { icon: <CornerDownRight />, label: 'Continuar no próximo dia útil', onClick: () => { close(); setDraft({ day: nextWorkday(e.day), projectId: e.project_id }); } },
+            { icon: <FolderKanban />, label: 'Abrir projeto', onClick: () => { close(); setDrawer(e.project_id); } },
+            ...(projects.get(e.project_id)?.initiative_id ? [{ icon: <KanbanSquare />, label: 'Abrir kanban da iniciativa', onClick: () => { close(); openKanban(projects.get(e.project_id)!.initiative_id as string, (e.work_ids || [])[0] || null); } }] : []),
+          ]} />
+        ) : (
+          <MenuList items={[
+            { icon: <CalendarSearch />, label: 'Abrir detalhes', onClick: () => { close(); openDay(e.day, e.project_id); } },
+            { icon: <Pencil />, label: 'Editar', onClick: () => { close(); window.setTimeout(() => (document.querySelector(`[data-entry="${e.id}"] .txt`) as HTMLElement | null)?.click(), 0); } },
+            ...(canEdit ? [{ icon: <Copy />, label: 'Duplicar', hint: 'Escolha o dia da cópia', onClick: () => setPop({ kind: 'copy', entryId: e.id, anchor: pop.anchor }) }] : []),
+            ...(canEdit ? [{ icon: <Link2 />, label: 'Vincular a Tarefa…', onClick: () => setPop({ kind: 'work', entryId: e.id, anchor: pop.anchor }) }] : []),
+            { icon: <Trash2 />, label: 'Excluir', danger: true, onClick: () => { close(); void deleteEntry(e); } },
+            { icon: <Ellipsis />, label: 'Mais ações', onClick: () => setPop({ kind: 'more', entryId: e.id, anchor: pop.anchor }) },
+          ]} />
+        )}
       </Popover>
     );
   };
@@ -526,7 +535,7 @@ export function DailyWorkspace() {
                   <span className="dv-sw" style={{ background: projectColor(s.projectId) }} />
                   <span style={{ minWidth: 0 }}><b>{pr.name}</b>
                     <span className="s">último registro {brDate(s.last)}{!st && idle > 3 ? ` · há ${idle} dias úteis` : ''}</span>
-                    {st && <span className="dv-stale" title={`${st.active} trabalho(s) em execução e nenhum registro há ${st.idle} dias úteis`}>parado há {st.idle} dias úteis</span>}
+                    {st && <span className="dv-stale" title={`${st.active} Tarefa(s) em execução e nenhum registro há ${st.idle} dias úteis`}>parado há {st.idle} dias úteis</span>}
                   </span>
                   <span className="c">{s.days}d</span>
                 </button>

@@ -52,10 +52,10 @@ export function WorkPicker({ works, initiativeId, initiatives, selected, today, 
   }, [works, q, initiativeId, selected]);
   return (
     <>
-      <div className="hd"><b>Ligar a trabalho</b><div className="s">{initiativeId ? `Trabalhos de ${initiatives.get(initiativeId)?.title || 'iniciativa'}; busque para ver os outros` : 'Projeto sem iniciativa: busque em todos os trabalhos'}</div></div>
+      <div className="hd"><b>Vincular a Tarefa…</b><div className="s">{initiativeId ? `Tarefas de ${initiatives.get(initiativeId)?.title || 'iniciativa'}; busque para ver os outros` : 'Projeto sem iniciativa: busque em todas as Tarefas'}</div></div>
       <div style={{ padding: 10, borderBottom: '1px solid #f1f5f9', position: 'relative' }}>
         <Search size={13} style={{ position: 'absolute', left: 19, top: 20, color: '#94a3b8' }} />
-        <input autoFocus type="search" value={q} placeholder="Buscar trabalho" style={{ paddingLeft: 26 }} onChange={e => setQ(e.target.value)} />
+        <input autoFocus type="search" value={q} placeholder="Buscar Tarefa" style={{ paddingLeft: 26 }} onChange={e => setQ(e.target.value)} />
       </div>
       <div className="lst">
         {list.map(w => {
@@ -70,9 +70,9 @@ export function WorkPicker({ works, initiativeId, initiatives, selected, today, 
             </button>
           );
         })}
-        {!list.length && <div className="dv-empty" style={{ padding: '8px 12px' }}>{q ? 'Nenhum trabalho com esse nome.' : 'Esta iniciativa ainda não tem trabalhos.'}</div>}
+        {!list.length && <div className="dv-empty" style={{ padding: '8px 12px' }}>{q ? 'Nenhuma Tarefa com esse nome.' : 'Esta iniciativa ainda não tem Tarefas.'}</div>}
       </div>
-      {onCreate && <div className="ft"><button className="dv-link" onClick={onCreate}><Plus size={12} style={{ verticalAlign: -2 }} /> Criar trabalho a partir deste registro</button></div>}
+      {onCreate && <div className="ft"><button className="dv-link" onClick={onCreate}><Plus size={12} style={{ verticalAlign: -2 }} /> Criar Tarefa a partir deste registro</button></div>}
     </>
   );
 }
@@ -227,7 +227,7 @@ export function DailyKanbanModal(p: KanbanProps) {
           <span className="ic"><KanbanSquare /></span>
           <div style={{ minWidth: 0 }}>
             <b>{board ? board.title : 'Kanban'}</b>
-            <p>{allWorks.length} {allWorks.length === 1 ? 'trabalho' : 'trabalhos'}{works.length !== allWorks.length ? ` · ${works.length} no filtro` : ''} · arraste os cards entre colunas para mudar o status{p.canEdit ? '' : ' (somente leitura)'}</p>
+            <p>{allWorks.length} {allWorks.length === 1 ? 'Tarefa' : 'Tarefas'}{works.length !== allWorks.length ? ` · ${works.length} no filtro` : ''} · arraste os cards entre colunas para mudar o status{p.canEdit ? '' : ' (somente leitura)'}</p>
           </div>
           <span style={{ flex: 1 }} />
           <a className="cs-btn" href={tasksUrl} target="_blank" rel="noopener noreferrer"><ExternalLink />Abrir em Tarefas e atividades</a>
@@ -241,7 +241,7 @@ export function DailyKanbanModal(p: KanbanProps) {
           {cancelled > 0 && <button className="dv-link" style={{ marginLeft: 'auto' }} onClick={() => setShowCancelled(s => !s)}>{showCancelled ? 'Esconder' : 'Mostrar'} {cancelled} cancelado{cancelled > 1 ? 's' : ''}</button>}
         </nav>
         <div className="dv-kfil">
-          <label className="srch"><Search /><input type="search" value={q} placeholder="Buscar trabalho, responsável ou código" onChange={e => setQ(e.target.value)} /></label>
+          <label className="srch"><Search /><input type="search" value={q} placeholder="Buscar Tarefa, responsável ou código" onChange={e => setQ(e.target.value)} /></label>
           {tagCounts.length > 0 && <span className="lb">Filtrar:</span>}
           {tagCounts.map(({ tag, n }) => (
             <button key={tag.key} type="button" className={`dv-ktag${tag.color ? '' : ' neutral'}${tagFilter.includes(tag.key) ? ' on' : ''}`} style={tagStyle(tag)}
@@ -260,8 +260,8 @@ export function DailyKanbanModal(p: KanbanProps) {
                 <h4><i />{statusLabel(status)}<span>{list.length}</span></h4>
                 {status === 'backlog' && p.canEdit && board && (
                   <div className="dv-kadd">
-                    <input value={adding} placeholder="Novo trabalho" onChange={e => setAdding(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void create(); }} />
-                    <button className="dv-ib sm" aria-label="Criar trabalho" disabled={busy} onClick={() => void create()}><Plus /></button>
+                    <input value={adding} placeholder="Nova Tarefa" onChange={e => setAdding(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void create(); }} />
+                    <button className="dv-ib sm" aria-label="Criar Tarefa" disabled={busy} onClick={() => void create()}><Plus /></button>
                   </div>
                 )}
                 <div className="cards">{list.map(card)}{!list.length && <div className="empty">Nada aqui</div>}</div>

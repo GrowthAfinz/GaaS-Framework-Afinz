@@ -46,10 +46,10 @@ export function preparePilotSave(task: WorkItem, original?: WorkItem): WorkItem 
   const criteria = task.acceptance_criteria.map(c => c.trim()).filter(Boolean);
   const criteriaChanged = Boolean(original && JSON.stringify(criteria) !== JSON.stringify(original.acceptance_criteria));
   if (task.title.trim().length < 5) fail('O título precisa ter pelo menos cinco caracteres.');
-  if (criteriaChanged && task.status === 'concluida') fail('Reabra a atividade antes de alterar seus critérios de conclusão.');
+  if (criteriaChanged && task.status === 'concluida') fail('Reabra a Tarefa antes de alterar seus critérios de conclusão.');
   if (task.links.some(l => !l.label.trim() || !safeWorkUrl(l.url.trim()) || /[\u0000-\u001f]/.test(l.url.trim()))) fail('Revise as referências: informe título e endereço https, link interno ou caminho de nota válido.');
   const dependencies = [...new Set(task.dependencies.map(d => d.trim()).filter(Boolean))];
-  if (dependencies.includes(task.task_key)) fail('Uma atividade não pode depender dela mesma.');
+  if (dependencies.includes(task.task_key)) fail('Uma Tarefa não pode depender dela mesma.');
   const legacyUndated = original?.status === 'concluida' && !completionDate(original) && !task.details.completed_on;
   if (task.status === 'concluida' && !legacyUndated && (!completionDate(task) || completionDate(task)! > brazilToday())) fail('Informe uma data de conclusão válida, até hoje, no horário de Brasília.');
   return { ...task, title: task.title.trim(), acceptance_criteria: criteria, completed_criteria: criteriaChanged ? [] : task.completed_criteria, dependencies, links: task.links.map(l => ({ ...l, label: l.label.trim(), url: l.url.trim() })) };
