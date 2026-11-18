@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { Check, CheckCheck, ChevronDown, ChevronRight, ExternalLink, Loader2, Pencil, RefreshCw, Plus, MoreHorizontal, Copy, ArrowUp, ArrowDown, Trash2, GripVertical, X } from 'lucide-react';
+import { Check, CheckCheck, ChevronDown, ChevronRight, ExternalLink, Loader2, Pencil, RefreshCw, Plus, MoreHorizontal, Copy, ArrowUp, ArrowDown, Trash2, GripVertical, X, ListChecks } from 'lucide-react';
 import { saveWork } from '../growth-learning/development/workService';
+import { TaskModal } from '../growth-learning/development/TaskModal';
 import { TASK_STATUS, taskError, type taskHistory } from '../growth-learning/development/developmentService';
 import { subtaskProgress, newWork, type WorkItem } from '../growth-learning/development/workModel';
 import { loadInsuranceTasks, INSURANCE_STRATEGY_PATH, loadPilotTasks } from './wikiPilotService';
@@ -74,6 +75,8 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
   const activityTitle = insurance ? 'Tarefas: Construção e ativação de Seguros' : 'Tarefas: Construção do Piloto';
   const defaultNote = insurance ? 'Mesmos registros de Tarefas e atividades · seis frentes com liberação própria · marcos documentais não certificam ativação no SFMC.' : 'Mesmos registros de Tarefas e atividades · 3 cards no piloto · quarto card e GRUPO_2 ficam para depois.';
   const [data, setData] = useState<Awaited<ReturnType<typeof loadPilotTasks>> | null>(null);
+  /** Janela da Tarefa (a mesma de Tarefas e atividades e da Daily), por cima da nota. */
+  const [taskOpen, setTaskOpen] = useState<string | null>(null);
   const [opened, setOpened] = useState(initiallyOpen), [pending, setPending] = useState(false);
   const [groups, setGroups] = useState<Record<string, boolean>>({});
   const [error, setError] = useState(''), [message, setMessage] = useState('');
@@ -355,6 +358,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
         </span>
       </button>
       <RowMenu label={`Mais ações de ${task.title}`}>{close => <>
+        <button type="button" role="menuitem" className={menuItem} onClick={() => { close(); setTaskOpen(task.id); }}><ListChecks size={13}/>Abrir Tarefa</button>
         <button type="button" role="menuitem" className={menuItem} disabled={locked} onClick={() => { close(); setAdding(null); setRenaming({ id: task.id, title: task.title }); }}><Pencil size={13}/>Renomear</button>
         {onLayoutChange && <>
           <button type="button" role="menuitem" className={menuItem} disabled={locked} onClick={() => { close(); void duplicate(task); }}><Copy size={13}/>Duplicar</button>
@@ -458,5 +462,6 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     </div>
     {error && <p role="alert" className="border-t border-rose-100 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
     {message && <p role="status" className={`pilot-toast flex items-center justify-between gap-3 border-t px-4 py-2.5 text-xs ${warn ? 'border-amber-100 bg-amber-50 text-amber-800' : 'border-teal-100 bg-teal-50/60 text-teal-800'}`}><span>{message}</span>{undo && <button type="button" className="shrink-0 rounded px-2 py-1 font-semibold text-teal-800 underline-offset-2 hover:bg-teal-100 hover:underline" onClick={() => { const run = undo.run; setUndo(null); setMessage(''); run(); }}>{undo.label}</button>}</p>}
+  {taskOpen && <TaskModal taskId={taskOpen} onClose={() => setTaskOpen(null)} onChanged={() => void load()} />}
   </section>;
 }

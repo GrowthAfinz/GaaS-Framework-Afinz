@@ -116,7 +116,7 @@ export function DailyEntries(p: Props) {
           {(e.work_ids || []).length > 0 && (
             <div className="dv-rw">
               {(e.work_ids || []).map(id => p.works.get(id)).filter((w): w is DailyWork => Boolean(w)).map(w => (
-                <button key={w.id} className="dv-dw sm" title={`${w.title}: abrir no kanban`} onClick={() => p.onOpenWork(w)}><StatusPill status={w.status} small /><span className="t">{w.title}</span></button>
+                <button key={w.id} className="dv-dw sm" title={`Abrir a Tarefa ${w.title}`} onClick={() => p.onOpenWork(w)}><StatusPill status={w.status} small /><span className="t">{w.title}</span></button>
               ))}
             </div>
           )}

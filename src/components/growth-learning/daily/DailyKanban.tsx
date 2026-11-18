@@ -108,6 +108,8 @@ const tagStyle = (t: TagVocab) => (t.color ? { color: `color-mix(in srgb, ${t.co
 
 /* ---------- kanban da iniciativa ---------- */
 interface KanbanProps {
+  /** Abre a janela da Tarefa (a mesma de Tarefas e atividades). */
+  onOpenTask?: (id: string) => void;
   boards: DailyInitiative[]; boardId: string; focusWorkId: string | null; works: DailyWork[]; mentions: EntryLite[];
   projects: Map<string, DailyProject>; partners: DailyPartner[]; today: string; canEdit: boolean;
   onBoard: (id: string) => void; onClose: () => void;
@@ -200,6 +202,7 @@ export function DailyKanbanModal(p: KanbanProps) {
           {focus && <span className="here">deste registro</span>}
         </div>
         <div className="tt">{w.title}</div>
+        {p.onOpenTask && <button className="dv-link" style={{ fontSize: 12, marginTop: 2 }} onClick={ev => { ev.stopPropagation(); p.onOpenTask?.(w.id); }}>Abrir Tarefa</button>}
         {w.status === 'bloqueada' && w.blocked_reason && <div className="bl">{w.blocked_reason}</div>}
         {w.next_action && <div className="na"><b>Próxima ação</b>{w.next_action}</div>}
         <div className="ft">

@@ -28,6 +28,7 @@ import { DailyDayModal } from './DailyDayModal';
 import { DailyKanbanModal, WorkPicker, boardName, dailyBoards, statusLabel } from './DailyKanban';
 import { workspaceLabel, type Workspace } from '../development/workModel';
 import { DailyEntries, type Draft } from './DailyEntries';
+import { TaskModal } from '../development/TaskModal';
 import { DailyProjectDrawer } from './DailyProjectDrawer';
 import { DailyConfigModal, type ConfigTab } from './DailyConfigModal';
 import { DayPicker, MenuList, MultiFilter, PeoplePicker, Popover, ProjectPicker, TagPicker, anchorOf, type Anchor, type FilterOption } from './DailyPopovers';
@@ -64,6 +65,8 @@ export function DailyWorkspace() {
   const [ym, setYm] = useState({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) });
   const [selected, setSelected] = useState(today);
   const [byMonth, setByMonth] = useState<Record<string, DailyEntry[]>>({});
+  /** Janela da Tarefa aberta por cima da Daily (a mesma de Tarefas e atividades). */
+  const [taskOpen, setTaskOpen] = useState<string | null>(() => new URLSearchParams(window.location.search).get('task'));
   const [b2c, setB2c] = useState<Map<string, B2cDay>>(new Map());
   const [crm, setCrm] = useState<Map<string, CrmCell[]>>(new Map());
   const loaded = useRef(new Set<string>());
@@ -627,7 +630,7 @@ export function DailyWorkspace() {
               onMenu={(e, el) => setPop({ kind: 'menu', entryId: e.id, anchor: anchorOf(el) })}
               onContinue={e => setDraft({ day: nextWorkday(e.day), projectId: e.project_id })}
               onOpenProject={setDrawer} onHoverProject={setHoverProject}
-              pin={pin} onPin={pinTopic} works={worksById} onOpenWork={w => { if (w.initiative_id) openKanban(w.initiative_id, w.id); }}
+              pin={pin} onPin={pinTopic} works={worksById} onOpenWork={w => setTaskOpen(w.id)}
               onWorkPop={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })}
               dropDay={dropDay} onDragEntry={(e, ev) => startDrag([e.id], e.day, ev)} onDragOverDay={overDay} onDropDay={dropOnDay} onDragEnd={endDrag} />
           </div>
@@ -662,14 +665,16 @@ export function DailyWorkspace() {
           b2c={b2c.get(dayModal.day)} crm={crm.get(dayModal.day) || []} canEdit={canEdit}
           onClose={closeDay} onDay={openDay} onFocus={pid => setPin({ day: dayModal.day, projectId: pid })}
           onKanban={openKanban} onOpenProject={id => setDrawer(id)}
-          onLinkWork={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })} onCreateWork={e => void createWorkFromEntry(e)} />
+          onLinkWork={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })} onCreateWork={e => void createWorkFromEntry(e)}  onOpenTask={id => setTaskOpen(id)}/>
       )}
       {kanban && (
         <DailyKanbanModal boards={boards.some(b => b.id === kanban.boardId) ? boards : [...boards, ...initiativeList.filter(i => i.id === kanban.boardId)]}
           boardId={kanban.boardId} focusWorkId={kanban.focusWorkId} works={works} mentions={mentions} projects={projects} partners={cfg?.partners || []} today={today} canEdit={canEdit}
           onBoard={id => setKanban({ boardId: id, focusWorkId: null })} onClose={() => { setKanban(null); void reloadWorks(); }} onSave={saveWorkFromBoard}
-          onOpenDay={(day, pid) => { setKanban(null); openDay(day, pid); }} />
+          onOpenDay={(day, pid) => { setKanban(null); openDay(day, pid); }} onOpenTask={id => setTaskOpen(id)} />
       )}
+      {taskOpen && <TaskModal taskId={taskOpen} onClose={() => setTaskOpen(null)} onChanged={() => void reloadWorks()}
+        onOpenDay={(day, pid) => { setTaskOpen(null); setKanban(null); openDay(day, pid); }} />}
       {config && cfg && (
         <DailyConfigModal tab={config} projects={cfg.projects} frentes={cfg.frentes} partners={cfg.partners} tags={cfg.tags} canEdit={canEdit}
           onTab={setConfig} onClose={() => setConfig(null)} onSaveProject={saveProjectProps} onMerge={merge}

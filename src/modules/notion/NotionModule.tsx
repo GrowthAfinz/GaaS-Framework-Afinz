@@ -11,13 +11,14 @@ import { SearchModal } from './components/layout/SearchModal';
 import { TrashModal } from './components/layout/TrashModal';
 import { TemplatesModal } from './components/layout/TemplatesModal';
 import { RowPeekModal } from './components/database/RowPeekModal';
+import { TaskModal } from '../../components/growth-learning/development/TaskModal';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
 import { configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
 import { supabase } from '../../services/supabaseClient';
 import { saveInitiative } from '../../components/growth-learning/development/workService';
 import { GaasSettingsModal } from './gaas/GaasPanels';
 import { useAuth } from '../../context/AuthContext';
-import { newWork, type Initiative, type WorkItem } from '../../components/growth-learning/development/workModel';
+import { newWork, subtaskProgress, type Initiative, type WorkItem } from '../../components/growth-learning/development/workModel';
 import { taskError } from '../../components/growth-learning/development/developmentService';
 import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionUser, NotionWorkspace, SelectOption } from './types/notion';
 import { generateId } from './utils/id';
@@ -391,6 +392,36 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
   const [peekPageId, setPeekPageId] = useState<string | null>(null);
   const [peekDatabaseId, setPeekDatabaseId] = useState<string | null>(null);
 
+  /* ---------- janela da Tarefa (a mesma de Daily e Wiki) ---------- */
+  const taskModalId = peekDatabaseId === TASKS_DB && peekPageId ? taskIdOfRow(peekPageId) : null;
+  /** A janela salvou: atualiza as Tarefas conhecidas e as linhas afetadas, sem disparar novo salvamento. */
+  const applyTaskChanges = useCallback((changed: WorkItem[]) => {
+    for (const t of changed) ctx.tasks.set(t.id, t);
+    const all = [...ctx.tasks.values()];
+    const tops = new Set(changed.map(t => t.parent_task_id || t.id));
+    patchWorkspace(prev => {
+      const db = prev.databases[TASKS_DB]; if (!db) return prev;
+      let rows = db.rows; const pages = { ...prev.pages };
+      for (const id of tops) {
+        const task = ctx.tasks.get(id); if (!task || task.parent_task_id) { rows = rows.filter(r => r.id !== taskRowId(id)); continue; }
+        const current = rows.find(r => r.id === taskRowId(id));
+        const row = taskToRow(task, db.properties, prev.users, current ? extraProps(current) : {}, ctx.projects, ctx.initiatives, subtaskProgress(id, all));
+        rows = current ? rows.map(r => (r.id === row.id ? row : r)) : [...rows, row];
+        if (!pages[row.pageId]) pages[row.pageId] = taskPage(task, taskBlocks(task));
+        baseline.current.rows.set(TASKS_DB + '|' + row.id, JSON.stringify(row));
+        baseline.current.rowObjs.set(TASKS_DB + '|' + row.id, JSON.parse(JSON.stringify(row)));
+      }
+      return { ...prev, pages, databases: { ...prev.databases, [TASKS_DB]: { ...db, rows } } };
+    });
+  }, [ctx, patchWorkspace]);
+  // Página de Tarefa aberta inteira (link antigo, busca): abre a janela por cima da página da frente.
+  useEffect(() => {
+    const id = activePage?.id ? taskIdOfRow(activePage.id) : null;
+    if (!id) return;
+    const top = ctx.tasks.get(id)?.parent_task_id || id;
+    setActivePage(pageOfTask(top)); setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB);
+  }, [activePage?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ---------- páginas por frente (fixas na lateral) e tom do fundo ---------- */
   const fixedPageIds = useMemo(() => new Set([TASKS_PAGE, ...ctx.taskPages.map(d => d.id)]), [ctx.taskPages]);
   const sidebarSections = useMemo(() => [
@@ -416,11 +447,13 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     return ctx.taskPages.find(d => key && d.fronts.includes(key))?.id || TASKS_PAGE;
   }, [ctx.taskPages]);
 
-  // Link da Fila e das notificações (?dev_task=<id>) abre a tarefa por cima da página da frente dela.
+  // Link direto (?task=<id>, e o antigo ?dev_task=<id> da Fila) abre a Tarefa por cima da página da frente dela.
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('dev_task');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('task') || params.get('dev_task');
     if (!id) return;
-    if (ctx.tasks.has(id)) { setActivePage(pageOfTask(id)); setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB); }
+    const known = ctx.tasks.get(id);
+    if (known) { const top = known.parent_task_id || id; setActivePage(pageOfTask(top)); setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB); }
     else showToast('Tarefa do link não encontrada neste acesso.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -769,8 +802,15 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       />
 
       {/* Database Item Peek Modal (Center Peek / Side Peek) */}
+      {taskModalId && (
+        <TaskModal
+          taskId={taskModalId}
+          onClose={() => { setPeekPageId(null); setPeekDatabaseId(null); }}
+          onChanged={applyTaskChanges}
+        />
+      )}
       <RowPeekModal
-        isOpen={Boolean(peekPageId)}
+        isOpen={Boolean(peekPageId) && !taskModalId}
         pageId={peekPageId}
         databaseId={peekDatabaseId}
         workspace={workspace}
