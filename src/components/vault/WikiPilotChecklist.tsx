@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'rea
 import { Check, CheckCheck, ChevronDown, ChevronRight, ExternalLink, Loader2, Pencil, RefreshCw, Plus, MoreHorizontal, Copy, ArrowUp, ArrowDown, Trash2, GripVertical, X } from 'lucide-react';
 import { saveWork } from '../growth-learning/development/workService';
 import { TASK_STATUS, taskError, type taskHistory } from '../growth-learning/development/developmentService';
-import { newWork, type WorkItem } from '../growth-learning/development/workModel';
+import { subtaskProgress, newWork, type WorkItem } from '../growth-learning/development/workModel';
 import { loadInsuranceTasks, INSURANCE_STRATEGY_PATH, loadPilotTasks } from './wikiPilotService';
 import { brazilToday, displayCompletionDate, PILOT_GROUPS, PILOT_KEYS, pilotTaskGroup, activePilotProgress, preparePilotSave, insuranceTaskOrder } from './wikiPilotModel';
 import type { TaskGroup, TaskLayout } from './strategy/strategyModel';
@@ -117,7 +117,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     document.addEventListener('keydown', key); return () => document.removeEventListener('keydown', key);
   }, [editing, onEditingChange]);
 
-  const visibleTasks = (data?.tasks || []).filter(t => !layout?.hidden.includes(t.task_key));
+  const visibleTasks = (data?.tasks || []).filter(t => !t.parent_task_id && !layout?.hidden.includes(t.task_key));
   const progress = activePilotProgress(visibleTasks);
   const doneCount = visibleTasks.filter(t => t.status === 'concluida').length;
   const taskOrder = (task: WorkItem) => { const custom = layout?.order.indexOf(task.task_key) ?? -1; return custom >= 0 ? custom : insurance ? 1000 + insuranceTaskOrder(task) : PILOT_KEYS.includes(task.task_key) ? 1000 + PILOT_KEYS.indexOf(task.task_key) : 2000; };
@@ -330,8 +330,10 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     const done = task.status === 'concluida', saving = savingId === task.id;
     const notable = NOTABLE[task.status];
     const blockers = done ? [] : blockersOf(task);
+    const subs = subtaskProgress(task.id, data?.tasks || []);
     const meta = [
       task.owner_label && <span key="owner">{task.owner_label}</span>,
+      subs.total > 0 && <span key="subs">Sub Tarefas {subs.done}/{subs.total}{subs.blocked ? ` · ${subs.blocked} bloqueada${subs.blocked > 1 ? 's' : ''}` : ''}</span>,
       notable && <span key="status" className={notable}>{TASK_STATUS[task.status]}</span>,
       blockers.length > 0 && <span key="deps" className={`transition-colors ${nudge === task.id ? 'font-medium text-amber-700' : ''}`}>Depois de {blockers.map(b => b.title).join(' e ')}</span>,
       done && <span key="done">Concluída em {displayCompletionDate(task)}</span>,
