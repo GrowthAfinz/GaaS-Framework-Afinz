@@ -38,41 +38,68 @@ export function StatusPill({ status, small }: { status: string; small?: boolean 
 /* ---------- seletor de trabalhos para um registro ---------- */
 /** No seletor, o que está andando aparece antes do que ainda vai começar. */
 const PICK_ORDER = ['em_execucao', 'bloqueada', 'pronta', 'planejando', 'backlog', 'concluida'];
-export function WorkPicker({ works, initiativeId, initiatives, selected, today, onToggle, onCreate }: {
+export function WorkPicker({ works, initiativeId, initiatives, selected, today, onToggle, onCreate, onCreateSub }: {
   works: DailyWork[]; initiativeId: string | null; initiatives: Map<string, DailyInitiative>; selected: string[]; today: string;
   onToggle: (id: string) => void; onCreate?: () => void;
+  /** Cria Sub Tarefa nesta Tarefa a partir do registro (o registro fica vinculado como origem). */
+  onCreateSub?: (parentId: string) => void;
 }) {
   const [q, setQ] = useState('');
+  const [openIds, setOpenIds] = useState<string[]>([]);
   const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const kidsOf = useMemo(() => {
+    const m = new Map<string, DailyWork[]>();
+    for (const w of works) if (w.parent_task_id) m.set(w.parent_task_id, [...(m.get(w.parent_task_id) || []), w]);
+    return m;
+  }, [works]);
   const list = useMemo(() => {
     const nq = norm(q.trim());
-    const open = works.filter(w => w.status !== 'cancelada' && (nq ? norm(w.title + ' ' + w.task_key).includes(nq) : w.initiative_id === initiativeId || selected.includes(w.id)));
+    const hit = (w: DailyWork) => norm(w.title + ' ' + w.task_key).includes(nq);
+    const open = works.filter(w => !w.parent_task_id && w.status !== 'cancelada' && (nq ? hit(w) || (kidsOf.get(w.id) || []).some(hit)
+      : w.initiative_id === initiativeId || selected.includes(w.id) || (kidsOf.get(w.id) || []).some(k => selected.includes(k.id))));
     return open.sort((a, b) => Number(selected.includes(b.id)) - Number(selected.includes(a.id)) || Number(b.initiative_id === initiativeId) - Number(a.initiative_id === initiativeId)
       || PICK_ORDER.indexOf(a.status) - PICK_ORDER.indexOf(b.status)).slice(0, 60);
-  }, [works, q, initiativeId, selected]);
+  }, [works, q, initiativeId, selected, kidsOf]);
+  const row = (w: DailyWork, sub: boolean) => {
+    const on = selected.includes(w.id);
+    return (
+      <button key={w.id} className="dv-pi" style={sub ? { paddingLeft: 34 } : undefined} onClick={() => onToggle(w.id)} title={on ? 'Desvincular' : 'Vincular: o registro aparece na Tarefa, nada novo é criado'}>
+        <span className={`dv-cb${on ? ' on' : ''}`}>{on && <Check />}</span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: on ? 600 : 400, fontSize: sub ? 12.5 : undefined }}>{w.title}</span>
+          <span style={{ fontSize: 10.5, color: isOverdue(w, today) ? '#b91c1c' : '#94a3b8' }}>{sub ? 'Sub Tarefa · ' : ''}{statusLabel(w.status)}{w.due_date ? ` · prazo ${brDate(w.due_date)}` : ''}{!sub && w.initiative_id !== initiativeId && w.initiative_id ? ` · ${initiatives.get(w.initiative_id)?.title || ''}` : ''}</span>
+        </span>
+      </button>
+    );
+  };
   return (
     <>
-      <div className="hd"><b>Vincular a Tarefa…</b><div className="s">{initiativeId ? `Tarefas de ${initiatives.get(initiativeId)?.title || 'iniciativa'}; busque para ver os outros` : 'Projeto sem iniciativa: busque em todas as Tarefas'}</div></div>
+      <div className="hd"><b>Vincular a Tarefa…</b><div className="s">{initiativeId ? `Tarefas de ${initiatives.get(initiativeId)?.title || 'iniciativa'}; busque para ver as outras` : 'Projeto sem iniciativa: busque em todas as Tarefas'}</div></div>
       <div style={{ padding: 10, borderBottom: '1px solid #f1f5f9', position: 'relative' }}>
         <Search size={13} style={{ position: 'absolute', left: 19, top: 20, color: '#94a3b8' }} />
-        <input autoFocus type="search" value={q} placeholder="Buscar Tarefa" style={{ paddingLeft: 26 }} onChange={e => setQ(e.target.value)} />
+        <input autoFocus type="search" value={q} placeholder="Buscar Tarefa ou Sub Tarefa" style={{ paddingLeft: 26 }} onChange={e => setQ(e.target.value)} />
       </div>
       <div className="lst">
         {list.map(w => {
-          const on = selected.includes(w.id);
+          const kids = (kidsOf.get(w.id) || []).filter(k => k.status !== 'cancelada');
+          const expanded = openIds.includes(w.id) || Boolean(q.trim()) || kids.some(k => selected.includes(k.id));
           return (
-            <button key={w.id} className="dv-pi" onClick={() => onToggle(w.id)}>
-              <span className={`dv-cb${on ? ' on' : ''}`}>{on && <Check />}</span>
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: on ? 600 : 400 }}>{w.title}</span>
-                <span style={{ fontSize: 10.5, color: isOverdue(w, today) ? '#b91c1c' : '#94a3b8' }}>{statusLabel(w.status)}{w.due_date ? ` · prazo ${brDate(w.due_date)}` : ''}{w.initiative_id !== initiativeId && w.initiative_id ? ` · ${initiatives.get(w.initiative_id)?.title || ''}` : ''}</span>
-              </span>
-            </button>
+            <div key={w.id}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>{row(w, false)}</div>
+                {kids.length > 0 && <button className="dv-ib sm" title={expanded ? 'Recolher Sub Tarefas' : `Ver ${kids.length} Sub Tarefas`} onClick={() => setOpenIds(ids => (ids.includes(w.id) ? ids.filter(x => x !== w.id) : [...ids, w.id]))}>{kids.length}</button>}
+                {onCreateSub && <button className="dv-ib sm" title="Criar Sub Tarefa nesta Tarefa a partir do registro" onClick={() => onCreateSub(w.id)}><Plus /></button>}
+              </div>
+              {expanded && kids.sort((a, b) => a.title.localeCompare(b.title)).map(k => row(k, true))}
+            </div>
           );
         })}
         {!list.length && <div className="dv-empty" style={{ padding: '8px 12px' }}>{q ? 'Nenhuma Tarefa com esse nome.' : 'Esta iniciativa ainda não tem Tarefas.'}</div>}
       </div>
-      {onCreate && <div className="ft"><button className="dv-link" onClick={onCreate}><Plus size={12} style={{ verticalAlign: -2 }} /> Criar Tarefa a partir deste registro</button></div>}
+      <div className="ft" style={{ display: 'grid', gap: 4 }}>
+        <span style={{ fontSize: 11, color: '#64748b' }}>Marcar vincula (nada novo é criado). O + cria Sub Tarefa naquela Tarefa.</span>
+        {onCreate && <button className="dv-link" onClick={onCreate}><Plus size={12} style={{ verticalAlign: -2 }} /> Criar Tarefa nova a partir deste registro</button>}
+      </div>
     </>
   );
 }

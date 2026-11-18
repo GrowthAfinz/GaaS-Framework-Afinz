@@ -128,7 +128,7 @@ export function DailyDayModal(p: Props) {
                         {p.canEdit && (
                           <div className="acts">
                             <button className="dv-link" onClick={ev => p.onLinkWork(e, ev.currentTarget)}><Link2 size={12} />Vincular a Tarefa…</button>
-                            {pr?.initiative_id && <button className="dv-link" onClick={() => p.onCreateWork(e)}><Plus size={12} />Criar Tarefa</button>}
+                            <button className="dv-link" onClick={() => p.onCreateWork(e)}><Plus size={12} />Criar Tarefa</button>
                           </div>
                         )}
                       </div>

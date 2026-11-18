@@ -129,6 +129,12 @@ export async function loadInitiativesFull(): Promise<DailyInitiative[]> {
   if (error) throw error;
   return (data || []) as DailyInitiative[];
 }
+/** Cria Sub Tarefa numa Tarefa (growth_save_task_tree). */
+export async function createSubWork(parentId: string, body: Record<string, unknown>): Promise<DailyWork> {
+  const { data, error } = await supabase.rpc('growth_save_task_tree', { p_body: { parent_id: parentId, subtasks: [body] } });
+  if (error) throw error;
+  return (data as { subtasks: DailyWork[] }).subtasks[0];
+}
 /** Salva um trabalho pelo RPC de Tarefas (as regras de bloqueio, critérios e evidência continuam valendo). */
 export const saveWork = (id: string | null, revision: number | null, body: Record<string, unknown>) =>
   rpc<DailyWork>('growth_save_development_task', { p_id: id, p_revision: revision, p_body: body });

@@ -19,7 +19,7 @@ import {
   type DailySort, type DailyTag, type DailyView, type FilterKey,
 } from './dailyModel';
 import {
-  loadB2c, loadCrm, loadDailyConfig, loadEarliestDay, loadEntries, loadFreshness, mergeProjects, saveEntry, saveOption, saveProject, saveWorkPerson, linkWorkPerson,
+  loadB2c, loadCrm, loadDailyConfig, loadEarliestDay, loadEntries, loadFreshness, mergeProjects, saveEntry, saveOption, saveProject, saveWorkPerson, linkWorkPerson, createSubWork,
   type DailyLoad, loadBoardCampaigns, loadEntriesLite, loadInitiativesFull, loadWorkMentions, loadWorks, saveWork,
   type DailyInitiative, type DailyWork, type EntryLite,
 } from './dailyService';
@@ -52,7 +52,7 @@ const readPrefs = (): Prefs => {
 
 type Pop =
   | { kind: 'filter'; key: FilterKey; anchor: Anchor } | { kind: 'sort'; anchor: Anchor } | { kind: 'group'; anchor: Anchor }
-  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'more' | 'move' | 'copy' | 'work'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
+  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'more' | 'move' | 'copy' | 'work' | 'partners'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 const FILTER_LABELS: [FilterKey, string][] = [['frentes', 'Frente'], ['projects', 'Projeto'], ['partners', 'Parceiro'], ['people', 'Pessoa'], ['tags', 'Tag']];
 
@@ -315,8 +315,9 @@ export function DailyWorkspace() {
   }, [fail, goToDay, putEntry, showToast]);
   const createEntry = useCallback(async (d: Draft, text: string) => {
     try {
-      const saved = await saveEntry(null, null, { day: d.day, project_id: d.projectId, body: text, responsible_id: me, follower_ids: [] });
-      putEntry(saved); setDraft(null); goToDay(saved.day); setDrawerKey(k => k + 1); showToast('Registro salvo');
+      const saved = await saveEntry(null, null, { day: d.day, project_id: d.projectId, body: text, responsible_id: me, follower_ids: [],
+        ...(d.workIds?.length ? { work_ids: d.workIds } : {}), ...(d.partnerKeys?.length ? { partner_keys: d.partnerKeys } : {}) });
+      putEntry(saved); setDraft(null); goToDay(saved.day); setDrawerKey(k => k + 1); showToast(d.workIds?.length ? 'Registro salvo, vinculado às mesmas Tarefas' : 'Registro salvo');
     } catch (err) { fail(err); }
   }, [fail, goToDay, me, putEntry, showToast]);
   /** Renomeia, arquiva ou cria pessoa só com nome (aba Pessoas da configuração). */
@@ -404,25 +405,54 @@ export function DailyWorkspace() {
     const cur = e.work_ids || [], on = cur.includes(workId), w = worksById.get(workId);
     void patchEntry(e, { work_ids: on ? cur.filter(x => x !== workId) : [...cur, workId] }, on ? 'Registro desvinculado da Tarefa' : `Registro vinculado a "${w?.title || 'Tarefa'}"`);
   }, [patchEntry, worksById]);
-  /** Cria um trabalho na iniciativa do projeto com o texto do registro e já liga os dois. */
+  /** Título sugerido pelo registro (primeira linha); a pessoa revisa antes de confirmar. */
+  const titleFromEntry = (e: DailyEntry, what: string) => {
+    const first = e.body.split('\n')[0].replace(/\s+/g, ' ').trim();
+    const suggestion = first.length > 120 ? first.slice(0, 117).trimEnd() + '…' : first;
+    const typed = window.prompt(`Título da ${what} (revise se quiser):`, suggestion)?.trim();
+    if (typed == null) return null;
+    if (typed.length < 5) { showToast('O título precisa de pelo menos 5 letras.'); return null; }
+    return typed;
+  };
+  /** Campos que a Tarefa herda do registro: projeto, frente, BU/parceiro, responsável e a origem. */
+  const inheritFromEntry = (e: DailyEntry) => {
+    const pr = projects.get(e.project_id);
+    return {
+      front_key: pr?.frente_key, project_ids: pr ? [pr.id] : [], partner_keys: (e.partner_keys || []).length ? e.partner_keys : pr?.partner_keys || [],
+      owner_label: e.responsible_id ? people.get(e.responsible_id)?.name || null : null,
+      details: { origin_entry_id: e.id, origin_day: e.day },
+    };
+  };
+  /** Cria Tarefa nova (card próprio no Kanban da frente) a partir do registro e já vincula os dois. */
   const createWorkFromEntry = useCallback(async (e: DailyEntry) => {
     setPop(null);
     const pr = projects.get(e.project_id), ini = pr?.initiative_id ? initiatives.get(pr.initiative_id) : undefined;
-    if (!ini) { showToast('Ligue o projeto a uma iniciativa (página do projeto) antes de criar Tarefa.'); return; }
-    const text = e.body.replace(/\s+/g, ' ').trim();
-    const title = (text.length > 120 ? text.slice(0, 117).trimEnd() + '…' : text).padEnd(5, '.');
+    const title = titleFromEntry(e, 'Tarefa'); if (!title) return;
     try {
       const saved = await saveWork(null, null, {
-        title, initiative_id: ini.id, workspace: ini.workspace, area: workspaceLabel(ini.workspace as Workspace),
-        owner_label: e.responsible_id ? people.get(e.responsible_id)?.name || null : null,
-        description: `Criado a partir do registro de ${brDate(e.day)} na Visão Daily (${pr?.name}).`,
+        title, ...inheritFromEntry(e), ...(ini ? { initiative_id: ini.id, area: workspaceLabel(ini.workspace as Workspace) } : {}),
+        description: `Criada a partir do registro de ${brDate(e.day)} na Visão Daily (${pr?.name}).`,
       });
       setWorks(list => [saved, ...list]);
       const linked = await saveEntry(e.id, e.revision, { work_ids: [...(e.work_ids || []), saved.id] });
       putEntry(linked);
-      showToast(`Tarefa criada em ${ini.title} e vinculada ao registro`);
+      showToast(`Tarefa criada${ini ? ` em ${ini.title}` : ''} e vinculada ao registro`);
     } catch (err) { fail(err); }
-  }, [fail, initiatives, people, projects, putEntry, showToast]);
+  }, [fail, initiatives, people, projects, putEntry, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Cria Sub Tarefa numa Tarefa existente a partir do registro e já vincula o registro a ela. */
+  const createSubFromEntry = useCallback(async (e: DailyEntry, parentId: string) => {
+    setPop(null);
+    const parent = worksById.get(parentId);
+    const title = titleFromEntry(e, `Sub Tarefa em "${parent?.title || 'Tarefa'}"`); if (!title) return;
+    try {
+      const { owner_label, details } = inheritFromEntry(e);
+      const sub = await createSubWork(parentId, { title, owner_label, details });
+      setWorks(list => [sub, ...list]);
+      const linked = await saveEntry(e.id, e.revision, { work_ids: [...(e.work_ids || []), sub.id] });
+      putEntry(linked);
+      showToast(`Sub Tarefa criada em "${parent?.title || 'Tarefa'}" e vinculada ao registro`);
+    } catch (err) { fail(err); }
+  }, [fail, people, projects, putEntry, showToast, worksById]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- popovers ---------- */
   const entryOf = (id: string) => all.find(e => e.id === id);
@@ -477,7 +507,7 @@ export function DailyWorkspace() {
     if (pop.kind === 'work') {
       const ini = projects.get(e.project_id)?.initiative_id || null;
       return <Popover anchor={pop.anchor} width={340} onClose={close}><WorkPicker works={works} initiativeId={ini} initiatives={initiatives} selected={e.work_ids || []} today={today}
-        onToggle={id => toggleWork(e, id)} onCreate={ini ? () => void createWorkFromEntry(e) : undefined} /></Popover>;
+        onToggle={id => toggleWork(e, id)} onCreate={canEdit ? () => void createWorkFromEntry(e) : undefined} onCreateSub={canEdit ? id => void createSubFromEntry(e, id) : undefined} /></Popover>;
     }
     if (pop.kind === 'people') {
       return <Popover anchor={pop.anchor} width={330} onClose={close}><PeoplePicker people={cfg.people} me={me} responsible={e.responsible_id} followers={e.follower_ids} subject={e.body}
@@ -487,6 +517,15 @@ export function DailyWorkspace() {
     if (pop.kind === 'move') {
       return <Popover anchor={pop.anchor} width={260} onClose={close}><DayPicker value={e.day} title="Mover para o dia" shortcuts={[['Hoje', today], ['Próximo dia útil', nextWorkday(e.day)], ['+1 semana', addDays(e.day, 7)]]}
         onPick={day => { close(); if (day !== e.day) { void patchEntry(e, { day }, `Movido para ${brDate(day)}`); goToDay(day); } }} /></Popover>;
+    }
+    if (pop.kind === 'partners') {
+      const pr = projects.get(e.project_id);
+      const keys = pr?.partner_keys?.length ? pr.partner_keys : (cfg.partners || []).filter(x => !x.archived).map(x => x.key);
+      const options = (cfg.partners || []).filter(x => keys.includes(x.key) || (e.partner_keys || []).includes(x.key)).map(x => ({ key: x.key, label: x.name, color: x.color }));
+      const cur = e.partner_keys || [];
+      return <Popover anchor={pop.anchor} width={260} onClose={close}><MultiFilter label="BU/parceiro do registro" options={options} selected={cur}
+        onToggle={k => void patchEntry(e, { partner_keys: cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k] }, 'BU/parceiro do registro atualizado')}
+        onClear={() => void patchEntry(e, { partner_keys: [] }, 'Registro vale para o projeto todo')} /></Popover>;
     }
     if (pop.kind === 'copy') {
       return <Popover anchor={pop.anchor} width={260} onClose={close}><DayPicker value={e.day} title="Copiar para o dia" shortcuts={[['Hoje', today], ['Próximo dia útil', nextWorkday(e.day)], ['+1 semana', addDays(e.day, 7)]]}
@@ -498,7 +537,8 @@ export function DailyWorkspace() {
           <MenuList title="Mais ações" items={[
             { icon: <FolderInput />, label: 'Mover para outro projeto', onClick: () => setPop({ kind: 'project', entryId: e.id, anchor: pop.anchor }) },
             { icon: <CalendarArrowUp />, label: 'Mudar o dia', onClick: () => setPop({ kind: 'move', entryId: e.id, anchor: pop.anchor }) },
-            { icon: <CornerDownRight />, label: 'Continuar no próximo dia útil', onClick: () => { close(); setDraft({ day: nextWorkday(e.day), projectId: e.project_id }); } },
+            { icon: <CornerDownRight />, label: 'Continuar no próximo dia útil', onClick: () => { close(); setDraft({ day: nextWorkday(e.day), projectId: e.project_id, workIds: e.work_ids || [], partnerKeys: e.partner_keys || [] }); } },
+            ...(canEdit ? [{ icon: <Layers />, label: 'BU/parceiro do registro…', hint: 'Vazio = vale o do projeto', onClick: () => setPop({ kind: 'partners', entryId: e.id, anchor: pop.anchor }) }] : []),
             { icon: <FolderKanban />, label: 'Abrir projeto', onClick: () => { close(); setDrawer(e.project_id); } },
             ...(projects.get(e.project_id)?.initiative_id ? [{ icon: <KanbanSquare />, label: 'Abrir kanban da iniciativa', onClick: () => { close(); openKanban(projects.get(e.project_id)!.initiative_id as string, (e.work_ids || [])[0] || null); } }] : []),
           ]} />
@@ -628,7 +668,7 @@ export function DailyWorkspace() {
               onRemoveTag={(e, k) => void patchEntry(e, { tag_keys: e.tag_keys.filter(x => x !== k) }, 'Tag removida')}
               onPeoplePop={(e, el) => setPop({ kind: 'people', entryId: e.id, anchor: anchorOf(el) })}
               onMenu={(e, el) => setPop({ kind: 'menu', entryId: e.id, anchor: anchorOf(el) })}
-              onContinue={e => setDraft({ day: nextWorkday(e.day), projectId: e.project_id })}
+              onContinue={e => setDraft({ day: nextWorkday(e.day), projectId: e.project_id, workIds: e.work_ids || [], partnerKeys: e.partner_keys || [] })}
               onOpenProject={setDrawer} onHoverProject={setHoverProject}
               pin={pin} onPin={pinTopic} works={worksById} onOpenWork={w => setTaskOpen(w.id)}
               onWorkPop={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })}
