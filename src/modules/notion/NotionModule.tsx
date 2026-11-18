@@ -423,7 +423,10 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     const ws = latest.current, db = ws.databases[TASKS_DB], src = db.rows.find(r => r.id === taskRowId(taskId));
     const srcPage = ws.pages[taskRowId(taskId)];
     setStatus('saving');
-    void createTask({ title: `${task.title} (cópia)` }, task).then(saved => {
+    // A cópia leva a estrutura (texto, critérios, dependências), nunca a conclusão nem a chave da original.
+    const { completed_on: _done, ...details } = task.details || {};
+    const fresh = { title: `${task.title} (cópia)`, task_key: '', status: 'backlog' as const, completed_criteria: [], resolution: null, blocked_reason: null, details };
+    void createTask(fresh, task).then(saved => {
       ctx.tasks.set(saved.id, saved);
       const props = latest.current.databases[TASKS_DB].properties;
       const extra = src ? extraProps(src) : {};

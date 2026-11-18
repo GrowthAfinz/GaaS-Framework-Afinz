@@ -8,11 +8,12 @@ export interface DevelopmentTask {
  blocked_reason:string|null;resolution:string|null;source_note:string|null;revision:number;created_at?:string;updated_at?:string;
 }
 export interface TaskEvent {id:string;revision:number;kind:string;created_at:string;before_data:DevelopmentTask|null;after_data:DevelopmentTask}
+/** Tarefas e a seção de Tarefas da Wiki são editáveis por todo membro aprovado (decisão de 17/11/2026). */
+export async function canEditWork():Promise<boolean>{const {data,error}=await supabase.rpc('gaas_can_edit_work');if(error)throw error;return data===true;}
 export async function listDevelopmentTasks():Promise<{tasks:DevelopmentTask[];canEdit:boolean}>{
- const [rows,access]=await Promise.all([supabase.from('growth_development_tasks').select('*').order('priority').order('created_at'),supabase.rpc('gaas_vault_is_admin')]);
+ const [rows,access]=await Promise.all([supabase.from('growth_development_tasks').select('*').order('priority').order('created_at'),canEditWork()]);
  if(rows.error)throw rows.error;
- if(access.error)throw access.error;
- return {tasks:rows.data||[],canEdit:access.data===true};
+ return {tasks:rows.data||[],canEdit:access};
 }
 export async function saveDevelopmentTask(task:DevelopmentTask):Promise<DevelopmentTask>{
  const {data,error}=await supabase.rpc('growth_save_development_task',{p_id:task.id||null,p_revision:task.id?task.revision:null,p_body:task});
@@ -36,7 +37,7 @@ export function taskError(error:unknown):string {
  if(message.includes('completion_evidence'))return 'Para concluir, marque os critérios atendidos e registre a entrega ou evidência de conclusão.';
  if(message.includes('block_reason'))return 'Descreva o impedimento para marcar a tarefa como bloqueada.';
  if(message.includes('empty_acceptance'))return 'Remova as linhas vazias dos critérios de conclusão.';
- if(message.includes('access_denied'))return 'O backlog de desenvolvimento requer acesso administrativo.';
+ if(message.includes('access_denied'))return 'Seu acesso não permite editar Tarefas. Peça a aprovação do seu acesso ao GaaS.';
  return 'Não foi possível salvar ou carregar. Confira seu acesso e tente atualizar.';
 }
 export function newDevelopmentTask():DevelopmentTask{return {id:'',task_key:'',title:'',description:'',area:'Loop de Memória',priority:'P2',status:'backlog',owner_label:null,due_date:null,dependencies:[],acceptance_criteria:[],completed_criteria:[],blocked_reason:null,resolution:null,source_note:null,revision:0};}

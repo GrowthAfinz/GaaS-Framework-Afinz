@@ -96,7 +96,7 @@ export function DailyDayModal(p: Props) {
                     <ChevronDown className={isOpen ? '' : 'closed'} />
                     <span className="dv-pchip" style={tint(c, 14)}><span>{pr?.name || 'Projeto removido'}</span></span>
                     <span className="fr">{p.frentes.get(pr?.frente_key || '')?.name}</span>
-                    {st && <span className="dv-stale" title={`${st.active} trabalho(s) em execução e nenhum registro há ${st.idle} dias úteis (último em ${brDate(st.last)})`}>parado {st.idle}d</span>}
+                    {st && <span className="dv-stale" title={`${st.active} Tarefa(s) em execução e nenhum registro há ${st.idle} dias úteis (último em ${brDate(st.last)})`}>parado {st.idle}d</span>}
                     <span style={{ flex: 1 }} />
                     {!isOpen && <span className="cnt">{list.length} {list.length === 1 ? 'registro' : 'registros'}</span>}
                     {ini && <button className="cs-btn sm" title={`Abrir o kanban de ${boardName(ini)} (${ini.title})`} onClick={e => { e.stopPropagation(); p.onKanban(ini.id, null); }}><KanbanSquare />Abrir Kanban</button>}
@@ -116,7 +116,7 @@ export function DailyDayModal(p: Props) {
                         {linked.length > 0 && (
                           <div className="works">
                             {linked.map(w => (
-                              <button key={w.id} className="dv-dw" title="Abrir este trabalho no kanban" onClick={() => w.initiative_id && p.onKanban(w.initiative_id, w.id)}>
+                              <button key={w.id} className="dv-dw" title="Abrir esta Tarefa no kanban" onClick={() => w.initiative_id && p.onKanban(w.initiative_id, w.id)}>
                                 <StatusPill status={w.status} small /><span className="t">{w.title}</span>
                                 {w.owner_label && <span className="o">{w.owner_label}</span>}
                                 {w.due_date && <span className={`o${isOverdue(w, p.today) ? ' late' : ''}`}><CalendarClock />{brDate(w.due_date)}</span>}
@@ -126,8 +126,8 @@ export function DailyDayModal(p: Props) {
                         )}
                         {p.canEdit && (
                           <div className="acts">
-                            <button className="dv-link" onClick={ev => p.onLinkWork(e, ev.currentTarget)}><Link2 size={12} />Ligar a trabalho</button>
-                            {pr?.initiative_id && <button className="dv-link" onClick={() => p.onCreateWork(e)}><Plus size={12} />Criar trabalho</button>}
+                            <button className="dv-link" onClick={ev => p.onLinkWork(e, ev.currentTarget)}><Link2 size={12} />Vincular a Tarefa…</button>
+                            {pr?.initiative_id && <button className="dv-link" onClick={() => p.onCreateWork(e)}><Plus size={12} />Criar Tarefa</button>}
                           </div>
                         )}
                       </div>

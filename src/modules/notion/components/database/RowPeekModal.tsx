@@ -210,13 +210,14 @@ export const RowPeekModal: React.FC<RowPeekModalProps> = ({
           <div className="relative mb-3 inline-block">
             <button
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="text-4xl hover:opacity-80 transition-opacity"
-              title="Trocar ícone"
+              className={page.icon ? 'text-4xl hover:opacity-80 transition-opacity' : 'text-xs px-2 py-1 rounded text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)]'}
+              title={page.icon ? 'Trocar ou remover ícone' : 'Adicionar ícone'}
             >
-              {page.icon || '📄'}
+              {page.icon || '+ Adicionar ícone'}
             </button>
             {showEmojiPicker && (
               <EmojiPicker
+                currentIcon={page.icon}
                 onSelect={(emoji) => {
                   onUpdatePage(pageId, { icon: emoji });
                   setShowEmojiPicker(false);

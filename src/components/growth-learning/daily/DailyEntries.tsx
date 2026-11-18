@@ -130,7 +130,7 @@ export function DailyEntries(p: Props) {
           {p.canEdit && (
             <span className="tools">
               <button className="dv-ib sm" title="Adicionar tag" onClick={ev => p.onTagPop(e, ev.currentTarget)}><TagIcon /></button>
-              <button className="dv-ib sm" title="Ligar a trabalho do kanban" onClick={ev => p.onWorkPop(e, ev.currentTarget)}><Link2 /></button>
+              <button className="dv-ib sm" title="Vincular a Tarefa…" onClick={ev => p.onWorkPop(e, ev.currentTarget)}><Link2 /></button>
               <button className="dv-ib sm" title="Continuar no próximo dia útil" onClick={() => p.onContinue(e)}><CornerDownRight /></button>
               <button className="dv-ib sm" title="Abrir projeto" onClick={() => p.onOpenProject(e.project_id)}><PanelRightOpen /></button>
               <button className="dv-ib sm" title="Mais ações" onClick={ev => p.onMenu(e, ev.currentTarget)}><Ellipsis /></button>

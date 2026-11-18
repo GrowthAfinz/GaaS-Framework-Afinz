@@ -16,7 +16,7 @@ const ghostInput = 'min-w-0 flex-1 rounded-md border border-transparent bg-trans
 const MESSAGE_MS = 3500, UNDO_MS = 10000;
 /** Statuses worth calling out on the row; the default planning states stay quiet. */
 const NOTABLE: Partial<Record<WorkItem['status'], string>> = { pronta: 'text-cyan-700', em_execucao: 'text-cyan-700', bloqueada: 'text-amber-700', cancelada: 'text-slate-400' };
-const DEFAULT_CRITERION = 'Atividade concluída';
+const DEFAULT_CRITERION = 'Tarefa concluída';
 const isField = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest('input,textarea,select,[contenteditable="true"]'));
 
 function RowMenu({ label, children }: { label: string; children: (close: () => void) => ReactNode }) {
@@ -71,8 +71,8 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     const fallback = insurance ? task.details.insurance_group || 'prepare' : pilotTaskGroup(task);
     return groupKeys.has(fallback) ? fallback : groupList[0]?.key || 'prepare';
   };
-  const activityTitle = insurance ? 'Atividades: Construção e ativação de Seguros' : 'Atividades: Construção do Piloto';
-  const defaultNote = insurance ? 'Mesmas atividades de Testes e Tarefas · seis frentes com liberação própria · marcos documentais não certificam ativação no SFMC.' : 'Mesmas atividades de Testes e Tarefas · 3 cards no piloto · quarto card e GRUPO_2 ficam para depois.';
+  const activityTitle = insurance ? 'Tarefas: Construção e ativação de Seguros' : 'Tarefas: Construção do Piloto';
+  const defaultNote = insurance ? 'Mesmos registros de Tarefas e atividades · seis frentes com liberação própria · marcos documentais não certificam ativação no SFMC.' : 'Mesmos registros de Tarefas e atividades · 3 cards no piloto · quarto card e GRUPO_2 ficam para depois.';
   const [data, setData] = useState<Awaited<ReturnType<typeof loadPilotTasks>> | null>(null);
   const [opened, setOpened] = useState(initiallyOpen), [pending, setPending] = useState(false);
   const [groups, setGroups] = useState<Record<string, boolean>>({});
@@ -97,7 +97,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
   const load = async () => {
     const g = ++generation.current;
     try { const next = await taskLoader(); if (g === generation.current) { setData(next); setError(''); } }
-    catch { if (g === generation.current) setError('Não foi possível consultar as atividades. Tente atualizar.'); }
+    catch { if (g === generation.current) setError('Não foi possível consultar as Tarefas. Tente atualizar.'); }
   };
   useEffect(() => { void load(); return () => { generation.current++; }; }, [taskLoader]);
   useEffect(() => { const focus = () => { if (!busy && !typing) void load(); }; window.addEventListener('focus', focus); return () => window.removeEventListener('focus', focus); }, [taskLoader, busy, typing]);
@@ -162,13 +162,13 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
       resolution: base.resolution?.trim() ? base.resolution : `Concluída na Wiki em ${today.split('-').reverse().join('/')}.`,
       details: { ...base.details, completed_on: today },
     }, true, base);
-    if (saved) notify('Atividade concluída.');
+    if (saved) notify('Tarefa concluída.');
   };
   const toggle = (task: WorkItem) => {
     if (documentBusy || busy || renaming) return;
     if (task.status === 'concluida') {
       // Reopening keeps the ticked criteria and the delivery note, so a second click completes it again.
-      void persist({ ...task, status: 'planejando' }, true).then(saved => { if (saved) notify('Atividade reaberta.'); });
+      void persist({ ...task, status: 'planejando' }, true).then(saved => { if (saved) notify('Tarefa reaberta.'); });
       return;
     }
     const blockers = blockersOf(task);
@@ -186,7 +186,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     try { if (await persist({ ...task, title }, true)) { setRenaming(null); notify('Título atualizado.'); } } finally { inlineLock.current = false; }
   };
   const renameTask = async (task: WorkItem, title: string) => {
-    if (!title) { setError('Informe um título para a atividade.'); return false; }
+    if (!title) { setError('Informe um título para a Tarefa.'); return false; }
     return Boolean(await persist({ ...task, title }, true));
   };
   const create = async (group: string, title: string) => {
@@ -199,18 +199,18 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     const title = adding.title.trim();
     if (!title) { setAdding(null); return; }
     inlineLock.current = true;
-    try { if (await create(adding.group, title)) { setAdding({ group: adding.group, title: '' }); notify('Atividade adicionada.'); } } finally { inlineLock.current = false; }
+    try { if (await create(adding.group, title)) { setAdding({ group: adding.group, title: '' }); notify('Tarefa adicionada.'); } } finally { inlineLock.current = false; }
   };
   const addInGroup = async (group: string) => {
     const title = (newTitles[group] || '').trim();
     if (!title || busy || inlineLock.current) return;
     inlineLock.current = true;
-    try { if (await create(group, title)) { setNewTitles(t => ({ ...t, [group]: '' })); notify('Atividade adicionada.'); } } finally { inlineLock.current = false; }
+    try { if (await create(group, title)) { setNewTitles(t => ({ ...t, [group]: '' })); notify('Tarefa adicionada.'); } } finally { inlineLock.current = false; }
   };
   const duplicate = async (task: WorkItem) => {
     const copy: WorkItem = { ...structuredClone(task), id: '', revision: 0, task_key: (insurance ? 'SEG-PILOT-' : 'VDV-PILOT-') + crypto.randomUUID().slice(0, 12), title: task.title + ' (cópia)', status: 'planejando', completed_criteria: [], resolution: null };
     delete copy.details.completed_on;
-    if (await persist(copy)) notify('Atividade duplicada.');
+    if (await persist(copy)) notify('Tarefa duplicada.');
   };
   const currentLayout = (): TaskLayout => { const l = layoutRef.current; return { hidden: l?.hidden || [], order: l?.order || [], ...(l?.groups ? { groups: l.groups } : {}) }; };
   const updateLayout = async (next: TaskLayout, reason?: string) => {
@@ -218,8 +218,8 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     try { await onLayoutChange(next, reason); setError(''); return true; } catch { setError('Não foi possível atualizar a organização. Tente novamente.'); return false; }
   };
   const removeTask = async (task: WorkItem) => {
-    if (await updateLayout({ ...currentLayout(), hidden: [...currentLayout().hidden, task.task_key] }, 'Excluir atividade da nota: ' + task.title)) {
-      notify(`“${task.title}” saiu da nota.`, () => { const l = currentLayout(); void updateLayout({ ...l, hidden: l.hidden.filter(k => k !== task.task_key) }, 'Restaurar atividade: ' + task.title).then(ok => { if (ok) notify('Atividade de volta.'); }); });
+    if (await updateLayout({ ...currentLayout(), hidden: [...currentLayout().hidden, task.task_key] }, 'Tirar Tarefa da nota: ' + task.title)) {
+      notify(`“${task.title}” saiu da nota.`, () => { const l = currentLayout(); void updateLayout({ ...l, hidden: l.hidden.filter(k => k !== task.task_key) }, 'Restaurar Tarefa: ' + task.title).then(ok => { if (ok) notify('Tarefa de volta.'); }); });
     }
   };
 
@@ -237,7 +237,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     target.ids.splice(Math.max(0, Math.min(at, target.ids.length)), 0, task.task_key);
     if (from !== target && !(await persist({ ...task, details: { ...task.details, wiki_pilot_group: toGroup, ...(insurance ? { insurance_group: toGroup } : {}) } }, true))) return;
     const flat = arrangement.flatMap(a => a.ids), l = currentLayout();
-    await updateLayout({ ...l, order: [...flat, ...l.order.filter(k => !flat.includes(k))] }, 'Reorganizar atividades da nota');
+    await updateLayout({ ...l, order: [...flat, ...l.order.filter(k => !flat.includes(k))] }, 'Reorganizar Tarefas da nota');
   };
   const stepTask = (task: WorkItem, delta: -1 | 1) => {
     const group = taskGroup(task), list = tasksOf(group), i = list.findIndex(t => t.id === task.id), gi = groupList.findIndex(g => g.key === group);
@@ -255,17 +255,17 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     const i = groupList.findIndex(g => g.key === key), j = i + delta;
     if (i < 0 || j < 0 || j >= groupList.length) return;
     const next = [...groupList]; [next[i], next[j]] = [next[j], next[i]];
-    void saveGroups(next, 'Reordenar grupos de atividades');
+    void saveGroups(next, 'Reordenar grupos de Tarefas');
   };
   const removeGroup = (group: TaskGroup) => {
-    if (tasksOf(group.key).length) { setError('Mova ou exclua as atividades deste grupo antes de excluí-lo.'); return; }
+    if (tasksOf(group.key).length) { setError('Mova ou tire as Tarefas deste grupo antes de excluí-lo.'); return; }
     if (groupList.length <= 1) { setError('A seção precisa de pelo menos um grupo.'); return; }
     const before = groupList;
     void saveGroups(groupList.filter(g => g.key !== group.key), 'Excluir grupo: ' + group.label).then(ok => { if (ok) notify(`Grupo “${group.label}” excluído.`, () => void saveGroups(before, 'Restaurar grupo: ' + group.label)); });
   };
   const addGroup = () => {
     const key = 'g-' + crypto.randomUUID().slice(0, 8);
-    void saveGroups([...groupList, { key, label: 'Novo grupo' }], 'Adicionar grupo de atividades').then(ok => { if (ok) setFreshGroup(key); });
+    void saveGroups([...groupList, { key, label: 'Novo grupo' }], 'Adicionar grupo de Tarefas').then(ok => { if (ok) setFreshGroup(key); });
   };
   const removeDependency = (task: WorkItem, key: string) => void persist({ ...task, dependencies: task.dependencies.filter(d => d !== key) }, true).then(saved => { if (saved) notify('Dependência removida.'); });
   const saveNote = async () => {
@@ -296,7 +296,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
   };
   const endDrag = () => { setDragging(null); setDropAt(null); setArmed(null); };
 
-  const label = insurance ? `${doneCount}/${visibleTasks.length} atividades concluídas · liberação por frente` : data?.canEdit ? progress.validated ? 'Validado na seedlist' : progress.ready ? 'Pronto para testar na seedlist' : `Preparação ${progress.done}/${progress.total}` : data ? 'Acesso administrativo' : 'Consultar atividades';
+  const label = insurance ? `${doneCount}/${visibleTasks.length} Tarefas concluídas · liberação por frente` : data?.canEdit ? progress.validated ? 'Validado na seedlist' : progress.ready ? 'Pronto para testar na seedlist' : `Preparação ${progress.done}/${progress.total}` : data ? 'Acesso administrativo' : 'Consultar Tarefas';
   const subtitle = insurance ? 'Diagnóstico, preparação e seis frentes · conclusão documental não libera disparo' : `Preparação ${progress.done}/${progress.total} · validação na seedlist ${progress.validationDone}/${progress.validationTotal}`;
   const percent = visibleTasks.length ? Math.round(doneCount / visibleTasks.length * 100) : 0;
   const locked = busy || documentBusy;
@@ -337,7 +337,7 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
     if (renaming?.id === task.id) return <li key={task.id} className="flex items-center gap-2 bg-slate-50 px-3 py-2 sm:px-4">
       <span className="ml-0.5 h-[1.125rem] w-[1.125rem] shrink-0"/>
       <form className="flex min-w-0 flex-1 items-center gap-2" onSubmit={e => { e.preventDefault(); void rename(); }}>
-        <input autoFocus aria-label="Título da atividade" className={inlineInput} value={renaming.title} readOnly={busy} onChange={e => setRenaming({ id: task.id, title: e.target.value })} onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }} onBlur={() => { if (!busy) void rename(); }}/>
+        <input autoFocus aria-label="Título da Tarefa" className={inlineInput} value={renaming.title} readOnly={busy} onChange={e => setRenaming({ id: task.id, title: e.target.value })} onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }} onBlur={() => { if (!busy) void rename(); }}/>
       </form>
     </li>;
     return <li key={task.id} className="group/row flex items-center gap-1 px-1.5 transition-colors hover:bg-slate-50/80 sm:px-2.5">
@@ -376,15 +376,15 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
           <div className="flex items-center opacity-60 transition-opacity group-hover/head:opacity-100 group-focus-within/head:opacity-100">
             <button type="button" className={iconButton} disabled={locked || gi === 0} aria-label={`Subir grupo ${group.label}`} title="Subir grupo" onClick={() => moveGroup(group.key, -1)}><ArrowUp size={14}/></button>
             <button type="button" className={iconButton} disabled={locked || gi === groupList.length - 1} aria-label={`Descer grupo ${group.label}`} title="Descer grupo" onClick={() => moveGroup(group.key, 1)}><ArrowDown size={14}/></button>
-            <button type="button" className={`${iconButton} hover:bg-rose-50 hover:text-rose-700`} disabled={locked} aria-label={`Excluir grupo ${group.label}`} title={list.length ? 'Mova ou exclua as atividades antes' : 'Excluir grupo'} onClick={() => removeGroup(group)}><Trash2 size={14}/></button>
+            <button type="button" className={`${iconButton} hover:bg-rose-50 hover:text-rose-700`} disabled={locked} aria-label={`Excluir grupo ${group.label}`} title={list.length ? 'Mova ou tire as Tarefas antes' : 'Excluir grupo'} onClick={() => removeGroup(group)}><Trash2 size={14}/></button>
           </div>
         </div>
         <ul className="mt-0.5">{list.map((t, i) => editRow(t, group.key, i, list))}</ul>
-        {!list.length && <div className={`mx-1 my-1 rounded-md border border-dashed px-3 py-2.5 text-xs transition-colors ${dropAt?.group === group.key ? 'border-teal-500 bg-teal-50/60 text-teal-800' : 'border-slate-200 text-slate-400'}`}>Grupo vazio. Arraste uma atividade para cá ou adicione abaixo.</div>}
+        {!list.length && <div className={`mx-1 my-1 rounded-md border border-dashed px-3 py-2.5 text-xs transition-colors ${dropAt?.group === group.key ? 'border-teal-500 bg-teal-50/60 text-teal-800' : 'border-slate-200 text-slate-400'}`}>Grupo vazio. Arraste uma Tarefa para cá ou adicione abaixo.</div>}
         <form className="flex items-center gap-1 px-1 sm:px-2" onSubmit={e => { e.preventDefault(); void addInGroup(group.key); }}>
           <span className="flex h-8 w-6 shrink-0 items-center justify-center text-slate-300"><Plus size={15}/></span>
           <span aria-hidden className="h-[1.125rem] w-[1.125rem] shrink-0 rounded-full border-2 border-dashed border-slate-200"/>
-          <input aria-label={`Nova atividade em ${group.label}`} placeholder="Nova atividade" readOnly={busy} className={`${ghostInput} placeholder:text-slate-400`} value={newTitles[group.key] || ''} onChange={e => setNewTitles(t => ({ ...t, [group.key]: e.target.value }))} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setNewTitles(t => ({ ...t, [group.key]: '' })); e.currentTarget.blur(); } }}/>
+          <input aria-label={`Nova Tarefa em ${group.label}`} placeholder="Nova Tarefa" readOnly={busy} className={`${ghostInput} placeholder:text-slate-400`} value={newTitles[group.key] || ''} onChange={e => setNewTitles(t => ({ ...t, [group.key]: e.target.value }))} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setNewTitles(t => ({ ...t, [group.key]: '' })); e.currentTarget.blur(); } }}/>
           {(newTitles[group.key] || '').trim() && <span className="shrink-0 pr-1 text-[11px] text-slate-400">Enter para adicionar</span>}
         </form>
       </div>;
@@ -407,17 +407,17 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
       </div> : <div className="pilot-checklist-toolbar flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-3 sm:px-4">
         <div className="min-w-[12rem] flex-1">
           <div className="flex items-baseline justify-between gap-3 text-xs"><span className="text-slate-500">{subtitle}</span>{data?.canEdit && <span className="shrink-0 font-medium tabular-nums text-slate-700">{doneCount} de {visibleTasks.length}</span>}</div>
-          {data?.canEdit && <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Atividades concluídas" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><div className="pilot-progress h-full rounded-full bg-teal-600" style={{ width: `${percent}%` }}/></div>}
+          {data?.canEdit && <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Tarefas concluídas" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><div className="pilot-progress h-full rounded-full bg-teal-600" style={{ width: `${percent}%` }}/></div>}
         </div>
         <div className="flex items-center gap-1">
           <button type="button" aria-pressed={pending} disabled={busy} onClick={() => { setPending(p => !p); setJustDone(new Set()); }} className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors disabled:opacity-45 ${pending ? 'border-teal-600 bg-teal-50 text-teal-800' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>{pending && <Check size={12} strokeWidth={3}/>}Só pendentes</button>
-          <button type="button" className={iconButton} disabled={busy || typing} onClick={() => void load()} aria-label="Atualizar atividades" title="Atualizar"><RefreshCw size={14}/></button>
+          <button type="button" className={iconButton} disabled={busy || typing} onClick={() => void load()} aria-label="Atualizar Tarefas" title="Atualizar"><RefreshCw size={14}/></button>
         </div>
       </div>}
-      {!data && !error && <p role="status" className="px-4 py-3 text-xs text-slate-500">Consultando atividades…</p>}
-      {data && !data.canEdit && <p className="px-4 py-3 text-xs text-slate-500">As atividades seguem as permissões administrativas de Testes e Tarefas.</p>}
+      {!data && !error && <p role="status" className="px-4 py-3 text-xs text-slate-500">Consultando Tarefas…</p>}
+      {data && !data.canEdit && <p className="px-4 py-3 text-xs text-slate-500">As Tarefas seguem as permissões de Tarefas e atividades.</p>}
       {data?.canEdit && (canOrganize ? editGroups() : <>
-        {!insurance && data.tasks.length < PILOT_KEYS.length && <p className="px-4 py-2 text-xs text-amber-800">Há atividades do piloto ainda não cadastradas. O marco de prontidão permanece pendente.</p>}
+        {!insurance && data.tasks.length < PILOT_KEYS.length && <p className="px-4 py-2 text-xs text-amber-800">Há Tarefas do piloto ainda não cadastradas. O marco de prontidão permanece pendente.</p>}
         {groupList.map(({ key: group, label: name }) => {
           const all = tasksOf(group);
           const tasks = all.filter(t => !pending || t.status !== 'concluida' || justDone.has(t.id));
@@ -435,20 +435,20 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
               <ul>{tasks.map(row)}</ul>
               {addingHere && <form className="flex items-center gap-3 px-3 py-2 sm:px-4" onSubmit={e => { e.preventDefault(); void add(); }}>
                 <span className="h-[1.125rem] w-[1.125rem] shrink-0 rounded-full border-2 border-dashed border-slate-300"/>
-                <input autoFocus aria-label="Nova atividade" placeholder="Nova atividade · Enter para salvar, Esc para sair" className={inlineInput} value={adding.title} readOnly={busy} onChange={e => setAdding({ group, title: e.target.value })} onKeyDown={e => { if (e.key === 'Escape') setAdding(null); }} onBlur={() => { if (!busy && !adding.title.trim()) setAdding(null); }}/>
+                <input autoFocus aria-label="Nova Tarefa" placeholder="Nova Tarefa · Enter para salvar, Esc para sair" className={inlineInput} value={adding.title} readOnly={busy} onChange={e => setAdding({ group, title: e.target.value })} onKeyDown={e => { if (e.key === 'Escape') setAdding(null); }} onBlur={() => { if (!busy && !adding.title.trim()) setAdding(null); }}/>
               </form>}
               {onLayoutChange && !addingHere && <button type="button" className="flex min-h-9 items-center gap-1.5 px-3 text-xs font-medium text-slate-400 transition-colors hover:text-teal-700 disabled:opacity-45 sm:px-4" disabled={locked} onClick={() => { setRenaming(null); setAdding({ group, title: '' }); }}><Plus size={14}/>Adicionar</button>}
             </div>}
           </div>;
         })}
-        {pending && visibleTasks.every(t => t.status === 'concluida') && <p className="px-4 py-3 text-xs text-teal-800">Nenhuma atividade pendente.</p>}
+        {pending && visibleTasks.every(t => t.status === 'concluida') && <p className="px-4 py-3 text-xs text-teal-800">Nenhuma Tarefa pendente.</p>}
       </>)}
       {canOrganize && onNoteChange ? <div className="border-t border-slate-100 px-3 py-3 sm:px-4">
         <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-400" htmlFor="wiki-pilot-note">Nota de rodapé</label>
         <textarea id="wiki-pilot-note" rows={2} readOnly={locked} className="mt-1 w-full resize-y rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs leading-5 text-slate-600 outline-none transition-colors hover:border-slate-300 focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/15" value={noteDraft ?? noteText} onChange={e => setNoteDraft(e.target.value)} onBlur={() => void saveNote()} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setNoteDraft(null); e.currentTarget.blur(); } }}/>
       </div> : <p className="pilot-checklist-note border-t border-slate-100 px-4 py-3 text-xs leading-5 text-slate-400">{noteText}</p>}
       {canOrganize && <div className="pilot-edit-foot flex flex-wrap items-center justify-between gap-3 border-t border-teal-100 bg-teal-50/50 px-3 py-2 sm:px-4">
-        <span className="text-[11px] text-slate-500">Excluir tira a atividade da nota; o registro continua em Testes e Tarefas.</span>
+        <span className="text-[11px] text-slate-500">Tirar da nota só esconde a Tarefa aqui; ela continua em Tarefas e atividades.</span>
         <button type="button" className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-teal-700 px-3 text-xs font-semibold text-white transition-colors hover:bg-teal-800 disabled:opacity-50" disabled={busy} onClick={() => onEditingChange?.(false)}><Check size={13} strokeWidth={3}/>Concluir edição</button>
       </div>}
     </div>

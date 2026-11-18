@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, FileText, X, ArrowRight } from 'lucide-react';
+import { PageIcon } from '../ui/PageIcon';
 import { NotionWorkspace } from '../../types/notion';
 
 interface SearchModalProps {
@@ -147,7 +148,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 pr-2">
-                  <span className="text-base shrink-0">{item.page.icon || '📄'}</span>
+                  <PageIcon icon={item.page.icon} className="text-base shrink-0 w-5 text-center" />
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">
                       {item.page.title || 'Sem título'}

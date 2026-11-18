@@ -1,8 +1,9 @@
 import { supabase } from '../../../services/supabaseClient';
-import { getVaultNote, canSyncVault } from '../vaultService';
+import { getVaultNote } from '../vaultService';
+import { canEditWork } from '../../growth-learning/development/developmentService';
 import type { StrategyDocument, StrategyHead, StrategyRevision } from './strategyModel';
 export async function loadStrategy(noteId:string) {
- const [source,access,result,session] = await Promise.all([getVaultNote(noteId),canSyncVault(),supabase.from('gaas_wiki_pilot_documents').select('*').eq('note_id',noteId).maybeSingle(),supabase.auth.getSession()]);
+ const [source,access,result,session] = await Promise.all([getVaultNote(noteId),canEditWork(),supabase.from('gaas_wiki_pilot_documents').select('*').eq('note_id',noteId).maybeSingle(),supabase.auth.getSession()]);
  if(result.error)throw result.error;
  return {source,canEdit:access,viewerId:session.data.session?.user.id||'',head:result.data as StrategyHead|null};
 }

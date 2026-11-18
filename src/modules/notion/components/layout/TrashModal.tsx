@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { PageIcon } from '../ui/PageIcon';
 import { NotionWorkspace } from '../../types/notion';
 
 interface TrashModalProps {
@@ -70,7 +71,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
                 className="flex items-center justify-between p-2 hover:bg-[var(--notion-hover)]/40 rounded transition-colors"
               >
                 <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                  <span className="text-base shrink-0">{page.icon || '📄'}</span>
+                  <PageIcon icon={page.icon} className="text-base shrink-0 w-5 text-center" />
                   <span className="text-xs font-medium truncate">
                     {page.title || 'Sem título'}
                   </span>

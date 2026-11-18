@@ -20,7 +20,7 @@ async function setup(){
  await db.query('insert into gaas_vault_notes values($1,$2,$3,$4,null)',[note,'05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md','base',original]);
  await db.exec(migration);
  await db.exec(readFileSync('supabase/migrations/20261106204000_wiki_strategy_pilot_member_gate.sql','utf8'));
- await db.exec(readFileSync('supabase/migrations/20261107001500_wiki_strategy_notes.sql','utf8'));await db.exec(readFileSync('supabase/migrations/20261109141118_insurance_strategy_task_binding.sql','utf8'));
+ await db.exec(readFileSync('supabase/migrations/20261107001500_wiki_strategy_notes.sql','utf8'));await db.exec(readFileSync('supabase/migrations/20261109141118_insurance_strategy_task_binding.sql','utf8'));await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(f=>f.endsWith('_tarefas_edicao_membros.sql')),'utf8'));
  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${admin}',false);`);
  const save=async(doc,revision=0,hash='base',request=crypto.randomUUID(),reconcile=false)=>(await db.query('select public.gaas_wiki_pilot_save($1,$2,$3,$4,$5,$6,$7) r',[note,revision,hash,JSON.stringify(doc),request,'Teste',reconcile])).rows[0].r;
  return{db,save};
@@ -49,18 +49,20 @@ test('concurrent writes, retries and changed source require explicit reconciliat
  const prior=(await db.query('select source_markdown from gaas_wiki_pilot_revisions where revision=2')).rows[0];assert.equal(prior.source_markdown,original);
  }finally{await db.close();}
 });
-test('anonymous and non-admin writes are denied; append-only history cannot be rewritten',async()=>{
+test('approved members write; unapproved and anonymous are denied; append-only history cannot be rewritten',async()=>{
  const{db,save}=await setup();try{
  await save(initial);
  await assert.rejects(db.exec("update gaas_wiki_pilot_revisions set reason='Hacked'"),/permission denied/);
  await db.exec(`select set_config('request.jwt.claim.sub','${other}',false)`);
- await assert.rejects(save(initial,1),/access_denied/);
- assert.equal((await db.query('select * from gaas_wiki_pilot_revisions')).rows.length,0);
+ assert.equal((await save({...initial,title:'Versão do membro'},1)).revision,2);
+ assert.equal((await db.query('select public.gaas_can_edit_work() as v')).rows[0].v,true);
  assert.equal((await db.query('select * from gaas_wiki_pilot_documents')).rows.length,1);
  await db.exec("select set_config('test.approved','false',false)");
  assert.equal((await db.query('select * from gaas_wiki_pilot_documents')).rows.length,0);
+ await assert.rejects(save(initial,2),/access_denied/);
+ assert.equal((await db.query('select public.gaas_can_edit_work() as v')).rows[0].v,false);
  await db.exec(`select set_config('request.jwt.claim.sub','${admin}',false)`);
- await assert.rejects(save(initial,1),/access_denied/);
+ await assert.rejects(save(initial,2),/access_denied/);
  await db.exec("reset role;set role anon;select set_config('request.jwt.claim.sub','',false)");
  await assert.rejects(save(initial,1),/permission denied/);
  await assert.rejects(db.query('select * from gaas_wiki_pilot_documents'),/permission denied/);

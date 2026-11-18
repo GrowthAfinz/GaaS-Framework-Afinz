@@ -64,15 +64,21 @@ export const MODULE_PROP_IDS = new Set(['p_frente', 'p_projeto']);
 /** Propriedades cujas opções vêm de outra tela (criar opção grava lá). */
 export const SYNCED_PROPS = new Set(['p_frente', 'p_projeto', 'p_iniciativa']);
 
+/** Visões padrão de toda página de Tarefas: Quadro, Tabela e Calendário (decisão de 17/11/2026). As demais são opcionais. */
+export const STANDARD_VIEW_IDS = ['v_quadro', 'v_tabela', 'v_calendario'];
 export function defaultTaskViews(): DatabaseViewConfig[] {
   const all = ['p_frente', 'p_projeto', 'p_campanha', 'p_status', 'p_tipo', 'p_responsavel', 'p_prazo', 'p_prioridade', 'p_iniciativa', 'p_proxima'];
   return [
-    { id: 'v_quadro', name: 'Quadro por status', type: 'board', groupByPropertyId: 'p_status', visiblePropertyIds: ['p_frente', 'p_projeto', 'p_responsavel', 'p_prazo'], sorts: [], filters: [] },
-    { id: 'v_frente', name: 'Por frente', type: 'board', groupByPropertyId: 'p_frente', visiblePropertyIds: ['p_projeto', 'p_status', 'p_responsavel'], sorts: [], filters: [] },
-    { id: 'v_projeto', name: 'Por projeto', type: 'board', groupByPropertyId: 'p_projeto', hideEmptyGroups: true, visiblePropertyIds: ['p_campanha', 'p_frente', 'p_status', 'p_responsavel'], sorts: [], filters: [] },
-    { id: 'v_calendario', name: 'Calendário', type: 'calendar', datePropertyId: 'p_prazo', visiblePropertyIds: ['p_frente', 'p_status'], sorts: [], filters: [] },
+    { id: 'v_quadro', name: 'Quadro', type: 'board', groupByPropertyId: 'p_status', visiblePropertyIds: ['p_frente', 'p_projeto', 'p_responsavel', 'p_prazo'], sorts: [], filters: [] },
     { id: 'v_tabela', name: 'Tabela', type: 'table', visiblePropertyIds: all, sorts: [], filters: [] },
+    { id: 'v_calendario', name: 'Calendário', type: 'calendar', datePropertyId: 'p_prazo', visiblePropertyIds: ['p_frente', 'p_status'], sorts: [], filters: [] },
   ];
+}
+/** Garante as três visões padrão na frente das personalizadas, sem apagar visão criada pelo time. */
+export function withStandardViews(views: DatabaseViewConfig[]): DatabaseViewConfig[] {
+  const defaults = defaultTaskViews();
+  const standard = STANDARD_VIEW_IDS.map(id => views.find(v => v.id === id) || defaults.find(v => v.id === id)!);
+  return [...standard, ...views.filter(v => !STANDARD_VIEW_IDS.includes(v.id))];
 }
 /** A antiga visão "SDD (GaaS)" saiu da base: o SDD agora tem página própria. */
 const RETIRED_VIEWS = new Set(['v_sdd']);
@@ -204,7 +210,7 @@ export function taskPage(t: WorkItem, blocks: Block[], stored?: NotionPage): Not
 export function tasksDatabase(props: DatabaseProperty[], rows: DatabaseRow[], stored?: Partial<NotionDatabase>): NotionDatabase {
   const userProps = (stored?.properties || []).filter(p => !SYSTEM_PROP_IDS.has(p.id) && !MODULE_PROP_IDS.has(p.id));
   const kept = (stored?.views || []).filter(v => !RETIRED_VIEWS.has(v.id));
-  const views = kept.length ? kept : defaultTaskViews();
+  const views = withStandardViews(kept);
   return {
     id: TASKS_DB, title: stored?.title || 'Tarefas', description: stored?.description ?? 'O que o time leva na daily, por frente de negócio e projeto. Cada linha é uma página.',
     properties: [...props, ...userProps], views, currentViewId: views.some(v => v.id === stored?.currentViewId) ? (stored!.currentViewId as string) : views[0].id, rows,
