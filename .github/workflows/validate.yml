@@ -8,27 +8,12 @@ on:
 permissions:
   contents: read
 
+# Três partes em paralelo (antes era um job só, ~4 min). O check obrigatório da main continua sendo
+# "validate": o job final só passa se as três partes passarem.
 jobs:
-  validate:
+  contracts:
+    name: Testes de tela e contratos
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      PGHOST: localhost
-      PGPORT: 5432
-      PGUSER: postgres
-      PGPASSWORD: postgres
-      PGDATABASE: postgres
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -46,14 +31,6 @@ jobs:
         run: npm run test:insurance
       - name: Portfolio report dependencies and Wiki review contracts
         run: npm run test:portfolio-knowledge
-      - name: Development backlog and notification contracts
-        run: node --test scripts/test-development-backlog.mjs scripts/test-tasks-four-fronts.mjs scripts/test-initiative-workbench.mjs scripts/test-corrections-and-improvements.mjs scripts/test-wiki-seedlist.mjs scripts/test-wiki-strategy-pilot.mjs scripts/test-crm-structure.mjs scripts/test-crm-consumo.mjs scripts/test-daily-view.mjs scripts/test-notion-module.mjs scripts/test-structure-names.mjs scripts/test-daily-kanban.mjs
-      - name: SFMC package ingestion SQL contracts
-        run: npm run test:sfmc-package-sql
-      - name: Content performance and automatic linkage SQL contracts
-        run: node scripts/test-content-performance-integration.mjs
-      - name: Journey snapshot SQL contracts
-        run: npm run test:journey-snapshots-sql
       - name: Report Live contract and recovery protocol tests
         run: npm run test:report-live
       - name: Report Live renderer fixtures are reproducible
@@ -88,9 +65,52 @@ jobs:
         run: node --test scripts/test-growth-loop-attention.mjs
       - name: Approved pilot configuration is reproducible
         run: npm run check:growth-trigger-pilot
+
+  sql:
+    name: Contratos SQL
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
+      - name: Development backlog and notification contracts
+        run: node --test scripts/test-development-backlog.mjs scripts/test-tasks-four-fronts.mjs scripts/test-initiative-workbench.mjs scripts/test-corrections-and-improvements.mjs scripts/test-wiki-seedlist.mjs scripts/test-wiki-strategy-pilot.mjs scripts/test-crm-structure.mjs scripts/test-crm-consumo.mjs scripts/test-daily-view.mjs scripts/test-notion-module.mjs scripts/test-structure-names.mjs scripts/test-daily-kanban.mjs
+      - name: SFMC package ingestion SQL contracts
+        run: npm run test:sfmc-package-sql
+      - name: Content performance and automatic linkage SQL contracts
+        run: node scripts/test-content-performance-integration.mjs
+      - name: Journey snapshot SQL contracts
+        run: npm run test:journey-snapshots-sql
+
+  build:
+    name: Tipos e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+      - run: npm ci
       - name: TypeScript regression gate (documented main debt)
         run: npm run typecheck:release
       - name: Edge Function type checks
         run: npm run check:edge
       - name: Production build
         run: npm run build
+
+  validate:
+    name: validate
+    if: always()
+    needs: [contracts, sql, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Todas as partes passaram
+        run: |
+          echo "contracts=${{ needs.contracts.result }} sql=${{ needs.sql.result }} build=${{ needs.build.result }}"
+          test "${{ needs.contracts.result }}" = success
+          test "${{ needs.sql.result }}" = success
+          test "${{ needs.build.result }}" = success
