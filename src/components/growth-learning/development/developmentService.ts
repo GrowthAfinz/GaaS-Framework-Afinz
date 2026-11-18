@@ -6,6 +6,8 @@ export interface DevelopmentTask {
  id:string;task_key:string;title:string;description:string;area:string;priority:'P0'|'P1'|'P2'|'P3';status:TaskStatus;
  owner_label:string|null;due_date:string|null;dependencies:string[];acceptance_criteria:string[];completed_criteria:number[];
  blocked_reason:string|null;resolution:string|null;source_note:string|null;revision:number;created_at?:string;updated_at?:string;
+ /** Pertencimento (20261118): frente da Visão Daily ou 'gaas', projetos da Daily e BU/parceiros. */
+ front_key?:string|null;project_ids?:string[];partner_keys?:string[];
 }
 export interface TaskEvent {id:string;revision:number;kind:string;created_at:string;before_data:DevelopmentTask|null;after_data:DevelopmentTask}
 /** Tarefas e a seção de Tarefas da Wiki são editáveis por todo membro aprovado (decisão de 17/11/2026). */

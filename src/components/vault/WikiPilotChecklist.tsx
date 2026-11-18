@@ -191,7 +191,9 @@ export function WikiPilotChecklist({ loader = loadPilotTasks, writer = saveWork,
   };
   const create = async (group: string, title: string) => {
     const next: WorkItem = { ...newWork('monetization'), id: '', revision: 0, task_key: (insurance ? 'SEG-PILOT-' : 'VDV-PILOT-') + crypto.randomUUID().slice(0, 12), title, status: 'planejando', details: { wiki_pilot_note: insurance ? INSURANCE_STRATEGY_PATH : '05-Estrategia/Estrategia-Pool-de-Ofertas-Visa.md', wiki_pilot_group: group, ...(insurance ? { insurance_group: group } : {}) } };
-    if (insurance) { next.initiative_id = '03d2907e-2bb1-4c45-9b26-f3caf11480b4'; next.source_note = INSURANCE_STRATEGY_PATH; }
+    const noteInitiative = (data as { initiativeId?: string | null } | null)?.initiativeId || null;
+    if (insurance) { next.initiative_id = noteInitiative || '03d2907e-2bb1-4c45-9b26-f3caf11480b4'; next.source_note = INSURANCE_STRATEGY_PATH; }
+    else if (noteInitiative) next.initiative_id = noteInitiative;
     return persist(next);
   };
   const add = async () => {

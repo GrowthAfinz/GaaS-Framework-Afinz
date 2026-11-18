@@ -152,7 +152,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     patchView({ filters: [...filters.filter((f) => f.propertyId !== pid), ...(value.trim() ? [{ propertyId: pid, operator: 'contains' as const, value }] : [])] });
   const propName = (pid: string) => database.properties.find((p) => p.id === pid)?.name || pid;
   const sort = (currentView.sorts || [])[0];
-  const groupable = database.properties.filter((p) => ['select', 'status', 'person'].includes(p.type));
+  const groupable = database.properties.filter((p) => ['select', 'status', 'person', 'multi_select'].includes(p.type));
   const dateProps = database.properties.filter((p) => p.type === 'date');
   const groupPropId = currentView.groupByPropertyId || groupable.find((p) => p.type === 'status')?.id || groupable[0]?.id;
   const groupProperty = groupable.find(p => p.id === groupPropId);
