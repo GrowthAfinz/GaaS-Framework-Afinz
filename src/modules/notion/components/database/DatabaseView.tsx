@@ -50,6 +50,8 @@ interface DatabaseViewProps {
   readOnly?: boolean;
   /** Chips de filtro rápido por uma propriedade (ex.: Frente). A seleção é de cada pessoa e fica no navegador. */
   quickFilter?: QuickFilterConfig;
+  /** Linhas que só o Calendário mostra (ex.: Sub Tarefas com prazo, que não viram card). */
+  calendarExtraRows?: DatabaseRow[];
 }
 export interface QuickFilterConfig {
   propertyId: string; hiddenByDefault: string[]; storageKey: string;
@@ -75,6 +77,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onDuplicateRow,
   readOnly = false,
   quickFilter,
+  calendarExtraRows,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -480,7 +483,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         <CalendarView
           taskCalendar={Boolean(layoutKey)}
           database={database}
-          filteredRows={filteredRows}
+          filteredRows={calendarExtraRows?.length ? [...filteredRows, ...calendarExtraRows] : filteredRows}
           datePropId={datePropId}
           readOnly={readOnly}
           onUpdateRow={readOnly ? undefined : (rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}

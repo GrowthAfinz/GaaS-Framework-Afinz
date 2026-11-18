@@ -12,6 +12,7 @@ import { TrashModal } from './components/layout/TrashModal';
 import { TemplatesModal } from './components/layout/TemplatesModal';
 import { RowPeekModal } from './components/database/RowPeekModal';
 import { TaskModal } from '../../components/growth-learning/development/TaskModal';
+import { patchTask } from '../../components/growth-learning/development/taskModalService';
 import { WorkStrip } from './gaas/WorkStrip';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
 import { configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
@@ -193,6 +194,12 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     return taskRowId('pending');
   }, [addRowToDatabase, ctx, patchWorkspace, showToast]);
   const updateRow = useCallback((databaseId: string, rowId: string, propertyId: string, value: any) => {
+    // Sub Tarefa no Calendário: não é linha da base; o prazo vai direto para a Tarefa.
+    if (databaseId === TASKS_DB && propertyId === 'p_prazo' && !latest.current.databases[TASKS_DB]?.rows.some(r => r.id === rowId)) {
+      const sub = ctx.tasks.get(taskIdOfRow(rowId) || '');
+      if (sub) void patchTask(sub, { due_date: value || '' }).then(saved => { ctx.tasks.set(saved.id, saved); patchWorkspace(prev => ({ ...prev })); showToast('Prazo da Sub Tarefa atualizado.'); }).catch(e => showToast(taskError(e)));
+      return;
+    }
     if (databaseId === TASKS_DB && propertyId === 'p_campanha') { showToast('A campanha vem do projeto: troque o projeto ou ligue a campanha ao projeto na Visão Daily.'); return; }
     updateDatabaseRow(databaseId, rowId, propertyId, value);
     if (isCreditBases(databaseId) && propertyId === 'prop_status') {
@@ -566,6 +573,18 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setSearchOpen]);
 
+  /** Sub Tarefas com prazo aparecem no Calendário (só lá): abrem a janela da Tarefa e arrastar muda o prazo. */
+  const subtaskCalendarRows = useCallback((fronts: string[]): DatabaseRow[] => {
+    const props = workspace.databases[TASKS_DB]?.properties || [];
+    const statusName = (k: string) => props.find(p => p.id === 'p_status')?.options?.find(o => o.id === k)?.name || '';
+    const frontName = (k: string | null | undefined) => props.find(p => p.id === 'p_frente')?.options?.find(o => o.id === k)?.name || '';
+    return [...ctx.tasks.values()]
+      .filter(t => t.parent_task_id && t.due_date && !['concluida', 'cancelada'].includes(t.status) && (!fronts.length ? t.front_key !== GAAS_FRONT : fronts.includes(String(t.front_key || ''))))
+      .map(t => ({ id: taskRowId(t.id), pageId: taskRowId(t.id), properties: {
+        prop_title: `↳ ${t.title}`, p_prazo: t.due_date, p_status: statusName(t.status), p_frente: frontName(t.front_key),
+      } }));
+  }, [ctx.tasks, workspace.databases]);
+
   // Database renderer helper for embedding database views into any block or page
   const renderDatabase = useCallback(
     (databaseId: string, pageId?: string) => {
@@ -593,6 +612,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
             onUpdateRow={updateRow}
             onAddRow={(id, props = {}) => addRow(id, props.p_frente || !scope.length ? props : { ...props, p_frente: scope[0] })}
             quickFilter={{ propertyId: 'p_frente', hiddenByDefault: [], scope, storageKey: `gaas.notion.chips.${ctx.me || 'anon'}.${!pageId || pageId === TASKS_PAGE ? databaseId : pageId}` }}
+            calendarExtraRows={subtaskCalendarRows(page?.taskFronts || [])}
             onDeleteRow={deleteRow}
             onAddProperty={addDatabaseProperty}
             onSetView={(_db, viewId) => setViewByPage(prev => ({ ...prev, [viewKey]: viewId }))}
