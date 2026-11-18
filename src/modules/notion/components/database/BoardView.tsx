@@ -4,11 +4,13 @@ import { DatabaseRow, NotionColor, NotionDatabase, NotionUser } from '../../type
 import { PropertyCell } from './PropertyCell';
 import { ColumnControls, ResizeColumn } from './ColumnControls';
 import { useColumnLayout } from './columnLayout';
+import { CreditDateAlert } from './CreditDateAlert';
 import { CHIP_COLORS, PropertyChip } from './viewEngine';
 
 interface BoardViewProps {
   database: NotionDatabase;
   layoutKey?: string;
+  creditBases?: boolean;
   projectList?: boolean;
   filteredRows: DatabaseRow[];
   /** Propriedade que define as colunas (select, status ou pessoa). Adição GaaS: antes era sempre o primeiro status. */
@@ -32,6 +34,7 @@ interface Column { key: string; name: string; color: NotionColor; value: string 
 export const BoardView: React.FC<BoardViewProps> = ({
   database,
   layoutKey,
+  creditBases = false,
   projectList = false,
   filteredRows,
   groupPropId,
@@ -98,7 +101,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
     });
   const shown = columns.filter((col) => !hiddenValues.includes(col.key === '__vazio__' ? '__vazio__' : col.value) && (!hideEmpty || rowsOf(col).length > 0));
 
-  const widthOf = (key: string) => layout.widths[key] ?? 248;
+  const widthOf = (key: string) => layout.widths[key] ?? (creditBases ? 224 : 248);
   const titleKey = database.properties.find(prop => prop.type === 'title')?.id ?? 'prop_title';
   const status = database.properties.find(prop => prop.id === 'p_status');
   const deadline = database.properties.find(prop => prop.id === 'p_prazo');
@@ -136,7 +139,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
       {shown.length === 0 && <div className="p-4 text-xs text-[var(--notion-text-muted)]">Nada para mostrar com os filtros atuais.</div>}
       {shown.map((col) => {
         const rowsInCol = rowsOf(col);
-        const empty = Boolean(layoutKey && !rowsInCol.length);
+        const empty = Boolean(layoutKey && !creditBases && !rowsInCol.length);
         const collapsed = empty && !openEmpty[col.key];
 
         return (
@@ -151,7 +154,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
             {/* Column Header */}
             <div className="nt-lane-head relative flex items-center justify-between px-1">
               <div className="flex items-center gap-2 min-w-0">
-                {layoutKey ? <><span className={`nt-status-dot nt-dot-${col.color}`} /><span className="truncate text-xs font-semibold">{col.name}</span></> :
+                {layoutKey ? <><span className={`nt-status-dot nt-dot-${col.color}`} /><span className={`${creditBases ? 'break-words' : 'truncate'} text-xs font-semibold`} title={col.name}>{col.name}</span></> :
                   <span className={`px-2 py-0.5 rounded text-xs font-semibold truncate ${CHIP_COLORS[col.color]}`}>{col.name}</span>}
                 <span className="text-xs text-[var(--notion-text-muted)] font-medium">{rowsInCol.length}</span>
               </div>
@@ -175,22 +178,37 @@ export const BoardView: React.FC<BoardViewProps> = ({
             {/* Cards List */}
             <div hidden={collapsed} className="space-y-2 flex-1 min-h-[56px] pt-2">
               {rowsInCol.map((row) => (
-                <div
-                  key={row.id}
-                  draggable={!readOnly}
-                  onDragStart={(e) => handleDragStart(e, row.id)}
-                  onDragEnd={() => { setDraggedRowId(null); setOverCol(null); }}
-                  role="button" tabIndex={0}
-                  onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpenRowPage(row.pageId); } }}
-                  onClick={() => onOpenRowPage(row.pageId)}
-                  className={`group relative p-3 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xs hover:shadow-md transition-all cursor-pointer select-none ${draggedRowId === row.id ? 'opacity-50' : ''}`}
-                >
-                  <div className="text-sm font-medium text-[var(--notion-text)] leading-snug">{row.properties[titleKey] || 'Sem título'}</div>
-                  {cardProps.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] mt-2">
-                      {cardProps.map((p) => <PropertyChip key={p.id} prop={p} value={row.properties[p.id]} users={users} />)}
-                    </div>
-                  )}
+                <div key={row.id} className="rounded-md bg-[var(--notion-card)]">
+                  <div
+                    draggable={!readOnly}
+                    onDragStart={(e) => handleDragStart(e, row.id)}
+                    onDragEnd={() => { setDraggedRowId(null); setOverCol(null); }}
+                    role="button" tabIndex={0}
+                    onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpenRowPage(row.pageId); } }}
+                    onClick={() => onOpenRowPage(row.pageId)}
+                    className={`group relative p-3 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xs hover:shadow-md transition-all cursor-pointer select-none ${draggedRowId === row.id ? 'opacity-50' : ''}`}
+                  >
+                    <div className="text-sm font-medium text-[var(--notion-text)] leading-snug">{row.properties[titleKey] || 'Sem título'}</div>
+                    {cardProps.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] mt-2">
+                        {cardProps.map(p => <React.Fragment key={p.id}>
+                          <PropertyChip prop={p} value={row.properties[p.id]} users={users} />
+                          <CreditDateAlert database={database} row={row} propertyId={p.id} />
+                        </React.Fragment>)}
+                      </div>
+                    )}
+                  </div>
+                  {creditBases && !readOnly && <select
+                    aria-label={`Mover ${row.properties[titleKey] || 'pedido'} para outra etapa`}
+                    className="mx-2 mb-2 mt-1 max-w-[calc(100%-1rem)] rounded border border-[var(--notion-border)] bg-[var(--notion-card)] px-1 text-xs"
+                    value=""
+                    onChange={event => onUpdateRow(row.id, groupProp.id, event.target.value)}
+                  >
+                    <option value="" disabled>Mover para…</option>
+                    {columns.filter(target => target.value && target.value !== col.value).map(target => (
+                      <option key={target.key} value={target.value}>{target.name}</option>
+                    ))}
+                  </select>}
                 </div>
               ))}
             </div>

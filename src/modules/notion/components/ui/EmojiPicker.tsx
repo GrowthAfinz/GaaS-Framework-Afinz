@@ -15,7 +15,7 @@ const EMOJI_CATEGORIES: Record<string, string[]> = {
   'Symbols & Flags': ['✅', '❌', '⚠️', '❗', '❓', '💯', '🔔', '🔕', '💤', '🛑', '🏁', '🚩', '🏳️', '🏴', '🎯', '🎲', '🧩', '🏷️', '🔑', '🔒', '🔓'],
 };
 
-export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose }) => {
+export const EmojiPicker: React.FC<EmojiPickerProps> = ({ currentIcon, onSelect, onClose }) => {
   const [activeTab, setActiveTab] = useState<string>('Recent & Popular');
   const [search, setSearch] = useState('');
 
@@ -29,7 +29,10 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose }) =
     <div className="absolute z-50 mt-1 w-72 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] p-3 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
       <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--notion-border)]">
         <span className="text-xs font-semibold text-[var(--notion-text-muted)] uppercase tracking-wider">Escolher ícone</span>
+        {currentIcon && <button type="button" className="ml-auto mr-2 rounded px-2 py-1 text-xs hover:bg-[var(--notion-hover)]"
+          onClick={() => { onSelect(''); onClose(); }}>Remover ícone</button>}
         <button
+          aria-label="Fechar seletor de ícones"
           onClick={onClose}
           className="p-1 rounded hover:bg-[var(--notion-hover)] text-[var(--notion-text-muted)]"
         >

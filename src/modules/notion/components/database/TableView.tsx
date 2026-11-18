@@ -26,6 +26,9 @@ import { GripVertical, Pin } from 'lucide-react';
 import { PropertyCell } from './PropertyCell';
 import { PropertyHeader } from './PropertyHeader';
 import { PropertyChip } from './viewEngine';
+import { DatabasePopup } from './DatabasePopup';
+import { CreditDateAlert } from './CreditDateAlert';
+import { isCreditBases } from '../../gaas/creditBases';
 
 interface TableViewProps {
   database: NotionDatabase;
@@ -61,14 +64,14 @@ export const TableView: React.FC<TableViewProps> = ({
   const [newPropType, setNewPropType] = useState<PropertyType>('text');
 
   const layout = useColumnLayout(layoutKey);
-  const movable = database.properties.filter(prop => !layoutKey || prop.type === 'title' || !visiblePropertyIds?.length || visiblePropertyIds.includes(prop.id));
+  const movable = database.properties.filter(prop => !layoutKey || prop.type === 'title' || !visiblePropertyIds || visiblePropertyIds.includes(prop.id));
   const title = movable.find(prop => prop.type === 'title');
   const columns = layoutKey ? [
     ...movable.filter(prop => prop === title),
     ...layout.order.flatMap(id => movable.filter(prop => prop.id === id && prop !== title)),
     ...movable.filter(prop => prop !== title && !layout.order.includes(prop.id)),
   ] : movable;
-  const widthOf = (id: string) => layout.widths[id] ?? (id === title?.id ? 340 : 164);
+  const widthOf = (id: string) => layout.widths[id] ?? (id === title?.id ? (isCreditBases(database.id) ? 210 : 340) : id === 'prop_status' ? 205 : 164);
   const move = (id: string, target: string) => {
     if (id === title?.id || target === title?.id || id === target) return;
     const order = columns.map(prop => prop.id);
@@ -116,7 +119,7 @@ export const TableView: React.FC<TableViewProps> = ({
     <div>
     {layoutKey && <ColumnControls columns={columns.map(prop => ({
       id: prop.id, label: prop.name, width: widthOf(prop.id), fixed: prop === title,
-    }))} onResize={layout.resize} onMove={move} onReset={layout.reset} />}
+    }))} label={isCreditBases(database.id) ? 'Largura e ordem' : undefined} onResize={layout.resize} onMove={move} onReset={layout.reset} />}
     <div className={`w-full overflow-x-auto border border-[var(--notion-border)] rounded-md bg-[var(--notion-card)] shadow-xs ${layoutKey ? 'nt-task-grid' : ''}`}>
       <table className={`text-left text-xs ${layoutKey ? 'table-fixed border-separate border-spacing-0' : 'min-w-full divide-y divide-[var(--notion-border)] border-collapse'}`}
         style={layoutKey ? { width: columns.reduce((sum, prop) => sum + widthOf(prop.id), readOnly ? 0 : 88) } : undefined}>
@@ -148,22 +151,19 @@ export const TableView: React.FC<TableViewProps> = ({
                 </button>
 
                 {showAddProp && (
-                  <form
-                    onSubmit={handleAddPropSubmit}
-                    className="absolute right-0 top-7 z-50 w-52 p-3 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xl text-left"
-                  >
-                    <div className="text-xs font-semibold text-[var(--notion-text-muted)] mb-2">
-                      Nova propriedade
-                    </div>
+                  <DatabasePopup title="Nova coluna" onClose={() => setShowAddProp(false)}>
+                  <form onSubmit={handleAddPropSubmit}>
                     <input
                       type="text"
-                      placeholder="Nome da propriedade"
+                      aria-label="Nome da coluna"
+                      placeholder="Nome da coluna"
                       value={newPropName}
                       onChange={(e) => setNewPropName(e.target.value)}
                       className="w-full px-2 py-1 mb-2 text-xs rounded border border-[var(--notion-border)] bg-[var(--notion-hover)] text-[var(--notion-text)] focus:outline-none"
                       autoFocus
                     />
                     <select
+                      aria-label="Tipo da coluna"
                       value={newPropType}
                       onChange={(e) => setNewPropType(e.target.value as PropertyType)}
                       className="w-full px-2 py-1 mb-3 text-xs rounded border border-[var(--notion-border)] bg-[var(--notion-hover)] text-[var(--notion-text)] focus:outline-none"
@@ -182,9 +182,10 @@ export const TableView: React.FC<TableViewProps> = ({
                       type="submit"
                       className="w-full py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white font-medium rounded transition-colors"
                     >
-                      Criar propriedade
+                      Criar coluna
                     </button>
                   </form>
+                  </DatabasePopup>
                 )}
               </div>
             </th>}
@@ -194,6 +195,11 @@ export const TableView: React.FC<TableViewProps> = ({
 
         {/* Rows */}
         <tbody className="divide-y divide-[var(--notion-border)]">
+          {isCreditBases(database.id) && filteredRows.length === 0 && (
+            <tr><td className="p-4 text-[var(--notion-text-muted)]" colSpan={columns.length + (readOnly ? 0 : 2)}>
+              {database.rows.length ? 'Nenhum pedido corresponde aos filtros.' : 'Nenhum pedido cadastrado.'}
+            </td></tr>
+          )}
           {filteredRows.map((row) => (
             <tr
               key={row.id}
@@ -219,7 +225,8 @@ export const TableView: React.FC<TableViewProps> = ({
                     rowId={row.id}
                     onChange={(val) => onUpdateRow(row.id, prop.id, val)}
                     onOpenPage={prop.type === 'title' ? () => onOpenRowPage(row.pageId) : undefined}
-                  />}
+                    />}
+                  <CreditDateAlert database={database} row={row} propertyId={prop.id} />
                 </td>
               ))}
               {!readOnly && <td className="w-10" />}

@@ -9,8 +9,8 @@ interface TableBlockProps {
 
 export const TableBlock: React.FC<TableBlockProps> = ({ block, onChange }) => {
   const data = block.tableData || [
-    ['Header 1', 'Header 2', 'Header 3'],
-    ['Cell 1', 'Cell 2', 'Cell 3'],
+    ['', '', ''],
+    ['', '', ''],
   ];
 
   const handleCellChange = (rIdx: number, cIdx: number, val: string) => {
@@ -33,19 +33,21 @@ export const TableBlock: React.FC<TableBlockProps> = ({ block, onChange }) => {
 
   const deleteRow = (rIdx: number) => {
     if (data.length <= 1) return;
+    if (data[rIdx].some(cell => cell.trim()) && !window.confirm('Remover esta linha e seu conteúdo?')) return;
     const nextData = data.filter((_, idx) => idx !== rIdx);
     onChange({ tableData: nextData });
   };
 
   const deleteColumn = (cIdx: number) => {
     if ((data[0]?.length || 0) <= 1) return;
+    if (data.some(row => row[cIdx]?.trim()) && !window.confirm('Remover esta coluna e seu conteúdo?')) return;
     const nextData = data.map((row) => row.filter((_, idx) => idx !== cIdx));
     onChange({ tableData: nextData });
   };
 
   return (
     <div className="my-3 overflow-x-auto">
-      <div className="flex items-center gap-3 mb-2 text-xs text-[var(--notion-text-muted)]">
+      <div className="flex flex-wrap items-center gap-3 mb-2 text-xs text-[var(--notion-text-muted)]">
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
             type="checkbox"
@@ -53,7 +55,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({ block, onChange }) => {
             onChange={(e) => onChange({ hasHeaderRow: e.target.checked })}
             className="rounded border-[var(--notion-border)] text-blue-500 focus:ring-0"
           />
-          Header row
+          Linha de cabeçalho
         </label>
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input
@@ -62,8 +64,18 @@ export const TableBlock: React.FC<TableBlockProps> = ({ block, onChange }) => {
             onChange={(e) => onChange({ hasHeaderColumn: e.target.checked })}
             className="rounded border-[var(--notion-border)] text-blue-500 focus:ring-0"
           />
-          Header column
+          Coluna de cabeçalho
         </label>
+        {(data[0]?.length ?? 0) > 1 && <label className="flex items-center gap-1.5">
+          <span>Remover coluna</span>
+          <select aria-label="Remover coluna" value="" className="max-w-40 rounded border bg-transparent p-1"
+            onChange={event => { if (event.target.value) deleteColumn(Number(event.target.value) - 1); }}>
+            <option value="">Selecionar</option>
+            {data[0].map((title, index) => <option key={index} value={index + 1}>
+              {block.hasHeaderRow && title.trim() ? title : `Coluna ${index + 1}`}
+            </option>)}
+          </select>
+        </label>}
       </div>
 
       <div className="inline-block min-w-full align-middle border border-[var(--notion-border)] rounded-md overflow-hidden bg-[var(--notion-card)]">
@@ -89,17 +101,18 @@ export const TableBlock: React.FC<TableBlockProps> = ({ block, onChange }) => {
                       >
                         <input
                           type="text"
+                          aria-label={`Linha ${rIdx + 1}, coluna ${cIdx + 1}`}
                           value={cell}
                           onChange={(e) => handleCellChange(rIdx, cIdx, e.target.value)}
-                          placeholder="Vazio"
                           className="w-full px-2.5 py-1.5 text-sm bg-transparent focus:outline-none focus:bg-blue-500/5 text-[var(--notion-text)] placeholder-[var(--notion-text-muted)]/40"
                         />
                       </td>
                     );
                   })}
                   {/* Delete row button */}
-                  <td className="w-8 p-1 opacity-0 group-hover:opacity-100 transition-opacity text-center">
+                  <td className="w-8 p-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity text-center">
                     <button
+                      disabled={data.length <= 1}
                       onClick={() => deleteRow(rIdx)}
                       className="p-1 rounded text-red-500 hover:bg-red-500/10"
                       title="Remover linha"
@@ -119,13 +132,13 @@ export const TableBlock: React.FC<TableBlockProps> = ({ block, onChange }) => {
             onClick={addRow}
             className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] hover:bg-[var(--notion-hover)] rounded transition-colors"
           >
-            <Plus size={14} /> Add Row
+            <Plus size={14} /> Adicionar linha
           </button>
           <button
             onClick={addColumn}
             className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--notion-text-muted)] hover:text-[var(--notion-text)] hover:bg-[var(--notion-hover)] rounded transition-colors"
           >
-            <Plus size={14} /> Add Column
+            <Plus size={14} /> Adicionar coluna
           </button>
         </div>
       </div>

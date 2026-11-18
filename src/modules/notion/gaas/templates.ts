@@ -2,6 +2,7 @@
 import type { Block, BlockType } from '../types/notion';
 import type { TemplateDefinition } from '../components/layout/TemplatesModal';
 import { generateId } from '../utils/id';
+import { CREDIT_BASES_TITLE, creditBasesDatabase } from './creditBases';
 
 const cover = (a: string, b: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`)}`;
@@ -11,6 +12,13 @@ const build = (specs: Spec[]): Block[] => specs.map(([type, content, extra]) => 
 const section = (title: string, hint: string): Spec[] => [['heading_3', title], ['paragraph', hint]];
 
 export const GAAS_TEMPLATES: TemplateDefinition[] = [
+  {
+    id: 'gaas_credit_bases', name: CREDIT_BASES_TITLE, category: 'Operação', icon: '🏷️',
+    cover: cover('#0e7490', '#2563eb'),
+    description: 'Acompanhe pedidos de compra, transferência, whitelist e validade na tabela e no Kanban.',
+    tags: ['IN', 'Crédito'],
+    createData: () => ({ pageTitle: CREDIT_BASES_TITLE, icon: '🏷️', cover: '', blocks: [], database: creditBasesDatabase() }),
+  },
   {
     id: 'gaas_spec', name: 'Spec SDD', category: 'SDD', icon: '📐', cover: cover('#0e7490', '#7c3aed'),
     description: 'Especificação no formato Spec Driven Development: problema, comportamento esperado, cenários, plano e verificação.',

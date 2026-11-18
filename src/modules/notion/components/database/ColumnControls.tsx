@@ -35,14 +35,15 @@ interface Column {
   fixed?: boolean;
 }
 
-export function ColumnControls({ columns, onResize, onMove, onReset }: {
+export function ColumnControls({ columns, onResize, onMove, onReset, label = 'Colunas' }: {
   columns: Column[];
+  label?: string;
   onResize: (id: string, width: number) => void;
   onMove?: (id: string, target: string) => void;
   onReset: () => void;
 }) {
   return <details className="nt-column-menu">
-    <summary><Columns3 size={14} /> Colunas</summary>
+    <summary><Columns3 size={14} /> {label}</summary>
     <div className="nt-column-panel">
       {columns.map((column, index) => <div key={column.id} className="nt-column-setting">
         <label>

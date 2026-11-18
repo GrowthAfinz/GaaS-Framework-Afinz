@@ -176,7 +176,7 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
             aria-label={property.name}
-            className="min-w-0 max-w-full bg-transparent text-xs text-[var(--notion-text)] focus:outline-none cursor-pointer"
+            className="min-w-0 max-w-full bg-transparent text-xs text-[var(--notion-text)] rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
           />
         </div>
       );

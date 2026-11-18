@@ -12,7 +12,7 @@ import { TrashModal } from './components/layout/TrashModal';
 import { TemplatesModal } from './components/layout/TemplatesModal';
 import { RowPeekModal } from './components/database/RowPeekModal';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
-import { PageComments } from './components/editor/PageComments';
+import { configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
 import { supabase } from '../../services/supabaseClient';
 import { saveInitiative } from '../../components/growth-learning/development/workService';
 import { GaasSettingsModal } from './gaas/GaasPanels';
@@ -145,7 +145,24 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
 
   /* ---------- base Tarefas: criar vira tarefa real, excluir vira "Cancelada" ---------- */
   const addRow = useCallback((databaseId: string, initialProps: Record<string, any> = {}) => {
-    if (databaseId !== TASKS_DB) return addRowToDatabase(databaseId, initialProps);
+    if (databaseId !== TASKS_DB) {
+      if (!isCreditBases(databaseId)) return addRowToDatabase(databaseId, initialProps);
+      const db = latest.current.databases[databaseId];
+      if (!db) return '';
+      const defaultStage = db.properties.find(p => p.id === 'prop_status')?.options?.[0]?.name;
+      const stage = initialProps.prop_status ?? defaultStage;
+      const team = creditStageTeam(db, stage);
+      const pageId = generateId('page_row');
+      const rowId = addRowToDatabase(databaseId, {
+        prop_title: 'Novo pedido',
+        ...(stage ? { prop_status: stage } : {}),
+        ...(team ? { prop_team: team } : {}),
+        ...initialProps,
+      }, pageId);
+      setPeekDatabaseId(databaseId);
+      setPeekPageId(pageId);
+      return rowId;
+    }
     if (!ctx.canEditTasks) { showToast('Criar tarefas requer acesso de edição.'); return ''; }
     const props = latest.current.databases[TASKS_DB].properties;
     const empty: DatabaseRow = { id: '', pageId: '', properties: {} };
@@ -176,6 +193,18 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
   const updateRow = useCallback((databaseId: string, rowId: string, propertyId: string, value: any) => {
     if (databaseId === TASKS_DB && propertyId === 'p_campanha') { showToast('A campanha vem do projeto: troque o projeto ou ligue a campanha ao projeto na Visão Daily.'); return; }
     updateDatabaseRow(databaseId, rowId, propertyId, value);
+    if (isCreditBases(databaseId) && propertyId === 'prop_status') {
+      const db = latest.current.databases[databaseId];
+      const row = db?.rows.find(item => item.id === rowId);
+      if (row && row.properties.prop_status !== value) {
+        const previousTeam = creditStageTeam(db, row.properties.prop_status);
+        const team = creditStageTeam(db, value);
+        const currentTeam = row.properties.prop_team;
+        if (team && (!currentTeam || currentTeam === previousTeam)) {
+          updateDatabaseRow(databaseId, rowId, 'prop_team', team);
+        }
+      }
+    }
     if (databaseId === TASKS_DB && propertyId === 'p_projeto') {
       const front = frontOfProject(latest.current.databases[TASKS_DB].properties, ctx.projects, value);
       if (front) updateDatabaseRow(databaseId, rowId, 'p_frente', front);
@@ -187,7 +216,12 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     }
   }, [ctx.projects, updateDatabaseRow, showToast]);
   const deleteRow = useCallback((databaseId: string, rowId: string) => {
-    if (databaseId !== TASKS_DB) return deleteDatabaseRow(databaseId, rowId);
+    if (databaseId !== TASKS_DB) {
+      if (!isCreditBases(databaseId) || window.confirm('Excluir este pedido de Bases de Crédito?')) {
+        deleteDatabaseRow(databaseId, rowId);
+      }
+      return;
+    }
     if (!window.confirm('Cancelar esta tarefa? Ela continua no histórico com o status "Cancelada".')) return;
     const cancel = latest.current.databases[TASKS_DB].properties.find(p => p.id === 'p_status')?.options?.find(o => o.id === 'cancelada')?.name;
     if (cancel) updateDatabaseRow(TASKS_DB, rowId, 'p_status', cancel);
@@ -226,6 +260,10 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       createOption: async (dbId, propId, name, rowId) => {
         const prop = latest.current.databases[dbId]?.properties.find(p => p.id === propId);
         if (!prop) return null;
+        name = name.trim();
+        if (!name || prop.options?.some(option => option.name.toLowerCase() === name.toLowerCase())) {
+          throw new Error('Informe um nome novo para a opção.');
+        }
         if (dbId === TASKS_DB && propId === 'p_frente') {
           const { data, error } = await supabase.rpc('gaas_daily_save_option', { p_kind: 'frente', p_key: null, p_body: { name, short: name.slice(0, 2).toUpperCase() } });
           if (error) fail(error, 'Não foi possível criar a frente.');
@@ -261,12 +299,48 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         pushOption(dbId, propId, { id: 'opt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, color: colors[(prop.options || []).length % colors.length] });
         return name;
       },
+      editOption: (dbId, propId, optionId, changes) =>
+        patchDb(dbId, db => {
+          const property = db.properties.find(p => p.id === propId);
+          const options = [...(property?.options || [])];
+          const index = options.findIndex(option => option.id === optionId);
+          if (!property || index === -1 || (dbId === TASKS_DB && SYSTEM_PROP_IDS.has(propId))) return db;
+          const option = options[index];
+          const name = changes.name?.trim() ?? option.name;
+          if (!name || options.some(other => other.id !== optionId && other.name.toLowerCase() === name.toLowerCase())) {
+            return db;
+          }
+          options[index] = { ...option, name, color: changes.color ?? option.color };
+          const target = index + (changes.offset ?? 0);
+          if (target >= 0 && target < options.length && target !== index) {
+            [options[index], options[target]] = [options[target], options[index]];
+          }
+          return {
+            ...db,
+            properties: db.properties.map(p => p.id === propId ? { ...p, options } : p),
+            rows: name === option.name ? db.rows : db.rows.map(row => {
+              const value = row.properties[propId];
+              if (value === option.name) return { ...row, properties: { ...row.properties, [propId]: name } };
+              if (Array.isArray(value) && value.includes(option.name)) {
+                return { ...row, properties: { ...row.properties, [propId]: value.map(item => item === option.name ? name : item) } };
+              }
+              return row;
+            }),
+            views: name === option.name ? db.views : db.views.map(view => ({
+              ...view, filters: (view.filters || []).map(filter =>
+                filter.propertyId === propId && filter.value === option.name ? { ...filter, value: name } : filter),
+            })),
+          };
+        }),
       removeOption: (dbId, propId, optionId) =>
         patchDb(dbId, db => {
           const name = db.properties.find(p => p.id === propId)?.options?.find(o => o.id === optionId)?.name;
           return {
             ...db,
             properties: db.properties.map(p => (p.id === propId ? { ...p, options: (p.options || []).filter(o => o.id !== optionId) } : p)),
+            views: db.views.map(view => ({
+              ...view, filters: (view.filters || []).filter(filter => filter.propertyId !== propId || filter.value !== name),
+            })),
             rows: db.rows.map(r => {
               const v = r.properties[propId];
               if (Array.isArray(v) && v.includes(name)) return { ...r, properties: { ...r.properties, [propId]: v.filter(x => x !== name) } };
@@ -292,11 +366,9 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         })),
     };
   }, [ctx, patchDb, pushOption]);
-  const openComments = useCallback(() => {
-    const el = rootRef.current?.querySelector('#nt-comments');
-    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.querySelector('input')?.focus(); }
-    else showToast('Os comentários ficam nas páginas de conteúdo e dentro de cada tarefa.');
-  }, [showToast]);
+  useEffect(() => {
+    if (activePage) patchWorkspace(prev => configureCreditBases(prev, activePage.id));
+  }, [activePage, patchWorkspace]);
 
   // Peak Modal State for clicking any card/row in a database
   const [peekPageId, setPeekPageId] = useState<string | null>(null);
@@ -384,7 +456,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       const p = ws.pages[id], nid = generateId('page');
       let databaseId = p.databaseId;
       if (p.databaseId && ws.databases[p.databaseId]) {
-        const src = ws.databases[p.databaseId], ndb = generateId('db');
+        const src = ws.databases[p.databaseId], ndb = generateId(isCreditBases(p.databaseId) ? 'db_credit_bases' : 'db');
         const rows = src.rows.map(r => {
           const rp = ws.pages[r.pageId];
           const npid = rp ? generateId('page') : r.pageId;
@@ -478,8 +550,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           />
         );
       }
-      const db = raw;
-      if (!db) {
+      if (!raw) {
         return (
           <div className="p-4 rounded-lg border border-[var(--notion-border)] text-xs text-[var(--notion-text-muted)] bg-[var(--notion-hover)]">
             Base "{databaseId}" não encontrada.
@@ -487,16 +558,31 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         );
       }
 
+      const creditBases = isCreditBases(databaseId);
+      const selectedView = viewByPage[databaseId];
+      const db = creditBases && raw.views.some(view => view.id === selectedView)
+        ? { ...raw, currentViewId: selectedView }
+        : raw;
+
       return (
         <DatabaseView
           database={db}
+          layoutKey={creditBases ? `gaas.notion.columns.${ctx.me || 'anon'}.${databaseId}` : undefined}
+          creditBases={creditBases}
           users={users}
           onUpdateRow={updateRow}
           onAddRow={addRow}
           onDeleteRow={deleteRow}
           onAddProperty={addDatabaseProperty}
-          onSetView={setDatabaseView}
-          onAddView={addDatabaseView}
+          onSetView={creditBases ? (id, viewId) => setViewByPage(prev => ({ ...prev, [id]: viewId })) : setDatabaseView}
+          onAddView={creditBases ? (id, name, type) => {
+            addDatabaseView(id, name, type);
+            setViewByPage(prev => {
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
+          } : addDatabaseView}
           onUpdateView={updateDatabaseView}
           onDeleteView={deleteView}
           onDuplicateRow={duplicateRow}
@@ -535,7 +621,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
             Escolha uma página na barra lateral ou crie uma nova.
           </p>
           <button
-            onClick={() => createPage(null, 'Sem título', '📄')}
+            onClick={() => createPage()}
             className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-medium transition-colors"
           >
             Criar página
@@ -593,7 +679,6 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           onDuplicatePage={() => duplicatePage(activePage.id)}
           onExportJSON={exportJSON}
           onExportMarkdown={() => downloadPageMarkdown(activePage, workspace, users)}
-          onOpenComments={openComments}
         />
 
         <div className={`flex-1 w-full ${widthClass} ${textScaleClass} transition-all duration-150`}>
@@ -611,16 +696,12 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           />
 
           {/* Full Page Database Check (if this page is a dedicated database) */}
-          {activePage.databaseId ? (
+          {activePage.databaseId && (
             <div className="nt-page-inset pb-12">
               {renderDatabase(activePage.databaseId, activePage.id)}
             </div>
-          ) : (
-            <>
-            <div className="nt-page-inset">
-              <PageComments id="nt-comments" comments={activePage.comments || []} me={activeUser} onChange={(comments) => updatePage(activePage.id, { comments })} />
-            </div>
-            {/* Block List Editor */}
+          )}
+          {(!activePage.databaseId || activePage.blockIds.length > 0) && (
             <BlockList
               pageId={activePage.id}
               blockIds={activePage.blockIds}
@@ -633,7 +714,6 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
               onMoveBlock={moveBlock}
               renderDatabase={renderDatabase}
             />
-            </>
           )}
         </div>
       </main>
