@@ -1,7 +1,7 @@
 /** Carga e sincronização do módulo com o Supabase (tabelas nt_*), mais a ponte com as tarefas reais. */
 import { supabase } from '../../../services/supabaseClient';
 import { loadWorkspace, saveWork } from '../../../components/growth-learning/development/workService';
-import { type Initiative, type WorkItem } from '../../../components/growth-learning/development/workModel';
+import { subtaskProgress, type Initiative, type WorkItem } from '../../../components/growth-learning/development/workModel';
 import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionUser, NotionWorkspace } from '../types/notion';
 import { TASKS_DB, TASKS_PAGE, type TaskPageDef, taskPageDefs, taskScopePage, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, type PartnerRef, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
 
@@ -73,11 +73,13 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
   const extra = new Map((rows.data || []).filter(r => r.database_id === TASKS_DB).map(r => [r.id, (r.data as { properties?: Record<string, unknown> }).properties || {}]));
   const taskRows: DatabaseRow[] = [];
   for (const t of work.tasks) {
+    // Sub Tarefa é item de checklist dentro do card: não vira linha da base nem card no quadro.
+    if (t.parent_task_id) continue;
     const gen = taskBlocks(t);
     gen.forEach(b => { if (!blockMap[b.id]) blockMap[b.id] = b; });
     const id = taskRowId(t.id);
     pageMap[id] = taskPage(t, gen, pageMap[id]);
-    taskRows.push(taskToRow(t, props, users, extra.get(id), projects, work.initiatives));
+    taskRows.push(taskToRow(t, props, users, extra.get(id), projects, work.initiatives, subtaskProgress(t.id, work.tasks)));
   }
   const databases: Record<string, NotionDatabase> = { [TASKS_DB]: tasksDatabase(props, taskRows, storedTasksDb) };
   for (const d of dbs.data || []) {

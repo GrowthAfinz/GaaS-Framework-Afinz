@@ -8,6 +8,8 @@ export interface DevelopmentTask {
  blocked_reason:string|null;resolution:string|null;source_note:string|null;revision:number;created_at?:string;updated_at?:string;
  /** Pertencimento (20261118): frente da Visão Daily ou 'gaas', projetos da Daily e BU/parceiros. */
  front_key?:string|null;project_ids?:string[];partner_keys?:string[];
+ /** Sub Tarefa (20261118): Tarefa pai, grupo dentro do bloco Sub Tarefas e ordem. */
+ parent_task_id?:string|null;subtask_group?:string|null;position?:number|null;
 }
 export interface TaskEvent {id:string;revision:number;kind:string;created_at:string;before_data:DevelopmentTask|null;after_data:DevelopmentTask}
 /** Tarefas e a seção de Tarefas da Wiki são editáveis por todo membro aprovado (decisão de 17/11/2026). */
@@ -33,6 +35,11 @@ export function taskError(error:unknown):string {
  if(message.includes('invalid_work_link'))return 'Revise as referências: use título e endereço https, link interno ou caminho de nota.';
  if(message.includes('spec_design_required'))return 'Registre comportamento esperado, cenários e verificação antes de executar a especificação.';
  if(message.includes('experiment_close_required'))return 'Encerre ou cancele o experimento antes de concluir seu acompanhamento.';
+ if(message.includes('task_subtasks_pending'))return 'Feche as Sub Tarefas (concluir ou cancelar) antes de concluir esta Tarefa.';
+ if(message.includes('task_parent_nested'))return 'Sub Tarefa não pode ter Sub Tarefas. Escolha uma Tarefa como pai.';
+ if(message.includes('task_has_subtasks'))return 'Esta Tarefa tem Sub Tarefas e não pode virar Sub Tarefa.';
+ if(message.includes('task_parent_invalid'))return 'Tarefa pai não encontrada.';
+ if(message.includes('invalid_task_front')||message.includes('invalid_task_projects')||message.includes('invalid_task_partners'))return 'Revise frente, projetos e BU/parceiro: algum deles não existe mais na Visão Daily.';
  if(message.includes('revision_conflict'))return 'Esta tarefa mudou. Atualize a lista e reabra a tarefa antes de salvar.';
  if(message.includes('dependencies_pending'))return 'Conclua as dependências antes de iniciar a execução ou concluir esta tarefa.';
  if(message.includes('dependency_cycle')||message.includes('invalid_task_dependency'))return 'Revise as dependências: elas precisam existir e não podem formar um ciclo.';

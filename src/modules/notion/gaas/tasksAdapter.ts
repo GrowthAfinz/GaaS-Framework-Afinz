@@ -58,10 +58,11 @@ export function systemProperties(initiatives: Initiative[], fronts: BusinessFron
     { id: 'p_prioridade', name: 'Prioridade', type: 'select', options: Object.entries(TASK_PRIORITY).map(([k, v]) => opt(k, `${k} · ${v}`, PRIORITY_COLOR[k] || 'gray')) },
     { id: 'p_iniciativa', name: 'Iniciativa', type: 'select', options: initiatives.map(i => opt(i.id, i.title, 'default')) },
     { id: 'p_proxima', name: 'Próxima ação', type: 'text' },
+    { id: 'p_subtarefas', name: 'Sub Tarefas', type: 'text' },
   ];
 }
 /** Propriedades que espelham colunas da tarefa (não são guardadas nas linhas do módulo). */
-export const SYSTEM_PROP_IDS = new Set(['prop_title', 'p_tipo', 'p_status', 'p_iniciativa', 'p_prioridade', 'p_responsavel', 'p_prazo', 'p_proxima', 'p_campanha', 'p_frente', 'p_projeto', 'p_parceiro']);
+export const SYSTEM_PROP_IDS = new Set(['prop_title', 'p_tipo', 'p_status', 'p_iniciativa', 'p_prioridade', 'p_responsavel', 'p_prazo', 'p_proxima', 'p_campanha', 'p_frente', 'p_projeto', 'p_parceiro', 'p_subtarefas']);
 /** Propriedades do módulo com regra própria (ficam nas linhas, mas são recalculadas e não podem ser removidas). */
 export const MODULE_PROP_IDS = new Set<string>([]);
 /** Propriedades cujas opções vêm de outra tela (criar opção grava lá). */
@@ -72,7 +73,7 @@ export const STANDARD_VIEW_IDS = ['v_quadro', 'v_tabela', 'v_calendario'];
 export function defaultTaskViews(): DatabaseViewConfig[] {
   const all = ['p_frente', 'p_projeto', 'p_campanha', 'p_status', 'p_tipo', 'p_responsavel', 'p_prazo', 'p_prioridade', 'p_iniciativa', 'p_proxima'];
   return [
-    { id: 'v_quadro', name: 'Quadro', type: 'board', groupByPropertyId: 'p_status', visiblePropertyIds: ['p_frente', 'p_projeto', 'p_responsavel', 'p_prazo'], sorts: [], filters: [] },
+    { id: 'v_quadro', name: 'Quadro', type: 'board', groupByPropertyId: 'p_status', visiblePropertyIds: ['p_frente', 'p_projeto', 'p_subtarefas', 'p_responsavel', 'p_prazo'], sorts: [], filters: [] },
     { id: 'v_tabela', name: 'Tabela', type: 'table', visiblePropertyIds: all, sorts: [], filters: [] },
     { id: 'v_calendario', name: 'Calendário', type: 'calendar', datePropertyId: 'p_prazo', visiblePropertyIds: ['p_frente', 'p_status'], sorts: [], filters: [] },
   ];
@@ -131,7 +132,7 @@ const personId = (users: NotionUser[], name: string | null) => (name ? users.fin
  * Projeto nunca é adivinhado. Frente/projeto guardados no módulo por versões antigas (extra) ainda valem
  * enquanto a Tarefa não tiver os seus.
  */
-export function taskToRow(t: WorkItem, props: DatabaseProperty[], users: NotionUser[], extra: Record<string, unknown> = {}, projects: DailyProjectRef[] = [], initiatives: Initiative[] = []): DatabaseRow {
+export function taskToRow(t: WorkItem, props: DatabaseProperty[], users: NotionUser[], extra: Record<string, unknown> = {}, projects: DailyProjectRef[] = [], initiatives: Initiative[] = [], subtasks?: { done: number; total: number; blocked: number }): DatabaseRow {
   const nameOf = (propId: string, v: unknown) => (typeof v === 'string' && v ? label(props, propId, v) || v : '');
   const legacyProject = typeof extra.p_projeto === 'string' && extra.p_projeto ? [keyOf(props, 'p_projeto', extra.p_projeto) || extra.p_projeto] : [];
   const projectIds = (t.project_ids || []).length ? t.project_ids || [] : legacyProject;
@@ -152,6 +153,7 @@ export function taskToRow(t: WorkItem, props: DatabaseProperty[], users: NotionU
       p_tipo: label(props, 'p_tipo', t.work_type), p_status: label(props, 'p_status', t.status),
       p_iniciativa: label(props, 'p_iniciativa', t.initiative_id), p_prioridade: label(props, 'p_prioridade', t.priority),
       p_responsavel: personId(users, t.owner_label), p_prazo: t.due_date || '', p_proxima: t.next_action || '',
+      p_subtarefas: subtasks && subtasks.total ? `${subtasks.done}/${subtasks.total}${subtasks.blocked ? ` · ${subtasks.blocked} bloqueada${subtasks.blocked > 1 ? 's' : ''}` : ''}` : '',
     },
   };
 }

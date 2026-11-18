@@ -131,7 +131,7 @@ export function DailyKanbanModal(p: KanbanProps) {
 
   const vocab = useMemo(() => boardVocab([...p.projects.values()], p.partners, p.boardId), [p.projects, p.partners, p.boardId]);
   const tagsOf = useMemo(() => new Map(p.works.filter(w => w.initiative_id === p.boardId).map(w => [w.id, workTags(w, vocab)])), [p.works, p.boardId, vocab]);
-  const allWorks = useMemo(() => p.works.filter(w => w.initiative_id === p.boardId), [p.works, p.boardId]);
+  const allWorks = useMemo(() => p.works.filter(w => w.initiative_id === p.boardId && !w.parent_task_id), [p.works, p.boardId]);
   const tagCounts = useMemo(() => {
     const m = new Map<string, { tag: TagVocab; n: number }>();
     for (const w of allWorks) if (w.status !== 'cancelada') for (const t of tagsOf.get(w.id) || []) m.set(t.key, { tag: t, n: (m.get(t.key)?.n || 0) + 1 });
@@ -235,7 +235,7 @@ export function DailyKanbanModal(p: KanbanProps) {
         </header>
         <nav className="dv-ktabs" role="tablist">
           {p.boards.map(b => {
-            const n = p.works.filter(w => w.initiative_id === b.id && !['concluida', 'cancelada'].includes(w.status)).length;
+            const n = p.works.filter(w => w.initiative_id === b.id && !w.parent_task_id && !['concluida', 'cancelada'].includes(w.status)).length;
             return <button key={b.id} role="tab" aria-selected={b.id === p.boardId} className={b.id === p.boardId ? 'on' : ''} onClick={() => p.onBoard(b.id)}>{boardName(b)}<span>{n}</span></button>;
           })}
           {cancelled > 0 && <button className="dv-link" style={{ marginLeft: 'auto' }} onClick={() => setShowCancelled(s => !s)}>{showCancelled ? 'Esconder' : 'Mostrar'} {cancelled} cancelado{cancelled > 1 ? 's' : ''}</button>}
