@@ -1,4 +1,4 @@
-import type { NotionColor } from '../../types/notion';
+import type { NotionColor, NotionUser } from '../../types/notion';
 import { createContext, useContext } from 'react';
 
 /**
@@ -15,6 +15,8 @@ export interface NotionEditApi {
   removeOption: (databaseId: string, propertyId: string, optionId: string) => void;
   renameProperty: (databaseId: string, propertyId: string, name: string) => void;
   deleteProperty: (databaseId: string, propertyId: string) => void;
+  /** Cria pessoa só com nome (sem conta) para ser responsável. */
+  createPerson?: (name: string) => Promise<NotionUser | null>;
 }
 const noop: NotionEditApi = {
   lockOf: () => null,

@@ -82,13 +82,8 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
       const assignedUser = users.find((u) => u.id === value);
 
       const picker = showDropdown && (
-        <div className={compact ? 'p-1' : 'absolute left-0 top-7 z-50 w-52 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-xl'}>
-          <div className="px-2 py-1 text-[10px] font-semibold uppercase text-[var(--notion-text-muted)]">Responsável</div>
-          <button type="button" onClick={() => { onChange(''); close(); }} className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-[var(--notion-hover)]">Sem responsável</button>
-          {users.map(user => <button key={user.id} type="button" onClick={() => { onChange(user.id); close(); }}
-            className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-[var(--notion-hover)]">
-            <span className="truncate">{user.name}</span>{value === user.id && <Check size={12} />}
-          </button>)}
+        <div className={compact ? 'p-1' : 'absolute left-0 top-7 z-50 w-60 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] p-1 shadow-xl'}>
+          <PersonPicker users={users} value={String(value || '')} onPick={id => { onChange(id); close(); }} />
         </div>
       );
       return (
@@ -100,7 +95,7 @@ export const PropertyCell: React.FC<PropertyCellProps> = ({
           >
             {assignedUser ? (
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-sm shrink-0">{assignedUser.avatar || '👤'}</span>
+                <span className={`text-sm shrink-0 ${assignedUser.guest ? 'opacity-60' : ''}`} title={assignedUser.guest ? 'Sem conta no GaaS' : undefined}>{assignedUser.avatar || '👤'}</span>
                 <span className="truncate text-xs text-[var(--notion-text)] font-medium">
                   {assignedUser.name}
                 </span>
@@ -317,4 +312,40 @@ const SYNCED_HINT: Record<string, string> = {
   p_frente: 'Cria a frente também na Visão Daily.',
   p_projeto: 'Cria o projeto também na Visão Daily, na frente desta tarefa.',
   p_iniciativa: 'Cria a iniciativa também na aba de iniciativas.',
+};
+
+
+/** Escolher responsável: membro com conta ou só o nome (cria a pessoa na hora). */
+const PersonPicker: React.FC<{ users: NotionUser[]; value: string; onPick: (id: string) => void }> = ({ users, value, onPick }) => {
+  const edit = useNotionEdit();
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const typed = q.trim().replace(/\s+/g, ' ');
+  const list = users.filter(u => !typed || norm(u.name).includes(norm(typed)));
+  const exact = users.some(u => norm(u.name) === norm(typed));
+  const create = async () => {
+    if (!edit.createPerson || typed.length < 2 || exact || busy) return;
+    setBusy(true); setErr('');
+    try { const user = await edit.createPerson(typed); if (user) onPick(user.id); }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Não foi possível adicionar a pessoa.'); }
+    finally { setBusy(false); }
+  };
+  return <>
+    <div className="px-2 py-1 text-[10px] font-semibold uppercase text-[var(--notion-text-muted)]">Responsável</div>
+    <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar ou escrever um nome"
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (list.length === 1 && !(edit.createPerson && typed && !exact)) onPick(list[0].id); else void create(); } }}
+      className="mb-1 w-full rounded border border-[var(--notion-border)] bg-transparent px-2 py-1 text-xs outline-none" />
+    <button type="button" onClick={() => onPick('')} className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-[var(--notion-hover)]">Sem responsável</button>
+    <div className="max-h-56 overflow-y-auto">
+      {list.map(user => <button key={user.id} type="button" onClick={() => onPick(user.id)}
+        className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-[var(--notion-hover)]">
+        <span className="truncate">{user.name}{user.guest && <span className="ml-1 text-[var(--notion-text-muted)]">(sem conta)</span>}</span>{value === user.id && <Check size={12} />}
+      </button>)}
+    </div>
+    {edit.createPerson && typed.length >= 2 && !exact && <button type="button" disabled={busy} onClick={() => void create()}
+      className="w-full rounded px-2 py-1.5 text-left text-xs text-blue-600 hover:bg-[var(--notion-hover)]">{busy ? 'Adicionando…' : `Usar "${typed}" (só o nome, sem conta)`}</button>}
+    {err && <p role="alert" className="px-2 py-1 text-xs text-red-600">{err}</p>}
+  </>;
 };

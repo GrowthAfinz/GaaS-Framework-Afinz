@@ -58,6 +58,8 @@ export interface NotionUser {
   avatar?: string;
   role: UserRole;
   color?: NotionColor;
+  /** Pessoa só com nome, sem conta no GaaS. */
+  guest?: boolean;
 }
 
 // Database Property Types

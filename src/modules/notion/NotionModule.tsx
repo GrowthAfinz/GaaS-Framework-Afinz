@@ -19,7 +19,7 @@ import { GaasSettingsModal } from './gaas/GaasPanels';
 import { useAuth } from '../../context/AuthContext';
 import { newWork, type Initiative, type WorkItem } from '../../components/growth-learning/development/workModel';
 import { taskError } from '../../components/growth-learning/development/developmentService';
-import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionWorkspace, SelectOption } from './types/notion';
+import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionUser, NotionWorkspace, SelectOption } from './types/notion';
 import { generateId } from './utils/id';
 import { createTask, diff, loadNotion, pushChanges, saveLocalPrefs, saveTask, snapshot, type NotionContext, type Snapshot } from './gaas/notionData';
 import { readTone, saveTone, type NotionTone } from './gaas/tones';
@@ -349,6 +349,15 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
             }),
           };
         }),
+      createPerson: async name => {
+        const { data, error } = await supabase.rpc('gaas_work_save_person', { p_id: null, p_revision: null, p_body: { name } });
+        if (error) fail(error, /person_name_taken/.test(error.message) ? 'Já existe alguém com esse nome na lista.' : 'Não foi possível adicionar a pessoa.');
+        const saved = data as { id: string; name: string };
+        const user: NotionUser = { id: saved.id, name: saved.name, email: '', role: 'Member', color: 'gray', guest: true };
+        patchWorkspace(prev => ({ ...prev, users: [...prev.users, user] }));
+        latest.current = { ...latest.current, users: [...latest.current.users, user] };
+        return user;
+      },
       renameProperty: (dbId, propId, name) => patchDb(dbId, db => ({ ...db, properties: db.properties.map(p => (p.id === propId ? { ...p, name } : p)) })),
       deleteProperty: (dbId, propId) =>
         patchDb(dbId, db => ({

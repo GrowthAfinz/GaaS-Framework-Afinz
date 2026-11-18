@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import { Check, FolderPlus, Plus, Search, Settings2 } from 'lucide-react';
+import { Check, FolderPlus, Plus, Search, Settings2, UserPlus } from 'lucide-react';
 import { getLocalViewport, toLocalRect } from '../../../context/UIScaleContext';
 import { FALLBACK_COLOR, brDate, initials, personColor, type DailyFrente, type DailyPerson, type DailyProject, type DailyTag } from './dailyModel';
 
@@ -100,19 +100,25 @@ export function TagPicker({ tags, selected, onToggle, onCreate, onConfig }: { ta
 export function Avatar({ person, follower, size }: { person: DailyPerson | undefined; follower?: boolean; size?: number }) {
   if (!person) return null;
   const s = size ? { width: size, height: size, fontSize: size * 0.38, border: 'none' } : {};
-  return <span className={`dv-av${follower ? ' f' : ''}`} style={{ background: personColor(person.id), ...s }} title={`${person.name}${follower ? ' · acompanhando' : ' · responsável'}`}>{initials(person.name)}</span>;
+  const guest = person.has_account === false;
+  return <span className={`dv-av${follower ? ' f' : ''}${guest ? ' guest' : ''}`} style={{ background: guest ? '#fff' : personColor(person.id), color: guest ? personColor(person.id) : undefined, borderColor: guest ? personColor(person.id) : undefined, ...s }} title={`${person.name}${guest ? ' (sem conta no GaaS)' : ''}${follower ? ' · acompanhando' : ' · responsável'}`}>{initials(person.name)}</span>;
 }
 
-export function PeoplePicker({ people, me, responsible, followers, subject, onChange }: {
+export function PeoplePicker({ people, me, responsible, followers, subject, onChange, onCreate }: {
   people: DailyPerson[]; me: string | null; responsible: string | null; followers: string[]; subject: string;
   onChange: (responsible: string | null, followers: string[]) => void;
+  /** Cria pessoa só com nome (sem conta no GaaS) e devolve o id. */
+  onCreate?: (name: string) => Promise<string | null>;
 }) {
   const [q, setQ] = useState('');
   const list = people.filter(p => !q.trim() || norm(p.name).includes(norm(q.trim())));
+  const typed = q.trim().replace(/\s+/g, ' ');
+  const exact = people.some(p => norm(p.name) === norm(typed));
+  const create = async () => { if (!onCreate || typed.length < 2 || exact) return; const id = await onCreate(typed); if (id) { onChange(responsible || id, responsible ? [...followers, id] : followers); setQ(''); } };
   return (
     <>
       <div className="hd"><b>Pessoas no registro</b><div className="s">{subject}</div></div>
-      <SearchBox value={q} onChange={setQ} placeholder="Buscar pessoa" />
+      <SearchBox value={q} onChange={setQ} placeholder="Buscar ou escrever um nome" onEnter={() => { if (!list.length) void create(); }} />
       <div className="lst">
         {list.map(p => {
           const own = responsible === p.id, fol = own || followers.includes(p.id);
@@ -125,7 +131,8 @@ export function PeoplePicker({ people, me, responsible, followers, subject, onCh
             </div>
           );
         })}
-        {!list.length && <div className="dv-empty">Ninguém encontrado.</div>}
+        {onCreate && typed.length >= 2 && !exact && <button className="dv-pi acc" onClick={() => void create()}><UserPlus />Usar "{typed}" (só o nome, sem conta)</button>}
+        {!list.length && !onCreate && <div className="dv-empty">Ninguém encontrado.</div>}
       </div>
       <div className="ft">Quem acompanha aparece com o avatar ao lado do registro.</div>
     </>

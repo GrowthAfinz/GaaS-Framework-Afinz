@@ -42,14 +42,14 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
   const [pages, blocks, dbs, rows, meta, people, work, frentesRes, projectsRes, cardsRes] = await Promise.all([
     supabase.from('nt_pages').select('id,data'), supabase.from('nt_blocks').select('id,page_id,data'),
     supabase.from('nt_databases').select('id,data'), supabase.from('nt_rows').select('id,database_id,data'),
-    supabase.from('nt_meta').select('key,data'), supabase.rpc('gaas_daily_people'), loadWorkspace(),
+    supabase.from('nt_meta').select('key,data'), supabase.rpc('gaas_work_people'), loadWorkspace(),
     supabase.from('daily_frentes').select('key,name,color,archived,position').order('position'),
     supabase.from('daily_projects').select('id,name,frente_key,initiative_id,archived,structure_card_id').order('name'),
     supabase.from('crm_structure_cards').select('id,title').eq('archived', false).order('title'),
   ]);
   const err = pages.error || blocks.error || dbs.error || rows.error || meta.error;
   if (err) throw err;
-  const users: NotionUser[] = ((people.data || []) as { id: string; name: string }[]).map((p, i) => ({ id: p.id, name: p.name, email: '', role: 'Member', color: COLORS[i % COLORS.length] }));
+  const users: NotionUser[] = ((people.data || []) as { id: string; name: string; has_account?: boolean }[]).map((p, i) => ({ id: p.id, name: p.name, email: '', role: 'Member', color: COLORS[i % COLORS.length], guest: p.has_account === false }));
   const tasks = new Map(work.tasks.map(t => [t.id, t]));
   // Frentes e projetos da Visão Daily; se a leitura falhar, o módulo abre só com a frente do GaaS.
   const fronts = (frentesRes.data || []) as BusinessFront[];
