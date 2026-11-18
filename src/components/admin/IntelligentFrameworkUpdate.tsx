@@ -1,4 +1,5 @@
-import { ImportCampaignTree } from './ImportCampaignTree';
+import { previousWeekStart, replaceImportScopeSelection } from './importSelection';
+import { ImportCampaignTree, importToday } from './ImportCampaignTree';
 import { loadStructure } from '../growth-learning/structure/structureService';
 import { supabase } from '../../services/supabaseClient';
 import { classify, compileRules } from '../growth-learning/structure/consumoModel';
@@ -3312,6 +3313,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         return [...groups].sort(([, a], [, b]) => a.title.localeCompare(b.title, 'pt-BR'));
     }, [candidates, campaignByCandidate]);
     const [previousFocus, setPreviousFocus] = useState<{ front: string; campaign: string; journey: string } | null>(null);
+    const [frontSelectorOpen, setFrontSelectorOpen] = useState(true);
     const [reviewCollection, setReviewCollection] = useState<'selected' | 'all' | 'status'>('selected');
     const openSelected = () => {
         setReviewCollection('selected');
@@ -3603,6 +3605,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setReviewFront('');
             setReviewCollision('');
             setReviewCollection('selected');
+            setFrontSelectorOpen(true);
             setPreviousFocus(null);
             const reviewed = processed.candidates.map(candidate =>
                 isBulkApprovalEligible(candidate)
@@ -3617,7 +3620,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
             setReviewPage(1);
             setStatusFilter('new_dispatch');
-            setSelectedKeys(new Set(reviewed.filter(candidate => candidate.accepted).map(candidate => candidate.key)));
+            setSelectedKeys(new Set(reviewed.filter(candidate => candidate.accepted
+                && (candidate.domain !== 'aquisicao' || candidate.date >= previousWeekStart(importToday()) && candidate.date <= importToday()))
+                .map(candidate => candidate.key)));
             setReviewOpen(true);
         } catch (error: any) {
             const debug = {
@@ -3765,11 +3770,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     };
 
     const acceptHighConfidence = () => {
-        setSelectedKeys(current => new Set([...current, ...candidates.filter(isBulkApprovalEligible).map(candidate => candidate.key)]));
+        const eligibleKeys = new Set(filteredCandidates.filter(isBulkApprovalEligible).map(candidate => candidate.key));
+        setSelectedKeys(current => new Set([...current, ...eligibleKeys]));
         setResult((current) => {
             if (!current) return current;
             const candidates = current.candidates.map((candidate) =>
-                isBulkApprovalEligible(candidate)
+                eligibleKeys.has(candidate.key)
                     ? { ...applyApprovalDefaults(candidate), accepted: true }
                     : candidate
             );
@@ -4483,6 +4489,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     setReviewFront(''); setReviewCampaign(''); setReviewJourney(''); setReviewPage(1);
                                 }}>Limpar foco</button>
                             </span>}
+                            {(reviewStartDate || reviewEndDate) && <span className="rounded bg-cyan-50 px-2 py-1 text-xs text-cyan-900">
+                                Disparos de {reviewStartDate || 'início'} a {reviewEndDate || 'fim'}
+                            </span>}
                             {previousFocus && <button type="button" className="text-xs text-cyan-800 underline" onClick={() => {
                                 setReviewFront(previousFocus.front); setReviewCampaign(previousFocus.campaign); setReviewJourney(previousFocus.journey);
                                 setPreviousFocus(null); setReviewCollision(''); setReviewPage(1);
@@ -4493,13 +4502,22 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 {[...new Set(candidates.map(row => row.channel))].sort().map(channel => <option key={channel}>{channel}</option>)}
                             </select>
                         </div>
-                        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <details open={frontSelectorOpen} onToggle={event => setFrontSelectorOpen(event.currentTarget.open)} className="shrink-0">
+                                <summary className="cursor-pointer border-b bg-slate-50 px-6 py-2 text-xs font-semibold text-cyan-800">Campanhas e períodos · expandir ou recolher</summary>
                             <ImportCampaignTree campaigns={treeCampaigns} selected={selectedKeys}
                                 focusedCampaign={reviewCampaign} focusedJourney={reviewJourney}
-                                onFocus={(front, campaign, journey) => {
+                                onFocus={(front, campaign, journey, period) => {
                                     setPreviousFocus({ front: reviewFront, campaign: reviewCampaign, journey: reviewJourney });
                                     setReviewFront(front); setReviewCampaign(campaign); setReviewJourney(journey);
+                                    if (period) { setReviewStartDate(period.from); setReviewEndDate(period.to); }
+                                    setReviewCollection('all');
+                                    setFrontSelectorOpen(false);
                                     setReviewCollision(''); setReviewPage(1);
+                                }}
+                                onScopeSelection={(rows, period, checked) => {
+                                    setSelectedKeys(current => replaceImportScopeSelection(current, rows, period, checked));
+                                    setReviewPage(1);
                                 }}
                                 onSelection={(keys, action) => setSelectedKeys(current => {
                                     const next = action === 'only' ? new Set<string>() : new Set(current);
@@ -4509,6 +4527,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     }
                                     return next;
                                 })} />
+                            </details>
                             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                         <div className={`flex flex-col gap-2 border-b px-6 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
                             selectedKeys.size > 0 ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600'
