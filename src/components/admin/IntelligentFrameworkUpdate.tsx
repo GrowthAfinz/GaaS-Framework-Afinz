@@ -4226,6 +4226,8 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     <X size={18} />
                                 </button>
                             </div>
+                            <details className="mt-2">
+                                <summary className="cursor-pointer text-xs text-slate-600">Resumo do arquivo · {result.insights.uniqueJourneys} jornadas · {result.insights.classificationConflicts} conflitos</summary>
                             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
                                 <strong>{result.insights.rawRows.toLocaleString('pt-BR')} linhas</strong> da Dinâmica BI foram consolidadas em{' '}
                                 <strong>{result.insights.uniqueJourneys} jornadas</strong>,{' '}
@@ -4249,6 +4251,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+                            </details>
                         </header>
 
                         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3">
@@ -4428,7 +4431,9 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                         </div>
 
                         {collisionGroups.length > 0 && (
-                            <section className="space-y-2 border-b px-6 py-3 text-xs" aria-label="Colisões de jornadas">
+                            <details className="space-y-2 border-b px-6 py-2 text-xs" open={Boolean(reviewCollision)}>
+                                <summary className="cursor-pointer font-semibold">Conflitos por grupo ({collisionGroups.length})</summary>
+                            <section className="space-y-2" aria-label="Colisões de jornadas">
                                 <label className="flex flex-wrap items-center gap-2 font-semibold">
                                     Conflitos por grupo
                                     <select className="max-w-full rounded border px-2 py-1" value={reviewCollision} onChange={event => {
@@ -4463,6 +4468,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     </div>
                                 )}
                             </section>
+                            </details>
                         )}
                         <div className="flex flex-wrap items-center gap-2 border-b bg-white px-6 py-3">
                             <button type="button" aria-pressed={reviewCollection === 'selected' && !reviewCollision}
@@ -4510,6 +4516,12 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 <label className="inline-flex items-center gap-2 font-bold">
                                     <input
                                         type="checkbox"
+                                        ref={input => {
+                                            if (!input) return;
+                                            const eligible = filteredCandidates.filter(canUploadCandidate);
+                                            const selected = eligible.filter(candidate => selectedKeys.has(candidate.key)).length;
+                                            input.indeterminate = selected > 0 && selected < eligible.length;
+                                        }}
                                         checked={filteredCandidates.some(canUploadCandidate) && filteredCandidates.filter(canUploadCandidate).every(candidate => selectedKeys.has(candidate.key))}
                                         onChange={() => {
                                             const allSelected = filteredCandidates.some(canUploadCandidate) && filteredCandidates.filter(canUploadCandidate).every(candidate => selectedKeys.has(candidate.key));

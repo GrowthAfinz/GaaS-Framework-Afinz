@@ -55,7 +55,7 @@ export function ImportCampaignTree({ campaigns, selected, focusedCampaign, focus
     const count = (rows: ImportTreeRow[]) => rows.filter(row => selected.has(row.key)).length;
     const apply = (rows: ImportTreeRow[], checked: boolean) => onSelection(rows.filter(row => row.eligible).map(row => row.key), checked ? 'add' : 'remove');
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    return <aside className="w-full shrink-0 border-b bg-slate-50 lg:w-80 lg:border-b-0 lg:border-r" aria-label="Frentes e jornadas">
+    return <aside className="flex min-h-0 w-full shrink-0 flex-col border-b bg-slate-50 lg:w-80 lg:border-b-0 lg:border-r" aria-label="Frentes e jornadas">
         <div className="sticky top-0 z-10 space-y-3 border-b bg-slate-50 p-3">
             <div className="flex items-center justify-between"><strong className="text-sm">Campanhas e jornadas</strong>
                 <button type="button" className="text-xs text-cyan-800 underline" onClick={() => onFocus('', '', '')}>Todas</button></div>
@@ -68,7 +68,7 @@ export function ImportCampaignTree({ campaigns, selected, focusedCampaign, focus
                 <button type="button" onClick={() => { setOpen(new Set()); }}>Recolher tudo</button>
             </div>
         </div>
-        <div className="max-h-[55vh] overflow-auto p-2 lg:max-h-[65vh]">
+        <div className="min-h-0 max-h-[35vh] flex-1 overflow-auto p-2 lg:max-h-none">
             {fronts.map(([front, allCampaigns]) => {
                 const frontMatches = front.toLocaleLowerCase('pt-BR').includes(term);
                 const visible = allCampaigns.filter(campaign =>
