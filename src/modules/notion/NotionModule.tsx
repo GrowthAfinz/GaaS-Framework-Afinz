@@ -12,6 +12,7 @@ import { TrashModal } from './components/layout/TrashModal';
 import { TemplatesModal } from './components/layout/TemplatesModal';
 import { RowPeekModal } from './components/database/RowPeekModal';
 import { TaskModal } from '../../components/growth-learning/development/TaskModal';
+import { WorkStrip } from './gaas/WorkStrip';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
 import { configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
 import { supabase } from '../../services/supabaseClient';
@@ -581,6 +582,9 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         const currentViewId = views.some(v => v.id === pick) ? pick : views.some(v => v.id === raw.currentViewId) ? raw.currentViewId : views[0].id;
         const db = { ...raw, rows, views, currentViewId };
         return (
+          <>
+          <WorkStrip tasks={[...ctx.tasks.values()]} myName={users.find(u => u.id === ctx.me)?.name || null}
+            fronts={page?.taskFronts || []} onOpenTask={id => { setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB); }} />
           <DatabaseView
             key={viewKey}
             database={db}
@@ -601,6 +605,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
               setPeekDatabaseId(databaseId);
             }}
           />
+          </>
         );
       }
       if (!raw) {

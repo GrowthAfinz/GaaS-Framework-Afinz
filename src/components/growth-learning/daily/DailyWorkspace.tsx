@@ -217,6 +217,11 @@ export function DailyWorkspace() {
     setCollapsed(c => ({ ...c, [day]: false }));
     setScrollTo({ day, key: Date.now() });
   }, [today]);
+  // Link direto para um dia (?day=aaaa-mm-dd), usado pela triagem de registros em Tarefas.
+  useEffect(() => {
+    const d = new URLSearchParams(window.location.search).get('day');
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) goToDay(d);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const moveMonth = (delta: number | 'today') => {
     if (delta === 'today') { setYm({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }); goToDay(today); return; }
     setYm(({ y, m }) => { const t = m + delta; return { y: y + Math.floor((t - 1) / 12), m: ((t - 1) % 12 + 12) % 12 + 1 }; });
