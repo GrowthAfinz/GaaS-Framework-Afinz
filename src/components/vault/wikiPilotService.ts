@@ -23,7 +23,10 @@ export async function loadPilotTasks() {
   canEditWork(),
  ]);
  if(known.error)throw known.error;if(added.error)throw added.error;if(byInitiative.error)throw byInitiative.error;
- const tasks=[...new Map([...(known.data||[]),...(added.data||[]),...(byInitiative.data||[])].map(t=>[t.id,t])).values()].map(normalizeWork);
+ // Da iniciativa entram só as Sub Tarefas (progresso dos cards) e o que foi marcado para esta nota;
+ // as outras Tarefas da iniciativa não fazem parte do piloto e não podem mexer no marco de prontidão.
+ const pilotExtra=(byInitiative.data||[]).filter(t=>t.parent_task_id||t.details?.wiki_pilot_note===VISA_STRATEGY_PATH);
+ const tasks=[...new Map([...(known.data||[]),...(added.data||[]),...pilotExtra].map(t=>[t.id,t])).values()].map(normalizeWork);
  return {tasks,canEdit:access,initiativeId};
 }
 

@@ -18,7 +18,7 @@ import {
   type B2cDay, type CrmCell, type DailyEntry, type DailyFilters, type DailyFrente, type DailyGroup, type DailyPartner, type DailyPerson, type DailyProject,
   type DailySort, type DailyTag, type DailyView, type FilterKey,
 } from './dailyModel';
-import {
+import { loadEntry,
   loadB2c, loadCrm, loadDailyConfig, loadEarliestDay, loadEntries, loadFreshness, mergeProjects, saveEntry, saveOption, saveProject, saveWorkPerson, linkWorkPerson, createSubWork,
   type DailyLoad, loadBoardCampaigns, loadEntriesLite, loadInitiativesFull, loadWorkMentions, loadWorks, saveWork,
   type DailyInitiative, type DailyWork, type EntryLite,
@@ -247,7 +247,7 @@ export function DailyWorkspace() {
     try {
       putEntry(await saveEntry(e.id, e.revision, { deleted: true }));
       showToast('Registro excluído', async () => {
-        try { putEntry(await saveEntry(null, null, { day: e.day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids, position: e.position })); setToast(null); }
+        try { putEntry(await saveEntry(null, null, { day: e.day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids, position: e.position, partner_keys: e.partner_keys || [], work_ids: e.work_ids || [] })); setToast(null); }
         catch (err) { fail(err); }
       });
     } catch (err) { fail(err); }
@@ -262,7 +262,7 @@ export function DailyWorkspace() {
       if (copy) {
         const created: DailyEntry[] = [];
         for (const e of list) {
-          const saved = await saveEntry(null, null, { day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids });
+          const saved = await saveEntry(null, null, { day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids, partner_keys: e.partner_keys || [] });
           putEntry(saved); created.push(saved);
         }
         showToast(label(created.length, created.length === 1 ? 'copiado' : 'copiados'), async () => {
@@ -301,7 +301,7 @@ export function DailyWorkspace() {
   /** Copia um registro para outro dia e já abre o texto da cópia para editar. */
   const copyEntry = useCallback(async (e: DailyEntry, day: string) => {
     try {
-      const saved = await saveEntry(null, null, { day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids });
+      const saved = await saveEntry(null, null, { day, project_id: e.project_id, body: e.body, tag_keys: e.tag_keys, responsible_id: e.responsible_id, follower_ids: e.follower_ids, partner_keys: e.partner_keys || [] });
       putEntry(saved); goToDay(day); setDrawerKey(k => k + 1);
       // A cópia nunca leva o vínculo com Tarefas: duplicar não pode criar trabalho nem citação por acidente.
       const linked = (e.work_ids || []).length ? ' (sem o vínculo com a Tarefa; vincule de novo se for o mesmo trabalho)' : '';
@@ -329,8 +329,8 @@ export function DailyWorkspace() {
   const savePersonProps = useCallback(async (person: DailyPerson | null, body: Record<string, unknown>) => {
     try {
       const saved = await saveWorkPerson(person?.id ?? null, person?.revision ?? null, body);
-      setCfg(c => c && { ...c, people: saved.archived ? c.people.filter(x => x.id !== saved.id)
-        : (c.people.some(x => x.id === saved.id) ? c.people.map(x => (x.id === saved.id ? { ...x, name: saved.name, revision: saved.revision } : x)) : [...c.people, { id: saved.id, name: saved.name, has_account: false, revision: saved.revision }]) });
+      setCfg(c => c && { ...c, people: saved.archived ? c.people.map(x => (x.id === saved.id ? { ...x, archived: true, revision: saved.revision } : x))
+        : (c.people.some(x => x.id === saved.id) ? c.people.map(x => (x.id === saved.id ? { ...x, name: saved.name, revision: saved.revision, archived: false } : x)) : [...c.people, { id: saved.id, name: saved.name, has_account: false, revision: saved.revision }]) });
     } catch (err) {
       const m = String((err as { message?: string })?.message || '');
       showToast(m.includes('person_name_taken') ? 'Já existe alguém com esse nome na lista.' : m.includes('revision_conflict') ? 'Alguém mudou essa pessoa antes de você. Reabra a configuração.' : 'Não foi possível salvar a pessoa.');
@@ -343,7 +343,7 @@ export function DailyWorkspace() {
       setCfg(c => c && { ...c, people: c.people.filter(x => x.id !== person.id) });
       await reloadEntries(); void reloadWorks();
       showToast(`${person.name} ligada à conta: ${r.daily_entries} registro(s) e ${r.tasks} Tarefa(s) atualizados`);
-    } catch { showToast('Não foi possível ligar a pessoa à conta.'); }
+    } catch (err) { showToast(String((err as { message?: string })?.message || '').includes('person_archived') ? 'Essa pessoa está arquivada. Desarquive antes de ligar à conta.' : 'Não foi possível ligar a pessoa à conta.'); }
   }, [showToast, reloadWorks, reloadEntries]);
   /** Pessoa só com nome: entra na lista na hora e já pode ser responsável ou seguidora. */
   const createPerson = useCallback(async (name: string): Promise<string | null> => {
@@ -428,6 +428,15 @@ export function DailyWorkspace() {
       details: { origin_entry_id: e.id, origin_day: e.day },
     };
   };
+  /** Vincula a Tarefa recém-criada ao registro; se o registro mudou no meio, relê e tenta de novo (a Tarefa não fica órfã). */
+  const attachWork = async (e: DailyEntry, workId: string) => {
+    try { putEntry(await saveEntry(e.id, e.revision, { work_ids: [...new Set([...(e.work_ids || []), workId])] })); }
+    catch (err) {
+      if (!String((err as { message?: string })?.message || '').includes('revision_conflict')) throw err;
+      const fresh = await loadEntry(e.id);
+      putEntry(await saveEntry(fresh.id, fresh.revision, { work_ids: [...new Set([...(fresh.work_ids || []), workId])] }));
+    }
+  };
   /** Cria Tarefa nova (card próprio no Kanban da frente) a partir do registro e já vincula os dois. */
   const createWorkFromEntry = useCallback(async (e: DailyEntry) => {
     setPop(null);
@@ -439,8 +448,7 @@ export function DailyWorkspace() {
         description: `Criada a partir do registro de ${brDate(e.day)} na Visão Daily (${pr?.name}).`,
       });
       setWorks(list => [saved, ...list]);
-      const linked = await saveEntry(e.id, e.revision, { work_ids: [...(e.work_ids || []), saved.id] });
-      putEntry(linked);
+      await attachWork(e, saved.id);
       showToast(`Tarefa criada${ini ? ` em ${ini.title}` : ''} e vinculada ao registro`);
     } catch (err) { fail(err); }
   }, [fail, initiatives, people, projects, putEntry, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -453,8 +461,7 @@ export function DailyWorkspace() {
       const { owner_label, details } = inheritFromEntry(e);
       const sub = await createSubWork(parentId, { title, owner_label, details });
       setWorks(list => [sub, ...list]);
-      const linked = await saveEntry(e.id, e.revision, { work_ids: [...(e.work_ids || []), sub.id] });
-      putEntry(linked);
+      await attachWork(e, sub.id);
       showToast(`Sub Tarefa criada em "${parent?.title || 'Tarefa'}" e vinculada ao registro`);
     } catch (err) { fail(err); }
   }, [fail, people, projects, putEntry, showToast, worksById]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -470,7 +477,7 @@ export function DailyWorkspace() {
     if (key === 'frentes') return (cfg?.frentes || []).filter(f => !f.archived).map(f => ({ key: f.key, label: f.name, color: f.color }));
     if (key === 'projects') return (cfg?.projects || []).filter(p => !p.archived).map(p => ({ key: p.id, label: p.name, color: projectColor(p.id) }));
     if (key === 'partners') return (cfg?.partners || []).filter(p => !p.archived).map(p => ({ key: p.key, label: p.name, color: p.color }));
-    if (key === 'people') return (cfg?.people || []).map(p => ({ key: p.id, label: p.name + (p.id === me ? ' (você)' : ''), color: '#0e7490' }));
+    if (key === 'people') return (cfg?.people || []).filter(p => !p.archived).map(p => ({ key: p.id, label: p.name + (p.id === me ? ' (você)' : ''), color: '#0e7490' }));
     return (cfg?.tags || []).filter(t => !t.archived).map(t => ({ key: t.key, label: '#' + t.name, color: t.color }));
   };
   const filterLabels = useMemo(() => FILTER_LABELS.map(([key, label]) => ({
@@ -515,7 +522,7 @@ export function DailyWorkspace() {
         onToggle={id => toggleWork(e, id)} onCreate={canEdit ? () => void createWorkFromEntry(e) : undefined} onCreateSub={canEdit ? id => void createSubFromEntry(e, id) : undefined} /></Popover>;
     }
     if (pop.kind === 'people') {
-      return <Popover anchor={pop.anchor} width={330} onClose={close}><PeoplePicker people={cfg.people} me={me} responsible={e.responsible_id} followers={e.follower_ids} subject={e.body}
+      return <Popover anchor={pop.anchor} width={330} onClose={close}><PeoplePicker people={cfg.people.filter(p => !p.archived)} me={me} responsible={e.responsible_id} followers={e.follower_ids} subject={e.body}
         onChange={(r, f) => void patchEntry(e, { responsible_id: r, follower_ids: f }, 'Pessoas atualizadas')}
         onCreate={createPerson} /></Popover>;
     }
@@ -724,7 +731,7 @@ export function DailyWorkspace() {
         <DailyConfigModal tab={config} projects={cfg.projects} frentes={cfg.frentes} partners={cfg.partners} tags={cfg.tags} canEdit={canEdit}
           onTab={setConfig} onClose={() => setConfig(null)} onSaveProject={saveProjectProps} onMerge={merge}
           onSaveOption={async (kind, key, body) => { await saveOpt(kind, key, body); }}
-          people={cfg.people} onSavePerson={savePersonProps} onLinkPerson={linkPerson} />
+          people={cfg.people.filter(p => !p.archived)} onSavePerson={savePersonProps} onLinkPerson={linkPerson} />
       )}
       {toast && <div className="cs-toast">{toast.text}{toast.undo && <button onClick={() => void toast.undo?.()}>Desfazer</button>}</div>}
     </div>

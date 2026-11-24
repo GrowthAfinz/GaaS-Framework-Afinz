@@ -12,7 +12,7 @@ import { TrashModal } from './components/layout/TrashModal';
 import { TemplatesModal } from './components/layout/TemplatesModal';
 import { RowPeekModal } from './components/database/RowPeekModal';
 import { TaskModal } from '../../components/growth-learning/development/TaskModal';
-import { patchTask } from '../../components/growth-learning/development/taskModalService';
+import { loadSubtasks, patchTask } from '../../components/growth-learning/development/taskModalService';
 import { WorkStrip } from './gaas/WorkStrip';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
 import { configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
@@ -119,9 +119,14 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       const reverted: { key: string; row: DatabaseRow }[] = [];
       for (const tc of changes.tasks) {
         const task = ctx.tasks.get(tc.taskId); if (!task) continue;
-        if (!ctx.canEditTasks) { showToast('Seu acesso permite ler as tarefas, mas não alterá-las.'); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects, ctx.initiatives) }); continue; }
-        try { const saved = await saveTask(task, tc.patch); ctx.tasks.set(saved.id, saved); }
-        catch (e) { showToast(taskError(e)); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects, ctx.initiatives) }); }
+        if (!ctx.canEditTasks) { showToast('Seu acesso permite ler as tarefas, mas não alterá-las.'); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects, ctx.initiatives, [...ctx.tasks.values()]) }); continue; }
+        try {
+          const saved = await saveTask(task, tc.patch); ctx.tasks.set(saved.id, saved);
+          // O servidor leva frente, projetos e iniciativa para as Sub Tarefas (revisão nova): relê as filhas.
+          const cascade = ['initiative_id', 'front_key', 'project_ids', 'workspace'].some(k => k in tc.patch) && [...ctx.tasks.values()].some(t => t.parent_task_id === saved.id);
+          if (cascade) for (const k of await loadSubtasks(saved.id).catch(() => [])) ctx.tasks.set(k.id, k);
+        }
+        catch (e) { showToast(taskError(e)); reverted.push({ key: tc.rowKey, row: serverRow(ws, task, ctx.projects, ctx.initiatives, [...ctx.tasks.values()]) }); }
       }
       const next = snapshot(ws);
       for (const r of reverted) { next.rows.set(r.key, JSON.stringify(r.row)); next.rowObjs.set(r.key, r.row); }
@@ -172,7 +177,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     const front = initialProps.p_frente || frontOfProject(props, ctx.projects, initialProps.p_projeto) || props.find(p => p.id === 'p_frente')?.options?.find(o => o.name !== GAAS_FRONT_NAME)?.name || '';
     const moduleProps: Record<string, unknown> = { p_frente: front, ...(initialProps.p_projeto ? { p_projeto: initialProps.p_projeto } : {}) };
     const fields = rowPatch(empty, { id: '', pageId: '', properties: { ...initialProps, ...moduleProps, prop_title: initialProps.prop_title || 'Nova tarefa' } }, props, latest.current.users);
-    const base = newWork(fields.workspace || 'sdd', fields.work_type || 'task');
+    const base = newWork(fields.workspace || (fields.front_key === GAAS_FRONT || !fields.front_key ? 'sdd' : workspaceOfFront(fields.front_key)), fields.work_type || 'task');
     setStatus('saving');
     void createTask({ ...fields, title: fields.title || 'Nova tarefa' }, base).then(saved => {
       ctx.tasks.set(saved.id, saved);
@@ -404,9 +409,11 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
   const taskModalId = peekDatabaseId === TASKS_DB && peekPageId ? taskIdOfRow(peekPageId) : null;
   /** A janela salvou: atualiza as Tarefas conhecidas e as linhas afetadas, sem disparar novo salvamento. */
   const applyTaskChanges = useCallback((changed: WorkItem[]) => {
+    // Pai antigo também é recalculado (Sub Tarefa que virou Tarefa ou mudou de pai).
+    const oldParents = changed.map(t => ctx.tasks.get(t.id)?.parent_task_id).filter((x): x is string => Boolean(x));
     for (const t of changed) ctx.tasks.set(t.id, t);
     const all = [...ctx.tasks.values()];
-    const tops = new Set(changed.map(t => t.parent_task_id || t.id));
+    const tops = new Set([...changed.map(t => t.parent_task_id || t.id), ...oldParents]);
     patchWorkspace(prev => {
       const db = prev.databases[TASKS_DB]; if (!db) return prev;
       let rows = db.rows; const pages = { ...prev.pages };
@@ -602,7 +609,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         const db = { ...raw, rows, views, currentViewId };
         return (
           <>
-          <WorkStrip tasks={[...ctx.tasks.values()]} myName={users.find(u => u.id === ctx.me)?.name || null}
+          <WorkStrip key={viewKey} tasks={[...ctx.tasks.values()]} myName={users.find(u => u.id === ctx.me)?.name || null}
             fronts={page?.taskFronts || []} onOpenTask={id => { setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB); }} />
           <DatabaseView
             key={viewKey}
@@ -880,10 +887,10 @@ function withoutSeed(ws: NotionWorkspace): NotionWorkspace {
   const dbs = tasksDb ? { ...others, [TASKS_DB]: { ...tasksDb, title: '' } } : others;
   return { ...ws, pages, blocks, databases: dbs, rootPageIds: [] };
 }
-function serverRow(ws: NotionWorkspace, task: WorkItem, projects: DailyProjectRef[], initiatives: Initiative[] = []): DatabaseRow {
+function serverRow(ws: NotionWorkspace, task: WorkItem, projects: DailyProjectRef[], initiatives: Initiative[] = [], all: WorkItem[] = []): DatabaseRow {
   const db = ws.databases[TASKS_DB];
   const current = db.rows.find(r => r.id === taskRowId(task.id));
-  return taskToRow(task, db.properties, ws.users, current ? extraProps(current) : {}, projects, initiatives);
+  return taskToRow(task, db.properties, ws.users, current ? extraProps(current) : {}, projects, initiatives, subtaskProgress(task.id, all));
 }
 function replaceRows(ws: NotionWorkspace, rows: DatabaseRow[]): NotionWorkspace {
   const db = ws.databases[TASKS_DB];

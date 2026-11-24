@@ -98,8 +98,11 @@ export const BoardView: React.FC<BoardViewProps> = ({
         // Seleção múltipla: arrastar troca só o valor da coluna de origem; a linha continua nas outras.
         const row = filteredRows.find(r => r.id === rowId);
         const current = row ? valuesOf(row) : [];
-        const next = col.key === '__vazio__' ? [] : [...current.filter(v => v !== dragFrom && v !== col.value), col.value];
-        onUpdateRow(rowId, groupProp.id, next);
+        // Soltar na própria coluna não muda nada; "Sem valor" tira só o valor de origem; a ordem dos outros fica (o primeiro decide campanha e frente).
+        const next = col.key === '__vazio__' ? current.filter(v => v !== dragFrom)
+          : current.includes(col.value) ? current.filter(v => v !== dragFrom)
+          : dragFrom && current.includes(dragFrom) ? current.map(v => (v === dragFrom ? col.value : v)) : [...current, col.value];
+        if (col.value !== dragFrom && JSON.stringify(next) !== JSON.stringify(current)) onUpdateRow(rowId, groupProp.id, next);
       } else onUpdateRow(rowId, groupProp.id, col.value);
     }
     setDraggedRowId(null);

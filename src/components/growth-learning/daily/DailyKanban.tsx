@@ -55,11 +55,13 @@ export function WorkPicker({ works, initiativeId, initiatives, selected, today, 
   const list = useMemo(() => {
     const nq = norm(q.trim());
     const hit = (w: DailyWork) => norm(w.title + ' ' + w.task_key).includes(nq);
-    const open = works.filter(w => !w.parent_task_id && w.status !== 'cancelada' && (nq ? hit(w) || (kidsOf.get(w.id) || []).some(hit)
+    const pinned = (w: DailyWork) => selected.includes(w.id) || (kidsOf.get(w.id) || []).some(k => selected.includes(k.id));
+    const open = works.filter(w => !w.parent_task_id && (w.status !== 'cancelada' || pinned(w)) && (nq ? hit(w) || (kidsOf.get(w.id) || []).some(hit)
       : w.initiative_id === initiativeId || selected.includes(w.id) || (kidsOf.get(w.id) || []).some(k => selected.includes(k.id))));
     return open.sort((a, b) => Number(selected.includes(b.id)) - Number(selected.includes(a.id)) || Number(b.initiative_id === initiativeId) - Number(a.initiative_id === initiativeId)
       || PICK_ORDER.indexOf(a.status) - PICK_ORDER.indexOf(b.status)).slice(0, 60);
   }, [works, q, initiativeId, selected, kidsOf]);
+  const orphans = useMemo(() => works.filter(w => w.parent_task_id && selected.includes(w.id) && !list.some(t => t.id === w.parent_task_id)), [works, selected, list]);
   const row = (w: DailyWork, sub: boolean) => {
     const on = selected.includes(w.id);
     return (
@@ -88,13 +90,15 @@ export function WorkPicker({ works, initiativeId, initiatives, selected, today, 
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>{row(w, false)}</div>
                 {kids.length > 0 && <button className="dv-ib sm" title={expanded ? 'Recolher Sub Tarefas' : `Ver ${kids.length} Sub Tarefas`} onClick={() => setOpenIds(ids => (ids.includes(w.id) ? ids.filter(x => x !== w.id) : [...ids, w.id]))}>{kids.length}</button>}
-                {onCreateSub && <button className="dv-ib sm" title="Criar Sub Tarefa nesta Tarefa a partir do registro" onClick={() => onCreateSub(w.id)}><Plus /></button>}
+                {onCreateSub && w.status !== 'concluida' && w.status !== 'cancelada' && <button className="dv-ib sm" title="Criar Sub Tarefa nesta Tarefa a partir do registro" onClick={() => onCreateSub(w.id)}><Plus /></button>}
               </div>
               {expanded && kids.sort((a, b) => a.title.localeCompare(b.title)).map(k => row(k, true))}
             </div>
           );
         })}
-        {!list.length && <div className="dv-empty" style={{ padding: '8px 12px' }}>{q ? 'Nenhuma Tarefa com esse nome.' : 'Esta iniciativa ainda não tem Tarefas.'}</div>}
+        {/* Sub Tarefa marcada cujo pai não está na lista (cancelado ou fora do recorte): aparece solta para poder desmarcar. */}
+        {orphans.map(k => row(k, true))}
+        {!list.length && !orphans.length && <div className="dv-empty" style={{ padding: '8px 12px' }}>{q ? 'Nenhuma Tarefa com esse nome.' : 'Esta iniciativa ainda não tem Tarefas.'}</div>}
       </div>
       <div className="ft" style={{ display: 'grid', gap: 4 }}>
         <span style={{ fontSize: 11, color: '#64748b' }}>Marcar vincula (nada novo é criado). O + cria Sub Tarefa naquela Tarefa.</span>

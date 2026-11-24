@@ -35,6 +35,10 @@ export function taskError(error:unknown):string {
  if(message.includes('invalid_work_link'))return 'Revise as referências: use título e endereço https, link interno ou caminho de nota.';
  if(message.includes('spec_design_required'))return 'Registre comportamento esperado, cenários e verificação antes de executar a especificação.';
  if(message.includes('experiment_close_required'))return 'Encerre ou cancele o experimento antes de concluir seu acompanhamento.';
+ if(message.includes('task_parent_closed'))return 'A Tarefa está concluída ou cancelada. Reabra a Tarefa antes de abrir ou acrescentar Sub Tarefas.';
+ if(message.includes('task_title_required'))return 'O título precisa ter de 5 a 180 letras.';
+ if(message.includes('person_archived'))return 'Essa pessoa está arquivada. Desarquive antes de ligar à conta.';
+ if(message.includes('task_key_key')||message.includes('duplicate key'))return 'Já existe uma Tarefa com essa chave. Tente de novo.';
  if(message.includes('task_subtasks_pending'))return 'Feche as Sub Tarefas (concluir ou cancelar) antes de concluir esta Tarefa.';
  if(message.includes('task_parent_nested'))return 'Sub Tarefa não pode ter Sub Tarefas. Escolha uma Tarefa como pai.';
  if(message.includes('task_has_subtasks'))return 'Esta Tarefa tem Sub Tarefas e não pode virar Sub Tarefa.';

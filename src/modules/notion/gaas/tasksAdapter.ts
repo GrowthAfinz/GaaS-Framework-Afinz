@@ -170,7 +170,8 @@ export function rowPatch(before: DatabaseRow, after: DatabaseRow, props: Databas
   if (changed('p_tipo')) { const k = keyOf(props, 'p_tipo', b.p_tipo); if (k) out.work_type = k as WorkItem['work_type']; }
   if (changed('p_status')) { const k = keyOf(props, 'p_status', b.p_status); if (k) out.status = k as WorkItem['status']; }
   if (changed('p_frente')) { const k = keyOf(props, 'p_frente', b.p_frente); if (k) out.front_key = k; }
-  if (changed('p_projeto')) out.project_ids = namesOf(b.p_projeto).map(n => keyOf(props, 'p_projeto', n)).filter((k): k is string => Boolean(k));
+  // Projeto arquivado não tem opção e aparece pelo id: o id é mantido, para o vínculo não sumir ao mexer nos outros.
+  if (changed('p_projeto')) out.project_ids = namesOf(b.p_projeto).map(n => keyOf(props, 'p_projeto', n) || (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(n) ? n : null)).filter((k): k is string => Boolean(k));
   if (changed('p_parceiro')) out.partner_keys = namesOf(b.p_parceiro).map(n => keyOf(props, 'p_parceiro', n)).filter((k): k is string => Boolean(k));
   if (changed('p_iniciativa')) out.initiative_id = keyOf(props, 'p_iniciativa', b.p_iniciativa);
   if (changed('p_prioridade')) { const k = keyOf(props, 'p_prioridade', b.p_prioridade); if (k) out.priority = k as WorkItem['priority']; }
