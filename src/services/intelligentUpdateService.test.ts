@@ -20,6 +20,7 @@ describe('acquisition persistence safeguards', () => {
         expect(row).toMatchObject({ journey: 'JOR_VBS_PROMO_DO_MES', activityName: 'afz_promo', channel: 'E-mail', date: '2026-11-20' });
         expect(mapCandidateRow({ proposed_activity_update: { journey: 'legacy', activity_name: 'message', channel: 'SMS', metric_date: '2026-11-19' } })).toMatchObject({ journey: 'legacy', activityName: 'message', channel: 'SMS', date: '2026-11-19' });
         expect(mapRunRow({ summary: { selected: 58, applied: 58 } }).blocked).toBe(0);
+        expect(mapRunRow({ pasted_row_count: 0, summary: { physicalRows: 49796 } }).pastedRowCount).toBe(49796);
     });
     it('leaves financial updates to the RPC so partial performance cannot erase historical incentives', () => {
         const patch = numericPatch(candidate({ delivered: 771, finalized: 4 }));

@@ -353,7 +353,7 @@ export const mapRunRow = (row: any): UpdateRunHistoryItem => {
         sourceLabel: row?.source_label ?? 'Dinamica BI',
         domain: row?.domain ?? summary?.domain ?? 'aquisicao',
         status: row?.status ?? 'reviewing',
-        pastedRowCount: row?.pasted_row_count ?? 0,
+        pastedRowCount: row?.pasted_row_count > 0 ? row.pasted_row_count : numberFromSummary(summary, 'physicalRows', 'sourceRows'),
         summary,
         metrics: numberFromSummary(summary, 'metrics'),
         applied,
