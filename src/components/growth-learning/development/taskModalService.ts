@@ -52,6 +52,15 @@ export async function loadTaskBundle(id: string): Promise<TaskBundle> {
   };
 }
 
+/** Linha atual de uma Tarefa e Sub Tarefas atuais de um pai (depois de cascata do servidor). */
+export async function loadTask(id: string): Promise<WorkItem> {
+  return normalizeWork(await one(supabase.from('growth_development_tasks').select('*').eq('id', id).single()));
+}
+export async function loadSubtasks(parentId: string): Promise<WorkItem[]> {
+  const r = await one(supabase.from('growth_development_tasks').select('*').eq('parent_task_id', parentId).order('position', { ascending: true, nullsFirst: false }).order('created_at'));
+  return (r as WorkItem[]).map(normalizeWork);
+}
+
 /** Salva só os campos enviados, com a revisão que a janela conhece. */
 export async function patchTask(task: Pick<WorkItem, 'id' | 'revision'>, patch: Record<string, unknown>): Promise<WorkItem> {
   const { data, error } = await supabase.rpc('growth_save_development_task', { p_id: task.id, p_revision: task.revision, p_body: patch });

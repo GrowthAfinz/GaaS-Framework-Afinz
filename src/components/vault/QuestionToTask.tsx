@@ -24,7 +24,18 @@ export function isQuestionTable(table?: HastNode): boolean {
 
 export const QuestionTableContext = createContext<{ notePath: string; domain?: string } | null>(null);
 
-const FRONT_OF_DOMAIN: Record<string, string> = { 'crm-aquisicao': 'aq', aquisicao: 'aq', rentabilizacao: 're', seguros: 'se', 'midia-paga': 'aq' };
+const FRONT_OF_DOMAIN: Record<string, string> = { 'crm-aquisicao': 'aq', aquisicao: 'aq', rentabilizacao: 're', seguros: 'se', 'midia-paga': 'aq', 'originacao-b2c': 'aq', b2c: 'aq', midia: 'aq', crm: 'aq', renta: 're' };
+
+/** Frente da pergunta: pelo domínio da nota; sem domínio, pela pasta (nota de engenharia e IA vai para GaaS, o resto é negócio). */
+export function frontOfNote(path: string, domain?: string): string {
+  const d = (domain || '').toLowerCase();
+  if (FRONT_OF_DOMAIN[d]) return FRONT_OF_DOMAIN[d];
+  const p = path.toLowerCase();
+  if (/^(08-engenharia|09-inteligencia-ia)\//.test(p)) return 'gaas';
+  if (p.includes('seguro')) return 'se';
+  if (p.includes('rentabiliza') || p.includes('cartonista')) return 're';
+  return 'aq';
+}
 
 /** Linha da tabela: no cabeçalho acrescenta a coluna; nas linhas, o botão "Virar Tarefa". */
 export function QuestionRow({ node, children }: { node?: HastNode; children?: React.ReactNode }) {
@@ -47,7 +58,7 @@ export function QuestionRow({ node, children }: { node?: HastNode; children?: Re
       const title = question.length > 175 ? question.slice(0, 172).trimEnd() + '…' : question.length < 5 ? `Investigar: ${question}` : question;
       const { data, error: e } = await supabase.rpc('growth_save_development_task', { p_id: null, p_revision: null, p_body: {
         title, work_type: 'investigation', status: 'backlog', priority: 'P2', source_note: ctx.notePath,
-        ...(initiative ? { initiative_id: initiative } : {}), ...(ctx.domain && FRONT_OF_DOMAIN[ctx.domain] ? { front_key: FRONT_OF_DOMAIN[ctx.domain] } : {}),
+        ...(initiative ? { initiative_id: initiative } : {}), front_key: frontOfNote(ctx.notePath, ctx.domain),
         description: [`Pergunta em aberto da nota ${ctx.notePath}.`, impact && `Impacto: ${impact}`, evidence && `Evidência necessária: ${evidence}`, owner && `Dono na nota: ${owner}`].filter(Boolean).join('\n\n'),
         details: { question, origin_note: ctx.notePath, ...(evidence ? { scope: evidence } : {}) },
       } });

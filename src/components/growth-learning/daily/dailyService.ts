@@ -9,7 +9,8 @@ export async function loadDailyConfig(): Promise<DailyLoad> {
     supabase.from('daily_partners').select('*').order('position'),
     supabase.from('daily_tags').select('*').order('position'),
     supabase.from('daily_projects').select('*').order('name'),
-    supabase.rpc('gaas_work_people'),
+    // Arquivadas vêm junto só para mostrar o nome nos registros antigos; os seletores escondem.
+    supabase.rpc('gaas_work_people', { p_include_archived: true }),
   ]);
   const error = frentes.error || partners.error || tags.error || projects.error;
   if (error) throw error;
@@ -21,6 +22,13 @@ export async function loadDailyConfig(): Promise<DailyLoad> {
     people: (people.data || []) as DailyPerson[],
     canEdit: !people.error,
   };
+}
+
+/** Registro atual (para refazer um vínculo quando a revisão da tela ficou velha). */
+export async function loadEntry(id: string): Promise<DailyEntry> {
+  const { data, error } = await supabase.from('daily_entries').select('*').eq('id', id).single();
+  if (error) throw error;
+  return data as DailyEntry;
 }
 
 export async function loadEntries(start: string, end: string): Promise<DailyEntry[]> {
