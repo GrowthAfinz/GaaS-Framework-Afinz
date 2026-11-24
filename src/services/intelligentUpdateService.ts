@@ -295,6 +295,9 @@ const applyConfirmedActivityChanges = async (
 export interface UpdateRunHistoryItem {
     id: string;
     createdAt: string;
+    /** Última mudança do run; a diferença para createdAt aproxima a duração da execução. */
+    updatedAt: string;
+    createdBy: string | null;
     sourceLabel: string;
     domain: string;
     status: string;
@@ -350,6 +353,8 @@ export const mapRunRow = (row: any): UpdateRunHistoryItem => {
     return {
         id: row?.id,
         createdAt: row?.created_at ?? '',
+        updatedAt: row?.updated_at ?? row?.created_at ?? '',
+        createdBy: row?.created_by ?? null,
         sourceLabel: row?.source_label ?? 'Dinamica BI',
         domain: row?.domain ?? summary?.domain ?? 'aquisicao',
         status: row?.status ?? 'reviewing',
@@ -384,6 +389,10 @@ export const mapCandidateRow = (row: any): UpdateRunCandidateRow => {
     };
 };
 
+const DOMAIN_HISTORY_TTL_MS = 10 * 60 * 1000;
+const DOMAIN_HISTORY_CONCURRENCY = 6;
+const domainHistoryCache = new Map<UpdateDomain, { rows: Array<Record<string, any>>; at: number }>();
+
 export const intelligentUpdateService = {
     // Busca os disparos ja gravados na tabela do dominio (activity name, canal, data)
     // para deduplicar contra a base e nao reinserir o que ja existe.
@@ -413,21 +422,42 @@ export const intelligentUpdateService = {
     // Historico completo da tabela do dominio (todas as colunas) para inteligencia
     // de sugestoes por jornada/segmento. Usado na Rentabilizacao para herdar a
     // classificacao ja existente ao subir novos disparos.
+    // Páginas em paralelo (ordem estável por id) e cache na sessão: o mesmo histórico era
+    // baixado inteiro, em ~40 chamadas seguidas, a cada arquivo. O cache cai depois de gravar.
     async fetchDomainHistory(domain: UpdateDomain): Promise<Array<Record<string, any>>> {
+        const cached = domainHistoryCache.get(domain);
+        if (cached && Date.now() - cached.at < DOMAIN_HISTORY_TTL_MS) return cached.rows;
         const table = targetTableForDomain(domain);
         const pageSize = 1000;
-        const rows: Array<Record<string, any>> = [];
-        for (let offset = 0; ; offset += pageSize) {
+        const { count, error: countError } = await supabase.from(table).select('id', { count: 'exact', head: true });
+        if (countError) throw countError;
+        const pages = Math.max(1, Math.ceil((count ?? 0) / pageSize) + 1);
+        const fetchPage = async (page: number) => {
             const { data, error } = await supabase
                 .from(table)
                 .select('*')
-                .range(offset, offset + pageSize - 1);
+                .order('id', { ascending: true })
+                .range(page * pageSize, page * pageSize + pageSize - 1);
             if (error) throw error;
-            const batch = data ?? [];
-            rows.push(...batch);
-            if (batch.length < pageSize) break;
-        }
+            return data ?? [];
+        };
+        const results: Array<Array<Record<string, any>>> = new Array(pages);
+        let cursor = 0;
+        const runner = async () => {
+            while (cursor < pages) {
+                const page = cursor++;
+                results[page] = await fetchPage(page);
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(DOMAIN_HISTORY_CONCURRENCY, pages) }, runner));
+        const rows = results.flat();
+        domainHistoryCache.set(domain, { rows, at: Date.now() });
         return rows;
+    },
+
+    invalidateDomainHistory(domain?: UpdateDomain) {
+        if (domain) domainHistoryCache.delete(domain);
+        else domainHistoryCache.clear();
     },
 
     // Lista os ultimos runs de atualizacao (gaas_update_runs). Numeros agregados
@@ -440,6 +470,52 @@ export const intelligentUpdateService = {
             .limit(limit);
         if (error) throw error;
         return (data ?? []).map(mapRunRow);
+    },
+
+    // Página do histórico com total, filtrada no servidor (a tela não baixa tudo).
+    async fetchUpdateRunPage(options: {
+        page: number;
+        pageSize: number;
+        domain?: string;
+        status?: string;
+        sinceIso?: string;
+    }): Promise<{ items: UpdateRunHistoryItem[]; total: number }> {
+        const from = options.page * options.pageSize;
+        let query = supabase
+            .from('gaas_update_runs')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(from, from + options.pageSize - 1);
+        if (options.domain) query = query.eq('domain', options.domain);
+        if (options.status) query = query.eq('status', options.status);
+        if (options.sinceIso) query = query.gte('created_at', options.sinceIso);
+        const { data, error, count } = await query;
+        if (error) throw error;
+        return { items: (data ?? []).map(mapRunRow), total: count ?? 0 };
+    },
+
+    // Linha do tempo leve para o quadro de status das bases (só as colunas necessárias).
+    async fetchUpdateRunActivity(sinceIso: string): Promise<Array<{ id: string; createdAt: string; domain: string; status: string }>> {
+        const { data, error } = await supabase
+            .from('gaas_update_runs')
+            .select('id, created_at, domain, status')
+            .gte('created_at', sinceIso)
+            .order('created_at', { ascending: false })
+            .limit(1000);
+        if (error) throw error;
+        return (data ?? []).map((row: any) => ({ id: row.id, createdAt: row.created_at, domain: row.domain ?? '', status: row.status ?? '' }));
+    },
+
+    // Última gravação concluída de cada frente, para o selo de frescor.
+    async fetchLatestAppliedRuns(): Promise<Array<{ createdAt: string; domain: string }>> {
+        const { data, error } = await supabase
+            .from('gaas_update_runs')
+            .select('created_at, domain')
+            .eq('status', 'applied')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        if (error) throw error;
+        return (data ?? []).map((row: any) => ({ createdAt: row.created_at, domain: row.domain ?? '' }));
     },
 
     // Detalhe de um run: candidatos aplicados (insert/upsert/update_metrics) na integra
@@ -504,6 +580,8 @@ export const intelligentUpdateService = {
     },
 
     async saveRun(payload: IntelligentUpdateRunPayload): Promise<IntelligentUpdateRunResult> {
+        // A base vai mudar: o próximo arquivo precisa conferir contra o histórico novo.
+        domainHistoryCache.clear();
         const runInsertPayload = {
             domain: payload.domain,
             source_type: payload.sourceType ?? 'csv',

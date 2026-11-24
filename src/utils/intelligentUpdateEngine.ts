@@ -404,15 +404,35 @@ export const FLOW_TARGET_LABEL: Record<UpdateFlow, string> = {
     rentabilizacao: DOMAIN_TARGET_TABLE.rentabilizacao,
 };
 
-export const normalize = (value: unknown) =>
-    String(value ?? '')
+// Cache das normalizações: as mesmas jornadas e activities são normalizadas milhares de
+// vezes por arquivo. A saída é pura em relação ao texto de entrada, então o cache não muda regra.
+const NORMALIZE_CACHE_LIMIT = 200_000;
+const normalizeCache = new Map<string, string>();
+const normalizeKeyCache = new Map<string, string>();
+const remember = (cache: Map<string, string>, key: string, value: string) => {
+    if (cache.size >= NORMALIZE_CACHE_LIMIT) cache.clear();
+    cache.set(key, value);
+    return value;
+};
+
+export const normalize = (value: unknown) => {
+    const text = String(value ?? '');
+    const cached = normalizeCache.get(text);
+    if (cached !== undefined) return cached;
+    return remember(normalizeCache, text, text
         .replace(/ATIVA�+O/gi, 'ATIVACAO')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .trim()
-        .toLowerCase();
+        .toLowerCase());
+};
 
-export const normalizeKey = (value: unknown) => normalize(value).replace(/\s+/g, ' ');
+export const normalizeKey = (value: unknown) => {
+    const text = String(value ?? '');
+    const cached = normalizeKeyCache.get(text);
+    if (cached !== undefined) return cached;
+    return remember(normalizeKeyCache, text, normalize(text).replace(/\s+/g, ' '));
+};
 
 export const parseNumber = (value: unknown): number | undefined => {
     if (value === null || value === undefined || value === '') return undefined;
@@ -1081,7 +1101,33 @@ export const buildHistoryIndex = (activities: Activity[]): HistoryIndex => {
     return index;
 };
 
+// Ranking por balde em cache: o mesmo balde (ex.: o global) era reordenado para cada
+// disparo e cada campo. Baldes não mudam depois que o índice é montado; devolvemos cópias
+// para que ninguém altere o resultado guardado.
+const topSuggestionsCache = new WeakMap<SuggestionBucket, Map<string, FieldSuggestion[]>>();
+
 export const topSuggestionsFromBucket = (
+    bucket: SuggestionBucket | undefined,
+    field: SuggestionField,
+    source: string,
+    confidenceCap: number
+): FieldSuggestion[] => {
+    if (!bucket) return [];
+    let byKey = topSuggestionsCache.get(bucket);
+    if (!byKey) {
+        byKey = new Map();
+        topSuggestionsCache.set(bucket, byKey);
+    }
+    const cacheKey = `${field}|${source}|${confidenceCap}`;
+    let ranked = byKey.get(cacheKey);
+    if (!ranked) {
+        ranked = rankBucket(bucket, field, source, confidenceCap);
+        byKey.set(cacheKey, ranked);
+    }
+    return ranked.map((suggestion) => ({ ...suggestion }));
+};
+
+const rankBucket = (
     bucket: SuggestionBucket | undefined,
     field: SuggestionField,
     source: string,
@@ -1122,8 +1168,8 @@ export const suggestAllFields = (
         .filter((bucket): bucket is SuggestionBucket => Boolean(bucket));
 
     const result: Partial<Record<SuggestionField, FieldSuggestion[]>> = {};
+    const deterministic = inferDeterministicDimensions(metric);
     for (const field of SUGGESTION_FIELDS) {
-        const deterministic = inferDeterministicDimensions(metric);
         const deterministicValue = field === 'bu'
             ? taxonomy.bu
             : field === 'produto'
@@ -1689,11 +1735,25 @@ export const toCsv = (tsv: string) =>
 
 export const positive = (value?: number) => (value ?? 0) > 0;
 
+// Meio-dia local de cada data em cache: a consolidação compara as mesmas datas milhões de
+// vezes. Mesma conta de antes (diferença em ms arredondada), só sem reinterpretar a data.
+const noonMsCache = new Map<string, number>();
+const noonMs = (date: string) => {
+    const key = String(date);
+    let value = noonMsCache.get(key);
+    if (value === undefined) {
+        value = new Date(`${key}T12:00:00`).getTime();
+        if (noonMsCache.size >= 50_000) noonMsCache.clear();
+        noonMsCache.set(key, value);
+    }
+    return value;
+};
+
 export const dayDiff = (fromDate: string, toDate: string) => {
-    const from = new Date(`${fromDate}T12:00:00`);
-    const to = new Date(`${toDate}T12:00:00`);
-    if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime())) return Number.POSITIVE_INFINITY;
-    return Math.round((to.getTime() - from.getTime()) / 86400000);
+    const from = noonMs(fromDate);
+    const to = noonMs(toDate);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return Number.POSITIVE_INFINITY;
+    return Math.round((to - from) / 86400000);
 };
 
 export const attributionKey = (row: MetricRow) => `${normalizeKey(row.activityName)}|${canonicalChannel(row.channel)}`;
@@ -1749,10 +1809,33 @@ export const consolidateOperationalRows = (dispatchRows: MetricRow[], performanc
     let mergedEcred = 0;
     let ignoredPerformance = 0;
 
+    // Índice por data dentro de cada chave: a janela D0-D2 olha só as datas distintas da
+    // chave, não todos os disparos. A ordem original das âncoras é preservada, então o
+    // resultado é idêntico ao da varredura completa.
+    const anchorOrder = new Map<MetricRow, number>();
+    anchors.forEach((row, index) => anchorOrder.set(row, index));
+    const byDate = (rows: MetricRow[]) => rows.reduce((map, row) => {
+        const list = map.get(row.date);
+        if (list) list.push(row);
+        else map.set(row.date, [row]);
+        return map;
+    }, new Map<string, MetricRow[]>());
+    const datedByAttributionKey = new Map<string, Map<string, MetricRow[]>>();
+    anchorsByAttributionKey.forEach((rows, key) => datedByAttributionKey.set(key, byDate(rows)));
+    const datedByActivityName = new Map<string, Map<string, MetricRow[]>>();
+    anchorsByActivityName.forEach((rows, key) => datedByActivityName.set(key, byDate(rows)));
+    const windowCandidates = (dated: Map<string, MetricRow[]> | undefined, date: string) => {
+        if (!dated) return [];
+        const found: Array<{ candidate: MetricRow; diff: number }> = [];
+        dated.forEach((rows, anchorDate) => {
+            const diff = dayDiff(anchorDate, date);
+            if (diff >= 0 && diff <= 2) rows.forEach((candidate) => found.push({ candidate, diff }));
+        });
+        return found.sort((a, b) => anchorOrder.get(a.candidate)! - anchorOrder.get(b.candidate)!);
+    };
+
     const findAnchor = (row: MetricRow) => {
-        const candidates = (anchorsByAttributionKey.get(attributionKey(row)) ?? [])
-            .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
-            .filter((item) => item.diff >= 0 && item.diff <= 2);
+        const candidates = windowCandidates(datedByAttributionKey.get(attributionKey(row)), row.date);
 
         // A resposta padrão é reutilizada. Só vincula métricas à execução da mesma
         // jornada, incluindo a safra do nome, quando há uma âncora inequívoca.
@@ -1783,9 +1866,7 @@ export const consolidateOperationalRows = (dispatchRows: MetricRow[], performanc
         // PERF com canal='ECRED-API', mas o disparo original e WPP/SMS. Busca pelo
         // activityName sem considerar o canal, dentro da janela D0-D2.
         if (isEcredChannel(row.channel)) {
-            const ecredCandidates = (anchorsByActivityName.get(normalizeKey(row.activityName)) ?? [])
-                .map((candidate) => ({ candidate, diff: dayDiff(candidate.date, row.date) }))
-                .filter((item) => item.diff >= 0 && item.diff <= 2);
+            const ecredCandidates = windowCandidates(datedByActivityName.get(normalizeKey(row.activityName)), row.date);
             // Mesma preferencia por jornada do caminho principal: quando o BI duplica a
             // activity em varias jornadas, cada PERF ECRED-API vai para a ancora da SUA
             // jornada (evita somar 3x o mesmo cartao numa unica jornada).
