@@ -1,0 +1,81 @@
+{
+  "measuredAt": "2026-11-24T14:02:24.610Z",
+  "node": "v24.11.1",
+  "history": {
+    "acquisition": "~12 mil",
+    "rentabilizacao": "~40 mil"
+  },
+  "results": [
+    {
+      "rows": 2000,
+      "matrixRows": 2002,
+      "csvMb": 0.6,
+      "parseMs": 12,
+      "rentIndexMs": 2410,
+      "aquisicaoMs": 4642,
+      "rentabilizacaoMs": 522,
+      "totalCrmMs": 8090,
+      "candidates": 3417,
+      "candidatesJsonMb": 14.7,
+      "heapGrowthMb": 135
+    },
+    {
+      "rows": 5000,
+      "matrixRows": 5002,
+      "csvMb": 1.4,
+      "parseMs": 23,
+      "rentIndexMs": 2874,
+      "aquisicaoMs": 8670,
+      "rentabilizacaoMs": 922,
+      "totalCrmMs": 12433,
+      "candidates": 7560,
+      "candidatesJsonMb": 32.6,
+      "heapGrowthMb": 240
+    },
+    {
+      "rows": 10000,
+      "matrixRows": 10002,
+      "csvMb": 2.8,
+      "parseMs": 23,
+      "rentIndexMs": 1998,
+      "aquisicaoMs": 14697,
+      "rentabilizacaoMs": 1734,
+      "totalCrmMs": 19170,
+      "candidates": 12686,
+      "candidatesJsonMb": 54.4,
+      "heapGrowthMb": 363
+    },
+    {
+      "rows": 20000,
+      "matrixRows": 20002,
+      "csvMb": 5.5,
+      "parseMs": 108,
+      "rentIndexMs": 2708,
+      "aquisicaoMs": 28603,
+      "rentabilizacaoMs": 3350,
+      "totalCrmMs": 36909,
+      "candidates": 18978,
+      "candidatesJsonMb": 81.2,
+      "heapGrowthMb": 175
+    },
+    {
+      "rows": 50000,
+      "matrixRows": 50002,
+      "csvMb": 13.8,
+      "parseMs": 220,
+      "rentIndexMs": 3008,
+      "aquisicaoMs": 61526,
+      "rentabilizacaoMs": 2603,
+      "totalCrmMs": 49639,
+      "candidates": 26287,
+      "candidatesJsonMb": 112.3,
+      "heapGrowthMb": 93
+    }
+  ],
+  "notes": [
+    "Medido em Node 24 na máquina local; o navegador tende a ser igual ou mais lento.",
+    "Tamanhos 2k e 5k medidos numa rodada anterior, mesmo código e mesma seed.",
+    "A fixture tem variedade limitada de assinaturas: acima de ~20 mil linhas o número de candidatos satura, então o tempo real em arquivos de 35 a 55 mil linhas tende a ser maior.",
+    "heapGrowthMb sofre efeito do coletor de lixo entre etapas; usar só como ordem de grandeza."
+  ]
+}
