@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./supabaseClient', () => ({ supabase: {} }));
-import { buildInsertPayload, numericPatch, type IntelligentUpdateCandidatePayload } from './intelligentUpdateService';
+import { buildInsertPayload, numericPatch, mapCandidateRow, mapRunRow, type IntelligentUpdateCandidatePayload } from './intelligentUpdateService';
 
 const candidate = (overrides = {}): IntelligentUpdateCandidatePayload => ({
     key: 'key', activityName: 'plu_car_plx_aqs_wpp_car_21d_diario',
@@ -13,6 +13,15 @@ const candidate = (overrides = {}): IntelligentUpdateCandidatePayload => ({
 });
 
 describe('acquisition persistence safeguards', () => {
+    it('displays executor audit rows and legacy API-shaped rows in the importer history', () => {
+        const row = mapCandidateRow({ domain: 'rentabilizacao', operation_type: 'update', status: 'applied',
+            proposed_activity_update: { Abertura: 12 },
+            after_payload: { jornada: 'JOR_VBS_PROMO_DO_MES', 'Activity name / Taxonomia': 'afz_promo', Canal: 'E-mail', 'Data de Disparo': '2026-11-20T03:00:00+00:00' } });
+        expect(row).toMatchObject({ journey: 'JOR_VBS_PROMO_DO_MES', activityName: 'afz_promo', channel: 'E-mail', date: '2026-11-20' });
+        expect(mapCandidateRow({ proposed_activity_update: { journey: 'legacy', activity_name: 'message', channel: 'SMS', metric_date: '2026-11-19' } })).toMatchObject({ journey: 'legacy', activityName: 'message', channel: 'SMS', date: '2026-11-19' });
+        expect(mapRunRow({ summary: { selected: 58, applied: 58 } }).blocked).toBe(0);
+        expect(mapRunRow({ pasted_row_count: 0, summary: { physicalRows: 49796 } }).pastedRowCount).toBe(49796);
+    });
     it('leaves financial updates to the RPC so partial performance cannot erase historical incentives', () => {
         const patch = numericPatch(candidate({ delivered: 771, finalized: 4 }));
         expect(patch['Base Acionável']).toBe(771);

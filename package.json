@@ -48,7 +48,9 @@
     "pretest:skills": "node scripts/skills/build-skills-catalog.mjs",
     "test:insurance": "node --test scripts/test-insurance-foundation.mjs scripts/test-insurance-office.mjs",
     "test:portfolio-knowledge": "node scripts/build-portfolio-report-contracts.mjs --check && node --test scripts/test-portfolio-knowledge-contracts.mjs",
-    "test:security": "node scripts/check-source-secrets.mjs && npx --yes deno@2.9.6 test scripts/test-gaas-security.ts"
+    "test:security": "node scripts/check-source-secrets.mjs && npx --yes deno@2.9.6 test scripts/test-gaas-security.ts",
+    "crm:csv": "node scripts/activities-csv.mjs",
+    "test:crm-csv": "node --test scripts/test-activities-csv.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -97,6 +99,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "@xmldom/xmldom": "0.9.12",
     "autoprefixer": "^10.4.16",
+    "esbuild": "0.21.5",
     "gh-pages": "^6.3.0",
     "playwright": "^1.59.1",
     "postcss": "^8.4.32",

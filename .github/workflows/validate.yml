@@ -40,6 +40,8 @@ jobs:
         run: npm run test:security
       - name: Skill catalog and publication safety
         run: npm run test:skills
+      - name: CRM CSV executor contracts
+        run: npm run test:crm-csv
       - name: Frontend tests
         run: npm test
       - name: Insurance ingestion, security and Office package contracts
