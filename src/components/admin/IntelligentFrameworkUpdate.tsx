@@ -639,7 +639,10 @@ export const IntelligentFrameworkUpdate: React.FC<{
     const [copied, setCopied] = useState(false);
     // Etapas no lugar do overlay de revisão: Arquivo, Escopo, Revisão, Gravação, Recibo.
     const [step, setStep] = useState<ImportStep>('arquivo');
-    useEffect(() => { onStepChange?.(step); }, [step, onStepChange]);
+    // Avisa só quando a etapa muda (a callback do pai é recriada a cada render).
+    const onStepChangeRef = useRef(onStepChange);
+    onStepChangeRef.current = onStepChange;
+    useEffect(() => { onStepChangeRef.current?.(step); }, [step]);
     const reviewOpen = step === 'revisao';
     const setReviewOpen = (open: boolean) => setStep(open ? 'revisao' : 'escopo');
     const rentabilizacaoCount = useAppStore((state) => state.rentabilizacaoActivities?.length ?? 0);
@@ -1590,10 +1593,9 @@ export const IntelligentFrameworkUpdate: React.FC<{
                 <div className="flex min-h-0 flex-1 flex-col">
                     <div className="flex min-h-0 flex-1 flex-wrap gap-5 p-6">
                         <section aria-label="Frentes e período" className="flex min-w-[520px] flex-[999_1_640px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white">
-                            <div className="flex flex-wrap items-center gap-2 border-b border-[#eef2f6] px-3.5 py-2.5">
-                                <b className="text-[13px]">Frentes e período</b>
-                                <span className="text-xs text-slate-600">padrão da casa já marcado: Aquisição da segunda passada para cá e as demais frentes inteiras</span>
-                            </div>
+                            <p className="border-b border-[#eef2f6] px-3.5 py-2 text-xs text-slate-600">
+                                Padrão da casa já marcado: Aquisição da segunda passada para cá e as demais frentes inteiras.
+                            </p>
                             {mappingUnavailable && (
                                 <p role="status" className="border-b border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
                                     Mapeamento de campanhas indisponível agora. Dá para revisar disparo a disparo na próxima etapa.

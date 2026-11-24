@@ -87,6 +87,7 @@ const runInWorker = (target: Worker, input: ImporterInput, onStage: (stage: Impo
             }
             if (message.type === 'done') {
                 cleanup();
+                if (typeof performance !== 'undefined') performance.mark('importer:worker-done');
                 resolve(message.output);
             }
         };

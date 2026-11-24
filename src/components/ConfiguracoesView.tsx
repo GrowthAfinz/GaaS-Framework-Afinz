@@ -1,5 +1,5 @@
 import {SfmcIngestionHistory} from './communications/SfmcIngestionHistory';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck, Users, Wand2, History, Target, Package, UserCircle, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUserRole } from '../context/UserRoleContext';
@@ -12,7 +12,7 @@ import { GoalsManager } from './admin/GoalsManager';
 import { UserManagementPanel } from './admin/UserManagementPanel';
 import { activityService, versionService } from '../services/activityService';
 import { dataService } from '../services/dataService';
-import { IntelligentFrameworkUpdate } from './admin/IntelligentFrameworkUpdate';
+import { IntelligentFrameworkUpdate, type ImportStep } from './admin/IntelligentFrameworkUpdate';
 import { UpdateHistoryView } from './admin/UpdateHistoryView';
 import { readSettingsSection, writeSettingsSection, type SettingsSection } from './admin/settingsSections';
 
@@ -436,12 +436,22 @@ export const ConfiguracoesView: React.FC = () => {
     const [section, setSectionState] = useState<SettingsSection>(() => readSettingsSection());
     const [navCollapsed, setNavCollapsed] = useState(false);
     const [navQuery, setNavQuery] = useState('');
+    // O importador fica montado mesmo fora da seção, para não perder uma revisão em andamento.
+    const [importerVisited, setImporterVisited] = useState(section === 'atualizar');
+    const importerStepRef = useRef<ImportStep>('arquivo');
     const setSection = (next: SettingsSection) => {
         setSectionState(next);
         writeSettingsSection(next);
+        if (next === 'atualizar') setImporterVisited(true);
+        // Nas etapas do importador o menu recolhe; fora dele volta aberto.
+        setNavCollapsed(next === 'atualizar' && importerStepRef.current !== 'arquivo');
     };
     useEffect(() => {
-        const onPop = () => setSectionState(readSettingsSection());
+        const onPop = () => {
+            const next = readSettingsSection();
+            setSectionState(next);
+            if (next === 'atualizar') setImporterVisited(true);
+        };
         window.addEventListener('popstate', onPop);
         return () => window.removeEventListener('popstate', onPop);
     }, []);
@@ -586,11 +596,16 @@ export const ConfiguracoesView: React.FC = () => {
             </nav>
 
             <main className="min-w-0 flex-1">
-                {activeSection === 'atualizar' && (
-                    <IntelligentFrameworkUpdate
-                        onOpenHistory={() => setSection('historico')}
-                        onStepChange={(step) => setNavCollapsed(step !== 'arquivo')}
-                    />
+                {(importerVisited || activeSection === 'atualizar') && (
+                    <div hidden={activeSection !== 'atualizar'}>
+                        <IntelligentFrameworkUpdate
+                            onOpenHistory={() => setSection('historico')}
+                            onStepChange={(step) => {
+                                importerStepRef.current = step;
+                                if (activeSection === 'atualizar') setNavCollapsed(step !== 'arquivo');
+                            }}
+                        />
+                    </div>
                 )}
                 {activeSection === 'historico' && <UpdateHistoryView onStartUpdate={() => setSection('atualizar')} />}
                 {activeSection !== 'atualizar' && activeSection !== 'historico' && (
