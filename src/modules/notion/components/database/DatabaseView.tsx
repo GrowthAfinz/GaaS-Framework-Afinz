@@ -130,6 +130,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [viewRows, qfActive, qfSelected.join('|')]
   );
+  // Linhas só do Calendário (Sub Tarefas com prazo) passam pelos mesmos filtros, busca e chips da visão.
+  const calendarExtras = useMemo(() => {
+    if (!calendarExtraRows?.length) return [];
+    const rows = applyView(calendarExtraRows, currentView, database.properties, users, searchQuery);
+    return qfActive ? rows.filter((r) => qfSelected.includes(qfValue(r))) : rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarExtraRows, currentView, database.properties, users, searchQuery, qfActive, qfSelected.join('|')]);
   const qfCount = (name: string) => viewRows.filter((r) => qfValue(r) === name).length;
   const qfToggle = (name: string, only: boolean) =>
     setQfSel(only ? [name] : qfSelected.includes(name) ? qfSelected.filter((n) => n !== name) : [...qfSelected, name]);
@@ -483,7 +490,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
         <CalendarView
           taskCalendar={Boolean(layoutKey)}
           database={database}
-          filteredRows={calendarExtraRows?.length ? [...filteredRows, ...calendarExtraRows] : filteredRows}
+          filteredRows={calendarExtras.length ? [...filteredRows, ...calendarExtras] : filteredRows}
           datePropId={datePropId}
           readOnly={readOnly}
           onUpdateRow={readOnly ? undefined : (rId, pId, val) => onUpdateRow(database.id, rId, pId, val)}

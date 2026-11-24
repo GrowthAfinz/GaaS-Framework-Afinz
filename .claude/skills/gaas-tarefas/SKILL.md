@@ -2,7 +2,7 @@
 name: gaas-tarefas
 description: Criar, ler e atualizar Tarefas e Sub Tarefas do GaaS (Tarefas e atividades, Kanban da Visão Daily e seção de Tarefas da Wiki) pelo caminho único do banco, com modelos, sem duplicar trabalho. Usar quando o pedido for criar Tarefa a partir de modelo, montar o checklist de uma entrega, vincular registro da Daily a uma Tarefa, marcar Sub Tarefa, concluir Tarefa, mover Tarefa de projeto ou frente, ou ler o andamento de uma iniciativa. Não usar para disparos CRM (tabela activities).
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   origin: claude-code
   agents: [claude-code, codex]
   process: [Operação, Produto, Engenharia]
@@ -66,6 +66,10 @@ As Sub Tarefas recebem a chave `<chave do pai>-01`, `-02`... e herdam iniciativa
 - Bloquear: `{"status":"bloqueada","blocked_reason":"..."}` (o motivo é obrigatório).
 - Concluir Tarefa com Sub Tarefas: todas fechadas (concluídas ou canceladas) e `resolution` com a entrega. Sem Sub Tarefas: critérios todos marcados e `resolution`.
 - Dependências (`dependencies`, por `task_key`) impedem iniciar ou concluir antes da dependência.
+- Tarefa concluída ou cancelada não recebe Sub Tarefa aberta (nova, reaberta ou movida para baixo dela): o banco devolve `task_parent_closed`. Reabra a Tarefa primeiro.
+- Árvore pedida já concluída (`task.status: concluida`) só passa com todas as Sub Tarefas fechadas; a conclusão é aplicada depois das filhas.
+- A chave da Sub Tarefa nova (`PAI-NN`) sai do maior sufixo já usado; não mande `task_key` só para "acertar a numeração".
+- `project_ids` mantém a ordem enviada (o primeiro projeto decide campanha e frente); projeto juntado na Daily vira o projeto destino.
 - Transformar Sub Tarefa em Tarefa: `{"parent_task_id": null}`. Mantém id, chave, histórico e vínculos.
 
 ### Rodar SQL em nome de alguém (scripts)

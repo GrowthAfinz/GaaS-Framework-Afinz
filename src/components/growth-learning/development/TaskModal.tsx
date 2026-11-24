@@ -15,7 +15,7 @@ import { TASK_PRIORITY, TASK_STATUS, taskError } from './developmentService';
 import { saveTaskTree } from './workService';
 import { subtaskProgress, type WorkItem } from './workModel';
 import {
-  addComment, createPerson, createSubtask, deleteComment, loadTaskBundle, patchTask, taskLink,
+  addComment, createPerson, createSubtask, deleteComment, loadSubtasks, loadTask, loadTaskBundle, patchTask, taskLink,
   type Person, type TaskBundle,
 } from './taskModalService';
 
@@ -47,6 +47,9 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [newGroup, setNewGroup] = useState<string | null>(null);
   const [comment, setComment] = useState('');
+  const [nonce, setNonce] = useState(0);
+  const busyRef = useRef(false);
+  const resolutionDraft = useRef<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null);
 
@@ -77,6 +80,12 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
+        const a = document.activeElement as HTMLElement | null;
+        if (a && box.current?.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !['checkbox', 'radio'].includes((a as HTMLInputElement).type)) {
+          if (a.tagName !== 'SELECT') a.dataset.cancel = '1';
+          a.blur();
+          return;
+        }
         if (menus.current.menu) setMenu(false); else if (menus.current.rowMenu) setRowMenu(null); else closeRef.current();
         return;
       }
@@ -100,14 +109,21 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
   /** Salva campos de uma linha (a Tarefa ou uma Sub Tarefa) e atualiza a janela e a tela de origem. */
   const save = async (target: WorkItem, patch: Record<string, unknown>, ok?: string) => {
     if (!b?.canEdit) { setError('Seu acesso permite ler, mas não editar.'); return null; }
-    setBusy(true); setError('');
+    if (busyRef.current) return null;
+    if ('title' in patch) {
+      const len = String(patch.title || '').trim().length;
+      if (len < 5 || len > 180) { setError('O título precisa ter de 5 a 180 letras.'); setNonce(n => n + 1); return null; }
+    }
+    busyRef.current = true; setBusy(true); setError('');
     try {
       const saved = await patchTask(target, patch);
-      setB(cur => cur && (saved.id === cur.task.id ? { ...cur, task: saved } : { ...cur, subtasks: cur.subtasks.map(s => (s.id === saved.id ? saved : s)) }));
-      onChanged?.([saved]);
+      const cascade = saved.id === b.task.id && !saved.parent_task_id && b.subtasks.length > 0 && ['initiative_id', 'front_key', 'project_ids', 'workspace'].some(k => k in patch);
+      const kidsNow = cascade ? await loadSubtasks(saved.id) : null;
+      setB(cur => cur && (saved.id === cur.task.id ? { ...cur, task: saved, subtasks: kidsNow || cur.subtasks } : { ...cur, subtasks: cur.subtasks.map(s => (s.id === saved.id ? saved : s)) }));
+      onChanged?.([saved, ...(kidsNow || [])]);
       if (ok) flash(ok);
       return saved;
-    } catch (e) { await fail(e); return null; } finally { setBusy(false); }
+    } catch (e) { await fail(e); return null; } finally { busyRef.current = false; setBusy(false); }
   };
 
   const t = b?.task;
@@ -135,6 +151,8 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
   const initiative = b.initiatives.find(i => i.id === t.initiative_id);
   const projectNames = (t.project_ids || []).map(id => b.projects.find(p => p.id === id)?.name).filter(Boolean) as string[];
   const isSub = Boolean(b.parent);
+  /** Tarefa fechada não recebe nem reabre Sub Tarefa (a regra também vale no servidor). */
+  const parentClosed = !isSub && closed(t.status);
   const people = b.people;
   const criteria = t.acceptance_criteria || [];
   const marked = new Set(t.completed_criteria || []);
@@ -151,6 +169,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
     }
     await save(target, { owner_label: value || '' });
   };
+  // Chamado como função (não como componente) para o select não ser recriado a cada render e manter o foco.
   const PersonSelect = ({ target, small }: { target: WorkItem; small?: boolean }) => (
     <select aria-label={`Responsável de ${target.title}`} disabled={ro} value={target.owner_label || ''} onChange={e => void personPick(target, e.target.value)}
       className={`${small ? 'w-[7.5rem] shrink-0 truncate text-xs' : 'w-full text-sm'} rounded border border-transparent bg-transparent px-1 py-0.5 ${target.owner_label ? 'text-slate-700' : 'text-slate-400'} hover:border-slate-200 focus:border-slate-300`}>
@@ -164,18 +183,20 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
   /* ---------- Sub Tarefas ---------- */
   const addSub = async (group: string) => {
     const title = (drafts[group] || '').trim();
-    if (!title) return;
+    if (!title || busyRef.current) return;
     if (title.length < 5) { setError('O título precisa de pelo menos 5 letras.'); return; }
-    setBusy(true); setError('');
+    if (parentClosed) { setError('A Tarefa está fechada. Reabra a Tarefa antes de acrescentar Sub Tarefas.'); return; }
+    busyRef.current = true; setBusy(true); setError('');
     try {
       const pos = Math.max(0, ...kids.map(k => k.position || 0)) + 1;
       const sub = await createSubtask(t, title, group || null, pos);
       setB(cur => cur && { ...cur, subtasks: [...cur.subtasks, sub] });
       setDrafts(d => ({ ...d, [group]: '' }));
       onChanged?.([sub]);
-    } catch (e) { await fail(e); } finally { setBusy(false); }
+    } catch (e) { await fail(e); } finally { busyRef.current = false; setBusy(false); }
   };
   const toggleSub = async (s: WorkItem) => {
+    if (s.status === 'concluida' && parentClosed) { setError('A Tarefa está fechada. Reabra a Tarefa antes de reabrir uma Sub Tarefa.'); return; }
     if (s.status === 'concluida') await save(s, { status: 'em_execucao' }, 'Sub Tarefa reaberta.');
     else await save(s, { status: 'concluida' });
   };
@@ -193,7 +214,18 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
   const promote = async (s: WorkItem) => {
     if (!window.confirm(`Transformar "${s.title}" em Tarefa? Ela sai do checklist e vira card próprio, com o mesmo histórico e vínculos.`)) return;
     const saved = await save(s, { parent_task_id: null });
-    if (saved) setB(cur => cur && { ...cur, subtasks: cur.subtasks.filter(k => k.id !== s.id) });
+    if (saved) {
+      setB(cur => cur && { ...cur, subtasks: cur.subtasks.filter(k => k.id !== s.id) });
+      onChanged?.([saved, { ...t, revision: t.revision }]);
+    }
+  };
+  /** "Transformar em Tarefa" com a janela aberta na própria Sub Tarefa: recarrega como Tarefa e atualiza o pai antigo. */
+  const promoteSelf = async () => {
+    const oldParent = b.parent;
+    const saved = await save(t, { parent_task_id: null }, 'Agora é uma Tarefa com card próprio.');
+    if (!saved) return;
+    await reload(saved.id);
+    if (oldParent) { try { onChanged?.([saved, await loadTask(oldParent.id)]); } catch { /* o card do pai atualiza no próximo carregamento */ } }
   };
 
   /* ---------- critérios, entrega e conclusão ---------- */
@@ -202,18 +234,28 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
     await save(t, { acceptance_criteria: list });
   };
   const toggleCriterion = async (i: number) => save(t, { completed_criteria: marked.has(i) ? [...marked].filter(x => x !== i) : [...marked, i] });
+  /** Conclui levando junto a entrega que ainda está sendo digitada (o clique não perde o texto nem precisa ser repetido). */
   const conclude = async () => {
-    if (!t.resolution?.trim()) { setError('Escreva a entrega antes de concluir.'); return; }
-    await save(t, { status: 'concluida' }, 'Tarefa concluída.');
+    const res = (resolutionDraft.current ?? t.resolution ?? '').trim();
+    if (!res) { setError('Escreva a entrega antes de concluir.'); return; }
+    const patch: Record<string, unknown> = { status: 'concluida' };
+    if (res !== (t.resolution || '').trim()) patch.resolution = res;
+    if (await save(t, patch, 'Tarefa concluída.')) resolutionDraft.current = null;
   };
+  const finish = () => (isSub ? save(t, { status: 'concluida' }) : conclude());
+  const reopen = () => (isSub && b.parent && closed(b.parent.status)
+    ? (setError('A Tarefa pai está fechada. Reabra a Tarefa antes de reabrir esta Sub Tarefa.'), Promise.resolve(null))
+    : save(t, { status: 'em_execucao' }, isSub ? 'Sub Tarefa reaberta.' : 'Tarefa reaberta.'));
 
   /* ---------- ações ---------- */
   const duplicate = async () => {
     setMenu(false); setBusy(true);
     try {
-      const { completed_on: _d, ...details } = t.details || {};
+      // A cópia não leva o que identifica a original nem resultado: pergunta da Wiki, nota de origem, fase, veredito, leitura.
+      const RESULT_KEYS = ['completed_on', 'question', 'origin_note', 'phase', 'verdict', 'reading', 'result', 'wiki_pilot_note', 'wiki_pilot_group'];
+      const details = Object.fromEntries(Object.entries(t.details || {}).filter(([k]) => !RESULT_KEYS.includes(k)));
       const r = await saveTaskTree({
-        task: { title: `${t.title} (cópia)`, description: t.description, next_action: t.next_action, priority: t.priority, work_type: t.work_type, initiative_id: t.initiative_id,
+        task: { title: `${t.title.slice(0, 172).trimEnd()} (cópia)`, description: t.description, next_action: t.next_action, priority: t.priority, work_type: t.work_type, initiative_id: t.initiative_id,
           front_key: t.front_key, project_ids: t.project_ids, partner_keys: t.partner_keys, acceptance_criteria: t.acceptance_criteria, details, dependencies: t.dependencies, workspace: t.workspace },
         subtasks: kids.filter(k => k.status !== 'cancelada').map(k => ({ title: k.title, subtask_group: k.subtask_group, owner_label: k.owner_label })),
       });
@@ -238,7 +280,13 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
   const chip = 'inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700';
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-2 sm:p-6" onPointerDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-2 sm:p-6" onPointerDown={e => {
+      if (e.target !== e.currentTarget) return;
+      // Sai do campo antes de fechar, para o texto digitado ser salvo (o blur não acontece sozinho se a janela some).
+      const a = document.activeElement as HTMLElement | null;
+      if (a && box.current?.contains(a)) a.blur();
+      onClose();
+    }}>
       <div ref={box} role="dialog" aria-modal="true" aria-labelledby="task-modal-title" className="relative my-4 w-full max-w-4xl rounded-xl bg-white text-slate-800 shadow-2xl">
         {/* topo: contexto, status, ações */}
         <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-xs text-slate-500 sm:px-6">
@@ -246,7 +294,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
           {!isSub && <span className="truncate">{[front, initiative?.title, projectNames.join(', ')].filter(Boolean).join(' › ') || 'Sem frente'}</span>}
           <span className="ml-auto inline-flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ background: STATUS_COLOR[t.status] }} />
-            <select aria-label="Status" disabled={ro} value={t.status} onChange={e => void (e.target.value === 'concluida' ? conclude() : e.target.value === 'bloqueada' ? (() => { const r = window.prompt('O que está travando?')?.trim(); return r ? save(t, { status: 'bloqueada', blocked_reason: r }) : undefined; })() : save(t, { status: e.target.value }))}
+            <select aria-label="Status" disabled={ro} value={t.status} onChange={e => void (e.target.value === 'concluida' ? finish() : t.status === 'concluida' && e.target.value !== 'cancelada' && isSub && b.parent && closed(b.parent.status) ? reopen() : e.target.value === 'bloqueada' ? (() => { const r = window.prompt('O que está travando?')?.trim(); return r ? save(t, { status: 'bloqueada', blocked_reason: r }) : undefined; })() : save(t, { status: e.target.value }))}
               className="rounded border border-slate-200 bg-white px-1.5 py-1 text-xs font-medium text-slate-700">
               {Object.entries(TASK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -256,7 +304,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
             {menu && <div role="menu" className="absolute right-0 top-8 z-10 w-56 rounded-lg border border-slate-200 bg-white p-1 text-sm shadow-xl">
               <button role="menuitem" className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-50" onClick={() => void copyLink()}><Link2 size={14} />Copiar link</button>
               {!isSub && <button role="menuitem" disabled={ro} className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-50" onClick={() => void duplicate()}><Copy size={14} />Duplicar (sem conclusão)</button>}
-              {isSub && <button role="menuitem" disabled={ro} className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-50" onClick={() => { setMenu(false); void save(t, { parent_task_id: null }, 'Agora é uma Tarefa com card próprio.'); }}><ArrowUpRight size={14} />Transformar em Tarefa</button>}
+              {isSub && <button role="menuitem" disabled={ro} className="flex w-full items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-50" onClick={() => { setMenu(false); void promoteSelf(); }}><ArrowUpRight size={14} />Transformar em Tarefa</button>}
               <button role="menuitem" disabled={ro} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-red-700 hover:bg-red-50" onClick={() => void cancelTask()}><Trash2 size={14} />Cancelar {isSub ? 'Sub Tarefa' : 'Tarefa'}</button>
             </div>}
           </div>
@@ -266,9 +314,9 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
         <div className="grid gap-6 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
           <main className="min-w-0 space-y-5">
             <div className="flex items-start gap-3">
-              <button aria-label={t.status === 'concluida' ? 'Reabrir' : 'Concluir'} disabled={ro} onClick={() => void (t.status === 'concluida' ? save(t, { status: 'em_execucao' }, 'Tarefa reaberta.') : isSub ? save(t, { status: 'concluida' }) : conclude())}
+              <button aria-label={t.status === 'concluida' ? 'Reabrir' : 'Concluir'} disabled={ro} onMouseDown={e => e.preventDefault()} onClick={() => void (t.status === 'concluida' ? reopen() : finish())}
                 className={`mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${t.status === 'concluida' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-300 hover:border-green-600'}`}>{t.status === 'concluida' && <Check size={12} strokeWidth={3} />}</button>
-              <TitleInput key={t.id + t.revision} value={t.title} disabled={ro} onSave={v => void save(t, { title: v })} />
+              <TitleInput key={`${t.id}${t.revision}.${nonce}`} value={t.title} disabled={ro} onSave={v => void save(t, { title: v })} />
             </div>
             {t.status === 'bloqueada' && t.blocked_reason && <p className="flex items-center gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800"><AlertTriangle size={14} />{t.blocked_reason}</p>}
 
@@ -314,12 +362,12 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
                               <li key={s.id} className="group flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1.5 hover:bg-slate-50 sm:flex-nowrap">
                                 <button aria-label={s.status === 'concluida' ? `Reabrir ${s.title}` : `Concluir ${s.title}`} disabled={ro || s.status === 'cancelada'} onClick={() => void toggleSub(s)}
                                   className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${s.status === 'concluida' ? 'border-green-600 bg-green-600 text-white' : 'border-slate-300 hover:border-green-600'}`}>{s.status === 'concluida' && <Check size={11} strokeWidth={3} />}</button>
-                                <CommitInput value={s.title} disabled={ro} onSave={v => void save(s, { title: v })} ariaLabel={`Título de ${s.title}`}
+                                <CommitInput key={`${s.id}.${nonce}`} value={s.title} disabled={ro} onSave={v => void save(s, { title: v })} ariaLabel={`Título de ${s.title}`}
                                   className={`min-w-0 flex-1 basis-[calc(100%-1.5rem)] truncate bg-transparent text-sm sm:basis-auto ${closed(s.status) ? 'text-slate-400 line-through' : ''}`} />
                                 {s.status === 'bloqueada' && <span className="rounded bg-red-50 px-1.5 text-xs text-red-700" title={s.blocked_reason || ''}>bloqueada</span>}
                                 {waits.length > 0 && <span className="text-xs text-amber-700" title={waits.map(w => w!.title).join(', ')}>espera {waits.length}</span>}
-                                <PersonSelect target={s} small />
-                                <input type="date" aria-label={`Prazo de ${s.title}`} disabled={ro} value={s.due_date || ''} onChange={e => void save(s, { due_date: e.target.value })}
+                                {PersonSelect({ target: s, small: true })}
+                                <DateInput ariaLabel={`Prazo de ${s.title}`} disabled={!b.canEdit} value={s.due_date || ''} onSave={v => void save(s, { due_date: v })}
                                   className={`w-[7.25rem] shrink-0 rounded border border-transparent bg-transparent px-1 text-xs hover:border-slate-200 ${late ? 'text-red-700' : s.due_date ? 'text-slate-600' : 'text-slate-300'}`} />
                                 <span className="relative shrink-0">
                                   <button aria-label={`Ações de ${s.title}`} aria-expanded={rowMenu === s.id} className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700" onClick={() => setRowMenu(m => (m === s.id ? null : s.id))}><MoreHorizontal size={14} /></button>
@@ -335,15 +383,16 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
                             );
                           })}
                         </ul>
-                        {b.canEdit && <form className="flex items-center gap-2 px-3 py-1.5" onSubmit={e => { e.preventDefault(); void addSub(g); }}>
+                        {b.canEdit && !parentClosed && <form className="flex items-center gap-2 px-3 py-1.5" onSubmit={e => { e.preventDefault(); void addSub(g); }}>
                           <Plus size={14} className="text-slate-400" />
-                          <input aria-label={`Adicionar Sub Tarefa${g ? ` em ${g}` : ''}`} placeholder="Adicionar Sub Tarefa" value={drafts[g] || ''} onChange={e => setDrafts(d => ({ ...d, [g]: e.target.value }))}
+                          <input disabled={busy} aria-label={`Adicionar Sub Tarefa${g ? ` em ${g}` : ''}`} placeholder="Adicionar Sub Tarefa" value={drafts[g] || ''} onChange={e => setDrafts(d => ({ ...d, [g]: e.target.value }))}
                             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
                         </form>}
                       </div>
                     );
                   })}
-                  {b.canEdit && (newGroup === null
+                  {parentClosed && <p className="text-xs text-slate-500">Tarefa fechada: para acrescentar ou reabrir Sub Tarefas, reabra a Tarefa.</p>}
+                  {b.canEdit && !parentClosed && (newGroup === null
                     ? <button className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800" onClick={() => setNewGroup('')}><Plus size={13} />Novo grupo</button>
                     : <form className="flex items-center gap-2" onSubmit={e => { e.preventDefault(); const v = (newGroup || '').trim(); if (v) void saveGroups([...groupLabels.filter(Boolean), v]); setNewGroup(null); }}>
                         <input autoFocus aria-label="Nome do novo grupo" value={newGroup} onChange={e => setNewGroup(e.target.value)} onBlur={() => setNewGroup(null)} placeholder="Ex.: Conteúdo, Validação" className="rounded border border-slate-200 px-2 py-1 text-sm" />
@@ -358,15 +407,15 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
                 {criteria.map((c, i) => <li key={i} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" aria-label={c} disabled={ro} checked={marked.has(i)} onChange={() => void toggleCriterion(i)} />
                   <span className={marked.has(i) ? 'text-slate-500' : ''}>{c}</span>
-                  {b.canEdit && <button aria-label={`Remover critério ${c}`} className="ml-auto rounded p-0.5 text-slate-400 hover:text-red-700" onClick={() => void setCriteria(criteria.filter((_, j) => j !== i))}><X size={12} /></button>}
+                  {b.canEdit && <button aria-label={`Remover critério ${c}`} disabled={ro} className="ml-auto rounded p-0.5 text-slate-400 hover:text-red-700" onClick={() => void setCriteria(criteria.filter((_, j) => j !== i))}><X size={12} /></button>}
                 </li>)}
               </ul>
               {b.canEdit && <form className="mt-1 flex items-center gap-2" onSubmit={e => { e.preventDefault(); const v = (drafts.__crit || '').trim(); if (v) { void setCriteria([...criteria, v]); setDrafts(d => ({ ...d, __crit: '' })); } }}>
-                <Plus size={14} className="text-slate-400" /><input aria-label="Adicionar critério de aceite" placeholder="Adicionar critério (o resultado que comprova a entrega)" value={drafts.__crit || ''} onChange={e => setDrafts(d => ({ ...d, __crit: e.target.value }))} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
+                <Plus size={14} className="text-slate-400" /><input disabled={ro} aria-label="Adicionar critério de aceite" placeholder="Adicionar critério (o resultado que comprova a entrega)" value={drafts.__crit || ''} onChange={e => setDrafts(d => ({ ...d, __crit: e.target.value }))} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
               </form>}
               {!isSub && <label className="mt-3 block"><span className={label}>Entrega e evidência</span>
-                <CommitArea value={t.resolution || ''} disabled={ro} placeholder="O que foi entregue, link da evidência e limitações" onSave={v => void save(t, { resolution: v })} rows={2} /></label>}
-              {!isSub && t.status !== 'concluida' && b.canEdit && <button className="mt-2 rounded-md bg-green-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50" disabled={ro} onClick={() => void conclude()}>Concluir Tarefa</button>}
+                <CommitArea value={t.resolution || ''} disabled={ro} placeholder="O que foi entregue, link da evidência e limitações" onDraft={v => { resolutionDraft.current = v; }} onSave={v => void save(t, { resolution: v }).then(r => { if (r) resolutionDraft.current = null; })} rows={2} /></label>}
+              {!isSub && t.status !== 'concluida' && b.canEdit && <button className="mt-2 rounded-md bg-green-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50" disabled={ro} onMouseDown={e => e.preventDefault()} onClick={() => void conclude()}>Concluir Tarefa</button>}
             </section>
 
             {(b.dependencies.length > 0 || b.dependents.length > 0) && <section className="text-sm">
@@ -401,8 +450,8 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
           </main>
 
           <aside className="space-y-3 border-t border-slate-100 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-            <div><span className={label}>Responsável</span><div className={field}><PersonSelect target={t} /></div></div>
-            <div><span className={label}>Prazo</span><div className={field}><input type="date" aria-label="Prazo" disabled={ro} value={t.due_date || ''} onChange={e => void save(t, { due_date: e.target.value })} className="rounded border border-slate-200 px-2 py-1 text-sm" /></div></div>
+            <div><span className={label}>Responsável</span><div className={field}>{PersonSelect({ target: t })}</div></div>
+            <div><span className={label}>Prazo</span><div className={field}><DateInput ariaLabel="Prazo" disabled={!b.canEdit} value={t.due_date || ''} onSave={v => void save(t, { due_date: v })} className="rounded border border-slate-200 px-2 py-1 text-sm" /></div></div>
             <div><span className={label}>Prioridade</span><div className={field}>
               <select aria-label="Prioridade" disabled={ro} value={t.priority} onChange={e => void save(t, { priority: e.target.value })} className="w-full rounded border border-slate-200 px-2 py-1 text-sm">
                 {Object.entries(TASK_PRIORITY).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></div></div>
@@ -442,24 +491,43 @@ const MD = {
 function TitleInput({ value, disabled, onSave }: { value: string; disabled: boolean; onSave: (v: string) => void }) {
   const [v, setV] = useState(value);
   return <textarea id="task-modal-title" rows={1} aria-label="Título da Tarefa" value={v} disabled={disabled} onChange={e => setV(e.target.value)}
-    onBlur={() => { const n = v.trim(); if (n && n !== value) onSave(n); else setV(value); }}
-    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } if (e.key === 'Escape') { e.stopPropagation(); setV(value); } }}
+    onBlur={e => { if (cancelled(e.currentTarget)) { setV(value); return; } const n = v.trim(); if (n && n !== value) onSave(n); else setV(value); }}
+    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
     className="w-full resize-none bg-transparent text-xl font-semibold leading-snug outline-none focus:rounded focus:ring-2 focus:ring-cyan-600/30" />;
 }
 function CommitInput({ value, disabled, onSave, className, placeholder, ariaLabel }: { value: string; disabled: boolean; onSave: (v: string) => void; className?: string; placeholder?: string; ariaLabel?: string }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return <input aria-label={ariaLabel || placeholder} value={v} disabled={disabled} placeholder={placeholder} onChange={e => setV(e.target.value)}
-    onBlur={() => { if (v.trim() !== value.trim()) onSave(v.trim()); }}
-    onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { e.stopPropagation(); setV(value); } }}
+    onBlur={e => { if (cancelled(e.currentTarget)) { setV(value); return; } if (v.trim() !== value.trim()) onSave(v.trim()); }}
+    onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
     className={`${className || ''} outline-none focus:rounded focus:ring-2 focus:ring-cyan-600/30`} />;
 }
-function CommitArea({ value, disabled, onSave, placeholder, rows = 5 }: { value: string; disabled: boolean; onSave: (v: string) => void; placeholder?: string; rows?: number }) {
+function CommitArea({ value, disabled, onSave, onDraft, placeholder, rows = 5 }: { value: string; disabled: boolean; onSave: (v: string) => void; onDraft?: (v: string | null) => void; placeholder?: string; rows?: number }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
-  return <textarea aria-label={placeholder} rows={rows} value={v} disabled={disabled} placeholder={placeholder} onChange={e => setV(e.target.value)}
-    onBlur={() => { if (v !== value) onSave(v); }} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setV(value); } }}
+  return <textarea aria-label={placeholder} rows={rows} value={v} disabled={disabled} placeholder={placeholder} onChange={e => { setV(e.target.value); onDraft?.(e.target.value); }}
+    onBlur={e => { if (cancelled(e.currentTarget)) { setV(value); onDraft?.(null); return; } if (v !== value) onSave(v); }}
     className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-cyan-600/30" />;
+}
+/** Esc dentro do campo (marcado pelo teclado da janela) desfaz em vez de salvar. */
+function cancelled(el: HTMLElement): boolean {
+  if (el.dataset.cancel !== '1') return false;
+  delete el.dataset.cancel;
+  return true;
+}
+/** Data salva ao sair do campo (digitar pelo teclado não grava ano pela metade); ano antes de 2000 é recusado. */
+function DateInput({ value, disabled, onSave, className, ariaLabel }: { value: string; disabled: boolean; onSave: (v: string) => void; className?: string; ariaLabel: string }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  const commit = (next: string) => {
+    if (next === value) return;
+    if (next && (!/^\d{4}-\d{2}-\d{2}$/.test(next) || next < '2000-01-01')) { setV(value); return; }
+    onSave(next);
+  };
+  return <input type="date" aria-label={ariaLabel} disabled={disabled} value={v} onChange={e => setV(e.target.value)}
+    onBlur={e => { if (cancelled(e.currentTarget)) { setV(value); return; } commit(v); }}
+    onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} className={className} />;
 }
 function ChipPicker({ title, options, selected, disabled, onToggle }: { title: string; options: { id: string; name: string }[]; selected: string[]; disabled: boolean; onToggle: (id: string) => void }) {
   const [open, setOpen] = useState(false);
