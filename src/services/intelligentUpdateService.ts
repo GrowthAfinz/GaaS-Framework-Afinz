@@ -295,6 +295,9 @@ const applyConfirmedActivityChanges = async (
 export interface UpdateRunHistoryItem {
     id: string;
     createdAt: string;
+    /** Última mudança do run; a diferença para createdAt aproxima a duração da execução. */
+    updatedAt: string;
+    createdBy: string | null;
     sourceLabel: string;
     domain: string;
     status: string;
@@ -350,6 +353,8 @@ export const mapRunRow = (row: any): UpdateRunHistoryItem => {
     return {
         id: row?.id,
         createdAt: row?.created_at ?? '',
+        updatedAt: row?.updated_at ?? row?.created_at ?? '',
+        createdBy: row?.created_by ?? null,
         sourceLabel: row?.source_label ?? 'Dinamica BI',
         domain: row?.domain ?? summary?.domain ?? 'aquisicao',
         status: row?.status ?? 'reviewing',
@@ -465,6 +470,52 @@ export const intelligentUpdateService = {
             .limit(limit);
         if (error) throw error;
         return (data ?? []).map(mapRunRow);
+    },
+
+    // Página do histórico com total, filtrada no servidor (a tela não baixa tudo).
+    async fetchUpdateRunPage(options: {
+        page: number;
+        pageSize: number;
+        domain?: string;
+        status?: string;
+        sinceIso?: string;
+    }): Promise<{ items: UpdateRunHistoryItem[]; total: number }> {
+        const from = options.page * options.pageSize;
+        let query = supabase
+            .from('gaas_update_runs')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(from, from + options.pageSize - 1);
+        if (options.domain) query = query.eq('domain', options.domain);
+        if (options.status) query = query.eq('status', options.status);
+        if (options.sinceIso) query = query.gte('created_at', options.sinceIso);
+        const { data, error, count } = await query;
+        if (error) throw error;
+        return { items: (data ?? []).map(mapRunRow), total: count ?? 0 };
+    },
+
+    // Linha do tempo leve para o quadro de status das bases (só as colunas necessárias).
+    async fetchUpdateRunActivity(sinceIso: string): Promise<Array<{ id: string; createdAt: string; domain: string; status: string }>> {
+        const { data, error } = await supabase
+            .from('gaas_update_runs')
+            .select('id, created_at, domain, status')
+            .gte('created_at', sinceIso)
+            .order('created_at', { ascending: false })
+            .limit(1000);
+        if (error) throw error;
+        return (data ?? []).map((row: any) => ({ id: row.id, createdAt: row.created_at, domain: row.domain ?? '', status: row.status ?? '' }));
+    },
+
+    // Última gravação concluída de cada frente, para o selo de frescor.
+    async fetchLatestAppliedRuns(): Promise<Array<{ createdAt: string; domain: string }>> {
+        const { data, error } = await supabase
+            .from('gaas_update_runs')
+            .select('created_at, domain')
+            .eq('status', 'applied')
+            .order('created_at', { ascending: false })
+            .limit(200);
+        if (error) throw error;
+        return (data ?? []).map((row: any) => ({ createdAt: row.created_at, domain: row.domain ?? '' }));
     },
 
     // Detalhe de um run: candidatos aplicados (insert/upsert/update_metrics) na integra

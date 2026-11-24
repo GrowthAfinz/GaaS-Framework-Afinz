@@ -44,6 +44,7 @@ export { matchesReviewCollection, processRentabilizacaoDinamicaBI, processDinami
 import { previousWeekStart, replaceImportScopeSelection } from './importSelection';
 import { processImportFile } from '../../utils/importerWorkerClient';
 import { isImporterFailure } from '../../utils/importerPipeline';
+import { buildBaseFreshness, type BaseFreshness } from './updateHistoryModel';
 import { ImportCampaignTree, importToday } from './ImportCampaignTree';
 import { loadStructure } from '../growth-learning/structure/structureService';
 import { supabase } from '../../services/supabaseClient';
@@ -69,6 +70,7 @@ import {
     Upload,
     Wand2,
     X,
+    RotateCcw,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { dataService } from '../../services/dataService';
@@ -611,354 +613,21 @@ const momentChipsFor = (candidate: UpdateCandidate) => {
 };
 
 // ── Historico de atualizacoes ──
-type HistoryDomainFilter = 'all' | 'aquisicao' | 'rentabilizacao';
-type HistoryOperationFilter = 'all' | 'new' | 'metrics' | 'blocked';
+export type ImportStep = 'arquivo' | 'escopo' | 'revisao' | 'recibo';
+type ImportStepView = ImportStep | 'gravacao';
 
-const OPERATION_META: Record<string, { label: string; className: string }> = {
-    insert: { label: 'Novo', className: 'bg-blue-50 text-blue-700 border-blue-200' },
-    upsert: { label: 'Upsert', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    update_metrics: { label: 'Metricas', className: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-    blocked: { label: 'Bloqueado', className: 'bg-slate-100 text-slate-500 border-slate-200' },
-    pending: { label: 'Pendente', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-};
-
-const OperationBadge = ({ operation }: { operation: string }) => {
-    const meta = OPERATION_META[operation] ?? { label: operation || '-', className: 'bg-slate-100 text-slate-500 border-slate-200' };
-    return (
-        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.className}`}>
-            {meta.label}
-        </span>
-    );
-};
-
-const formatRunDateTime = (iso: string) => {
-    if (!iso) return '-';
-    const date = new Date(iso);
-    if (!Number.isFinite(date.getTime())) return iso;
-    return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-};
-
-const DIFF_METRIC_KEYS = [
-    'Base Total',
-    'Base Acionável',
-    'Abertura',
-    'Cliques',
-    'Propostas',
-    'Aprovados',
-    'Cartões Gerados',
-    'Emissões Assistidas',
-    'Emissões Independentes',
+const IMPORT_STEPS: Array<{ id: ImportStepView; label: string; hint: string }> = [
+    { id: 'arquivo', label: 'Arquivo', hint: 'solte a Dinâmica BI' },
+    { id: 'escopo', label: 'Escopo', hint: 'frentes e período' },
+    { id: 'revisao', label: 'Revisão', hint: 'Operação, Dimensões, Métricas' },
+    { id: 'gravacao', label: 'Gravação', hint: 'em lotes, com retorno validado' },
+    { id: 'recibo', label: 'Recibo', hint: 'vai para o histórico' },
 ];
 
-const formatDiffValue = (value: unknown) => {
-    if (value === null || value === undefined || value === '') return '—';
-    const num = Number(value);
-    return Number.isFinite(num) ? num.toLocaleString('pt-BR') : String(value);
-};
-
-const MetricDiffList = ({ before, after }: { before: any; after: any }) => {
-    const rows = DIFF_METRIC_KEYS
-        .filter((key) => after && Object.prototype.hasOwnProperty.call(after, key))
-        .map((key) => ({ key, previous: before?.[key], next: after?.[key] }))
-        .filter(({ previous, next }) => formatDiffValue(previous) !== formatDiffValue(next));
-
-    if (rows.length === 0) {
-        return <span className="text-[11px] text-slate-400">sem diferenca de metricas</span>;
-    }
-
-    return (
-        <div className="flex flex-wrap gap-1.5">
-            {rows.map(({ key, previous, next }) => (
-                <span key={key} className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">
-                    <span className="font-semibold text-slate-500">{key}</span>
-                    <span className="text-slate-400">{formatDiffValue(previous)}</span>
-                    <span className="text-cyan-600">→</span>
-                    <span className="font-bold text-slate-800">{formatDiffValue(next)}</span>
-                </span>
-            ))}
-        </div>
-    );
-};
-
-const HISTORY_DOMAIN_LABEL: Record<string, string> = {
-    total_crm: 'Total CRM',
-    aquisicao: 'Aquisição',
-    rentabilizacao: 'Rentabilização',
-};
-
-const matchesOperationFilter = (row: UpdateRunCandidateRow, filter: HistoryOperationFilter) => {
-    if (filter === 'all') return true;
-    if (filter === 'metrics') return row.operationType === 'update_metrics';
-    if (filter === 'new') return row.operationType === 'insert' || row.operationType === 'upsert';
-    if (filter === 'blocked') return row.status !== 'applied';
-    return true;
-};
-
-const UpdateRunDrawer = ({
-    detail,
-    loading,
-    onClose,
-}: {
-    detail: UpdateRunHistoryDetail | null;
-    loading: boolean;
-    onClose: () => void;
-}) => {
-    const [search, setSearch] = useState('');
-    const [operationFilter, setOperationFilter] = useState<HistoryOperationFilter>('all');
-
-    const allRows = useMemo(
-        () => (detail ? [...detail.applied, ...detail.blocked] : []),
-        [detail]
-    );
-
-    const filteredRows = useMemo(() => {
-        const term = normalizeKey(search);
-        return allRows
-            .filter((row) => matchesOperationFilter(row, operationFilter))
-            .filter((row) => !term
-                || normalizeKey(row.journey).includes(term)
-                || normalizeKey(row.activityName).includes(term));
-    }, [allRows, operationFilter, search]);
-
-    return createPortal(
-        <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/40 backdrop-blur-sm" onClick={onClose}>
-            <div
-                className="flex h-full w-full max-w-3xl flex-col bg-white shadow-2xl"
-                onClick={(event) => event.stopPropagation()}
-            >
-                <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-                    <div>
-                        <h4 className="text-sm font-bold text-slate-900">Detalhe da atualizacao</h4>
-                        {detail && (
-                            <p className="mt-0.5 text-xs text-slate-500">
-                                {formatRunDateTime(detail.run.createdAt)} · {detail.run.sourceLabel} · {HISTORY_DOMAIN_LABEL[detail.run.domain] ?? detail.run.domain}
-                            </p>
-                        )}
-                    </div>
-                    <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-                        <X size={16} />
-                    </button>
-                </header>
-
-                {loading || !detail ? (
-                    <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
-                        <Loader2 size={18} className="mr-2 animate-spin" /> Carregando detalhe...
-                    </div>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-4 gap-2 border-b border-slate-100 px-5 py-3">
-                            <StatCard label="Aplicadas" value={detail.appliedTotal} tone="text-emerald-700" />
-                            <StatCard label="Novas" value={detail.applied.filter((row) => row.operationType === 'insert' || row.operationType === 'upsert').length} tone="text-blue-700" />
-                            <StatCard label="Metricas" value={detail.applied.filter((row) => row.operationType === 'update_metrics').length} tone="text-cyan-700" />
-                            <StatCard label="Bloqueadas" value={detail.blockedTotal} tone="text-amber-700" />
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3">
-                            <div className="relative flex-1 min-w-[180px]">
-                                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
-                                    placeholder="Buscar jornada ou activity"
-                                    className="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-3 text-xs text-slate-700 focus:border-cyan-400 focus:outline-none"
-                                />
-                            </div>
-                            {([
-                                ['all', 'Todos'],
-                                ['new', 'Novos'],
-                                ['metrics', 'Metricas'],
-                                ['blocked', 'Bloqueados'],
-                            ] as Array<[HistoryOperationFilter, string]>).map(([value, label]) => (
-                                <button
-                                    key={value}
-                                    type="button"
-                                    onClick={() => setOperationFilter(value)}
-                                    className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
-                                        operationFilter === value
-                                            ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
-                                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto px-5 py-3">
-                            {(detail.appliedCapped || detail.blockedCapped) && (
-                                <p className="mb-2 rounded-md bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700">
-                                    Mostrando amostra: {detail.applied.length} de {detail.appliedTotal} aplicadas e {detail.blocked.length} de {detail.blockedTotal} bloqueadas.
-                                </p>
-                            )}
-                            {filteredRows.length === 0 ? (
-                                <div className="py-10 text-center text-xs text-slate-400">Nenhuma linha para o filtro atual.</div>
-                            ) : (
-                                <table className="w-full border-collapse text-left text-[11px]">
-                                    <thead className="sticky top-0 bg-white">
-                                        <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
-                                            <th className="py-2 pr-2 font-bold">Operacao</th>
-                                            <th className="py-2 pr-2 font-bold">Jornada / Activity</th>
-                                            <th className="py-2 pr-2 font-bold">Canal / Data</th>
-                                            <th className="py-2 font-bold">Diff / Motivo</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredRows.map((row) => (
-                                            <tr key={row.id} className="border-b border-slate-100 align-top">
-                                                <td className="py-2 pr-2"><OperationBadge operation={row.operationType} /></td>
-                                                <td className="py-2 pr-2">
-                                                    <div className="font-semibold text-slate-700">{row.journey || '—'}</div>
-                                                    <div className="font-mono text-[10px] text-slate-400">{row.activityName || '—'}</div>
-                                                </td>
-                                                <td className="py-2 pr-2 text-slate-500">
-                                                    <div>{row.channel || '—'}</div>
-                                                    <div className="text-[10px] text-slate-400">{row.date ? formatDateBR(row.date) : '—'}</div>
-                                                </td>
-                                                <td className="py-2">
-                                                    {row.operationType === 'update_metrics' ? (
-                                                        <MetricDiffList before={row.beforePayload} after={row.afterPayload} />
-                                                    ) : row.status !== 'applied' ? (
-                                                        <span className="text-[11px] text-slate-500">{row.conflictReason || row.fieldToReview || row.suggestion || 'bloqueado'}</span>
-                                                    ) : (
-                                                        <span className="text-[11px] text-emerald-600">{row.targetTable}</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    </>
-                )}
-            </div>
-        </div>,
-        document.body
-    );
-};
-
-const UpdateHistoryPanel = ({
-    items,
-    loading,
-    error,
-    onRefresh,
-    onSelect,
-}: {
-    items: UpdateRunHistoryItem[];
-    loading: boolean;
-    error: string | null;
-    onRefresh: () => void;
-    onSelect: (runId: string) => void;
-}) => {
-    const [domainFilter, setDomainFilter] = useState<HistoryDomainFilter>('all');
-
-    const visibleItems = useMemo(
-        () => items.filter((item) => domainFilter === 'all' || item.domain === domainFilter),
-        [items, domainFilter]
-    );
-
-    return (
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h4 className="text-sm font-bold text-slate-800">Historico de atualizacoes</h4>
-                    <p className="text-xs text-slate-500">O que foi aplicado, atualizado e bloqueado em cada envio para a base de dados.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    {([
-                        ['all', 'Todos'],
-                        ['aquisicao', 'Aquisição'],
-                        ['rentabilizacao', 'Rentabilização'],
-                    ] as Array<[HistoryDomainFilter, string]>).map(([value, label]) => (
-                        <button
-                            key={value}
-                            type="button"
-                            onClick={() => setDomainFilter(value)}
-                            className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition ${
-                                domainFilter === value
-                                    ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
-                                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                            }`}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                    <button
-                        type="button"
-                        onClick={onRefresh}
-                        disabled={loading}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                    >
-                        {loading ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
-                        Atualizar
-                    </button>
-                </div>
-            </div>
-
-            {error ? (
-                <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
-                    <span>{error}</span>
-                    <button type="button" onClick={onRefresh} className="font-bold underline">Tentar novamente</button>
-                </div>
-            ) : loading && items.length === 0 ? (
-                <div className="space-y-2">
-                    {[0, 1, 2].map((index) => (
-                        <div key={index} className="h-12 animate-pulse rounded-lg bg-slate-100" />
-                    ))}
-                </div>
-            ) : visibleItems.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 py-10 text-center text-xs text-slate-400">
-                    Nenhuma atualizacao registrada ainda.
-                </div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-left text-xs">
-                        <thead>
-                            <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
-                                <th className="py-2 pr-3 font-bold">Quando</th>
-                                <th className="py-2 pr-3 font-bold">Arquivo</th>
-                                <th className="py-2 pr-3 font-bold">Fluxo</th>
-                                <th className="py-2 pr-3 text-right font-bold">Lido</th>
-                                <th className="py-2 pr-3 text-right font-bold">Aplicadas</th>
-                                <th className="py-2 pr-3 text-right font-bold">Bloqueadas</th>
-                                <th className="py-2 font-bold">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visibleItems.map((item) => (
-                                <tr
-                                    key={item.id}
-                                    onClick={() => onSelect(item.id)}
-                                    className="cursor-pointer border-b border-slate-100 transition hover:bg-slate-50"
-                                >
-                                    <td className="py-2.5 pr-3 text-slate-600">{formatRunDateTime(item.createdAt)}</td>
-                                    <td className="py-2.5 pr-3 max-w-[220px] truncate text-slate-700" title={item.sourceLabel}>{item.sourceLabel}</td>
-                                    <td className="py-2.5 pr-3 text-slate-500">{HISTORY_DOMAIN_LABEL[item.domain] ?? item.domain}</td>
-                                    <td className="py-2.5 pr-3 text-right tabular-nums text-slate-600">{item.pastedRowCount.toLocaleString('pt-BR')}</td>
-                                    <td className="py-2.5 pr-3 text-right tabular-nums font-bold text-emerald-700">{item.applied.toLocaleString('pt-BR')}</td>
-                                    <td className="py-2.5 pr-3 text-right tabular-nums text-amber-700">{item.blocked.toLocaleString('pt-BR')}</td>
-                                    <td className="py-2.5">
-                                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                                            item.status === 'applied'
-                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                                : item.status === 'failed'
-                                                    ? 'bg-red-50 text-red-700 border-red-200'
-                                                    : 'bg-slate-100 text-slate-500 border-slate-200'
-                                        }`}>
-                                            {item.status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </section>
-    );
-};
-
-export const IntelligentFrameworkUpdate: React.FC = () => {
+export const IntelligentFrameworkUpdate: React.FC<{
+    onOpenHistory?: () => void;
+    onStepChange?: (step: ImportStep) => void;
+}> = ({ onOpenHistory, onStepChange }) => {
     const { activities } = useAppStore();
     const [activeFlow, setActiveFlow] = useState<UpdateFlow>('total_crm');
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -968,7 +637,13 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
     const [processing, setProcessing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [reviewOpen, setReviewOpen] = useState(false);
+    // Etapas no lugar do overlay de revisão: Arquivo, Escopo, Revisão, Gravação, Recibo.
+    const [step, setStep] = useState<ImportStep>('arquivo');
+    useEffect(() => { onStepChange?.(step); }, [step, onStepChange]);
+    const reviewOpen = step === 'revisao';
+    const setReviewOpen = (open: boolean) => setStep(open ? 'revisao' : 'escopo');
+    const rentabilizacaoCount = useAppStore((state) => state.rentabilizacaoActivities?.length ?? 0);
+    const [baseFreshness, setBaseFreshness] = useState<BaseFreshness[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [dragError, setDragError] = useState<string | null>(null);
     const [debugInfo, setDebugInfo] = useState<ParseDebugInfo | null>(null);
@@ -1009,8 +684,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setResult(null);
         setFileMeta(null);
         setSelectedKeys(new Set());
-        setReviewOpen(false);
-        setFlowChooserOpen(false);
+        setStep('arquivo');
     }, [activeFlow]);
 
     const candidates = useMemo(() => result?.candidates ?? [], [result]);
@@ -1378,7 +1052,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setSelectedKeys(new Set(reviewed.filter(candidate => candidate.accepted
                 && (candidate.domain !== 'aquisicao' || candidate.date >= previousWeekStart(importToday()) && candidate.date <= importToday()))
                 .map(candidate => candidate.key)));
-            setReviewOpen(true);
+            setStep('escopo');
         } catch (error: any) {
             const debug = {
                 fileName: file.name,
@@ -1574,6 +1248,19 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         void loadHistory();
     }, [loadHistory]);
 
+    const loadFreshness = useCallback(async () => {
+        try {
+            const latest = await intelligentUpdateService.fetchLatestAppliedRuns();
+            setBaseFreshness(buildBaseFreshness(latest, {}));
+        } catch {
+            setBaseFreshness([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadFreshness();
+    }, [loadFreshness]);
+
     const handleSelectRun = useCallback(async (runId: string) => {
         setSelectedRunId(runId);
         setRunDetail(null);
@@ -1639,30 +1326,33 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 rentabilizacao: appliedCandidates.filter((candidate) => candidate.domain === 'rentabilizacao').length,
                 blocked: Math.max(0, saved.candidateCount - saved.appliedCount),
             });
-            setReviewOpen(false);
             setUploadConfirmOpen(false);
+            setStep('recibo');
 
             // PILAR: apos gravar, o snapshot do Zustand fica defasado (ainda tem os
             // valores antigos). Sem este reload, reprocessar o mesmo arquivo na mesma
             // sessao compara contra a base velha e os disparos ja aplicados reaparecem
             // como "Atualizar metricas". Recarrega as duas frentes da base.
-            try {
-                const [freshActivities, freshRentab] = await Promise.all([
-                    dataService.fetchActivities(),
-                    dataService.fetchRentabilizacaoActivities(),
-                ]);
+            // Roda em segundo plano: o recibo aparece na hora.
+            void Promise.all([
+                dataService.fetchActivities(),
+                dataService.fetchRentabilizacaoActivities(),
+            ]).then(([freshActivities, freshRentab]) => {
                 useAppStore.getState().setActivities(freshActivities);
                 useAppStore.getState().setRentabilizacaoActivities(freshRentab);
-            } catch (refreshError) {
+            }).catch((refreshError) => {
                 console.error('Falha ao recarregar base apos atualizacao inteligente:', refreshError);
-            }
+            });
 
             void loadHistory();
+            void loadFreshness();
         } catch (error: any) {
             setSaveMessage({
                 type: 'error',
                 text: error?.message ? `Falha ao salvar: ${error.message}` : 'Falha ao salvar na base de dados.',
             });
+            setUploadConfirmOpen(false);
+            setStep('recibo');
         } finally {
             setSaving(false);
         }
@@ -1684,335 +1374,388 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         await handleSaveRun(candidatesForRun);
     };
 
+    const visualStep: ImportStepView = saving ? 'gravacao' : step;
+    const scopeTotal = selectedKeys.size;
+    const scopeCandidates = candidates.filter((candidate) => selectedKeys.has(candidate.key));
+    const scopeNew = scopeCandidates.filter((candidate) => candidateAction(candidate) === 'novo').length;
+    const scopeUpdates = scopeCandidates.filter((candidate) => candidateAction(candidate) === 'atualizar').length;
+    const scopeDomain = {
+        aquisicao: scopeCandidates.filter((candidate) => candidate.domain === 'aquisicao').length,
+        rentabilizacao: scopeCandidates.filter((candidate) => candidate.domain === 'rentabilizacao').length,
+    };
+    const scopeConfidence = scopeCandidates.length
+        ? Math.round(scopeCandidates.reduce((sum, candidate) => sum + candidate.confidence, 0) / scopeCandidates.length)
+        : null;
+    const needsYou = summary.review + summary.conflict;
+    const fileDates = candidates.map((candidate) => candidate.date).filter(Boolean).sort();
+    const filePeriod = fileDates.length ? `${formatDateBR(fileDates[0])} a ${formatDateBR(fileDates[fileDates.length - 1])}` : 'sem dado';
+    const worstFreshness = baseFreshness.find((base) => base.tone !== 'ok') ?? baseFreshness[0];
+    const goToReview = () => {
+        setReviewCollection('selected');
+        setReviewCollision('');
+        setReviewPage(1);
+        setStep('revisao');
+    };
+    const startOver = () => {
+        setStep('arquivo');
+        setSaveMessage(null);
+    };
+
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
-            <div className="pointer-events-none absolute right-0 top-0 h-96 w-96 rounded-full bg-cyan-500/5 blur-3xl -mr-32 -mt-32" />
-
-            <div className="relative z-10 space-y-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="rounded-xl bg-cyan-50 p-3 text-cyan-700 shadow-inner">
-                            <Wand2 size={24} />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-slate-900">Atualizacao Inteligente</h3>
-                            <p className="text-sm text-slate-500">
-                                Upload assistido para {FLOW_LABEL[activeFlow]} com validacao antes da base de dados.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setFlowChooserOpen(true)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-700 transition hover:bg-cyan-100"
-                        >
-                            <Sparkles size={14} />
-                            Alterar fluxo
-                        </button>
-                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-                            <Database size={14} />
-                            Historico carregado: {activities.length} campanhas
-                        </div>
-                    </div>
+        <div className="flex min-h-[calc(var(--screen-h)-56px)] flex-col bg-slate-50 text-slate-900">
+            <div className="flex flex-wrap items-center gap-3 bg-white px-6 pb-2.5 pt-3.5">
+                <div>
+                    <div className="text-xs text-slate-500">Configurações · Gestão de dados</div>
+                    <h1 className="text-xl font-bold">Atualizar bases</h1>
                 </div>
-
-                <section className="space-y-4">
-                    <div>
-                        <h4 className="text-sm font-bold text-slate-800">1. Entrada de arquivo</h4>
-                        <p className="text-xs text-slate-500">Use a aba Dinamica BI em Excel, CSV ou TSV. O conteudo bruto nao sera renderizado.</p>
-                    </div>
-
-                    {dragError && (
-                        <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
-                            <div className="flex items-center gap-2">
-                                <AlertCircle size={14} className="text-red-500" />
-                                <span>{dragError}</span>
-                            </div>
-                            {debugInfo && (
-                                <div className="rounded-md bg-white/70 p-2 font-mono text-[10px] text-red-700">
-                                    <div>arquivo: {debugInfo.fileName || '-'}</div>
-                                    <div>etapa: {debugInfo.stage || '-'}</div>
-                                    <div>linhas matriz: {debugInfo.matrixRows ?? '-'}</div>
-                                    <div>colunas primeira linha: {debugInfo.firstRowColumns ?? '-'}</div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {saveMessage && (
-                        <div className={`rounded-xl border px-4 py-3 text-xs ${
-                            saveMessage.type === 'success'
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                                : 'border-red-200 bg-red-50 text-red-700'
-                        }`}>
-                            <div className="flex items-center gap-2 font-bold">
-                                {saveMessage.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-                                <span>{saveMessage.type === 'success' ? 'Recibo da atualizacao' : 'Falha na atualizacao'}</span>
-                            </div>
-                            <p className="mt-1 text-slate-600">{saveMessage.text}</p>
-                            {saveMessage.type === 'success' && (
-                                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                                    <StatCard label="Auditadas" value={saveMessage.audited ?? 0} tone="text-slate-800" />
-                                    <StatCard label="Aplicadas" value={saveMessage.applied ?? 0} tone="text-emerald-700" />
-                                    <StatCard label="Aquisicao" value={saveMessage.acquisition ?? 0} tone="text-blue-700" />
-                                    <StatCard label="Rentabilizacao" value={saveMessage.rentabilizacao ?? 0} tone="text-cyan-700" />
-                                    <StatCard label="Fora do envio" value={saveMessage.blocked ?? 0} tone="text-amber-700" />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    <div
-                        onDragOver={(event) => {
-                            event.preventDefault();
-                            setIsDragging(true);
-                        }}
-                        onDragLeave={(event) => {
-                            event.preventDefault();
-                            setIsDragging(false);
-                        }}
-                        onDrop={async (event) => {
-                            event.preventDefault();
-                            setIsDragging(false);
-                            const file = event.dataTransfer.files?.[0];
-                            if (file) await processFile(file);
-                        }}
-                        className={`flex min-h-64 flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition ${
-                            isDragging ? 'border-cyan-500 bg-cyan-50' : 'border-slate-300 bg-slate-50 hover:border-cyan-400'
-                        }`}
-                    >
-                        <div className="mb-4 rounded-full bg-white p-4 text-cyan-700 shadow-sm">
-                            {processing ? <Loader2 size={34} className="animate-spin" /> : <Upload size={34} />}
-                        </div>
-                        <h4 className="text-base font-bold text-slate-900">
-                            {processing ? 'Processando arquivo...' : 'Arraste a Dinamica BI aqui'}
-                        </h4>
-                        {processing && (
-                            <div className="mt-3 w-full max-w-md rounded-lg border border-cyan-100 bg-white px-3 py-2 text-left">
-                                <div className="flex items-center justify-between text-xs font-bold text-cyan-800">
-                                    <span>{PROCESSING_STAGE_LABEL[processingStage]}</span>
-                                    <span>em andamento</span>
-                                </div>
-                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                                    <div className="h-full w-2/3 rounded-full bg-cyan-600" />
-                                </div>
-                            </div>
-                        )}
-                        <p className="mt-2 max-w-md text-sm text-slate-500">
-                            O sistema detecta novas linhas por JourneyName + Canal + Data e abre a revisao humana automaticamente.
-                        </p>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xlsx,.xls,.csv,.tsv,.txt"
-                            className="hidden"
-                            onChange={async (event) => {
-                                const file = event.target.files?.[0];
-                                if (file) await processFile(file);
-                                event.currentTarget.value = '';
-                            }}
-                        />
+                <div role="group" aria-label="O que atualizar" className="ml-2 inline-flex overflow-hidden rounded-sm border border-slate-300">
+                    {(['total_crm', 'aquisicao', 'rentabilizacao'] as const).map((flow) => (
                         <button
+                            key={flow}
                             type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={processing}
-                            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-cyan-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            disabled={step !== 'arquivo' || processing}
+                            title={step !== 'arquivo' ? 'Volte para a etapa Arquivo para trocar a frente' : FLOW_TARGET_LABEL[flow]}
+                            aria-pressed={activeFlow === flow}
+                            onClick={() => setActiveFlow(flow)}
+                            className={`px-3 py-1.5 text-[12.5px] disabled:cursor-not-allowed ${activeFlow === flow ? 'bg-cyan-50 font-semibold text-cyan-700' : 'bg-white text-slate-600 disabled:text-slate-400'}`}
                         >
-                            <FileSpreadsheet size={14} />
-                            Selecionar arquivo
+                            {flow === 'total_crm' ? 'Total CRM' : flow === 'aquisicao' ? 'Só Aquisição' : 'Só Rentabilização'}
                         </button>
-                    </div>
+                    ))}
+                </div>
+                <span className="flex-1" />
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
+                    <Database size={14} aria-hidden="true" />
+                    Na base: {activities.length.toLocaleString('pt-BR')} disparos de Aquisição · {rentabilizacaoCount.toLocaleString('pt-BR')} de Rentabilização
+                </span>
+                {worstFreshness && (
+                    <span
+                        title={baseFreshness.map((base) => `${base.label}: ${base.freshLabel}`).join(' · ')}
+                        className={`rounded-sm border px-2.5 py-1 text-xs font-semibold ${worstFreshness.tone === 'ok' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}
+                    >
+                        {worstFreshness.label} gravada {worstFreshness.freshLabel}
+                    </span>
+                )}
+            </div>
 
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-                        {[
-                            ['Ingestao', 'detecta blocos e normaliza chave'],
-                            ['Novidade', 'separa novas, existentes e duplicadas'],
-                            ['Taxonomia', 'preenche BU e segmento'],
-                            ['Revisao', 'prioriza parceiro e campos humanos por confianca'],
-                        ].map(([title, description]) => (
-                            <div key={title} className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-                                <div className="text-xs font-bold text-slate-800">{title}</div>
-                                <div className="mt-1 text-[11px] leading-snug text-slate-500">{description}</div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+            <ol aria-label="Etapas" className="flex border-b border-slate-200 bg-white px-6 pb-3">
+                {IMPORT_STEPS.map((item, index) => {
+                    const currentIndex = IMPORT_STEPS.findIndex((stepItem) => stepItem.id === visualStep);
+                    const done = index < currentIndex;
+                    const current = index === currentIndex;
+                    const hint = item.id === 'arquivo' && fileMeta ? `${fileMeta.name} · ${fileMeta.rows.toLocaleString('pt-BR')} linhas`
+                        : item.id === 'escopo' && result ? `${scopeTotal.toLocaleString('pt-BR')} de ${candidates.length.toLocaleString('pt-BR')} disparos`
+                            : item.id === 'revisao' && result ? `${needsYou.toLocaleString('pt-BR')} precisam de você`
+                                : item.hint;
+                    return (
+                        <li
+                            key={item.id}
+                            aria-current={current ? 'step' : undefined}
+                            className={`flex min-w-0 flex-1 items-center gap-2 border px-3 py-2 text-[12.5px] ${index > 0 ? '-ml-px' : ''} ${current
+                                ? 'z-10 border-cyan-700 bg-cyan-700 text-white'
+                                : done ? 'border-teal-200 bg-teal-50 text-slate-900' : 'border-slate-200 bg-white text-slate-600'}`}
+                        >
+                            <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold ${current
+                                ? 'bg-white text-cyan-700'
+                                : done ? 'bg-teal-700 text-white' : 'border-[1.5px] border-slate-300 text-slate-600'}`}>
+                                {done ? <CheckCircle size={12} aria-hidden="true" /> : index + 1}
+                            </span>
+                            <span className="flex min-w-0 flex-col">
+                                {done && item.id !== 'gravacao' && item.id !== 'recibo' && !saving ? (
+                                    <button type="button" onClick={() => setStep(item.id as ImportStep)} className="truncate text-left font-bold underline-offset-2 hover:underline">{item.label}</button>
+                                ) : (
+                                    <b className={`truncate ${current ? '' : 'text-slate-900'}`}>{item.label}</b>
+                                )}
+                                <span className={`truncate ${current ? 'text-cyan-100' : 'text-slate-600'}`}>{hint}</span>
+                            </span>
+                        </li>
+                    );
+                })}
+            </ol>
 
-                {result && fileMeta && (
-                    <section className="space-y-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <h4 className="text-sm font-bold text-slate-800">2. Diagnostico da importacao</h4>
-                                <p className="text-xs text-slate-500">{fileMeta.name} - {fileMeta.rows} linhas lidas.</p>
-                            </div>
+            {dragError && (
+                <div role="alert" className="mx-6 mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-[12.5px] text-red-800">
+                    <div className="flex items-center gap-2 font-semibold"><AlertCircle size={15} aria-hidden="true" /> {dragError}</div>
+                    {debugInfo && (
+                        <details className="mt-1 text-xs text-red-700">
+                            <summary className="cursor-pointer">Detalhe técnico</summary>
+                            <div className="mt-1 font-mono">arquivo: {debugInfo.fileName || 'sem dado'} · etapa: {debugInfo.stage || 'sem dado'} · linhas: {debugInfo.matrixRows ?? 'sem dado'} · colunas: {debugInfo.firstRowColumns ?? 'sem dado'}</div>
+                        </details>
+                    )}
+                </div>
+            )}
+
+            {step === 'arquivo' && (
+                <div className="flex min-h-0 flex-1 flex-wrap gap-5 p-6">
+                    <section aria-label="Arquivo" className="flex min-w-[420px] flex-[999_1_560px] flex-col gap-3">
+                        <div
+                            onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={(event) => { event.preventDefault(); setIsDragging(false); }}
+                            onDrop={async (event) => {
+                                event.preventDefault();
+                                setIsDragging(false);
+                                const file = event.dataTransfer.files?.[0];
+                                if (file) await processFile(file);
+                            }}
+                            className={`flex min-h-[340px] flex-1 flex-col items-center justify-center gap-3 rounded-[14px] border-2 border-dashed px-6 text-center transition ${isDragging ? 'border-cyan-600 bg-cyan-50' : 'border-cyan-200 bg-[#f0fdff]'}`}
+                        >
+                            <span className="grid h-14 w-14 place-items-center rounded-full bg-white text-cyan-700 shadow-[0_1px_2px_rgba(15,23,42,.08)]">
+                                {processing ? <Loader2 size={26} className="animate-spin" aria-hidden="true" /> : <Upload size={26} aria-hidden="true" />}
+                            </span>
+                            <b className="text-[17px]">{processing ? PROCESSING_STAGE_LABEL[processingStage] : 'Solte a Dinâmica BI aqui'}</b>
+                            {processing ? (
+                                <ol className="flex gap-4 text-[12.5px] text-slate-600" aria-label="Progresso da leitura">
+                                    {(['reading', 'indexing', 'detecting'] as const).map((stage) => {
+                                        const order = ['reading', 'indexing', 'detecting', 'reviewing'];
+                                        const doneStage = order.indexOf(processingStage) > order.indexOf(stage);
+                                        const currentStage = processingStage === stage;
+                                        return (
+                                            <li key={stage} className={`inline-flex items-center gap-1.5 ${currentStage ? 'font-semibold text-cyan-700' : doneStage ? 'text-teal-700' : ''}`}>
+                                                {doneStage ? <CheckCircle size={13} aria-hidden="true" /> : currentStage ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <span className="h-2 w-2 rounded-full bg-slate-300" />}
+                                                {PROCESSING_STAGE_LABEL[stage]}
+                                            </li>
+                                        );
+                                    })}
+                                </ol>
+                            ) : (
+                                <span className="text-[13px] text-slate-600">.xlsx, .csv ou .tsv · a leitura roda em segundo plano, a tela não trava</span>
+                            )}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".xlsx,.xls,.csv,.tsv,.txt"
+                                className="hidden"
+                                onChange={async (event) => {
+                                    const file = event.target.files?.[0];
+                                    if (file) await processFile(file);
+                                    event.currentTarget.value = '';
+                                }}
+                            />
                             <button
                                 type="button"
-                                onClick={() => setReviewOpen(true)}
-                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-700"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={processing}
+                                className="h-9 rounded-sm border border-cyan-700 bg-cyan-700 px-4 text-[13px] font-bold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
                             >
-                                <Search size={14} />
-                                Abrir revisao
+                                Selecionar arquivo
                             </button>
                         </div>
+                        {result && fileMeta && !processing && (
+                            <div className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-[12.5px]">
+                                <RotateCcw size={16} className="text-slate-600" aria-hidden="true" />
+                                <span>Revisão em aberto: <b>{fileMeta.name}</b> · {needsYou.toLocaleString('pt-BR')} itens esperando você</span>
+                                <span className="flex-1" />
+                                <button type="button" onClick={() => setStep('escopo')} className="font-semibold text-cyan-700 hover:underline">Continuar revisão</button>
+                            </div>
+                        )}
+                    </section>
 
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-                            <StatCard label="Prontas" value={summary.ready} tone="text-emerald-700" />
-                            <StatCard label="Atualizar metricas" value={summary.update} tone="text-cyan-700" />
-                            <StatCard label="Revisao" value={summary.review} tone="text-amber-700" />
-                            <StatCard label="Novas" value={summary.fresh} tone="text-blue-700" />
-                            <StatCard label="Ja existem" value={summary.duplicate} tone="text-purple-700" />
-                            <StatCard label="Conflitos" value={summary.conflict} tone="text-orange-700" />
-                            <StatCard label="Existentes analisadas" value={result.ignoredExisting} tone="text-slate-700" />
+                    <aside aria-label="Situação" className="flex min-w-[300px] flex-[1_1_340px] flex-col gap-3.5">
+                        <div className="rounded-[14px] border border-slate-200 bg-white px-4 py-3.5">
+                            <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[0.4px] text-slate-500">Bases</div>
+                            {baseFreshness.map((base) => (
+                                <div key={base.key} className="flex items-center gap-2 border-b border-[#eef2f6] py-1.5 text-[13px] last:border-b-0">
+                                    <span className={`h-2 w-2 rounded-full ${base.tone === 'ok' ? 'bg-emerald-600' : 'bg-amber-600'}`} />
+                                    {base.label}
+                                    <span className="flex-1" />
+                                    <span className={`font-semibold ${base.tone === 'ok' ? 'text-emerald-700' : 'text-amber-700'}`}>{base.freshLabel}</span>
+                                </div>
+                            ))}
                         </div>
-
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
-                            {result.blocks.map((block) => (
-                                <div key={block.key} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                                    <span className="text-xs font-semibold text-slate-700">{block.label}</span>
-                                    <span className={`inline-flex items-center gap-1 text-xs font-bold ${block.detected ? 'text-emerald-700' : 'text-slate-400'}`}>
-                                        {block.detected ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
-                                        {block.rows}
+                        <div className="rounded-[14px] border border-slate-200 bg-white px-4 py-3.5">
+                            <div className="mb-2 flex items-center">
+                                <span className="text-[10.5px] font-bold uppercase tracking-[0.4px] text-slate-500">Últimas atualizações</span>
+                                <span className="flex-1" />
+                                {onOpenHistory && <button type="button" onClick={onOpenHistory} className="text-xs font-semibold text-cyan-700 hover:underline">Ver histórico</button>}
+                            </div>
+                            {historyLoading && historyItems.length === 0 && <div className="text-[12.5px] text-slate-500">Carregando</div>}
+                            {historyError && <div className="text-[12.5px] text-red-700">{historyError}</div>}
+                            {!historyLoading && !historyError && historyItems.length === 0 && <div className="text-[12.5px] text-slate-500">Nenhuma atualização registrada ainda.</div>}
+                            {historyItems.slice(0, 4).map((run) => (
+                                <div key={run.id} className="flex gap-2 border-b border-[#eef2f6] py-1.5 text-[12.5px] last:border-b-0">
+                                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${run.status === 'applied' ? 'bg-emerald-600' : run.status === 'failed' ? 'bg-red-600' : 'bg-amber-600'}`} />
+                                    <span className="min-w-0 flex-1">
+                                        <b>{new Date(run.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</b> · {FLOW_LABEL[run.domain as UpdateFlow] ?? run.domain}
+                                        <br />
+                                        <span className="text-slate-600">{run.applied.toLocaleString('pt-BR')} gravados · {run.blocked.toLocaleString('pt-BR')} fora</span>
                                     </span>
                                 </div>
                             ))}
                         </div>
-
-                        {lastRunId && (
-                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
-                                Execucao salva na base de dados: <span className="font-mono font-bold">{lastRunId.slice(0, 8)}...</span>
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                <UpdateHistoryPanel
-                    items={historyItems}
-                    loading={historyLoading}
-                    error={historyError}
-                    onRefresh={loadHistory}
-                    onSelect={handleSelectRun}
-                />
-            </div>
-
-            {selectedRunId && (
-                <UpdateRunDrawer
-                    detail={runDetail}
-                    loading={runDetailLoading}
-                    onClose={() => {
-                        setSelectedRunId(null);
-                        setRunDetail(null);
-                    }}
-                />
-            )}
-
-            {flowChooserOpen && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-                        <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-                            <div>
-                            <h3 className="text-base font-bold text-slate-900">Escolher fluxo de atualização</h3>
-                                <p className="mt-1 text-xs text-slate-500">Cada fluxo usa regras e tabela destino próprias.</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setFlowChooserOpen(false)}
-                                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                                aria-label="Fechar selecao de fluxo"
-                            >
-                                <X size={16} />
-                            </button>
-                        </header>
-                        <main className="grid gap-3 p-5">
-                            {(['total_crm', 'aquisicao', 'rentabilizacao'] as const).map((domain) => (
-                                <button
-                                    key={domain}
-                                    type="button"
-                                    onClick={() => {
-                                        setActiveFlow(domain);
-                                        setResult(null);
-                                        setFileMeta(null);
-                                        setSelectedKeys(new Set());
-                                        setFlowChooserOpen(false);
-                                    }}
-                                    className={`rounded-xl border px-4 py-4 text-left transition ${
-                                        activeFlow === domain
-                                            ? 'border-cyan-500 bg-cyan-50'
-                                            : 'border-slate-200 bg-white hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div className="text-sm font-bold text-slate-900">Atualizar {FLOW_LABEL[domain]}</div>
-                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                                            {FLOW_TARGET_LABEL[domain]}
-                                        </span>
-                                    </div>
-                                    <p className="mt-1 text-xs text-slate-500">
-                                        {domain === 'total_crm'
-                                            ? 'Lê todo o CRM da Dinâmica BI, separa aquisição e restante CRM, e grava cada disparo na base correta.'
-                                            : domain === 'aquisicao'
-                                            ? 'Campanhas do framework de aquisição, com revisão completa das dimensões antes de gravar.'
-                                            : 'Réguas de rentabilização, seguros, Copa e ativações mapeáveis para a base de rentabilização.'}
-                                    </p>
-                                </button>
-                            ))}
-                        </main>
-                    </div>
+                    </aside>
                 </div>
             )}
 
-            {reviewOpen && result && fileMeta && (
-                <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-slate-100">
-                    <div className="flex w-full flex-col overflow-hidden bg-white">
-                        <header className="border-b border-slate-200 bg-white px-6 py-4">
-                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-cyan-50 p-2 text-cyan-700">
-                                            <FileSpreadsheet size={18} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-bold text-slate-900">Revisao de {FLOW_LABEL[result.domain]}</h3>
-                                            <p className="text-xs text-slate-500">{fileMeta.name} - destino: {FLOW_TARGET_LABEL[result.domain]}</p>
-                                        </div>
-                                    </div>
+            {step === 'escopo' && result && fileMeta && (
+                <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex min-h-0 flex-1 flex-wrap gap-5 p-6">
+                        <section aria-label="Frentes e período" className="flex min-w-[520px] flex-[999_1_640px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+                            <div className="flex flex-wrap items-center gap-2 border-b border-[#eef2f6] px-3.5 py-2.5">
+                                <b className="text-[13px]">Frentes e período</b>
+                                <span className="text-xs text-slate-600">padrão da casa já marcado: Aquisição da segunda passada para cá e as demais frentes inteiras</span>
+                            </div>
+                            {mappingUnavailable && (
+                                <p role="status" className="border-b border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
+                                    Mapeamento de campanhas indisponível agora. Dá para revisar disparo a disparo na próxima etapa.
+                                </p>
+                            )}
+                            <div className="min-h-0 flex-1 overflow-auto">
+                                <ImportCampaignTree
+                                    campaigns={treeCampaigns}
+                                    selected={selectedKeys}
+                                    focusedCampaign={reviewCampaign}
+                                    focusedJourney={reviewJourney}
+                                    onFocus={(front, campaign, journey, period) => {
+                                        setPreviousFocus({ front: reviewFront, campaign: reviewCampaign, journey: reviewJourney });
+                                        setReviewFront(front); setReviewCampaign(campaign); setReviewJourney(journey);
+                                        if (period) { setReviewStartDate(period.from); setReviewEndDate(period.to); }
+                                        setReviewCollection('all');
+                                        setReviewCollision(''); setReviewPage(1);
+                                        setStep('revisao');
+                                    }}
+                                    onScopeSelection={(rows, period, checked) => {
+                                        setSelectedKeys((current) => replaceImportScopeSelection(current, rows, period, checked));
+                                        setReviewPage(1);
+                                    }}
+                                    onSelection={(keys, action) => setSelectedKeys((current) => {
+                                        const next = action === 'only' ? new Set<string>() : new Set(current);
+                                        for (const key of keys) {
+                                            if (action === 'remove') next.delete(key);
+                                            else next.add(key);
+                                        }
+                                        return next;
+                                    })}
+                                />
+                            </div>
+                        </section>
+
+                        <aside aria-label="Resumo do escopo" className="flex min-w-[300px] flex-[1_1_340px] flex-col gap-3.5">
+                            <div className="rounded-[14px] border border-slate-200 bg-white px-4 py-3.5">
+                                <div className="text-xs text-slate-600">Vai para a revisão</div>
+                                <div className="text-[30px] font-bold tabular-nums">
+                                    {scopeTotal.toLocaleString('pt-BR')} <span className="text-[13px] font-normal text-slate-600">de {candidates.length.toLocaleString('pt-BR')} no arquivo</span>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setReviewOpen(false)}
-                                    className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                                    aria-label="Fechar revisao"
-                                >
-                                    <X size={18} />
-                                </button>
+                                {scopeTotal > 0 && (
+                                    <>
+                                        <div className="mt-2 flex h-2 overflow-hidden rounded-[3px]" role="img" aria-label={`${scopeDomain.aquisicao} de Aquisição e ${scopeDomain.rentabilizacao} de Rentabilização`}>
+                                            <span className="bg-cyan-700" style={{ width: `${(scopeDomain.aquisicao / scopeTotal) * 100}%` }} />
+                                            <span className="bg-[#67c6d2]" style={{ width: `${(scopeDomain.rentabilizacao / scopeTotal) * 100}%` }} />
+                                        </div>
+                                        <div className="mt-1.5 flex justify-between text-[12.5px] tabular-nums text-slate-700">
+                                            <span>Aquisição <b>{scopeDomain.aquisicao.toLocaleString('pt-BR')}</b></span>
+                                            <span>Rentabilização <b>{scopeDomain.rentabilizacao.toLocaleString('pt-BR')}</b></span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                            <details className="mt-2">
-                                <summary className="cursor-pointer text-xs text-slate-600">Resumo do arquivo · {result.insights.uniqueJourneys} jornadas · {result.insights.classificationConflicts} conflitos</summary>
-                            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-                                <strong>{result.insights.rawRows.toLocaleString('pt-BR')} linhas</strong> da Dinâmica BI foram consolidadas em{' '}
-                                <strong>{result.insights.uniqueJourneys} jornadas</strong>,{' '}
-                                <strong>{result.insights.uniqueActivities} activities</strong> e{' '}
-                                <strong>{result.insights.newDispatches} novos disparos</strong>.
+                            <div className="flex flex-col gap-2 rounded-[14px] border border-slate-200 bg-white px-4 py-3.5 text-[12.5px]">
+                                <div className="text-[10.5px] font-bold uppercase tracking-[0.4px] text-slate-500">No arquivo</div>
+                                <div className="flex justify-between"><span className="text-slate-600">Período</span><b>{filePeriod}</b></div>
+                                <div className="flex justify-between"><span className="text-slate-600">Linhas lidas</span><b className="tabular-nums">{fileMeta.rows.toLocaleString('pt-BR')}</b></div>
+                                <div className="flex justify-between"><span className="text-slate-600">Jornadas</span><b className="tabular-nums">{result.insights.uniqueJourneys.toLocaleString('pt-BR')}</b></div>
+                                <div className="flex justify-between"><span className="text-slate-600">Conflitos de jornada</span><b className="tabular-nums text-orange-700">{summary.conflict.toLocaleString('pt-BR')}</b></div>
+                                <div className="flex justify-between"><span className="text-slate-600">Para revisar</span><b className="tabular-nums text-amber-700">{summary.review.toLocaleString('pt-BR')}</b></div>
+                                <div className="mt-1 text-xs text-slate-600">
+                                    Origem pela taxonomia: {Object.entries(result.insights.originCounts).map(([origin, count]) => `${origin === 'Sem origem' ? 'não identificada' : origin} ${Number(count).toLocaleString('pt-BR')}`).join(' · ')}
+                                </div>
                             </div>
-                            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+                            <p className="px-1 text-xs text-slate-600">A seleção fica guardada enquanto você estiver nesta tela. Dá para voltar aqui da Revisão sem perder o que já foi aprovado.</p>
+                        </aside>
+                    </div>
+                    <footer className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-slate-200 bg-white px-6 py-2.5">
+                        <span className="text-[13px]"><b className="tabular-nums">{scopeTotal.toLocaleString('pt-BR')}</b> disparos selecionados</span>
+                        <span className="text-[12.5px] text-slate-600">{(candidates.length - scopeTotal).toLocaleString('pt-BR')} ficam fora deste escopo e não são tocados</span>
+                        <span className="flex-1" />
+                        <button type="button" onClick={() => setStep('arquivo')} className="h-[34px] rounded-sm border border-slate-300 bg-white px-3 text-[13px] text-slate-800 hover:border-slate-400">Voltar</button>
+                        <button
+                            type="button"
+                            onClick={goToReview}
+                            disabled={scopeTotal === 0}
+                            className="h-[34px] rounded-sm border border-cyan-700 bg-cyan-700 px-4 text-[13px] font-bold text-white hover:bg-cyan-800 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300"
+                        >
+                            Revisar {scopeTotal.toLocaleString('pt-BR')} disparos
+                        </button>
+                    </footer>
+                </div>
+            )}
+
+            {step === 'recibo' && saveMessage && (
+                <div className="flex flex-1 justify-center p-6">
+                    <section aria-label="Recibo" className="w-full max-w-3xl self-start rounded-[14px] border border-slate-200 bg-white p-5">
+                        <div className="flex items-center gap-2.5">
+                            {saveMessage.type === 'success'
+                                ? <CheckCircle size={22} className="text-emerald-600" aria-hidden="true" />
+                                : <AlertCircle size={22} className="text-red-600" aria-hidden="true" />}
+                            <h2 className="text-[17px] font-bold">{saveMessage.type === 'success' ? 'Atualização gravada' : 'A gravação falhou'}</h2>
+                        </div>
+                        <p className="mt-1 text-[13px] text-slate-600">{saveMessage.text}</p>
+                        {saveMessage.type === 'success' && (
+                            <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-lg border border-[#eef2f6] md:grid-cols-4">
                                 {[
-                                    ['Linhas BI', result.insights.rawRows],
-                                    ['Métricas válidas', result.insights.validMetricRows],
-                                    ['Jornadas', result.insights.uniqueJourneys],
-                                    ['Activities', result.insights.uniqueActivities],
-                                    ['Acionáveis', result.insights.actionableDispatches],
-                                    ['Existentes', result.insights.existingDispatches],
-                                    ['Novos', result.insights.newDispatches],
-                                    ['Conflitos', result.insights.classificationConflicts],
+                                    ['Gravados', saveMessage.applied ?? 0],
+                                    ['Aquisição', saveMessage.acquisition ?? 0],
+                                    ['Rentabilização', saveMessage.rentabilizacao ?? 0],
+                                    ['Ficaram de fora', saveMessage.blocked ?? 0],
                                 ].map(([label, value]) => (
-                                    <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                                        <div className="text-lg font-bold text-slate-900">{Number(value).toLocaleString('pt-BR')}</div>
-                                        <div className="text-[10px] font-semibold text-slate-500">{label}</div>
+                                    <div key={label as string} className="border-r border-[#eef2f6] px-3.5 py-2.5 last:border-r-0">
+                                        <div className="text-xs text-slate-600">{label}</div>
+                                        <div className="text-[22px] font-bold tabular-nums">{Number(value).toLocaleString('pt-BR')}</div>
                                     </div>
                                 ))}
                             </div>
-                            </details>
-                        </header>
+                        )}
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            {onOpenHistory && saveMessage.type === 'success' && (
+                                <button type="button" onClick={onOpenHistory} className="h-[34px] rounded-sm border border-cyan-700 bg-cyan-700 px-4 text-[13px] font-bold text-white hover:bg-cyan-800">Ver no histórico</button>
+                            )}
+                            {saveMessage.type === 'error' && (
+                                <button type="button" onClick={() => setStep('revisao')} className="h-[34px] rounded-sm border border-cyan-700 bg-cyan-700 px-4 text-[13px] font-bold text-white hover:bg-cyan-800">Voltar à revisão</button>
+                            )}
+                            <button type="button" onClick={startOver} className="h-[34px] rounded-sm border border-slate-300 bg-white px-3 text-[13px] text-slate-800 hover:border-slate-400">Atualizar outro arquivo</button>
+                        </div>
+                    </section>
+                </div>
+            )}
+
+            {step === 'revisao' && result && fileMeta && (
+                <div className="flex flex-1 flex-col">
+                    <div className="flex w-full flex-1 flex-col bg-white">
+                        <section aria-label="Resumo do escopo" className="grid grid-cols-2 border-b border-slate-200 bg-white md:grid-cols-3 xl:grid-cols-6">
+                            <div className="border-r border-[#eef2f6] px-5 py-3">
+                                <div className="text-xs text-slate-600">Disparos no escopo</div>
+                                <div className="text-[26px] font-bold tabular-nums">{scopeTotal.toLocaleString('pt-BR')}</div>
+                                <div className="text-[11.5px] text-slate-600">de {candidates.length.toLocaleString('pt-BR')} no arquivo</div>
+                            </div>
+                            <div className="border-r border-[#eef2f6] px-5 py-3">
+                                <div className="text-xs text-slate-600">Novos</div>
+                                <div className="text-[26px] font-bold tabular-nums">{scopeNew.toLocaleString('pt-BR')}</div>
+                                <div className="text-[11.5px] text-slate-600">viram linha nova</div>
+                            </div>
+                            <div className="border-r border-[#eef2f6] px-5 py-3">
+                                <div className="text-xs text-slate-600">Atualizações</div>
+                                <div className="text-[26px] font-bold tabular-nums">{scopeUpdates.toLocaleString('pt-BR')}</div>
+                                <div className="text-[11.5px] text-slate-600">métrica mudou</div>
+                            </div>
+                            <div className={`border-r border-[#eef2f6] px-5 py-3 ${needsYou > 0 ? 'bg-amber-50' : ''}`}>
+                                <div className={`text-xs ${needsYou > 0 ? 'font-semibold text-amber-700' : 'text-slate-600'}`}>Precisa de você</div>
+                                <div className={`text-[26px] font-bold tabular-nums ${needsYou > 0 ? 'text-amber-800' : ''}`}>{needsYou.toLocaleString('pt-BR')}</div>
+                                <div className={`text-[11.5px] ${needsYou > 0 ? 'text-amber-800' : 'text-slate-600'}`}>no arquivo: {summary.conflict.toLocaleString('pt-BR')} conflitos · {summary.review.toLocaleString('pt-BR')} revisar</div>
+                            </div>
+                            <div className="border-r border-[#eef2f6] px-5 py-3">
+                                <div className="text-xs text-slate-600">Confiança média</div>
+                                <div className="text-[26px] font-bold tabular-nums">{scopeConfidence === null ? 'sem dado' : `${scopeConfidence}%`}</div>
+                                <div className="relative mt-1 h-1 rounded bg-[#eef2f6]" aria-hidden="true">
+                                    <span className="absolute left-0 top-0 h-1 rounded bg-cyan-700" style={{ width: `${scopeConfidence ?? 0}%` }} />
+                                    <span className="absolute -top-[3px] left-[90%] h-2.5 w-0.5 bg-slate-900" />
+                                </div>
+                                <div className="mt-0.5 text-[11.5px] text-slate-600">aprovação em massa a partir de 90%</div>
+                            </div>
+                            <div className="px-5 py-3">
+                                <div className="text-xs text-slate-600">Destino</div>
+                                <div className="mt-1 text-[13px] tabular-nums">Aquisição <b>{scopeDomain.aquisicao.toLocaleString('pt-BR')}</b></div>
+                                <div className="text-[13px] tabular-nums">Rentabilização <b>{scopeDomain.rentabilizacao.toLocaleString('pt-BR')}</b></div>
+                            </div>
+                        </section>
 
                         <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-6 py-3">
                             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -2100,7 +1843,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
                                 >
                                     <Sparkles size={14} />
-                                    Aceitar alta confianca
+                                    Aprovar alta confiança (90% ou mais)
                                 </button>
                             </div>
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2145,13 +1888,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                         </button>
                                     ))}
                                 </div>}
-                                <div className="flex flex-wrap gap-2 text-[10px]">
-                                    {Object.entries(result.insights.originCounts).map(([origin, count]) => (
-                                        <span key={origin} className="rounded-full border border-slate-200 bg-white px-2 py-1 font-semibold text-slate-600">
-                                            {origin}: {count}
-                                        </span>
-                                    ))}
-                                </div>
+
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {([
@@ -2257,31 +1994,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             </select>
                         </div>
                         <div className="flex min-h-0 flex-1 flex-col">
-                            <details open={frontSelectorOpen} onToggle={event => setFrontSelectorOpen(event.currentTarget.open)} className="shrink-0">
-                                <summary className="cursor-pointer border-b bg-slate-50 px-6 py-2 text-xs font-semibold text-cyan-800">Campanhas e períodos · expandir ou recolher</summary>
-                            <ImportCampaignTree campaigns={treeCampaigns} selected={selectedKeys}
-                                focusedCampaign={reviewCampaign} focusedJourney={reviewJourney}
-                                onFocus={(front, campaign, journey, period) => {
-                                    setPreviousFocus({ front: reviewFront, campaign: reviewCampaign, journey: reviewJourney });
-                                    setReviewFront(front); setReviewCampaign(campaign); setReviewJourney(journey);
-                                    if (period) { setReviewStartDate(period.from); setReviewEndDate(period.to); }
-                                    setReviewCollection('all');
-                                    setFrontSelectorOpen(false);
-                                    setReviewCollision(''); setReviewPage(1);
-                                }}
-                                onScopeSelection={(rows, period, checked) => {
-                                    setSelectedKeys(current => replaceImportScopeSelection(current, rows, period, checked));
-                                    setReviewPage(1);
-                                }}
-                                onSelection={(keys, action) => setSelectedKeys(current => {
-                                    const next = action === 'only' ? new Set<string>() : new Set(current);
-                                    for (const key of keys) {
-                                        if (action === 'remove') next.delete(key);
-                                        else next.add(key);
-                                    }
-                                    return next;
-                                })} />
-                            </details>
+
                             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                         <div className={`flex flex-col gap-2 border-b px-6 py-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
                             selectedKeys.size > 0 ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600'
@@ -2562,7 +2275,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     onClick={() => setReviewOpen(false)}
                                     className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
                                 >
-                                    Cancelar
+                                    Voltar ao escopo
                                 </button>
                                 <button
                                     type="button"
@@ -2589,7 +2302,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                     className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                                 >
                                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Clipboard size={14} />}
-                                    Enviar para base de dados
+                                    Gravar {uploadCandidates.length.toLocaleString('pt-BR')} disparos
                                 </button>
                             </div>
                         </footer>
@@ -2604,7 +2317,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                             <div>
                                 <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                                     <Database size={16} className="text-blue-700" />
-                                    Confirmar upload para base de dados
+                                    Confirmar gravação
                                 </div>
                                 <p className="mt-1 text-xs text-slate-500">
                                     Revise o lote antes de gravar. Apenas linhas aceitas entram na tabela de campanhas.
@@ -2678,7 +2391,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                                 className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                             >
                                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                                {saving ? 'Enviando...' : 'Enviar para base de dados'}
+                                {saving ? 'Gravando...' : `Gravar ${uploadCandidates.length.toLocaleString('pt-BR')} disparos`}
                             </button>
                         </footer>
                     </div>

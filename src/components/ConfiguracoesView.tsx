@@ -1,6 +1,6 @@
 import {SfmcIngestionHistory} from './communications/SfmcIngestionHistory';
 import React, { useState, useEffect } from 'react';
-import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck, Users, Wand2 } from 'lucide-react';
+import { User, Moon, LogOut, Mail, Loader2, UploadCloud, FileText, Download, Trash2, RefreshCw, CheckCircle, Database, AlertCircle, ArrowRight, ShieldCheck, Users, Wand2, History, Target, Package, UserCircle, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUserRole } from '../context/UserRoleContext';
 import { storageService, StorageFile } from '../services/storageService';
@@ -13,6 +13,8 @@ import { UserManagementPanel } from './admin/UserManagementPanel';
 import { activityService, versionService } from '../services/activityService';
 import { dataService } from '../services/dataService';
 import { IntelligentFrameworkUpdate } from './admin/IntelligentFrameworkUpdate';
+import { UpdateHistoryView } from './admin/UpdateHistoryView';
+import { readSettingsSection, writeSettingsSection, type SettingsSection } from './admin/settingsSections';
 
 const UPLOAD_FIX_VERSION = 'ENG_FIX_V3_2026-03-09';
 
@@ -417,6 +419,13 @@ const FileManager: React.FC<{ title: string; slot: string; accept: string }> = (
     );
 };
 
+const SettingsPageHeader: React.FC<{ title: string }> = ({ title }) => (
+    <div>
+        <div className="text-xs text-slate-500">Configurações</div>
+        <h1 className="text-xl font-bold text-slate-900">{title}</h1>
+    </div>
+);
+
 export const ConfiguracoesView: React.FC = () => {
     const { user, signInWithEmail, signOut, loading } = useAuth();
     const { isAdmin } = useUserRole();
@@ -424,19 +433,18 @@ export const ConfiguracoesView: React.FC = () => {
     const [isSending, setIsSending] = useState(false);
     const [sent, setSent] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'goals' | 'database' | 'intelligent-update' | 'users' | 'sfmc'>(() => {
-        if(sessionStorage.getItem('gaas-settings-tab')==='sfmc'){sessionStorage.removeItem('gaas-settings-tab');return 'sfmc';}
-        // Atalho vindo do aviso de metas herdadas no Launch Planner.
-        try {
-            if (sessionStorage.getItem('gaas.configuracoes.tab') === 'goals') {
-                sessionStorage.removeItem('gaas.configuracoes.tab');
-                return 'goals';
-            }
-        } catch {
-            // sessionStorage indisponível: segue na aba padrão.
-        }
-        return 'intelligent-update';
-    });
+    const [section, setSectionState] = useState<SettingsSection>(() => readSettingsSection());
+    const [navCollapsed, setNavCollapsed] = useState(false);
+    const [navQuery, setNavQuery] = useState('');
+    const setSection = (next: SettingsSection) => {
+        setSectionState(next);
+        writeSettingsSection(next);
+    };
+    useEffect(() => {
+        const onPop = () => setSectionState(readSettingsSection());
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -479,167 +487,165 @@ export const ConfiguracoesView: React.FC = () => {
     }
 
     // --- LOGGED IN STATE ---
+    // Configurações no formato Setup: menu lateral por grupo e área de trabalho com a
+    // largura toda. A seção vem da URL (?cfg=), então voltar e F5 caem no mesmo lugar.
+    const navGroups: Array<{ title: string; items: Array<{ id: SettingsSection; label: string; icon: React.ReactNode; hidden?: boolean }> }> = [
+        {
+            title: 'Gestão de dados',
+            items: [
+                { id: 'atualizar', label: 'Atualizar bases', icon: <Wand2 size={16} /> },
+                { id: 'historico', label: 'Histórico de atualizações', icon: <History size={16} /> },
+                { id: 'arquivos', label: 'Arquivos e versões', icon: <Database size={16} /> },
+            ],
+        },
+        {
+            title: 'Operação',
+            items: [
+                { id: 'metas', label: 'Gestão de metas', icon: <Target size={16} /> },
+                { id: 'sfmc', label: 'Packs SFMC', icon: <Package size={16} /> },
+            ],
+        },
+        {
+            title: 'Acesso',
+            items: [
+                { id: 'usuarios', label: 'Usuários', icon: <Users size={16} />, hidden: !isAdmin },
+                { id: 'conta', label: 'Minha conta e aparência', icon: <UserCircle size={16} /> },
+            ],
+        },
+    ];
+    const query = navQuery.trim().toLowerCase();
+    const visibleGroups = navGroups
+        .map((group) => ({ ...group, items: group.items.filter((item) => !item.hidden && (!query || item.label.toLowerCase().includes(query))) }))
+        .filter((group) => group.items.length > 0);
+    const activeSection: SettingsSection = section === 'usuarios' && !isAdmin ? 'atualizar' : section;
+    const pageTitles: Partial<Record<SettingsSection, string>> = {
+        arquivos: 'Arquivos e versões',
+        metas: 'Gestão de metas',
+        sfmc: 'Packs SFMC',
+        usuarios: 'Usuários',
+        conta: 'Minha conta e aparência',
+    };
+
     return (
-        <div className="min-h-full bg-slate-50 text-slate-800 p-8 space-y-8 animate-fade-in pb-24">
-            <div className="max-w-5xl mx-auto space-y-8">
-
-                <div className="flex justify-between items-end border-b border-slate-200 pb-6">
-                    <div>
-                        <h2 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">Configurações</h2>
-                        <p className="text-slate-500 text-lg">Central de controle e sincronização.</p>
-                    </div>
-
+        <div className="flex min-h-full bg-slate-50 text-slate-800">
+            <nav
+                aria-label="Configurações"
+                className={`sticky top-0 flex max-h-[var(--screen-h)] shrink-0 flex-col self-start border-r border-slate-200 bg-white py-3 transition-[width] ${navCollapsed ? 'w-14 items-center px-2' : 'w-60 px-2.5'}`}
+            >
+                <div className={`mb-2 flex items-center gap-2 ${navCollapsed ? 'flex-col' : 'px-1'}`}>
+                    {!navCollapsed && (
+                        <label className="flex h-[30px] min-w-0 flex-1 items-center gap-1.5 rounded-sm border border-slate-300 px-2 text-slate-500">
+                            <Search size={14} aria-hidden="true" />
+                            <span className="sr-only">Busca rápida nas configurações</span>
+                            <input
+                                type="search"
+                                value={navQuery}
+                                onChange={(event) => setNavQuery(event.target.value)}
+                                placeholder="Busca rápida"
+                                className="min-w-0 flex-1 bg-transparent text-[12.5px] text-slate-800 outline-none"
+                            />
+                        </label>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setNavCollapsed((value) => !value)}
+                        aria-label={navCollapsed ? 'Abrir menu de configurações' : 'Recolher menu de configurações'}
+                        className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100"
+                    >
+                        {navCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+                    </button>
                 </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Profile & Settings */}
-                    <div className="space-y-6">
-                        {/* Profile Section */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                                    <User size={28} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-bold text-slate-900 truncate" title={user.email}>{user.email?.split('@')[0]}</h3>
-                                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3 mb-6">
-                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center group">
-                                    <span className="text-xs font-bold text-slate-500 uppercase">ID</span>
-                                    <code className="text-xs text-slate-600 font-mono bg-slate-100 px-2 py-0.5 rounded group-hover:text-slate-900 transition-colors">
-                                        {user.id.substring(0, 8)}...
-                                    </code>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={signOut}
-                                className="w-full flex items-center justify-center gap-2 text-red-500 hover:text-white hover:bg-red-500 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl transition-all text-sm font-bold"
-                            >
-                                <LogOut size={16} />
-                                Desconectar
-                            </button>
+                <div className="flex flex-col gap-0.5 overflow-y-auto">
+                    {visibleGroups.map((group) => (
+                        <div key={group.title} className="flex flex-col gap-0.5">
+                            {!navCollapsed && (
+                                <div className="px-2.5 pb-1 pt-3 text-[10.5px] font-bold uppercase tracking-[0.4px] text-slate-500">{group.title}</div>
+                            )}
+                            {group.items.map((item) => {
+                                const active = activeSection === item.id;
+                                return (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => setSection(item.id)}
+                                        aria-current={active ? 'page' : undefined}
+                                        title={navCollapsed ? item.label : undefined}
+                                        aria-label={navCollapsed ? item.label : undefined}
+                                        className={`flex items-center gap-2 rounded-md text-left text-[13px] transition ${navCollapsed ? 'h-9 w-9 justify-center' : 'px-2.5 py-1.5'} ${active
+                                            ? 'bg-cyan-50 font-semibold text-cyan-700'
+                                            : 'text-slate-700 hover:bg-slate-100'}`}
+                                    >
+                                        <span className={active ? 'text-cyan-700' : 'text-slate-500'}>{item.icon}</span>
+                                        {!navCollapsed && <span className="truncate">{item.label}</span>}
+                                    </button>
+                                );
+                            })}
                         </div>
+                    ))}
+                </div>
+            </nav>
 
-                        {/* Visual Settings */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xl opacity-60 pointer-events-none">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 tracking-wider">Aparência</h3>
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-500">
-                                        <Moon size={18} />
-                                    </div>
-                                    <span className="text-slate-700 font-medium text-sm">Modo Escuro</span>
-                                </div>
-                                <div className="w-10 h-5 bg-blue-600 rounded-full relative">
-                                    <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm" />
-                                </div>
+            <main className="min-w-0 flex-1">
+                {activeSection === 'atualizar' && (
+                    <IntelligentFrameworkUpdate
+                        onOpenHistory={() => setSection('historico')}
+                        onStepChange={(step) => setNavCollapsed(step !== 'arquivo')}
+                    />
+                )}
+                {activeSection === 'historico' && <UpdateHistoryView onStartUpdate={() => setSection('atualizar')} />}
+                {activeSection !== 'atualizar' && activeSection !== 'historico' && (
+                    <div className="mx-auto max-w-6xl space-y-6 p-6">
+                        <SettingsPageHeader title={pageTitles[activeSection] ?? 'Configurações'} />
+                        {activeSection === 'sfmc' && <SfmcIngestionHistory />}
+                        {activeSection === 'metas' && <GoalsManager />}
+                        {activeSection === 'usuarios' && (
+                            <div className="rounded-[14px] border border-slate-200 bg-white p-6">
+                                <UserManagementPanel />
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column: Content Area (Spans 2 cols) */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Tabs Navigation */}
-                        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200"><button onClick={()=>setActiveTab('sfmc')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab==='sfmc'?'border-blue-500 text-blue-500':'border-transparent text-slate-500'}`}>Packs SFMC</button>
-                            <button
-                                onClick={() => setActiveTab('goals')}
-                                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'goals'
-                                    ? 'border-blue-500 text-blue-500'
-                                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                                    }`}
-                            >
-                                Gestão de Metas
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('database')}
-                                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'database'
-                                    ? 'border-blue-500 text-blue-500'
-                                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                                    }`}
-                            >
-                                Gestão da Base de Dados
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('intelligent-update')}
-                                className={`order-first flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'intelligent-update'
-                                    ? 'border-blue-500 text-blue-500'
-                                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                                    }`}
-                            >
-                                <Wand2 size={16} />
-                                Atualização Inteligente
-                            </button>
-                            {isAdmin && (
-                                <button
-                                    onClick={() => setActiveTab('users')}
-                                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'users'
-                                        ? 'border-blue-500 text-blue-500'
-                                        : 'border-transparent text-slate-500 hover:text-slate-800'
-                                        }`}
-                                >
-                                    <Users size={16} />
-                                    Gerenciar Usuários
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Tab Content */}
-                        {activeTab==='sfmc'&&<SfmcIngestionHistory/>}
-                        <div className="animate-fade-in">
-                            {activeTab === 'goals' && (
-                                <GoalsManager />
-                            )}
-
-                            {activeTab === 'users' && (
-                                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xl">
-                                    <UserManagementPanel />
-                                </div>
-                            )}
-
-                            {activeTab === 'intelligent-update' && (
-                                <IntelligentFrameworkUpdate />
-                            )}
-
-                            {activeTab === 'database' && (
-                                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-xl relative overflow-hidden">
-                                    {/* Background subtle effect */}
-                                    <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
-
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 relative z-10">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-blue-500/20 rounded-xl text-blue-500 shadow-inner">
-                                                <Database size={24} />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold text-slate-900">Base de dados & Arquivos</h3>
-                                                <p className="text-sm text-slate-500">Importação e sincronização das tabelas do sistema.</p>
-                                            </div>
+                        )}
+                        {activeSection === 'arquivos' && (
+                            <div className="space-y-4">
+                                <VersionManager />
+                                <FileManager title="Histórico B2C" slot="b2c" accept=".csv" />
+                                <FileManager title="Mídia Paga (Ads)" slot="media" accept=".xlsx, .xls" />
+                            </div>
+                        )}
+                        {activeSection === 'conta' && (
+                            <div className="grid max-w-3xl gap-4 md:grid-cols-2">
+                                <div className="rounded-[14px] border border-slate-200 bg-white p-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="grid h-11 w-11 place-items-center rounded-full bg-cyan-700 text-white">
+                                            <User size={20} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="truncate text-[15px] font-bold text-slate-900" title={user.email}>{user.email?.split('@')[0]}</div>
+                                            <div className="truncate text-xs text-slate-500">{user.email}</div>
                                         </div>
                                     </div>
-
-                                    <div className="space-y-4 relative z-10">
-                                        <VersionManager />
-                                        <FileManager
-                                            title="Histórico B2C"
-                                            slot="b2c"
-                                            accept=".csv"
-                                        />
-                                        <FileManager
-                                            title="Mídia Paga (Ads)"
-                                            slot="media"
-                                            accept=".xlsx, .xls"
-                                        />
+                                    <div className="mt-4 flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                                        <span className="font-semibold text-slate-500">ID</span>
+                                        <code className="font-mono text-slate-700">{user.id.substring(0, 8)}...</code>
+                                    </div>
+                                    <button
+                                        onClick={signOut}
+                                        className="mt-4 flex h-[34px] w-full items-center justify-center gap-2 rounded-sm border border-red-200 bg-white text-[13px] font-semibold text-red-700 hover:bg-red-50"
+                                    >
+                                        <LogOut size={15} />
+                                        Desconectar
+                                    </button>
+                                </div>
+                                <div className="rounded-[14px] border border-slate-200 bg-white p-5">
+                                    <div className="text-[10.5px] font-bold uppercase tracking-[0.4px] text-slate-500">Aparência</div>
+                                    <div className="mt-3 flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 opacity-60">
+                                        <span className="flex items-center gap-2 text-[13px] text-slate-700"><Moon size={16} /> Modo escuro</span>
+                                        <span className="text-xs text-slate-500">em breve</span>
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
-                </div>
-            </div>
+                )}
+            </main>
         </div>
     );
 };
