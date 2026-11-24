@@ -384,6 +384,10 @@ export const mapCandidateRow = (row: any): UpdateRunCandidateRow => {
     };
 };
 
+const DOMAIN_HISTORY_TTL_MS = 10 * 60 * 1000;
+const DOMAIN_HISTORY_CONCURRENCY = 6;
+const domainHistoryCache = new Map<UpdateDomain, { rows: Array<Record<string, any>>; at: number }>();
+
 export const intelligentUpdateService = {
     // Busca os disparos ja gravados na tabela do dominio (activity name, canal, data)
     // para deduplicar contra a base e nao reinserir o que ja existe.
@@ -413,21 +417,42 @@ export const intelligentUpdateService = {
     // Historico completo da tabela do dominio (todas as colunas) para inteligencia
     // de sugestoes por jornada/segmento. Usado na Rentabilizacao para herdar a
     // classificacao ja existente ao subir novos disparos.
+    // Páginas em paralelo (ordem estável por id) e cache na sessão: o mesmo histórico era
+    // baixado inteiro, em ~40 chamadas seguidas, a cada arquivo. O cache cai depois de gravar.
     async fetchDomainHistory(domain: UpdateDomain): Promise<Array<Record<string, any>>> {
+        const cached = domainHistoryCache.get(domain);
+        if (cached && Date.now() - cached.at < DOMAIN_HISTORY_TTL_MS) return cached.rows;
         const table = targetTableForDomain(domain);
         const pageSize = 1000;
-        const rows: Array<Record<string, any>> = [];
-        for (let offset = 0; ; offset += pageSize) {
+        const { count, error: countError } = await supabase.from(table).select('id', { count: 'exact', head: true });
+        if (countError) throw countError;
+        const pages = Math.max(1, Math.ceil((count ?? 0) / pageSize) + 1);
+        const fetchPage = async (page: number) => {
             const { data, error } = await supabase
                 .from(table)
                 .select('*')
-                .range(offset, offset + pageSize - 1);
+                .order('id', { ascending: true })
+                .range(page * pageSize, page * pageSize + pageSize - 1);
             if (error) throw error;
-            const batch = data ?? [];
-            rows.push(...batch);
-            if (batch.length < pageSize) break;
-        }
+            return data ?? [];
+        };
+        const results: Array<Array<Record<string, any>>> = new Array(pages);
+        let cursor = 0;
+        const runner = async () => {
+            while (cursor < pages) {
+                const page = cursor++;
+                results[page] = await fetchPage(page);
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(DOMAIN_HISTORY_CONCURRENCY, pages) }, runner));
+        const rows = results.flat();
+        domainHistoryCache.set(domain, { rows, at: Date.now() });
         return rows;
+    },
+
+    invalidateDomainHistory(domain?: UpdateDomain) {
+        if (domain) domainHistoryCache.delete(domain);
+        else domainHistoryCache.clear();
     },
 
     // Lista os ultimos runs de atualizacao (gaas_update_runs). Numeros agregados
@@ -504,6 +529,8 @@ export const intelligentUpdateService = {
     },
 
     async saveRun(payload: IntelligentUpdateRunPayload): Promise<IntelligentUpdateRunResult> {
+        // A base vai mudar: o próximo arquivo precisa conferir contra o histórico novo.
+        domainHistoryCache.clear();
         const runInsertPayload = {
             domain: payload.domain,
             source_type: payload.sourceType ?? 'csv',

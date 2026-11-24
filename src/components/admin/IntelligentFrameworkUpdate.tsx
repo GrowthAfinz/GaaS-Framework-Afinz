@@ -39,21 +39,17 @@ import {
     applyApprovalDefaults,
     buildExcelRow,
     toCsv,
-    buildRentHistoryIndex,
-    emptyRentHistoryIndex,
-    decodeDelimitedFile,
-    safeProcessDinamicaBI,
 } from '../../utils/intelligentUpdateEngine';
 export { matchesReviewCollection, processRentabilizacaoDinamicaBI, processDinamicaBI } from '../../utils/intelligentUpdateEngine';
 import { previousWeekStart, replaceImportScopeSelection } from './importSelection';
+import { processImportFile } from '../../utils/importerWorkerClient';
+import { isImporterFailure } from '../../utils/importerPipeline';
 import { ImportCampaignTree, importToday } from './ImportCampaignTree';
 import { loadStructure } from '../growth-learning/structure/structureService';
 import { supabase } from '../../services/supabaseClient';
 import { classify, compileRules } from '../growth-learning/structure/consumoModel';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 import { getLocalViewport, toLocalRect } from '../../context/UIScaleContext';
 import {
     AlertCircle,
@@ -447,79 +443,6 @@ async function loadImportCampaigns() {
 
 
 
-
-const parseDelimitedText = (text: string, delimiter: string | undefined, resolve: (rows: string[][]) => void, reject: (reason?: any) => void) => {
-    Papa.parse<string[]>(text, {
-        skipEmptyLines: false,
-        delimiter,
-        complete: (results) => {
-            if (results.errors.length > 0 && results.data.length === 0) {
-                reject(new Error(results.errors[0]?.message || 'Erro ao interpretar o arquivo.'));
-                return;
-            }
-            resolve(results.data
-                .filter((row): row is string[] => Array.isArray(row))
-                .map((row) => row.map((cell) => String(cell ?? '').trim())));
-        },
-        error: (error: Error) => reject(new Error(error.message || 'Erro ao ler o arquivo.')),
-    });
-};
-
-const parseFileToMatrix = (file: File): Promise<string[][]> => new Promise((resolve, reject) => {
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const reader = new FileReader();
-
-    reader.onerror = () => reject(new Error('Erro ao ler o arquivo.'));
-    reader.onload = (event) => {
-        try {
-            if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
-                const text = decodeDelimitedFile(event.target?.result as ArrayBuffer);
-                parseDelimitedText(text, ext === 'tsv' ? '\t' : '', resolve, reject);
-                return;
-            }
-
-            if (ext === 'xlsx' || ext === 'xls') {
-                const data = new Uint8Array(event.target?.result as ArrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                const sheetName = workbook.SheetNames.find((name) => normalizeKey(name).includes('dinamica')) ?? workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
-                if (!worksheet) throw new Error('Nenhuma planilha encontrada no arquivo.');
-                const rows = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, raw: false, defval: '' });
-                resolve(rows
-                    .filter((row): row is unknown[] => Array.isArray(row))
-                    .map((row) => row.map((cell) => String(cell ?? '').trim())));
-                return;
-            }
-
-            reject(new Error('Formato não suportado pelo parser.'));
-        } catch (error: any) {
-            reject(new Error(error?.message || 'Erro ao processar o arquivo.'));
-        }
-    };
-
-    reader.readAsArrayBuffer(file);
-});
-
-
-
-const nextFrame = () => new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-});
-
-const sleep = (ms: number) => new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms);
-});
-
-const waitForLoadingPaint = async () => {
-    await nextFrame();
-    await nextFrame();
-    await sleep(80);
-};
-
-const keepLoadingVisible = async (startedAt: number, minimumMs = 900) => {
-    const elapsed = performance.now() - startedAt;
-    if (elapsed < minimumMs) await sleep(minimumMs - elapsed);
-};
 
 const suggestionGroup = (suggestion: FieldSuggestion) => {
     if (suggestion.deterministic || suggestion.confidence >= 90) return 'Recomendadas';
@@ -1384,7 +1307,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             return;
         }
 
-        const processingStartedAt = performance.now();
         setProcessing(true);
         setDragError(null);
         setDebugInfo(null);
@@ -1402,46 +1324,34 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
         setProcessingStage('reading');
 
         try {
-            await waitForLoadingPaint();
-            const matrix = await parseFileToMatrix(file);
-            if (matrix.length === 0) throw new Error('Arquivo vazio.');
-            setProcessingStage('indexing');
-            await nextFrame();
-            await sleep(40);
-            // Para rentabilizacao, carrega o historico completo da base para (1) deduplicar
-            // o que ja existe e (2) herdar dimensoes (BU/Segmento/Etapa) por jornada/segmento.
-            let rentHistory = emptyRentHistoryIndex();
-            if (activeFlow === 'rentabilizacao' || activeFlow === 'total_crm') {
-                try {
-                    const historyRows = await intelligentUpdateService.fetchDomainHistory('rentabilizacao');
-                    rentHistory = buildRentHistoryIndex(historyRows);
-                } catch (fetchError) {
-                    throw new Error('Não foi possível conferir o histórico de Rentabilização. Tente carregar o arquivo novamente.');
-                }
-            }
-            setProcessingStage('detecting');
-            await nextFrame();
-            await sleep(40);
-            const mapping = await loadImportCampaigns().catch(() => null);
-            const mappedJourneys = new Set<string>(mapping?.exactRentCards.keys());
-            const processedResult = safeProcessDinamicaBI(matrix, activities, activeFlow, rentHistory, mappedJourneys);
-            if (!processedResult.result) {
-                const debug = {
-                    ...processedResult.error,
-                    fileName: file.name,
-                    fileSize: file.size,
-                    fileType: ext,
-                    message: processedResult.error?.message || 'Erro ao processar arquivo.',
-                };
+            // Para rentabilizacao, carrega o historico da base para (1) deduplicar o que ja
+            // existe e (2) herdar dimensoes por jornada/segmento. Historico e mapeamento de
+            // campanhas vem em paralelo; leitura, indice e motor rodam no Web Worker.
+            const needsRentHistory = activeFlow === 'rentabilizacao' || activeFlow === 'total_crm';
+            const [rentHistoryRows, mapping] = await Promise.all([
+                needsRentHistory
+                    ? intelligentUpdateService.fetchDomainHistory('rentabilizacao').catch(() => {
+                        throw new Error('Não foi possível conferir o histórico de Rentabilização. Tente carregar o arquivo novamente.');
+                    })
+                    : Promise.resolve(null),
+                loadImportCampaigns().catch(() => null),
+            ]);
+            const output = await processImportFile({
+                file,
+                flow: activeFlow,
+                activities,
+                rentHistoryRows,
+                mappedJourneys: Array.from(mapping?.exactRentCards.keys() ?? []),
+            }, setProcessingStage);
+            if (isImporterFailure(output)) {
+                const debug = { ...output.debug, fileName: file.name, fileSize: file.size, fileType: ext };
                 console.error('[Atualizacao Inteligente] Falha ao processar arquivo', debug);
                 setDebugInfo(debug);
                 setDragError(`Erro ao processar o arquivo (${debug.stage || 'parser'}): ${debug.message}`);
                 return;
             }
-            const processed = processedResult.result;
+            const processed = output.result;
             setProcessingStage('reviewing');
-            await nextFrame();
-            await sleep(40);
             setImportMapping(mapping);
             setMappingUnavailable(mapping === null);
             setReviewCampaign('');
@@ -1462,7 +1372,7 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
                 candidates: reviewed,
                 tsv: reviewed.filter(candidate => candidate.accepted).map(buildExcelRow).join('\n'),
             });
-            setFileMeta({ name: file.name, rows: matrix.length, type: ext ?? 'arquivo' });
+            setFileMeta({ name: file.name, rows: output.matrixRows, type: ext ?? 'arquivo' });
             setReviewPage(1);
             setStatusFilter('new_dispatch');
             setSelectedKeys(new Set(reviewed.filter(candidate => candidate.accepted
@@ -1482,7 +1392,6 @@ export const IntelligentFrameworkUpdate: React.FC = () => {
             setDebugInfo(debug);
             setDragError(`${debug.stage}: ${debug.message}`);
         } finally {
-            await keepLoadingVisible(processingStartedAt);
             setProcessing(false);
             setProcessingStage('idle');
         }
