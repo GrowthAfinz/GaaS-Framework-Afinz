@@ -1,0 +1,4268 @@
+{
+  "dataset": {
+    "rows": 3000,
+    "acquisitionHistory": 2000,
+    "rentHistory": 3000,
+    "seed": 20261124,
+    "matrixRows": 3002,
+    "blockRows": {
+      "whatsapp": 3000,
+      "email": 1800,
+      "sms": 1050,
+      "push": 300,
+      "performance": 1650
+    }
+  },
+  "aquisicao": {
+    "hash": "c66e1107b2db092262d941b324a034b26a296f8287093a6940165aed129b9c6b",
+    "candidates": 3369,
+    "status": {
+      "ready": 2980,
+      "review": 389
+    },
+    "domain": {
+      "aquisicao": 3369
+    },
+    "warnings": [
+      "1611 linhas sem prefixo JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo aquisicao.",
+      "150 linhas residuais D0-D2 consolidadas no disparo real; 167 linhas sem Base Total e Base Acionavel validas foram ignoradas.",
+      "1317 linhas de performance D0-D2 consolidadas no disparo real; 227 linhas de performance sem disparo acionavel foram ignoradas.",
+      "28 linhas ECRED-API consolidadas via caminho ecred (cartoes emitidos pelo canal ECRED atribuidos ao disparo de origem).",
+      "916 grupos jornada/canal/data tinham multiplas activities e foram preservados como disparos separados."
+    ],
+    "sample": [
+      {
+        "accepted": false,
+        "activityName": "bbt_aqs_bmv_reg_wpp_topo4_padrao",
+        "auditRequired": false,
+        "basis": "delivered: 39750 -> 50560 | opens: 0 -> 4447",
+        "bu": "B2B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "WhatsApp",
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 50560,
+        "dispatchSignature": "bbt_aqs_bmv_reg_wpp_topo4_padrao|WhatsApp|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "JOR_AQS_B2B2C_BBT_TOPO_PAD_AGO26",
+        "key": "jor_aqs_b2b2c_bbt_topo_pad_ago26|bbt_aqs_bmv_reg_wpp_topo4_padrao|WhatsApp|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000000456",
+        "metricRefresh": true,
+        "oferta": "Sem oferta",
+        "opens": 4447,
+        "parceiro": "Bem Barato",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "CRM",
+        "sent": 44167,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "2 metricas mudaram desde a ultima atualizacao",
+        "suggestions": {
+          "bu": [
+            [
+              "B2B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "B2C",
+              44,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Sem oferta",
+              72,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              22,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              6,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "Bem Barato",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "N/A",
+              11,
+              "mesma activity"
+            ],
+            [
+              "Plurix",
+              30,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              54,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              45,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              28,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              17,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "CRM",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Topo de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio de Funil",
+              21,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Clube",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "RFV",
+              13,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_car_vis_aqs_wpp_apr_resposta_optout_pontual",
+        "auditRequired": false,
+        "basis": "sent: 2517 -> 23251 | delivered: 2265 -> 19515 | opens: 0 -> 10388",
+        "bu": "B2C",
+        "canonicalDimensionFields": [
+          "segmento"
+        ],
+        "canonicalDimensionRefresh": true,
+        "channel": "WhatsApp",
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 19515,
+        "dispatchSignature": "afz_car_vis_aqs_wpp_apr_resposta_optout_pontual|WhatsApp|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Meio_de_Funil",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_AGO26",
+        "key": "jor_aqs_b2c_na_anc_meio_de_funil_pad_vibe_ago26|afz_car_vis_aqs_wpp_apr_resposta_optout_pontual|WhatsApp|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000000226",
+        "metricRefresh": true,
+        "oferta": "Cashback",
+        "opens": 10388,
+        "parceiro": "N/A",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Padrao",
+        "segmento": "Aprovados_nao_convertidos",
+        "sent": 23251,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "ready",
+        "subgrupo": "Opt-out",
+        "suggestion": "Classificacao canonica de segmento, etapa ou janela do publico mudou",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Meio_de_Funil",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Reativacao",
+              19,
+              "campanhas similares por token"
+            ],
+            [
+              "Aquisicao",
+              16,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Cashback",
+              37,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              34,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              28,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              52,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              47,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              51,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Padrao",
+              37,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              32,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              29,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Aprovados_nao_convertidos",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Meio de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Abandonados",
+              19,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Opt-out",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              47,
+              "mesma jornada e canal"
+            ],
+            [
+              "Diario",
+              19,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_email_leads6_vibe",
+        "auditRequired": false,
+        "basis": "delivered: 16826 -> 16822 | opens: 0 -> 3780 | clicks: 0 -> 350",
+        "bu": "B2C",
+        "canonicalDimensionFields": [
+          "segmento"
+        ],
+        "canonicalDimensionRefresh": true,
+        "channel": "E-mail",
+        "clicks": 350,
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 16822,
+        "dispatchSignature": "afz_aqs_vis_reg_email_leads6_vibe|E-mail|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "DISP_AQUISICAO_B2C_LEADS_AGO26",
+        "key": "disp_aquisicao_b2c_leads_ago26|afz_aqs_vis_reg_email_leads6_vibe|E-mail|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000000849",
+        "metricRefresh": true,
+        "oferta": "Anuidade Zero",
+        "opens": 3780,
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "Leads_Parceiros",
+        "sent": 18696,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "ready",
+        "subgrupo": "Vibe",
+        "suggestion": "Classificacao canonica de segmento, etapa ou janela do publico mudou",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Anuidade Zero",
+              58,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              25,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              17,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              66,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              33,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              41,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              55,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              22,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              22,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Leads_Parceiros",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Leads",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Churn",
+              39,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Vibe",
+              99,
+              "mesma activity"
+            ],
+            [
+              "RFV",
+              39,
+              "campanhas similares por token"
+            ],
+            [
+              "Padrao",
+              20,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_sms_leads1_vibe",
+        "auditRequired": false,
+        "basis": "delivered: 3642 -> 3592",
+        "bu": "B2C",
+        "canonicalDimensionFields": [
+          "segmento"
+        ],
+        "canonicalDimensionRefresh": true,
+        "channel": "SMS",
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 3592,
+        "dispatchSignature": "afz_aqs_vis_reg_sms_leads1_vibe|SMS|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "DISP_AQUISICAO_B2C_LEADS_AGO26",
+        "key": "disp_aquisicao_b2c_leads_ago26|afz_aqs_vis_reg_sms_leads1_vibe|SMS|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000001127",
+        "metricRefresh": true,
+        "oferta": "Anuidade Zero",
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Padrao",
+        "segmento": "Leads_Parceiros",
+        "sent": 4047,
+        "sourceBlock": "sms",
+        "sourceBlocks": [
+          "sms"
+        ],
+        "status": "ready",
+        "subgrupo": "Vibe",
+        "suggestion": "Classificacao canonica de segmento, etapa ou janela do publico mudou",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Anuidade Zero",
+              36,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              36,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              27,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              50,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              45,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Padrao",
+              40,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              40,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              20,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Leads_Parceiros",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Leads",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Churn",
+              39,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Vibe",
+              99,
+              "mesma activity"
+            ],
+            [
+              "RFV",
+              39,
+              "campanhas similares por token"
+            ],
+            [
+              "Padrao",
+              20,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_cart_sms_ordem5_padrao",
+        "approved": 30,
+        "assisted": 0,
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "SMS",
+        "confidence": 98,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 83,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 66,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 43649,
+        "dispatchSignature": "afz_aqs_vis_reg_cart_sms_ordem5_padrao|SMS|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Meio_de_Funil",
+        "fieldToReview": "Aprovar",
+        "finalized": 5,
+        "independent": 5,
+        "journey": "JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_AGO26",
+        "key": "jor_aqs_b2c_na_anc_meio_de_funil_pad_vibe_ago26|afz_aqs_vis_reg_cart_sms_ordem5_padrao|SMS|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Sem oferta",
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Copa",
+        "proposals": 39,
+        "segmento": "Aprovados_nao_convertidos",
+        "sent": 50885,
+        "sourceBlock": "sms",
+        "sourceBlocks": [
+          "sms",
+          "performance"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Meio_de_Funil",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Reativacao",
+              19,
+              "campanhas similares por token"
+            ],
+            [
+              "Aquisicao",
+              16,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Sem oferta",
+              83,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              17,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              36,
+              "mesma jornada e canal"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              54,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              50,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Copa",
+              66,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              14,
+              "mesma jornada e canal"
+            ]
+          ],
+          "segmento": [
+            [
+              "Aprovados_nao_convertidos",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Meio de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Abandonados",
+              19,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Opt-out",
+              53,
+              "mesma jornada e canal"
+            ],
+            [
+              "Diario",
+              19,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_cart_email_ordem5_padrao",
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "E-mail",
+        "clicks": 1094,
+        "confidence": 97,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 59,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 59,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 35317,
+        "dispatchSignature": "afz_aqs_vis_reg_cart_email_ordem5_padrao|E-mail|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Meio_de_Funil",
+        "fieldToReview": "Aprovar",
+        "journey": "JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_AGO26",
+        "key": "jor_aqs_b2c_na_anc_meio_de_funil_pad_vibe_ago26|afz_aqs_vis_reg_cart_email_ordem5_padrao|E-mail|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Cashback",
+        "opens": 6894,
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "Aprovados_nao_convertidos",
+        "sent": 41131,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Meio_de_Funil",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Reativacao",
+              19,
+              "campanhas similares por token"
+            ],
+            [
+              "Aquisicao",
+              16,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Cashback",
+              59,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              20,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              20,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              35,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              59,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              59,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              20,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              20,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Aprovados_nao_convertidos",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Meio de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Abandonados",
+              19,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Opt-out",
+              51,
+              "mesma jornada e canal"
+            ],
+            [
+              "Diario",
+              19,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "plu_aqs_plx_reg_email_topoclube3_padrao",
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "E-mail",
+        "clicks": 169,
+        "confidence": 96,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 99,
+          "oferta": 55,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 50,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 21406,
+        "dispatchSignature": "plu_aqs_plx_reg_email_topoclube3_padrao|E-mail|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Aprovar",
+        "journey": "JOR_AQS_PLX_TOPO_CLUBE_AGO26",
+        "key": "jor_aqs_plx_topo_clube_ago26|plu_aqs_plx_reg_email_topoclube3_padrao|E-mail|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Sem oferta",
+        "opens": 1297,
+        "parceiro": "N/A",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Copa",
+        "segmento": "CRM",
+        "sent": 22291,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "ready",
+        "subgrupo": "Clube",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Plurix",
+              99,
+              "mesma activity"
+            ],
+            [
+              "B2B2C",
+              37,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Sem oferta",
+              55,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              11,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Plurix",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Bem Barato",
+              34,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              41,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Cartao Visa",
+              55,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Copa",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              17,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "CRM",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Topo de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio de Funil",
+              21,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Clube",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              37,
+              "campanhas similares por token"
+            ],
+            [
+              "RFV",
+              13,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "bbt_aqs_bmv_reg_sms_topo1_padrao",
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "SMS",
+        "confidence": 96,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 99,
+          "oferta": 50,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 50,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 15517,
+        "dispatchSignature": "bbt_aqs_bmv_reg_sms_topo1_padrao|SMS|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Aprovar",
+        "journey": "JOR_AQS_B2B2C_BBT_TOPO_PAD_AGO26",
+        "key": "jor_aqs_b2b2c_bbt_topo_pad_ago26|bbt_aqs_bmv_reg_sms_topo1_padrao|SMS|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Anuidade Zero",
+        "parceiro": "Bem Barato",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "CRM",
+        "sent": 17247,
+        "sourceBlock": "sms",
+        "sourceBlocks": [
+          "sms"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "B2C",
+              44,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Anuidade Zero",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              24,
+              "mesma jornada e canal"
+            ]
+          ],
+          "parceiro": [
+            [
+              "Bem Barato",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "N/A",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Plurix",
+              30,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              64,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              50,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              25,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              25,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "CRM",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Topo de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio de Funil",
+              21,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Clube",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "RFV",
+              13,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "rentabilizacao": {
+    "hash": "eebc4f439419b11c9b0f41b76677aaad939aa49594f743917c93dea2d456cb9c",
+    "candidates": 1564,
+    "status": {
+      "conflict": 427,
+      "ignored": 70,
+      "ready": 1067
+    },
+    "domain": {
+      "rentabilizacao": 1564
+    },
+    "warnings": [
+      "4278 linhas JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo rentabilizacao."
+    ],
+    "sample": [
+      {
+        "accepted": false,
+        "activityName": "afz_ren_vis_atv_wpp_ativacao4_padrao",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "B2C",
+        "channel": "WhatsApp",
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 10635,
+        "dispatchSignature": "afz_ren_vis_atv_wpp_ativacao4_padrao|WhatsApp|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_ATIVACAO_AFINZ_VC_AGO26",
+        "key": "[\"afz_ren_vis_atv_wpp_ativacao4_padrao|WhatsApp|2026-08-01\",\"jor_ativacao_afinz_vc_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "opens": 173,
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Cartao",
+        "promocional": "N/A",
+        "segmento": "Ativação",
+        "sent": 11402,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "conflict",
+        "subgrupo": "Afinz VC",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              35,
+              "outros valores da base"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "segmento": [
+            [
+              "Ativação",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Abandonado",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Afinz VC",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Plurix Mais Amigo",
+              8,
+              "outros valores da base"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_seg_res_car_wpp_carrinho5_diario",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "Seguros",
+        "channel": "WhatsApp",
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 35839,
+        "dispatchSignature": "afz_seg_res_car_wpp_carrinho5_diario|WhatsApp|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_SEGURO_CARRINHO_RESIDENCIA_AGO26",
+        "key": "[\"afz_seg_res_car_wpp_carrinho5_diario|WhatsApp|2026-08-01\",\"jor_seguro_carrinho_residencia_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "opens": 21988,
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Carrinho Seguro Residencia",
+        "promocional": "N/A",
+        "segmento": "Abandonado",
+        "sent": 37385,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "conflict",
+        "subgrupo": "Seguro Carrinho Residencial",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "Seguros",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "B2C",
+              96,
+              "mesma jornada e canal"
+            ],
+            [
+              "Plurix",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              35,
+              "outros valores da base"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Carrinho Seguro Residencia",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [],
+          "segmento": [
+            [
+              "Abandonado",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Ativacao",
+              9,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Seguro Carrinho Residencial",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Afinz VC",
+              9,
+              "outros valores da base"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_cp_vis_upg_wpp_upgrade2_padrao",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "B2C",
+        "channel": "WhatsApp",
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 289,
+        "dispatchSignature": "afz_cp_vis_upg_wpp_upgrade2_padrao|WhatsApp|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_AQS_CP_UPGRADE_AGO26",
+        "key": "[\"afz_cp_vis_upg_wpp_upgrade2_padrao|WhatsApp|2026-08-01\",\"jor_aqs_cp_upgrade_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "opens": 103,
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Cartao",
+        "promocional": "N/A",
+        "segmento": "Rentabilização",
+        "sent": 293,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "conflict",
+        "subgrupo": "N/A",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              35,
+              "outros valores da base"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "segmento": [
+            [
+              "Rentabilização",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              96,
+              "mesma jornada e canal"
+            ],
+            [
+              "Ativacao",
+              9,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              96,
+              "mesma jornada e canal"
+            ],
+            [
+              "Afinz VC",
+              9,
+              "outros valores da base"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_ren_vis_atv_wpp_ativacao3_padrao",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "B2C",
+        "channel": "WhatsApp",
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 21447,
+        "dispatchSignature": "afz_ren_vis_atv_wpp_ativacao3_padrao|WhatsApp|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_ATIVACAO_AFINZ_VC_AGO26",
+        "key": "[\"afz_ren_vis_atv_wpp_ativacao3_padrao|WhatsApp|2026-08-01\",\"jor_ativacao_afinz_vc_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "opens": 11088,
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Cartao",
+        "promocional": "N/A",
+        "segmento": "Ativação",
+        "sent": 25992,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "conflict",
+        "subgrupo": "Afinz VC",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              35,
+              "outros valores da base"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "segmento": [
+            [
+              "Ativação",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Abandonado",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Afinz VC",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Plurix Mais Amigo",
+              8,
+              "outros valores da base"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_cp_vis_upg_wpp_upgrade3_padrao",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "B2C",
+        "channel": "WhatsApp",
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 49630,
+        "dispatchSignature": "afz_cp_vis_upg_wpp_upgrade3_padrao|WhatsApp|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_AQS_CP_UPGRADE_AGO26",
+        "key": "[\"afz_cp_vis_upg_wpp_upgrade3_padrao|WhatsApp|2026-08-01\",\"jor_aqs_cp_upgrade_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "opens": 26546,
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Cartao",
+        "promocional": "N/A",
+        "segmento": "Rentabilização",
+        "sent": 56721,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "conflict",
+        "subgrupo": "N/A",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              35,
+              "outros valores da base"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "segmento": [
+            [
+              "Rentabilização",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              96,
+              "mesma jornada e canal"
+            ],
+            [
+              "Ativacao",
+              9,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              96,
+              "mesma jornada e canal"
+            ],
+            [
+              "Afinz VC",
+              9,
+              "outros valores da base"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_seg_res_car_email_carrinho2_diario",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "Seguros",
+        "channel": "E-mail",
+        "clicks": 1420,
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 43692,
+        "dispatchSignature": "afz_seg_res_car_email_carrinho2_diario|E-mail|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_SEGURO_CARRINHO_RESIDENCIA_AGO26",
+        "key": "[\"afz_seg_res_car_email_carrinho2_diario|E-mail|2026-08-01\",\"jor_seguro_carrinho_residencia_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "opens": 11832,
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Carrinho Seguro Residencia",
+        "promocional": "N/A",
+        "segmento": "Abandonado",
+        "sent": 48635,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "conflict",
+        "subgrupo": "Seguro Carrinho Residencial",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "Seguros",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "B2C",
+              96,
+              "mesma jornada e canal"
+            ],
+            [
+              "Plurix",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              35,
+              "outros valores da base"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Carrinho Seguro Residencia",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [],
+          "segmento": [
+            [
+              "Abandonado",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Ativacao",
+              9,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Seguro Carrinho Residencial",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Afinz VC",
+              9,
+              "outros valores da base"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_ren_vis_atv_email_ativacao1_padrao",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "B2C",
+        "channel": "E-mail",
+        "clicks": 607,
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 18784,
+        "dispatchSignature": "afz_ren_vis_atv_email_ativacao1_padrao|E-mail|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_ATIVACAO_AFINZ_VC_AGO26",
+        "key": "[\"afz_ren_vis_atv_email_ativacao1_padrao|E-mail|2026-08-01\",\"jor_ativacao_afinz_vc_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "opens": 3979,
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Cartao",
+        "promocional": "N/A",
+        "segmento": "Ativação",
+        "sent": 20511,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "conflict",
+        "subgrupo": "Afinz VC",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              35,
+              "outros valores da base"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "segmento": [
+            [
+              "Ativação",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Abandonado",
+              8,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Afinz VC",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Plurix Mais Amigo",
+              8,
+              "outros valores da base"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "plu_ren_plx_uso_sms_incentivo3_padrao",
+        "auditRequired": true,
+        "basis": "Mesma Activity, canal e data em jornadas diferentes",
+        "bu": "Plurix",
+        "channel": "SMS",
+        "confidence": 0,
+        "conflictJourneys": [],
+        "conflictReason": "Confirmar a identidade do disparo antes de aplicar.",
+        "date": "2026-08-01",
+        "delivered": 19560,
+        "dispatchSignature": "plu_ren_plx_uso_sms_incentivo3_padrao|SMS|2026-08-01",
+        "domain": "rentabilizacao",
+        "etapaAquisicao": "Rentabilizacao",
+        "fieldToReview": "Jornada em conflito",
+        "journey": "JOR_INCENTIVO_AO_USO_PLURIX_AGO26",
+        "key": "[\"plu_ren_plx_uso_sms_incentivo3_padrao|SMS|2026-08-01\",\"jor_incentivo_ao_uso_plurix_ago26\"]",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Padrao",
+        "parceiro": "N/A",
+        "perfilCredito": "N/A",
+        "produto": "Incentivo ao Uso",
+        "promocional": "N/A",
+        "segmento": "Incentivo ao Uso",
+        "sent": 23663,
+        "sourceBlock": "sms",
+        "sourceBlocks": [
+          "sms"
+        ],
+        "status": "conflict",
+        "subgrupo": "Plurix Mais Amigo",
+        "suggestion": "Linha fora do upload automatico",
+        "suggestions": {
+          "bu": [
+            [
+              "Plurix",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "B2C",
+              27,
+              "outros valores da base"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Rentabilizacao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "oferta": [
+            [
+              "Padrao",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Plurix",
+              96,
+              "mesma jornada e canal"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "produto": [
+            [
+              "Incentivo ao Uso",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "promocional": [
+            [
+              "N/A",
+              100,
+              "regra deterministica de rentabilizacao"
+            ]
+          ],
+          "segmento": [
+            [
+              "Incentivo ao Uso",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "Upgrade",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Ativacao",
+              9,
+              "outros valores da base"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Plurix Mais Amigo",
+              100,
+              "regra deterministica de rentabilizacao"
+            ],
+            [
+              "CP",
+              9,
+              "outros valores da base"
+            ],
+            [
+              "Afinz VC",
+              9,
+              "outros valores da base"
+            ]
+          ]
+        }
+      }
+    ]
+  },
+  "total_crm": {
+    "hash": "cb2de98c40bca592de2b308154f04043a19b55213ff601af466d73e078df03c4",
+    "candidates": 4933,
+    "status": {
+      "ready": 4047,
+      "review": 389,
+      "conflict": 427,
+      "ignored": 70
+    },
+    "domain": {
+      "aquisicao": 3369,
+      "rentabilizacao": 1564
+    },
+    "warnings": [
+      "1611 linhas sem prefixo JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo aquisicao.",
+      "150 linhas residuais D0-D2 consolidadas no disparo real; 167 linhas sem Base Total e Base Acionavel validas foram ignoradas.",
+      "1317 linhas de performance D0-D2 consolidadas no disparo real; 227 linhas de performance sem disparo acionavel foram ignoradas.",
+      "28 linhas ECRED-API consolidadas via caminho ecred (cartoes emitidos pelo canal ECRED atribuidos ao disparo de origem).",
+      "916 grupos jornada/canal/data tinham multiplas activities e foram preservados como disparos separados.",
+      "4278 linhas JOR_AQUISICAO/DISP_AQUISICAO foram ignoradas no modo rentabilizacao."
+    ],
+    "sample": [
+      {
+        "accepted": false,
+        "activityName": "bbt_aqs_bmv_reg_wpp_topo4_padrao",
+        "auditRequired": false,
+        "basis": "delivered: 39750 -> 50560 | opens: 0 -> 4447",
+        "bu": "B2B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "WhatsApp",
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 50560,
+        "dispatchSignature": "bbt_aqs_bmv_reg_wpp_topo4_padrao|WhatsApp|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "JOR_AQS_B2B2C_BBT_TOPO_PAD_AGO26",
+        "key": "jor_aqs_b2b2c_bbt_topo_pad_ago26|bbt_aqs_bmv_reg_wpp_topo4_padrao|WhatsApp|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000000456",
+        "metricRefresh": true,
+        "oferta": "Sem oferta",
+        "opens": 4447,
+        "parceiro": "Bem Barato",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "CRM",
+        "sent": 44167,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "2 metricas mudaram desde a ultima atualizacao",
+        "suggestions": {
+          "bu": [
+            [
+              "B2B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "B2C",
+              44,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Sem oferta",
+              72,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              22,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              6,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "Bem Barato",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "N/A",
+              11,
+              "mesma activity"
+            ],
+            [
+              "Plurix",
+              30,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              54,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              45,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              28,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              17,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "CRM",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Topo de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio de Funil",
+              21,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Clube",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "RFV",
+              13,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_car_vis_aqs_wpp_apr_resposta_optout_pontual",
+        "auditRequired": false,
+        "basis": "sent: 2517 -> 23251 | delivered: 2265 -> 19515 | opens: 0 -> 10388",
+        "bu": "B2C",
+        "canonicalDimensionFields": [
+          "segmento"
+        ],
+        "canonicalDimensionRefresh": true,
+        "channel": "WhatsApp",
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 19515,
+        "dispatchSignature": "afz_car_vis_aqs_wpp_apr_resposta_optout_pontual|WhatsApp|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Meio_de_Funil",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_AGO26",
+        "key": "jor_aqs_b2c_na_anc_meio_de_funil_pad_vibe_ago26|afz_car_vis_aqs_wpp_apr_resposta_optout_pontual|WhatsApp|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000000226",
+        "metricRefresh": true,
+        "oferta": "Cashback",
+        "opens": 10388,
+        "parceiro": "N/A",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Padrao",
+        "segmento": "Aprovados_nao_convertidos",
+        "sent": 23251,
+        "sourceBlock": "whatsapp",
+        "sourceBlocks": [
+          "whatsapp"
+        ],
+        "status": "ready",
+        "subgrupo": "Opt-out",
+        "suggestion": "Classificacao canonica de segmento, etapa ou janela do publico mudou",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Meio_de_Funil",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Reativacao",
+              19,
+              "campanhas similares por token"
+            ],
+            [
+              "Aquisicao",
+              16,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Cashback",
+              37,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              34,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              28,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              52,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              47,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              51,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Padrao",
+              37,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              32,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              29,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Aprovados_nao_convertidos",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Meio de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Abandonados",
+              19,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Opt-out",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              47,
+              "mesma jornada e canal"
+            ],
+            [
+              "Diario",
+              19,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_email_leads6_vibe",
+        "auditRequired": false,
+        "basis": "delivered: 16826 -> 16822 | opens: 0 -> 3780 | clicks: 0 -> 350",
+        "bu": "B2C",
+        "canonicalDimensionFields": [
+          "segmento"
+        ],
+        "canonicalDimensionRefresh": true,
+        "channel": "E-mail",
+        "clicks": 350,
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 16822,
+        "dispatchSignature": "afz_aqs_vis_reg_email_leads6_vibe|E-mail|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "DISP_AQUISICAO_B2C_LEADS_AGO26",
+        "key": "disp_aquisicao_b2c_leads_ago26|afz_aqs_vis_reg_email_leads6_vibe|E-mail|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000000849",
+        "metricRefresh": true,
+        "oferta": "Anuidade Zero",
+        "opens": 3780,
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "Leads_Parceiros",
+        "sent": 18696,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "ready",
+        "subgrupo": "Vibe",
+        "suggestion": "Classificacao canonica de segmento, etapa ou janela do publico mudou",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Anuidade Zero",
+              58,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              25,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              17,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              66,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              33,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              41,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              55,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              22,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              22,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Leads_Parceiros",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Leads",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Churn",
+              39,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Vibe",
+              99,
+              "mesma activity"
+            ],
+            [
+              "RFV",
+              39,
+              "campanhas similares por token"
+            ],
+            [
+              "Padrao",
+              20,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_sms_leads1_vibe",
+        "auditRequired": false,
+        "basis": "delivered: 3642 -> 3592",
+        "bu": "B2C",
+        "canonicalDimensionFields": [
+          "segmento"
+        ],
+        "canonicalDimensionRefresh": true,
+        "channel": "SMS",
+        "confidence": 100,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 100,
+          "parceiro": 100,
+          "perfilCredito": 100,
+          "produto": 100,
+          "promocional": 100,
+          "segmento": 100,
+          "subgrupo": 100
+        },
+        "conflictJourneys": [],
+        "conflictReason": "existing_dispatch",
+        "date": "2026-08-01",
+        "delivered": 3592,
+        "dispatchSignature": "afz_aqs_vis_reg_sms_leads1_vibe|SMS|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Atualizar resultados",
+        "journey": "DISP_AQUISICAO_B2C_LEADS_AGO26",
+        "key": "disp_aquisicao_b2c_leads_ago26|afz_aqs_vis_reg_sms_leads1_vibe|SMS|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": "00000000-0000-4000-8000-000000001127",
+        "metricRefresh": true,
+        "oferta": "Anuidade Zero",
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Padrao",
+        "segmento": "Leads_Parceiros",
+        "sent": 4047,
+        "sourceBlock": "sms",
+        "sourceBlocks": [
+          "sms"
+        ],
+        "status": "ready",
+        "subgrupo": "Vibe",
+        "suggestion": "Classificacao canonica de segmento, etapa ou janela do publico mudou",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Anuidade Zero",
+              36,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              36,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              27,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              50,
+              "mesma activity"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              45,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Padrao",
+              40,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              40,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              20,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Leads_Parceiros",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Leads",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Churn",
+              39,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Vibe",
+              99,
+              "mesma activity"
+            ],
+            [
+              "RFV",
+              39,
+              "campanhas similares por token"
+            ],
+            [
+              "Padrao",
+              20,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_cart_sms_ordem5_padrao",
+        "approved": 30,
+        "assisted": 0,
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "SMS",
+        "confidence": 98,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 83,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 66,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 43649,
+        "dispatchSignature": "afz_aqs_vis_reg_cart_sms_ordem5_padrao|SMS|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Meio_de_Funil",
+        "fieldToReview": "Aprovar",
+        "finalized": 5,
+        "independent": 5,
+        "journey": "JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_AGO26",
+        "key": "jor_aqs_b2c_na_anc_meio_de_funil_pad_vibe_ago26|afz_aqs_vis_reg_cart_sms_ordem5_padrao|SMS|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Sem oferta",
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Copa",
+        "proposals": 39,
+        "segmento": "Aprovados_nao_convertidos",
+        "sent": 50885,
+        "sourceBlock": "sms",
+        "sourceBlocks": [
+          "sms",
+          "performance"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Meio_de_Funil",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Reativacao",
+              19,
+              "campanhas similares por token"
+            ],
+            [
+              "Aquisicao",
+              16,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Sem oferta",
+              83,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              17,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              36,
+              "mesma jornada e canal"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              54,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              50,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Copa",
+              66,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              14,
+              "mesma jornada e canal"
+            ]
+          ],
+          "segmento": [
+            [
+              "Aprovados_nao_convertidos",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Meio de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Abandonados",
+              19,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Opt-out",
+              53,
+              "mesma jornada e canal"
+            ],
+            [
+              "Diario",
+              19,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "afz_aqs_vis_reg_cart_email_ordem5_padrao",
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "E-mail",
+        "clicks": 1094,
+        "confidence": 97,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 100,
+          "oferta": 59,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 59,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 35317,
+        "dispatchSignature": "afz_aqs_vis_reg_cart_email_ordem5_padrao|E-mail|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Meio_de_Funil",
+        "fieldToReview": "Aprovar",
+        "journey": "JOR_AQS_B2C_NA_ANC_MEIO_DE_FUNIL_PAD_VIBE_AGO26",
+        "key": "jor_aqs_b2c_na_anc_meio_de_funil_pad_vibe_ago26|afz_aqs_vis_reg_cart_email_ordem5_padrao|E-mail|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Cashback",
+        "opens": 6894,
+        "parceiro": "N/A",
+        "perfilCredito": "Pre-aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "Aprovados_nao_convertidos",
+        "sent": 41131,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              15,
+              "campanhas similares por token"
+            ],
+            [
+              "B2B2C",
+              11,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Meio_de_Funil",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Reativacao",
+              19,
+              "campanhas similares por token"
+            ],
+            [
+              "Aquisicao",
+              16,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Cashback",
+              59,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              20,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              20,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              14,
+              "campanhas similares por token"
+            ],
+            [
+              "Bem Barato",
+              10,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Pre-aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Aprovado",
+              35,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              59,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              59,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              20,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              20,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "Aprovados_nao_convertidos",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Meio de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Abandonados",
+              19,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Opt-out",
+              51,
+              "mesma jornada e canal"
+            ],
+            [
+              "Diario",
+              19,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "plu_aqs_plx_reg_email_topoclube3_padrao",
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "E-mail",
+        "clicks": 169,
+        "confidence": 96,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 99,
+          "oferta": 55,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 50,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 21406,
+        "dispatchSignature": "plu_aqs_plx_reg_email_topoclube3_padrao|E-mail|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Aprovar",
+        "journey": "JOR_AQS_PLX_TOPO_CLUBE_AGO26",
+        "key": "jor_aqs_plx_topo_clube_ago26|plu_aqs_plx_reg_email_topoclube3_padrao|E-mail|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Sem oferta",
+        "opens": 1297,
+        "parceiro": "N/A",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Copa",
+        "segmento": "CRM",
+        "sent": 22291,
+        "sourceBlock": "email",
+        "sourceBlocks": [
+          "email"
+        ],
+        "status": "ready",
+        "subgrupo": "Clube",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2C",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Plurix",
+              99,
+              "mesma activity"
+            ],
+            [
+              "B2B2C",
+              37,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Sem oferta",
+              55,
+              "mesma activity"
+            ],
+            [
+              "Anuidade Zero",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              11,
+              "mesma activity"
+            ]
+          ],
+          "parceiro": [
+            [
+              "N/A",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Plurix",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Bem Barato",
+              34,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              41,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Cartao Visa",
+              55,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Copa",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Black Friday",
+              33,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              17,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "CRM",
+              100,
+              "regra determinística"
+            ],
+            [
+              "Topo de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio de Funil",
+              21,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Clube",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              37,
+              "campanhas similares por token"
+            ],
+            [
+              "RFV",
+              13,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      },
+      {
+        "accepted": false,
+        "activityName": "bbt_aqs_bmv_reg_sms_topo1_padrao",
+        "auditRequired": false,
+        "basis": "sugestoes por taxonomia e historico",
+        "bu": "B2B2C",
+        "canonicalDimensionFields": [],
+        "canonicalDimensionRefresh": false,
+        "channel": "SMS",
+        "confidence": 96,
+        "confidenceBreakdown": {
+          "bu": 100,
+          "etapaAquisicao": 99,
+          "oferta": 50,
+          "parceiro": 100,
+          "perfilCredito": 99,
+          "produto": 100,
+          "promocional": 50,
+          "segmento": 100,
+          "subgrupo": 99
+        },
+        "conflictJourneys": [],
+        "date": "2026-08-01",
+        "delivered": 15517,
+        "dispatchSignature": "bbt_aqs_bmv_reg_sms_topo1_padrao|SMS|2026-08-01",
+        "domain": "aquisicao",
+        "etapaAquisicao": "Aquisicao",
+        "fieldToReview": "Aprovar",
+        "journey": "JOR_AQS_B2B2C_BBT_TOPO_PAD_AGO26",
+        "key": "jor_aqs_b2b2c_bbt_topo_pad_ago26|bbt_aqs_bmv_reg_sms_topo1_padrao|SMS|2026-08-01",
+        "matchCount": 0,
+        "matchedActivity": null,
+        "metricRefresh": false,
+        "oferta": "Anuidade Zero",
+        "parceiro": "Bem Barato",
+        "perfilCredito": "Aprovado",
+        "produto": "Cartao",
+        "promocional": "Black Friday",
+        "segmento": "CRM",
+        "sent": 17247,
+        "sourceBlock": "sms",
+        "sourceBlocks": [
+          "sms"
+        ],
+        "status": "ready",
+        "subgrupo": "Padrao",
+        "suggestion": "Sugestoes historicas fortes",
+        "suggestions": {
+          "bu": [
+            [
+              "B2B2C",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Plurix",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "B2C",
+              44,
+              "campanhas similares por token"
+            ]
+          ],
+          "etapaAquisicao": [
+            [
+              "Aquisicao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio_de_Funil",
+              21,
+              "campanhas similares por token"
+            ],
+            [
+              "Reativacao",
+              8,
+              "campanhas similares por token"
+            ]
+          ],
+          "oferta": [
+            [
+              "Anuidade Zero",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Sem oferta",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Cashback",
+              24,
+              "mesma jornada e canal"
+            ]
+          ],
+          "parceiro": [
+            [
+              "Bem Barato",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "N/A",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Plurix",
+              30,
+              "campanhas similares por token"
+            ]
+          ],
+          "perfilCredito": [
+            [
+              "Aprovado",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Pre-aprovado",
+              64,
+              "mesma jornada e canal"
+            ]
+          ],
+          "produto": [
+            [
+              "Cartao",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Cartao Visa",
+              50,
+              "mesma activity"
+            ]
+          ],
+          "promocional": [
+            [
+              "Black Friday",
+              50,
+              "mesma activity"
+            ],
+            [
+              "Copa",
+              25,
+              "mesma activity"
+            ],
+            [
+              "Padrao",
+              25,
+              "mesma activity"
+            ]
+          ],
+          "segmento": [
+            [
+              "CRM",
+              100,
+              "jornada canonica"
+            ],
+            [
+              "Topo de Funil",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Meio de Funil",
+              21,
+              "campanhas similares por token"
+            ]
+          ],
+          "subgrupo": [
+            [
+              "Padrao",
+              99,
+              "mesma activity"
+            ],
+            [
+              "Clube",
+              33,
+              "campanhas similares por token"
+            ],
+            [
+              "RFV",
+              13,
+              "campanhas similares por token"
+            ]
+          ]
+        }
+      }
+    ]
+  }
+}
