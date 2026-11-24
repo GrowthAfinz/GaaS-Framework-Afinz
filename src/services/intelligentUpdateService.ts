@@ -343,9 +343,9 @@ const numberFromSummary = (summary: Record<string, any> | null | undefined, ...k
     return 0;
 };
 
-const mapRunRow = (row: any): UpdateRunHistoryItem => {
+export const mapRunRow = (row: any): UpdateRunHistoryItem => {
     const summary = (row?.summary ?? {}) as Record<string, any>;
-    const candidates = numberFromSummary(summary, 'candidates');
+    const candidates = numberFromSummary(summary, 'candidates', 'selected');
     const applied = numberFromSummary(summary, 'applied', 'accepted');
     return {
         id: row?.id,
@@ -361,8 +361,9 @@ const mapRunRow = (row: any): UpdateRunHistoryItem => {
     };
 };
 
-const mapCandidateRow = (row: any): UpdateRunCandidateRow => {
+export const mapCandidateRow = (row: any): UpdateRunCandidateRow => {
     const proposed = (row?.proposed_activity_update ?? {}) as Record<string, any>;
+    const saved = row?.after_payload ?? row?.before_payload ?? {};
     return {
         id: row?.id,
         operationType: row?.operation_type ?? 'pending',
@@ -370,10 +371,10 @@ const mapCandidateRow = (row: any): UpdateRunCandidateRow => {
         domain: row?.domain ?? proposed?.domain ?? '',
         targetTable: row?.target_table ?? proposed?.target_table ?? '',
         targetRecordId: row?.target_record_id ?? proposed?.target_record_id ?? null,
-        journey: proposed?.journey ?? '',
-        activityName: proposed?.activity_name ?? '',
-        channel: proposed?.channel ?? '',
-        date: proposed?.metric_date ?? '',
+        journey: proposed?.journey ?? proposed?.jornada ?? saved.jornada ?? '',
+        activityName: proposed?.activity_name ?? proposed?.['Activity name / Taxonomia'] ?? saved['Activity name / Taxonomia'] ?? '',
+        channel: proposed?.channel ?? proposed?.Canal ?? saved.Canal ?? '',
+        date: proposed?.metric_date ?? String(proposed?.['Data de Disparo'] ?? saved['Data de Disparo'] ?? '').slice(0, 10),
         fieldToReview: row?.field_to_review ?? '',
         suggestion: row?.suggestion ?? '',
         basis: row?.dispatch_order_basis ?? '',
