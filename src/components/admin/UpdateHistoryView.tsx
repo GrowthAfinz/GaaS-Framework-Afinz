@@ -146,7 +146,7 @@ export const UpdateHistoryView: React.FC<{ onStartUpdate: () => void }> = ({ onS
 
     const bases = useMemo(() => buildBaseFreshness(latestApplied, buildDailyActivity(activity, 30), new Date(), baseChanges), [latestApplied, activity, baseChanges]);
     const anyStale = bases.some((base) => base.tone !== 'ok');
-    const who = (run: UpdateRunHistoryItem) => !run.createdBy ? 'sem autor' : run.createdBy === user?.id ? 'Você' : people.get(run.createdBy) ?? 'outra pessoa';
+    const who = (run: UpdateRunHistoryItem) => !run.createdBy ? 'agente ou script' : run.createdBy === user?.id ? 'Você' : people.get(run.createdBy) ?? 'outra pessoa';
 
     const fieldChanges = useMemo(() => (detail ? buildFieldChanges(detail.applied) : []), [detail]);
     const term = search.trim().toLowerCase();

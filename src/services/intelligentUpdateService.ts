@@ -518,6 +518,28 @@ export const intelligentUpdateService = {
         return (data ?? []).map((row: any) => ({ createdAt: row.created_at, domain: row.domain ?? '' }));
     },
 
+    // Execuções gravadas com o mesmo arquivo (mesmo SHA-256). O app grava em summary.sourceHash;
+    // cargas por script usam sourceHash, sha256 ou source_sha256 (esta em maiúsculas).
+    async findAppliedRunsBySource(hash: string): Promise<Array<{ id: string; createdAt: string; createdBy: string | null; applied: number; domain: string }>> {
+        const lower = hash.toLowerCase();
+        const upper = hash.toUpperCase();
+        const { data, error } = await supabase
+            .from('gaas_update_runs')
+            .select('id, created_at, created_by, domain, summary->applied')
+            .eq('status', 'applied')
+            .or(`summary->>sourceHash.eq.${lower},summary->>sha256.eq.${lower},summary->>source_sha256.eq.${upper},summary->>source_sha256.eq.${lower}`)
+            .order('created_at', { ascending: false })
+            .limit(5);
+        if (error) throw error;
+        return (data ?? []).map((row: any) => ({
+            id: row.id,
+            createdAt: row.created_at,
+            createdBy: row.created_by ?? null,
+            applied: Number(row.applied ?? 0) || 0,
+            domain: row.domain ?? '',
+        }));
+    },
+
     // Tamanho real e última mudança de cada base, lidos nas próprias tabelas. A lista de
     // execuções só mostra as do usuário (RLS) e carga feita por script não tem autor, então
     // ela sozinha não diz quando a base mudou de verdade.
