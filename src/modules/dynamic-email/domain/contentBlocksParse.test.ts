@@ -26,12 +26,13 @@ describe('leitura dos blocos a partir do HTML', () => {
     expect(parseContentBlocks(renderContentBlocks(blocks))).toEqual(blocks);
   });
 
-  it('converte os benefícios do e-mail 7 preservando os passos e o fechamento', () => {
+  it.each([undefined, 'plain'] as const)('converte os benefícios do e-mail 7 (%s) preservando passos e fechamento', (appearance) => {
     const email = plurix.emails.find((item) => item.number === 7)!;
     const [steps, intro, closing] = parseContentBlocks(email.patch.COPY_2_PRETO)!;
     if (intro.type !== 'lead') throw new Error('Introdução esperada');
     const [text, ...items] = intro.text.split('<br>');
-    const blocks: ContentBlock[] = [steps, { type: 'lead', text }, { type: 'benefits_panel', items }, closing];
+    const panel: ContentBlock = appearance ? { type: 'benefits_panel', items, appearance } : { type: 'benefits_panel', items };
+    const blocks: ContentBlock[] = [steps, { type: 'lead', text }, panel, closing];
     const html = renderContentBlocks(blocks);
     expect(items).toHaveLength(4);
     expect(html.length).toBeLessThanOrEqual(4000);

@@ -6,7 +6,8 @@ export type ContentBlock =
       items: Array<{ title: string; text: string }>;
     }
   | { type: "stat_tiles"; items: Array<{ number: string; label: string }> }
-  | { type: "check_list" | "benefits_panel"; items: string[] };
+  | { type: "check_list"; items: string[] }
+  | { type: "benefits_panel"; items: string[]; appearance?: "plain" };
 
 const escapeText = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -41,6 +42,7 @@ export function closing(value: string, allowHtml = true): string {
 const table = (body: string, spacing: number, separate = false) =>
   `<table role="presentation" width="100%" cellpadding="0" cellspacing="${spacing}" border="0" style="margin:0 auto;${separate ? "border-collapse:separate;" : ""}">${body}</table>`;
 const BENEFITS_PANEL_START = '<table role="presentation" width="100%" cellpadding="8" cellspacing="0" border="0" bgcolor="#F4F5FB" style="background-color:#F4F5FB;">';
+const BENEFITS_PLAIN_START = '<table role="presentation" width="100%" cellpadding="4" cellspacing="0" border="0" style="margin:0 auto;">';
 export function benefitGrid(
   items: Array<{ title: string; text: string }>,
   allowHtml = false,
@@ -117,7 +119,7 @@ export function renderContentBlocks(blocks: ContentBlock[]): string {
         case "check_list":
           return checkList(block.items);
         case "benefits_panel":
-          return BENEFITS_PANEL_START +
+          return (block.appearance === "plain" ? BENEFITS_PLAIN_START : BENEFITS_PANEL_START) +
             block.items.map((item) => '<tr><td width="18" valign="top" style="color:#2C3490;">&#8226;</td><td align="left" style="color:#242424;">' + textFor(item, true) + '</td></tr>').join('') +
             '</table>';
         case "steps":
@@ -161,7 +163,10 @@ export function parseContentBlocks(html: string): ContentBlock[] | null {
     else if (body.includes("font-size:26px")) blocks.push({ type: "stat_tiles", items: [...body.matchAll(TILE_TEXT)].map((m) => ({ number: unescapeText(m[1]), label: unescapeText(m[2]) })) });
     else if (body.includes('class="stack-column"')) blocks.push({ type: "benefit_grid", items: [...body.matchAll(CELL_TEXT)].map((m) => ({ title: unescapeText(m[1]), text: m[2].split('<b style="color:#242424;">').join("<b>") })) });
     else if (body.includes('valign="middle"')) blocks.push({ type: "check_list", items: [...body.matchAll(CHECK_TEXT)].map((m) => m[1]) });
-    else if (match[0].startsWith(BENEFITS_PANEL_START)) blocks.push({ type: "benefits_panel", items: [...body.matchAll(PANEL_TEXT)].map((m) => m[1]) });
+    else if (match[0].startsWith(BENEFITS_PANEL_START) || match[0].startsWith(BENEFITS_PLAIN_START)) {
+      const items = [...body.matchAll(PANEL_TEXT)].map((m) => m[1]);
+      blocks.push(match[0].startsWith(BENEFITS_PLAIN_START) ? { type: "benefits_panel", items, appearance: "plain" } : { type: "benefits_panel", items });
+    }
     else blocks.push({ type: "steps", items: [...body.matchAll(STEP_TEXT)].map((m) => ({ title: unescapeText(m[1]), text: unescapeText(m[2]) })) });
   }
   try {

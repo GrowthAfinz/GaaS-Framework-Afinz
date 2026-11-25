@@ -87,7 +87,7 @@ def render_blocks(blocks):
         elif kind == "check_list":
             parts.append(check_list(block["items"]))
         elif kind == "benefits_panel":
-            parts.append(benefits_panel(block["items"]))
+            parts.append(benefits_panel(block["items"], block.get("appearance")))
         elif kind == "steps":
             parts.append(steps([(i["title"], i["text"]) for i in block["items"]]))
         else:

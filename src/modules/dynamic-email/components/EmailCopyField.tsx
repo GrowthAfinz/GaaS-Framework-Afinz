@@ -110,8 +110,14 @@ function StructuredCopyEditor({ blocks, label, value, onApply, onCancel, firstNa
           </>}
           {(block.type === 'check_list' || block.type === 'benefits_panel') && <>
             <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">Aparência
-              <select className={control} value={block.type} onChange={(event) => update(id, { ...block, type: event.target.value === 'check_list' ? 'check_list' : 'benefits_panel' })}>
-                <option value="check_list">Lista com marcadores</option><option value="benefits_panel">Quadro de benefícios</option>
+              <select className={control} value={block.type === 'check_list' ? 'check_list' : block.appearance ?? 'panel'} onChange={(event) => {
+                const appearance = event.target.value;
+                const items = block.items;
+                update(id, appearance === 'check_list' ? { type: 'check_list', items } :
+                  appearance === 'plain' ? { type: 'benefits_panel', items, appearance } : { type: 'benefits_panel', items });
+              }}>
+                {block.type === 'check_list' && <option value="check_list">Lista com selo</option>}
+                <option value="plain">Lista com marcadores</option><option value="panel">Quadro de benefícios</option>
               </select>
             </label>
             {block.items.map((item, itemIndex) => <div key={itemIndex} className="space-y-1">

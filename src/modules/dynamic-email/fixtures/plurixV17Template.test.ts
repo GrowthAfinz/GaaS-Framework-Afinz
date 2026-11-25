@@ -9,7 +9,7 @@ import { renderContentBlocks } from '../domain/contentBlocks';
 
 describe('V17: audiencia COMUNICACAO_PLX, restante igual a V16',()=>{
  it('renderiza o negrito, a quebra, a personalização e o quadro de benefícios do editor', () => {
-  const row = Object.assign(emptyBriefingRow('editor-v17'), {
+  const row = Object.assign(emptyBriefingRow('00000000-0000-4000-8000-000000000001'), {
    SEQUENCIA: 'E-mail 7',
    COPY_1_PRETO: 'Olá, %%=v(@FirstName)=%%!<br><b>Benefícios para você</b>.',
    COPY_2_PRETO: renderContentBlocks([{ type: 'benefits_panel', items: ['Mais prazo', '<b>Desconto</b> nas compras'] }]),
