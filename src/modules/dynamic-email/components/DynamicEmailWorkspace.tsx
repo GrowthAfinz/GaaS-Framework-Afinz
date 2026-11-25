@@ -8,6 +8,7 @@ import type { VdvSample } from '../domain/vaiDeVisa';
 import { VdvCampaignTree } from './VdvCampaignTree';
 import { isVdvEmail, ensureVdvTemplate, materializeVdvTemplate, projectVdvEditorial, factoryFamilyOrder, createVdvEdition, VDV_SLOT } from '../domain/factoryEmail';
 import { validateVdv, exportVdvBriefingCsv, exportVdvMovimentoCsv } from '../domain/vaiDeVisa';
+import { EmailCopyField } from './EmailCopyField';
 import { saveVdvFactory } from '../services/vaiDeVisaService';
 import { type VdvData } from './VaiDeVisaWorkspace';
 import { detectVdvTemplate, resolveVdvPreview, VDV_SAMPLES, parseVdvBriefingCsv, parseVdvMovimentoCsv } from '../domain/vaiDeVisa';
@@ -1247,7 +1248,16 @@ export const DynamicEmailWorkspace: React.FC = () => {
                   {section.id === 'pool' && <PoolOfferEditorCard offer={poolOffer} offers={poolOffers} signatureKey={selected.NM_PRODUTO_INTERNO} signatureLabel={selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO} date={previewSendDate} onDateChange={setPreviewSendDate} buttonLink={selected.LINK_CTA_1} onManage={() => setMode('topo')}/>}
                   {section.id === 'limit' && <LimitMessageEditor value={selected.MENSAGEM_LIMITE} issues={selectedIssues.filter((issue) => issue.field === 'MENSAGEM_LIMITE')} networkCount={rows.filter((row) => row.__meta.status !== 'archived' && row.__meta.campaignGroupId === selected.__meta.campaignGroupId).length} sampleName={subscriber.PRI_NOME} sampleLimit={subscriber.LIMITE} onChange={(value) => updateField('MENSAGEM_LIMITE', value)}/>}
                   {section.id === 'legal' && <LegalTools selected={selected} legalTexts={legalTexts} updateSelected={updateSelected}/>}
-                  {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)} locked={isContentBlock && !isColumnEditable(field)}/>)}</div>}
+                  {section.fields && <div className="grid gap-3 md:grid-cols-2">{section.fields.map((field) => {
+                    const locked = selected.__meta.status === 'archived' || (isContentBlock && !isColumnEditable(field));
+                    if (!locked && templateActiveCols.has(field) && /TreatAsContent\s*\(/i.test(previewTemplate) && (field === 'COPY_1_PRETO' || field === 'COPY_2_PRETO')) {
+                      return <EmailCopyField key={`${selected.__id}:${linkedTemplateId}:${field}`}
+                        id={`dynamic-${field}`} label={FIELD_LABELS[field] ?? field} field={field} value={selected[field] ?? ''}
+                        onChange={(value) => updateField(field, value)} firstName={/@FirstName\b/i.test(previewTemplate)}
+                        structured={field === 'COPY_2_PRETO'}/>;
+                    }
+                    return <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)} locked={locked}/>;
+                  })}</div>}
                   {section.id === 'message' && <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
                     <p className="mb-2 text-[11px] font-semibold text-slate-500">Amostra usada só na simulação da prévia — equivale aos dados do Test Send do SFMC, não vai no CSV.</p>
                     <div className="grid gap-3 md:grid-cols-2">

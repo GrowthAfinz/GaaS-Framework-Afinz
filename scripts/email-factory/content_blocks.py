@@ -95,6 +95,20 @@ def check_list(items):
     return f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">{rows}</table>'
 
 
+def benefits_panel(items, appearance=None):
+    """Lista de benefícios em um quadro compacto."""
+    rows = "".join(
+        '<tr><td width="18" valign="top" style="color:#2C3490;">&#8226;</td>'
+        f'<td align="left" style="color:#242424;">{_t(text, True)}</td></tr>'
+        for text in items)
+    if appearance == "plain":
+        start = '<table role="presentation" width="100%" cellpadding="4" cellspacing="0" border="0" style="margin:0 auto;">'
+    else:
+        start = ('<table role="presentation" width="100%" cellpadding="8" cellspacing="0" border="0" '
+                 'bgcolor="#F4F5FB" style="background-color:#F4F5FB;">')
+    return f'{start}{rows}</table>'
+
+
 def steps(items):
     """Passo a passo numerado. items: lista de (titulo, descricao)."""
     rows = "".join(

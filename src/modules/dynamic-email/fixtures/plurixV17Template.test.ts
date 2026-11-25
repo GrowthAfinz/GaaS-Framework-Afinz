@@ -5,8 +5,23 @@ import {renderDynamicEmail} from '../ampscript/renderer';
 import {emptyBriefingRow} from '../domain/briefing';
 import {plurixEnvelope} from '../domain/sfmcEnvelope';
 import {readFileSync,readdirSync} from 'node:fs';
+import { renderContentBlocks } from '../domain/contentBlocks';
 
 describe('V17: audiencia COMUNICACAO_PLX, restante igual a V16',()=>{
+ it('renderiza o negrito, a quebra, a personalização e o quadro de benefícios do editor', () => {
+  const row = Object.assign(emptyBriefingRow('00000000-0000-4000-8000-000000000001'), {
+   SEQUENCIA: 'E-mail 7',
+   COPY_1_PRETO: 'Olá, %%=v(@FirstName)=%%!<br><b>Benefícios para você</b>.',
+   COPY_2_PRETO: renderContentBlocks([{ type: 'benefits_panel', items: ['Mais prazo', '<b>Desconto</b> nas compras'] }]),
+  });
+  const preview = renderDynamicEmail(PLURIX_V17_TEMPLATE, row, {
+   CPF: '00000000000', PRI_NOME: 'MARIA', LIMITE: '3000', PRODUTO: 'Amigao', SEQUENCIA: row.SEQUENCIA, TP_CAMPANHA: 'CRM',
+  });
+  expect(preview.diagnostics).toEqual([]);
+  expect(preview.html).toMatch(/Olá, Maria!<br><b>Benefícios para você<\/b>/i);
+  expect(preview.html).toContain('bgcolor="#F4F5FB"');
+  expect(preview.html).toContain('<b>Desconto</b> nas compras');
+ });
  it('exporta a mesma fonte publicada pela migration',()=>{
   const migration=readdirSync('supabase/migrations').find(f=>f.endsWith('_plurix_v17_comunicacao_plx_audience.sql'))!;
   expect(readFileSync('supabase/migrations/'+migration,'utf8').replace(/\r\n/g,'\n').split('$v17$')[1]).toBe(PLURIX_V17_TEMPLATE);

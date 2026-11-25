@@ -728,6 +728,7 @@ Você manda dados; o HTML sai sempre igual, com tabelas que funcionam no Outlook
 | 2 a 6 benefícios com título e explicação | \`benefit_grid\` | Número par de itens. Título até ~26 caracteres, sem HTML; explicação aceita <b>. |
 | 2 ou 3 benefícios que são números | \`stat_tiles\` | 2 ou 3 itens; legendas com comprimento parecido. Sem HTML. |
 | Lista curta de vantagens | \`check_list\` | Itens alinhados à esquerda, aceitam <b>. |
+| Lista de vantagens em fundo de destaque | \`benefits_panel\` | Um marcador por item, aceita <b>. Use \`appearance: "plain"\` para remover o fundo. |
 | Como pedir, passo a passo | \`steps\` | O GaaS numera. Sem HTML. |
 | Chamada antes do botão | \`closing\` | Curta, em destaque. |
 
