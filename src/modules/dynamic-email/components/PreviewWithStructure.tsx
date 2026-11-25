@@ -10,7 +10,6 @@ export type StructureBlock = {
   templateLocked?: boolean;
 };
 
-const DESKTOP_W = 680; // viewport fixo da prévia — garante o layout desktop do e-mail
 const MAX_CONTENT_H = 9000; // trava defensiva contra template que estica <body> a 100%
 
 // o elemento renderiza de fato? (o pré-cabeçalho fica num <div display:none no
@@ -75,12 +74,16 @@ export const measureContentHeight = (doc: Document): number => {
   return Math.min(Math.max(Math.round(extent), 200), MAX_CONTENT_H);
 };
 
-export const PreviewWithStructure = ({ html, contextKey, className, blocks, activeBlockId, openBlockIds, onSelectBlock, onHoverBlock }: {
+export const PreviewWithStructure = ({ html, contextKey, className, blocks, activeBlockId, selectedBlockId, scrollRef, messageRef, viewportWidth, openBlockIds, onSelectBlock, onHoverBlock }: {
   html: string;
   contextKey: string;
   className: string;
   blocks: StructureBlock[];
   activeBlockId: string | null;
+  selectedBlockId: string | null;
+  scrollRef: React.RefObject<HTMLDivElement>;
+  messageRef: React.RefObject<HTMLDivElement>;
+  viewportWidth: number;
   openBlockIds: Set<string>;
   onSelectBlock: (id: string) => void;
   onHoverBlock: (id: string | null) => void;
@@ -96,7 +99,7 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
   const [loaded, setLoaded] = useState(false);
 
   // a escala só encaixa a largura — a altura fica 100% natural, sem scroll interno
-  const scale = boxW > 0 ? Math.min(1, boxW / DESKTOP_W) : 1;
+  const scale = boxW > 0 ? Math.min(1, boxW / viewportWidth) : 1;
   const visualH = (contentH || 600) * scale;
 
   const measure = useCallback(() => {
@@ -124,7 +127,7 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
     const raf = requestAnimationFrame(measure);
     const timers = [250, 700, 1500, 2600].map((delay) => window.setTimeout(measure, delay));
     return () => { cancelAnimationFrame(raf); timers.forEach(window.clearTimeout); };
-  }, [measure, html, contextKey]);
+  }, [measure, html, contextKey, viewportWidth]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -194,10 +197,30 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
     band = { top: start, height: Math.max(0, ((nextStart ?? visualH) || start + 120) - start) };
   }
 
+  const selectedTop = selectedBlockId ? clampedTops[selectedBlockId] : undefined;
+  const selectedBlock = blocks.find((block) => block.id === selectedBlockId);
+  const selectedMissing = selectedBlock && anchorTops[selectedBlock.id] === 'missing';
+  useLayoutEffect(() => {
+    const viewport = scrollRef.current;
+    const target = selectedBlockId === 'message' ? messageRef.current : boxRef.current;
+    if (!selectedBlockId || !viewport || !target) return;
+    if (selectedBlockId !== 'message' && typeof selectedTop !== 'number' && !selectedMissing) return;
+    const offset = typeof selectedTop === 'number' ? selectedTop * scale : 0;
+    const viewportRect = viewport.getBoundingClientRect();
+    const interfaceScale = viewport.offsetHeight ? viewportRect.height / viewport.offsetHeight : 1;
+    if (!interfaceScale) return;
+    const top = (target.getBoundingClientRect().top - viewportRect.top) / interfaceScale + viewport.scrollTop + offset;
+    viewport.scrollTop = Math.max(0, top - 28);
+  }, [contextKey, messageRef, scale, scrollRef, selectedBlockId, selectedMissing, selectedTop, viewportWidth, visualH]);
+
   const pinClass = (block: StructureBlock, on: boolean) =>
     `relative grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-extrabold shadow-sm transition ${on ? 'border-cyan-600 bg-cyan-600 text-white' : block.status === 'warning' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-cyan-300 bg-white text-cyan-800 group-hover/pin:border-cyan-500'}`;
 
   return (
+    <div>
+      {selectedMissing && <div role="status" className="sticky top-0 z-20 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        {selectedBlock.label} não aparece neste cenário da prévia.
+      </div>}
     <div className={`flex ${className}`} style={{ minHeight: Math.max(300, visualH) }}>
       <div className="relative w-[30px] shrink-0 border-r border-slate-200 bg-white">
         <span className="pointer-events-none absolute inset-y-0 left-[14px] w-px bg-slate-100"/>
@@ -242,13 +265,14 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
           sandbox="allow-same-origin"
           scrolling="no"
           srcDoc={html}
-          style={{ position: 'absolute', top: 0, left: 0, width: DESKTOP_W, height: contentH || 600, transform: `scale(${scale})`, transformOrigin: 'top left' }}
+          style={{ position: 'absolute', top: 0, left: viewportWidth < 680 ? Math.max(0, (boxW - viewportWidth) / 2) : 0, width: viewportWidth, height: contentH || 600, transform: `scale(${scale})`, transformOrigin: 'top left' }}
           className={`border-0 bg-white transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         />
         {band && band.height > 6 && (
           <div className="pointer-events-none absolute inset-x-0 z-10 border-y-2 border-cyan-400/70 bg-cyan-300/[0.12]" style={{ top: band.top, height: band.height }}/>
         )}
       </div>
+    </div>
     </div>
   );
 };
