@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -53,6 +54,23 @@ jobs:
           path: ${{ runner.temp }}/artifact.tar
           retention-days: 1
           if-no-files-found: error
+
+      # O deploy-pages procura o artefato logo depois do upload e, às vezes, a API ainda
+      # não o lista ("No artifacts named ... were found"). Espera ele aparecer antes.
+      - name: Wait for Pages artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          for attempt in $(seq 1 30); do
+            found=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"               --jq "[.artifacts[] | select(.name == \"$ARTIFACT\")] | length" || echo 0)
+            if [ "${found:-0}" -gt 0 ]; then
+              echo "Artefato $ARTIFACT disponível após $attempt verificação(ões)."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::warning::Artefato $ARTIFACT ainda não aparece na API após 150 s; tentando o deploy assim mesmo."
 
       - name: Deploy GitHub Pages
         id: deployment
