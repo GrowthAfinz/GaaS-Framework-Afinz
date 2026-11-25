@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { Bold, Undo2, Redo2 } from 'lucide-react';
 
 export const FIRST_NAME = '%%=v(@FirstName)=%%';
-const chip = '<span contenteditable="false" data-first-name class="rounded bg-cyan-100 px-1 text-cyan-900">Primeiro nome</span>';
+// Keep a text caret position after the non-editable token, including at the end of a field.
+const chip = '<span contenteditable="false" data-first-name class="rounded bg-cyan-100 px-1 text-cyan-900">Primeiro nome</span>&#8203;';
 const escapeText = (text: string) => text.replace(/[&<>%]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '%': '&#37;' })[char]!);
 
 export function visualCopyHtml(value: string): string | null {
@@ -18,7 +19,7 @@ function serializeChildren(element: Node): string {
   let html = '';
   nodes.forEach((node, index) => {
     if (node.nodeType === Node.TEXT_NODE) {
-      html += escapeText((node.textContent ?? '').replace(/\u00a0/g, ' '));
+      html += escapeText((node.textContent ?? '').replace(/\u200b/g, '').replace(/\u00a0/g, ' '));
       return;
     }
     if (!(node instanceof HTMLElement)) return;
@@ -27,7 +28,7 @@ function serializeChildren(element: Node): string {
       return;
     }
     if (node.tagName === 'BR') {
-      if (index !== nodes.length - 1 || node.previousSibling?.nodeName === 'BR') html += '<br>';
+      if (index !== nodes.length - 1) html += '<br>';
       return;
     }
     const content = serializeChildren(node);
@@ -35,7 +36,7 @@ function serializeChildren(element: Node): string {
       html += content ? '<b>' + content + '</b>' : '';
       return;
     }
-    if (node.matches('p,div') && index > 0) html += node.tagName === 'P' ? '<br><br>' : '<br>';
+    if (node.matches('p,div') && index > 0) html += '<br><br>';
     html += content;
   });
   return html;
@@ -52,7 +53,8 @@ export function VisualCopyInput({ id, label, html, onChange, firstName }: {
   const [bold, setBold] = useState(false);
   useLayoutEffect(() => {
     if (!editor.current || lastValue.current === html) return;
-    editor.current.innerHTML = visualCopyHtml(html) ?? '';
+    const markup = visualCopyHtml(html) ?? '';
+    editor.current.innerHTML = /<br\s*\/?>$/i.test(markup) ? markup + '<br>' : markup;
     lastValue.current = html;
     selection.current = undefined;
     setBold(false);
@@ -96,14 +98,9 @@ export function VisualCopyInput({ id, label, html, onChange, firstName }: {
     <div id={id} ref={editor} contentEditable suppressContentEditableWarning role="textbox" aria-label={label} aria-multiline="true"
       className="min-h-20 break-words whitespace-pre-wrap px-3 py-2 text-sm font-normal leading-5 text-slate-800 outline-none [&_p+p]:mt-3"
       onInput={publish} onSelect={rememberSelection} onKeyUp={rememberSelection} onMouseUp={rememberSelection}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-          event.preventDefault();
-          run('insertHTML', event.shiftKey ? '<br>' : '<br><br>');
-        }
-      }}
       onPaste={(event) => {
         event.preventDefault();
+        rememberSelection();
         const text = event.clipboardData.getData('text/plain');
         run('insertHTML', escapeText(text).replace(/\r\n?|\n/g, '<br>'));
       }}
