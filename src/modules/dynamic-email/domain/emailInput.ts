@@ -33,6 +33,7 @@ export const contentBlockSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("steps"), items: z.array(item).min(1) }),
   z.object({ type: z.literal("check_list"), items: z.array(text).min(1) }),
+  z.object({ type: z.literal("benefits_panel"), items: z.array(text).min(1) }),
   z.object({
     type: z.literal("stat_tiles"),
     items: z

@@ -19,7 +19,7 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from content_blocks import benefit_grid, check_list, closing, lead, stat_tiles, steps  # noqa: E402
+from content_blocks import benefit_grid, benefits_panel, check_list, closing, lead, stat_tiles, steps  # noqa: E402
 
 CONTRACT = "gaas-emails-input/1"
 GOVERNED_EXACT = {"UTM_CAMPANHA", "BANNER_3_CORPO", "NOTA_LEGAL", "RODAPE", "HEADER_LOGO",
@@ -86,6 +86,8 @@ def render_blocks(blocks):
             parts.append(stat_tiles([(i["number"], i["label"]) for i in block["items"]]))
         elif kind == "check_list":
             parts.append(check_list(block["items"]))
+        elif kind == "benefits_panel":
+            parts.append(benefits_panel(block["items"]))
         elif kind == "steps":
             parts.append(steps([(i["title"], i["text"]) for i in block["items"]]))
         else:

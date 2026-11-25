@@ -6,7 +6,7 @@ export type ContentBlock =
       items: Array<{ title: string; text: string }>;
     }
   | { type: "stat_tiles"; items: Array<{ number: string; label: string }> }
-  | { type: "check_list"; items: string[] };
+  | { type: "check_list" | "benefits_panel"; items: string[] };
 
 const escapeText = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -40,6 +40,7 @@ export function closing(value: string, allowHtml = true): string {
 }
 const table = (body: string, spacing: number, separate = false) =>
   `<table role="presentation" width="100%" cellpadding="0" cellspacing="${spacing}" border="0" style="margin:0 auto;${separate ? "border-collapse:separate;" : ""}">${body}</table>`;
+const BENEFITS_PANEL_START = '<table role="presentation" width="100%" cellpadding="8" cellspacing="0" border="0" bgcolor="#F4F5FB" style="background-color:#F4F5FB;">';
 export function benefitGrid(
   items: Array<{ title: string; text: string }>,
   allowHtml = false,
@@ -115,6 +116,10 @@ export function renderContentBlocks(blocks: ContentBlock[]): string {
           return statTiles(block.items);
         case "check_list":
           return checkList(block.items);
+        case "benefits_panel":
+          return BENEFITS_PANEL_START +
+            block.items.map((item) => '<tr><td width="18" valign="top" style="color:#2C3490;">&#8226;</td><td align="left" style="color:#242424;">' + textFor(item, true) + '</td></tr>').join('') +
+            '</table>';
         case "steps":
           return steps(block.items);
       }
@@ -132,6 +137,7 @@ const BLOCK_PATTERN =
 const CELL_TEXT = /<p style="margin:10px 0 4px 0;[^"]*">([\s\S]*?)<\/p><p style="margin:0;[^"]*">([\s\S]*?)<\/p><\/td>/g;
 const TILE_TEXT = /<p style="margin:0;font-size:26px;[^"]*">([\s\S]*?)<\/p><p style="margin:6px 0 0 0;[^"]*">([\s\S]*?)<\/p><\/td>/g;
 const CHECK_TEXT = /<td valign="middle"[^>]*>([\s\S]*?)<\/td><\/tr>/g;
+const PANEL_TEXT = /<td align="left" style="color:#242424;">([\s\S]*?)<\/td><\/tr>/g;
 const STEP_TEXT = /<p style="margin:4px 0 2px 0;[^"]*">([\s\S]*?)<\/p><p style="margin:0;[^"]*">([\s\S]*?)<\/p><\/td><\/tr>/g;
 
 /**
@@ -155,6 +161,7 @@ export function parseContentBlocks(html: string): ContentBlock[] | null {
     else if (body.includes("font-size:26px")) blocks.push({ type: "stat_tiles", items: [...body.matchAll(TILE_TEXT)].map((m) => ({ number: unescapeText(m[1]), label: unescapeText(m[2]) })) });
     else if (body.includes('class="stack-column"')) blocks.push({ type: "benefit_grid", items: [...body.matchAll(CELL_TEXT)].map((m) => ({ title: unescapeText(m[1]), text: m[2].split('<b style="color:#242424;">').join("<b>") })) });
     else if (body.includes('valign="middle"')) blocks.push({ type: "check_list", items: [...body.matchAll(CHECK_TEXT)].map((m) => m[1]) });
+    else if (match[0].startsWith(BENEFITS_PANEL_START)) blocks.push({ type: "benefits_panel", items: [...body.matchAll(PANEL_TEXT)].map((m) => m[1]) });
     else blocks.push({ type: "steps", items: [...body.matchAll(STEP_TEXT)].map((m) => ({ title: unescapeText(m[1]), text: unescapeText(m[2]) })) });
   }
   try {
