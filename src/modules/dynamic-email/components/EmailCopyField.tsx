@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, List, Plus, Trash2 } from 'lucide-react';
 import { parseContentBlocks, renderContentBlocks, type ContentBlock } from '../domain/contentBlocks';
+import type { CopyVariable } from '../domain/copyVariables';
 import { opaqueEmailBackgrounds } from '../domain/opaqueEmailBackgrounds';
 import { VisualCopyInput, visualCopyHtml } from './VisualCopyInput';
 
@@ -38,9 +39,9 @@ function RowActions({ label, index, count, onMove, onDelete }: {
 }
 
 type EditorBlock = { id: number; block: ContentBlock };
-type CopyProps = { id: string; label: string; field: string; value: string; onChange: (value: string) => void; firstName: boolean; structured: boolean; scopeLabel?: string };
+type CopyProps = { id: string; label: string; field: string; value: string; onChange: (value: string) => void; variables: readonly CopyVariable[]; structured: boolean; scopeLabel?: string };
 
-export function EmailCopyField({ id, label, field, value, onChange, firstName, structured, scopeLabel }: CopyProps) {
+export function EmailCopyField({ id, label, field, value, onChange, variables, structured, scopeLabel }: CopyProps) {
   const [mode, setMode] = useState<'visual' | 'html'>('visual');
   const [organizing, setOrganizing] = useState(false);
   const originalBlocks = structured ? parseContentBlocks(value) : null;
@@ -65,19 +66,20 @@ export function EmailCopyField({ id, label, field, value, onChange, firstName, s
     {showHtml ? <>
       <textarea id={id} value={value} onChange={(event) => { setMode('html'); onChange(event.target.value); }} rows={5} className={input}/>
       <p className="text-xs text-slate-600">Campo CSV {field}. {(!canEditVisually && !blocks) && 'Este conteúdo tem formatação personalizada e abre no modo HTML.'}</p>
-    </> : editableBlocks ? <StructuredCopyEditor key={value} blocks={editableBlocks} label={label} value={blocks && decorated ? undecorated : value}
-      onApply={(html) => { setOrganizing(false); onChange(decorated ? opaqueEmailBackgrounds(html) : html); }}
-      onCancel={blocks ? undefined : () => setOrganizing(false)} firstName={firstName}/> : <>
-      <VisualCopyInput id={id} label={label} html={value} onChange={onChange} firstName={firstName}/>
+    </> : editableBlocks ? <StructuredCopyEditor blocks={editableBlocks} label={label} value={value} decorated={decorated}
+      onApply={(html) => { setOrganizing(true); onChange(html); }}
+      variables={variables}/> : <>
+      <VisualCopyInput id={id} label={label} html={value} onChange={onChange} variables={variables}/>
       {organized !== null && <button type="button" className={control} onClick={() => setOrganizing(true)}>Organizar em blocos</button>}
     </>}
   </div>;
 }
 
-function StructuredCopyEditor({ blocks, label, value, onApply, onCancel, firstName }: {
-  blocks: ContentBlock[]; label: string; value: string; onApply: (value: string) => void; onCancel?: () => void; firstName: boolean;
+function StructuredCopyEditor({ blocks, label, value, decorated, onApply, variables }: {
+  blocks: ContentBlock[]; label: string; value: string; decorated: boolean; onApply: (value: string) => void; variables: readonly CopyVariable[];
 }) {
-  const [draft, setDraft] = useState<EditorBlock[]>(() => blocks.map((block, id) => ({ block, id })));
+  const initial = useRef(blocks.map((block, id) => ({ block, id })));
+  const [draft, setDraft] = useState<EditorBlock[]>(initial.current);
   const [nextId, setNextId] = useState(blocks.length);
   const update = (id: number, block: ContentBlock) => setDraft((current) => current.map((entry) => entry.id === id ? { ...entry, block } : entry));
   const insert = (index: number, block: ContentBlock) => {
@@ -90,15 +92,31 @@ function StructuredCopyEditor({ blocks, label, value, onApply, onCancel, firstNa
   };
   let output: string | undefined;
   let error = '';
+  let emptyItems = false;
   try {
-    if (draft.some(({ block }) => 'items' in block && (!block.items.length ||
-      block.items.some((item) => typeof item === 'string' ? !item.trim() : !('title' in item ? item.title : item.number).trim())))) {
-      throw new Error('Preencha os itens da lista ou remova os itens vazios.');
-    }
-    output = renderContentBlocks(draft.map(({ block }) => block));
+    const rendered = draft.flatMap<ContentBlock>(({ block }) => {
+      if (block.type === 'check_list' || block.type === 'benefits_panel') {
+        const items = block.items.filter((item) => item.replace(/<br\s*\/?\s*>/gi, '').trim());
+        emptyItems ||= items.length !== block.items.length;
+        return items.length ? [{ ...block, items }] : [];
+      }
+      if (block.type === 'steps') {
+        const items = block.items.filter((item) => item.title.trim());
+        emptyItems ||= items.length !== block.items.length;
+        return items.length ? [{ ...block, items }] : [];
+      }
+      return [block];
+    });
+    const html = renderContentBlocks(rendered);
+    const finalHtml = decorated ? opaqueEmailBackgrounds(html) : html;
+    if (Array.from(finalHtml).length > 4000) throw new Error('O texto complementar ultrapassou o limite do SFMC de 4.000 caracteres após a formatação.');
+    output = finalHtml;
   } catch (reason) {
-    error = reason instanceof Error ? reason.message : 'Revise o conteúdo antes de aplicar.';
+    error = reason instanceof Error ? reason.message : 'Revise o conteúdo.';
   }
+  useEffect(() => {
+    if (draft !== initial.current && output !== undefined && output !== value) onApply(output);
+  }, [draft, onApply, output, value]);
 
   return <div className="space-y-2" role="group" aria-label={label}>
     <div className="space-y-2">
@@ -114,32 +132,11 @@ function StructuredCopyEditor({ blocks, label, value, onApply, onCancel, firstNa
               onDelete={() => setDraft((current) => current.filter((item) => item.id !== id))}/>
           </div>
           {'text' in block && <>
-            <VisualCopyInput label={name} html={block.text} firstName={firstName} onChange={(text) => update(id, { ...block, text })}/>
-            {lines.length >= 3 && <button type="button" className={control} onClick={() => convert(index, entry, lines)}>Transformar linhas em benefícios</button>}
+            <VisualCopyInput label={name} html={block.text} variables={variables} onChange={(text) => update(id, { ...block, text })}/>
+            {lines.length >= 3 && <button type="button" className={control} onClick={() => convert(index, entry, lines)}><List size={14} className="mr-1 inline"/>Transformar linhas em benefícios</button>}
           </>}
-          {(block.type === 'check_list' || block.type === 'benefits_panel') && <>
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">Aparência
-              <select className={control} value={block.type === 'check_list' ? 'check_list' : block.appearance ?? 'panel'} onChange={(event) => {
-                const appearance = event.target.value;
-                const items = block.items;
-                update(id, appearance === 'check_list' ? { type: 'check_list', items } :
-                  appearance === 'plain' ? { type: 'benefits_panel', items, appearance } : { type: 'benefits_panel', items });
-              }}>
-                {block.type === 'check_list' && <option value="check_list">Lista com selo</option>}
-                <option value="plain">Lista com marcadores</option><option value="panel">Quadro de benefícios</option>
-              </select>
-            </label>
-            {block.items.map((item, itemIndex) => <div key={itemIndex} className="space-y-1">
-              <div className="flex items-center justify-between gap-2 text-xs text-slate-600">Benefício {itemIndex + 1}
-                <RowActions label={`benefício ${itemIndex + 1}`} index={itemIndex} count={block.items.length}
-                  onMove={(offset) => update(id, { ...block, items: move(block.items, itemIndex, offset) })}
-                  onDelete={() => update(id, { ...block, items: block.items.filter((_, position) => position !== itemIndex) })}/>
-              </div>
-              <VisualCopyInput label={`Benefício ${itemIndex + 1}`} html={item} firstName={firstName}
-                onChange={(text) => update(id, { ...block, items: block.items.map((old, position) => position === itemIndex ? text : old) })}/>
-            </div>)}
-            <button type="button" className={control} onClick={() => update(id, { ...block, items: [...block.items, ''] })}>Adicionar benefício</button>
-          </>}
+          {(block.type === 'check_list' || block.type === 'benefits_panel') &&
+            <BenefitList block={block} variables={variables} onChange={(next) => update(id, next)}/>}
           {block.type === 'steps' && <>
             {block.items.map((item, itemIndex) => <div key={itemIndex} className="space-y-1">
               <div className="flex items-center gap-1">
@@ -164,15 +161,45 @@ function StructuredCopyEditor({ blocks, label, value, onApply, onCancel, firstNa
       <button type="button" className={control} onClick={() => insert(draft.length, { type: 'steps', items: [{ title: '', text: '' }] })}><Plus size={13} className="mr-1 inline"/>Passos</button>
       <button type="button" className={control} onClick={() => insert(draft.length, { type: 'benefits_panel', items: [''] })}><Plus size={13} className="mr-1 inline"/>Benefícios</button>
     </div>
-    <div className="flex flex-wrap items-center gap-2">
-      <button type="button" className={control + ' border-cyan-700 text-cyan-800'} disabled={output === undefined || output === value} onClick={() => output !== undefined && onApply(output)}>Aplicar ao briefing</button>
-      <button type="button" className={control} onClick={() => {
-        if (onCancel) { onCancel(); return; }
-        setDraft(blocks.map((block, id) => ({ block, id: id + nextId })));
-        setNextId(nextId + blocks.length);
-      }}>Descartar ajustes nos blocos</button>
-      {error && <span role="status" className="text-xs text-amber-900">{error}</span>}
-    </div>
-    {output !== undefined && output !== value && <p className="text-xs text-slate-600">Aplique os ajustes para atualizar a prévia e incluir os blocos ao salvar.</p>}
+    {error ? <p role="alert" className="text-xs text-amber-900">{error} A prévia e o briefing mantêm o último conteúdo válido.</p> :
+      emptyItems && <p className="text-xs text-slate-600">Itens vazios entram na prévia após o preenchimento.</p>}
   </div>;
+}
+
+type BenefitBlock = Extract<ContentBlock, { type: 'check_list' | 'benefits_panel' }>;
+function BenefitList({ block, variables, onChange }: { block: BenefitBlock; variables: readonly CopyVariable[]; onChange: (block: BenefitBlock) => void }) {
+  const [toolbarHost, setToolbarHost] = useState<HTMLDivElement | null>(null);
+  const [active, setActive] = useState(0);
+  const activeIndex = Math.min(active, block.items.length - 1);
+  return <>
+    <div className="overflow-hidden rounded-lg border border-slate-300">
+      <div ref={setToolbarHost} className="border-b border-slate-200 bg-slate-50"/>
+      <ul className="space-y-0.5 px-2 py-1">
+        {block.items.map((item, index) => <li key={index} className="flex items-start gap-1">
+          <span aria-hidden="true" className="px-1 py-1 text-cyan-800">•</span>
+          <VisualCopyInput label={`Benefício ${index + 1}`} html={item} variables={variables} compact
+            toolbarHost={index === activeIndex ? toolbarHost : null} onActivate={() => setActive(index)}
+            onChange={(text) => onChange({ ...block, items: block.items.map((old, position) => position === index ? text : old) })}/>
+          <RowActions label={`benefício ${index + 1}`} index={index} count={block.items.length}
+            onMove={(offset) => { setActive(index + offset); onChange({ ...block, items: move(block.items, index, offset) }); }}
+            onDelete={() => onChange({ ...block, items: block.items.filter((_, position) => position !== index) })}/>
+        </li>)}
+      </ul>
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <button type="button" className={control} onClick={() => onChange({ ...block, items: [...block.items, ''] })}>Adicionar benefício</button>
+      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">Aparência
+        <select className={control} value={block.type === 'check_list' ? 'check_list' : block.appearance ?? 'panel'} onChange={(event) => {
+          const appearance = event.target.value;
+          const { items } = block;
+          onChange(appearance === 'check_list' ? { type: 'check_list', items } :
+            appearance === 'plain' ? { type: 'benefits_panel', items, appearance } : { type: 'benefits_panel', items });
+        }}>
+          <option value="check_list">Lista com selo</option>
+          <option value="plain">Lista com marcadores</option>
+          <option value="panel">Quadro de benefícios</option>
+        </select>
+      </label>
+    </div>
+  </>;
 }

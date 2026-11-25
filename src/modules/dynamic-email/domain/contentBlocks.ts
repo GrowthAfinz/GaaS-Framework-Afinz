@@ -1,4 +1,6 @@
-/** Port byte a byte de scripts/email-factory/content_blocks.py. */
+import { withoutCopyTokens } from './copyVariables';
+
+/** Port de scripts/email-factory/content_blocks.py. */
 export type ContentBlock =
   | { type: "lead" | "closing"; text: string }
   | {
@@ -12,7 +14,7 @@ export type ContentBlock =
 const escapeText = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 export function validateBlockText(text: string): void {
-  if (/%%/.test(text.split("%%=v(@FirstName)=%%").join("")))
+  if (/%%/.test(withoutCopyTokens(text)))
     throw new Error("Personalização não permitida.");
   if (/[\r\n]/.test(text))
     throw new Error("Quebra de linha crua não permitida.");

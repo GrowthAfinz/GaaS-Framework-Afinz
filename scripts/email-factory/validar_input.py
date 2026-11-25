@@ -47,10 +47,13 @@ def normalize(text):
     return re.sub(r"\s+", " ", text).strip()
 
 
+COPY_VARIABLE = re.compile(r"%%=v\(@(?:FirstName|NomeInvestida|CartaoNmComercial|LimiteNovo)\)=%%", re.I)
+
+
 def check_text(value):
     """Mesmas regras de validateBlockText: só <b> e <br>, negrito fechado, sem quebra crua."""
-    if "%%" in value.replace(FIRST_NAME, ""):
-        return "Personalização não permitida: use só %%=v(@FirstName)=%% (ou PRI_NOME)."
+    if "%%" in COPY_VARIABLE.sub("", value):
+        return "Personalização não permitida: use uma variável de conteúdo reconhecida pelo GaaS."
     if "\n" in value or "\r" in value:
         return "Quebra de linha crua: use <br>."
     if len(value) > 4000:
