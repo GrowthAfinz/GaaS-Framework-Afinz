@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -72,9 +72,24 @@ jobs:
           done
           echo "::warning::Artefato $ARTIFACT ainda não aparece na API após 150 s; tentando o deploy assim mesmo."
 
+      # A API do Pages às vezes responde 500 ao criar o deployment, sem incidente aberto.
+      # A primeira tentativa não derruba o job; se falhar, espera 30 s e tenta de novo.
       - name: Deploy GitHub Pages
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         with:
           artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
-          timeout: 1200000
+          timeout: 600000
+
+      - name: Wait before retrying deploy
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+
+      - name: Deploy GitHub Pages (retry)
+        id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        with:
+          artifact_name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          timeout: 600000
