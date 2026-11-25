@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
+import { createPortal, flushSync } from 'react-dom';
+import { downloadStructureBoard, type BoardExportFormat } from './structureExport';
 import {
-  Archive, ArchiveRestore, ArrowLeft, ArrowRight, ChartLine, Columns3, Copy, DatabaseZap, Ellipsis, GripVertical, Inbox, Link2,
+  Archive, ArchiveRestore, ArrowLeft, ArrowRight, ChartLine, Columns3, Copy, DatabaseZap, Download, Ellipsis, GripVertical, Inbox, Link2,
   PanelLeftClose, PanelLeftOpen, Pencil, Pin, Plus, Rows3, Search, SlidersHorizontal, TriangleAlert, Zap, CirclePause,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
@@ -27,7 +29,7 @@ interface Prefs { lens: Lens; dense: boolean; mini: boolean; showMetric: boolean
 const DEFAULT_PREFS: Prefs = { lens: 'st', dense: false, mini: true, showMetric: true, collapsed: [], legend: { docked: true, x: 14, y: 14 } };
 function readPrefs(): Prefs { try { return { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') }; } catch { return DEFAULT_PREFS; } }
 
-type MenuState = { kind: 'card' | 'lane' | 'pillar' | 'filters' | 'alert' | 'more'; id?: string; rect: { left: number; right: number; bottom: number } } | null;
+type MenuState = { kind: 'card' | 'lane' | 'pillar' | 'filters' | 'export' | 'alert' | 'more'; id?: string; rect: { left: number; right: number; bottom: number } } | null;
 type DrawerState = { mode: 'view'; id: string } | { mode: 'create'; laneId: string | null } | null;
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 
@@ -57,6 +59,8 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   const [showArchived, setShowArchived] = useState(false);
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [menu, setMenu] = useState<MenuState>(null);
+  const [exporting, setExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [addingLane, setAddingLane] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; overCard: string | null; overLane: string | null } | null>(null);
@@ -95,9 +99,10 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
     return m;
   }, [board]);
   const laneOptions = useMemo(() => pillars.flatMap(p => (lanesByPillar.get(p.id) || []).map(l => ({ ...l, pillar: p }))), [pillars, lanesByPillar]);
-  const cards = useMemo(() => (board?.cards || []).filter(c => !c.archived && (prefs.lens !== 'st' || !c.data_scope?.observed_only) && laneOptions.some(l => l.id === c.lane_id)).sort((a, b) => a.position - b.position), [board, laneOptions, prefs.lens]);
+  const allCards = useMemo(() => (board?.cards || []).filter(c => !c.archived && laneOptions.some(l => l.id === c.lane_id)).sort((a, b) => a.position - b.position), [board, laneOptions]);
+  const cards = useMemo(() => allCards.filter(c => prefs.lens !== 'st' || !c.data_scope?.observed_only), [allCards, prefs.lens]);
   const archived = useMemo(() => (board?.cards || []).filter(c => c.archived), [board]);
-  const signals = useMemo(() => new Map<string, CardSignal>(cards.map(c => [c.id, computeSignal(c, rows, today)])), [cards, rows, today]);
+  const signals = useMemo(() => new Map<string, CardSignal>(allCards.map(c => [c.id, computeSignal(c, rows, today)])), [allCards, rows, today]);
   const sig = useCallback((id: string) => signals.get(id) || computeSignal({ data_scope: null }, [], today), [signals, today]);
   const visible = useMemo(() => cards.filter(c => passes(c, sig(c.id), filters)), [cards, sig, filters]);
   const visibleIds = useMemo(() => new Set(visible.map(c => c.id)), [visible]);
@@ -145,20 +150,24 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   }, [fail, reload, showToast]);
 
   /* ---------- layout do quadro ---------- */
-  const template: string[] = [];
-  const placed: { pillar: StructurePillar; col: number; span: number; lanes: { lane: StructureLane; col: number; span: number }[] }[] = [];
-  let col = 1;
-  for (const p of pillars) {
-    const ls = lanesByPillar.get(p.id) || [];
-    if (prefs.lens === 'st' && ls.length > 0
-      && board?.cards.some(c => !c.archived && ls.some(l => l.id === c.lane_id))
-      && !cards.some(c => ls.some(l => l.id === c.lane_id))) continue;
-    if (collapsed.has(p.id)) { template.push('46px'); placed.push({ pillar: p, col, span: 1, lanes: [] }); col += 1; continue; }
-    const start = col; const lanes = [];
-    for (const l of ls) { const span = l.wide ? 2 : 1; for (let s = 0; s < span; s++) template.push(`${W}px`); lanes.push({ lane: l, col, span }); col += span; }
-    if (!ls.length) { template.push(`${W}px`); col += 1; }
-    placed.push({ pillar: p, col: start, span: Math.max(1, col - start), lanes });
-  }
+  const getLayout = (forExport: boolean) => {
+    const template: string[] = [];
+    const placed: { pillar: StructurePillar; col: number; span: number; lanes: { lane: StructureLane; col: number; span: number }[] }[] = [];
+    let col = 1;
+    for (const p of pillars) {
+      const ls = lanesByPillar.get(p.id) || [];
+      if (!forExport && prefs.lens === 'st' && ls.length > 0
+        && board?.cards.some(c => !c.archived && ls.some(l => l.id === c.lane_id))
+        && !cards.some(c => ls.some(l => l.id === c.lane_id))) continue;
+      if (!forExport && collapsed.has(p.id)) { template.push('46px'); placed.push({ pillar: p, col, span: 1, lanes: [] }); col += 1; continue; }
+      const start = col; const lanes = [];
+      for (const l of ls) { const span = l.wide ? 2 : 1; for (let s = 0; s < span; s++) template.push(`${W}px`); lanes.push({ lane: l, col, span }); col += span; }
+      if (!ls.length) { template.push(`${W}px`); col += 1; }
+      placed.push({ pillar: p, col: start, span: Math.max(1, col - start), lanes });
+    }
+    return { template, placed };
+  };
+  const layout = getLayout(false);
 
   /* ---------- altura do canvas, enquadramento inicial e minimapa (comum com o Mapeamento) ---------- */
   const mini = useBoardChrome(vp, { ready: Boolean(board), mini: prefs.mini, deps: [hasFilters(filters)] });
@@ -166,10 +175,10 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   /* ---------- teclado ---------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setMenu(null); setDrawer(null); return; }
       const a = document.activeElement as HTMLElement | null;
       if (a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable)) return;
-      if (e.key === 'Escape') { setMenu(null); setDrawer(null); }
-      else if (e.key === '/') { e.preventDefault(); document.getElementById('cs-q')?.focus({ preventScroll: true }); }
+      if (e.key === '/') { e.preventDefault(); const anchor = document.getElementById('cs-filters'); if (anchor) { const r = toLocalRect(anchor.getBoundingClientRect()); setMenu({ kind: 'filters', rect: { left: r.left, right: r.right, bottom: r.bottom } }); } }
       else if ((e.key === 'n' || e.key === 'N') && editable) { e.preventDefault(); setDrawer({ mode: 'create', laneId: null }); }
       else if (e.ctrlKey || e.metaKey) return;
       else if (e.key === '+' || e.key === '=') vp.zoomAt(1.15);
@@ -219,7 +228,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   if (filters.q) chips.push([`Busca: "${filters.q}"`, () => setFilter({ q: '' })]);
   if (filters.quick) chips.push([{ drift: 'Só divergências', parada: 'Paradas há mais de 30 dias', unlinked: 'Sem vínculo de dados' }[filters.quick], () => setFilter({ quick: null })]);
 
-  const driftByPillar = placed.map(p => ({ p: p.pillar, n: cards.filter(c => (lanesByPillar.get(p.pillar.id) || []).some(l => l.id === c.lane_id) && isDrift(c, sig(c.id))).length })).sort((a, b) => b.n - a.n);
+  const driftByPillar = layout.placed.map(p => ({ p: p.pillar, n: cards.filter(c => (lanesByPillar.get(p.pillar.id) || []).some(l => l.id === c.lane_id) && isDrift(c, sig(c.id))).length })).sort((a, b) => b.n - a.n);
   const openCard = useCallback((id: string) => setDrawer({ mode: 'view', id }), []);
   const drawerCard = drawer?.mode === 'view' ? cards.find(c => c.id === drawer.id) || null : null;
   const drawerIdx = drawerCard ? visible.findIndex(c => c.id === drawerCard.id) : -1;
@@ -246,26 +255,119 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
   const menuPillar = menu?.kind === 'pillar' ? pillars.find(p => p.id === menu.id) : undefined;
   const fora = B2B2C_WITHOUT_CRM.filter(b => !cards.some(c => c.bus.includes(b)));
 
+  const renderBoard = (forExport: boolean) => {
+    const { template, placed } = forExport ? getLayout(true) : layout;
+    const boardCards = forExport ? allCards : cards;
+    const canEdit = editable && !forExport;
+    return (
+      <div className="cs-board" style={{ gridTemplateColumns: template.join(' ') }}>
+        {placed.map(({ pillar, col: c0, span }) => {
+          const pl = lanesByPillar.get(pillar.id) || [];
+          const pillarCards = boardCards.filter(c => pl.some(l => l.id === c.lane_id));
+          const total = pillarCards.length, shown = pillarCards.filter(c => forExport || visibleIds.has(c.id)).length;
+          const sum = pillarSummary(pillarCards, signals);
+          if (!forExport && collapsed.has(pillar.id)) return (
+            <div key={pillar.id} className="cs-H collapsed" data-nopan data-mini={pillar.accent} style={{ gridColumn: `${c0} / span 1`, gridRow: '1 / span 3', ['--acc' as string]: pillar.accent }} title={`Expandir ${pillar.title}`}
+              onClick={() => setPrefs(p => ({ ...p, collapsed: p.collapsed.filter(x => x !== pillar.id) }))}>
+              <PanelLeftOpen size={15} /><span>{pillar.title}</span><span className="cs-n">· {shown === total ? total : `${shown} de ${total}`}</span>
+            </div>
+          );
+          return (
+            <div key={pillar.id} className="cs-H" data-mini={pillar.accent} style={{ gridColumn: `${c0} / span ${span}`, gridRow: 1, ['--acc' as string]: pillar.accent }}>
+              <div className="cs-Hr">
+                {!forExport && <button className="cs-icon cs-Hic" aria-label="Recolher pilar" title="Recolher pilar" onClick={() => setPrefs(p => ({ ...p, collapsed: [...p.collapsed, pillar.id] }))}><PanelLeftClose /></button>}
+                <span className="cs-Ht" data-nopan onDoubleClick={e => { if (canEdit) inlineEdit(e.currentTarget, v => void pillarPatch(pillar, { title: v }, 'Pilar renomeado')); }}>{pillar.title}</span>
+                <span className="cs-n">{shown === total ? total : `${shown} de ${total}`}</span>
+                {canEdit && <button className="cs-icon" style={{ marginLeft: 'auto' }} aria-label="Ações do pilar" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('pillar', e.currentTarget, pillar.id)}><Ellipsis /></button>}
+              </div>
+              <div className="cs-Hs">
+                {total} {total === 1 ? 'campanha' : 'campanhas'}
+                {rowsState !== 'ok' ? <> · {rowDep(null)}</> : (<>
+                  {' · '}<b>{sum.active} {sum.active === 1 ? 'ativa' : 'ativas'}</b>
+                  {sum.cards != null ? <> · <b>{fmtInt(sum.cards)}</b> cartões 90d{sum.cac != null && <> · CAC <b>{fmtMoney(sum.cac)}</b></>}</> : sum.base > 0 ? <> · <b>{fmtInt(sum.base)}</b> base 90d</> : null}
+                  {sum.stopped > 0 && <> · {sum.stopped} {sum.stopped === 1 ? 'parada' : 'paradas'}</>}
+                </>)}
+              </div>
+              <div className="cs-Hbar" title={`Composição por ${dim.title.toLowerCase()}`}>
+                {dim.entries.map(([value, meta]) => { const n = pillarCards.filter(c => lensValue(c) === value).length; return n ? <i key={value} title={`${meta.label}: ${n}`} style={{ flex: n, background: lensSwatch(value) }} /> : null; })}
+              </div>
+            </div>
+          );
+        })}
+        {placed.flatMap(p => p.lanes).map(({ lane, col: c0, span }) => {
+          const all = boardCards.filter(c => c.lane_id === lane.id); const vis = forExport ? all : all.filter(c => visibleIds.has(c.id));
+          return (
+            <div key={'h' + lane.id} className="cs-S" style={{ gridColumn: `${c0} / span ${span}`, gridRow: 2 }}>
+              <div className="cs-Si">
+                <span data-nopan onDoubleClick={e => { if (canEdit) inlineEdit(e.currentTarget, v => void lanePatch(lane, { title: v }, 'Coluna renomeada')); }}>{lane.title}</span>
+                <span className="cs-pill">{vis.length === all.length ? all.length : `${vis.length} de ${all.length}`}</span>
+                {canEdit && <button className="cs-icon" aria-label="Ações da coluna" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('lane', e.currentTarget, lane.id)}><Ellipsis /></button>}
+              </div>
+            </div>
+          );
+        })}
+        {placed.flatMap(p => p.lanes).map(({ lane, col: c0, span }) => {
+          const all = boardCards.filter(c => c.lane_id === lane.id); const vis = forExport ? all : all.filter(c => visibleIds.has(c.id));
+          return (
+            <div key={'l' + lane.id} data-mini="" className={`cs-lane${lane.wide ? ' wide' : ''}${!forExport && drag?.overLane === lane.id ? ' over' : ''}`} style={{ gridColumn: `${c0} / span ${span}`, gridRow: 3 }}
+              onDragOver={e => { if (!canEdit || !drag) return; e.preventDefault(); if (drag.overLane !== lane.id) setDrag({ ...drag, overLane: lane.id }); }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDrag(d => (d ? { ...d, overLane: null, overCard: null } : d)); }}
+              onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDrag(null); if (id) void moveCard(id, lane.id, null); }}>
+              {vis.map(c => (
+                <StructureCardView key={c.id} card={c} signal={sig(c.id)} metricKey={lane.metric_key} lens={prefs.lens} showMetric={prefs.showMetric} editable={canEdit} today={today} dataState={rowsState}
+                  dropBefore={!forExport && drag?.overCard === c.id && drag.id !== c.id} dragging={!forExport && drag?.id === c.id}
+                  onOpen={openCard} onRename={onRename} onMenu={onCardMenu} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOverCard={onDragOverCard} onDropCard={onDropCard} />
+              ))}
+              {!vis.length && <div className="cs-empty">{all.length ? 'Nenhuma campanha neste filtro' : 'Coluna vazia. Arraste um card ou crie um.'}</div>}
+              {canEdit && (addingLane === lane.id ? (
+                <div className="cs-add" data-nopan>
+                  <textarea autoFocus placeholder="Nome da campanha" onKeyDown={async e => {
+                    if (e.key === 'Escape') setAddingLane(null);
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const ta = e.currentTarget; const v = ta.value.trim(); if (v.length < 2) return; try { await createCard({ lane_id: lane.id, title: v }, false); ta.value = ''; } catch (err) { fail(err); } }
+                  }} />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 5 }}><span style={{ fontSize: 11.5, color: '#64748b' }}>Enter cria · Esc fecha</span><button className="cs-icon" style={{ marginLeft: 'auto' }} onClick={() => setAddingLane(null)}>Fechar</button></div>
+                </div>
+              ) : <div className="cs-add"><button onClick={() => setAddingLane(lane.id)}><Plus size={14} />Adicionar campanha</button></div>)}
+            </div>
+          );
+        })}
+        {showFora && <div className="cs-fora" style={{ gridRow: 4 }}><b>Carteira B2B2C sem CRM</b>{fora.length ? fora.map(f => <span key={f}>{f}</span>) : 'todos os parceiros já têm alguma campanha'}</div>}
+        {showArchived && (
+          <div className="cs-fora" style={{ gridRow: 5 }} data-nopan>
+            <b>Arquivadas · {archived.length}</b>
+            {archived.length ? archived.map(c => <span key={c.id}>{c.title}{canEdit && <button className="cs-icon" title="Restaurar" onClick={() => mutateCard(c, { archived: false }, 'Campanha restaurada').catch(fail)}><ArchiveRestore size={13} /></button>}</span>) : 'Nada arquivado.'}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const exportBoard = async (format: BoardExportFormat) => {
+    if (exporting) return;
+    setMenu(null);
+    flushSync(() => setExporting(true));
+    try {
+      const source = exportRef.current;
+      if (!source) throw new Error('Quadro indisponível');
+      await downloadStructureBoard(source, format, today);
+      showToast('Quadro exportado');
+    } catch {
+      showToast('Não foi possível exportar o quadro. Tente novamente.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className={`cs-root${prefs.dense ? ' cs-dense' : ''}`}>
       <div className="cs-bar">
         {modeSwitch ? <span title={`${cards.length} campanhas · dados até ${dataUntil}`}>{modeSwitch}</span> : <h2 title={`${cards.length} campanhas · dados até ${dataUntil}`}>Estrutura CRM</h2>}
-        <span className="cs-sep" />
-        <button className={`cs-stat${filters.obs.has('on') ? ' on' : ''}`} title="Disparo nos últimos 30 dias" onClick={() => statKpi('on')}><Zap /><b>{rowDep(k.active)}</b><span className="lb">ativas</span></button>
-        <button className={`cs-stat${filters.med.has('r') ? ' on' : ''}`} title="Têm fonte de resultado" onClick={() => statKpi('r')}><ChartLine /><b>{k.measured}</b><span className="lb">medem resultado</span></button>
-        <button className={`cs-stat${filters.quick === 'drift' ? ' on' : ''}`} title="Declaradas ativas sem disparo recente" onClick={() => statKpi('drift')}><TriangleAlert /><b>{rowDep(k.drift)}</b><span className="lb">divergem</span></button>
-        <button className={`cs-stat${filters.med.has('n') ? ' on' : ''}`} title="Nenhuma fonte mapeada" onClick={() => statKpi('n')}><DatabaseZap /><b>{k.noSource}</b><span className="lb">sem fonte</span></button>
-        <button className={`cs-stat${filters.quick === 'parada' ? ' on' : ''}`} title="Sem disparo há mais de 30 dias" onClick={() => statKpi('parada')}><CirclePause /><b>{rowDep(k.stopped)}</b><span className="lb">paradas</span></button>
-        <button className={`cs-stat${filters.quick === 'unlinked' ? ' on' : ''}`} title="Ainda não ligadas aos disparos" onClick={() => statKpi('unlinked')}><Link2 /><b>{k.unlinked}</b><span className="lb">sem vínculo</span></button>
-        {rowsState === 'ok' && k.drift > 0 && <button className="cs-alert" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('alert', e.currentTarget)}><TriangleAlert size={13} />{k.drift}</button>}
         {rowsState === 'loading' && <span className="cs-readonly">Lendo disparos…</span>}
         {rowsState === 'error' && <span className="cs-readonly" style={{ color: '#b91c1c' }}>Disparos indisponíveis</span>}
         <span className="cs-grow" />
         {!editable && <span className="cs-readonly">Somente leitura</span>}
-        <label className="cs-search"><Search size={14} /><input id="cs-q" type="search" placeholder="Buscar  /" value={filters.q} onChange={e => setFilter({ q: e.target.value })} /></label>
-        <span className="cs-seg">{(['st', 'obs', 'med'] as Lens[]).map(l => <button key={l} className={prefs.lens === l ? 'on' : ''} onClick={() => setPrefs(p => ({ ...p, lens: l }))}>{{ st: 'Declarado', obs: 'Observado', med: 'Medição' }[l]}</button>)}</span>
-        <select className="cs-sel" value={filters.bu} aria-label="Filtrar por BU" onChange={e => setFilter({ bu: e.target.value })}><option value="">Todas as BUs</option>{[...BU_OPTIONS, ...B2B2C_WITHOUT_CRM].map(b => <option key={b}>{b}</option>)}</select>
-        <button className="cs-btn" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('filters', e.currentTarget)}><SlidersHorizontal />Filtros{(showFora || showArchived || !prefs.showMetric) && <span className="cs-count">{[showFora, showArchived, !prefs.showMetric].filter(Boolean).length}</span>}</button>
+        <button id="cs-filters" className="cs-btn" aria-expanded={menu?.kind === 'filters'} onPointerDown={e => e.stopPropagation()} onClick={e => menu?.kind === 'filters' ? setMenu(null) : openMenu('filters', e.currentTarget)}><SlidersHorizontal />Filtros{chips.length > 0 && <span className="cs-count">{chips.length}</span>}</button>
+        <button className="cs-btn" aria-expanded={menu?.kind === 'export'} disabled={exporting || rowsState === 'loading'} title={rowsState === 'loading' ? 'Aguardando dados dos disparos' : undefined} onPointerDown={e => e.stopPropagation()} onClick={e => menu?.kind === 'export' ? setMenu(null) : openMenu('export', e.currentTarget)}><Download />{exporting ? 'Exportando…' : 'Exportar'}</button>
         <BoardColorButton />
         <button className="cs-icon" aria-label="Mais opções" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('more', e.currentTarget)}><Ellipsis /></button>
         {editable && <button className="cs-btn pri" onClick={() => setDrawer({ mode: 'create', laneId: null })}><Plus />Campanha</button>}
@@ -303,85 +405,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
             {prefs.lens === 'st' && <button className={`cs-lg${filters.quick === 'drift' ? ' on' : ''}`} onClick={() => setFilter({ quick: filters.quick === 'drift' ? null : 'drift' })}><TriangleAlert size={15} color="#b45309" /><span><b>Divergência</b><span className="s">Declarado não bate com os dados</span></span><span className="c">{rowDep(k.drift)}</span></button>}
           </div>
 
-          <div className="cs-board" style={{ gridTemplateColumns: template.join(' ') }}>
-            {placed.map(({ pillar, col: c0, span }) => {
-              const pl = lanesByPillar.get(pillar.id) || [];
-              const pillarCards = cards.filter(c => pl.some(l => l.id === c.lane_id));
-              const total = pillarCards.length, shown = visible.filter(c => pl.some(l => l.id === c.lane_id)).length;
-              const sum = pillarSummary(pillarCards, signals);
-              if (collapsed.has(pillar.id)) return (
-                <div key={pillar.id} className="cs-H collapsed" data-nopan data-mini={pillar.accent} style={{ gridColumn: `${c0} / span 1`, gridRow: '1 / span 3', ['--acc' as string]: pillar.accent }} title={`Expandir ${pillar.title}`}
-                  onClick={() => setPrefs(p => ({ ...p, collapsed: p.collapsed.filter(x => x !== pillar.id) }))}>
-                  <PanelLeftOpen size={15} /><span>{pillar.title}</span><span className="cs-n">· {shown === total ? total : `${shown} de ${total}`}</span>
-                </div>
-              );
-              return (
-                <div key={pillar.id} className="cs-H" data-mini={pillar.accent} style={{ gridColumn: `${c0} / span ${span}`, gridRow: 1, ['--acc' as string]: pillar.accent }}>
-                  <div className="cs-Hr">
-                    <button className="cs-icon cs-Hic" title="Recolher pilar" onClick={() => setPrefs(p => ({ ...p, collapsed: [...p.collapsed, pillar.id] }))}><PanelLeftClose /></button>
-                    <span className="cs-Ht" data-nopan onDoubleClick={e => { if (editable) inlineEdit(e.currentTarget, v => void pillarPatch(pillar, { title: v }, 'Pilar renomeado')); }}>{pillar.title}</span>
-                    <span className="cs-n">{shown === total ? total : `${shown} de ${total}`}</span>
-                    {editable && <button className="cs-icon" style={{ marginLeft: 'auto' }} aria-label="Ações do pilar" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('pillar', e.currentTarget, pillar.id)}><Ellipsis /></button>}
-                  </div>
-                  <div className="cs-Hs">
-                    {total} {total === 1 ? 'campanha' : 'campanhas'}
-                    {rowsState !== 'ok' ? <> · {rowDep(null)}</> : (<>
-                      {' · '}<b>{sum.active} {sum.active === 1 ? 'ativa' : 'ativas'}</b>
-                      {sum.cards != null ? <> · <b>{fmtInt(sum.cards)}</b> cartões 90d{sum.cac != null && <> · CAC <b>{fmtMoney(sum.cac)}</b></>}</> : sum.base > 0 ? <> · <b>{fmtInt(sum.base)}</b> base 90d</> : null}
-                      {sum.stopped > 0 && <> · {sum.stopped} {sum.stopped === 1 ? 'parada' : 'paradas'}</>}
-                    </>)}
-                  </div>
-                  <div className="cs-Hbar" title={`Composição por ${dim.title.toLowerCase()}`}>
-                    {dim.entries.map(([value, meta]) => { const n = pillarCards.filter(c => lensValue(c) === value).length; return n ? <i key={value} title={`${meta.label}: ${n}`} style={{ flex: n, background: lensSwatch(value) }} /> : null; })}
-                  </div>
-                </div>
-              );
-            })}
-            {placed.flatMap(p => p.lanes).map(({ lane, col: c0, span }) => {
-              const all = cards.filter(c => c.lane_id === lane.id); const vis = all.filter(c => visibleIds.has(c.id));
-              return (
-                <div key={'h' + lane.id} className="cs-S" style={{ gridColumn: `${c0} / span ${span}`, gridRow: 2 }}>
-                  <div className="cs-Si">
-                    <span data-nopan onDoubleClick={e => { if (editable) inlineEdit(e.currentTarget, v => void lanePatch(lane, { title: v }, 'Coluna renomeada')); }}>{lane.title}</span>
-                    <span className="cs-pill">{vis.length === all.length ? all.length : `${vis.length} de ${all.length}`}</span>
-                    {editable && <button className="cs-icon" aria-label="Ações da coluna" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('lane', e.currentTarget, lane.id)}><Ellipsis /></button>}
-                  </div>
-                </div>
-              );
-            })}
-            {placed.flatMap(p => p.lanes).map(({ lane, col: c0, span }) => {
-              const all = cards.filter(c => c.lane_id === lane.id); const vis = all.filter(c => visibleIds.has(c.id));
-              return (
-                <div key={'l' + lane.id} data-mini="" className={`cs-lane${lane.wide ? ' wide' : ''}${drag?.overLane === lane.id ? ' over' : ''}`} style={{ gridColumn: `${c0} / span ${span}`, gridRow: 3 }}
-                  onDragOver={e => { if (!editable || !drag) return; e.preventDefault(); if (drag.overLane !== lane.id) setDrag({ ...drag, overLane: lane.id }); }}
-                  onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDrag(d => (d ? { ...d, overLane: null, overCard: null } : d)); }}
-                  onDrop={e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); setDrag(null); if (id) void moveCard(id, lane.id, null); }}>
-                  {vis.map(c => (
-                    <StructureCardView key={c.id} card={c} signal={sig(c.id)} metricKey={lane.metric_key} lens={prefs.lens} showMetric={prefs.showMetric} editable={editable} today={today} dataState={rowsState}
-                      dropBefore={drag?.overCard === c.id && drag.id !== c.id} dragging={drag?.id === c.id}
-                      onOpen={openCard} onRename={onRename} onMenu={onCardMenu} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragOverCard={onDragOverCard} onDropCard={onDropCard} />
-                  ))}
-                  {!vis.length && <div className="cs-empty">{all.length ? 'Nenhuma campanha neste filtro' : 'Coluna vazia. Arraste um card ou crie um.'}</div>}
-                  {editable && (addingLane === lane.id ? (
-                    <div className="cs-add" data-nopan>
-                      <textarea autoFocus placeholder="Nome da campanha" onKeyDown={async e => {
-                        if (e.key === 'Escape') setAddingLane(null);
-                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const ta = e.currentTarget; const v = ta.value.trim(); if (v.length < 2) return; try { await createCard({ lane_id: lane.id, title: v }, false); ta.value = ''; } catch (err) { fail(err); } }
-                      }} />
-                      <div style={{ display: 'flex', gap: 6, marginTop: 5 }}><span style={{ fontSize: 11.5, color: '#64748b' }}>Enter cria · Esc fecha</span><button className="cs-icon" style={{ marginLeft: 'auto' }} onClick={() => setAddingLane(null)}>Fechar</button></div>
-                    </div>
-                  ) : <div className="cs-add"><button onClick={() => setAddingLane(lane.id)}><Plus size={14} />Adicionar campanha</button></div>)}
-                </div>
-              );
-            })}
-            {showFora && <div className="cs-fora" style={{ gridRow: 4 }}><b>Carteira B2B2C sem CRM</b>{fora.length ? fora.map(f => <span key={f}>{f}</span>) : 'todos os parceiros já têm alguma campanha'}</div>}
-            {showArchived && (
-              <div className="cs-fora" style={{ gridRow: 5 }} data-nopan>
-                <b>Arquivadas · {archived.length}</b>
-                {archived.length ? archived.map(c => <span key={c.id}>{c.title}{editable && <button className="cs-icon" title="Restaurar" onClick={() => mutateCard(c, { archived: false }, 'Campanha restaurada').catch(fail)}><ArchiveRestore size={13} /></button>}</span>) : 'Nada arquivado.'}
-              </div>
-            )}
-          </div>
+          {renderBoard(false)}
         </div>
 
         <BoardZoomBar vp={vp} showMini={prefs.mini} onToggleMini={() => setPrefs(p => ({ ...p, mini: !p.mini }))}>
@@ -416,7 +440,25 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
             <button onClick={async () => { setMenu(null); try { const p = await savePillar(null, null, { title: 'Novo pilar' }); await saveLane(null, null, { pillar_id: p.id, title: 'Nova coluna' }); await reload(); showToast('Pilar criado no fim do quadro.'); } catch (e) { fail(e); } }}><Columns3 />Novo pilar</button>
             <hr /><button style={{ color: '#b91c1c' }} onClick={() => { setMenu(null); void pillarPatch(menuPillar, { archived: true }, 'Pilar arquivado'); }}><Archive />Arquivar pilar vazio</button>
           </>)}
+          {menu.kind === 'export' && (<>
+            <div className="sec">QUADRO COMPLETO</div>
+            <button onClick={() => void exportBoard('jpeg')}><Download />Baixar JPEG</button>
+            <button onClick={() => void exportBoard('pdf')}><Download />Baixar PDF</button>
+          </>)}
           {menu.kind === 'filters' && (<>
+            <div className="cs-filter-fields">
+              <label className="cs-search"><Search size={14} /><input id="cs-q" autoFocus aria-label="Buscar campanhas" type="search" placeholder="Buscar  /" value={filters.q} onChange={e => setFilter({ q: e.target.value })} /></label>
+              <span className="cs-seg cs-filter-lens">{(['st', 'obs', 'med'] as Lens[]).map(l => <button key={l} className={prefs.lens === l ? 'on' : ''} aria-pressed={prefs.lens === l} onClick={() => setPrefs(p => ({ ...p, lens: l }))}>{{ st: 'Declarado', obs: 'Observado', med: 'Medição' }[l]}</button>)}</span>
+              <select className="cs-sel" value={filters.bu} aria-label="Filtrar por BU" onChange={e => setFilter({ bu: e.target.value })}><option value="">Todas as BUs</option>{[...BU_OPTIONS, ...B2B2C_WITHOUT_CRM].map(b => <option key={b}>{b}</option>)}</select>
+            </div>
+            <div className="sec">FILTROS RÁPIDOS</div>
+              <button className={`cs-stat${filters.obs.has('on') ? ' on' : ''}`} title="Disparo nos últimos 30 dias" onClick={() => statKpi('on')}><Zap /><b>{rowDep(k.active)}</b><span>ativas</span></button>
+              <button className={`cs-stat${filters.med.has('r') ? ' on' : ''}`} title="Têm fonte de resultado" onClick={() => statKpi('r')}><ChartLine /><b>{k.measured}</b><span>medem resultado</span></button>
+              <button className={`cs-stat${filters.quick === 'drift' ? ' on' : ''}`} title="Declaradas ativas sem disparo recente" onClick={() => statKpi('drift')}><TriangleAlert /><b>{rowDep(k.drift)}</b><span>divergem</span></button>
+              <button className={`cs-stat${filters.med.has('n') ? ' on' : ''}`} title="Nenhuma fonte mapeada" onClick={() => statKpi('n')}><DatabaseZap /><b>{k.noSource}</b><span>sem fonte</span></button>
+              <button className={`cs-stat${filters.quick === 'parada' ? ' on' : ''}`} title="Sem disparo há mais de 30 dias" onClick={() => statKpi('parada')}><CirclePause /><b>{rowDep(k.stopped)}</b><span>paradas</span></button>
+              <button className={`cs-stat${filters.quick === 'unlinked' ? ' on' : ''}`} title="Ainda não ligadas aos disparos" onClick={() => statKpi('unlinked')}><Link2 /><b>{k.unlinked}</b><span>sem vínculo</span></button>
+            {rowsState === 'ok' && k.drift > 0 && <button onClick={() => setMenu({ ...menu, kind: 'alert' })}><TriangleAlert />Detalhes das divergências</button>}
             <div className="sec">CARDS</div>
             <label className="row2">Número em destaque<input type="checkbox" checked={prefs.showMetric} onChange={e => setPrefs(p => ({ ...p, showMetric: e.target.checked }))} /></label>
             <label className="row2">Modo compacto<input type="checkbox" checked={prefs.dense} onChange={e => setPrefs(p => ({ ...p, dense: e.target.checked }))} /></label>
@@ -438,6 +480,16 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
             <button onClick={() => { setMenu(null); setPrefs(p => ({ ...p, legend: { ...p.legend, docked: true }, collapsed: [] })); }}>Restaurar disposição</button>
           </>)}
         </div>
+      )}
+
+      {exporting && createPortal(
+        <div className="cs-export-host" aria-hidden="true" ref={host => { if (host) host.inert = true; }}>
+          <div ref={exportRef} className="cs-root cs-export-board" style={{ backgroundColor: vp.canvasRef.current ? getComputedStyle(vp.canvasRef.current).backgroundColor : undefined }}>
+            <h2>Board Campanhas</h2>
+            {renderBoard(true)}
+          </div>
+        </div>,
+        document.body,
       )}
 
       {drawer && (
