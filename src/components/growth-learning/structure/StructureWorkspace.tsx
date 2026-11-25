@@ -367,7 +367,23 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
         <span className="cs-grow" />
         {!editable && <span className="cs-readonly">Somente leitura</span>}
         <button id="cs-filters" className="cs-btn" aria-expanded={menu?.kind === 'filters'} onPointerDown={e => e.stopPropagation()} onClick={e => menu?.kind === 'filters' ? setMenu(null) : openMenu('filters', e.currentTarget)}><SlidersHorizontal />Filtros{chips.length > 0 && <span className="cs-count">{chips.length}</span>}</button>
-        <button className="cs-btn" aria-expanded={menu?.kind === 'export'} disabled={exporting || rowsState === 'loading'} title={rowsState === 'loading' ? 'Aguardando dados dos disparos' : undefined} onPointerDown={e => e.stopPropagation()} onClick={e => menu?.kind === 'export' ? setMenu(null) : openMenu('export', e.currentTarget)}><Download />{exporting ? 'Exportando…' : 'Exportar'}</button>
+        <div className="cs-export-control" onPointerDown={e => e.stopPropagation()}>
+          <button
+            className="cs-btn"
+            aria-expanded={menu?.kind === 'export'}
+            aria-controls={menu?.kind === 'export' ? 'cs-export-menu' : undefined}
+            disabled={exporting || rowsState === 'loading'}
+            title={rowsState === 'loading' ? 'Aguardando dados dos disparos' : undefined}
+            onClick={e => menu?.kind === 'export' ? setMenu(null) : openMenu('export', e.currentTarget)}
+          ><Download />{exporting ? 'Exportando…' : 'Exportar'}</button>
+          {menu?.kind === 'export' && (
+            <div id="cs-export-menu" className="cs-menu cs-export-menu">
+              <div className="sec">QUADRO COMPLETO</div>
+              <button onClick={() => void exportBoard('jpeg')}><Download />Baixar JPEG</button>
+              <button onClick={() => void exportBoard('pdf')}><Download />Baixar PDF</button>
+            </div>
+          )}
+        </div>
         <BoardColorButton />
         <button className="cs-icon" aria-label="Mais opções" onPointerDown={e => e.stopPropagation()} onClick={e => openMenu('more', e.currentTarget)}><Ellipsis /></button>
         {editable && <button className="cs-btn pri" onClick={() => setDrawer({ mode: 'create', laneId: null })}><Plus />Campanha</button>}
@@ -414,7 +430,7 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
         {prefs.mini && <BoardMiniMap vp={vp} mini={mini} />}
       </div>
 
-      {menu && (
+      {menu && menu.kind !== 'export' && (
         <div className="cs-menu" style={{ left: Math.max(8, Math.min(menu.rect.right - 240, getLocalViewport().width - 250)), top: menu.rect.bottom + 4 }} onPointerDown={e => e.stopPropagation()}>
           {menu.kind === 'card' && menuCard && (<>
             <div className="sec">STATUS</div>
@@ -439,11 +455,6 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
             <button onClick={() => { setMenu(null); void reorder(pillars, menuPillar.id, 1, (p, position) => savePillar(p.id, p.revision, { position })); }}><ArrowRight />Mover para a direita</button>
             <button onClick={async () => { setMenu(null); try { const p = await savePillar(null, null, { title: 'Novo pilar' }); await saveLane(null, null, { pillar_id: p.id, title: 'Nova coluna' }); await reload(); showToast('Pilar criado no fim do quadro.'); } catch (e) { fail(e); } }}><Columns3 />Novo pilar</button>
             <hr /><button style={{ color: '#b91c1c' }} onClick={() => { setMenu(null); void pillarPatch(menuPillar, { archived: true }, 'Pilar arquivado'); }}><Archive />Arquivar pilar vazio</button>
-          </>)}
-          {menu.kind === 'export' && (<>
-            <div className="sec">QUADRO COMPLETO</div>
-            <button onClick={() => void exportBoard('jpeg')}><Download />Baixar JPEG</button>
-            <button onClick={() => void exportBoard('pdf')}><Download />Baixar PDF</button>
           </>)}
           {menu.kind === 'filters' && (<>
             <div className="cs-filter-fields">
@@ -485,7 +496,10 @@ export function StructureWorkspace({ modeSwitch }: { modeSwitch?: React.ReactNod
       {exporting && createPortal(
         <div className="cs-export-host" aria-hidden="true" ref={host => { if (host) host.inert = true; }}>
           <div ref={exportRef} className="cs-root cs-export-board" style={{ backgroundColor: vp.canvasRef.current ? getComputedStyle(vp.canvasRef.current).backgroundColor : undefined }}>
-            <h2>Board Campanhas</h2>
+            <header className="cs-export-heading">
+              <h2>Estrutura CRM</h2>
+              <time dateTime={today}>{today.split('-').reverse().join('/')}</time>
+            </header>
             {renderBoard(true)}
           </div>
         </div>,

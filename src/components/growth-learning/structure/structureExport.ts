@@ -12,7 +12,7 @@ export async function downloadStructureBoard(source: HTMLElement, format: BoardE
     canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Falha ao gerar imagem')), 'image/jpeg', 0.95);
   });
 
-  const filename = `board-campanhas-${date}`;
+  const filename = `estrutura-crm-${date}`;
   if (format === 'pdf') {
     const { jsPDF } = await import('jspdf');
     // A custom page preserves the whole layout and lets the reader zoom into each card.
