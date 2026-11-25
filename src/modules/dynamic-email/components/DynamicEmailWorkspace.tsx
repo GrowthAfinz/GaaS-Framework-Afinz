@@ -84,7 +84,7 @@ import { HeaderVariantPicker } from './HeaderVariantPicker';
 import { LimitMessageEditor, LimitTestInput } from './LimitMessageEditor';
 import { renderLimitMessage } from '../domain/limitMessage';
 import { B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE, B2C_CLASSIC_VIBE_DYNAMIC_TEMPLATE_ID } from '../fixtures/b2cClassicVibeDynamicTemplate';
-import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailFactorySegment, type EmailTemplateSlot, type LegalText, type RulerStrategy, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
+import { applyWorkspaceField, briefingRowsForView, ensurePlurixVariants, normalizeLegacyRows, partnerLabel, PLURIX_SIGNATURES, sharedFields, withMeta, type ActivityTaxonomy, type EmailAsset, type EmailFactorySegment, type EmailTemplateSlot, type LegalText, type RulerStrategy, type SignatureSetting, type WorkspaceBriefing } from '../domain/workspace';
 import { projectMarketingPreview } from '../domain/previewProjection';
 import { PromptAiWorkspace } from './PromptAiWorkspace';
 import { saveEmailInputDrafts } from '../services/emailInputService';
@@ -200,7 +200,6 @@ const STRUCTURE_BLOCKS: { id: string; num: number; label: string; textFields: Br
   { id: 'closing', num: 5, label: 'Encerramento', textFields: [], imageField: 'BANNER_3_CORPO' },
   { id: 'legal', num: 6, label: 'Info. legais', textFields: ['NOTA_LEGAL', 'RODAPE'] },
 ];
-const STRUCTURE_IDS = new Set(STRUCTURE_BLOCKS.map((block) => block.id));
 // O bloco de oferta do pool só existe no template V10; nos demais a numeração segue sem ele.
 // A faixa de limite editável só existe nos templates que leem MENSAGEM_LIMITE (V12+).
 const visibleStructureBlocks = (withPool: boolean, withLimit = false) => STRUCTURE_BLOCKS.filter((block) => (withPool || block.id !== 'pool') && (withLimit || block.id !== 'limit')).map((block, index) => ({ ...block, num: index + 1 }));
@@ -391,7 +390,10 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   // E-mails em que a pessoa ligou o header dinâmico e ainda não escreveu a linha principal.
   const [dynamicHeaderOn, setDynamicHeaderOn] = useState<Set<string>>(new Set());
-  const [editorHoverBlock, setEditorHoverBlock] = useState<string | null>(null);
+  const [selectedStructureBlock, setSelectedStructureBlock] = useState<string | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
+  const previewScrollRef = useRef<HTMLDivElement>(null);
+  const messagePreviewRef = useRef<HTMLDivElement>(null);
   const [railHoverBlock, setRailHoverBlock] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -399,6 +401,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const templateFileRef = useRef<HTMLInputElement>(null);
   const workspaceGridRef = useRef<HTMLDivElement>(null);
+  const [briefingBoxOpen, setBriefingBoxOpen] = useState(() => localStorage.getItem('gaas-email-briefing-box-v1') !== 'closed');
+  useEffect(() => { localStorage.setItem('gaas-email-briefing-box-v1', briefingBoxOpen ? 'open' : 'closed'); }, [briefingBoxOpen]);
   const [cols, setCols] = useState<[number, number, number]>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(COLS_KEY) || 'null');
@@ -417,7 +421,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
     if (width <= 0) return;
     const startX = event.clientX;
     const base = [...cols] as [number, number, number];
-    const total = base[0] + base[1] + base[2];
+    const total = (briefingBoxOpen ? base[0] : 0) + base[1] + base[2];
     const minFr = total * 0.13;
     const left = edge;
     const right = edge + 1;
@@ -513,15 +517,29 @@ export const DynamicEmailWorkspace: React.FC = () => {
   const selected = selectedBase ? projectVdvEditorial(selectedBase,vdvData.briefing) : undefined;
   const nativeVdv = isVdvEmail(selected);
   // Trocar de assinatura dentro do mesmo e-mail mantém os blocos abertos; trocar de e-mail recolhe.
-  useEffect(() => { setOpenSections(new Set()); setEditorHoverBlock(null); setRailHoverBlock(null); }, [selected?.__meta.campaignGroupId]);
-  const toggleSection = (id: string) => setOpenSections((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  useEffect(() => {
+    setOpenSections(new Set());
+    setSelectedStructureBlock(null);
+    setRailHoverBlock(null);
+    previewScrollRef.current?.scrollTo({ top: 0 });
+  }, [selected?.__meta.campaignGroupId]);
+  const toggleSection = (id: string) => {
+    const closing = openSections.has(id);
+    setOpenSections((current) => {
+      const next = new Set(current);
+      if (closing) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setSelectedStructureBlock((current) => closing ? (current === id ? null : current) : id);
+  };
   const focusStructureBlock = (id: string) => {
     const detail=document.getElementById(`eb-${id}`);if(detail?.tagName==='DETAILS')(detail as HTMLDetailsElement).open=true;
     setOpenSections((current) => (current.has(id) ? current : new Set(current).add(id)));
-    setEditorHoverBlock(id);
-    requestAnimationFrame(() => setTimeout(() => document.getElementById(`eb-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30));
+    setSelectedStructureBlock(id);
+    requestAnimationFrame(() => document.getElementById(`eb-${id}`)?.scrollIntoView({ block: 'nearest' }));
   };
-  const activeStructureBlock = railHoverBlock ?? editorHoverBlock ?? [...openSections].find((id) => STRUCTURE_IDS.has(id)) ?? null;
+  const activeStructureBlock = selectedStructureBlock ?? railHoverBlock;
   const selectedIssues = selected ? issuesByRow.get(selected.__id) ?? [] : [];
   const linkedTemplateId = selected?.__editor && !selected.__meta.templateSlotId ? VDV_SLOT : selected?.__meta.templateSlotId && templateSlots.some((slot) => slot.id === selected.__meta.templateSlotId)
     ? selected.__meta.templateSlotId
@@ -1113,6 +1131,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
             <button role="tab" aria-selected={mode === 'topo'} onClick={() => setMode('topo')} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${mode === 'topo' ? 'bg-white text-slate-900 shadow-sm' : 'text-cyan-50 hover:bg-white/10'}`}><Sparkles className="mr-1.5 inline" size={14}/>Header e ofertas</button>
           </div>
           {mode === 'briefings' && <div className="flex flex-wrap items-center justify-end gap-2">
+            <button type="button" aria-expanded={briefingBoxOpen} aria-controls="email-briefing-inbox"
+              onClick={() => setBriefingBoxOpen((open) => !open)}
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-white">
+              <Inbox size={15}/>{briefingBoxOpen ? 'Recolher briefings' : 'Mostrar briefings'}
+            </button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={(event) => onFile(event.target.files?.[0])}/>
             <HeaderAction onClick={() => fileRef.current?.click()} icon={<Upload size={15}/>} label="Importar CSV"/>
             <HeaderAction onClick={duplicateBriefing} disabled={!selected} icon={<Copy size={15}/>} label="Duplicar"/>
@@ -1131,9 +1154,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
     <main className="pt-4">
       {importMessages.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">{importMessages.map((message) => <div key={message}>{message}</div>)}</div>}
 
-      <div className="h-[calc(var(--screen-h,900px)_-_172px)] min-h-[480px] overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]">
-      <div ref={workspaceGridRef} className="grid items-start pb-1" style={{ gridTemplateColumns: `minmax(0,${cols[0]}fr) auto minmax(0,${cols[1]}fr) auto minmax(0,${cols[2]}fr)` }}>
-        <div className="min-w-0">
+      <div className="h-[calc(var(--screen-h,900px)_-_172px)] min-h-[480px]">
+      <div ref={workspaceGridRef} className="grid h-full grid-rows-[minmax(0,1fr)] pb-1" style={{ gridTemplateColumns: `${briefingBoxOpen ? `minmax(0,${cols[0]}fr) auto ` : ''}minmax(0,${cols[1]}fr) auto minmax(0,${cols[2]}fr)` }}>
+        <div id="email-briefing-inbox" hidden={!briefingBoxOpen} className="min-w-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
         <aside className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
           <div className="border-b border-slate-200 p-3.5">
             <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredGroups.length} de {activeEditorialGroupCount} e-mails · {activeRows.length} variantes ativas</p></div><Inbox className="text-cyan-700" size={18}/></div>
@@ -1184,13 +1207,22 @@ export const DynamicEmailWorkspace: React.FC = () => {
         </aside>
         </div>
 
-        <ResizeHandle label="Ajustar largura da Caixa de briefings" onPointerDown={startColDrag(0)} onReset={resetCols}/>
+        {briefingBoxOpen && <ResizeHandle label="Ajustar largura da Caixa de briefings" onPointerDown={startColDrag(0)} onReset={resetCols}/>}
 
-        {poolReviewVersion ? <PoolCampaignReview rows={activeRows.filter(r=>r.__editor?.contentVersion===poolReviewVersion)} data={vdvData} sample={vdvSample} today={previewSendDate} templates={templateSlots} onClose={()=>setPoolReviewVersion('')} onOpen={(id,sample)=>{setVdvSample(sample);setPoolReviewVersion('');selectEmail(id);}}/> : selectedSegment ? <div className="min-w-0"><WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)} onOpenPlan={() => setMode('strategy')}/></div> : selectedWeek ? <div className="min-w-0"><WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onOpenPlan={() => setMode('strategy')}/></div> : selected ? <section id="email-editor-panel" className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado">
+        {poolReviewVersion ? <PoolCampaignReview rows={activeRows.filter(r=>r.__editor?.contentVersion===poolReviewVersion)} data={vdvData} sample={vdvSample} today={previewSendDate} templates={templateSlots} onClose={()=>setPoolReviewVersion('')} onOpen={(id,sample)=>{setVdvSample(sample);setPoolReviewVersion('');selectEmail(id);}}/> : selectedSegment ? <div className="min-w-0"><WeekReviewer selection={selectedSegment} groups={selectedSegmentGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onDuplicateRuler={() => setDuplicateRulerOpen(true)} onOpenPlan={() => setMode('strategy')}/></div> : selectedWeek ? <div className="min-w-0"><WeekReviewer selection={selectedWeek} groups={selectedWeekGroups} strategies={emailStrategies} issuesByRow={issuesByRow} selectedId={selected?.__id ?? ''} onSelect={setSelectedId} onEdit={(id) => selectEmail(id)} onNewEmail={() => openNewBriefing(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onDuplicate={() => duplicateWeek(selectedWeek.partner, selectedWeek.segment, selectedWeek.weekKey)} onOpenPlan={() => setMode('strategy')}/></div> : selected ? <section id="email-editor-panel" className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Editor do briefing selecionado"
+          onFocusCapture={(event) => {
+            const block = (event.target as HTMLElement).closest('[id^="eb-"]');
+            if (block) setSelectedStructureBlock(block.id.slice(3));
+          }}
+          onClickCapture={(event) => {
+            const summary = (event.target as Element).closest('summary');
+            const block = summary?.parentElement;
+            if (block?.id.startsWith('eb-')) setSelectedStructureBlock(block.id.slice(3));
+          }}>
           <div className="rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3">
             <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{nativeVdv ? `${selected.__editor!.campaignName} · ${selected.SEQUENCIA}` : `${selected.__meta.partner || 'Parceiro pendente'} · ${selected.__meta.segment || 'Segmento pendente'} · ${selected.SEQUENCIA || 'Sequência pendente'}`}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Na Lixeira · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : nativeVdv ? (selected.__meta.status==='ready'?'Pronto':'Rascunho · revisão editorial') : 'Pronto para exportar'}</span></div>
           </div>
-          {nativeVdv && selected.__editor && vdvPreview ? <><div id="email-editor-scroll">{vdvLoadError&&<p role="alert" className="p-3 text-xs text-red-700">{vdvLoadError}</p>}<fieldset disabled={selected.__meta.status==='archived'}><PoolEmailEditor assets={assets} onLibrary={()=>{setLibraryView('offers');setMode('library');}} onReview={()=>setPoolReviewVersion(selected.__editor!.contentVersion)} row={selected} data={vdvData} onChange={(data)=>{setVdvData(data);setVdvDirty(true);}} sample={{...vdvSample,ID_VERSAO_OFERTAS:selected.__editor.contentVersion}} onSample={setVdvSample} today={previewSendDate} onDate={setPreviewSendDate} preview={vdvPreview} onContext={(name)=>{setRows(current=>current.map(r=>r.__editor?.contentVersion===selected.__editor!.contentVersion?{...r,__editor:{...r.__editor,campaignName:name},__meta:{...r.__meta,weekKey:name}}:r));}} onDuplicate={()=>duplicateVdvCampaign()} onAnnounce={setAnnouncement}/><details className="m-3 rounded-xl border border-slate-200"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-slate-600">Detalhes do envelope SFMC</summary><SfmcEnvelopeGuide source={previewTemplate}/></details></fieldset></div></> : <div id="email-editor-scroll" className="p-3.5">
+          {nativeVdv && selected.__editor && vdvPreview ? <><div id="email-editor-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{vdvLoadError&&<p role="alert" className="p-3 text-xs text-red-700">{vdvLoadError}</p>}<fieldset disabled={selected.__meta.status==='archived'}><PoolEmailEditor assets={assets} onLibrary={()=>{setLibraryView('offers');setMode('library');}} onReview={()=>setPoolReviewVersion(selected.__editor!.contentVersion)} row={selected} data={vdvData} onChange={(data)=>{setVdvData(data);setVdvDirty(true);}} sample={{...vdvSample,ID_VERSAO_OFERTAS:selected.__editor.contentVersion}} onSample={setVdvSample} today={previewSendDate} onDate={setPreviewSendDate} preview={vdvPreview} onContext={(name)=>{setRows(current=>current.map(r=>r.__editor?.contentVersion===selected.__editor!.contentVersion?{...r,__editor:{...r.__editor,campaignName:name},__meta:{...r.__meta,weekKey:name}}:r));}} onDuplicate={()=>duplicateVdvCampaign()} onAnnounce={setAnnouncement}/><details className="m-3 rounded-xl border border-slate-200"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-slate-600">Detalhes do envelope SFMC</summary><SfmcEnvelopeGuide source={previewTemplate}/></details></fieldset></div></> : <div id="email-editor-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3.5">
             <label className="mb-2.5 flex min-h-11 items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700"><input type="checkbox" checked={!!selected.__journeyConfirmed} onChange={(event) => updateSelected({ __journeyConfirmed: event.target.checked })} className="mt-0.5 h-4 w-4 accent-cyan-600"/><span><b>Jornada conferida no SFMC</b><br/><span className="text-xs text-slate-500">Confirma que esta campanha e sequência estão habilitadas para entrada.</span></span></label>
             {selectedIssues.length > 0 && <div className="mb-2.5 space-y-2">{selectedIssues.map((issue, index) => <div key={`${issue.code}-${issue.field}-${index}`} className={`flex items-start justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><span>{issue.message}</span>{issue.fix && <button onClick={() => fixIssue(issue)} className="shrink-0 rounded-md bg-white px-2 py-1 font-bold shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><Wand2 className="mr-1 inline" size={12}/>Corrigir</button>}</div>)}</div>}
             <EmailConfigSummary
@@ -1207,7 +1239,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
               <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Blocos do e-mail</span>
               <div className="flex gap-1">
                 <button type="button" onClick={() => setOpenSections(new Set(ALL_EDITOR_BLOCK_IDS))} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 outline-none hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500">Expandir tudo</button>
-                <button type="button" onClick={() => setOpenSections(new Set())} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 outline-none hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500">Recolher tudo</button>
+                <button type="button" onClick={() => { setOpenSections(new Set()); setSelectedStructureBlock(null); }} className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 outline-none hover:border-cyan-300 hover:text-cyan-800 focus-visible:ring-2 focus-visible:ring-cyan-500">Recolher tudo</button>
               </div>
             </div>
             <div className="space-y-2.5">
@@ -1243,7 +1275,7 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 const lockedFields = isContentBlock ? (section.fields ?? []).filter((field) => !isColumnEditable(field)) : [];
                 const imageLocked = isContentBlock && section.imageSlot ? !isColumnEditable(section.imageSlot.image) : false;
                 return (
-                <CollapsibleBlock key={section.id} id={`eb-${section.id}`} marker={<BlockMarker num={structureNum[section.id]}/>} focused={activeStructureBlock === section.id} onHoverChange={structureNum[section.id] ? (hovering) => setEditorHoverBlock(hovering ? section.id : null) : undefined} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
+                <CollapsibleBlock key={section.id} id={`eb-${section.id}`} marker={<BlockMarker num={structureNum[section.id]}/>} focused={activeStructureBlock === section.id} label={section.label} description={section.description} open={openSections.has(section.id)} onToggle={() => toggleSection(section.id)}>
                   {(lockedFields.length > 0 || imageLocked) && <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-[11px] leading-4 text-slate-600"><Lock size={12} className="mt-px shrink-0"/><span>Parte deste bloco é fixa no template <b>{templateSlots.find((slot) => slot.id === linkedTemplateId)?.name}</b> — vem direto do HTML/AMPscript e não pode ser ajustada aqui. Para mudar, troque o template ou edite o Template-fonte.</span></p>}
                   {section.id === 'pool' && <PoolOfferEditorCard offer={poolOffer} offers={poolOffers} signatureKey={selected.NM_PRODUTO_INTERNO} signatureLabel={selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO} date={previewSendDate} onDateChange={setPreviewSendDate} buttonLink={selected.LINK_CTA_1} onManage={() => setMode('topo')}/>}
                   {section.id === 'limit' && <LimitMessageEditor value={selected.MENSAGEM_LIMITE} issues={selectedIssues.filter((issue) => issue.field === 'MENSAGEM_LIMITE')} networkCount={rows.filter((row) => row.__meta.status !== 'archived' && row.__meta.campaignGroupId === selected.__meta.campaignGroupId).length} sampleName={subscriber.PRI_NOME} sampleLimit={subscriber.LIMITE} onChange={(value) => updateField('MENSAGEM_LIMITE', value)}/>}
@@ -1254,7 +1286,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
                       return <EmailCopyField key={`${selected.__id}:${linkedTemplateId}:${field}`}
                         id={`dynamic-${field}`} label={FIELD_LABELS[field] ?? field} field={field} value={selected[field] ?? ''}
                         onChange={(value) => updateField(field, value)} firstName={/@FirstName\b/i.test(previewTemplate)}
-                        structured={field === 'COPY_2_PRETO'}/>;
+                        structured={field === 'COPY_2_PRETO'}
+                        scopeLabel={selectedGroupRows.length > 1 && sharedFields.includes(field) && !selected.__meta.legalOverride
+                          ? `Compartilhado pelas ${selectedGroupRows.length} assinaturas` : 'Só nesta assinatura'}/>;
                     }
                     return <Field key={field} field={field} value={selected[field]} suggestions={[...new Set(rows.map((row) => row[field]).filter(Boolean))]} onChange={(value) => updateField(field, value)} locked={locked}/>;
                   })}</div>}
@@ -1280,14 +1314,20 @@ export const DynamicEmailWorkspace: React.FC = () => {
               })}
             </div>
           </div>}
-          <div className="sticky bottom-0 z-30 rounded-b-2xl border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-6px_20px_-4px_rgba(15,23,42,0.15)]">{selected.__meta.status === 'archived'
+          <div className="shrink-0 rounded-b-2xl border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-6px_20px_-4px_rgba(15,23,42,0.15)]">{selected.__meta.status === 'archived'
             ? <button type="button" onClick={() => void restoreSelected()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><ArchiveRestore size={16}/>Desarquivar e voltar a editar</button>
             : <><button type="button" onClick={() => setSaveOpen(true)} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#07595b] px-4 py-3 text-sm font-bold text-white shadow-sm outline-none transition hover:bg-[#064c4e] focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"><Save size={16}/>Salvar briefing{selectedGroupErrorCount > 0 && <span className="rounded-full bg-white/20 px-1.5 text-[11px]">{selectedGroupErrorCount} pend.</span>}</button><p className="mt-1.5 text-center text-[11px] text-slate-500">Salve o rascunho ou marque como pronto depois de revisar os blocos.</p></>}</div>
         </section> : <div/>}
 
         <ResizeHandle label="Ajustar largura do editor e da prévia" onPointerDown={startColDrag(1)} onReset={resetCols}/>
 
-        <div className="min-w-0">
+        <div className="flex min-h-0 min-w-0 flex-col">
+          <div role="group" aria-label="Tamanho da prévia" className="flex shrink-0 justify-end gap-1 border-b border-slate-200 bg-white p-1.5">
+            {([['desktop', 'Desktop'], ['mobile', 'Celular']] as const).map(([value, label]) =>
+              <button key={value} type="button" aria-pressed={previewDevice === value} onClick={() => setPreviewDevice(value)}
+                className={`rounded-md px-3 py-1 text-xs font-semibold focus-visible:outline focus-visible:outline-cyan-600 ${previewDevice === value ? 'bg-cyan-100 text-cyan-900' : 'text-slate-600 hover:bg-slate-100'}`}>{label}</button>)}
+          </div>
+          <div ref={previewScrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none] [scrollbar-gutter:stable]">
             <section id="email-preview-panel" className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Prévia do e-mail">
               <div className="border-b border-slate-200 bg-white px-3 py-2.5">
                 <div className="flex items-start justify-between gap-2">
@@ -1313,12 +1353,13 @@ export const DynamicEmailWorkspace: React.FC = () => {
                 </label>}
               </div>
               {vdvPreview && <div className="space-y-1 border-b border-slate-200 bg-white p-3 text-xs"><p><b>Assunto:</b> {vdvPreview.vars.Assunto}</p><p><b>Pré-cabeçalho:</b> {vdvPreview.vars.PreHeader}</p><p>Hero: {vdvPreview.heroUsed} · Célula: {vdvPreview.cellUsed}</p><p>Cards: {vdvPreview.cards.map(c=>`${c.marca} (posição ${c.position})`).join(' → ')}</p></div>}
-              {selected && !vdvPreview && <div className="space-y-1.5 border-b border-slate-200 bg-white px-4 py-3">
+              {selected && !vdvPreview && <div ref={messagePreviewRef} className={`space-y-1.5 border-b px-4 py-3 ${activeStructureBlock === "message" ? "border-cyan-400 bg-cyan-50" : "border-slate-200 bg-white"}`}>
                 <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Assunto:</span><span className="min-w-0 font-semibold text-slate-900">{(vdvPreview?.vars.Assunto ?? selected.ASSUNTO) || <span className="font-normal italic text-red-500">— não preenchido</span>}</span></div>
                 <div className="flex gap-2 text-sm"><span className="w-[92px] shrink-0 pt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Pré-cabeçalho:</span><span className="min-w-0 text-slate-600">{(vdvPreview?.vars.PreHeader ?? selected.PRE_CABECALHO) || <span className="italic text-amber-600">— vazio, o cliente verá o início do corpo do e-mail</span>}</span></div>
               </div>}
-              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="min-h-[300px] bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
+              {render.diagnostics.length > 0 ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{render.diagnostics.map((diagnostic) => <div key={diagnostic}>{diagnostic}</div>)}</div> : <PreviewWithStructure html={render.html} contextKey={previewContextKey} className="min-h-[300px] bg-slate-100" blocks={structureBlocks} activeBlockId={activeStructureBlock} selectedBlockId={selectedStructureBlock} scrollRef={previewScrollRef} messageRef={messagePreviewRef} viewportWidth={previewDevice === 'mobile' ? 390 : 680} openBlockIds={openSections} onSelectBlock={focusStructureBlock} onHoverBlock={setRailHoverBlock}/>}
             </section>
+          </div>
         </div>
       </div>
       </div>
@@ -1374,11 +1415,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
   </div>;
 };
 
-const CollapsibleBlock = ({ id, label, description, open, onToggle, tone = 'default', marker, focused, onHoverChange, children }: { id?: string; label: string; description?: string; open: boolean; onToggle: () => void; tone?: 'default' | 'audit'; marker?: React.ReactNode; focused?: boolean; onHoverChange?: (hovering: boolean) => void; children: React.ReactNode }) => (
+const CollapsibleBlock = ({ id, label, description, open, onToggle, tone = 'default', marker, focused, children }: { id?: string; label: string; description?: string; open: boolean; onToggle: () => void; tone?: 'default' | 'audit'; marker?: React.ReactNode; focused?: boolean; children: React.ReactNode }) => (
   <div
     id={id}
-    onMouseEnter={onHoverChange ? () => onHoverChange(true) : undefined}
-    onMouseLeave={onHoverChange ? () => onHoverChange(false) : undefined}
     className={`scroll-mt-24 overflow-hidden rounded-xl border transition ${focused ? 'border-cyan-400 ring-2 ring-cyan-200' : tone === 'audit' ? 'border-cyan-200 bg-cyan-50/40' : 'border-slate-200 bg-white'}`}
   >
     <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left outline-none transition hover:bg-slate-50/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-500">

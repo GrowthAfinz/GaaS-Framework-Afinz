@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { parseContentBlocks, renderContentBlocks, type ContentBlock } from '../domain/contentBlocks';
+import { opaqueEmailBackgrounds } from '../domain/opaqueEmailBackgrounds';
 import { VisualCopyInput, visualCopyHtml } from './VisualCopyInput';
 
 const labels: Record<ContentBlock['type'], string> = {
@@ -37,12 +38,19 @@ function RowActions({ label, index, count, onMove, onDelete }: {
 }
 
 type EditorBlock = { id: number; block: ContentBlock };
-type CopyProps = { id: string; label: string; field: string; value: string; onChange: (value: string) => void; firstName: boolean; structured: boolean };
+type CopyProps = { id: string; label: string; field: string; value: string; onChange: (value: string) => void; firstName: boolean; structured: boolean; scopeLabel?: string };
 
-export function EmailCopyField({ id, label, field, value, onChange, firstName, structured }: CopyProps) {
+export function EmailCopyField({ id, label, field, value, onChange, firstName, structured, scopeLabel }: CopyProps) {
   const [mode, setMode] = useState<'visual' | 'html'>('visual');
   const [organizing, setOrganizing] = useState(false);
-  const blocks = structured ? parseContentBlocks(value) : null;
+  const originalBlocks = structured ? parseContentBlocks(value) : null;
+  // V16/V17 briefings can contain white backgrounds generated for dark mode.
+  // Round-trip the transformation before accepting it as a known block.
+  const undecorated = structured && !originalBlocks ? value.replace(/<[a-z][^>]*>/gi, (tag) =>
+    tag.replace(/ style="background-color:#ffffff;"/g, '')
+      .replace(/background-color:#ffffff;(?=")/g, '').replace(/ bgcolor="#ffffff"/g, '')) : value;
+  const decorated = undecorated !== value && opaqueEmailBackgrounds(undecorated) === value;
+  const blocks = originalBlocks ?? (decorated ? parseContentBlocks(undecorated) : null);
   const canEditVisually = visualCopyHtml(value) !== null;
   const showHtml = mode === 'html' || (!canEditVisually && !blocks);
   const organized = structured && !blocks && canEditVisually ? asTextBlock(value) : null;
@@ -53,11 +61,12 @@ export function EmailCopyField({ id, label, field, value, onChange, firstName, s
       <button type="button" className={control} disabled={showHtml && !canEditVisually && !blocks}
         onClick={() => setMode(showHtml ? 'visual' : 'html')}>{showHtml ? 'Edição visual' : 'HTML avançado'}</button>
     </div>
+    {scopeLabel && <p className="text-xs text-slate-600">{scopeLabel}</p>}
     {showHtml ? <>
       <textarea id={id} value={value} onChange={(event) => { setMode('html'); onChange(event.target.value); }} rows={5} className={input}/>
       <p className="text-xs text-slate-600">Campo CSV {field}. {(!canEditVisually && !blocks) && 'Este conteúdo tem formatação personalizada e abre no modo HTML.'}</p>
-    </> : editableBlocks ? <StructuredCopyEditor key={value} blocks={editableBlocks} label={label} value={value}
-      onApply={(html) => { setOrganizing(false); onChange(html); }}
+    </> : editableBlocks ? <StructuredCopyEditor key={value} blocks={editableBlocks} label={label} value={blocks && decorated ? undecorated : value}
+      onApply={(html) => { setOrganizing(false); onChange(decorated ? opaqueEmailBackgrounds(html) : html); }}
       onCancel={blocks ? undefined : () => setOrganizing(false)} firstName={firstName}/> : <>
       <VisualCopyInput id={id} label={label} html={value} onChange={onChange} firstName={firstName}/>
       {organized !== null && <button type="button" className={control} onClick={() => setOrganizing(true)}>Organizar em blocos</button>}
