@@ -2320,6 +2320,70 @@ export const buildRentabilizacaoCandidate = (
     };
 };
 
+const MIRROR_METRIC_FIELDS = ['sent', 'delivered', 'opens', 'clicks', 'proposals', 'approved', 'finalized', 'assisted', 'independent'] as const;
+
+export interface BiMirrorResolution {
+    metrics: MetricRow[];
+    /** Assinatura do disparo -> jornadas descartadas por serem espelho da vencedora. */
+    mirrored: Map<string, string[]>;
+    droppedRows: number;
+}
+
+/**
+ * O BI da Dinâmica repete o mesmo envio em toda jornada que tem uma activity com aquele nome:
+ * cópia, teste, seedlist e jornada renomeada herdam os nomes da original. Mesma activity, canal,
+ * data e os mesmos números em várias jornadas é um disparo só. Fica a jornada que já está gravada
+ * para esse disparo; sem isso, a do grupo que manda sozinha em outros envios do arquivo (espelho
+ * nunca manda sozinho), desde que tenha pelo menos 10x mais envios sozinha que a segunda.
+ * Números diferentes, candidatas parecidas ou nenhuma: segue conflito.
+ */
+export function resolveBiJourneyMirrors(metrics: MetricRow[], history: RentHistoryIndex): BiMirrorResolution {
+    const bySignature = new Map<string, MetricRow[]>();
+    for (const row of metrics) {
+        const list = bySignature.get(row.dispatchSignature);
+        if (list) list.push(row); else bySignature.set(row.dispatchSignature, [row]);
+    }
+    // Quantos envios cada jornada tem sozinha no arquivo. Espelho tem zero.
+    const standalone = new Map<string, number>();
+    for (const group of bySignature.values()) {
+        if (new Set(group.map((row) => normalizeKey(row.journey))).size !== 1) continue;
+        const key = normalizeKey(group[0].journey);
+        standalone.set(key, (standalone.get(key) ?? 0) + 1);
+    }
+    // A original manda sozinha muito mais que uma jornada de teste que disparou poucas vezes.
+    const DOMINANCE = 10;
+    const pickOrigin = (group: MetricRow[]) => {
+        const ranked = group
+            .map((row) => ({ row, alone: standalone.get(normalizeKey(row.journey)) ?? 0 }))
+            .filter((item) => item.alone > 0)
+            .sort((a, b) => b.alone - a.alone);
+        if (ranked.length === 1) return ranked[0].row;
+        if (ranked.length > 1 && ranked[0].alone >= DOMINANCE * ranked[1].alone) return ranked[0].row;
+        return undefined;
+    };
+    const mirrored = new Map<string, string[]>();
+    const kept: MetricRow[] = [];
+    let droppedRows = 0;
+    for (const [signature, group] of bySignature) {
+        const journeys = new Set(group.map((row) => normalizeKey(row.journey)));
+        if (journeys.size < 2) { kept.push(...group); continue; }
+        const numbers = new Set(group.map((row) => MIRROR_METRIC_FIELDS.map((field) => row[field] ?? '').join('|')));
+        let winner: MetricRow | undefined;
+        if (numbers.size === 1) {
+            const recorded = new Set((history.bySignature.get(signature) ?? []).map((row) => normalizeKey(row.jornada)).filter(Boolean));
+            const byHistory = group.filter((row) => recorded.has(normalizeKey(row.journey)));
+            winner = recorded.size > 0
+                ? (byHistory.length === 1 && recorded.size === 1 ? byHistory[0] : undefined)
+                : pickOrigin(group);
+        }
+        if (!winner) { kept.push(...group); continue; }
+        kept.push(winner);
+        droppedRows += group.length - 1;
+        mirrored.set(signature, group.filter((row) => row !== winner).map((row) => row.journey));
+    }
+    return { metrics: kept, mirrored, droppedRows };
+}
+
 export const processRentabilizacaoDinamicaBI = (matrix: string[][], history: RentHistoryIndex = emptyRentHistoryIndex(), mappedJourneys?: ReadonlySet<string>): ProcessResult => {
     const warnings: string[] = [];
     const whatsappStart = findCell(matrix, ['journeyname (whatsapp)']);
@@ -2355,20 +2419,30 @@ export const processRentabilizacaoDinamicaBI = (matrix: string[][], history: Ren
     }
 
     const metricMap = new Map<string, MetricRow>();
-    const importedJourneys = new Map<string, Set<string>>();
     for (const row of scopedRows) {
-        const journeys = importedJourneys.get(row.dispatchSignature) ?? new Set<string>();
-        journeys.add(row.journey);
-        importedJourneys.set(row.dispatchSignature, journeys);
         mergeMetric(metricMap, {
             ...row,
             key: JSON.stringify([row.dispatchSignature, normalizeKey(row.journey)]),
         });
     }
-    const metrics = Array.from(metricMap.values());
+    const resolution = resolveBiJourneyMirrors(Array.from(metricMap.values()), history);
+    const metrics = resolution.metrics;
+    if (resolution.droppedRows > 0) {
+        warnings.push(`${resolution.droppedRows} linhas repetidas pelo BI em jornadas copiadas ou renomeadas foram unificadas em ${resolution.mirrored.size} disparos.`);
+    }
+    const importedJourneys = new Map<string, Set<string>>();
+    for (const row of metrics) {
+        const journeys = importedJourneys.get(row.dispatchSignature) ?? new Set<string>();
+        journeys.add(row.journey);
+        importedJourneys.set(row.dispatchSignature, journeys);
+    }
     const suggestionCache = new Map<string, Partial<Record<SuggestionField, FieldSuggestion[]>>>();
     const candidates = metrics
-        .map(row => buildRentabilizacaoCandidate(row, importedJourneys, history, suggestionCache))
+        .map(row => {
+            const candidate = buildRentabilizacaoCandidate(row, importedJourneys, history, suggestionCache);
+            const mirrors = resolution.mirrored.get(row.dispatchSignature);
+            return mirrors ? { ...candidate, basis: `${candidate.basis} · o BI repetiu este envio em: ${mirrors.join(', ')}` } : candidate;
+        })
         .sort((a, b) => a.date.localeCompare(b.date) || a.status.localeCompare(b.status));
     const ignoredExisting = candidates.filter((candidate) => candidate.status === 'ignored').length;
     const tsv = candidates
