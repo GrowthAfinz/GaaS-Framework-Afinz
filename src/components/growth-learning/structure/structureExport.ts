@@ -3,8 +3,9 @@ export type BoardExportFormat = 'jpeg' | 'pdf';
 export async function downloadStructureBoard(source: HTMLElement, format: BoardExportFormat, date: string) {
   const { toCanvas } = await import('html-to-image');
   await document.fonts.ready;
-  const width = Math.ceil(source.getBoundingClientRect().width);
-  const height = Math.ceil(source.getBoundingClientRect().height);
+  // The SVG clone uses layout pixels, without the app zoom applied to client rectangles.
+  const width = source.offsetWidth;
+  const height = source.offsetHeight;
   // Keep large boards within browser canvas limits while targeting 2x for normal boards.
   const pixelRatio = Math.min(2, 16384 / Math.max(width, height), Math.sqrt(48_000_000 / (width * height)));
   const canvas = await toCanvas(source, { width, height, pixelRatio, skipAutoScale: true });
