@@ -1,17 +1,21 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bold, Undo2, Redo2 } from 'lucide-react';
+import { COPY_TOKEN_PATTERN, COPY_VARIABLES, copyToken, copyVariable, withoutCopyTokens, type CopyVariable } from '../domain/copyVariables';
 
-export const FIRST_NAME = '%%=v(@FirstName)=%%';
 // Keep a text caret position after the non-editable token, including at the end of a field.
-const chip = '<span contenteditable="false" data-first-name class="rounded bg-cyan-100 px-1 text-cyan-900">Primeiro nome</span>&#8203;';
+const chip = (name: CopyVariable) => `<span contenteditable="false" data-copy-variable="${name}" class="rounded bg-cyan-100 px-1 text-cyan-900">${COPY_VARIABLES[name]}</span>&#8203;`;
 const escapeText = (text: string) => text.replace(/[&<>%]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '%': '&#37;' })[char]!);
 
 export function visualCopyHtml(value: string): string | null {
-  if (/%%/.test(value.split(FIRST_NAME).join(''))) return null;
+  if (/%%/.test(withoutCopyTokens(value))) return null;
   // Only accept formatting the visual editor can represent without losing styles or blocks.
   const tagsRemoved = value.replace(/<\/?(?:b|strong|p)>|<br\s*\/?>/gi, '');
   if (/[<>]/.test(tagsRemoved)) return null;
-  return value.replace(/\r\n?|\n/g, '<br>').split(FIRST_NAME).join(chip);
+  return value.replace(/\r\n?|\n/g, '<br>').replace(COPY_TOKEN_PATTERN, (token, rawName: string) => {
+    const name = copyVariable(rawName);
+    return name ? chip(name) : token;
+  });
 }
 
 function serializeChildren(element: Node): string {
@@ -23,8 +27,9 @@ function serializeChildren(element: Node): string {
       return;
     }
     if (!(node instanceof HTMLElement)) return;
-    if (node.hasAttribute('data-first-name')) {
-      html += FIRST_NAME;
+    const variable = copyVariable(node.getAttribute('data-copy-variable') ?? '');
+    if (variable) {
+      html += copyToken(variable);
       return;
     }
     if (node.tagName === 'BR') {
@@ -44,8 +49,9 @@ function serializeChildren(element: Node): string {
 
 const button = 'inline-flex min-h-8 items-center gap-1 rounded px-2 text-slate-700 hover:bg-cyan-100 focus-visible:outline focus-visible:outline-cyan-600';
 
-export function VisualCopyInput({ id, label, html, onChange, firstName }: {
-  id?: string; label: string; html: string; onChange: (html: string) => void; firstName: boolean;
+export function VisualCopyInput({ id, label, html, onChange, variables, compact, toolbarHost, onActivate }: {
+  id?: string; label: string; html: string; onChange: (html: string) => void; variables: readonly CopyVariable[];
+  compact?: boolean; toolbarHost?: HTMLElement | null; onActivate?: () => void;
 }) {
   const editor = useRef<HTMLDivElement>(null);
   const lastValue = useRef<string>();
@@ -88,16 +94,24 @@ export function VisualCopyInput({ id, label, html, onChange, firstName }: {
     publish();
   };
 
-  return <div className="overflow-hidden rounded-lg border border-slate-300 focus-within:border-cyan-500">
-    <div role="group" aria-label={`Formatação de ${label.toLowerCase()}`} className="flex flex-wrap gap-1 border-b border-slate-200 bg-slate-50 p-1 text-xs">
+  const toolbar = <div role="group" aria-label={`Formatação de ${label.toLowerCase()}`} className="flex flex-wrap gap-1 bg-slate-50 p-1 text-xs">
       <button type="button" className={`${button} ${bold ? 'bg-cyan-100' : ''}`} aria-pressed={bold} onMouseDown={(event) => event.preventDefault()} onClick={() => run('bold')}><Bold size={14}/>Negrito</button>
       <button type="button" className={button} aria-label="Desfazer" title="Desfazer" onMouseDown={(event) => event.preventDefault()} onClick={() => run('undo')}><Undo2 size={15}/></button>
       <button type="button" className={button} aria-label="Refazer" title="Refazer" onMouseDown={(event) => event.preventDefault()} onClick={() => run('redo')}><Redo2 size={15}/></button>
-      {firstName && <button type="button" className={button} onMouseDown={(event) => event.preventDefault()} onClick={() => run('insertHTML', chip)}>+ Primeiro nome</button>}
-    </div>
+      {variables.length > 0 && <select aria-label="Inserir variável" value="" className={button}
+        onChange={(event) => {
+          const name = copyVariable(event.target.value);
+          if (name && variables.includes(name)) run('insertHTML', chip(name));
+        }}>
+        <option value="" disabled>Inserir variável</option>
+        {variables.map((name) => <option key={name} value={name}>{COPY_VARIABLES[name]}</option>)}
+      </select>}
+    </div>;
+  return <div className={compact ? 'min-w-0 flex-1 rounded focus-within:bg-cyan-50' : 'overflow-hidden rounded-lg border border-slate-300 focus-within:border-cyan-500'}>
+    {compact ? toolbarHost && createPortal(toolbar, toolbarHost) : <div className="border-b border-slate-200">{toolbar}</div>}
     <div id={id} ref={editor} contentEditable suppressContentEditableWarning role="textbox" aria-label={label} aria-multiline="true"
-      className="min-h-20 break-words whitespace-pre-wrap px-3 py-2 text-sm font-normal leading-5 text-slate-800 outline-none [&_p+p]:mt-3"
-      onInput={publish} onSelect={rememberSelection} onKeyUp={rememberSelection} onMouseUp={rememberSelection}
+      className={`${compact ? 'min-h-8 px-1 py-1' : 'min-h-20 px-3 py-2'} break-words whitespace-pre-wrap text-sm font-normal leading-5 text-slate-800 outline-none [&_p+p]:mt-3`}
+      onInput={publish} onFocus={onActivate} onSelect={rememberSelection} onKeyUp={rememberSelection} onMouseUp={rememberSelection}
       onPaste={(event) => {
         event.preventDefault();
         rememberSelection();

@@ -9,6 +9,7 @@ import { VdvCampaignTree } from './VdvCampaignTree';
 import { isVdvEmail, ensureVdvTemplate, materializeVdvTemplate, projectVdvEditorial, factoryFamilyOrder, createVdvEdition, VDV_SLOT } from '../domain/factoryEmail';
 import { validateVdv, exportVdvBriefingCsv, exportVdvMovimentoCsv } from '../domain/vaiDeVisa';
 import { EmailCopyField } from './EmailCopyField';
+import { COPY_VARIABLES, type CopyVariable } from '../domain/copyVariables';
 import { saveVdvFactory } from '../services/vaiDeVisaService';
 import { type VdvData } from './VaiDeVisaWorkspace';
 import { detectVdvTemplate, resolveVdvPreview, VDV_SAMPLES, parseVdvBriefingCsv, parseVdvMovimentoCsv } from '../domain/vaiDeVisa';
@@ -1159,7 +1160,11 @@ export const DynamicEmailWorkspace: React.FC = () => {
         <div id="email-briefing-inbox" hidden={!briefingBoxOpen} className="min-w-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
         <aside className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="Caixa de briefings">
           <div className="border-b border-slate-200 p-3.5">
-            <div className="flex items-center justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredGroups.length} de {activeEditorialGroupCount} e-mails · {activeRows.length} variantes ativas</p></div><Inbox className="text-cyan-700" size={18}/></div>
+            <div className="flex items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">Caixa de briefings</h2><p className="text-xs text-slate-500">{filteredGroups.length} de {activeEditorialGroupCount} e-mails · {activeRows.length} variantes ativas</p></div>
+              <button type="button" aria-label="Minimizar caixa de briefings" title="Minimizar caixa de briefings" aria-controls="email-briefing-inbox" aria-expanded={true}
+                onClick={() => { setBriefingBoxOpen(false); requestAnimationFrame(() => document.getElementById('show-briefing-inbox')?.focus({ preventScroll: true })); }}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-cyan-50 focus-visible:outline focus-visible:outline-cyan-600"><ChevronUp size={14}/>Minimizar</button>
+            </div>
             <label className="mt-3 flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-cyan-400 focus-within:bg-white">
               <Search size={15}/><span className="sr-only">Buscar briefings</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar parceiro, campanha..." className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"/>
             </label>
@@ -1220,6 +1225,9 @@ export const DynamicEmailWorkspace: React.FC = () => {
             if (block?.id.startsWith('eb-')) setSelectedStructureBlock(block.id.slice(3));
           }}>
           <div className="rounded-t-2xl border-b border-slate-200 bg-white px-4 py-3">
+            {!briefingBoxOpen && <button id="show-briefing-inbox" type="button" aria-controls="email-briefing-inbox" aria-expanded={false}
+              onClick={() => { setBriefingBoxOpen(true); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('#email-briefing-inbox button[aria-controls="email-briefing-inbox"]')?.focus({ preventScroll: true })); }}
+              className="mb-2 inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-cyan-800 hover:bg-cyan-50 focus-visible:outline focus-visible:outline-cyan-600"><Inbox size={14}/>Mostrar briefings</button>}
             <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-bold text-slate-900">{nativeVdv ? `${selected.__editor!.campaignName} · ${selected.SEQUENCIA}` : `${selected.__meta.partner || 'Parceiro pendente'} · ${selected.__meta.segment || 'Segmento pendente'} · ${selected.SEQUENCIA || 'Sequência pendente'}`}</h2><p className="mt-0.5 text-xs text-slate-500">{selected.__meta.partner === 'Plurix' ? 'Assinatura' : 'Régua'} em edição: <b>{selected.__meta.subgroup || selected.NM_PRODUTO_INTERNO}</b> · {syncState} · versão {selected.__meta.version}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${selected.__meta.status === 'archived' ? 'bg-slate-200 text-slate-700' : selectedIssues.some((issue) => issue.severity === 'error') ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{selected.__meta.status === 'archived' ? 'Na Lixeira · somente leitura' : selectedIssues.filter((issue) => issue.severity === 'error').length ? `${selectedIssues.filter((issue) => issue.severity === 'error').length} ajustes necessários` : nativeVdv ? (selected.__meta.status==='ready'?'Pronto':'Rascunho · revisão editorial') : 'Pronto para exportar'}</span></div>
           </div>
           {nativeVdv && selected.__editor && vdvPreview ? <><div id="email-editor-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{vdvLoadError&&<p role="alert" className="p-3 text-xs text-red-700">{vdvLoadError}</p>}<fieldset disabled={selected.__meta.status==='archived'}><PoolEmailEditor assets={assets} onLibrary={()=>{setLibraryView('offers');setMode('library');}} onReview={()=>setPoolReviewVersion(selected.__editor!.contentVersion)} row={selected} data={vdvData} onChange={(data)=>{setVdvData(data);setVdvDirty(true);}} sample={{...vdvSample,ID_VERSAO_OFERTAS:selected.__editor.contentVersion}} onSample={setVdvSample} today={previewSendDate} onDate={setPreviewSendDate} preview={vdvPreview} onContext={(name)=>{setRows(current=>current.map(r=>r.__editor?.contentVersion===selected.__editor!.contentVersion?{...r,__editor:{...r.__editor,campaignName:name},__meta:{...r.__meta,weekKey:name}}:r));}} onDuplicate={()=>duplicateVdvCampaign()} onAnnounce={setAnnouncement}/><details className="m-3 rounded-xl border border-slate-200"><summary className="cursor-pointer px-3 py-2 text-xs font-bold text-slate-600">Detalhes do envelope SFMC</summary><SfmcEnvelopeGuide source={previewTemplate}/></details></fieldset></div></> : <div id="email-editor-scroll" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3.5">
@@ -1285,7 +1293,8 @@ export const DynamicEmailWorkspace: React.FC = () => {
                     if (!locked && templateActiveCols.has(field) && /TreatAsContent\s*\(/i.test(previewTemplate) && (field === 'COPY_1_PRETO' || field === 'COPY_2_PRETO')) {
                       return <EmailCopyField key={`${selected.__id}:${linkedTemplateId}:${field}`}
                         id={`dynamic-${field}`} label={FIELD_LABELS[field] ?? field} field={field} value={selected[field] ?? ''}
-                        onChange={(value) => updateField(field, value)} firstName={/@FirstName\b/i.test(previewTemplate)}
+                        onChange={(value) => updateField(field, value)}
+                        variables={(Object.keys(COPY_VARIABLES) as CopyVariable[]).filter((name) => new RegExp(`@${name}\\b`, 'i').test(previewTemplate))}
                         structured={field === 'COPY_2_PRETO'}
                         scopeLabel={selectedGroupRows.length > 1 && sharedFields.includes(field) && !selected.__meta.legalOverride
                           ? `Compartilhado pelas ${selectedGroupRows.length} assinaturas` : 'Só nesta assinatura'}/>;
