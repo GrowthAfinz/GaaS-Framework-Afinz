@@ -41,6 +41,18 @@ describe('histórico de atualizações', () => {
         ]);
     });
 
+    it('carga sem autor (script) ainda conta pelo que mudou na tabela', () => {
+        // Usuário só enxerga a própria execução de 18/11; a base mudou hoje por script.
+        const bases = buildBaseFreshness([{ createdAt: at(18), domain: 'total_crm' }], {}, NOW, {
+            aquisicao: { count: 11512, lastChange: at(24, 10) },
+            rentabilizacao: { count: null, lastChange: null },
+        });
+        expect(bases.map((base) => [base.label, base.freshLabel, base.tone, base.count])).toEqual([
+            ['Aquisição', 'hoje · 10:30', 'ok', 11512],
+            ['Rentabilização', 'há 6 dias · 18/11', 'warn', null],
+        ]);
+    });
+
     it('traduz situação e duração', () => {
         expect(runStatusMeta('applied')).toEqual({ label: 'Concluída', tone: 'ok' });
         expect(runStatusMeta('reviewing').label).toBe('Não gravada');

@@ -19,6 +19,7 @@ import {
     buildFieldChanges,
     durationLabel,
     runStatusMeta,
+    type BaseChanges,
     type BaseFreshness,
 } from './updateHistoryModel';
 
@@ -65,7 +66,9 @@ const BaseRow = ({ base }: { base: BaseFreshness }) => (
     <div className="grid grid-cols-[220px_minmax(0,1fr)_170px] items-center gap-4 border-b border-[#eef2f6] px-4 py-3 last:border-b-0">
         <div className="min-w-0">
             <div className="text-[13px] font-bold text-slate-900">{base.label}</div>
-            <div className="truncate text-xs text-slate-500">{base.table}</div>
+            <div className="truncate text-xs text-slate-500">
+                {base.table}{base.count !== null && <> · <span className="tabular-nums">{base.count.toLocaleString('pt-BR')}</span> linhas</>}
+            </div>
         </div>
         <div className="flex h-[26px] items-end gap-[3px]" role="img" aria-label={`${base.loads} cargas em 30 dias`}>
             {base.days.map((day) => (
@@ -91,6 +94,7 @@ export const UpdateHistoryView: React.FC<{ onStartUpdate: () => void }> = ({ onS
     const [error, setError] = useState<string | null>(null);
     const [activity, setActivity] = useState<Array<{ id: string; createdAt: string; domain: string; status: string }>>([]);
     const [latestApplied, setLatestApplied] = useState<Array<{ createdAt: string; domain: string }>>([]);
+    const [baseChanges, setBaseChanges] = useState<BaseChanges>({});
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [detail, setDetail] = useState<UpdateRunHistoryDetail | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -120,6 +124,7 @@ export const UpdateHistoryView: React.FC<{ onStartUpdate: () => void }> = ({ onS
     useEffect(() => {
         intelligentUpdateService.fetchUpdateRunActivity(since).then(setActivity).catch(() => setActivity([]));
         intelligentUpdateService.fetchLatestAppliedRuns().then(setLatestApplied).catch(() => setLatestApplied([]));
+        intelligentUpdateService.fetchBaseStats().then(setBaseChanges).catch(() => setBaseChanges({}));
         supabase.from('profiles').select('id,full_name,email').then(({ data }) => {
             setPeople(new Map((data ?? []).map((row: any) => [row.id, row.full_name || String(row.email ?? '').split('@')[0] || 'sem nome'])));
         });
@@ -139,7 +144,7 @@ export const UpdateHistoryView: React.FC<{ onStartUpdate: () => void }> = ({ onS
         return () => { cancelled = true; };
     }, [selectedId]);
 
-    const bases = useMemo(() => buildBaseFreshness(latestApplied, buildDailyActivity(activity, 30)), [latestApplied, activity]);
+    const bases = useMemo(() => buildBaseFreshness(latestApplied, buildDailyActivity(activity, 30), new Date(), baseChanges), [latestApplied, activity, baseChanges]);
     const anyStale = bases.some((base) => base.tone !== 'ok');
     const who = (run: UpdateRunHistoryItem) => !run.createdBy ? 'sem autor' : run.createdBy === user?.id ? 'Você' : people.get(run.createdBy) ?? 'outra pessoa';
 
