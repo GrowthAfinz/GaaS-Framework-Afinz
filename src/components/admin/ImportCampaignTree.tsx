@@ -106,8 +106,28 @@ export function ImportCampaignTree({ campaigns, selected, focusedCampaign, focus
         return next;
     });
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    const periodOf = (front: string): ImportSelectionPeriod => periods[front]
-        ?? { from: front === 'Aquisição' ? previousWeekStart(today) : '', to: front === 'Aquisição' ? today : '' };
+    const housePeriod = (front: string): ImportSelectionPeriod =>
+        ({ from: front === 'Aquisição' ? previousWeekStart(today) : '', to: front === 'Aquisição' ? today : '' });
+    const periodOf = (front: string): ImportSelectionPeriod => periods[front] ?? housePeriod(front);
+
+    // Período geral: vale para todas as frentes de uma vez, sem precisar abrir nenhuma.
+    const [allPeriod, setAllPeriod] = useState<ImportSelectionPeriod>({ from: '', to: '' });
+    const allInvalid = Boolean(allPeriod.from && allPeriod.to && allPeriod.from > allPeriod.to);
+    const applyToAll = (nextPeriod: ImportSelectionPeriod) => {
+        setAllPeriod(nextPeriod);
+        setPeriods(Object.fromEntries(fronts.map(([front]) => [front, nextPeriod])));
+        onScopeSelection(campaigns.flatMap(campaign => campaign.rows), nextPeriod, true);
+    };
+    const applyHouseDefault = () => {
+        setAllPeriod({ from: '', to: '' });
+        setPeriods({});
+        for (const [front, allCampaigns] of fronts) onScopeSelection(allCampaigns.flatMap(campaign => campaign.rows), housePeriod(front), true);
+    };
+    const frontPeriods = fronts.map(([front]) => periodOf(front));
+    const samePeriod = frontPeriods.every(period => period.from === frontPeriods[0]?.from && period.to === frontPeriods[0]?.to);
+    const periodText = (period: ImportSelectionPeriod) => period.from || period.to
+        ? `${period.from ? fmt(period.from) : 'início'} a ${period.to ? fmt(period.to) : 'fim'}`
+        : 'todo o arquivo';
 
     const prepared = fronts.map(([front, allCampaigns]) => {
         const period = periodOf(front);
@@ -220,6 +240,22 @@ export function ImportCampaignTree({ campaigns, selected, focusedCampaign, focus
             <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" className="accent-cyan-700" checked={selectedOnly}
                 onChange={event => setSelectedOnly(event.target.checked)} />Só com seleção</label>
             <button type="button" className="text-xs text-cyan-700 hover:underline" onClick={() => setOpen(new Set())}>Recolher tudo</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs" role="group" aria-label="Período de todas as frentes">
+            <span className="font-semibold text-slate-700">Período de todas as frentes</span>
+            <input type="date" aria-label="Início do período de todas as frentes" className="h-7 rounded-sm border border-slate-300 bg-white px-2" value={allPeriod.from} onChange={event => setAllPeriod(current => ({ ...current, from: event.target.value }))} />
+            <span className="text-slate-500">a</span>
+            <input type="date" aria-label="Fim do período de todas as frentes" className="h-7 rounded-sm border border-slate-300 bg-white px-2" value={allPeriod.to} onChange={event => setAllPeriod(current => ({ ...current, to: event.target.value }))} />
+            <button type="button" disabled={allInvalid || (!allPeriod.from && !allPeriod.to)} className="h-7 rounded-sm bg-cyan-700 px-3 font-semibold text-white hover:bg-cyan-800 disabled:opacity-40"
+                title="Marca tudo que dá para gravar nesse período, em todas as frentes, e tira o que estiver fora" onClick={() => applyToAll(allPeriod)}>Aplicar a todas</button>
+            <span className="mx-1 h-4 w-px bg-slate-300" aria-hidden="true" />
+            <button type="button" className="h-7 rounded-sm border border-slate-300 bg-white px-2.5 text-slate-700 hover:border-slate-400" onClick={() => applyToAll({ from: previousWeekStart(today), to: today })}>Desde segunda passada</button>
+            <button type="button" className="h-7 rounded-sm border border-slate-300 bg-white px-2.5 text-slate-700 hover:border-slate-400" onClick={() => applyToAll({ from: '', to: '' })}>Todo o arquivo</button>
+            <button type="button" className="h-7 px-2 text-slate-600 hover:underline" title="Aquisição da segunda passada para cá e as outras frentes inteiras" onClick={applyHouseDefault}>Padrão da casa</button>
+            {allInvalid && <span role="alert" className="text-red-700">O início vem depois do fim.</span>}
+            <span className="ml-auto text-slate-500" role="status">
+                {samePeriod ? `Todas: ${periodText(frontPeriods[0] ?? { from: '', to: '' })}` : 'Cada frente com seu período (veja a coluna Período)'}
+            </span>
         </div>
         <div className={`${GRID} border-b border-slate-200 bg-white px-4 py-1.5 text-[11px] font-semibold text-slate-500`}>
             <span className="pl-6">Frente · campanha · jornada</span>
