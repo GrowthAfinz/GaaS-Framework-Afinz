@@ -90,7 +90,6 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
 }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const lastAlignment = useRef<{ key: string; scrollTop: number }>();
   const rafRef = useRef<number>();
   const lastWidthRef = useRef(0);
   // âncora de cada bloco em px do documento do e-mail (sem escala)
@@ -204,20 +203,11 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
   useLayoutEffect(() => {
     const viewport = scrollRef.current;
     const target = selectedBlockId === 'message' ? messageRef.current : boxRef.current;
-    if (!selectedBlockId || !viewport || !target) {
-      lastAlignment.current = undefined;
-      return;
-    }
+    if (!selectedBlockId || !viewport || !target) return;
     if (selectedBlockId !== 'message' && typeof selectedTop !== 'number' && !selectedMissing) return;
-    const key = `${contextKey}:${viewportWidth}:${selectedBlockId}:${selectedMissing ? 'missing' : 'visible'}`;
-    const previous = lastAlignment.current;
-    // Reflow can move an anchor during editing. Only follow it if the user
-    // has left the independently scrollable preview at the last alignment.
-    if (previous?.key === key && Math.abs(viewport.scrollTop - previous.scrollTop) > 2) return;
     const offset = typeof selectedTop === 'number' ? selectedTop * scale : 0;
     const top = target.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop + offset;
     viewport.scrollTop = Math.max(0, top - 16);
-    lastAlignment.current = { key, scrollTop: viewport.scrollTop };
   }, [contextKey, messageRef, scale, scrollRef, selectedBlockId, selectedMissing, selectedTop, viewportWidth, visualH]);
 
   const pinClass = (block: StructureBlock, on: boolean) =>
