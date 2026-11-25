@@ -518,6 +518,24 @@ export const intelligentUpdateService = {
         return (data ?? []).map((row: any) => ({ createdAt: row.created_at, domain: row.domain ?? '' }));
     },
 
+    // Tamanho real e última mudança de cada base, lidos nas próprias tabelas. A lista de
+    // execuções só mostra as do usuário (RLS) e carga feita por script não tem autor, então
+    // ela sozinha não diz quando a base mudou de verdade.
+    async fetchBaseStats(): Promise<Record<UpdateDomain, { count: number | null; lastChange: string | null }>> {
+        const read = async (table: 'activities' | 'rentabilizacao_activities') => {
+            const [count, last] = await Promise.all([
+                supabase.from(table).select('id', { count: 'exact', head: true }),
+                supabase.from(table).select('updated_at').order('updated_at', { ascending: false, nullsFirst: false }).limit(1),
+            ]);
+            return {
+                count: count.error ? null : count.count ?? null,
+                lastChange: last.error ? null : ((last.data?.[0] as any)?.updated_at ?? null),
+            };
+        };
+        const [aquisicao, rentabilizacao] = await Promise.all([read('activities'), read('rentabilizacao_activities')]);
+        return { aquisicao, rentabilizacao };
+    },
+
     // Detalhe de um run: candidatos aplicados (insert/upsert/update_metrics) na integra
     // ate um teto, e uma amostra dos bloqueados com o total real. Le proposed_activity_update
     // para jornada/activity/canal/data sem join na tabela de metricas.

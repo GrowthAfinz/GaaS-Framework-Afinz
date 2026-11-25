@@ -729,15 +729,25 @@ export const IntelligentFrameworkUpdate: React.FC<{
         const cards = new Map(importMapping?.board.cards.filter(card => !card.archived).map(card => [card.id, card]));
         const lanes = new Map(importMapping?.board.lanes.map(lane => [lane.id, lane]));
         const pillars = new Map(importMapping?.board.pillars.map(pillar => [pillar.id, pillar.title]));
+        // A regra do Consumo SFMC e o pilar do Board escrevem a mesma frente de jeitos diferentes
+        // ("1º uso" e "1º Uso"). Mesma frente sem diferenciar caixa e acento; vale o nome do pilar.
+        const frontNames = new Map<string, string>();
+        importMapping?.board.pillars.forEach(pillar => frontNames.set(normalizeKey(pillar.title), pillar.title));
+        const canonicalFront = (front: string) => {
+            const key = normalizeKey(front);
+            if (!key) return '';
+            if (!frontNames.has(key)) frontNames.set(key, front.trim());
+            return frontNames.get(key)!;
+        };
         return new Map(candidates.map(candidate => {
             const manual = importMapping?.manual.get(candidate.journey || candidate.activityName);
             const rule = manual ?? (importMapping && classify(candidate.journey, candidate.activityName, importMapping.rules));
             const exactCardId = importMapping?.exactRentCards.get(normalizeKey(candidate.journey));
             const cardId = manual ? manual.card_id : exactCardId || rule?.card_id;
             const card = cardId ? cards.get(cardId) : undefined;
-            const front = rule?.front || pillars.get(lanes.get(card?.lane_id ?? '')?.pillar_id ?? '') || '';
+            const front = canonicalFront(rule?.front || pillars.get(lanes.get(card?.lane_id ?? '')?.pillar_id ?? '') || '');
             const title = card?.title || rule?.group_label || front || 'Sem campanha mapeada';
-            const key = card?.id || JSON.stringify([front, title]);
+            const key = card?.id || JSON.stringify([normalizeKey(front), normalizeKey(title)]);
             return [candidate.key, { key, title, front, origin: manual ? 'Vínculo aprovado' : exactCardId ? 'Vínculo no Board Campanhas' : rule?.card_id ? 'Regra do Consumo SFMC' : '' }] as const;
         }));
     }, [candidates, importMapping]);
@@ -777,6 +787,7 @@ export const IntelligentFrameworkUpdate: React.FC<{
         rows: group.rows.map(row => ({
             key: row.key, journey: row.journey, date: row.date,
             eligible: canUploadCandidate(row), operation: candidateFilterKey(row),
+            status: row.status, accepted: Boolean(row.accepted),
         })),
     })), [campaignRows]);
     const [reviewCollision, setReviewCollision] = useState('');
@@ -1052,7 +1063,9 @@ export const IntelligentFrameworkUpdate: React.FC<{
             setFileMeta({ name: file.name, rows: output.matrixRows, type: ext ?? 'arquivo' });
             setReviewPage(1);
             setStatusFilter('new_dispatch');
-            setSelectedKeys(new Set(reviewed.filter(candidate => candidate.accepted
+            // Padrão da casa: tudo que dá para gravar, Aquisição da segunda passada para cá e as
+            // demais frentes inteiras. Gravar continua exigindo aprovação na Revisão.
+            setSelectedKeys(new Set(reviewed.filter(candidate => canUploadCandidate(candidate)
                 && (candidate.domain !== 'aquisicao' || candidate.date >= previousWeekStart(importToday()) && candidate.date <= importToday()))
                 .map(candidate => candidate.key)));
             setStep('escopo');
@@ -1253,8 +1266,11 @@ export const IntelligentFrameworkUpdate: React.FC<{
 
     const loadFreshness = useCallback(async () => {
         try {
-            const latest = await intelligentUpdateService.fetchLatestAppliedRuns();
-            setBaseFreshness(buildBaseFreshness(latest, {}));
+            const [latest, stats] = await Promise.all([
+                intelligentUpdateService.fetchLatestAppliedRuns().catch(() => []),
+                intelligentUpdateService.fetchBaseStats().catch(() => ({})),
+            ]);
+            setBaseFreshness(buildBaseFreshness(latest, {}, new Date(), stats));
         } catch {
             setBaseFreshness([]);
         }
@@ -1389,8 +1405,17 @@ export const IntelligentFrameworkUpdate: React.FC<{
     const scopeConfidence = scopeCandidates.length
         ? Math.round(scopeCandidates.reduce((sum, candidate) => sum + candidate.confidence, 0) / scopeCandidates.length)
         : null;
-    const needsYou = summary.review + summary.conflict;
+    // Só o que está no escopo, dá para gravar e ainda não foi aprovado. Conflito e "já existe"
+    // ficam de fora do escopo (não dá para selecionar), então não entram aqui.
+    const needsYou = scopeCandidates.filter((candidate) => canUploadCandidate(candidate) && !candidate.accepted).length;
     const fileDates = candidates.map((candidate) => candidate.date).filter(Boolean).sort();
+    const fileComposition = [
+        { key: 'ok', label: 'Dá para gravar', bar: 'bg-cyan-700', count: candidates.filter(canUploadCandidate).length, hint: 'Novo ou com número novo. Entra no escopo e passa pela Revisão.' },
+        { key: 'duplicate', label: 'Já igual na base', bar: 'bg-slate-300', count: summary.duplicate, hint: 'Já está gravado com os mesmos números. Nada para fazer.' },
+        { key: 'conflict', label: 'Conflito de jornada', bar: 'bg-orange-400', count: summary.conflict, hint: 'A mesma activity, canal e data aparece com outra jornada, no arquivo ou na base. Não grava sem decisão.' },
+        { key: 'ignored', label: 'Sem volume', bar: 'bg-slate-200', count: summary.ignored, hint: 'Linha sem Base Total e Base Acionável válidas. Não vira disparo.' },
+        { key: 'error', label: 'Erro de leitura', bar: 'bg-red-600', count: summary.error, hint: 'Falta jornada, activity, data ou canal.' },
+    ].filter((part) => part.key === 'ok' || part.count > 0);
     const filePeriod = fileDates.length ? `${formatDateBR(fileDates[0])} a ${formatDateBR(fileDates[fileDates.length - 1])}` : 'sem dado';
     const worstFreshness = baseFreshness.find((base) => base.tone !== 'ok') ?? baseFreshness[0];
     const goToReview = () => {
@@ -1429,7 +1454,7 @@ export const IntelligentFrameworkUpdate: React.FC<{
                 <span className="flex-1" />
                 <span className="inline-flex items-center gap-1.5 text-xs text-slate-600">
                     <Database size={14} aria-hidden="true" />
-                    Na base: {activities.length.toLocaleString('pt-BR')} disparos de Aquisição · {rentabilizacaoCount.toLocaleString('pt-BR')} de Rentabilização
+                    Na base: {(baseFreshness.find((base) => base.key === 'aquisicao')?.count ?? activities.length).toLocaleString('pt-BR')} disparos de Aquisição · {(baseFreshness.find((base) => base.key === 'rentabilizacao')?.count ?? rentabilizacaoCount).toLocaleString('pt-BR')} de Rentabilização
                 </span>
                 {worstFreshness && (
                     <span
@@ -1591,17 +1616,17 @@ export const IntelligentFrameworkUpdate: React.FC<{
 
             {step === 'escopo' && result && fileMeta && (
                 <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex min-h-0 flex-1 flex-wrap gap-5 p-6">
+                    <div className="flex flex-1 flex-wrap items-start gap-5 p-6">
                         <section aria-label="Frentes e período" className="flex min-w-[520px] flex-[999_1_640px] flex-col overflow-hidden rounded-[14px] border border-slate-200 bg-white">
-                            <p className="border-b border-[#eef2f6] px-3.5 py-2 text-xs text-slate-600">
-                                Padrão da casa já marcado: Aquisição da segunda passada para cá e as demais frentes inteiras.
+                            <p className="border-b border-[#eef2f6] bg-slate-50 px-4 py-2 text-xs text-slate-600">
+                                Já veio marcado tudo que dá para gravar: Aquisição da segunda passada para cá e as outras frentes inteiras. Gravar ainda pede sua aprovação na Revisão.
                             </p>
                             {mappingUnavailable && (
                                 <p role="status" className="border-b border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
                                     Mapeamento de campanhas indisponível agora. Dá para revisar disparo a disparo na próxima etapa.
                                 </p>
                             )}
-                            <div className="min-h-0 flex-1 overflow-auto">
+                            <div>
                                 <ImportCampaignTree
                                     campaigns={treeCampaigns}
                                     selected={selectedKeys}
@@ -1635,7 +1660,7 @@ export const IntelligentFrameworkUpdate: React.FC<{
                             <div className="rounded-[14px] border border-slate-200 bg-white px-4 py-3.5">
                                 <div className="text-xs text-slate-600">Vai para a revisão</div>
                                 <div className="text-[30px] font-bold tabular-nums">
-                                    {scopeTotal.toLocaleString('pt-BR')} <span className="text-[13px] font-normal text-slate-600">de {candidates.length.toLocaleString('pt-BR')} no arquivo</span>
+                                    {scopeTotal.toLocaleString('pt-BR')} <span className="text-[13px] font-normal text-slate-600">de {(fileComposition[0]?.count ?? 0).toLocaleString('pt-BR')} que dá para gravar</span>
                                 </div>
                                 {scopeTotal > 0 && (
                                     <>
@@ -1655,18 +1680,27 @@ export const IntelligentFrameworkUpdate: React.FC<{
                                 <div className="flex justify-between"><span className="text-slate-600">Período</span><b>{filePeriod}</b></div>
                                 <div className="flex justify-between"><span className="text-slate-600">Linhas lidas</span><b className="tabular-nums">{fileMeta.rows.toLocaleString('pt-BR')}</b></div>
                                 <div className="flex justify-between"><span className="text-slate-600">Jornadas</span><b className="tabular-nums">{result.insights.uniqueJourneys.toLocaleString('pt-BR')}</b></div>
-                                <div className="flex justify-between"><span className="text-slate-600">Conflitos de jornada</span><b className="tabular-nums text-orange-700">{summary.conflict.toLocaleString('pt-BR')}</b></div>
-                                <div className="flex justify-between"><span className="text-slate-600">Para revisar</span><b className="tabular-nums text-amber-700">{summary.review.toLocaleString('pt-BR')}</b></div>
+                                <div className="mt-1 text-[10.5px] font-bold uppercase tracking-[0.4px] text-slate-500">O que dá para gravar</div>
+                                <div className="flex h-2 overflow-hidden rounded-[3px] bg-slate-100" role="img" aria-label={fileComposition.map((part) => `${part.label} ${part.count}`).join(', ')}>
+                                    {fileComposition.map((part) => part.count > 0 && (
+                                        <span key={part.key} className={part.bar} style={{ width: `${(part.count / Math.max(candidates.length, 1)) * 100}%` }} />
+                                    ))}
+                                </div>
+                                {fileComposition.map((part) => (
+                                    <div key={part.key} className="flex items-center justify-between gap-2" title={part.hint}>
+                                        <span className="flex items-center gap-2 text-slate-600"><span className={`h-2 w-2 rounded-[2px] ${part.bar}`} />{part.label}</span>
+                                        <b className="tabular-nums">{part.count.toLocaleString('pt-BR')}</b>
+                                    </div>
+                                ))}
                                 <div className="mt-1 text-xs text-slate-600">
                                     Origem pela taxonomia: {Object.entries(result.insights.originCounts).map(([origin, count]) => `${origin === 'Sem origem' ? 'não identificada' : origin} ${Number(count).toLocaleString('pt-BR')}`).join(' · ')}
                                 </div>
                             </div>
-                            <p className="px-1 text-xs text-slate-600">A seleção fica guardada enquanto você estiver nesta tela. Dá para voltar aqui da Revisão sem perder o que já foi aprovado.</p>
                         </aside>
                     </div>
                     <footer className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-slate-200 bg-white px-6 py-2.5">
                         <span className="text-[13px]"><b className="tabular-nums">{scopeTotal.toLocaleString('pt-BR')}</b> disparos selecionados</span>
-                        <span className="text-[12.5px] text-slate-600">{(candidates.length - scopeTotal).toLocaleString('pt-BR')} ficam fora deste escopo e não são tocados</span>
+                        <span className="text-[12.5px] text-slate-600">os outros {(candidates.length - scopeTotal).toLocaleString('pt-BR')} do arquivo não são tocados</span>
                         <span className="flex-1" />
                         <button type="button" onClick={() => setStep('arquivo')} className="h-[34px] rounded-sm border border-slate-300 bg-white px-3 text-[13px] text-slate-800 hover:border-slate-400">Voltar</button>
                         <button
@@ -1741,7 +1775,7 @@ export const IntelligentFrameworkUpdate: React.FC<{
                             <div className={`border-r border-[#eef2f6] px-5 py-3 ${needsYou > 0 ? 'bg-amber-50' : ''}`}>
                                 <div className={`text-xs ${needsYou > 0 ? 'font-semibold text-amber-700' : 'text-slate-600'}`}>Precisa de você</div>
                                 <div className={`text-[26px] font-bold tabular-nums ${needsYou > 0 ? 'text-amber-800' : ''}`}>{needsYou.toLocaleString('pt-BR')}</div>
-                                <div className={`text-[11.5px] ${needsYou > 0 ? 'text-amber-800' : 'text-slate-600'}`}>no arquivo: {summary.conflict.toLocaleString('pt-BR')} conflitos · {summary.review.toLocaleString('pt-BR')} revisar</div>
+                                <div className={`text-[11.5px] ${needsYou > 0 ? 'text-amber-800' : 'text-slate-600'}`}>{needsYou > 0 ? 'no escopo, ainda sem aprovação' : 'tudo aprovado no escopo'}</div>
                             </div>
                             <div className="border-r border-[#eef2f6] px-5 py-3">
                                 <div className="text-xs text-slate-600">Confiança média</div>

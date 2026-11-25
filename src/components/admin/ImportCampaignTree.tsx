@@ -4,6 +4,9 @@ import { inImportPeriod, previousWeekStart, type ImportSelectionPeriod } from '.
 export interface ImportTreeRow {
     key: string; journey: string; date: string; eligible: boolean;
     operation: 'new_dispatch' | 'update_dispatch' | 'ignore';
+    /** Situação do motor; explica por que uma linha não dá para gravar. */
+    status?: string;
+    accepted?: boolean;
 }
 export interface ImportTreeCampaign { key: string; title: string; front: string; rows: ImportTreeRow[] }
 interface Props {
@@ -18,27 +21,74 @@ interface Props {
 export function importToday() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 }
-function DateRange({ rows }: { rows: ImportTreeRow[] }) {
-    if (!rows.length) return <>—</>;
-    const dates = rows.map(row => row.date).sort();
-    const fmt = (date: string) => date.split('-').reverse().join('/');
-    return <span className="whitespace-nowrap">{fmt(dates[0])} a {fmt(dates[dates.length - 1])}</span>;
+
+const fmt = (date: string) => date.split('-').reverse().slice(0, 2).join('/');
+const fmtFull = (date: string) => date.split('-').reverse().join('/');
+const nf = (value: number) => value.toLocaleString('pt-BR');
+
+/** Colunas fixas para frente, campanha e jornada ficarem alinhadas. */
+const GRID = 'grid grid-cols-[minmax(0,1fr)_88px_96px_96px_88px_128px_84px] items-center gap-x-3';
+
+interface Tally { total: number; eligible: number; selected: number; duplicate: number; conflict: number; other: number }
+function tally(rows: ImportTreeRow[], selected: Set<string>): Tally {
+    const result: Tally = { total: rows.length, eligible: 0, selected: 0, duplicate: 0, conflict: 0, other: 0 };
+    for (const row of rows) {
+        if (row.eligible) result.eligible += 1;
+        else if (row.status === 'duplicate') result.duplicate += 1;
+        else if (row.status === 'conflict') result.conflict += 1;
+        else result.other += 1;
+        if (selected.has(row.key)) result.selected += 1;
+    }
+    return result;
 }
-function SelectionBox({ rows, selected, onChange, label }: {
-    rows: ImportTreeRow[]; selected: Set<string>; onChange: (checked: boolean) => void; label: string;
+function blockedReason(t: Tally) {
+    if (t.total === 0) return 'Nenhum disparo no período.';
+    const parts = [
+        t.duplicate && `${nf(t.duplicate)} já iguais na base`,
+        t.conflict && `${nf(t.conflict)} em conflito de jornada`,
+        t.other && `${nf(t.other)} sem volume ou com erro`,
+    ].filter(Boolean);
+    return `Nada para gravar: ${parts.join(', ')}.`;
+}
+function dateSpan(rows: ImportTreeRow[]) {
+    if (!rows.length) return '';
+    let min = rows[0].date; let max = rows[0].date;
+    for (const row of rows) { if (row.date < min) min = row.date; if (row.date > max) max = row.date; }
+    return min === max ? fmt(min) : `${fmt(min)} a ${fmt(max)}`;
+}
+
+function SelectionBox({ rows, selected, onChange, label, t }: {
+    rows: ImportTreeRow[]; selected: Set<string>; onChange: (checked: boolean) => void; label: string; t: Tally;
 }) {
     const ref = useRef<HTMLInputElement>(null);
-    const eligible = rows.filter(row => row.eligible);
-    const count = eligible.filter(row => selected.has(row.key)).length;
-    useEffect(() => { if (ref.current) ref.current.indeterminate = count > 0 && count < eligible.length; }, [count, eligible.length]);
-    return <input ref={ref} type="checkbox" aria-label={label} disabled={!eligible.length}
-        checked={eligible.length > 0 && count === eligible.length} onChange={event => onChange(event.target.checked)} />;
+    const count = rows.filter(row => row.eligible && selected.has(row.key)).length;
+    useEffect(() => { if (ref.current) ref.current.indeterminate = count > 0 && count < t.eligible; }, [count, t.eligible]);
+    // O motivo fica no invólucro: navegador não mostra dica em campo desabilitado.
+    return <span className="inline-flex shrink-0" title={t.eligible ? undefined : blockedReason(t)}>
+        <input ref={ref} type="checkbox" aria-label={label} disabled={!t.eligible}
+            aria-description={t.eligible ? undefined : blockedReason(t)}
+            className="h-3.5 w-3.5 accent-cyan-700 disabled:cursor-not-allowed"
+            checked={t.eligible > 0 && count === t.eligible} onChange={event => onChange(event.target.checked)} />
+    </span>;
+}
+
+/** Números da linha: selecionados, dá para gravar, já na base, conflito. Zero fica apagado. */
+function Counts({ t }: { t: Tally }) {
+    const cell = (value: number, tone = 'text-slate-900') =>
+        <span className={`text-right tabular-nums ${value ? tone : 'text-slate-300'}`}>{nf(value)}</span>;
+    return <>
+        {cell(t.selected, 'font-semibold text-cyan-800')}
+        {cell(t.eligible)}
+        {cell(t.duplicate, 'text-slate-500')}
+        {cell(t.conflict, 'text-orange-700')}
+    </>;
 }
 
 export function ImportCampaignTree({ campaigns, selected, focusedCampaign, focusedJourney, onFocus, onSelection, onScopeSelection }: Props) {
     const [search, setSearch] = useState('');
     const [selectedOnly, setSelectedOnly] = useState(false);
     const [open, setOpen] = useState<Set<string>>(new Set());
+    const [showEmpty, setShowEmpty] = useState(false);
     const [periods, setPeriods] = useState<Record<string, ImportSelectionPeriod>>({});
     const today = importToday();
     const fronts = useMemo(() => {
@@ -55,94 +105,143 @@ export function ImportCampaignTree({ campaigns, selected, focusedCampaign, focus
         if (next.has(key)) next.delete(key); else next.add(key);
         return next;
     });
-    const count = (rows: ImportTreeRow[]) => rows.filter(row => selected.has(row.key)).length;
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    return <section className="w-full border-b bg-slate-50" aria-label="Seleção de campanhas por período">
-        <div className="flex flex-wrap items-center gap-3 border-b p-3">
-            <strong className="text-sm">Selecionar por frente e período</strong>
-            <input className="min-w-64 flex-1 rounded-lg border px-3 py-2 text-xs" aria-label="Buscar frentes, campanhas e jornadas"
-                placeholder="Buscar frente, campanha ou nome da jornada" value={search} onChange={event => setSearch(event.target.value)} />
-            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={selectedOnly}
-                onChange={event => setSelectedOnly(event.target.checked)} />Só com seleção</label>
-            <button type="button" className="text-xs text-cyan-800 underline" onClick={() => setOpen(new Set())}>Recolher tudo</button>
-        </div>
-        <div className="max-h-[42vh] overflow-auto p-3">
-            <p className="mb-2 text-xs text-slate-600">O período vale para a frente aberta. Aplicar período substitui a seleção dessa frente e preserva as demais.</p>
-            {fronts.map(([front, allCampaigns]) => {
-                const rows = allCampaigns.flatMap(campaign => campaign.rows);
-                if (selectedOnly && !count(rows)) return null;
-                const visible = allCampaigns.filter(campaign => !term || [front, campaign.title, ...campaign.rows.map(row => row.journey)]
-                    .some(value => value.toLocaleLowerCase('pt-BR').includes(term)));
-                if (!visible.length) return null;
-                const key = 'front:' + front;
-                const isOpen = Boolean(term) || open.has(key);
-                const period = periods[front] ?? { from: front === 'Aquisição' ? previousWeekStart(today) : '', to: front === 'Aquisição' ? today : '' };
-                const invalid = Boolean(period.from && period.to && period.from > period.to);
-                const scoped = rows.filter(row => inImportPeriod(row.date, period));
-                const outside = count(rows) - count(scoped);
-                const apply = (nextPeriod: ImportSelectionPeriod) => {
-                    setPeriods(current => ({ ...current, [front]: nextPeriod }));
-                    onScopeSelection(rows, nextPeriod, true);
-                    onFocus(allCampaigns[0].front, '', '', nextPeriod);
-                };
-                return <section key={front} className="mb-2 rounded-lg border bg-white">
-                    <div className="flex flex-wrap items-center gap-3 p-3">
-                        <SelectionBox rows={scoped} selected={selected} label={'Selecionar ' + front + ' no período'}
-                            onChange={checked => onScopeSelection(rows, period, checked)} />
-                        <button type="button" aria-expanded={isOpen} className="flex-1 text-left text-sm font-semibold" onClick={() => toggle(key)}>
-                            {isOpen ? '▾' : '▸'} {front}
-                        </button>
-                        <span className="text-xs text-slate-600">{count(rows)} selecionados · {scoped.filter(row => row.eligible).length} aptos no período</span>
-                        <span className="text-xs text-slate-600">{period.from || period.to ? (period.from || 'Início') + ' a ' + (period.to || 'Fim') : 'Todo o arquivo'}</span>
-                        <button type="button" className="text-xs text-cyan-800 underline" onClick={() => { setOpen(new Set([key])); onFocus(allCampaigns[0].front, '', '', period); }}>Focar</button>
-                    </div>
-                    {isOpen && <div className="border-t">
-                        <div className="flex flex-wrap items-end gap-3 bg-slate-50 p-3 text-xs">
-                            <label>De<input type="date" className="ml-2 rounded border p-2" value={period.from} onChange={event => setPeriods(current => ({ ...current, [front]: { ...period, from: event.target.value } }))} /></label>
-                            <label>Até<input type="date" className="ml-2 rounded border p-2" value={period.to} onChange={event => setPeriods(current => ({ ...current, [front]: { ...period, to: event.target.value } }))} /></label>
-                            <button type="button" className="rounded border bg-white p-2 text-cyan-800" onClick={() => apply({ from: previousWeekStart(today), to: today })}>Desde segunda passada</button>
-                            <button type="button" className="rounded border bg-white p-2 text-cyan-800" onClick={() => apply({ from: '', to: '' })}>Todo o arquivo</button>
-                            <button type="button" disabled={invalid} className="rounded bg-cyan-700 p-2 font-semibold text-white disabled:opacity-40" onClick={() => apply(period)}>Aplicar período à seleção</button>
-                            <button type="button" className="p-2 text-slate-600 underline" onClick={() => onSelection(rows.map(row => row.key), 'remove')}>Desmarcar frente</button>
-                            {invalid && <span role="alert" className="text-red-700">A data inicial deve vir antes da final.</span>}
-                            {outside > 0 && <span role="status" className="text-amber-800">{outside} selecionados fora desse período. Aplicar período remove esses itens da seleção.</span>}
+    const periodOf = (front: string): ImportSelectionPeriod => periods[front]
+        ?? { from: front === 'Aquisição' ? previousWeekStart(today) : '', to: front === 'Aquisição' ? today : '' };
+
+    const prepared = fronts.map(([front, allCampaigns]) => {
+        const period = periodOf(front);
+        const rows = allCampaigns.flatMap(campaign => campaign.rows);
+        const scoped = rows.filter(row => inImportPeriod(row.date, period));
+        return { front, allCampaigns, period, rows, scoped, t: tally(scoped, selected) };
+    });
+    const withWork = prepared.filter(item => item.t.eligible > 0);
+    const empty = prepared.filter(item => item.t.eligible === 0);
+
+    const renderFront = ({ front, allCampaigns, period, rows, scoped, t }: typeof prepared[number]) => {
+        if (selectedOnly && !t.selected) return null;
+        const visible = allCampaigns.filter(campaign => !term || [front, campaign.title, ...campaign.rows.map(row => row.journey)]
+            .some(value => value.toLocaleLowerCase('pt-BR').includes(term)));
+        if (!visible.length) return null;
+        const key = 'front:' + front;
+        const isOpen = Boolean(term) || open.has(key);
+        const invalid = Boolean(period.from && period.to && period.from > period.to);
+        const outside = rows.filter(row => selected.has(row.key)).length - t.selected;
+        const apply = (nextPeriod: ImportSelectionPeriod) => {
+            setPeriods(current => ({ ...current, [front]: nextPeriod }));
+            onScopeSelection(rows, nextPeriod, true);
+        };
+        const periodLabel = period.from || period.to
+            ? `${period.from ? fmt(period.from) : 'início'} a ${period.to ? fmt(period.to) : 'fim'}`
+            : 'Todo o arquivo';
+        return <section key={front} className="border-b border-slate-200 last:border-b-0">
+            <div className={`${GRID} px-4 py-2.5 ${isOpen ? 'bg-slate-50' : 'hover:bg-slate-50'}`}>
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <SelectionBox rows={scoped} selected={selected} t={t} label={'Selecionar ' + front + ' no período'}
+                        onChange={checked => onScopeSelection(rows, period, checked)} />
+                    <button type="button" aria-expanded={isOpen} className="flex min-w-0 items-center gap-1.5 text-left text-[13.5px] font-bold text-slate-900" onClick={() => toggle(key)}>
+                        <span className="w-3 text-[10px] text-slate-500" aria-hidden="true">{isOpen ? '▼' : '▶'}</span>
+                        <span className="truncate">{front}</span>
+                        <span className="shrink-0 text-xs font-normal text-slate-500">{allCampaigns.length} {allCampaigns.length === 1 ? 'campanha' : 'campanhas'}</span>
+                    </button>
+                </div>
+                <Counts t={t} />
+                <span className="truncate text-right text-xs text-slate-600" title={period.from || period.to ? 'Período aplicado nesta frente' : 'Sem recorte de data'}>{periodLabel}</span>
+                <button type="button" className="justify-self-end text-xs font-semibold text-cyan-700 hover:underline" onClick={() => onFocus(allCampaigns[0].front, '', '', period)}>Revisar</button>
+            </div>
+            {isOpen && <div className="border-t border-slate-200 bg-white">
+                <div className="flex flex-wrap items-center gap-2 border-b border-[#eef2f6] bg-slate-50 px-4 py-2 pl-10 text-xs">
+                    <span className="text-slate-600">Período</span>
+                    <input type="date" aria-label={'Início do período de ' + front} className="h-7 rounded-sm border border-slate-300 bg-white px-2" value={period.from} onChange={event => setPeriods(current => ({ ...current, [front]: { ...period, from: event.target.value } }))} />
+                    <span className="text-slate-500">a</span>
+                    <input type="date" aria-label={'Fim do período de ' + front} className="h-7 rounded-sm border border-slate-300 bg-white px-2" value={period.to} onChange={event => setPeriods(current => ({ ...current, [front]: { ...period, to: event.target.value } }))} />
+                    <button type="button" disabled={invalid} className="h-7 rounded-sm bg-cyan-700 px-3 font-semibold text-white hover:bg-cyan-800 disabled:opacity-40"
+                        title="Marca tudo que dá para gravar nesse período e tira o que estiver fora dele" onClick={() => apply(period)}>Aplicar</button>
+                    <span className="mx-1 h-4 w-px bg-slate-300" aria-hidden="true" />
+                    <button type="button" className="h-7 rounded-sm border border-slate-300 bg-white px-2.5 text-slate-700 hover:border-slate-400" onClick={() => apply({ from: previousWeekStart(today), to: today })}>Desde segunda passada</button>
+                    <button type="button" className="h-7 rounded-sm border border-slate-300 bg-white px-2.5 text-slate-700 hover:border-slate-400" onClick={() => apply({ from: '', to: '' })}>Todo o arquivo</button>
+                    <button type="button" className="h-7 px-2 text-slate-600 hover:underline" onClick={() => onSelection(rows.map(row => row.key), 'remove')}>Desmarcar frente</button>
+                    {invalid && <span role="alert" className="text-red-700">O início vem depois do fim.</span>}
+                    {outside > 0 && <span role="status" className="text-amber-800">{nf(outside)} marcados fora do período; Aplicar tira esses.</span>}
+                </div>
+                {visible.map(campaign => {
+                    const list = campaign.rows.filter(row => inImportPeriod(row.date, period));
+                    const ct = tally(list, selected);
+                    const campaignKey = 'campaign:' + campaign.key;
+                    const campaignOpen = Boolean(term) || open.has(campaignKey);
+                    const journeys = new Map<string, ImportTreeRow[]>();
+                    for (const row of list) {
+                        const entries = journeys.get(row.journey) ?? [];
+                        entries.push(row); journeys.set(row.journey, entries);
+                    }
+                    if (selectedOnly && !ct.selected) return null;
+                    return <div key={campaign.key} className="border-t border-[#eef2f6] first:border-t-0">
+                        <div className={`${GRID} py-2 pl-10 pr-4 text-[12.5px] ${focusedCampaign === campaign.key && !focusedJourney ? 'bg-cyan-50' : ''}`}>
+                            <div className="flex min-w-0 items-center gap-2.5">
+                                <SelectionBox rows={list} selected={selected} t={ct} label={'Selecionar ' + campaign.title + ' no período'}
+                                    onChange={checked => onScopeSelection(campaign.rows, period, checked)} />
+                                <button type="button" aria-expanded={campaignOpen} disabled={!list.length} className="flex min-w-0 items-center gap-1.5 text-left font-semibold text-slate-800 disabled:text-slate-400" onClick={() => toggle(campaignKey)}>
+                                    <span className="w-3 text-[9px] text-slate-500" aria-hidden="true">{list.length ? (campaignOpen ? '▼' : '▶') : ''}</span>
+                                    <span className="truncate">{campaign.title}</span>
+                                    <span className="shrink-0 font-normal text-slate-500">{journeys.size} {journeys.size === 1 ? 'jornada' : 'jornadas'}</span>
+                                </button>
+                            </div>
+                            <Counts t={ct} />
+                            <span className="text-right text-xs text-slate-600">{dateSpan(list) || 'sem disparo'}</span>
+                            <button type="button" disabled={!list.length} className="justify-self-end text-xs text-cyan-700 hover:underline disabled:text-slate-300 disabled:no-underline" onClick={() => onFocus(campaign.front, campaign.key, '', period)}>Ver</button>
                         </div>
-                        {visible.map(campaign => {
-                            const list = campaign.rows.filter(row => inImportPeriod(row.date, period));
-                            const selectedRows = list.filter(row => selected.has(row.key));
-                            const campaignKey = 'campaign:' + campaign.key;
-                            const campaignOpen = Boolean(term) || open.has(campaignKey);
-                            const journeys = new Map<string, ImportTreeRow[]>();
-                            for (const row of list) {
-                                const entries = journeys.get(row.journey) ?? [];
-                                entries.push(row); journeys.set(row.journey, entries);
-                            }
-                            return <div key={campaign.key} className="border-t">
-                                <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-xs">
-                                    <SelectionBox rows={list} selected={selected} label={'Selecionar ' + campaign.title + ' no período'}
-                                        onChange={checked => onScopeSelection(campaign.rows, period, checked)} />
-                                    <button type="button" aria-expanded={campaignOpen} className="flex-1 text-left font-semibold" onClick={() => toggle(campaignKey)}>{campaignOpen ? '▾' : '▸'} {campaign.title}</button>
-                                    <span>{count(list)} selecionados · {list.length} disparos no período</span>
-                                    <DateRange rows={selectedRows.length ? selectedRows : list} />
-                                    <button type="button" className="text-cyan-800 underline" onClick={() => onFocus(campaign.front, campaign.key, '', period)}>Ver disparos</button>
+                        {campaignOpen && [...journeys].sort(([a], [b]) => a.localeCompare(b)).map(([journey, entries]) => {
+                            const jt = tally(entries, selected);
+                            if (selectedOnly && !jt.selected) return null;
+                            return <div key={journey} className={`${GRID} border-t border-[#f3f5f8] py-1.5 pl-[68px] pr-4 text-xs ${focusedJourney === journey && focusedCampaign === campaign.key ? 'bg-cyan-50' : ''}`}>
+                                <div className="flex min-w-0 items-center gap-2.5">
+                                    <SelectionBox rows={entries} selected={selected} t={jt} label={'Selecionar ' + journey + ' no período'}
+                                        onChange={checked => onScopeSelection(campaign.rows.filter(row => row.journey === journey), period, checked)} />
+                                    <span className="truncate font-mono text-[11.5px] text-slate-700" title={journey}>{journey || '(sem jornada)'}</span>
                                 </div>
-                                {campaignOpen && <table className="w-full table-fixed text-left text-xs">
-                                    <thead className="bg-slate-50 text-slate-600"><tr><th className="w-10 p-2">Sel.</th><th className="w-[46%] p-2">Jornada · nome completo</th><th className="p-2">Período dos disparos</th><th className="w-24 p-2">Selecionados</th><th className="w-24 p-2">No período</th></tr></thead>
-                                    <tbody>{[...journeys].sort(([a], [b]) => a.localeCompare(b)).map(([journey, entries]) => {
-                                        if (selectedOnly && !count(entries)) return null;
-                                        return <tr key={journey} className={'border-t ' + (focusedJourney === journey && focusedCampaign === campaign.key ? 'bg-cyan-50' : '')}>
-                                            <td className="p-2"><SelectionBox rows={entries} selected={selected} label={'Selecionar ' + journey + ' no período'}
-                                                onChange={checked => onScopeSelection(campaign.rows.filter(row => row.journey === journey), period, checked)} /></td>
-                                            <td className="break-all p-2"><button type="button" className="text-left text-cyan-800 underline" onClick={() => onFocus(campaign.front, campaign.key, journey, period)}>{journey || '(sem jornada)'}</button></td>
-                                            <td className="p-2"><DateRange rows={entries} /></td><td className="p-2">{count(entries)}</td><td className="p-2">{entries.length}</td>
-                                        </tr>;
-                                    })}</tbody>
-                                </table>}
+                                <Counts t={jt} />
+                                <span className="text-right text-slate-600" title={entries.length ? `${fmtFull(entries[0].date)}` : ''}>{dateSpan(entries)}</span>
+                                <button type="button" className="justify-self-end text-cyan-700 hover:underline" onClick={() => onFocus(campaign.front, campaign.key, journey, period)}>Ver</button>
                             </div>;
                         })}
-                    </div>}
-                </section>;
-            })}
+                    </div>;
+                })}
+            </div>}
+        </section>;
+    };
+
+    const emptyRendered = (showEmpty || term) ? empty.map(renderFront) : [];
+    const emptyTotals = empty.reduce((sum, item) => ({ duplicate: sum.duplicate + item.t.duplicate, conflict: sum.conflict + item.t.conflict }), { duplicate: 0, conflict: 0 });
+    return <section className="flex flex-col" aria-label="Seleção de campanhas por período">
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-2.5">
+            <strong className="text-sm">Frentes e período</strong>
+            <input className="h-8 min-w-64 flex-1 rounded-sm border border-slate-300 px-3 text-xs" aria-label="Buscar frentes, campanhas e jornadas"
+                placeholder="Buscar frente, campanha ou jornada" value={search} onChange={event => setSearch(event.target.value)} />
+            <label className="flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" className="accent-cyan-700" checked={selectedOnly}
+                onChange={event => setSelectedOnly(event.target.checked)} />Só com seleção</label>
+            <button type="button" className="text-xs text-cyan-700 hover:underline" onClick={() => setOpen(new Set())}>Recolher tudo</button>
+        </div>
+        <div className={`${GRID} border-b border-slate-200 bg-white px-4 py-1.5 text-[11px] font-semibold text-slate-500`}>
+            <span className="pl-6">Frente · campanha · jornada</span>
+            <span className="text-right">Marcados</span>
+            <span className="text-right" title="Novo ou com número novo">Dá p/ gravar</span>
+            <span className="text-right" title="Já gravado com os mesmos números">Já na base</span>
+            <span className="text-right" title="Mesma activity, canal e data com outra jornada">Conflito</span>
+            <span className="text-right">Período</span>
+            <span />
+        </div>
+        <div>
+            {withWork.map(renderFront)}
+            {!withWork.length && !term && <p className="px-4 py-6 text-center text-sm text-slate-600">Nada novo para gravar neste arquivo. Tudo já está na base ou em conflito.</p>}
+            {empty.length > 0 && !term && (
+                <button type="button" aria-expanded={showEmpty} onClick={() => setShowEmpty(value => !value)}
+                    className="flex w-full items-center gap-2 border-y border-slate-200 bg-slate-50 px-4 py-2 text-left text-xs text-slate-600 hover:bg-slate-100">
+                    <span className="w-3 text-[10px]" aria-hidden="true">{showEmpty ? '▼' : '▶'}</span>
+                    <b className="text-slate-700">{empty.length} {empty.length === 1 ? 'frente' : 'frentes'} sem nada para gravar</b>
+                    <span>· {nf(emptyTotals.duplicate)} já na base · {nf(emptyTotals.conflict)} em conflito</span>
+                </button>
+            )}
+            {emptyRendered}
         </div>
     </section>;
 }

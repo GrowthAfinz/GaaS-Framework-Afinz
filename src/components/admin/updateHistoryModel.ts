@@ -28,6 +28,8 @@ export interface BaseFreshness {
     loads: number;
     freshLabel: string;
     tone: Tone;
+    /** Linhas na tabela, quando a contagem veio do banco. */
+    count: number | null;
 }
 
 /** Situação de cada base em cada um dos últimos `days` dias (mais antigo primeiro). */
@@ -77,14 +79,22 @@ export function freshnessLabel(lastIso: string | undefined, now = new Date()): {
     return { label, tone: days > STALE_AFTER_DAYS ? 'warn' : 'ok', days };
 }
 
+export type BaseChanges = Partial<Record<'aquisicao' | 'rentabilizacao', { count: number | null; lastChange: string | null }>>;
+
 export function buildBaseFreshness(
     latestApplied: Array<{ createdAt: string; domain: string }>,
     daily: Record<string, DayCell[]>,
     now = new Date(),
+    baseChanges: BaseChanges = {},
 ): BaseFreshness[] {
     return BASES.map((base) => {
         const last = latestApplied.find((run) => (base.domains as readonly string[]).includes(run.domain));
-        const fresh = freshnessLabel(last?.createdAt, now);
+        // Vale o mais recente entre a execução que o usuário enxerga e a mudança na própria
+        // tabela: carga feita por script não aparece na lista, mas mexe na base.
+        const change = baseChanges[base.key]?.lastChange ?? undefined;
+        const lastIso = [last?.createdAt, change].filter((value): value is string => Boolean(value))
+            .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+        const fresh = freshnessLabel(lastIso, now);
         const days = daily[base.key] ?? [];
         return {
             key: base.key,
@@ -94,6 +104,7 @@ export function buildBaseFreshness(
             loads: days.filter((day) => day.kind !== 'none').length,
             freshLabel: fresh.label,
             tone: fresh.tone,
+            count: baseChanges[base.key]?.count ?? null,
         };
     });
 }
