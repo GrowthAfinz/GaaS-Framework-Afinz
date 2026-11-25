@@ -46,6 +46,7 @@ import { processImportFile } from '../../utils/importerWorkerClient';
 import { isImporterFailure } from '../../utils/importerPipeline';
 import { buildBaseFreshness, type BaseFreshness } from './updateHistoryModel';
 import { ImportCampaignTree, importToday } from './ImportCampaignTree';
+import { sha256Hex } from '../../utils/fileHash';
 import { loadStructure } from '../growth-learning/structure/structureService';
 import { supabase } from '../../services/supabaseClient';
 import { classify, compileRules } from '../growth-learning/structure/consumoModel';
@@ -633,6 +634,8 @@ export const IntelligentFrameworkUpdate: React.FC<{
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [result, setResult] = useState<ProcessResult | null>(null);
     const [fileMeta, setFileMeta] = useState<FileMeta | null>(null);
+    const [sourceHash, setSourceHash] = useState<string | null>(null);
+    const [sameFileRuns, setSameFileRuns] = useState<Array<{ id: string; createdAt: string; createdBy: string | null; applied: number; domain: string }>>([]);
     const [statusFilter, setStatusFilter] = useState<CandidateFilter>('new_dispatch');
     const [processing, setProcessing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -1010,6 +1013,14 @@ export const IntelligentFrameworkUpdate: React.FC<{
         setUndoSnapshot(null);
         setBulkEditOpen(false);
         setProcessingStage('reading');
+        setSourceHash(null);
+        setSameFileRuns([]);
+        // Mesmo arquivo já gravado? O hash roda em paralelo e nunca segura o processamento.
+        void file.arrayBuffer().then(sha256Hex).then(async (hash) => {
+            if (!hash) return;
+            setSourceHash(hash);
+            setSameFileRuns(await intelligentUpdateService.findAppliedRunsBySource(hash));
+        }).catch(() => undefined);
 
         try {
             // Para rentabilizacao, carrega o historico da base para (1) deduplicar o que ja
@@ -1330,6 +1341,7 @@ export const IntelligentFrameworkUpdate: React.FC<{
                     accepted: acceptedCount,
                     domain: result.domain,
                     targetTable: FLOW_TARGET_LABEL[result.domain],
+                    ...(sourceHash ? { sourceHash } : {}),
                 },
             });
 
@@ -1621,6 +1633,16 @@ export const IntelligentFrameworkUpdate: React.FC<{
                             <p className="border-b border-[#eef2f6] bg-slate-50 px-4 py-2 text-xs text-slate-600">
                                 Já veio marcado tudo que dá para gravar: Aquisição da segunda passada para cá e as outras frentes inteiras. Gravar ainda pede sua aprovação na Revisão.
                             </p>
+                            {sameFileRuns.length > 0 && (
+                                <div role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-amber-200 bg-amber-50 px-4 py-2 text-[12.5px] text-amber-900">
+                                    <b>Esse arquivo já foi gravado</b>
+                                    <span>
+                                        {sameFileRuns.map((run) => `${new Date(run.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · ${run.applied.toLocaleString('pt-BR')} disparos${run.createdBy ? '' : ' por agente ou script'}`).join('  |  ')}
+                                    </span>
+                                    <span className="text-amber-800">O que já entrou aparece como "Já na base".</span>
+                                    {onOpenHistory && <button type="button" onClick={onOpenHistory} className="ml-auto font-semibold text-amber-900 underline-offset-2 hover:underline">Ver no histórico</button>}
+                                </div>
+                            )}
                             {mappingUnavailable && (
                                 <p role="status" className="border-b border-amber-200 bg-amber-50 px-3.5 py-2 text-xs text-amber-800">
                                     Mapeamento de campanhas indisponível agora. Dá para revisar disparo a disparo na próxima etapa.
