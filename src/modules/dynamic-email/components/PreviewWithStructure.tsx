@@ -206,8 +206,11 @@ export const PreviewWithStructure = ({ html, contextKey, className, blocks, acti
     if (!selectedBlockId || !viewport || !target) return;
     if (selectedBlockId !== 'message' && typeof selectedTop !== 'number' && !selectedMissing) return;
     const offset = typeof selectedTop === 'number' ? selectedTop * scale : 0;
-    const top = target.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop + offset;
-    viewport.scrollTop = Math.max(0, top - 16);
+    const viewportRect = viewport.getBoundingClientRect();
+    const interfaceScale = viewport.offsetHeight ? viewportRect.height / viewport.offsetHeight : 1;
+    if (!interfaceScale) return;
+    const top = (target.getBoundingClientRect().top - viewportRect.top) / interfaceScale + viewport.scrollTop + offset;
+    viewport.scrollTop = Math.max(0, top - 28);
   }, [contextKey, messageRef, scale, scrollRef, selectedBlockId, selectedMissing, selectedTop, viewportWidth, visualH]);
 
   const pinClass = (block: StructureBlock, on: boolean) =>
