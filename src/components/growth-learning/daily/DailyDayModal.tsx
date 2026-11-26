@@ -15,8 +15,10 @@ interface Props {
   b2c: B2cDay | undefined; crm: CrmCell[]; canEdit: boolean;
   onClose: () => void; onDay: (day: string, projectId: string) => void; onFocus: (projectId: string) => void;
   onKanban: (initiativeId: string, workId: string | null) => void; onOpenProject: (projectId: string) => void;
-  onLinkWork: (e: DailyEntry, el: HTMLElement) => void; onCreateWork: (e: DailyEntry) => void;
+  onLinkWork: (e: DailyEntry, el: HTMLElement) => void; onCreateWork: (e: DailyEntry, el: HTMLElement) => void;
   onOpenTask?: (id: string) => void;
+  /** Marca a Sub Tarefa como concluída num clique (lista "Vence hoje"). */
+  onCheckWork?: (w: DailyWork) => Promise<unknown>;
 }
 
 /** Modal claro do dia: tópicos à esquerda (o clicado primeiro e aberto), disparos CRM do dia à direita. */
@@ -37,8 +39,9 @@ export function DailyDayModal(p: Props) {
   const dayEntries = useMemo(() => p.entries.filter(e => e.day === p.day).sort(sortEntries), [p.entries, p.day]);
   const clusters = useMemo(() => {
     const list = clusterByProject(dayEntries);
-    return list.sort((a, b) => Number(b[0].project_id === p.focusProject) - Number(a[0].project_id === p.focusProject));
-  }, [dayEntries, p.focusProject]);
+    // Ordem alfabética de projeto (26/11/2026); o projeto clicado continua aberto.
+    return list.sort((a, b) => (p.projects.get(a[0].project_id)?.name || '').localeCompare(p.projects.get(b[0].project_id)?.name || '', 'pt-BR'));
+  }, [dayEntries, p.projects]);
   const projectIds = clusters.map(c => c[0].project_id);
   const step = (dir: 1 | -1) => {
     // Navega para o dia anterior/seguinte com registro do mesmo projeto; sem registro, só troca o dia.
@@ -67,6 +70,13 @@ export function DailyDayModal(p: Props) {
   const dispCards = (dispatches || []).reduce((a, d) => a + d.cards, 0);
   const color = (id: string) => p.frentes.get(p.projects.get(id)?.frente_key || '')?.color || FALLBACK_COLOR;
   const isFuture = p.day > p.today;
+  /** Cards (Tarefas) de cada projeto, com o progresso do checklist: o tópico do dia mostra onde o trabalho mora. */
+  const cardsOf = (pid: string) => [...p.works.values()].filter(w => !w.parent_task_id && (w.project_ids || []).includes(pid) && !['concluida', 'cancelada'].includes(w.status))
+    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+  const progressOf = (id: string) => { const kids = [...p.works.values()].filter(k => k.parent_task_id === id); return { done: kids.filter(k => ['concluida', 'cancelada'].includes(k.status)).length, total: kids.length }; };
+  const openWork = (w: DailyWork) => w.due_date && !['concluida', 'cancelada'].includes(w.status);
+  const dueToday = [...p.works.values()].filter(w => openWork(w) && w.due_date === p.day).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+  const overdue = p.day === p.today ? [...p.works.values()].filter(w => openWork(w) && (w.due_date as string) < p.today).sort((a, b) => (a.due_date as string).localeCompare(b.due_date as string)) : [];
 
   return (
     <div className="dv-dm" onPointerDown={e => { if (e.target === e.currentTarget) p.onClose(); }}>
@@ -128,18 +138,39 @@ export function DailyDayModal(p: Props) {
                         {p.canEdit && (
                           <div className="acts">
                             <button className="dv-link" onClick={ev => p.onLinkWork(e, ev.currentTarget)}><Link2 size={12} />Vincular a Tarefa…</button>
-                            <button className="dv-link" onClick={() => p.onCreateWork(e)}><Plus size={12} />Criar Tarefa</button>
+                            <button className="dv-link" onClick={ev => p.onCreateWork(e, ev.currentTarget)}><Plus size={12} />Criar Tarefa</button>
                           </div>
                         )}
                       </div>
                     );
                   }) : <div className="dv-de prev">{list[0].body}</div>}
+                  {isOpen && (() => {
+                    const cards = cardsOf(pid);
+                    if (!cards.length) return p.canEdit ? <div className="dv-nocard">Projeto sem card<button className="dv-link" onClick={ev => p.onCreateWork(list[0], ev.currentTarget)}><Plus size={12} />Criar card a partir do registro</button></div> : null;
+                    return <div className="dv-minis">{cards.slice(0, 4).map(w => { const pr2 = progressOf(w.id); return (
+                      <button key={w.id} className="dv-mini" title="Abrir o card" onClick={() => (p.onOpenTask ? p.onOpenTask(w.id) : w.initiative_id && p.onKanban(w.initiative_id, w.id))}>
+                        <span className="t">{w.title}</span>
+                        {pr2.total > 0 && <><span className="pb"><i style={{ width: `${(pr2.done / pr2.total) * 100}%` }} /></span><span className="c">{pr2.done}/{pr2.total}</span></>}
+                        <StatusPill status={w.status} small />
+                      </button>); })}{cards.length > 4 && <span className="dv-hint">+{cards.length - 4} cards</span>}</div>;
+                  })()}
                 </article>
               );
             })}
             {!clusters.length && <div className="dv-empty">Nenhum registro neste dia.</div>}
           </section>
           <aside className="disp">
+            {(dueToday.length > 0 || overdue.length > 0) && <div className="dv-due">
+              {[['Vence neste dia', dueToday], ['Atrasadas', overdue]].map(([title, list]) => (list as DailyWork[]).length > 0 && <div key={title as string}>
+                <h5>{title as string}<span>{(list as DailyWork[]).length}</span></h5>
+                <ul>{(list as DailyWork[]).slice(0, 8).map(w => { const parent = w.parent_task_id ? p.works.get(w.parent_task_id) : undefined; return (
+                  <li key={w.id}>
+                    {parent && p.canEdit && p.onCheckWork ? <input type="checkbox" aria-label={`Concluir ${w.title}`} onChange={() => void p.onCheckWork?.(w)} /> : <StatusPill status={w.status} small />}
+                    <button className="t" title="Abrir" onClick={() => p.onOpenTask?.(parent?.id || w.id)}>{w.title}{parent && <small>{parent.title}</small>}</button>
+                    <span className={`o${isOverdue(w, p.today) ? ' late' : ''}`}>{w.due_date ? brDate(w.due_date) : ''}</span>
+                  </li>); })}</ul>
+              </div>)}
+            </div>}
             <h5><Send />Disparos CRM do dia{dispatches && dispatches.length > 0 && <span>{dispatches.length} · {fmtInt(dispCards)} cartões</span>}</h5>
             {focusCrm.size > 0 && dispatches && dispatches.some(d => focusCrm.has(d.partner)) && <div className="hint">Os disparos dos parceiros de {focus?.name} vêm primeiro.</div>}
             {dispatches === null ? <div className="dv-empty">Carregando disparos…</div>

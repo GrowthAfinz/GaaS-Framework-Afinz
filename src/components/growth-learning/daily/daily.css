@@ -386,3 +386,24 @@ button.dv-ktag small{font-weight:600;opacity:.7}
 .dv-rs.zero.tot .l{color:#94a3b8}
 .dv-rs.nodata .v{color:#cbd5e1;font-weight:500}
 .dv-older{display:inline-flex;align-items:center;gap:4px}
+/* dia: o que vence (26/11/2026) */
+.dv-due{display:grid;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #eef2f6}
+.dv-due h5{display:flex;align-items:center;gap:6px}
+.dv-due h5 span{font-size:11px;color:#94a3b8;font-weight:600}
+.dv-due ul{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:4px}
+.dv-due li{display:flex;align-items:center;gap:7px;font-size:12.5px}
+.dv-due li input{accent-color:#16a34a;flex:none}
+.dv-due .t{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-due .t small{display:block;color:#94a3b8;font-size:11px}
+.dv-due .o{font-size:11px;color:#64748b;flex:none}.dv-due .o.late{color:#b91c1c;font-weight:600}
+/* dia: cards do projeto dentro do tópico (26/11/2026) */
+.dv-minis{display:grid;gap:5px;margin:6px 12px 10px 30px}
+.dv-mini{display:flex;align-items:center;gap:8px;border:1px solid #e2e8f0;border-radius:8px;background:#fbfcfd;padding:5px 9px;font-size:12.5px;text-align:left;cursor:pointer}
+.dv-mini:hover{border-color:#67c6d2}
+.dv-mini .t{flex:1;min-width:0;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-mini .pb{width:64px;height:5px;border-radius:3px;background:#f1f5f9;overflow:hidden;flex:none}
+.dv-mini .pb i{display:block;height:100%;background:#16a34a}
+.dv-mini .c{font-size:11px;color:#64748b;font-variant-numeric:tabular-nums;flex:none}
+.dv-nocard{display:flex;align-items:center;gap:8px;margin:6px 12px 10px 30px;font-size:12px;color:#94a3b8}
+
+.dv-nocard .dv-link{display:inline-flex;align-items:center;gap:3px}

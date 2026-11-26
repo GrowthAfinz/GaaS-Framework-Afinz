@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type React from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
-  FALLBACK_COLOR, MONTHS, RESULT_LINES, addDays, dayResultsAll, fmtInt, monthGrid, monthKey, packWeek, projectsByDay, resultValue, weekday, weekdayCompare,
+  FALLBACK_COLOR, MONTHS, RESULT_LINES, addDays, dayResultsAll, fmtInt, monthGrid, monthKey, projectsByDay, resultValue, weekday, weekdayCompare,
   type B2cDay, type CrmCell, type DailyEntry, type DailyFrente, type DailyPartner, type DailyProject, type ResultValue,
 } from './dailyModel';
 import { tint } from './DailyPopovers';
@@ -132,11 +132,12 @@ export function DailyCalendar(p: Props) {
       <div className="dv-cal">
         {weeks.map(week => {
           const present = week.map(d => byDay.get(d) || []);
-          const rows = packWeek(present);
-          const shown = rows.slice(0, maxRows);
+          // Ordem alfabética dentro de cada dia (26/11/2026). A pontinha na borda mostra que o projeto continua no dia vizinho.
+          const sortedDays = present.map(ps => [...ps].sort((a, b) => (p.projects.get(a)?.name || '').localeCompare(p.projects.get(b)?.name || '', 'pt-BR')));
+          const shown = Array.from({ length: Math.min(maxRows, Math.max(0, ...sortedDays.map(d => d.length))) }, (_, ri) => sortedDays.map(d => d[ri]));
           return week.map((day, i) => {
             const inMonth = monthKey(day) === month, ps = present[i], wd = i;
-            const extra = ps.filter(x => !shown.some(r => r.includes(x))).length;
+            const extra = Math.max(0, ps.length - shown.length);
             const pinnedDay = p.pin?.day === day;
             return (
               <div key={day} role="button" tabIndex={0} className={`dv-day${wd === 0 || wd === 6 ? ' we' : ''}${!inMonth ? ' out' : ''}${day === p.selected ? ' sel' : ''}${day === p.dropDay ? ' drop' : ''}${pinnedDay ? ' pinday' : ''}`}
@@ -150,7 +151,7 @@ export function DailyCalendar(p: Props) {
                 {results ? (inMonth ? renderResults(day) : null) : (
                   <>
                     {shown.map((row, ri) => {
-                      const pid = row.find(x => ps.includes(x));
+                      const pid = row[i];
                       if (!pid) return <div key={ri} className="dv-slot" />;
                       const cl = i > 0 && present[i - 1].includes(pid), cr = i < 6 && present[i + 1].includes(pid);
                       const c = color(pid), n = countByDayProject.get(day + '|' + pid) || 0;
