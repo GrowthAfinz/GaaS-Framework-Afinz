@@ -814,7 +814,7 @@ export const RelatorioView: React.FC<RelatorioViewProps> = ({ data, previousData
       {/* ── PAGE HEADER ── */}
       <ReportWorkspaceHeader
         title={rentab ? 'Relatórios | Rentabilização' : 'Relatórios | Aquisição'}
-        view={reportMode} onViewChange={setReportMode}
+        view={reportMode} onViewChange={next => { if (next !== "vitrine") setReportMode(next); }}
         description={<>{reportActivities.length} disparos analisados{selectedBU ? ` · BU: ${selectedBU}` : ' · Todas as BUs'} · {segmentoRows.length} segmentos · {canalRows.length} canais <span className="ml-2 opacity-70">· {format(periodStart, 'dd/MM/yyyy')} – {format(periodEnd, 'dd/MM/yyyy')}</span></>}
         actions={!rentab && reportMode !== 'xlsx' && reportMode !== 'journey' ? <button type="button" onClick={createContextualBet} className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/30 bg-white px-4 py-2.5 text-xs font-black text-cyan-800 shadow-sm transition hover:bg-cyan-50"><Target size={15} /> Criar aposta</button> : null}
         summaryStrip={reportMode === 'performance' ? <ReportKpiStrip items={(rentab
