@@ -8,6 +8,7 @@ import { SetPasswordView } from './components/SetPasswordView';
 import { ResultadosView } from './components/ResultadosView';
 import { RelatorioView } from './components/RelatorioView';
 import { InsuranceWorkspace } from './components/insurance/InsuranceWorkspace';
+import { PoolVisaWorkspace } from './components/pool-visa/PoolVisaWorkspace';
 import { GrowthLearningWorkspace } from './components/growth-learning/GrowthLearningWorkspace';
 import { readTabFromSearch } from './services/tabNavigation';
 import { useUserRole } from './context/UserRoleContext';
@@ -315,7 +316,7 @@ function App() {
   const resultados = useResultadosMetrics(filteredData);
 
   const hasData = Object.keys(data).length > 0 || Object.keys(rentabilizacaoData).length > 0;
-  const canRenderWithoutFrameworkData = activeTab === 'relatorio-seguros' || activeTab === 'aprendizado-growth' || activeTab === 'operacao' || activeTab === 'comunicacoes' || activeTab === 'comunicacoes-cadastro' || activeTab === 'comunicacoes-fluxo';
+  const canRenderWithoutFrameworkData = activeTab === 'relatorio-seguros' || activeTab === 'relatorio-pool-visa' || activeTab === 'aprendizado-growth' || activeTab === 'operacao' || activeTab === 'comunicacoes' || activeTab === 'comunicacoes-cadastro' || activeTab === 'comunicacoes-fluxo';
 
   if (import.meta.env.DEV && urlHash === '#funil-preview') {
     return (
@@ -402,7 +403,7 @@ function App() {
         onContentMouseEnter={scheduleCloseFilterDrop}
         isFilterDropOpen={isFilterDropOpen}
       >
-      {hasData && activeTab !== 'aprendizado-growth' && activeTab !== 'operacao' && activeTab !== 'relatorio-seguros' && (
+      {hasData && activeTab !== 'aprendizado-growth' && activeTab !== 'operacao' && activeTab !== 'relatorio-seguros' && activeTab !== 'relatorio-pool-visa' && (
         <div className="sticky top-0 z-30" ref={filterShellRef}>
           <div
             className={`
@@ -534,6 +535,9 @@ function App() {
               {activeTab === 'relatorio-seguros' && (
                 <PageTransition><div className="p-4 md:p-6"><InsuranceWorkspace /></div></PageTransition>
               )}
+              {activeTab === 'relatorio-pool-visa' && (
+                <PageTransition><div className="p-4 md:p-6"><PoolVisaWorkspace /></div></PageTransition>
+              )}
               {activeTab === 'relatorio' && (
                 <PageTransition>
                   <RelatorioView
@@ -617,7 +621,7 @@ function App() {
                   <DynamicEmailWorkspace />
                 </PageTransition>
               )}
-              {!['operacao', 'launch', 'resultados', 'jornada', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'relatorio-seguros', 'aprendizado-growth', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-fluxo', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
+              {!['operacao', 'launch', 'resultados', 'jornada', 'framework', 'explorador', 'orientador', 'configuracoes', 'originacao-b2c', 'funil-aquisicao', 'midia-paga', 'relatorio', 'relatorio-seguros', 'relatorio-pool-visa', 'aprendizado-growth', 'comunicacoes', 'comunicacoes-cadastro', 'comunicacoes-performance', 'comunicacoes-fluxo', 'comunicacoes-appsflyer-auditoria', 'comunicacoes-email-dinamico'].includes(activeTab) && (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>Aba desconhecida: {activeTab}. Redirecionando...</p>
                 </div>

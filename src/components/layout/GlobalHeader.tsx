@@ -222,6 +222,7 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
                 { id: 'funil-aquisicao', label: 'Funil de Aquisição', icon: Funnel, onClick: () => navigateToTab('funil-aquisicao') },
                 { id: 'relatorio', label: viewSettings.frente === 'rentabilizacao' ? 'Relatórios | Rentabilização' : 'Relatórios | Aquisição', icon: ClipboardList, onClick: () => navigateToTab('relatorio') },
                 { id: 'relatorio-seguros', label: 'Relatórios | Seguros', icon: ShieldCheck, onClick: () => navigateToTab('relatorio-seguros') },
+                { id: 'relatorio-pool-visa', label: 'Relatórios | Pool Visa', icon: ClipboardList, onClick: () => navigateToTab('relatorio-pool-visa') },
                 ...(FEATURES.jornadaDisparosTab ? [{ id: 'jornada', label: 'Jornada & Disparos', icon: TrendingUp, onClick: () => navigateToTab('jornada') } as HeaderNavItem] : []),
                 { id: 'orientador', label: 'Orientador', icon: Lightbulb, onClick: () => navigateToTab('orientador') },
             ]
@@ -339,13 +340,13 @@ export const GlobalHeader: React.FC<GlobalHeaderProps> = ({ onMouseEnter, isFilt
             {/* ── RIGHT: Controls ────────────────────────────────────── */}
             <div className="shrink-0 flex items-center gap-3">
                 {/* BU Filter (dropdown compacto) */}
-                {activeTab !== 'relatorio-seguros' && <BUDropdown />}
+                {activeTab !== 'relatorio-seguros' && activeTab !== 'relatorio-pool-visa' && <BUDropdown />}
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-slate-200" />
 
                 {/* Frente Switch (Aquisição | Rentabilização) */}
-                {activeTab !== 'relatorio-seguros' && <FrenteSwitcher />}
+                {activeTab !== 'relatorio-seguros' && activeTab !== 'relatorio-pool-visa' && <FrenteSwitcher />}
 
                 {/* Divider */}
                 <div className="h-6 w-px bg-slate-200" />
