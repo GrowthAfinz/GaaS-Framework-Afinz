@@ -49,6 +49,7 @@ export const PoolVisaWorkspace: React.FC = () => {
   const [chartMetric, setChartMetric] = useState<(typeof CHART_METRICS)[number]>('sent');
   const [split, setSplit] = useState<'channel' | 'bu'>('channel');
   const [accumulated, setAccumulated] = useState(false);
+  const [includeDirectSms, setIncludeDirectSms] = useState(false);
 
   const refresh = () => {
     setBusy(true);
@@ -92,6 +93,13 @@ export const PoolVisaWorkspace: React.FC = () => {
   const lpBlocked = filters.bu !== 'all';
   const lpFilters: LpFilters = useMemo(() => ({ start: filters.start, end: filters.end, origins: originsForChannels(filters.channels), group, cell }), [filters.start, filters.end, filters.channels, group, cell]);
   const lpTot = useMemo(() => lpTotals(traffic, events, lpFilters), [traffic, events, lpFilters]);
+  const smsScenarioAvailable = Boolean(lp?.coverage && filters.start && filters.end &&
+    filters.start >= lp.coverage.start && filters.end <= lp.coverage.end &&
+    !lpBlocked && (!filters.channels.length || filters.channels.includes('SMS')));
+  const smsScenario = useMemo(() => ({
+    identified: lpTotals(traffic, events, { ...lpFilters, origins: ['sms'] }),
+    direct: includeDirectSms ? lpTotals(traffic, events, { ...lpFilters, origins: ['direto'] }) : null,
+  }), [traffic, events, lpFilters, includeDirectSms]);
   const known = useMemo(() => knownGroupsAndCells(events), [events]);
   const lpReady = Boolean(lp);
 
@@ -185,6 +193,27 @@ export const PoolVisaWorkspace: React.FC = () => {
           <button type="button" onClick={() => setFilters({ ...filters, start: fullRange.min, end: fullRange.max })} className="text-xs font-semibold text-cyan-700 underline">Todo o histórico do Pool</button>
         )}
       </div>
+      {view === 'performance' && <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="pool-sms-scenario">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="pool-sms-scenario" className="font-bold text-slate-900">Atribuição de tráfego ao SMS</h2>
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <input type="checkbox" checked={includeDirectSms} onChange={event => setIncludeDirectSms(event.target.checked)} />
+            Incluir Direto como hipótese de SMS
+          </label>
+        </div>
+        {!smsScenarioAvailable ? <p className="mt-2 text-sm text-slate-600">Comparação disponível para Afinz + Plurix, com SMS no recorte e o período dentro da cobertura do GA4{lp?.coverage ? ` (${fmtDate(lp.coverage.start)} a ${fmtDate(lp.coverage.end)})` : ''}.</p> :
+          <div className="mt-3 grid gap-3 sm:grid-cols-2" aria-live="polite">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <h3 className="text-sm font-bold text-slate-800">SMS identificado no GA4</h3>
+              <p className="text-sm text-slate-600">{smsScenario.identified.sessions === null ? 'Sessões indisponíveis no recorte' : `${nf(smsScenario.identified.sessions)} sessões`} · {nf(smsScenario.identified.offerClicks)} cliques em ofertas</p>
+            </div>
+            {smsScenario.direct && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <h3 className="text-sm font-bold text-amber-950">Hipótese · SMS + todo o Direto</h3>
+              <p className="text-sm text-amber-900">{smsScenario.identified.sessions === null ? 'Sessões indisponíveis no recorte' : `${nf(smsScenario.identified.sessions + (smsScenario.direct.sessions ?? 0))} sessões`} · {nf(smsScenario.identified.offerClicks + smsScenario.direct.offerClicks)} cliques em ofertas</p>
+              <p className="mt-1 text-xs text-amber-900">Direto pode incluir WhatsApp e outras origens.</p>
+            </div>}
+          </div>}
+      </section>}
       {(group || cell) && <p className="-mt-3 text-[11px] text-slate-500">Filtro de grupo e célula aplicado só aos cliques da LP. A comunicação SFMC não tem célula e segue sem esse filtro.</p>}
 
       {load && !rows.length && view !== 'xlsx' && (
