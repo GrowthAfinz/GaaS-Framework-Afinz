@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { PoolVisaVitrine } from './vitrine/PoolVisaVitrine';
 import { RefreshCw } from 'lucide-react';
 import { ReportDailyModeControl, ReportKpiStrip, ReportWorkspaceHeader, type ReportView } from '../relatorio/ReportWorkspace';
 import { ReportTimeSeriesChart } from '../relatorio/ReportTimeSeriesChart';
@@ -16,7 +17,7 @@ import { fetchPoolVisaDispatches, fetchPoolVisaLp, type PoolVisaLoad, type PoolV
 import { MetricCell, PartialBadge } from './PoolVisaExplorer';
 import { BrandRankingCard, CellMatrixCard, DualTimeline, LpQualityCard, PartnerRankingCard, WhatsAppPiecesCard } from './PoolVisaLpPanels';
 
-const VIEWS: ReportView[] = ['performance', 'daily', 'monthly', 'xlsx'];
+const VIEWS: ReportView[] = ['performance', 'daily', 'monthly', 'xlsx', 'vitrine'];
 const CHART_METRICS = ['sent', 'delivered', 'opens', 'clicks'] as const;
 const fmtDate = (iso: string | null) => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '—');
 const fmtMonth = (ym: string) => new Date(`${ym}-15T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
@@ -36,7 +37,7 @@ const maxDate = (a: string | null, b: string | null) => (!a ? b : !b ? a : a > b
 const minDate = (a: string | null, b: string | null) => (!a ? b : !b ? a : a < b ? a : b);
 
 export const PoolVisaWorkspace: React.FC = () => {
-  const [view, setView] = useState<ReportView>('performance');
+  const [view, setView] = useState<ReportView>(() => new URLSearchParams(window.location.search).get('aba') === 'vitrine' ? 'vitrine' : 'performance');
   const [load, setLoad] = useState<PoolVisaLoad | null>(null);
   const [lp, setLp] = useState<PoolVisaLpLoad | null>(null);
   const [error, setError] = useState('');
@@ -132,6 +133,7 @@ export const PoolVisaWorkspace: React.FC = () => {
         }
       />
 
+      {view === 'vitrine' ? <PoolVisaVitrine events={events} lpReady={lpReady} dispatches={all} /> : <>
       {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}{load ? ' Mostrando a última leitura carregada.' : ''}</div>}
       {lpError && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Dados da LP (GA4) indisponíveis: {lpError}. A comunicação SFMC segue normal.</div>}
       {busy && !load && <p role="status" className="text-sm text-slate-500">Carregando os disparos do Pool…</p>}
@@ -228,6 +230,7 @@ export const PoolVisaWorkspace: React.FC = () => {
       )}
 
       <CoveragePanel load={load} />
+      </>}
     </section>
   );
 };
