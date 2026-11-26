@@ -1,3 +1,5 @@
+import { getCustoUnitarioCanal } from '../../constants/frameworkFields';
+
 /**
  * Pool de Ofertas Vai de Visa: camada SFMC (rentabilizacao_activities).
  *
@@ -43,6 +45,8 @@ export interface PoolDispatchRow {
   delivered: number | null;
   opens: number | null;
   clicks: number | null;
+  channelCost?: number | null;
+  estimatedCost?: boolean;
   updatedAt: string | null;
   status: string | null;
 }
@@ -102,6 +106,11 @@ export function toPoolDispatchRow(raw: Record<string, unknown>): PoolDispatchRow
   const activityName = str(raw['Activity name / Taxonomia']);
   const channel = str(raw.Canal) || 'Não informado';
   const parsed = parsePoolActivityName(activityName, channel);
+  const delivered = num(raw['Base Acionável']);
+  const recordedCost = num(raw['Custo total canal']);
+  const rate = num(raw['Custo unitário do canal']) ?? getCustoUnitarioCanal(channel, date + 'T12:00:00');
+  const estimatedCost = recordedCost === null && delivered !== null && delivered >= 0 && rate > 0;
+
   return {
     id: str(raw.id) || `${activityName}|${channel}|${date}`,
     date,
@@ -113,7 +122,9 @@ export function toPoolDispatchRow(raw: Record<string, unknown>): PoolDispatchRow
     channel,
     ...parsed,
     sent: num(raw['Base Total']),
-    delivered: num(raw['Base Acionável']),
+    delivered,
+    channelCost: recordedCost ?? (estimatedCost ? delivered! * rate : null),
+    estimatedCost,
     opens: num(raw.Abertura),
     clicks: num(raw.Cliques),
     updatedAt: str(raw.updated_at) || null,
@@ -154,6 +165,10 @@ export interface PoolAggregate {
   delivered: CoveredSum;
   opens: CoveredSum;
   clicks: CoveredSum;
+  channelCost: CoveredSum;
+  estimatedCosts: number;
+  messageCpc: number | null;
+  costPerThousand: number | null;
   deliveryRate: number | null;
   openRate: number | null;
   ctrDelivered: number | null;
@@ -164,8 +179,9 @@ export interface PoolAggregate {
 interface Acc {
   dims: Record<string, string>;
   rows: number;
-  sums: Record<'sent' | 'delivered' | 'opens' | 'clicks', { s: number; k: number }>;
-  pairs: Record<'sentDel' | 'delOpen' | 'delClick' | 'openClick', { a: number; b: number }>;
+  estimatedCosts: number;
+  sums: Record<'sent' | 'delivered' | 'opens' | 'clicks' | 'channelCost', { s: number; k: number }>;
+  pairs: Record<'sentDel' | 'delOpen' | 'delClick' | 'openClick' | 'costClick' | 'costDelivered', { a: number; b: number }>;
   lastUpdate: string | null;
 }
 
@@ -203,17 +219,21 @@ export function aggregatePool(rows: PoolDispatchRow[], dims: PoolDimensionKey[])
       acc = {
         dims: Object.fromEntries(dims.map((d, i) => [d, values[i]])),
         rows: 0,
-        sums: { sent: { s: 0, k: 0 }, delivered: { s: 0, k: 0 }, opens: { s: 0, k: 0 }, clicks: { s: 0, k: 0 } },
-        pairs: { sentDel: { a: 0, b: 0 }, delOpen: { a: 0, b: 0 }, delClick: { a: 0, b: 0 }, openClick: { a: 0, b: 0 } },
+        estimatedCosts: 0,
+        sums: { sent: { s: 0, k: 0 }, delivered: { s: 0, k: 0 }, opens: { s: 0, k: 0 }, clicks: { s: 0, k: 0 }, channelCost: { s: 0, k: 0 } },
+        pairs: { sentDel: { a: 0, b: 0 }, delOpen: { a: 0, b: 0 }, delClick: { a: 0, b: 0 }, openClick: { a: 0, b: 0 }, costClick: { a: 0, b: 0 }, costDelivered: { a: 0, b: 0 } },
         lastUpdate: null,
       };
       map.set(key, acc);
     }
     acc.rows += 1;
-    for (const f of ['sent', 'delivered', 'opens', 'clicks'] as const) {
+    for (const f of ['sent', 'delivered', 'opens', 'clicks', 'channelCost'] as const) {
       const v = r[f];
-      if (v !== null) { acc.sums[f].s += v; acc.sums[f].k += 1; }
+      if (v != null) { acc.sums[f].s += v; acc.sums[f].k += 1; }
     }
+    if (r.estimatedCost) acc.estimatedCosts += 1;
+    if (r.channelCost != null && r.clicks !== null) { acc.pairs.costClick.a += r.channelCost; acc.pairs.costClick.b += r.clicks; }
+    if (r.channelCost != null && r.delivered !== null) { acc.pairs.costDelivered.a += r.channelCost; acc.pairs.costDelivered.b += r.delivered; }
     if (r.sent !== null && r.delivered !== null) { acc.pairs.sentDel.a += r.delivered; acc.pairs.sentDel.b += r.sent; }
     if (r.delivered !== null && r.opens !== null) { acc.pairs.delOpen.a += r.opens; acc.pairs.delOpen.b += r.delivered; }
     if (r.delivered !== null && r.clicks !== null) { acc.pairs.delClick.a += r.clicks; acc.pairs.delClick.b += r.delivered; }
@@ -230,6 +250,9 @@ export function aggregatePool(rows: PoolDispatchRow[], dims: PoolDimensionKey[])
     delivered: covered(acc.sums.delivered, acc.rows),
     opens: covered(acc.sums.opens, acc.rows),
     clicks: covered(acc.sums.clicks, acc.rows),
+    channelCost: covered(acc.sums.channelCost, acc.rows), estimatedCosts: acc.estimatedCosts,
+    messageCpc: ratio(acc.pairs.costClick.a, acc.pairs.costClick.b),
+    costPerThousand: ratio(acc.pairs.costDelivered.a * 1000, acc.pairs.costDelivered.b),
     deliveryRate: ratio(acc.pairs.sentDel.a, acc.pairs.sentDel.b),
     openRate: ratio(acc.pairs.delOpen.a, acc.pairs.delOpen.b),
     ctrDelivered: ratio(acc.pairs.delClick.a, acc.pairs.delClick.b),
@@ -243,6 +266,7 @@ export function poolTotals(rows: PoolDispatchRow[]): PoolAggregate {
     key: '', dims: {}, rows: 0, dispatches: 0,
     sent: { value: null, known: 0, total: 0 }, delivered: { value: null, known: 0, total: 0 },
     opens: { value: null, known: 0, total: 0 }, clicks: { value: null, known: 0, total: 0 },
+    channelCost: { value: null, known: 0, total: 0 }, estimatedCosts: 0, messageCpc: null, costPerThousand: null,
     deliveryRate: null, openRate: null, ctrDelivered: null, ctor: null, lastUpdate: null,
   };
 }

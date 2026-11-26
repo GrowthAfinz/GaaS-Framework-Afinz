@@ -16,7 +16,7 @@ const GA4_PENDING = 'GA4 ainda não integrado ao GaaS. A leitura existe na anál
 const VITRINE_PENDING = 'Histórico da vitrine por rodada ainda não está no GaaS. As extrações da DE mostram rodadas alteradas depois de usadas.';
 const SAFRA_PENDING = 'A célula existe só na safra (VDV_FUNIL), sem vínculo com o envio real. Não dá para cruzar com enviados.';
 
-type MetricFormat = 'number' | 'percent';
+type MetricFormat = 'number' | 'percent' | 'currency';
 
 export interface PoolMetricField extends ReportFieldDef {
   kind: 'metric';
@@ -94,6 +94,12 @@ export const POOL_FIELDS: PoolField[] = [
     key: 'ctor', label: 'CTOR', kind: 'metric', category: 'Comunicação', layer: 'sfmc', source: SFMC, grain: SFMC_GRAIN, format: 'percent',
     definition: 'Cliques ÷ Aberturas, só nas linhas que informam os dois.', availability: { state: 'derived' }, value: (r) => r.ctor,
   },
+  { key: 'channelCost', label: 'Custo do canal', kind: 'metric', category: 'Custo', layer: 'sfmc', source: SFMC, grain: SFMC_GRAIN, format: 'currency',
+    definition: 'Custo registrado ou estimado pela tarifa vigente × base acionável.', availability: { state: 'derived' }, value: (r) => r.channelCost.value, coverage: (r) => r.channelCost, },
+  { key: 'messageCpc', label: 'CPC da mensagem', kind: 'metric', category: 'Custo', layer: 'sfmc', source: SFMC, grain: SFMC_GRAIN, format: 'currency',
+    definition: 'Custo dividido por cliques SFMC nas linhas com ambos os indicadores.', availability: { state: 'derived' }, value: (r) => r.messageCpc, },
+  { key: 'costPerThousand', label: 'Custo por mil acionados', kind: 'metric', category: 'Custo', layer: 'sfmc', source: SFMC, grain: SFMC_GRAIN, format: 'currency',
+    definition: 'Custo × 1.000 dividido pela base acionável das mesmas linhas.', availability: { state: 'derived' }, value: (r) => r.costPerThousand, },
   pending('lpSessions', 'Sessões na LP', 'metric', 'ga4', 'LP e ofertas', 'Sessões com page_view em /black afinz.', GA4_PENDING),
   pending('offerClicks', 'Cliques em ofertas', 'metric', 'ga4', 'LP e ofertas', 'Eventos clique_oferta na LP. Contagem de eventos, não de pessoas.', GA4_PENDING),
   pending('visaSiteClicks', 'Cliques no site Visa', 'metric', 'ga4', 'LP e ofertas', 'Eventos clique_site_visa na LP.', GA4_PENDING),
@@ -103,7 +109,7 @@ export const POOL_FIELDS: PoolField[] = [
 
 export const POOL_FIELD_BY_KEY = new Map(POOL_FIELDS.map((f) => [f.key, f]));
 
-export const POOL_DEFAULT_COLUMNS = ['date', 'bu', 'channel', 'touch', 'sent', 'delivered', 'deliveryRate', 'opens', 'clicks'];
+export const POOL_DEFAULT_COLUMNS = ['date', 'bu', 'channel', 'touch', 'sent', 'delivered', 'deliveryRate', 'opens', 'clicks', 'channelCost', 'messageCpc'];
 
 export const POOL_PROFILES: ReportFieldProfile[] = [
   { key: 'operacao', label: 'Operação', description: 'O que saiu, quando e por qual canal.', fields: POOL_DEFAULT_COLUMNS },
@@ -116,6 +122,7 @@ export const POOL_PROFILES: ReportFieldProfile[] = [
 
 export function formatPoolMetric(value: number | null, format: MetricFormat): string {
   if (value === null) return '—';
+  if (format === 'currency') return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   if (format === 'percent') return `${(value * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}%`;
   return value.toLocaleString('pt-BR');
 }

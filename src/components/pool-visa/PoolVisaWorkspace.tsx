@@ -100,6 +100,17 @@ export const PoolVisaWorkspace: React.FC = () => {
     identified: lpTotals(traffic, events, { ...lpFilters, origins: ['sms'] }),
     direct: includeDirectSms ? lpTotals(traffic, events, { ...lpFilters, origins: ['direto'] }) : null,
   }), [traffic, events, lpFilters, includeDirectSms]);
+  const costChannels = aggregatePool(rows, ['channel']);
+  const money = (value: number | null) => formatPoolMetric(value, 'currency');
+  const lpCost = (cost: PoolAggregate, volume: number | null) =>
+    cost.channelCost.value !== null && cost.channelCost.known === cost.rows && volume && volume > 0
+      ? cost.channelCost.value / volume : null;
+  const smsCost = costChannels.find(row => row.dims.channel === 'SMS');
+  const lpCostsAvailable = Boolean(lp?.coverage && filters.start && filters.end &&
+    filters.start >= lp.coverage.start && filters.end <= lp.coverage.end && !lpBlocked &&
+    !group && !cell && !filters.includeOptout);
+  const smsCostLabel = (sessions: number | null, clicks: number) => lpCostsAvailable && smsCost
+    ? ` · ${money(lpCost(smsCost, sessions))}/sessão · ${money(lpCost(smsCost, clicks))}/clique em oferta` : '';
   const known = useMemo(() => knownGroupsAndCells(events), [events]);
   const lpReady = Boolean(lp);
 
@@ -135,7 +146,10 @@ export const PoolVisaWorkspace: React.FC = () => {
         summaryStrip={
           <>
             <ReportKpiStrip items={[
-              kpi('sent', 'Enviados'), kpi('delivered', 'Entregues'), kpi('opens', 'Aberturas / leituras'), kpi('clicks', 'Cliques na comunicação'),
+              kpi('sent', 'Enviados'), kpi('delivered', 'Entregues'), kpi('clicks', 'Cliques na comunicação'),
+              kpi('channelCost', totals.estimatedCosts ? 'Custo do canal · inclui estimativa' : 'Custo do canal'),
+              kpi('messageCpc', 'CPC da mensagem · linhas cobertas'),
+              { label: 'SMS · Custo por sessão', value: <span title="Custo SMS dividido pelas sessões identificadas como SMS no mesmo período">{money(lpCostsAvailable && smsCost ? lpCost(smsCost, smsScenario.identified.sessions) : null)}</span> },
               lpKpi('LP · Sessões', lpTot.sessions, 'Soma diária de sessões em /black afinz (GA4)'),
               lpKpi('LP · Cliques em ofertas', lpTot.offerClicks, 'Eventos clique_oferta: contagem de eventos, não de pessoas'),
               lpKpi('LP · Cliques site Visa', lpTot.visaClicks, 'Eventos clique_site_visa'),
@@ -198,27 +212,7 @@ export const PoolVisaWorkspace: React.FC = () => {
       {lpError && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Dados da LP (GA4) indisponíveis: {lpError}. A comunicação SFMC segue normal.</div>}
       {busy && !load && <p role="status" className="text-sm text-slate-500">Carregando os disparos do Pool…</p>}
 
-      {view === 'performance' && <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="pool-sms-scenario">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="pool-sms-scenario" className="font-bold text-slate-900">Atribuição de tráfego ao SMS</h2>
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <input type="checkbox" checked={includeDirectSms} onChange={event => setIncludeDirectSms(event.target.checked)} />
-            Incluir Direto como hipótese de SMS
-          </label>
-        </div>
-        {!smsScenarioAvailable ? <p className="mt-2 text-sm text-slate-600">Comparação disponível para Afinz + Plurix, com SMS no recorte e o período dentro da cobertura do GA4{lp?.coverage ? ` (${fmtDate(lp.coverage.start)} a ${fmtDate(lp.coverage.end)})` : ''}.</p> :
-          <div className="mt-3 grid gap-3 sm:grid-cols-2" aria-live="polite">
-            <div className="rounded-lg bg-slate-50 p-3">
-              <h3 className="text-sm font-bold text-slate-800">SMS identificado no GA4</h3>
-              <p className="text-sm text-slate-600">{smsScenario.identified.sessions === null ? 'Sessões indisponíveis no recorte' : `${nf(smsScenario.identified.sessions)} sessões`} · {nf(smsScenario.identified.offerClicks)} cliques em ofertas</p>
-            </div>
-            {smsScenario.direct && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-              <h3 className="text-sm font-bold text-amber-950">Hipótese · SMS + todo o Direto</h3>
-              <p className="text-sm text-amber-900">{smsScenario.identified.sessions === null ? 'Sessões indisponíveis no recorte' : `${nf(smsScenario.identified.sessions + (smsScenario.direct.sessions ?? 0))} sessões`} · {nf(smsScenario.identified.offerClicks + smsScenario.direct.offerClicks)} cliques em ofertas</p>
-              <p className="mt-1 text-xs text-amber-900">Direto pode incluir WhatsApp e outras origens.</p>
-            </div>}
-          </div>}
-      </section>}
+
 
       {load && !rows.length && view !== 'xlsx' && (
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
@@ -230,7 +224,48 @@ export const PoolVisaWorkspace: React.FC = () => {
 
       {load && view === 'performance' && (rows.length > 0 || traffic.length > 0) && (
         <div className="space-y-6">
-          {filters.start && filters.end && <DualTimeline rows={rows} traffic={traffic} lpFilters={lpFilters} lpBlocked={lpBlocked || !lpReady} start={filters.start} end={filters.end} />}
+          {filters.start && filters.end && <DualTimeline rows={rows} traffic={traffic} lpFilters={lpFilters} lpBlocked={lpBlocked || !lpReady} start={filters.start} end={filters.end} attribution={<section className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs" aria-labelledby="pool-sms-scenario">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h4 id="pool-sms-scenario" className="font-bold text-slate-800">Hipótese de atribuição · SMS</h4>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+            <input type="checkbox" checked={includeDirectSms} onChange={event => setIncludeDirectSms(event.target.checked)} />
+            Incluir Direto como hipótese de SMS
+          </label>
+        </div>
+        {!smsScenarioAvailable ? <p className="mt-2 text-xs text-slate-600">Comparação disponível para Afinz + Plurix, com SMS no recorte e o período dentro da cobertura do GA4{lp?.coverage ? ` (${fmtDate(lp.coverage.start)} a ${fmtDate(lp.coverage.end)})` : ''}.</p> :
+          <div className="mt-1 grid gap-2 sm:grid-cols-2" aria-live="polite">
+            <div className="rounded-md bg-white p-2">
+              <h3 className="text-xs font-bold text-slate-800">SMS identificado no GA4</h3>
+              <p className="text-xs text-slate-600">{smsScenario.identified.sessions === null ? 'Sessões indisponíveis no recorte' : `${nf(smsScenario.identified.sessions)} sessões`} · {nf(smsScenario.identified.offerClicks)} cliques em ofertas{smsCostLabel(smsScenario.identified.sessions, smsScenario.identified.offerClicks)}</p>
+            </div>
+            {smsScenario.direct && <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
+              <h3 className="text-xs font-bold text-amber-950">Hipótese · SMS + todo o Direto</h3>
+              <p className="text-xs text-amber-900">{smsScenario.identified.sessions === null ? 'Sessões indisponíveis no recorte' : `${nf(smsScenario.identified.sessions + (smsScenario.direct.sessions ?? 0))} sessões`} · {nf(smsScenario.identified.offerClicks + smsScenario.direct.offerClicks)} cliques em ofertas{smsCostLabel(smsScenario.identified.sessions === null ? null : smsScenario.identified.sessions + (smsScenario.direct.sessions ?? 0), smsScenario.identified.offerClicks + smsScenario.direct.offerClicks)}</p>
+              <p className="mt-1 text-xs text-amber-900">Direto pode incluir WhatsApp e outras origens.</p>
+            </div>}
+          </div>}
+      </section>} />}
+          {costChannels.length > 0 && <section className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="font-bold text-slate-900">Custos e eficiência por canal</h3>
+            <p className="mb-3 text-xs text-slate-600">Custo registrado ou tarifa vigente × base acionável. Indicadores da LP comparam custo e tráfego identificado no mesmo período, sem vínculo individual ao disparo.</p>
+            <div className="overflow-x-auto"><table className="w-full text-left text-xs">
+              <thead className="bg-slate-50"><tr>{['Canal', 'Custo', 'Por mil acionados', 'CPC da mensagem', 'Sessões LP', 'Custo por sessão', 'Cliques em ofertas', 'CPC da oferta'].map(label => <th scope="col" className="p-2" key={label}>{label}</th>)}</tr></thead>
+              <tbody>{costChannels.map(cost => {
+                const channel = cost.dims.channel;
+                const origins = originsForChannels([channel]);
+                const lpMetrics = lpCostsAvailable && origins?.length ? lpTotals(traffic, events, { ...lpFilters, origins }) : null;
+                const showLpCosts = channel === 'SMS';
+                return <tr key={cost.key} className="border-t border-slate-100">
+                  <th scope="row" className="p-2">{channel}</th>
+                  <td className="p-2">{money(cost.channelCost.value)}{cost.estimatedCosts > 0 && <small className="block text-slate-600">{cost.estimatedCosts === cost.channelCost.known ? 'Estimado' : 'Inclui estimativa'}</small>}<PartialBadge label={coverageLabel(cost.channelCost)} /></td>
+                  <td className="p-2">{money(cost.costPerThousand)}</td><td className="p-2">{money(cost.messageCpc)}</td>
+                  <td className="p-2">{lpMetrics?.sessions ?? '—'}</td><td className="p-2">{money(showLpCosts ? lpCost(cost, lpMetrics?.sessions ?? null) : null)}</td>
+                  <td className="p-2">{lpMetrics?.offerClicks ?? '—'}</td><td className="p-2">{money(showLpCosts ? lpCost(cost, lpMetrics?.offerClicks ?? null) : null)}</td>
+                </tr>;
+              })}</tbody>
+            </table></div>
+            <p className="mt-2 text-xs text-slate-600">WhatsApp tem atribuição incompleta na LP. O CPC da mensagem usa as linhas com custo e clique informados.</p>
+          </section>}
           {lpReady && (
             <div className="grid gap-6 lg:grid-cols-2">
               <BrandRankingCard events={events} lpFilters={lpFilters} lpBlocked={lpBlocked} />
@@ -284,7 +319,7 @@ const Overview: React.FC<{ rows: PoolDispatchRow[] }> = ({ rows }) => {
       rowKey={(r) => r.key}
       firstLabel="BU · Canal"
       firstValue={(r) => `${r.dims.bu} · ${r.dims.channel}`}
-      columns={aggCols(['dispatches', 'sent', 'delivered', 'deliveryRate', 'opens', 'openRate', 'clicks', 'ctrDelivered', 'ctor'])}
+      columns={aggCols(['dispatches', 'sent', 'delivered', 'deliveryRate', 'opens', 'openRate', 'clicks', 'ctrDelivered', 'ctor', 'channelCost', 'messageCpc', 'costPerThousand'])}
       minWidth={1000}
     />
   );
@@ -308,7 +343,7 @@ const DispatchByTouchTable: React.FC<{ rows: PoolDispatchRow[] }> = ({ rows }) =
           { key: 'touch', label: 'Toque', render: (r) => r.dims.touch, csv: (r) => r.dims.touch },
           { key: 'kind', label: 'Tipo', render: (r) => r.dims.kind, csv: (r) => r.dims.kind },
           { key: 'pieces', label: 'Peças', render: (r) => r.dispatches, csv: (r) => r.dispatches },
-          ...cols(['sent', 'delivered', 'deliveryRate', 'opens', 'clicks']),
+          ...cols(['sent', 'delivered', 'deliveryRate', 'opens', 'clicks', 'channelCost', 'messageCpc']),
         ]}
         csvName="pool-visa-linha-do-tempo.csv"
         minWidth={1000}
@@ -355,7 +390,7 @@ const TimeView: React.FC<{
     return { data, series };
   }, [rows, grain, split, field, accumulated]);
   const singleMonth = grain === 'month' && periodRows.length === 1;
-  const sfCols = ['sent', 'delivered', 'deliveryRate', 'opens', 'openRate', 'clicks', 'ctrDelivered'].map((k) => {
+  const sfCols = ['sent', 'delivered', 'deliveryRate', 'opens', 'openRate', 'clicks', 'ctrDelivered', 'channelCost', 'messageCpc', 'costPerThousand'].map((k) => {
     const f = metric(k);
     return {
       key: k, label: f.label,
