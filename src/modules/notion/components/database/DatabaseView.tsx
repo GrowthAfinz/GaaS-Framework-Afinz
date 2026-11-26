@@ -52,6 +52,9 @@ interface DatabaseViewProps {
   quickFilter?: QuickFilterConfig;
   /** Linhas que só o Calendário mostra (ex.: Sub Tarefas com prazo, que não viram card). */
   calendarExtraRows?: DatabaseRow[];
+  /** Rodapé dos cards do Quadro e propriedades que ele já mostra. */
+  cardFooter?: (row: DatabaseRow) => React.ReactNode;
+  cardHides?: string[];
 }
 export interface QuickFilterConfig {
   propertyId: string; hiddenByDefault: string[]; storageKey: string;
@@ -78,6 +81,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   readOnly = false,
   quickFilter,
   calendarExtraRows,
+  cardFooter,
+  cardHides,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -457,6 +462,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           filteredRows={filteredRows}
           groupPropId={groupPropId}
           visiblePropIds={visible}
+          cardFooter={cardFooter}
+          cardHides={cardHides}
           users={users}
           hiddenValues={groupPropId === quickFilter?.propertyId ? [...qfAll.filter((n) => !qfOptions.includes(n)), ...(qfActive ? [...qfOptions, EMPTY].filter((n) => !qfSelected.includes(n)) : [])] : []}
           hideEmpty={Boolean(currentView.hideEmptyGroups)}

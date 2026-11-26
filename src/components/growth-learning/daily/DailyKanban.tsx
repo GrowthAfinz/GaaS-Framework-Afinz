@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarClock, Check, ExternalLink, KanbanSquare, MessageSquareText, Plus, Search, X } from 'lucide-react';
+import { CalendarClock, Check, CheckSquare, ExternalLink, KanbanSquare, MessageSquareText, Plus, Search, X } from 'lucide-react';
 import { TASK_PRIORITY, TASK_STATUS, taskError } from '../development/developmentService';
 import { addDays, brDate, initials, personColor, type DailyPartner, type DailyProject } from './dailyModel';
 import type { DailyInitiative, DailyWork, EntryLite } from './dailyService';
@@ -165,6 +165,7 @@ export function DailyKanbanModal(p: KanbanProps) {
   const vocab = useMemo(() => boardVocab([...p.projects.values()], p.partners, p.boardId), [p.projects, p.partners, p.boardId]);
   const tagsOf = useMemo(() => new Map(p.works.filter(w => w.initiative_id === p.boardId).map(w => [w.id, workTags(w, vocab)])), [p.works, p.boardId, vocab]);
   const allWorks = useMemo(() => p.works.filter(w => w.initiative_id === p.boardId && !w.parent_task_id), [p.works, p.boardId]);
+  const kidsOf = useMemo(() => { const m = new Map<string, DailyWork[]>(); for (const w of p.works) if (w.parent_task_id) m.set(w.parent_task_id, [...(m.get(w.parent_task_id) || []), w]); return m; }, [p.works]);
   const tagCounts = useMemo(() => {
     const m = new Map<string, { tag: TagVocab; n: number }>();
     for (const w of allWorks) if (w.status !== 'cancelada') for (const t of tagsOf.get(w.id) || []) m.set(t.key, { tag: t, n: (m.get(t.key)?.n || 0) + 1 });
@@ -241,6 +242,9 @@ export function DailyKanbanModal(p: KanbanProps) {
             ? <span className="who" title={`Responsável: ${w.owner_label}`}><span className="dv-kav" style={{ background: personColor(w.owner_label) }}>{initials(w.owner_label)}</span>{w.owner_label.split(/\s+/)[0]}</span>
             : <span title="Sem responsável definido" style={{ color: '#94a3b8' }}>sem responsável</span>}
           {w.due_date && <span className={`due${late ? ' late' : soon ? ' soon' : ''}`} title={late ? 'Prazo vencido' : soon ? 'Prazo nos próximos 3 dias' : 'Prazo'}><CalendarClock />{brDate(w.due_date)}</span>}
+          {(() => { const kids = kidsOf.get(w.id) || []; const done = kids.filter(k => ['concluida', 'cancelada'].includes(k.status)).length;
+            return kids.length > 0 ? <span className={`chk${done === kids.length ? ' all' : ''}`} title="Itens do checklist concluídos"><CheckSquare />{done}/{kids.length}</span> : null; })()}
+          {w.status === 'concluida' && w.details?.completed_on && <span className="fin" title="Data de finalização">finalizada {brDate(w.details.completed_on)}</span>}
           {ms.length > 0 && <span className="ment" title={`Citado ${ms.length} ${ms.length === 1 ? 'vez' : 'vezes'} na Daily; última em ${brDate(ms[0].day)}`}><MessageSquareText />{ms.length} · {brDate(ms[0].day)}</span>}
         </div>
         {expanded && ms.length > 0 && (

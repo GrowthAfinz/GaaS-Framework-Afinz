@@ -123,9 +123,11 @@ export interface DailyWork {
   next_action: string; initiative_id: string | null; work_type: string; workspace: string; blocked_reason: string | null; revision: number; updated_at?: string;
   /** Sub Tarefa: aparece dentro do card da Tarefa pai, não como card. */
   parent_task_id?: string | null;
+  /** completed_on = data de finalização (só quando concluída). */
+  details?: Record<string, string> | null;
 }
 export interface DailyInitiative { id: string; title: string; workspace: string; source_note: string | null }
-const WORK_COLS = 'id,task_key,title,status,priority,owner_label,due_date,next_action,initiative_id,work_type,workspace,blocked_reason,revision,updated_at,parent_task_id';
+const WORK_COLS = 'id,task_key,title,status,priority,owner_label,due_date,next_action,initiative_id,work_type,workspace,blocked_reason,revision,updated_at,parent_task_id,details';
 
 export async function loadWorks(): Promise<DailyWork[]> {
   const { data, error } = await supabase.from('growth_development_tasks').select(WORK_COLS).order('updated_at', { ascending: false }).limit(2000);

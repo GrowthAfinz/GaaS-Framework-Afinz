@@ -13,6 +13,7 @@ import { TemplatesModal } from './components/layout/TemplatesModal';
 import { RowPeekModal } from './components/database/RowPeekModal';
 import { TaskModal } from '../../components/growth-learning/development/TaskModal';
 import { loadSubtasks, patchTask } from '../../components/growth-learning/development/taskModalService';
+import { TaskCardFooter, type DailyPulse } from './gaas/TaskCardFooter';
 import { WorkStrip } from './gaas/WorkStrip';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
 import { configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
@@ -580,6 +581,29 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setSearchOpen]);
 
+  /** Registros da Visão Daily ligados a cada card (o do card e os das Sub Tarefas), para o selo "Daily" do Quadro. */
+  const [dailyPulse, setDailyPulse] = useState<Map<string, DailyPulse>>(new Map());
+  useEffect(() => {
+    const start = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+    void supabase.from('daily_entries').select('day,work_ids').is('deleted_at', null).not('work_ids', 'eq', '{}').gte('day', start).limit(3000)
+      .then(({ data }) => {
+        const recentFrom = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+        const m = new Map<string, DailyPulse>();
+        for (const e of (data || []) as { day: string; work_ids: string[] }[]) for (const id of e.work_ids || []) {
+          const top = ctx.tasks.get(id)?.parent_task_id || id;
+          const cur = m.get(top) || { recent: 0, last: '' };
+          m.set(top, { recent: cur.recent + (e.day >= recentFrom ? 1 : 0), last: e.day > cur.last ? e.day : cur.last });
+        }
+        setDailyPulse(m);
+      });
+  }, [ctx.tasks.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  const taskCardFooter = useCallback((row: DatabaseRow) => {
+    const id = taskIdOfRow(row.id); const task = id ? ctx.tasks.get(id) : undefined;
+    if (!task) return null;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    return <TaskCardFooter task={task} progress={subtaskProgress(task.id, [...ctx.tasks.values()])} daily={dailyPulse.get(task.id)} today={today} />;
+  }, [ctx.tasks, dailyPulse]);
+
   /** Sub Tarefas com prazo aparecem no Calendário (só lá): abrem a janela da Tarefa e arrastar muda o prazo. */
   const subtaskCalendarRows = useCallback((fronts: string[]): DatabaseRow[] => {
     const props = workspace.databases[TASKS_DB]?.properties || [];
@@ -620,6 +644,8 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
             onAddRow={(id, props = {}) => addRow(id, props.p_frente || !scope.length ? props : { ...props, p_frente: scope[0] })}
             quickFilter={{ propertyId: 'p_frente', hiddenByDefault: [], scope, storageKey: `gaas.notion.chips.${ctx.me || 'anon'}.${!pageId || pageId === TASKS_PAGE ? databaseId : pageId}` }}
             calendarExtraRows={subtaskCalendarRows(page?.taskFronts || [])}
+            cardFooter={taskCardFooter}
+            cardHides={['p_subtarefas', 'p_prazo']}
             onDeleteRow={deleteRow}
             onAddProperty={addDatabaseProperty}
             onSetView={(_db, viewId) => setViewByPage(prev => ({ ...prev, [viewKey]: viewId }))}

@@ -17,6 +17,10 @@ interface BoardViewProps {
   groupPropId?: string;
   /** Propriedades mostradas no card, na ordem da visão. */
   visiblePropIds?: string[];
+  /** Rodapé do card (ex.: Tarefas: checklist, Daily, prazo e finalização). Com rodapé o card fica maior. */
+  cardFooter?: (row: DatabaseRow) => React.ReactNode;
+  /** Propriedades que o rodapé já mostra e saem dos chips. */
+  cardHides?: string[];
   users?: NotionUser[];
   onUpdateRow: (rowId: string, propertyId: string, value: any) => void;
   onAddRow: (initialProps?: Record<string, any>) => void;
@@ -39,6 +43,8 @@ export const BoardView: React.FC<BoardViewProps> = ({
   filteredRows,
   groupPropId,
   visiblePropIds = [],
+  cardFooter,
+  cardHides = [],
   users = [],
   onUpdateRow,
   onAddRow,
@@ -74,7 +80,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   if (groupProp && (hasEmpty || groupProp.type === 'person')) columns.unshift({ key: '__vazio__', name: `Sem ${groupProp.name.toLowerCase()}`, color: 'gray', value: '' });
 
   const cardProps = visiblePropIds
-    .filter((id) => id !== groupProp?.id)
+    .filter((id) => id !== groupProp?.id && !cardHides.includes(id))
     .map((id) => database.properties.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
@@ -206,9 +212,9 @@ export const BoardView: React.FC<BoardViewProps> = ({
                     role="button" tabIndex={0}
                     onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpenRowPage(row.pageId); } }}
                     onClick={() => onOpenRowPage(row.pageId)}
-                    className={`group relative p-3 rounded-md border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xs hover:shadow-md transition-all cursor-pointer select-none ${draggedRowId === row.id ? 'opacity-50' : ''}`}
+                    className={`group relative ${cardFooter ? 'nt-task-card p-3.5 rounded-[10px]' : 'p-3 rounded-md'} border border-[var(--notion-border)] bg-[var(--notion-card)] shadow-xs hover:shadow-md transition-all cursor-pointer select-none ${draggedRowId === row.id ? 'opacity-50' : ''}`}
                   >
-                    <div className="text-sm font-medium text-[var(--notion-text)] leading-snug">{row.properties[titleKey] || 'Sem título'}</div>
+                    <div className={`${cardFooter ? 'text-[14.5px] font-semibold' : 'text-sm font-medium'} text-[var(--notion-text)] leading-snug`}>{row.properties[titleKey] || 'Sem título'}</div>
                     {cardProps.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px] mt-2">
                         {cardProps.map(p => <React.Fragment key={p.id}>
@@ -217,6 +223,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
                         </React.Fragment>)}
                       </div>
                     )}
+                    {cardFooter?.(row)}
                   </div>
                   {creditBases && !readOnly && <select
                     aria-label={`Mover ${row.properties[titleKey] || 'pedido'} para outra etapa`}
