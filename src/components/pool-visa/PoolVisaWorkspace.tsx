@@ -133,12 +133,63 @@ export const PoolVisaWorkspace: React.FC = () => {
           </button>
         }
         summaryStrip={
-          <ReportKpiStrip items={[
-            kpi('sent', 'Enviados'), kpi('delivered', 'Entregues'), kpi('opens', 'Aberturas / leituras'), kpi('clicks', 'Cliques na comunicação'),
-            lpKpi('LP · Sessões', lpTot.sessions, 'Soma diária de sessões em /black afinz (GA4)'),
-            lpKpi('LP · Cliques em ofertas', lpTot.offerClicks, 'Eventos clique_oferta: contagem de eventos, não de pessoas'),
-            lpKpi('LP · Cliques site Visa', lpTot.visaClicks, 'Eventos clique_site_visa'),
-          ]} />
+          <>
+            <ReportKpiStrip items={[
+              kpi('sent', 'Enviados'), kpi('delivered', 'Entregues'), kpi('opens', 'Aberturas / leituras'), kpi('clicks', 'Cliques na comunicação'),
+              lpKpi('LP · Sessões', lpTot.sessions, 'Soma diária de sessões em /black afinz (GA4)'),
+              lpKpi('LP · Cliques em ofertas', lpTot.offerClicks, 'Eventos clique_oferta: contagem de eventos, não de pessoas'),
+              lpKpi('LP · Cliques site Visa', lpTot.visaClicks, 'Eventos clique_site_visa'),
+            ]} />
+            {view !== 'vitrine' && (
+              <div className="flex flex-wrap items-end gap-4 border-x border-b border-slate-200 bg-white px-4 py-2">
+                <label className="text-xs font-semibold text-slate-600">De
+                  <input type="date" value={filters.start ?? ''} min={fullRange.min ?? undefined} max={filters.end ?? undefined} onChange={(e) => setFilters({ ...filters, start: e.target.value || null })} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">Até
+                  <input type="date" value={filters.end ?? ''} min={filters.start ?? undefined} onChange={(e) => setFilters({ ...filters, end: e.target.value || null })} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
+                </label>
+                <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm" role="group" aria-label="BU">
+                  {(['all', 'Afinz', 'Plurix'] as const).map((bu) => (
+                    <button key={bu} type="button" aria-pressed={filters.bu === bu} onClick={() => setFilters({ ...filters, bu })} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${filters.bu === bu ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
+                      {bu === 'all' ? 'Afinz + Plurix' : bu}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Canais">
+                  <span className="text-xs font-semibold text-slate-600">Canal</span>
+                  {channels.map((ch) => {
+                    const on = filters.channels.includes(ch);
+                    return (
+                      <button key={ch} type="button" aria-pressed={on} onClick={() => setFilters({ ...filters, channels: on ? filters.channels.filter((c) => c !== ch) : [...filters.channels, ch] })} className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${on ? 'border-cyan-600 bg-cyan-50 text-cyan-800' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                        {ch}
+                      </button>
+                    );
+                  })}
+                  {filters.channels.length > 0 && <button type="button" onClick={() => setFilters({ ...filters, channels: [] })} className="text-[11px] text-slate-400 underline">todos</button>}
+                </div>
+                <label className="text-xs font-semibold text-slate-600" title={groupCellTitle}>Grupo
+                  <select aria-label="Grupo do Pool (LP)" value={group ?? ''} disabled={!known.groups.length} onChange={(e) => setGroup((e.target.value || null) as PoolGroupKey | null)} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs disabled:bg-slate-50 disabled:text-slate-400">
+                    <option value="">Todos</option>
+                    {known.groups.map((g) => <option key={g} value={g}>{POOL_GROUP_LABELS[g]}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs font-semibold text-slate-600" title={groupCellTitle}>Célula
+                  <select aria-label="Célula do Pool (LP)" value={cell ?? ''} disabled={!known.cells.length} onChange={(e) => setCell((e.target.value || null) as PoolCellKey | null)} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs disabled:bg-slate-50 disabled:text-slate-400">
+                    <option value="">Todas</option>
+                    {known.cells.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-600" title="Linhas com token optout no nome: respostas automáticas de opt-out do WhatsApp, não disparos do Pool.">
+                  <input type="checkbox" checked={filters.includeOptout} onChange={(e) => setFilters({ ...filters, includeOptout: e.target.checked })} />
+                  Incluir respostas de opt-out ({optoutCount})
+                </label>
+                {(filters.start !== fullRange.min || filters.end !== fullRange.max) && (
+                  <button type="button" onClick={() => setFilters({ ...filters, start: fullRange.min, end: fullRange.max })} className="text-xs font-semibold text-cyan-700 underline">Todo o histórico do Pool</button>
+                )}
+                {(group || cell) && <p className="basis-full text-[11px] text-slate-500">Filtro de grupo e célula aplicado só aos cliques da LP. A comunicação SFMC não tem célula e segue sem esse filtro.</p>}
+              </div>
+            )}
+          </>
         }
       />
 
@@ -147,52 +198,6 @@ export const PoolVisaWorkspace: React.FC = () => {
       {lpError && <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">Dados da LP (GA4) indisponíveis: {lpError}. A comunicação SFMC segue normal.</div>}
       {busy && !load && <p role="status" className="text-sm text-slate-500">Carregando os disparos do Pool…</p>}
 
-      <div className="flex flex-wrap items-end gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="text-xs font-semibold text-slate-600">De
-          <input type="date" value={filters.start ?? ''} min={fullRange.min ?? undefined} max={filters.end ?? undefined} onChange={(e) => setFilters({ ...filters, start: e.target.value || null })} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-        </label>
-        <label className="text-xs font-semibold text-slate-600">Até
-          <input type="date" value={filters.end ?? ''} min={filters.start ?? undefined} onChange={(e) => setFilters({ ...filters, end: e.target.value || null })} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-        </label>
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm" role="group" aria-label="BU">
-          {(['all', 'Afinz', 'Plurix'] as const).map((bu) => (
-            <button key={bu} type="button" aria-pressed={filters.bu === bu} onClick={() => setFilters({ ...filters, bu })} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${filters.bu === bu ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}>
-              {bu === 'all' ? 'Afinz + Plurix' : bu}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Canais">
-          <span className="text-xs font-semibold text-slate-600">Canal</span>
-          {channels.map((ch) => {
-            const on = filters.channels.includes(ch);
-            return (
-              <button key={ch} type="button" aria-pressed={on} onClick={() => setFilters({ ...filters, channels: on ? filters.channels.filter((c) => c !== ch) : [...filters.channels, ch] })} className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${on ? 'border-cyan-600 bg-cyan-50 text-cyan-800' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                {ch}
-              </button>
-            );
-          })}
-          {filters.channels.length > 0 && <button type="button" onClick={() => setFilters({ ...filters, channels: [] })} className="text-[11px] text-slate-400 underline">todos</button>}
-        </div>
-        <label className="text-xs font-semibold text-slate-600" title={groupCellTitle}>Grupo
-          <select aria-label="Grupo do Pool (LP)" value={group ?? ''} disabled={!known.groups.length} onChange={(e) => setGroup((e.target.value || null) as PoolGroupKey | null)} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs disabled:bg-slate-50 disabled:text-slate-400">
-            <option value="">Todos</option>
-            {known.groups.map((g) => <option key={g} value={g}>{POOL_GROUP_LABELS[g]}</option>)}
-          </select>
-        </label>
-        <label className="text-xs font-semibold text-slate-600" title={groupCellTitle}>Célula
-          <select aria-label="Célula do Pool (LP)" value={cell ?? ''} disabled={!known.cells.length} onChange={(e) => setCell((e.target.value || null) as PoolCellKey | null)} className="ml-2 rounded-lg border border-slate-200 px-2 py-1.5 text-xs disabled:bg-slate-50 disabled:text-slate-400">
-            <option value="">Todas</option>
-            {known.cells.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-xs text-slate-600" title="Linhas com token optout no nome: respostas automáticas de opt-out do WhatsApp, não disparos do Pool.">
-          <input type="checkbox" checked={filters.includeOptout} onChange={(e) => setFilters({ ...filters, includeOptout: e.target.checked })} />
-          Incluir respostas de opt-out ({optoutCount})
-        </label>
-        {(filters.start !== fullRange.min || filters.end !== fullRange.max) && (
-          <button type="button" onClick={() => setFilters({ ...filters, start: fullRange.min, end: fullRange.max })} className="text-xs font-semibold text-cyan-700 underline">Todo o histórico do Pool</button>
-        )}
-      </div>
       {view === 'performance' && <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="pool-sms-scenario">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="pool-sms-scenario" className="font-bold text-slate-900">Atribuição de tráfego ao SMS</h2>
@@ -214,7 +219,6 @@ export const PoolVisaWorkspace: React.FC = () => {
             </div>}
           </div>}
       </section>}
-      {(group || cell) && <p className="-mt-3 text-[11px] text-slate-500">Filtro de grupo e célula aplicado só aos cliques da LP. A comunicação SFMC não tem célula e segue sem esse filtro.</p>}
 
       {load && !rows.length && view !== 'xlsx' && (
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
@@ -259,7 +263,7 @@ export const PoolVisaWorkspace: React.FC = () => {
         </div>
       )}
 
-      <CoveragePanel load={load} />
+      {view === 'performance' && <CoveragePanel load={load} />}
       </>}
     </section>
   );
