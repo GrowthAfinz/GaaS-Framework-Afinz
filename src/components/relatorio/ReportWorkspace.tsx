@@ -92,6 +92,7 @@ export function ReportWorkspaceHeader({
   description,
   actions,
   summaryStrip,
+  views = REPORT_VIEWS.map((option) => option.key),
 }: {
   title: string;
   view: ReportView;
@@ -99,6 +100,8 @@ export function ReportWorkspaceHeader({
   description?: ReactNode;
   actions?: ReactNode;
   summaryStrip?: ReactNode;
+  /** Subset of REPORT_VIEWS this domain offers; defaults to all of them. */
+  views?: readonly ReportView[];
 }) {
   return (
     <div
@@ -121,7 +124,7 @@ export function ReportWorkspaceHeader({
                 aria-label={`Visões de ${title}`}
                 className="flex max-w-full flex-wrap rounded-xl border border-white/30 bg-white/15 p-1"
               >
-                {REPORT_VIEWS.map((option) => (
+                {REPORT_VIEWS.filter((option) => views.includes(option.key)).map((option) => (
                   <button
                     key={option.key}
                     type="button"

@@ -189,6 +189,7 @@ export const TAB_LABELS: Record<TabId, string> = {
   explorador: 'Jornada e Aquisição',
   relatorio: 'Relatórios | Aquisição',
   'relatorio-seguros': 'Relatórios | Seguros',
+  'relatorio-pool-visa': 'Relatórios | Pool Visa',
   'aprendizado-growth': 'Loop de Memória',
   operacao: 'Operação',
   comunicacoes: 'Comunicações',

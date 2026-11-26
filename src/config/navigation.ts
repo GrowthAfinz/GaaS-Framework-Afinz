@@ -39,6 +39,7 @@ export const NAV_CONFIG: NavGroup[] = [
             { id: 'resultados', label: 'Resultados', icon: BarChart3 },
             { id: 'relatorio', label: 'Relatórios | Aquisição', icon: ClipboardList },
             { id: 'relatorio-seguros', label: 'Relatórios | Seguros', icon: ClipboardList },
+            { id: 'relatorio-pool-visa', label: 'Relatórios | Pool Visa', icon: ClipboardList },
             { id: 'orientador', label: 'Orientador', icon: Lightbulb },
         ]
     },
