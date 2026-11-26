@@ -44,7 +44,7 @@ function days(start: string, end: string): string[] {
 }
 
 /** Comunicação (SFMC) e visitas (GA4) na mesma régua de dias, escalas separadas. */
-export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTrafficRow[]; lpFilters: LpFilters; lpBlocked: boolean; start: string; end: string }> = ({ rows, traffic, lpFilters, lpBlocked, start, end }) => {
+export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTrafficRow[]; lpFilters: LpFilters; lpBlocked: boolean; start: string; end: string; attribution?: React.ReactNode }> = ({ rows, traffic, lpFilters, lpBlocked, start, end, attribution }) => {
   const axis = useMemo(() => days(start, end), [start, end]);
   const sfmc = useMemo(() => {
     const by = new Map<string, Record<string, number>>();
@@ -86,6 +86,9 @@ export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTraffi
         <div className="grid min-w-[720px] grid-cols-[110px_1fr] gap-x-3">
           <div className="flex flex-col justify-center text-xs font-bold text-slate-600">SFMC<span className="text-[10px] font-medium text-slate-400">entregues por canal</span></div>
           {lane(sfmc, sMax, CHANNEL_COLORS, 'entregues')}
+          <div className="col-span-2 my-2 flex items-center gap-2 text-[10px] font-semibold text-slate-600">
+            <span className="h-0.5 flex-1 bg-slate-400" /> Escalas independentes <span className="h-0.5 flex-1 bg-slate-400" />
+          </div>
           <div className="flex flex-col justify-center text-xs font-bold text-slate-600">GA4<span className="text-[10px] font-medium text-slate-400">sessões por origem</span></div>
           {lpOff
             ? <div className="flex h-32 items-center justify-center border-b border-slate-200 text-xs text-slate-500">{lpBlocked ? 'O GA4 não identifica BU. A faixa da LP só aparece com Afinz + Plurix.' : 'Visita não tem grupo nem célula: com esses filtros a faixa de sessões fica vazia.'}</div>
@@ -99,7 +102,8 @@ export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTraffi
         <span className="w-3" />
         {(Object.keys(ORIGIN_COLORS) as LpOrigin[]).map((k) => <span key={k}><i className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={{ background: ORIGIN_COLORS[k] }} />{LP_ORIGIN_LABELS[k]}</span>)}
       </div>
-      <p className="px-5 pb-4 text-[11px] text-slate-500">Escalas separadas e nenhuma divisão entre as faixas. Data coincidente não é atribuição: pelo desenho, o e-mail leva direto às ofertas e não passa pela LP.</p>
+      {attribution && <div className="px-5 pb-3">{attribution}</div>}
+      <p className="px-5 pb-4 text-[11px] text-slate-500">SFMC mede entregas da comunicação. GA4 mede sessões na LP. As duas faixas compartilham apenas a régua de datas.</p>
     </Card>
   );
 };
