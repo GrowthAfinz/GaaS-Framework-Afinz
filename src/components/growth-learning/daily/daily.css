@@ -322,7 +322,7 @@ button.dv-topic.on{box-shadow:0 0 0 2px var(--bc)}
 .dv-ktabs button[role=tab].on span{background:rgba(255,255,255,.18);color:#fff}
 .dv-kerr{margin:8px 16px 0;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:6px 6px 6px 10px;font-size:12px;display:flex;align-items:center;gap:6px;justify-content:space-between}
 .dv-kcols{flex:1;min-height:0;display:flex;gap:10px;padding:12px 16px 16px;overflow-x:auto;background:#f8fafc}
-.dv-kcol{flex:1 0 270px;display:flex;flex-direction:column;min-height:0;border-radius:12px;background:#f1f5f9;transition:background .12s}
+.dv-kcol{flex:1 0 300px;display:flex;flex-direction:column;min-height:0;border-radius:12px;background:#f1f5f9;transition:background .12s}
 .dv-kcol.over{background:color-mix(in srgb,var(--sc) 12%,#f1f5f9);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--sc) 45%,white)}
 .dv-kcol h4{margin:0;padding:10px 12px 8px;font-size:12px;font-weight:700;color:#334155;display:flex;align-items:center;gap:7px}
 .dv-kcol h4 i{width:8px;height:8px;border-radius:50%;background:var(--sc)}
@@ -331,7 +331,7 @@ button.dv-topic.on{box-shadow:0 0 0 2px var(--bc)}
 .dv-kcol .empty{font-size:11px;color:#cbd5e1;text-align:center;padding:14px 0}
 .dv-kadd{display:flex;gap:4px;margin:0 8px 8px;background:#fff;border:1px dashed #cbd5e1;border-radius:8px;padding:2px 2px 2px 8px}
 .dv-kadd input{flex:1;min-width:0;border:none;outline:none;font:inherit;font-size:12px;background:none}
-.dv-kc{background:#fff;border:1px solid #e5eaf0;border-left:3px solid var(--sc);border-radius:9px;padding:8px 9px;font-size:12px;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.04);flex:none}
+.dv-kc{background:#fff;border:1px solid #e5eaf0;border-left:3px solid var(--sc);border-radius:10px;padding:11px 12px;font-size:12.5px;cursor:pointer;box-shadow:0 1px 2px rgba(15,23,42,.04);flex:none}
 .dv-kc[draggable=true]{cursor:grab}
 .dv-kc:hover{border-color:#cbd5e1;box-shadow:0 4px 12px -6px rgba(15,23,42,.25)}
 .dv-kc.dragging{opacity:.4}
@@ -341,11 +341,13 @@ button.dv-topic.on{box-shadow:0 0 0 2px var(--bc)}
 .dv-kc .pr.pP0{background:#fee2e2;color:#b91c1c}.dv-kc .pr.pP1{background:#ffedd5;color:#c2410c}
 .dv-kc .ty{font-size:9.5px;color:#6366f1;font-weight:700}
 .dv-kc .here{margin-left:auto;font-size:9.5px;font-weight:700;color:#7c3aed}
-.dv-kc .tt{font-weight:600;color:#1e293b;line-height:1.35}
+.dv-kc .tt{font-weight:600;font-size:14px;color:#1e293b;line-height:1.35}
+.dv-kc .ft .chk{background:#f1f5f9;border-radius:4px;padding:0 4px}.dv-kc .ft .chk.all{background:#f0fdf4;color:#15803d}
+.dv-kc .ft .fin{color:#15803d;font-weight:600}
 .dv-kc .bl{margin-top:4px;font-size:11px;color:#b91c1c}
 .dv-kc .na{margin-top:5px;font-size:11px;color:#475569;line-height:1.35}
 .dv-kc .na b{display:block;font-size:9.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.3px}
-.dv-kc .ft{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px;font-size:10.5px;color:#64748b}
+.dv-kc .ft{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px;padding-top:7px;border-top:1px solid #eef2f6;font-size:11.5px;color:#64748b}
 .dv-kc .ft span{display:inline-flex;align-items:center;gap:3px}
 .dv-kc .ft svg{width:11px;height:11px}
 .dv-kc .ft .late{color:#b91c1c;font-weight:700}
