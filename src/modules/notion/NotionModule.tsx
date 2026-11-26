@@ -14,9 +14,10 @@ import { RowPeekModal } from './components/database/RowPeekModal';
 import { TaskModal } from '../../components/growth-learning/development/TaskModal';
 import { loadSubtasks, patchTask } from '../../components/growth-learning/development/taskModalService';
 import { TaskCardFooter, type DailyPulse } from './gaas/TaskCardFooter';
+import { TasksHome } from './gaas/TasksHome';
 import { WorkStrip } from './gaas/WorkStrip';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
-import { configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
+import { CREDIT_BASES_TITLE, configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
 import { supabase } from '../../services/supabaseClient';
 import { saveInitiative } from '../../components/growth-learning/development/workService';
 import { GaasSettingsModal } from './gaas/GaasPanels';
@@ -825,6 +826,13 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
               onMoveBlock={moveBlock}
               renderDatabase={renderDatabase}
             />
+          )}
+          {activePage.id === 'page_inicio' && (
+            <TasksHome tasks={[...ctx.tasks.values()]} projects={ctx.projects} me={ctx.me}
+              pages={Object.values(workspace.pages).filter(pg => pg.databaseId === TASKS_DB && (pg.taskFronts || []).length && !pg.isArchived)
+                .sort((x, y) => Number((x.taskFronts || []).includes(GAAS_FRONT)) - Number((y.taskFronts || []).includes(GAAS_FRONT)))}
+              creditBasesPage={Object.values(workspace.pages).find(pg => pg.title === CREDIT_BASES_TITLE && !pg.isArchived)}
+              onOpenPage={setActivePage} onOpenTemplates={() => setTemplatesOpen(true)} />
           )}
         </div>
       </main>
