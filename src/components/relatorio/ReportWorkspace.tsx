@@ -6,7 +6,6 @@ export const REPORT_VIEWS = [
   { key: "monthly", label: "Mensal" },
   { key: "journey", label: "Evolução e anomalias" },
   { key: "xlsx", label: "Relatórios" },
-  { key: "vitrine", label: "Vitrine Pool" },
 ] as const;
 export type ReportView = (typeof REPORT_VIEWS)[number]["key"];
 
@@ -93,10 +92,12 @@ export function ReportWorkspaceHeader({
   description,
   actions,
   summaryStrip,
-  views = REPORT_VIEWS.filter((option) => option.key !== "vitrine").map((option) => option.key),
+  extraView,
+  views = REPORT_VIEWS.map((option) => option.key),
 }: {
   title: string;
-  view: ReportView;
+  view: ReportView | null;
+  extraView?: ReactNode;
   onViewChange: (view: ReportView) => void;
   description?: ReactNode;
   actions?: ReactNode;
@@ -136,6 +137,7 @@ export function ReportWorkspaceHeader({
                     {option.label}
                   </button>
                 ))}
+                {extraView}
               </nav>
             </div>
             {description && (

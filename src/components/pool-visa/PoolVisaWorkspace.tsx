@@ -17,7 +17,7 @@ import { fetchPoolVisaDispatches, fetchPoolVisaLp, type PoolVisaLoad, type PoolV
 import { MetricCell, PartialBadge } from './PoolVisaExplorer';
 import { BrandRankingCard, CellMatrixCard, DualTimeline, LpQualityCard, PartnerRankingCard, WhatsAppPiecesCard } from './PoolVisaLpPanels';
 
-const VIEWS: ReportView[] = ['performance', 'daily', 'monthly', 'xlsx', 'vitrine'];
+const VIEWS: ReportView[] = ['performance', 'daily', 'monthly', 'xlsx'];
 const CHART_METRICS = ['sent', 'delivered', 'opens', 'clicks'] as const;
 const fmtDate = (iso: string | null) => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '—');
 const fmtMonth = (ym: string) => new Date(`${ym}-15T12:00:00`).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
@@ -37,7 +37,7 @@ const maxDate = (a: string | null, b: string | null) => (!a ? b : !b ? a : a > b
 const minDate = (a: string | null, b: string | null) => (!a ? b : !b ? a : a < b ? a : b);
 
 export const PoolVisaWorkspace: React.FC = () => {
-  const [view, setView] = useState<ReportView>(() => new URLSearchParams(window.location.search).get('aba') === 'vitrine' ? 'vitrine' : 'performance');
+  const [view, setView] = useState<ReportView | 'vitrine'>(() => new URLSearchParams(window.location.search).get('aba') === 'vitrine' ? 'vitrine' : 'performance');
   const [load, setLoad] = useState<PoolVisaLoad | null>(null);
   const [lp, setLp] = useState<PoolVisaLpLoad | null>(null);
   const [error, setError] = useState('');
@@ -114,7 +114,8 @@ export const PoolVisaWorkspace: React.FC = () => {
     <section className="space-y-6" aria-label="Relatórios do Pool Visa">
       <ReportWorkspaceHeader
         title="Relatórios | Pool Visa"
-        view={view}
+        view={view === 'vitrine' ? null : view}
+        extraView={<button type="button" aria-current={view === 'vitrine' ? 'page' : undefined} onClick={() => setView('vitrine')} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${view === 'vitrine' ? 'bg-white text-slate-900 shadow-sm' : 'text-white/80 hover:bg-white/15 hover:text-white'}`}>Vitrine Pool</button>}
         onViewChange={setView}
         views={VIEWS}
         description={<>{buLabel} · Pool de Ofertas Vai de Visa · SFMC{lastUpdate ? ` atualizado em ${new Date(lastUpdate).toLocaleDateString('pt-BR')}` : ''}{lp?.lastRun ? ` · GA4 lido em ${new Date(lp.lastRun.createdAt).toLocaleDateString('pt-BR')}` : ''}</>}
