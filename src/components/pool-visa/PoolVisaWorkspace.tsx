@@ -196,7 +196,7 @@ export const PoolVisaWorkspace: React.FC = () => {
         <div className="space-y-6">
           {filters.start && filters.end && <DualTimeline rows={rows} traffic={traffic} lpFilters={lpFilters} lpBlocked={lpBlocked || !lpReady} start={filters.start} end={filters.end} />}
           {lpReady && (
-            <div className="grid gap-6 xl:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
               <BrandRankingCard events={events} lpFilters={lpFilters} lpBlocked={lpBlocked} />
               <PartnerRankingCard events={events} lpFilters={lpFilters} lpBlocked={lpBlocked} />
             </div>
@@ -232,28 +232,35 @@ export const PoolVisaWorkspace: React.FC = () => {
   );
 };
 
+const aggCols = (keys: string[]) => keys.map((k) => {
+  const f = metric(k);
+  return { key: k, label: f.label, render: (r: PoolAggregate) => <MetricCell field={f} row={r} />, csv: (r: PoolAggregate) => f.value(r) };
+});
+
 const Overview: React.FC<{ rows: PoolDispatchRow[] }> = ({ rows }) => {
-  const timeline = useMemo(() => aggregatePool(rows, ['date', 'bu', 'channel', 'touch', 'kind']).sort((a, b) => a.dims.date.localeCompare(b.dims.date) || a.dims.bu.localeCompare(b.dims.bu)), [rows]);
   const mix = useMemo(() => aggregatePool(rows, ['bu', 'channel']).sort((a, b) => a.dims.bu.localeCompare(b.dims.bu) || a.dims.channel.localeCompare(b.dims.channel)), [rows]);
-  const cols = (keys: string[]) => keys.map((k) => {
-    const f = metric(k);
-    return { key: k, label: f.label, render: (r: PoolAggregate) => <MetricCell field={f} row={r} />, csv: (r: PoolAggregate) => f.value(r) };
-  });
   return (
-    <div className="space-y-6">
-      <ReportDataTable
-        title="Mix por BU e canal"
-        kicker="Overview · comunicação SFMC"
-        rows={mix}
-        rowKey={(r) => r.key}
-        firstLabel="BU · Canal"
-        firstValue={(r) => `${r.dims.bu} · ${r.dims.channel}`}
-        columns={cols(['dispatches', 'sent', 'delivered', 'deliveryRate', 'opens', 'openRate', 'clicks', 'ctrDelivered', 'ctor'])}
-        minWidth={1000}
-      />
+    <ReportDataTable
+      title="Mix por BU e canal"
+      kicker="Overview · comunicação SFMC"
+      rows={mix}
+      rowKey={(r) => r.key}
+      firstLabel="BU · Canal"
+      firstValue={(r) => `${r.dims.bu} · ${r.dims.channel}`}
+      columns={aggCols(['dispatches', 'sent', 'delivered', 'deliveryRate', 'opens', 'openRate', 'clicks', 'ctrDelivered', 'ctor'])}
+      minWidth={1000}
+    />
+  );
+};
+
+/** Disparos por dia, BU, canal e toque. Só aparece no Diário. */
+const DispatchByTouchTable: React.FC<{ rows: PoolDispatchRow[] }> = ({ rows }) => {
+  const timeline = useMemo(() => aggregatePool(rows, ['date', 'bu', 'channel', 'touch', 'kind']).sort((a, b) => a.dims.date.localeCompare(b.dims.date) || a.dims.bu.localeCompare(b.dims.bu)), [rows]);
+  const cols = aggCols;
+  return (
       <ReportDataTable
         title="Disparos por dia e toque"
-        kicker="Overview · comunicação SFMC"
+        kicker="Diário · comunicação SFMC"
         rows={timeline}
         rowKey={(r) => r.key}
         firstLabel="Data"
@@ -269,7 +276,6 @@ const Overview: React.FC<{ rows: PoolDispatchRow[] }> = ({ rows }) => {
         csvName="pool-visa-linha-do-tempo.csv"
         minWidth={1000}
       />
-    </div>
   );
 };
 
@@ -384,6 +390,7 @@ const TimeView: React.FC<{
         csvName={grain === 'date' ? 'pool-visa-diario.csv' : 'pool-visa-mensal.csv'}
         minWidth={1200}
       />
+      {grain === 'date' && <DispatchByTouchTable rows={rows} />}
     </div>
   );
 };
