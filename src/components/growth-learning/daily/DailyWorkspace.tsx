@@ -52,7 +52,8 @@ const readPrefs = (): Prefs => {
 
 type Pop =
   | { kind: 'filter'; key: FilterKey; anchor: Anchor } | { kind: 'sort'; anchor: Anchor } | { kind: 'group'; anchor: Anchor }
-  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'more' | 'move' | 'copy' | 'work' | 'partners'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor };
+  | { kind: 'project' | 'tag' | 'people' | 'menu' | 'more' | 'move' | 'copy' | 'work' | 'partners'; entryId: string; anchor: Anchor } | { kind: 'add'; day: string; anchor: Anchor }
+  | { kind: 'create'; entryId: string; parentId: string | null; anchor: Anchor };
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 const FILTER_LABELS: [FilterKey, string][] = [['frentes', 'Frente'], ['projects', 'Projeto'], ['partners', 'Parceiro'], ['people', 'Pessoa'], ['tags', 'Tag']];
 
@@ -410,14 +411,10 @@ export function DailyWorkspace() {
     const cur = e.work_ids || [], on = cur.includes(workId), w = worksById.get(workId);
     void patchEntry(e, { work_ids: on ? cur.filter(x => x !== workId) : [...cur, workId] }, on ? 'Registro desvinculado da Tarefa' : `Registro vinculado a "${w?.title || 'Tarefa'}"`);
   }, [patchEntry, worksById]);
-  /** Título sugerido pelo registro (primeira linha); a pessoa revisa antes de confirmar. */
-  const titleFromEntry = (e: DailyEntry, what: string) => {
+  /** Título sugerido pelo registro (primeira linha); a pessoa revisa na janelinha antes de confirmar. */
+  const titleFromEntry = (e: DailyEntry) => {
     const first = e.body.split('\n')[0].replace(/\s+/g, ' ').trim();
-    const suggestion = first.length > 120 ? first.slice(0, 117).trimEnd() + '…' : first;
-    const typed = window.prompt(`Título da ${what} (revise se quiser):`, suggestion)?.trim();
-    if (typed == null) return null;
-    if (typed.length < 5) { showToast('O título precisa de pelo menos 5 letras.'); return null; }
-    return typed;
+    return first.length > 120 ? first.slice(0, 117).trimEnd() + '…' : first;
   };
   /** Campos que a Tarefa herda do registro: projeto, frente, BU/parceiro, responsável e a origem. */
   const inheritFromEntry = (e: DailyEntry) => {
@@ -438,10 +435,9 @@ export function DailyWorkspace() {
     }
   };
   /** Cria Tarefa nova (card próprio no Kanban da frente) a partir do registro e já vincula os dois. */
-  const createWorkFromEntry = useCallback(async (e: DailyEntry) => {
+  const createWorkFromEntry = useCallback(async (e: DailyEntry, title: string) => {
     setPop(null);
     const pr = projects.get(e.project_id), ini = pr?.initiative_id ? initiatives.get(pr.initiative_id) : undefined;
-    const title = titleFromEntry(e, 'Tarefa'); if (!title) return;
     try {
       const saved = await saveWork(null, null, {
         title, ...inheritFromEntry(e), ...(ini ? { initiative_id: ini.id, area: workspaceLabel(ini.workspace as Workspace) } : {}),
@@ -453,10 +449,9 @@ export function DailyWorkspace() {
     } catch (err) { fail(err); }
   }, [fail, initiatives, people, projects, putEntry, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Cria Sub Tarefa numa Tarefa existente a partir do registro e já vincula o registro a ela. */
-  const createSubFromEntry = useCallback(async (e: DailyEntry, parentId: string) => {
+  const createSubFromEntry = useCallback(async (e: DailyEntry, parentId: string, title: string) => {
     setPop(null);
     const parent = worksById.get(parentId);
-    const title = titleFromEntry(e, `Sub Tarefa em "${parent?.title || 'Tarefa'}"`); if (!title) return;
     try {
       const { owner_label, details } = inheritFromEntry(e);
       const sub = await createSubWork(parentId, { title, owner_label, details });
@@ -519,7 +514,13 @@ export function DailyWorkspace() {
     if (pop.kind === 'work') {
       const ini = projects.get(e.project_id)?.initiative_id || null;
       return <Popover anchor={pop.anchor} width={340} onClose={close}><WorkPicker works={works} initiativeId={ini} initiatives={initiatives} selected={e.work_ids || []} today={today}
-        onToggle={id => toggleWork(e, id)} onCreate={canEdit ? () => void createWorkFromEntry(e) : undefined} onCreateSub={canEdit ? id => void createSubFromEntry(e, id) : undefined} /></Popover>;
+        onToggle={id => toggleWork(e, id)} onCreate={canEdit ? () => setPop({ kind: 'create', entryId: e.id, parentId: null, anchor: pop.anchor }) : undefined} onCreateSub={canEdit ? id => setPop({ kind: 'create', entryId: e.id, parentId: id, anchor: pop.anchor }) : undefined} /></Popover>;
+    }
+    if (pop.kind === 'create') {
+      const pr = projects.get(e.project_id), parent = pop.parentId ? worksById.get(pop.parentId) : undefined, parentId = pop.parentId;
+      return <Popover anchor={pop.anchor} width={340} onClose={close}><CreateFromEntry key={e.id + (parentId || '')} suggestion={titleFromEntry(e)}
+        what={parent ? `Sub Tarefa em "${parent.title}"` : 'card a partir do registro'} where={[frentes.get(pr?.frente_key || '')?.name, pr?.name].filter(Boolean).join(' › ')}
+        onCancel={close} onCreate={title => void (parentId ? createSubFromEntry(e, parentId, title) : createWorkFromEntry(e, title))} /></Popover>;
     }
     if (pop.kind === 'people') {
       return <Popover anchor={pop.anchor} width={330} onClose={close}><PeoplePicker people={cfg.people.filter(p => !p.archived)} me={me} responsible={e.responsible_id} followers={e.follower_ids} subject={e.body}
@@ -717,7 +718,7 @@ export function DailyWorkspace() {
           b2c={b2c.get(dayModal.day)} crm={crm.get(dayModal.day) || []} canEdit={canEdit}
           onClose={closeDay} onDay={openDay} onFocus={pid => setPin({ day: dayModal.day, projectId: pid })}
           onKanban={openKanban} onOpenProject={id => setDrawer(id)}
-          onLinkWork={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })} onCreateWork={e => void createWorkFromEntry(e)}  onOpenTask={id => setTaskOpen(id)}/>
+          onLinkWork={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })} onCreateWork={(e, el) => setPop({ kind: 'create', entryId: e.id, parentId: null, anchor: anchorOf(el) })}  onOpenTask={id => setTaskOpen(id)} onCheckWork={wk => saveWorkFromBoard(wk, { status: 'concluida' }).catch(fail)}/>
       )}
       {kanban && (
         <DailyKanbanModal boards={boards.some(b => b.id === kanban.boardId) ? boards : [...boards, ...initiativeList.filter(i => i.id === kanban.boardId)]}
@@ -739,3 +740,21 @@ export function DailyWorkspace() {
 }
 
 function nextMonthKey(key: string): string { const [y, m] = key.split('-').map(Number); return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`; }
+
+/** Janelinha de criar card ou Sub Tarefa a partir do registro (no lugar da caixa de texto do navegador). */
+function CreateFromEntry({ suggestion, what, where, onCancel, onCreate }: { suggestion: string; what: string; where: string; onCancel: () => void; onCreate: (title: string) => void }) {
+  const [title, setTitle] = useState(suggestion);
+  const ok = title.trim().length >= 5;
+  return (
+    <form style={{ padding: 12, display: 'grid', gap: 8 }} onSubmit={ev => { ev.preventDefault(); if (ok) onCreate(title.trim()); }}>
+      <b style={{ fontSize: 13 }}>Criar {what}</b>
+      <input autoFocus value={title} maxLength={180} onChange={ev => setTitle(ev.target.value)} aria-label="Título" onFocus={ev => ev.currentTarget.select()} />
+      {where && <span style={{ fontSize: 11.5, color: '#64748b' }}>Vai para {where}, já vinculado ao registro</span>}
+      {!ok && <span style={{ fontSize: 11.5, color: '#b45309' }}>O título precisa de pelo menos 5 letras.</span>}
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button type="button" className="cs-btn" onClick={onCancel}>Cancelar</button>
+        <button className="cs-btn pri" disabled={!ok}>Criar e vincular</button>
+      </div>
+    </form>
+  );
+}

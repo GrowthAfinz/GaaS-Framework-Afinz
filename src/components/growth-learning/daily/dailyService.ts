@@ -125,9 +125,11 @@ export interface DailyWork {
   parent_task_id?: string | null;
   /** completed_on = data de finalização (só quando concluída). */
   details?: Record<string, string> | null;
+  /** Projetos da Visão Daily em que o card mora. */
+  project_ids?: string[];
 }
 export interface DailyInitiative { id: string; title: string; workspace: string; source_note: string | null }
-const WORK_COLS = 'id,task_key,title,status,priority,owner_label,due_date,next_action,initiative_id,work_type,workspace,blocked_reason,revision,updated_at,parent_task_id,details';
+const WORK_COLS = 'id,task_key,title,status,priority,owner_label,due_date,next_action,initiative_id,work_type,workspace,blocked_reason,revision,updated_at,parent_task_id,details,project_ids';
 
 export async function loadWorks(): Promise<DailyWork[]> {
   const { data, error } = await supabase.from('growth_development_tasks').select(WORK_COLS).order('updated_at', { ascending: false }).limit(2000);
