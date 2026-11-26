@@ -7,10 +7,16 @@ import {
 
 const CHANNEL_COLORS: Record<string, string> = { 'E-mail': '#0891b2', SMS: '#6366f1', WhatsApp: '#16a34a' };
 const ORIGIN_COLORS: Record<LpOrigin, string> = { direto: '#94a3b8', sms: '#6366f1', whatsapp: '#16a34a', outros: '#cbd5e1' };
+/** Direto atribuído por hipótese: hachura na cor do canal. */
+const HYP_COLORS: Record<string, string> = {
+  smsHyp: 'repeating-linear-gradient(135deg,#6366f1 0 4px,#c7d2fe 4px 8px)',
+  whatsappHyp: 'repeating-linear-gradient(135deg,#16a34a 0 4px,#bbf7d0 4px 8px)',
+};
 const nf = (n: number) => n.toLocaleString('pt-BR');
 const pct = (n: number) => `${(n * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const dd = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
-const short = (n: number) => (n >= 1000 ? `${Math.round(n / 1000).toLocaleString('pt-BR')} mil` : nf(n));
+const short = (n: number) => (n >= 1000 ? `${Math.round(n / 1000).toLocaleString('pt-BR')} mil` : nf(Math.round(n)));
+const SERIES_LABEL: Record<string, string> = { direto: 'Direto (sem UTM)', sms: 'SMS', whatsapp: 'WhatsApp', outros: 'Outras origens', smsHyp: 'Direto como SMS (hipótese)', whatsappHyp: 'Direto como WhatsApp (hipótese)' };
 
 const Card: React.FC<{ kicker: string; title: string; description?: React.ReactNode; badge?: React.ReactNode; children: React.ReactNode }> = ({ kicker, title, description, badge, children }) => (
   <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -44,7 +50,8 @@ function days(start: string, end: string): string[] {
 }
 
 /** Comunicação (SFMC) e visitas (GA4) na mesma régua de dias, escalas separadas. */
-export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTrafficRow[]; lpFilters: LpFilters; lpBlocked: boolean; start: string; end: string; attribution?: React.ReactNode }> = ({ rows, traffic, lpFilters, lpBlocked, start, end, attribution }) => {
+export interface TimelineHypothesis { active: boolean; label: string; reassign: (day: string, o: Partial<Record<LpOrigin, number>>) => Record<string, number> }
+export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTrafficRow[]; lpFilters: LpFilters; lpBlocked: boolean; start: string; end: string; attribution?: React.ReactNode; hypothesis?: TimelineHypothesis }> = ({ rows, traffic, lpFilters, lpBlocked, start, end, attribution, hypothesis }) => {
   const axis = useMemo(() => days(start, end), [start, end]);
   const sfmc = useMemo(() => {
     const by = new Map<string, Record<string, number>>();
@@ -56,7 +63,11 @@ export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTraffi
     }
     return by;
   }, [rows]);
-  const lp = useMemo(() => sessionsByDayOrigin(traffic, lpFilters), [traffic, lpFilters]);
+  const lp = useMemo(() => {
+    const base = sessionsByDayOrigin(traffic, lpFilters);
+    if (!hypothesis?.active) return base as Map<string, Record<string, number>>;
+    return new Map([...base].map(([day, o]) => [day, hypothesis.reassign(day, o)]));
+  }, [traffic, lpFilters, hypothesis]);
   const sendDays = new Set(sfmc.keys());
   const max = (m: Map<string, Record<string, number>> | Map<string, Partial<Record<LpOrigin, number>>>) =>
     Math.max(1, ...[...m.values()].map((o) => Object.values(o).reduce<number>((a, b) => a + (b ?? 0), 0)));
@@ -72,7 +83,7 @@ export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTraffi
         const total = Object.values(o).reduce((a, b) => a + b, 0);
         return (
           <div key={d} className={`relative flex h-full flex-col-reverse ${sendDays.has(d) ? 'bg-cyan-50/70' : ''}`} title={total ? `${dd(d)} · ${label}: ${nf(total)}` : undefined}>
-            {Object.entries(o).map(([k, v]) => <div key={k} style={{ height: `${(v / top) * 85}%`, background: colors[k] ?? '#cbd5e1' }} title={`${k}: ${nf(v)}`} />)}
+            {Object.entries(o).map(([k, v]) => <div key={k} style={{ height: `${(v / top) * 85}%`, background: colors[k] ?? '#cbd5e1' }} title={`${SERIES_LABEL[k] ?? k}: ${nf(Math.round(v))}`} />)}
             {total > 0 && <span className="mb-0.5 text-center text-[9px] text-slate-500">{short(total)}</span>}
           </div>
         );
@@ -86,13 +97,11 @@ export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTraffi
         <div className="grid min-w-[720px] grid-cols-[110px_1fr] gap-x-3">
           <div className="flex flex-col justify-center text-xs font-bold text-slate-600">SFMC<span className="text-[10px] font-medium text-slate-400">entregues por canal</span></div>
           {lane(sfmc, sMax, CHANNEL_COLORS, 'entregues')}
-          <div className="col-span-2 my-2 flex items-center gap-2 text-[10px] font-semibold text-slate-600">
-            <span className="h-0.5 flex-1 bg-slate-400" /> Escalas independentes <span className="h-0.5 flex-1 bg-slate-400" />
-          </div>
+          <div className="col-span-2 my-2 h-px bg-slate-200" />
           <div className="flex flex-col justify-center text-xs font-bold text-slate-600">GA4<span className="text-[10px] font-medium text-slate-400">sessões por origem</span></div>
           {lpOff
             ? <div className="flex h-32 items-center justify-center border-b border-slate-200 text-xs text-slate-500">{lpBlocked ? 'O GA4 não identifica BU. A faixa da LP só aparece com Afinz + Plurix.' : 'Visita não tem grupo nem célula: com esses filtros a faixa de sessões fica vazia.'}</div>
-            : lane(lp as Map<string, Record<string, number>>, lMax, ORIGIN_COLORS, 'sessões')}
+            : lane(lp as Map<string, Record<string, number>>, lMax, { ...ORIGIN_COLORS, ...HYP_COLORS }, 'sessões')}
           <div />
           <div className="grid gap-1 pt-1 text-center text-[10px] text-slate-400" style={grid}>{axis.map((d) => <span key={d}>{dd(d)}</span>)}</div>
         </div>
@@ -101,6 +110,10 @@ export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTraffi
         {Object.entries(CHANNEL_COLORS).map(([k, c]) => <span key={k}><i className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={{ background: c }} />{k}</span>)}
         <span className="w-3" />
         {(Object.keys(ORIGIN_COLORS) as LpOrigin[]).map((k) => <span key={k}><i className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={{ background: ORIGIN_COLORS[k] }} />{LP_ORIGIN_LABELS[k]}</span>)}
+        {hypothesis?.active && <>
+          <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={{ background: HYP_COLORS.smsHyp }} />Direto como SMS (hipótese)</span>
+          <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-sm align-[-1px]" style={{ background: HYP_COLORS.whatsappHyp }} />Direto como WhatsApp (hipótese)</span>
+        </>}
       </div>
       {attribution && <div className="px-5 pb-3">{attribution}</div>}
       <p className="px-5 pb-4 text-[11px] text-slate-500">SFMC mede entregas da comunicação. GA4 mede sessões na LP. As duas faixas compartilham apenas a régua de datas.</p>
@@ -182,14 +195,14 @@ export const WhatsAppPiecesCard: React.FC<{ rows: PoolDispatchRow[] }> = ({ rows
   if (!dates.length) return null;
   const find = (d: string, a: string, g: string) => cells.find((c) => c.dims.date === d && c.dims.audience === a && c.dims.pieceGroup === g);
   return (
-    <Card kicker="SFMC · WhatsApp · lido do nome da peça" title="Peças de WhatsApp por público e grupo da peça" description="Entregues e % de leitura. O WhatsApp não informa clique." badge={<Pill tone="amber">derivado do nome</Pill>}>
+    <Card kicker="SFMC · WhatsApp · lido do nome da peça" title="Peças de WhatsApp por público e grupo da peça" description="Entregues e % de leitura. O WhatsApp não informa clique.">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-xs">
           <thead>
-            <tr className="bg-cyan-50/60 text-[10px] uppercase tracking-wide text-cyan-800"><th />{dates.map((d) => <th key={d} colSpan={4} className="px-3 py-1.5 text-center">{dd(d)}</th>)}</tr>
+            <tr className="bg-cyan-50/60 text-[10px] uppercase tracking-wide text-cyan-800"><th />{dates.map((d) => <th key={d} colSpan={4} className="border-l border-slate-300 px-3 py-1.5 text-center">{dd(d)}</th>)}</tr>
             <tr className="text-[10px] uppercase tracking-wide text-slate-500">
               <th className="px-3 py-2 text-left">Grupo da peça</th>
-              {dates.map((d) => <React.Fragment key={d}><th className="px-3 py-2 text-right">Inst. entregues</th><th className="px-3 py-2 text-right">Inst. % leitura</th><th className="px-3 py-2 text-right">Parc. entregues</th><th className="px-3 py-2 text-right">Parc. % leitura</th></React.Fragment>)}
+              {dates.map((d) => <React.Fragment key={d}><th className="border-l border-slate-300 px-3 py-2 text-right">Inst. entregues</th><th className="px-3 py-2 text-right">Inst. % leitura</th><th className="px-3 py-2 text-right">Parc. entregues</th><th className="px-3 py-2 text-right">Parc. % leitura</th></React.Fragment>)}
             </tr>
           </thead>
           <tbody>
@@ -198,9 +211,10 @@ export const WhatsAppPiecesCard: React.FC<{ rows: PoolDispatchRow[] }> = ({ rows
                 <td className="px-3 py-2 font-semibold text-slate-700">{g}</td>
                 {dates.map((d) => ['Institucional', 'Parceiro'].map((a) => {
                   const c = find(d, a, g);
+                  const sep = a === 'Institucional' ? 'border-l border-slate-300 ' : '';
                   return c
-                    ? <React.Fragment key={`${d}${a}`}><td className="px-3 py-2 text-right">{c.delivered.value === null ? '—' : nf(c.delivered.value)}</td><td className="px-3 py-2 text-right">{c.openRate === null ? '—' : pct(c.openRate)}</td></React.Fragment>
-                    : <React.Fragment key={`${d}${a}`}><td className="px-3 py-2 text-right text-slate-400">sem peça</td><td /></React.Fragment>;
+                    ? <React.Fragment key={`${d}${a}`}><td className={`${sep}px-3 py-2 text-right`}>{c.delivered.value === null ? '—' : nf(c.delivered.value)}</td><td className="px-3 py-2 text-right">{c.openRate === null ? '—' : pct(c.openRate)}</td></React.Fragment>
+                    : <React.Fragment key={`${d}${a}`}><td className={`${sep}px-3 py-2 text-right text-slate-400`}>sem peça</td><td /></React.Fragment>;
                 }))}
               </tr>
             ))}
