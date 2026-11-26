@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { aggregatePool, type PoolDispatchRow } from './poolVisaModel';
 import {
   LP_ORIGIN_LABELS, POOL_CELLS, POOL_GROUPS, POOL_GROUP_LABELS, cellExists, cellMatrix, isControlCell, offerRanking, sessionsByDayOrigin,
@@ -104,14 +104,18 @@ export const DualTimeline: React.FC<{ rows: PoolDispatchRow[]; traffic: LpTraffi
   );
 };
 
-const Bars: React.FC<{ items: { label: string; value: number }[]; total: number; color: string }> = ({ items, total, color }) => {
+interface BarItem { label: string; value: number; color?: string; onClick?: () => void; hint?: string }
+
+const Bars: React.FC<{ items: BarItem[]; total: number; color: string }> = ({ items, total, color }) => {
   const top = Math.max(1, ...items.map((i) => i.value));
   return (
     <div className="space-y-1.5">
       {items.map((i) => (
-        <div key={i.label} className="grid grid-cols-[150px_1fr_80px] items-center gap-3 text-xs">
-          <span className="truncate text-slate-700" title={i.label}>{i.label}</span>
-          <div className="h-3.5 overflow-hidden rounded bg-slate-100"><div className="h-full rounded" style={{ width: `${(i.value / top) * 100}%`, background: color }} /></div>
+        <div key={i.label} className="grid grid-cols-[170px_1fr_80px] items-center gap-3 text-xs">
+          {i.onClick
+            ? <button type="button" onClick={i.onClick} className="truncate text-left font-semibold text-cyan-700 underline decoration-dotted underline-offset-2 hover:text-cyan-900" title={i.hint ?? i.label}>{i.label}</button>
+            : <span className="truncate text-slate-700" title={i.hint ?? i.label}>{i.label}</span>}
+          <div className="h-3.5 overflow-hidden rounded bg-slate-100"><div className="h-full rounded" style={{ width: `${(i.value / top) * 100}%`, background: i.color ?? color }} /></div>
           <span className="text-right font-bold text-slate-800">{nf(i.value)} <span className="font-normal text-slate-400">{total ? pct(i.value / total) : ''}</span></span>
         </div>
       ))}
@@ -123,15 +127,20 @@ const prettyPartner = (s: string) => s.toLowerCase().replace(/_/g, ' ').replace(
 
 export const BrandRankingCard: React.FC<{ events: LpEventRow[]; lpFilters: LpFilters; lpBlocked: boolean }> = ({ events, lpFilters, lpBlocked }) => {
   const r = useMemo(() => offerRanking(events, lpFilters, 'brand'), [events, lpFilters]);
-  const items = r.items.slice(0, 8);
-  const rest = r.items.slice(8);
-  if (rest.length) items.push({ label: `Outras ${rest.length} marcas`, value: rest.reduce((s, i) => s + i.value, 0) });
-  if (r.undefinedCount) items.push({ label: 'Marca não definida', value: r.undefinedCount });
+  const [expanded, setExpanded] = useState(false);
+  const TOP = 8;
+  const rest = r.items.slice(TOP);
+  const items: BarItem[] = expanded || rest.length <= 1 ? [...r.items] : r.items.slice(0, TOP);
+  if (rest.length > 1 && !expanded) {
+    items.push({ label: `Outras ${rest.length} marcas ▸`, value: rest.reduce((s, i) => s + i.value, 0), onClick: () => setExpanded(true), hint: `Ver todas: ${rest.map((i) => i.label).join(', ')}` });
+  }
+  if (r.undefinedCount) items.push({ label: 'Marca não definida', value: r.undefinedCount, color: '#cbd5e1' });
   return (
     <Card kicker="LP · GA4 · clique_oferta" title="Marcas mais clicadas na LP" description={lpBlocked ? undefined : `${nf(r.total)} cliques em ofertas no recorte · contagem de eventos`} badge={<Pill tone="sky">sem posição</Pill>}>
       {lpBlocked ? <NoBu /> : (
         <div className="px-5 pb-4">
           {r.total ? <Bars items={items} total={r.total} color="#0891b2" /> : <p className="text-xs text-slate-500">Sem cliques em ofertas no recorte.</p>}
+          {expanded && rest.length > 1 && <button type="button" onClick={() => setExpanded(false)} className="mt-2 text-xs font-semibold text-cyan-700 underline decoration-dotted underline-offset-2 hover:text-cyan-900">◂ Agrupar as {rest.length} marcas menores</button>}
           <p className="mt-3 text-[11px] text-slate-500">A posição de cada marca na vitrine ainda não está no GaaS. Marca na posição 1 tende a receber mais clique, então o ranking ainda não mostra preferência.</p>
         </div>
       )}
@@ -142,12 +151,17 @@ export const BrandRankingCard: React.FC<{ events: LpEventRow[]; lpFilters: LpFil
 export const PartnerRankingCard: React.FC<{ events: LpEventRow[]; lpFilters: LpFilters; lpBlocked: boolean }> = ({ events, lpFilters, lpBlocked }) => {
   const r = useMemo(() => offerRanking(events, lpFilters, 'partner'), [events, lpFilters]);
   const withPartner = r.total - r.undefinedCount;
+  // Clique sem parceiro = público Institucional (sem cartão de parceiro), mostrado como uma barra própria.
+  const items: BarItem[] = [
+    ...(r.undefinedCount ? [{ label: 'Institucional (sem parceiro)', value: r.undefinedCount, color: '#94a3b8', hint: 'Cliques sem o parâmetro parceiro: público Institucional' }] : []),
+    ...r.items.map((i) => ({ label: prettyPartner(i.label), value: i.value })),
+  ].sort((a, b) => b.value - a.value);
   return (
-    <Card kicker="LP · GA4 · parâmetro parceiro" title="Parceiro do cartão nos cliques" description={lpBlocked ? undefined : `${nf(withPartner)} de ${nf(r.total)} cliques vieram com parceiro${r.total ? ` (${pct(withPartner / r.total)})` : ''}`} badge={<Pill tone="slate">não é BU</Pill>}>
+    <Card kicker="LP · GA4 · parâmetro parceiro" title="Parceiros x Clique" description={lpBlocked ? undefined : `${nf(r.total)} cliques em ofertas · ${nf(withPartner)} com parceiro${r.total ? ` (${pct(withPartner / r.total)})` : ''} e ${nf(r.undefinedCount)} do Institucional`} badge={<Pill tone="slate">não é BU</Pill>}>
       {lpBlocked ? <NoBu /> : (
         <div className="px-5 pb-4">
-          {r.items.length ? <Bars items={r.items.map((i) => ({ label: prettyPartner(i.label), value: i.value }))} total={withPartner} color="#7c6fd6" /> : <p className="text-xs text-slate-500">Nenhum clique com parceiro no recorte.</p>}
-          <p className="mt-3 text-[11px] text-slate-500">É o parceiro do cartão de quem clicou (público Parceiro). Não identifica a BU do disparo.</p>
+          {items.length ? <Bars items={items} total={r.total} color="#7c6fd6" /> : <p className="text-xs text-slate-500">Sem cliques em ofertas no recorte.</p>}
+          <p className="mt-3 text-[11px] text-slate-500">Parceiro é o parceiro do cartão de quem clicou; sem parceiro, o clique é do público Institucional. Percentuais sobre todos os cliques em ofertas. Não identifica a BU do disparo.</p>
         </div>
       )}
     </Card>
