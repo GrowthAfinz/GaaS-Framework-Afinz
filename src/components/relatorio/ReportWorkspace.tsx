@@ -92,10 +92,12 @@ export function ReportWorkspaceHeader({
   description,
   actions,
   summaryStrip,
+  extraView,
   views = REPORT_VIEWS.map((option) => option.key),
 }: {
   title: string;
-  view: ReportView;
+  view: ReportView | null;
+  extraView?: ReactNode;
   onViewChange: (view: ReportView) => void;
   description?: ReactNode;
   actions?: ReactNode;
@@ -135,6 +137,7 @@ export function ReportWorkspaceHeader({
                     {option.label}
                   </button>
                 ))}
+                {extraView}
               </nav>
             </div>
             {description && (
