@@ -44,6 +44,8 @@ interface SidebarProps {
   /** Seções fixas do GaaS, iguais para o time (ex.: Frentes). "top" vem antes de Páginas, "bottom" depois. */
   sections?: { title: string; pageIds: string[]; placement: 'top' | 'bottom'; defaultExpanded?: boolean }[];
   /** Seção com itens que não são páginas do espaço (ex.: Páginas IA, que vêm das tabelas dos agentes). Fica por último, recolhida. */
+  /** Número ao lado da página na barra (ex.: cards abertos de cada página de frente). */
+  pageBadges?: Record<string, number>;
   virtualSection?: { title: string; items: { id: string; icon: string; title: string; count?: number; indent?: boolean }[]; activeId: string | null; onSelect: (id: string) => void };
 }
 
@@ -67,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenTrash,
   sections = [],
   virtualSection,
+  pageBadges,
 }) => {
   const fixedIds = new Set(sections.flatMap((s) => s.pageIds));
   const [expandedPages, setExpandedPages] = useState<Record<string, boolean>>({});
@@ -123,6 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {page.icon && <span className="shrink-0 text-xs" aria-hidden="true">{page.icon}</span>}
             <span className="truncate">{page.title || 'Sem título'}</span>
+            {pageBadges?.[page.id] != null && <span className="ml-auto shrink-0 pl-1 text-[11px] tabular-nums text-[var(--notion-text-muted)] group-hover:hidden">{pageBadges[page.id]}</span>}
           </div>
 
           {/* Hover actions */}

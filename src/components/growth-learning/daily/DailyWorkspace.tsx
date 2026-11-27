@@ -718,7 +718,7 @@ export function DailyWorkspace() {
           b2c={b2c.get(dayModal.day)} crm={crm.get(dayModal.day) || []} canEdit={canEdit}
           onClose={closeDay} onDay={openDay} onFocus={pid => setPin({ day: dayModal.day, projectId: pid })}
           onKanban={openKanban} onOpenProject={id => setDrawer(id)}
-          onLinkWork={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })} onCreateWork={(e, el) => setPop({ kind: 'create', entryId: e.id, parentId: null, anchor: anchorOf(el) })}  onOpenTask={id => setTaskOpen(id)} onCheckWork={wk => saveWorkFromBoard(wk, { status: 'concluida' }).catch(fail)}/>
+          onLinkWork={(e, el) => setPop({ kind: 'work', entryId: e.id, anchor: anchorOf(el) })} onCreateWork={(e, el) => setPop({ kind: 'create', entryId: e.id, parentId: null, anchor: anchorOf(el) })}  onOpenTask={id => setTaskOpen(id)} onCheckWork={wk => saveWorkFromBoard(wk, { status: 'concluida' }).catch(fail)} onAddEntry={(d, el) => openAdd(d, el)}/>
       )}
       {kanban && (
         <DailyKanbanModal boards={boards.some(b => b.id === kanban.boardId) ? boards : [...boards, ...initiativeList.filter(i => i.id === kanban.boardId)]}

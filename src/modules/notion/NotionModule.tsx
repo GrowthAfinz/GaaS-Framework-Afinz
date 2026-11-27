@@ -631,6 +631,13 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setSearchOpen]);
 
+  /** Cards abertos de cada página de frente, ao lado do nome na barra lateral. */
+  const sidebarBadges = useMemo(() => {
+    const open = [...ctx.tasks.values()].filter(t => !t.parent_task_id && t.status !== 'concluida' && t.status !== 'cancelada');
+    const out: Record<string, number> = {};
+    for (const pg of Object.values(workspace.pages)) if (pg.databaseId === TASKS_DB && (pg.taskFronts || []).length) out[pg.id] = open.filter(t => (pg.taskFronts || []).includes(String(t.front_key || ''))).length;
+    return out;
+  }, [ctx.tasks, workspace.pages]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Registros da Visão Daily ligados a cada card (o do card e os das Sub Tarefas), para o selo "Daily" do Quadro. */
   const [dailyPulse, setDailyPulse] = useState<Map<string, DailyPulse>>(new Map());
   useEffect(() => {
@@ -692,10 +699,12 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
             users={users}
             onUpdateRow={updateRow}
             onAddRow={(id, props = {}) => addRow(id, props.p_frente || !scope.length ? props : { ...props, p_frente: scope[0] })}
-            quickFilter={{ propertyId: 'p_frente', hiddenByDefault: [], scope, storageKey: `gaas.notion.chips.${ctx.me || 'anon'}.${!pageId || pageId === TASKS_PAGE ? databaseId : pageId}` }}
+            quickFilter={single && page?.taskFronts?.length
+              ? { propertyId: 'p_projeto', hiddenByDefault: [], scope: ctx.projects.filter(pr => !pr.archived && (page.taskFronts || []).includes(pr.frente_key)).map(pr => pr.name), storageKey: `gaas.notion.chips.proj.${ctx.me || 'anon'}.${pageId}` }
+              : { propertyId: 'p_frente', hiddenByDefault: [], scope, storageKey: `gaas.notion.chips.${ctx.me || 'anon'}.${!pageId || pageId === TASKS_PAGE ? databaseId : pageId}` }}
             calendarExtraRows={subtaskCalendarRows(page?.taskFronts || [])}
             cardFooter={taskCardFooter}
-            cardHides={['p_subtarefas', 'p_prazo']}
+            cardHides={['p_subtarefas', 'p_prazo', ...(single ? ['p_frente'] : [])]}
             onDeleteRow={deleteRow}
             onAddProperty={addDatabaseProperty}
             onSetView={(_db, viewId) => setViewByPage(prev => ({ ...prev, [viewKey]: viewId }))}
@@ -809,6 +818,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       {/* Sidebar Navigation */}
       <Sidebar
         workspace={workspace}
+        pageBadges={sidebarBadges}
         activePageId={aiSection ? '' : activePage.id}
         users={users}
         activeUserId={activeUser.id}
@@ -882,10 +892,11 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
               onAddBlock={addBlock}
               onMoveBlock={moveBlock}
               renderDatabase={renderDatabase}
+              compactEnd={activePage.id === 'page_inicio'}
             />
           )}
           {activePage.id === 'page_inicio' && (
-            <TasksHome tasks={[...ctx.tasks.values()]} projects={ctx.projects} me={ctx.me}
+            <TasksHome tasks={[...ctx.tasks.values()]} projects={ctx.projects} me={ctx.me} frontColors={new Map(ctx.fronts.map(f => [f.key, f.color]))}
               pages={Object.values(workspace.pages).filter(pg => pg.databaseId === TASKS_DB && (pg.taskFronts || []).length && !pg.isArchived)
                 .sort((x, y) => Number((x.taskFronts || []).includes(GAAS_FRONT)) - Number((y.taskFronts || []).includes(GAAS_FRONT)))}
               creditBasesPage={Object.values(workspace.pages).find(pg => pg.title === CREDIT_BASES_TITLE && !pg.isArchived)}

@@ -129,9 +129,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const qfLockedByView = Boolean(quickFilter && (currentView.filters || []).some((f) => f.propertyId === quickFilter.propertyId));
   const qfActive = Boolean(qfProp) && !qfLockedByView;
   // Valor fora da lista (ex.: frente arquivada) cai em "Sem frente" para a tarefa nunca sumir.
-  const qfValue = (r: DatabaseRow) => { const v = String(r.properties[quickFilter?.propertyId || ''] || ''); return v && qfOptions.includes(v) ? v : EMPTY; };
+  // Valor de seleção múltipla (ex.: Projeto) conta em cada opção que a linha tiver.
+  const qfValues = (r: DatabaseRow): string[] => { const raw = r.properties[quickFilter?.propertyId || '']; const vs = (Array.isArray(raw) ? raw.map(String) : [String(raw || '')]).filter(v => v && qfOptions.includes(v)); return vs.length ? vs : [EMPTY]; };
   const filteredRows = useMemo(
-    () => (qfActive ? viewRows.filter((r) => qfSelected.includes(qfValue(r))) : viewRows),
+    () => (qfActive ? viewRows.filter((r) => qfValues(r).some(v => qfSelected.includes(v))) : viewRows),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [viewRows, qfActive, qfSelected.join('|')]
   );
@@ -139,10 +140,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   const calendarExtras = useMemo(() => {
     if (!calendarExtraRows?.length) return [];
     const rows = applyView(calendarExtraRows, currentView, database.properties, users, searchQuery);
-    return qfActive ? rows.filter((r) => qfSelected.includes(qfValue(r))) : rows;
+    return qfActive ? rows.filter((r) => qfValues(r).some(v => qfSelected.includes(v))) : rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarExtraRows, currentView, database.properties, users, searchQuery, qfActive, qfSelected.join('|')]);
-  const qfCount = (name: string) => viewRows.filter((r) => qfValue(r) === name).length;
+  const qfCount = (name: string) => viewRows.filter((r) => qfValues(r).includes(name)).length;
   const qfToggle = (name: string, only: boolean) =>
     setQfSel(only ? [name] : qfSelected.includes(name) ? qfSelected.filter((n) => n !== name) : [...qfSelected, name]);
   const addRowWithQuick = (props: Record<string, any> = {}) => {
