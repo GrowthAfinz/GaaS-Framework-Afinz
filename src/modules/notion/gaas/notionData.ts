@@ -3,12 +3,15 @@ import { supabase } from '../../../services/supabaseClient';
 import { loadWorkspace, saveWork } from '../../../components/growth-learning/development/workService';
 import { subtaskProgress, type Initiative, type WorkItem } from '../../../components/growth-learning/development/workModel';
 import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, NotionUser, NotionWorkspace } from '../types/notion';
-import { TASKS_DB, TASKS_PAGE, type TaskPageDef, taskPageDefs, taskScopePage, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, type PartnerRef, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
+import { withPartnerOptions } from './creditBases';
+import { TASKS_DB, TASKS_PAGE, type TaskPageDef, taskPageDefs, taskScopePage, type BusinessFront, type BoardCampaignRef, type DailyProjectRef, type PartnerRef, notionColor, extraProps, storedExtra, rowPatch, systemProperties, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow, tasksDatabase } from './tasksAdapter';
 
 export interface NotionContext {
   me: string | null; canEditTasks: boolean; tasks: Map<string, WorkItem>; initiatives: Initiative[]; fronts: BusinessFront[]; projects: DailyProjectRef[];
   /** Páginas da base Tarefas presas a frentes (geradas das frentes da Visão Daily, fixas na lateral). */
   taskPages: TaskPageDef[];
+  /** BU/parceiro da Visão Daily (daily_partners), com a chave e o hex de origem. */
+  partners: PartnerRef[];
 }
 export interface Loaded { workspace: NotionWorkspace; ctx: NotionContext; seeded: boolean }
 
@@ -46,7 +49,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
     supabase.from('daily_frentes').select('key,name,color,archived,position').order('position'),
     supabase.from('daily_projects').select('id,name,frente_key,initiative_id,archived,structure_card_id').order('name'),
     supabase.from('crm_structure_cards').select('id,title').eq('archived', false).order('title'),
-    supabase.from('daily_partners').select('key,name,color,archived').order('position'),
+    supabase.from('daily_partners').select('key,name,color,archived,position').order('position'),
   ]);
   const err = pages.error || blocks.error || dbs.error || rows.error || meta.error;
   if (err) throw err;
@@ -84,7 +87,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
   const databases: Record<string, NotionDatabase> = { [TASKS_DB]: tasksDatabase(props, taskRows, storedTasksDb) };
   for (const d of dbs.data || []) {
     if (d.id === TASKS_DB) continue;
-    databases[d.id] = { ...(d.data as NotionDatabase), rows: (rows.data || []).filter(r => r.database_id === d.id).map(r => r.data as DatabaseRow) };
+    databases[d.id] = withPartnerOptions({ ...(d.data as NotionDatabase), rows: (rows.data || []).filter(r => r.database_id === d.id).map(r => r.data as DatabaseRow) }, partners.map(p => ({ ...p, color: notionColor(p.color) })));
   }
   if (!pageMap[TASKS_PAGE]) pageMap[TASKS_PAGE] = seedPages().pages[1];
   // Páginas por frente: geradas a cada carga; o que foi guardado (título, ícone) fica por cima.
@@ -102,7 +105,7 @@ export async function loadNotion(me: string | null): Promise<Loaded> {
     favoritePageIds: readLocal<string[]>(favKey(me), [TASKS_PAGE]).filter(id => pageMap[id]),
     activePageId: pageMap[active] ? active : TASKS_PAGE,
   };
-  return { workspace, ctx: { me, canEditTasks: work.canEdit, tasks, initiatives: work.initiatives, fronts, projects, taskPages }, seeded };
+  return { workspace, ctx: { me, canEditTasks: work.canEdit, tasks, initiatives: work.initiatives, fronts, projects, taskPages, partners }, seeded };
 }
 
 /* ---------- foto e diferença ---------- */

@@ -30,7 +30,7 @@ import type { Block, DatabaseRow, NotionColor, NotionDatabase, NotionPage, Notio
 import { generateId } from './utils/id';
 import { createTask, diff, loadNotion, pushChanges, saveLocalPrefs, saveTask, snapshot, type NotionContext, type Snapshot } from './gaas/notionData';
 import { readTone, saveTone, type NotionTone } from './gaas/tones';
-import { SDD_PAGE, GAAS_FRONT, GAAS_FRONT_NAME, SYNCED_PROPS, SYSTEM_PROP_IDS, TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, notionColor, workspaceOfFront, extraProps, frontOfProject, rowPatch, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
+import { SDD_PAGE, GAAS_FRONT, GAAS_FRONT_NAME, SYNCED_PROPS, SYSTEM_PROP_IDS, TASKS_DB, TASKS_PAGE, type BusinessFront, type DailyProjectRef, type PartnerRef, hexOfNotion, notionColor, workspaceOfFront, extraProps, frontOfProject, rowPatch, taskBlocks, taskIdOfRow, taskPage, taskRowId, taskToRow } from './gaas/tasksAdapter';
 import './notion.css';
 import 'katex/dist/katex.min.css';
 
@@ -286,10 +286,75 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       if (/name_taken/.test(m)) throw new Error('Já existe um item com esse nome.');
       if (/name_required/.test(m)) throw new Error('O nome precisa de pelo menos 2 letras.');
       if (/access_denied|permission/.test(m)) throw new Error('Seu acesso não permite criar aqui.');
+      if (/project_name_taken/.test(m)) throw new Error('Já existe um projeto com esse nome.');
+      if (/revision_conflict/.test(m)) throw new Error('Alguém mudou isso agora há pouco. Recarregue e tente de novo.');
       throw new Error(fallback);
     };
+    /* Opções que vêm de outra tela: a mudança grava lá e aparece na Visão Daily, no quadro e nas Bases. */
+    type Kind = 'frente' | 'partner' | 'project' | 'initiative';
+    const kindOf = (dbId: string, propId: string): Kind | null => {
+      if (isCreditBases(dbId)) return propId === 'prop_partner' && ctx.partners.length ? 'partner' : null;
+      if (dbId !== TASKS_DB) return null;
+      return propId === 'p_frente' ? 'frente' : propId === 'p_parceiro' ? 'partner' : propId === 'p_projeto' ? 'project' : propId === 'p_iniciativa' ? 'initiative' : null;
+    };
+    const optionOf = (dbId: string, propId: string, optionId: string) =>
+      latest.current.databases[dbId]?.properties.find(p => p.id === propId)?.options?.find(o => o.id === optionId);
+    /** Tipo da opção só quando ela existe na origem (opção antiga das Bases fica local). */
+    const linkedKind = (dbId: string, propId: string, optionId: string): Kind | null => {
+      const kind = kindOf(dbId, propId);
+      if (kind === 'frente') return ctx.fronts.some(f => f.key === optionId) ? kind : null;
+      if (kind === 'partner') return ctx.partners.some(f => f.key === optionId) ? kind : null;
+      if (kind === 'project') return ctx.projects.some(f => f.id === optionId) ? kind : null;
+      if (kind === 'initiative') return ctx.initiatives.some(f => f.id === optionId) ? kind : null;
+      return null;
+    };
+    /** Toda propriedade que mostra a mesma lista: o parceiro aparece nas Tarefas e em cada Bases de Crédito. */
+    const targetsOf = (dbId: string, propId: string): [string, string][] => {
+      if (kindOf(dbId, propId) !== 'partner') return [[dbId, propId]];
+      const all: [string, string][] = [[TASKS_DB, 'p_parceiro'], ...Object.keys(latest.current.databases).filter(isCreditBases).map(id => [id, 'prop_partner'] as [string, string])];
+      return all.filter(([d]) => latest.current.databases[d]);
+    };
+    const hasValue = (v: unknown, name: string) => (Array.isArray(v) ? v.includes(name) : v === name);
+    const usesOf = (dbId: string, propId: string, name: string) =>
+      targetsOf(dbId, propId).reduce((n, [d, p]) => n + (latest.current.databases[d]?.rows || []).filter(r => hasValue(r.properties[p], name)).length, 0);
+    const renamed = (v: unknown, from: string, to: string): unknown =>
+      (v === from ? to : Array.isArray(v) && v.includes(from) ? v.map(x => (x === from ? to : x)) : v);
+    const renameIn = (db: NotionDatabase, propId: string, from: string, to: string): NotionDatabase => (from === to ? db : {
+      ...db,
+      rows: db.rows.map(r => { const v = r.properties[propId], n = renamed(v, from, to); return n === v ? r : { ...r, properties: { ...r.properties, [propId]: n } }; }),
+      views: db.views.map(view => ({ ...view, filters: (view.filters || []).map(f => (f.propertyId === propId && f.value === from ? { ...f, value: to } : f)) })),
+    });
+    /** Nas Tarefas o nome novo entra também na foto salva: a tarefa guarda a chave, que não mudou, então nada vai para o banco. */
+    const rebaseRename = (propId: string, from: string, to: string) => {
+      if (from === to) return;
+      for (const [key, row] of baseline.current.rowObjs) {
+        if (!key.startsWith(TASKS_DB + '|')) continue;
+        const v = row.properties[propId], n = renamed(v, from, to);
+        if (n === v) continue;
+        const next = { ...row, properties: { ...row.properties, [propId]: n } };
+        baseline.current.rowObjs.set(key, next); baseline.current.rows.set(key, JSON.stringify(next));
+      }
+    };
+    const readProjectRevision = async (id: string): Promise<number> => {
+      const { data, error } = await supabase.from('daily_projects').select('revision').eq('id', id).single();
+      if (error || !data) return fail(error, 'Não foi possível ler o projeto.');
+      return (data as { revision: number }).revision;
+    };
     return {
-      lockOf: (dbId, propId) => (dbId !== TASKS_DB ? null : SYNCED_PROPS.has(propId) ? 'synced' : SYSTEM_PROP_IDS.has(propId) ? 'fixed' : null),
+      lockOf: (dbId, propId) => (isCreditBases(dbId) ? (kindOf(dbId, propId) ? 'synced' : null) : dbId !== TASKS_DB ? null : SYNCED_PROPS.has(propId) ? 'synced' : SYSTEM_PROP_IDS.has(propId) ? 'fixed' : null),
+      optionCaps: (dbId, propId, optionId) => {
+        const option = optionOf(dbId, propId, optionId);
+        const uses = option ? usesOf(dbId, propId, option.name) : 0;
+        if (dbId === TASKS_DB && SYSTEM_PROP_IDS.has(propId)) return { rename: false, color: false, reorder: false, remove: null, uses, removeBlock: 'Lista fixa do GaaS.' };
+        if (optionId === GAAS_FRONT && kindOf(dbId, propId) === 'frente') return { rename: false, color: false, reorder: false, remove: null, uses, removeBlock: 'A frente GaaS é do sistema.' };
+        const kind = linkedKind(dbId, propId, optionId);
+        if (!kind) return { rename: true, color: true, reorder: true, remove: 'excluir', uses };
+        const inUse = uses ? `Em uso em ${uses} ${uses === 1 ? 'item' : 'itens'}: troque antes de arquivar.` : undefined;
+        if (kind === 'frente') return { rename: true, color: true, reorder: true, remove: inUse ? null : 'arquivar', uses, removeBlock: inUse, syncNote: 'Muda também na Visão Daily e no quadro.' };
+        if (kind === 'partner') return { rename: true, color: true, reorder: true, remove: inUse ? null : 'arquivar', uses, removeBlock: inUse, syncNote: 'Muda também na Visão Daily, no quadro e nas Bases de Crédito.' };
+        if (kind === 'project') return { rename: true, color: false, reorder: false, remove: inUse ? null : 'arquivar', uses, removeBlock: inUse, syncNote: 'Muda também na Visão Daily. A cor vem da frente.' };
+        return { rename: ctx.canEditTasks, color: false, reorder: false, remove: null, uses, removeBlock: 'Arquive a iniciativa na aba Iniciativas.', syncNote: 'Muda também na aba Iniciativas.' };
+      },
       createOption: async (dbId, propId, name, rowId) => {
         const prop = latest.current.databases[dbId]?.properties.find(p => p.id === propId);
         if (!prop) return null;
@@ -305,11 +370,12 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           pushOption(dbId, propId, { id: f.key, name: f.name, color: notionColor(f.color) }, GAAS_FRONT);
           return f.name;
         }
-        if (dbId === TASKS_DB && propId === 'p_parceiro') {
+        if (kindOf(dbId, propId) === 'partner') {
           const { data, error } = await supabase.rpc('gaas_daily_save_option', { p_kind: 'partner', p_key: null, p_body: { name } });
           if (error) fail(error, 'Não foi possível criar o BU/parceiro.');
-          const partner = data as { key: string; name: string; color: string };
-          pushOption(dbId, propId, { id: partner.key, name: partner.name, color: notionColor(partner.color) });
+          const partner = data as PartnerRef;
+          ctx.partners.push(partner);
+          for (const [d, p] of targetsOf(dbId, propId)) pushOption(d, p, { id: partner.key, name: partner.name, color: notionColor(partner.color) });
           return partner.name;
         }
         if (dbId === TASKS_DB && propId === 'p_projeto') {
@@ -339,56 +405,97 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
         pushOption(dbId, propId, { id: 'opt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, color: colors[(prop.options || []).length % colors.length] });
         return name;
       },
-      editOption: (dbId, propId, optionId, changes) =>
-        patchDb(dbId, db => {
-          const property = db.properties.find(p => p.id === propId);
-          const options = [...(property?.options || [])];
-          const index = options.findIndex(option => option.id === optionId);
-          if (!property || index === -1 || (dbId === TASKS_DB && SYSTEM_PROP_IDS.has(propId))) return db;
-          const option = options[index];
-          const name = changes.name?.trim() ?? option.name;
-          if (!name || options.some(other => other.id !== optionId && other.name.toLowerCase() === name.toLowerCase())) {
-            return db;
+      editOption: async (dbId, propId, optionId, changes) => {
+        if (dbId === TASKS_DB && SYSTEM_PROP_IDS.has(propId)) return;
+        const options = latest.current.databases[dbId]?.properties.find(p => p.id === propId)?.options || [];
+        const index = options.findIndex(o => o.id === optionId);
+        if (index < 0) return;
+        const option = options[index];
+        const name = (changes.name ?? option.name).trim().replace(/\s+/g, ' ');
+        if (!name) throw new Error('O nome não pode ficar vazio.');
+        if (options.some(o => o.id !== optionId && o.name.toLowerCase() === name.toLowerCase())) throw new Error('Já existe uma opção com esse nome.');
+        const color = changes.color ?? option.color;
+        const target = Math.max(0, Math.min(options.length - 1, changes.index ?? index + (changes.offset ?? 0)));
+        const order = options.filter(o => o.id !== optionId);
+        order.splice(target, 0, { ...option, name, color });
+        const kind = linkedKind(dbId, propId, optionId);
+        if (kind === 'frente' || kind === 'partner') {
+          const table: { key: string; name: string; color: string }[] = kind === 'frente' ? ctx.fronts : ctx.partners;
+          const src = table.find(x => x.key === optionId)!;
+          const body: Record<string, unknown> = {};
+          if (name !== option.name) body.name = name;
+          if (color !== option.color) body.color = hexOfNotion(color);
+          if (Object.keys(body).length) {
+            const { error } = await supabase.rpc('gaas_daily_save_option', { p_kind: kind, p_key: src.key, p_body: body });
+            if (error) return fail(error, 'Não foi possível salvar a mudança.');
+            src.name = name; if (typeof body.color === 'string') src.color = body.color;
           }
-          options[index] = { ...option, name, color: changes.color ?? option.color };
-          const target = index + (changes.offset ?? 0);
-          if (target >= 0 && target < options.length && target !== index) {
-            [options[index], options[target]] = [options[target], options[index]];
+          if (target !== index) {
+            const keys = order.map(o => o.id).filter(id => table.some(x => x.key === id));
+            const results = await Promise.all(keys.map((key, i) => supabase.rpc('gaas_daily_save_option', { p_kind: kind, p_key: key, p_body: { position: i + 1 } })));
+            const bad = results.find(r => r.error);
+            if (bad?.error) return fail(bad.error, 'Não foi possível salvar a nova ordem.');
           }
-          return {
-            ...db,
-            properties: db.properties.map(p => p.id === propId ? { ...p, options } : p),
-            rows: name === option.name ? db.rows : db.rows.map(row => {
-              const value = row.properties[propId];
-              if (value === option.name) return { ...row, properties: { ...row.properties, [propId]: name } };
-              if (Array.isArray(value) && value.includes(option.name)) {
-                return { ...row, properties: { ...row.properties, [propId]: value.map(item => item === option.name ? name : item) } };
-              }
-              return row;
-            }),
-            views: name === option.name ? db.views : db.views.map(view => ({
-              ...view, filters: (view.filters || []).map(filter =>
-                filter.propertyId === propId && filter.value === option.name ? { ...filter, value: name } : filter),
-            })),
-          };
-        }),
-      removeOption: (dbId, propId, optionId) =>
-        patchDb(dbId, db => {
-          const name = db.properties.find(p => p.id === propId)?.options?.find(o => o.id === optionId)?.name;
-          return {
+        } else if (kind === 'project' && name !== option.name) {
+          const revision = await readProjectRevision(optionId);
+          const { error } = await supabase.rpc('gaas_daily_save_project', { p_id: optionId, p_revision: revision, p_body: { name } });
+          if (error) return fail(error, 'Não foi possível renomear o projeto.');
+          const project = ctx.projects.find(x => x.id === optionId); if (project) project.name = name;
+        } else if (kind === 'initiative' && name !== option.name) {
+          if (!ctx.canEditTasks) throw new Error('Renomear iniciativas requer acesso de edição.');
+          const initiative = ctx.initiatives.find(x => x.id === optionId)!;
+          try { Object.assign(initiative, await saveInitiative({ ...initiative, title: name })); } catch (e) { return fail(e, 'Não foi possível renomear a iniciativa.'); }
+        }
+        // Projeto pega a cor da frente: trocar a cor da frente repinta os projetos dela.
+        const recolor = kind === 'frente' && color !== option.color ? new Set(ctx.projects.filter(p => p.frente_key === optionId).map(p => p.id)) : null;
+        for (const [d, p] of targetsOf(dbId, propId)) {
+          patchDb(d, db => {
+            const own = d === dbId && p === propId;
+            const properties = db.properties.map(x => {
+              if (x.id === p) return { ...x, options: own ? order : (x.options || []).map(o => (o.id === optionId ? { ...o, name, color } : o)) };
+              if (recolor && x.id === 'p_projeto') return { ...x, options: (x.options || []).map(o => (recolor.has(o.id) ? { ...o, color } : o)) };
+              return x;
+            });
+            return renameIn({ ...db, properties }, p, option.name, name);
+          });
+          if (d === TASKS_DB) rebaseRename(p, option.name, name);
+        }
+      },
+      removeOption: async (dbId, propId, optionId) => {
+        const option = optionOf(dbId, propId, optionId);
+        if (!option) return;
+        const kind = linkedKind(dbId, propId, optionId);
+        if (!kind) {
+          patchDb(dbId, db => ({
             ...db,
             properties: db.properties.map(p => (p.id === propId ? { ...p, options: (p.options || []).filter(o => o.id !== optionId) } : p)),
-            views: db.views.map(view => ({
-              ...view, filters: (view.filters || []).filter(filter => filter.propertyId !== propId || filter.value !== name),
-            })),
+            views: db.views.map(view => ({ ...view, filters: (view.filters || []).filter(f => f.propertyId !== propId || f.value !== option.name) })),
             rows: db.rows.map(r => {
               const v = r.properties[propId];
-              if (Array.isArray(v) && v.includes(name)) return { ...r, properties: { ...r.properties, [propId]: v.filter(x => x !== name) } };
-              if (v === name) return { ...r, properties: { ...r.properties, [propId]: '' } };
+              if (Array.isArray(v) && v.includes(option.name)) return { ...r, properties: { ...r.properties, [propId]: v.filter(x => x !== option.name) } };
+              if (v === option.name) return { ...r, properties: { ...r.properties, [propId]: '' } };
               return r;
             }),
-          };
-        }),
+          }));
+          return;
+        }
+        if (kind === 'initiative' || optionId === GAAS_FRONT) throw new Error(kind === 'initiative' ? 'Arquive a iniciativa na aba Iniciativas.' : 'A frente GaaS é do sistema.');
+        const uses = usesOf(dbId, propId, option.name);
+        if (uses) throw new Error(`Em uso em ${uses} ${uses === 1 ? 'item' : 'itens'}: troque antes de arquivar.`);
+        if (kind === 'project') {
+          const revision = await readProjectRevision(optionId);
+          const { error } = await supabase.rpc('gaas_daily_save_project', { p_id: optionId, p_revision: revision, p_body: { archived: true } });
+          if (error) return fail(error, 'Não foi possível arquivar o projeto.');
+          const project = ctx.projects.find(x => x.id === optionId); if (project) project.archived = true;
+        } else {
+          const { error } = await supabase.rpc('gaas_daily_save_option', { p_kind: kind, p_key: optionId, p_body: { archived: true } });
+          if (error) return fail(error, 'Não foi possível arquivar.');
+          const src = (kind === 'frente' ? ctx.fronts : ctx.partners).find(x => x.key === optionId); if (src) src.archived = true;
+        }
+        for (const [d, p] of targetsOf(dbId, propId)) {
+          patchDb(d, db => ({ ...db, properties: db.properties.map(x => (x.id === p ? { ...x, options: (x.options || []).filter(o => o.id !== optionId) } : x)) }));
+        }
+      },
       createPerson: async name => {
         const { data, error } = await supabase.rpc('gaas_work_save_person', { p_id: null, p_revision: null, p_body: { name } });
         if (error) fail(error, /person_name_taken/.test(error.message) ? 'Já existe alguém com esse nome na lista.' : 'Não foi possível adicionar a pessoa.');
@@ -416,7 +523,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     };
   }, [ctx, patchDb, pushOption]);
   useEffect(() => {
-    if (activePage) patchWorkspace(prev => configureCreditBases(prev, activePage.id));
+    if (activePage) patchWorkspace(prev => configureCreditBases(prev, activePage.id, ctx.partners.map(p => ({ ...p, color: notionColor(p.color) }))));
   }, [activePage, patchWorkspace]);
 
   // Peak Modal State for clicking any card/row in a database

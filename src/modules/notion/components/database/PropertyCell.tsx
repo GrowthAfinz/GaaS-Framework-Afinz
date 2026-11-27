@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { CellPopover } from './CellPopover';
 import { useNotionEdit } from './editContext';
+import { OptionList } from './OptionList';
 import { DatabaseProperty, NotionColor, NotionUser } from '../../types/notion';
 
 interface PropertyCellProps {
@@ -272,30 +273,14 @@ const OptionsMenu: React.FC<{
           className="w-full px-2 py-1 mb-1 rounded border border-[var(--notion-border)] bg-transparent focus:outline-none text-[var(--notion-text)]"
         />
         <div className="max-h-60 overflow-y-auto">
-          {shown.map((opt) => (
-            <div key={opt.id} className="group/opt flex items-center justify-between w-full rounded hover:bg-[var(--notion-hover)]">
-              <button onClick={() => onPick(opt.name)} className="flex-1 flex items-center justify-between px-2 py-1 text-left min-w-0">
-                <span className={`px-2 py-0.5 rounded truncate ${COLOR_CLASSES[opt.color]}`}>{opt.name}</span>
-                {selected.includes(opt.name) && <Check size={12} className="text-blue-500 shrink-0" />}
-              </button>
-              {lock === null && databaseId && (
-                <button
-                  onClick={() => { if (window.confirm(`Remover a opção "${opt.name}"? Os itens que usam ela ficam vazios.`)) edit.removeOption(databaseId, property.id, opt.id); }}
-                  className="opacity-0 group-hover/opt:opacity-100 p-1 mr-1 rounded text-[var(--notion-text-muted)] hover:text-red-500"
-                  title="Remover opção"
-                >
-                  <X size={11} />
-                </button>
-              )}
-            </div>
-          ))}
+          <OptionList databaseId={databaseId} property={property} options={shown} selected={selected} canDrag={!q.trim()} onPick={onPick} />
           {canCreate && (
             <button onClick={() => void create()} disabled={busy} className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded hover:bg-[var(--notion-hover)] text-left disabled:opacity-50">
               <Plus size={12} />
               <span>{busy ? 'Criando…' : <>Criar <b>{q.trim()}</b></>}</span>
             </button>
           )}
-          {!shown.length && !canCreate && <div className="px-2 py-1.5 text-[var(--notion-text-muted)]">{lock === 'fixed' ? 'Lista fixa: não aceita opção nova.' : 'Nenhuma opção.'}</div>}
+          {!shown.length && !canCreate && <div className="px-2 py-1.5 text-[var(--notion-text-muted)]">{lock === 'fixed' ? 'Lista fixa: não aceita opção nova.' : options.length ? 'Nenhuma opção com esse nome.' : 'Digite acima para criar a primeira opção.'}</div>}
           {lock === 'synced' && canCreate && <div className="px-2 pb-1 text-[10px] text-[var(--notion-text-muted)]">{SYNCED_HINT[property.id] || 'A opção nova também aparece nas outras telas do GaaS.'}</div>}
           {err && <div className="px-2 py-1 text-red-500">{err}</div>}
         </div>
@@ -312,6 +297,8 @@ const SYNCED_HINT: Record<string, string> = {
   p_frente: 'Cria a frente também na Visão Daily.',
   p_projeto: 'Cria o projeto também na Visão Daily, na frente desta tarefa.',
   p_iniciativa: 'Cria a iniciativa também na aba de iniciativas.',
+  p_parceiro: 'Cria o BU/parceiro também na Visão Daily e nas Bases de Crédito.',
+  prop_partner: 'Cria o parceiro também na Visão Daily e nas Tarefas.',
 };
 
 
