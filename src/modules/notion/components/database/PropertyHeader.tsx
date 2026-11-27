@@ -22,7 +22,7 @@ export const PropertyHeader: React.FC<{ databaseId: string; property: DatabasePr
       <button onClick={() => { setName(property.name); setOpen(!open); }} className="flex items-center gap-1.5 w-full text-left hover:text-[var(--notion-text)]">
         {icon}
         <span className="truncate">{buttonLabel || property.name}</span>
-        {locked && <Lock size={10} className="opacity-40 shrink-0" />}
+        {locked && <Lock size={10} className="shrink-0 opacity-0 group-hover/th:opacity-40" aria-label="Coluna travada" />}
       </button>
       {open && (
         <DatabasePopup title={buttonLabel || property.name} onClose={() => setOpen(false)}>

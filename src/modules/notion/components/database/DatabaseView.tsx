@@ -46,6 +46,8 @@ interface DatabaseViewProps {
   onUpdateView?: (databaseId: string, viewId: string, partial: Partial<DatabaseViewConfig>) => void;
   onDeleteView?: (databaseId: string, viewId: string) => void;
   onDuplicateRow?: (databaseId: string, rowId: string) => void;
+  /** Exclui várias linhas com uma confirmação só (seleção na tabela). */
+  onDeleteRows?: (databaseId: string, rowIds: string[]) => void;
   /** Só leitura: mostra os dados e deixa mexer só em visões, filtros e agrupamento. */
   readOnly?: boolean;
   /** Chips de filtro rápido por uma propriedade (ex.: Frente). A seleção é de cada pessoa e fica no navegador. */
@@ -78,6 +80,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   onUpdateView,
   onDeleteView,
   onDuplicateRow,
+  onDeleteRows,
   readOnly = false,
   quickFilter,
   calendarExtraRows,
@@ -109,10 +112,14 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
   };
 
   // Filtros, ordenação e agrupamento ficam salvos na visão (valem para o time todo).
-  const viewRows = useMemo(
-    () => applyView(database.rows, currentView, database.properties, users, searchQuery),
-    [database.rows, database.properties, currentView, users, searchQuery]
-  );
+  const viewRows = useMemo(() => {
+    const rows = applyView(database.rows, currentView, database.properties, users, searchQuery);
+    // Ordem manual (arrastando na tabela) quando a visão não tem ordenação por coluna.
+    const order = currentView.rowOrder;
+    if (!order?.length || (currentView.sorts || []).length) return rows;
+    const pos = new Map(order.map((id, i) => [id, i]));
+    return [...rows].sort((a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9));
+  }, [database.rows, database.properties, currentView, users, searchQuery]);
   // Filtro rápido (chips): por padrão tudo ligado, menos o que vem escondido (ex.: GaaS).
   const qfProp = quickFilter ? database.properties.find((p) => p.id === quickFilter.propertyId) : undefined;
   const qfAll = qfProp?.options?.map((o) => o.name) || [];
@@ -451,6 +458,12 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({
           readOnly={readOnly}
           onAddProperty={(name, type) => onAddProperty(database.id, name, type)}
           onOpenRowPage={onOpenRowPage}
+          onDeleteRows={onDeleteRows ? ids => onDeleteRows(database.id, ids) : undefined}
+          onReorderRows={onUpdateView && !(currentView.sorts || []).length && !readOnly ? ids => {
+            // Guarda a ordem de todas as linhas: as que estão fora do filtro mantêm a posição relativa no fim.
+            const rest = (currentView.rowOrder || database.rows.map(r => r.id)).filter(id => !ids.includes(id));
+            onUpdateView(database.id, currentView.id, { rowOrder: [...ids, ...rest] });
+          } : undefined}
         />
       )}
 

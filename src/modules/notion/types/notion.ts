@@ -116,6 +116,7 @@ export interface DatabaseViewConfig {
   cardSize?: 'small' | 'medium' | 'large'; // for gallery view
   datePropertyId?: string; // calendário: qual data posiciona os itens (adição GaaS)
   hideEmptyGroups?: boolean; // quadro: esconde colunas sem itens (adição GaaS)
+  rowOrder?: string[]; // tabela: ordem manual das linhas, arrastando (vale quando a visão não tem ordenação)
 }
 
 export interface DatabaseRow {
