@@ -16,6 +16,8 @@ import { loadSubtasks, patchTask } from '../../components/growth-learning/develo
 import { TaskCardFooter, type DailyPulse } from './gaas/TaskCardFooter';
 import { TasksHome } from './gaas/TasksHome';
 import { WorkStrip } from './gaas/WorkStrip';
+import { AiPages } from './gaas/AiPages';
+import { AI_SECTIONS, cardDraft, loadAiCards, loadAiPages, sectionCount, type AiCardLink, type AiPage, type AiSection } from './gaas/aiPagesData';
 import { NotionEditContext, type NotionEditApi } from './components/database/editContext';
 import { CREDIT_BASES_TITLE, configureCreditBases, creditStageTeam, isCreditBases } from './gaas/creditBases';
 import { supabase } from '../../services/supabaseClient';
@@ -439,6 +441,53 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     setActivePage(pageOfTask(top)); setPeekPageId(taskRowId(id)); setPeekDatabaseId(TASKS_DB);
   }, [activePage?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* ---------- Páginas IA: saídas dos agentes, lidas das tabelas que já existem ---------- */
+  const [aiSection, setAiSection] = useState<AiSection | null>(null);
+  const [aiOpen, setAiOpen] = useState<string | null>(null);
+  const [aiData, setAiData] = useState<{ pages: AiPage[] | null; failed: string[] }>({ pages: null, failed: [] });
+  const [aiCards, setAiCards] = useState<AiCardLink[]>([]);
+  const loadAi = useCallback(() => {
+    setAiData(prev => ({ pages: prev.pages, failed: [] }));
+    void loadAiPages().then(setAiData).catch(() => setAiData({ pages: [], failed: ['Páginas IA'] }));
+    void loadAiCards().then(setAiCards).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    loadAi();
+    // Link direto (?ai_page=<chave>) abre a página.
+    const key = new URLSearchParams(window.location.search).get('ai_page');
+    if (key) { setAiSection('todas'); setAiOpen(key); }
+  }, [loadAi]);
+  // Outra página aberta (busca, link de Tarefa) sai das Páginas IA. Na montagem não mexe, para o link direto valer.
+  const aiPageSeen = useRef(activePage?.id);
+  useEffect(() => { if (aiPageSeen.current === activePage?.id) return; aiPageSeen.current = activePage?.id; setAiSection(null); setAiOpen(null); }, [activePage?.id]);
+  const selectPage = useCallback((pageId: string) => { setAiSection(null); setAiOpen(null); setActivePage(pageId); }, [setActivePage]);
+  const aiSidebar = useMemo(() => ({
+    title: 'Páginas IA',
+    items: AI_SECTIONS.map(s => ({ id: s.id, icon: s.icon, title: s.title, indent: s.id !== 'todas', count: aiData.pages ? sectionCount(aiData.pages, s.id) : undefined })),
+    activeId: aiSection,
+    onSelect: (id: string) => { setAiSection(id as AiSection); setAiOpen(null); },
+  }), [aiData.pages, aiSection]);
+  const openTaskWindow = useCallback((taskId: string) => { setPeekPageId(taskRowId(taskId)); setPeekDatabaseId(TASKS_DB); }, []);
+  /** "Virar card": cria a Tarefa com a ação e o critério de sucesso (ou abre a que já existe) e mostra a janela dela. */
+  const turnIntoCard = useCallback(async (page: AiPage) => {
+    if (!ctx.canEditTasks) throw new Error('Criar cards requer acesso de edição.');
+    const existing = await supabase.from('growth_development_tasks').select('id,title').contains('details', { ai_page: page.key }).limit(1);
+    const found = existing.data?.[0] as { id: string; title: string } | undefined;
+    if (found) {
+      setAiCards(prev => (prev.some(c => c.key === page.key) ? prev : [...prev, { id: found.id, title: found.title, key: page.key }]));
+      openTaskWindow(found.id); return;
+    }
+    const draft = cardDraft(page);
+    const base = newWork(workspaceOfFront(draft.front_key), 'task');
+    try {
+      const saved = await createTask({ ...draft, details: { ...(base.details || {}), ...draft.details } } as Partial<WorkItem>, base);
+      applyTaskChanges([saved]);
+      setAiCards(prev => [...prev, { id: saved.id, title: saved.title, key: page.key }]);
+      showToast('Card criado. Ele já está no quadro da frente.');
+      openTaskWindow(saved.id);
+    } catch (e) { throw new Error(taskError(e)); }
+  }, [ctx.canEditTasks, applyTaskChanges, openTaskWindow, showToast]);
+
   /* ---------- páginas por frente (fixas na lateral) e tom do fundo ---------- */
   const fixedPageIds = useMemo(() => new Set([TASKS_PAGE, ...ctx.taskPages.map(d => d.id)]), [ctx.taskPages]);
   const sidebarSections = useMemo(() => [
@@ -760,16 +809,17 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       {/* Sidebar Navigation */}
       <Sidebar
         workspace={workspace}
-        activePageId={activePage.id}
+        activePageId={aiSection ? '' : activePage.id}
         users={users}
         activeUserId={activeUser.id}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!isSidebarCollapsed)}
-        onSelectPage={setActivePage}
+        onSelectPage={selectPage}
         onCreatePage={createPage}
         onArchivePage={archiveGuarded}
         onDuplicatePage={duplicatePage}
         sections={sidebarSections}
+        virtualSection={aiSidebar}
         onToggleFavorite={toggleFavorite}
         onSetActiveUser={setActiveUser}
         onOpenSearch={() => setSearchOpen(true)}
@@ -780,6 +830,13 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
       />
 
       {/* Main Page Workspace */}
+      {aiSection ? (
+        <main className="flex-1 min-w-0 h-full">
+          <AiPages section={aiSection} pages={aiData.pages} failed={aiData.failed} cards={aiCards} fronts={ctx.fronts}
+            canEdit={ctx.canEditTasks} openKey={aiOpen} onOpen={setAiOpen} onSection={setAiSection} onRetry={loadAi}
+            onTurnIntoCard={turnIntoCard} onOpenTask={openTaskWindow} />
+        </main>
+      ) : (
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
         <Topbar
           page={activePage}
@@ -836,6 +893,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           )}
         </div>
       </main>
+      )}
 
       {/* Floating Selection Toolbar */}
       <FormattingBar onUpdateBlock={updateBlock} />
