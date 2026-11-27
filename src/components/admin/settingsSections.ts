@@ -30,12 +30,17 @@ export function readSettingsSection(search = typeof window !== 'undefined' ? win
     return isSettingsSection(fromUrl) ? fromUrl : 'atualizar';
 }
 
-export function writeSettingsSection(section: SettingsSection) {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('cfg') === section) return;
+/** URL (sem o hash) da seção: serve de href do menu lateral, para o clique do meio abrir numa aba nova. */
+export function settingsSectionHref(section: SettingsSection, search = window.location.search): string {
+    const params = new URLSearchParams(search);
     if (section === 'atualizar') params.delete('cfg');
     else params.set('cfg', section);
     const query = params.toString();
-    window.history.pushState({}, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+    return window.location.pathname + (query ? `?${query}` : '');
+}
+
+export function writeSettingsSection(section: SettingsSection) {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('cfg') === section) return;
+    window.history.pushState({}, '', settingsSectionHref(section) + window.location.hash);
 }
