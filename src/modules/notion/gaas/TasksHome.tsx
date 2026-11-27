@@ -19,6 +19,8 @@ interface Props {
   me: string | null;
   onOpenPage: (id: string) => void;
   onOpenTemplates: () => void;
+  /** Cor de cada frente (chave da Visão Daily), para os chips de projeto. */
+  frontColors?: Map<string, string>;
 }
 interface Entry { day: string; project_id: string; work_ids: string[] }
 
@@ -26,7 +28,7 @@ const sp = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Ame
 const ago = (n: number) => sp(new Date(Date.now() - n * 86400000));
 const closed = (s: string) => s === 'concluida' || s === 'cancelada';
 
-export function TasksHome({ tasks, projects, pages, creditBasesPage, me, onOpenPage, onOpenTemplates }: Props) {
+export function TasksHome({ tasks, projects, pages, creditBasesPage, me, onOpenPage, onOpenTemplates, frontColors }: Props) {
   const key = `gaas.notion.home.hidden.${me || 'anon'}`;
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(key) === '1'; } catch { return false; } });
   const [entries, setEntries] = useState<Entry[] | null>(null);
@@ -73,14 +75,14 @@ export function TasksHome({ tasks, projects, pages, creditBasesPage, me, onOpenP
           {entries && loose > 0 && <span title="Registros da Visão Daily nos últimos 14 dias, nos projetos desta página, sem vínculo com card"><b className="mr-1 text-[15px] tabular-nums text-amber-700">{loose}</b>registros sem card</span>}
         </span>
         {subs.length > 0 && <span className="h-1.5 overflow-hidden rounded bg-[var(--notion-hover)]"><span className="block h-full bg-green-600" style={{ width: `${(done / subs.length) * 100}%` }} /></span>}
-        {top.length > 0 && <span className="flex flex-wrap gap-1">{top.map(([id, n]) => <span key={id} className="rounded bg-[var(--notion-hover)] px-1.5 py-0.5 text-[11.5px] font-semibold text-[var(--notion-text)]">{projById.get(id)?.name || 'Projeto'} {n}</span>)}</span>}
-        <span className="inline-flex items-center gap-1 text-xs font-bold text-cyan-700">Abrir página <ChevronRight size={13} /></span>
+        {top.length > 0 && <span className="flex flex-wrap gap-1">{top.map(([id, n]) => { const c = frontColors?.get(projById.get(id)?.frente_key || '') || '#64748b'; return <span key={id} className="rounded px-1.5 py-0.5 text-[11.5px] font-semibold" style={{ background: `color-mix(in srgb, ${c} 14%, white)`, color: `color-mix(in srgb, ${c} 75%, black)` }}>{projById.get(id)?.name || 'Projeto'} {n}</span>; })}</span>}
+        <span className="inline-flex items-center gap-1 text-xs font-bold text-cyan-700">Abrir quadro <ChevronRight size={13} /></span>
       </button>
     );
   };
 
   if (hidden) return (
-    <div className="nt-page-inset mt-6"><button type="button" onClick={toggle} className="inline-flex items-center gap-1 text-xs text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"><Eye size={13} />Mostrar "O que precisa andar?"</button></div>
+    <div className="nt-page-inset px-12"><button type="button" onClick={toggle} className="inline-flex items-center gap-1 text-xs text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"><Eye size={13} />Mostrar "O que precisa andar?"</button></div>
   );
   const stat = (v: number | null, l: string, s: string, warn = false) => (
     <div className={`rounded-xl border px-3.5 py-3 ${warn && v ? 'border-amber-200 bg-amber-50' : 'border-[var(--notion-border)] bg-[var(--notion-card)]'}`}>
@@ -90,7 +92,11 @@ export function TasksHome({ tasks, projects, pages, creditBasesPage, me, onOpenP
     </div>
   );
   return (
-    <section className="nt-page-inset mt-6 pb-12" aria-label="O que precisa andar?">
+    <section className="nt-page-inset px-12 pb-12" aria-label="O que precisa andar?">
+      <div className="mb-5 flex flex-wrap gap-1.5 text-xs text-[var(--notion-text-muted)]" aria-label="O que dá para fazer nas páginas">
+        {[['/', 'blocos em qualquer página'], ['Bases', 'com visões Quadro, Tabela e Calendário'], ['Propriedades', 'e filtros por página'], ['Modelos', 'de página e de Tarefa'], ['Favoritos', 'ícones e capa'], ['Páginas', 'dentro de páginas']].map(([b2, t2]) =>
+          <span key={b2} className="rounded-md bg-[var(--notion-hover)] px-2 py-0.5"><b className="text-[var(--notion-text)]">{b2}</b> {t2}</span>)}
+      </div>
       <div className="flex items-baseline gap-3">
         <h2 className="text-xl font-bold text-[var(--notion-text)]">O que precisa andar?</h2>
         <span className="text-xs text-[var(--notion-text-muted)]">Visão Daily e Tarefas juntas</span>

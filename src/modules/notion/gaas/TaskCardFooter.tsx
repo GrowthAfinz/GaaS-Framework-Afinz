@@ -24,6 +24,9 @@ export function TaskCardFooter({ task, progress, daily, today }: {
         {daily && daily.recent > 0 && <span title={`Registros da Visão Daily ligados a este card nos últimos 14 dias; último em ${br(daily.last)}`} className="inline-flex items-center gap-1 rounded bg-cyan-50 px-1.5 py-0.5 font-semibold text-cyan-800">
           <CalendarDays size={12} />Daily {daily.recent}</span>}
         {daily && !daily.recent && !closed(task.status) && <span title="Último registro da Daily ligado ao card" className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">Daily parada desde {br(daily.last)}</span>}
+        {task.owner_label
+          ? <span title={`Responsável: ${task.owner_label}`} className="ml-auto inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-cyan-700 text-[10px] font-bold text-white">{task.owner_label.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()}</span>
+          : <span title="Sem responsável" className="ml-auto inline-flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-[var(--notion-border)] text-[10px] text-[var(--notion-text-muted)]">?</span>}
       </div>
       <div className="grid grid-cols-2 gap-2 border-t border-[var(--notion-border)] pt-2 text-[var(--notion-text-muted)]">
         <span>Prazo<b className={`block text-xs font-semibold ${late ? 'text-red-700' : task.due_date ? 'text-[var(--notion-text)]' : ''}`}>{task.due_date ? br(task.due_date) : 'sem prazo'}</b></span>

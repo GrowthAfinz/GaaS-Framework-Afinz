@@ -3,6 +3,8 @@ import { Block, BlockType } from '../../types/notion';
 import { BlockItem } from './BlockItem';
 
 interface BlockListProps {
+  /** Página com conteúdo vivo logo abaixo (Início): sem o espaço grande no fim. */
+  compactEnd?: boolean;
   pageId: string;
   blockIds: string[];
   blocks: Record<string, Block>;
@@ -26,6 +28,7 @@ export const BlockList: React.FC<BlockListProps> = ({
   onAddBlock,
   onMoveBlock,
   renderDatabase,
+  compactEnd = false,
 }) => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -49,7 +52,7 @@ export const BlockList: React.FC<BlockListProps> = ({
   };
 
   return (
-    <div className="nt-page-inset px-12 pb-32">
+    <div className={`nt-page-inset px-12 ${compactEnd ? 'pb-2' : 'pb-32'}`}>
       <div className="space-y-0.5">
         {blockIds.map((blockId, idx) => {
           const block = blocks[blockId];
@@ -78,7 +81,7 @@ export const BlockList: React.FC<BlockListProps> = ({
       {/* Click below to append block */}
       <div
         onClick={() => onAddBlock(pageId, 'paragraph')}
-        className="h-32 cursor-text flex items-start pt-4 text-xs text-transparent hover:text-[var(--notion-text-muted)]/30 transition-colors"
+        className={`${compactEnd ? 'h-8 pt-1' : 'h-32 pt-4'} cursor-text flex items-start text-xs text-transparent hover:text-[var(--notion-text-muted)]/30 transition-colors`}
       >
         Clique para adicionar um bloco…
       </div>

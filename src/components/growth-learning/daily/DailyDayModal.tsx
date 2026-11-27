@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarClock, ChevronDown, ChevronLeft, ChevronRight, KanbanSquare, Link2, PanelRightOpen, Plus, Send, X } from 'lucide-react';
 import {
-  FALLBACK_COLOR, WEEKDAYS, brDate, clusterByProject, dayResults, fmtInt, sortEntries, weekday,
+  FALLBACK_COLOR, WEEKDAYS, addDays, brDate, clusterByProject, dayResults, fmtInt, sortEntries, weekday,
   type B2cDay, type CrmCell, type DailyEntry, type DailyFrente, type DailyPartner, type DailyPerson, type DailyProject, type DailyTag, type StaleInfo,
 } from './dailyModel';
 import { loadDispatches, type DailyInitiative, type DailyWork, type Dispatch } from './dailyService';
@@ -19,6 +19,8 @@ interface Props {
   onOpenTask?: (id: string) => void;
   /** Marca a Sub Tarefa como concluída num clique (lista "Vence hoje"). */
   onCheckWork?: (w: DailyWork) => Promise<unknown>;
+  /** Registrar algo no dia (abre o campo de registro, escolhendo o projeto). */
+  onAddEntry?: (day: string, el: HTMLElement) => void;
 }
 
 /** Modal claro do dia: tópicos à esquerda (o clicado primeiro e aberto), disparos CRM do dia à direita. */
@@ -90,6 +92,8 @@ export function DailyDayModal(p: Props) {
           <button className="dv-ib" aria-label="Próximo dia deste projeto" title="Próximo dia deste projeto (→)" onClick={() => step(1)}><ChevronRight /></button>
           <div className="sum">
             <span><b>{projectIds.length}</b> {projectIds.length === 1 ? 'projeto' : 'projetos'}</span>
+            <span><b>{projectIds.filter(pid => cardsOf(pid).length).length}</b> com card</span>
+            <span><b>{dayEntries.filter(e => (e.work_ids || []).length).length}</b> de {dayEntries.length} vinculados</span>
             {results.map(r => <span key={r.key} className={r.total ? 'tot' : ''}><b>{fmtInt(r.value)}</b> {r.label}</span>)}
           </div>
           <button className="dv-ib" aria-label="Fechar" onClick={p.onClose}><X /></button>
@@ -97,6 +101,7 @@ export function DailyDayModal(p: Props) {
         <div className="dv-dbody">
           <section className="topics">
             <h5>Tópicos do dia</h5>
+            {p.canEdit && p.onAddEntry && <button type="button" className="dv-qadd" onClick={ev => p.onAddEntry?.(p.day, ev.currentTarget)}><Plus size={14} /><span>Registrar algo neste dia…</span></button>}
             {clusters.map(list => {
               const pid = list[0].project_id, pr = p.projects.get(pid), c = color(pid), isOpen = openProjects.has(pid);
               const ini = pr?.initiative_id ? p.initiatives.get(pr.initiative_id) : undefined, st = p.stale.get(pid);
@@ -146,7 +151,7 @@ export function DailyDayModal(p: Props) {
                   }) : <div className="dv-de prev">{list[0].body}</div>}
                   {isOpen && (() => {
                     const cards = cardsOf(pid);
-                    if (!cards.length) return p.canEdit ? <div className="dv-nocard">Projeto sem card<button className="dv-link" onClick={ev => p.onCreateWork(list[0], ev.currentTarget)}><Plus size={12} />Criar card a partir do registro</button></div> : null;
+                    if (!cards.length) return p.canEdit ? <div className="dv-nocard">{(() => { const n = p.entries.filter(x => x.project_id === pid && x.day >= addDays(p.today, -14) && x.day <= p.today).length; return n > 1 ? `${n} registros em 14 dias e nenhum card` : 'Projeto sem card'; })()}<button className="dv-link" onClick={ev => p.onCreateWork(list[0], ev.currentTarget)}><Plus size={12} />Criar card a partir do registro</button></div> : null;
                     return <div className="dv-minis">{cards.slice(0, 4).map(w => { const pr2 = progressOf(w.id); return (
                       <button key={w.id} className="dv-mini" title="Abrir o card" onClick={() => (p.onOpenTask ? p.onOpenTask(w.id) : w.initiative_id && p.onKanban(w.initiative_id, w.id))}>
                         <span className="t">{w.title}</span>

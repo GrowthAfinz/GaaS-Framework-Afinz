@@ -65,6 +65,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
   const [composerProject, setComposerProject] = useState('');
   const [feedFilter, setFeedFilter] = useState<'all' | 'daily' | 'loose' | 'comment' | 'history'>('all');
   const [feedLimit, setFeedLimit] = useState(12);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [nonce, setNonce] = useState(0);
   const busyRef = useRef(false);
   const resolutionDraft = useRef<string | null>(null);
@@ -116,7 +117,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
     document.addEventListener('keydown', onKey, true);
     return () => { document.removeEventListener('keydown', onKey, true); prev?.focus?.(); };
   }, []);
-  useEffect(() => { if (b) window.setTimeout(() => box.current?.querySelector<HTMLElement>('#task-modal-title')?.focus(), 0); }, [b?.task.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (b) window.setTimeout(() => box.current?.focus(), 0); }, [b?.task.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const flash = (text: string) => { setNote(text); window.setTimeout(() => setNote(n => (n === text ? '' : n)), 4000); };
   const fail = async (e: unknown) => {
@@ -188,10 +189,10 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
     await save(target, { owner_label: value || '' });
   };
   // Chamado como função (não como componente) para o select não ser recriado a cada render e manter o foco.
-  const PersonSelect = ({ target, small }: { target: WorkItem; small?: boolean }) => (
+  const PersonSelect = ({ target, small, chip }: { target: WorkItem; small?: boolean; chip?: boolean }) => (
     <select aria-label={`Responsável de ${target.title}`} disabled={ro} value={target.owner_label || ''} onChange={e => void personPick(target, e.target.value)}
-      className={`${small ? 'w-[7.5rem] shrink-0 truncate text-xs' : 'w-full text-sm'} rounded border border-transparent bg-transparent px-1 py-0.5 ${target.owner_label ? 'text-slate-700' : 'text-slate-400'} hover:border-slate-200 focus:border-slate-300`}>
-      <option value="">{small ? 'Responsável' : 'Sem responsável'}</option>
+      className={chip ? `appearance-none rounded-md px-2 py-1 text-sm ${target.owner_label ? 'bg-slate-100 text-slate-800' : 'border border-dashed border-slate-300 bg-white text-slate-500'}` : `${small ? 'w-[7.5rem] shrink-0 truncate text-xs' : 'w-full text-sm'} rounded border border-transparent bg-transparent px-1 py-0.5 ${target.owner_label ? 'text-slate-700' : 'text-slate-400'} hover:border-slate-200 focus:border-slate-300`}>
+      <option value="">{small ? 'Responsável' : chip ? '+ Pessoa' : 'Sem responsável'}</option>
       {target.owner_label && !people.some(p => p.name === target.owner_label) && <option value={target.owner_label}>{target.owner_label}</option>}
       {people.map((p: Person) => <option key={p.id} value={p.name}>{p.name}{p.has_account ? '' : ' (sem conta)'}</option>)}
       <option value="__new__">+ Usar outro nome…</option>
@@ -345,7 +346,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
       if (a && box.current?.contains(a)) a.blur();
       onClose();
     }}>
-      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="task-modal-title" className="relative my-4 w-full max-w-5xl rounded-[14px] bg-white text-slate-800 shadow-2xl">
+      <div ref={box} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="task-modal-title" className="relative my-4 w-full max-w-5xl rounded-[14px] bg-white text-slate-800 shadow-2xl outline-none">
         {/* topo: onde o card mora e o que dá para fazer com ele */}
         <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5 text-xs text-slate-500 sm:px-6">
           {isSub && b.parent
@@ -373,7 +374,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
           </div>
           <p className="ml-8 mt-0.5 flex items-center gap-1.5 text-[12.5px] text-slate-500">na lista
             <span className="h-2 w-2 rounded-full" style={{ background: STATUS_COLOR[t.status] }} />
-            <select aria-label="Status" disabled={ro} value={t.status} onChange={e => void statusPick(e.target.value)} className="rounded border border-transparent bg-transparent px-0.5 font-semibold text-cyan-700 hover:border-slate-200">
+            <select aria-label="Status" disabled={ro} value={t.status} onChange={e => void statusPick(e.target.value)} className="appearance-none rounded bg-transparent px-0.5 font-semibold text-cyan-700 underline decoration-dotted underline-offset-2 hover:bg-slate-50">
               {Object.entries(TASK_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </p>
@@ -382,41 +383,52 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
 
         <div className="grid gap-6 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_12rem]">
           <main className="min-w-0 space-y-5">
-            {/* campos do card numa faixa, como no Trello */}
-            <div className="flex flex-wrap gap-x-6 gap-y-3">
-              <div><div className={label}>Responsável</div><div id="tm-owner">{PersonSelect({ target: t })}</div></div>
-              <div><div className={label}>Prazo</div><DateInput ariaLabel="Prazo" disabled={!b.canEdit} value={t.due_date || ''} onSave={v => void save(t, { due_date: v })} className="tm-due rounded-md bg-slate-100 px-2 py-1 text-sm" /></div>
+            {/* campos do card numa faixa de chips, como no Trello */}
+            <div className="flex flex-wrap gap-x-5 gap-y-3">
+              <div><div className={label}>Responsável</div><div id="tm-owner">{PersonSelect({ target: t, chip: true })}</div></div>
+              {!isSub && <div id="tm-labels"><div className={label}>Etiquetas</div>
+                <div className="flex flex-wrap items-center gap-1">
+                  {(t.project_ids || []).map(id => { const pr = b.projects.find(p => p.id === id); const c = b.fronts.find(f => f.id === pr?.frente_key)?.color || '#64748b';
+                    return pr ? <span key={id} className="rounded px-2 py-1 text-xs font-semibold" style={{ background: `color-mix(in srgb, ${c} 14%, white)`, color: `color-mix(in srgb, ${c} 75%, black)` }}>{pr.name}</span> : null; })}
+                  <select aria-label="Prioridade" disabled={ro} value={t.priority} onChange={e => void save(t, { priority: e.target.value })}
+                    className={`appearance-none rounded px-2 py-1 text-xs font-bold ${t.priority === 'P0' ? 'bg-red-100 text-red-800' : t.priority === 'P1' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-600'}`} title="Prioridade">
+                    {Object.entries(TASK_PRIORITY).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select>
+                  <button type="button" aria-expanded={moreOpen} className="rounded border border-dashed border-slate-300 px-1.5 py-0.5 text-xs text-slate-500 hover:border-slate-400" onClick={() => setMoreOpen(o => !o)} title="Frente, iniciativa, projetos e BU/parceiro"><Plus size={12} className="inline" /></button>
+                </div></div>}
+              {isSub && <div><div className={label}>Prioridade</div>
+                <select aria-label="Prioridade" disabled={ro} value={t.priority} onChange={e => void save(t, { priority: e.target.value })} className="appearance-none rounded-md bg-slate-100 px-2 py-1 text-sm">
+                  {Object.entries(TASK_PRIORITY).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></div>}
+              <div><div className={label}>Prazo</div><DateInput ariaLabel="Prazo" disabled={!b.canEdit} value={t.due_date || ''} onSave={v => void save(t, { due_date: v })} className="tm-due rounded-md border-0 bg-slate-100 px-2 py-1 text-sm" /></div>
               <div><div className={label}>Finalização</div>
                 {t.status === 'concluida'
-                  ? <DateInput ariaLabel="Data de finalização" disabled={!b.canEdit} value={completedOn} onSave={v => { if (v) void save(t, { details: { completed_on: v } }); }} className="rounded-md bg-green-50 px-2 py-1 text-sm text-green-800" />
+                  ? <DateInput ariaLabel="Data de finalização" disabled={!b.canEdit} value={completedOn} onSave={v => { if (v) void save(t, { details: { completed_on: v } }); }} className="rounded-md border-0 bg-green-50 px-2 py-1 text-sm text-green-800" />
                   : <span className="inline-block rounded-md bg-slate-50 px-2 py-1 text-sm text-slate-400" title="Preenchida sozinha ao concluir; dá para corrigir depois">ao concluir</span>}</div>
-              <div><div className={label}>Prioridade</div>
-                <select aria-label="Prioridade" disabled={ro} value={t.priority} onChange={e => void save(t, { priority: e.target.value })} className="rounded-md bg-slate-100 px-2 py-1 text-sm">
-                  {Object.entries(TASK_PRIORITY).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}</select></div>
               <div><div className={label}>Na Daily</div>
                 <button className="rounded-md bg-cyan-50 px-2 py-1 text-sm font-semibold text-cyan-800" onClick={() => setFeedFilter('daily')} title="Ver os registros na atividade">
                   <CalendarDays size={13} className="mr-1 inline" />{dailyLinked.length} {dailyLinked.length === 1 ? 'registro' : 'registros'}{dailyLinked[0] ? ` · último ${br(dailyLinked[0].day)}` : ''}</button></div>
             </div>
-            {!isSub && <div className="grid gap-3 sm:grid-cols-2">
+            {!isSub && moreOpen && <div className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
               <div className="flex items-center gap-2"><span className={`${label} w-16`}>Frente</span>
                 <select aria-label="Frente" disabled={ro} value={t.front_key || ''} onChange={e => void save(t, { front_key: e.target.value })} className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 text-sm">
                   {b.fronts.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}<option value="gaas">GaaS (SDD)</option></select></div>
               <div className="flex items-center gap-2"><span className={`${label} w-16`}>Iniciativa</span>
                 <select aria-label="Iniciativa" disabled={ro} value={t.initiative_id || ''} onChange={e => void save(t, { initiative_id: e.target.value })} className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 text-sm">
                   <option value="">Sem iniciativa</option>{b.initiatives.map(i => <option key={i.id} value={i.id}>{i.title}</option>)}</select></div>
-              <div id="tm-labels"><ChipPicker title="Projetos" options={b.projects} selected={t.project_ids || []} disabled={ro} onToggle={id => void save(t, { project_ids: toggleList(t.project_ids, id) })} /></div>
+              <ChipPicker title="Projetos" options={b.projects} selected={t.project_ids || []} disabled={ro} onToggle={id => void save(t, { project_ids: toggleList(t.project_ids, id) })} />
               <ChipPicker title="BU/parceiro" options={b.partners} selected={t.partner_keys || []} disabled={ro} onToggle={id => void save(t, { partner_keys: toggleList(t.partner_keys, id) })} />
             </div>}
 
-            <label className="block">
-              <span className={label}>Próxima ação</span>
-              <CommitInput value={t.next_action || ''} disabled={ro} placeholder="O próximo passo, numa linha" onSave={v => void save(t, { next_action: v })} className="mt-1 w-full rounded-md border border-slate-200 px-3 py-1.5 text-sm" />
+            <label className="flex items-center gap-2">
+              <span className={`${label} shrink-0`}>Próxima ação</span>
+              <CommitInput value={t.next_action || ''} disabled={ro} placeholder="O próximo passo, numa linha" onSave={v => void save(t, { next_action: v })} className="min-w-0 flex-1 rounded-md bg-slate-50 px-2.5 py-1 text-sm" />
             </label>
 
             <section>
               <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Descrição</h3>
                 <button className="text-xs text-slate-500 hover:text-slate-800" onClick={() => setPreview(p => !p)}>{preview ? 'Editar' : 'Ver formatado'}</button></div>
-              {preview && t.description
+              {preview && !t.description
+                ? <button type="button" disabled={ro} onClick={() => setPreview(false)} className="mt-1 w-full rounded-md bg-slate-50 px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-100">Sem descrição. Clique para escrever o briefing, as peças e os combinados.</button>
+                : preview
                 ? <div className="task-md mt-1 rounded-md bg-slate-50 px-3 py-2 text-sm leading-relaxed text-slate-700" onDoubleClick={() => !ro && setPreview(false)}><ReactMarkdown components={MD}>{t.description}</ReactMarkdown></div>
                 : <CommitArea value={t.description || ''} disabled={ro} placeholder="Briefing, peças, combinados. Aceita Markdown." onSave={v => { void save(t, { description: v }); setPreview(true); }} />}
             </section>
@@ -579,7 +591,7 @@ export function TaskModal({ taskId, onClose, onChanged, onOpenDay }: Props) {
             {b.canEdit && <div className="space-y-1.5">
               <div className={label}>Adicionar ao card</div>
               <button className={railBtn} onClick={() => focusEl('#tm-owner select')}><User size={14} />Responsável</button>
-              {!isSub && <button className={railBtn} onClick={() => focusEl('#tm-labels button')}><Tag size={14} />Projetos e etiquetas</button>}
+              {!isSub && <button className={railBtn} onClick={() => { setMoreOpen(true); focusEl('#tm-labels button'); }}><Tag size={14} />Projetos e etiquetas</button>}
               {!isSub && <button className={railBtn} disabled={parentClosed} onClick={() => focusEl('[data-addsub]')}><ListChecks size={14} />Item no checklist</button>}
               <button className={railBtn} onClick={() => focusEl('.tm-due')}><CalendarDays size={14} />Prazo</button>
             </div>}
@@ -623,7 +635,7 @@ function TitleInput({ value, disabled, onSave }: { value: string; disabled: bool
   return <textarea id="task-modal-title" rows={1} aria-label="Título da Tarefa" value={v} disabled={disabled} onChange={e => setV(e.target.value)}
     onBlur={e => { if (cancelled(e.currentTarget)) { setV(value); return; } const n = v.trim(); if (n && n !== value) onSave(n); else setV(value); }}
     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }}
-    className="w-full resize-none bg-transparent text-xl font-semibold leading-snug outline-none focus:rounded focus:ring-2 focus:ring-cyan-600/30" />;
+    className="w-full resize-none rounded bg-transparent text-xl font-semibold leading-snug outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-cyan-600/30" />;
 }
 function CommitInput({ value, disabled, onSave, className, placeholder, ariaLabel }: { value: string; disabled: boolean; onSave: (v: string) => void; className?: string; placeholder?: string; ariaLabel?: string }) {
   const [v, setV] = useState(value);
