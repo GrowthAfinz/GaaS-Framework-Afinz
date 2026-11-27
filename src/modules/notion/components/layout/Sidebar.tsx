@@ -43,7 +43,7 @@ interface SidebarProps {
   onOpenTrash: () => void;
   /** Seções fixas do GaaS, iguais para o time (ex.: Frentes). "top" vem antes de Páginas, "bottom" depois. */
   sections?: { title: string; pageIds: string[]; placement: 'top' | 'bottom'; defaultExpanded?: boolean }[];
-  /** Seção com itens que não são páginas do espaço (ex.: Páginas IA, que vêm das tabelas dos agentes). Fica depois das seções "top". */
+  /** Seção com itens que não são páginas do espaço (ex.: Páginas IA, que vêm das tabelas dos agentes). Fica por último, recolhida. */
   virtualSection?: { title: string; items: { id: string; icon: string; title: string; count?: number; indent?: boolean }[]; activeId: string | null; onSelect: (id: string) => void };
 }
 
@@ -205,14 +205,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const renderVirtualSection = (vs: NonNullable<SidebarProps['virtualSection']>) => {
-    const expanded = expandedSections[vs.title] ?? true;
+    const expanded = expandedSections[vs.title] ?? false;
     return (
       <div key={vs.title}>
         <div className="flex items-center gap-1 px-1 pb-1">
           <button
             type="button"
             aria-expanded={expanded}
-            onClick={() => setExpandedSections(prev => ({ ...prev, [vs.title]: !(prev[vs.title] ?? true) }))}
+            onClick={() => setExpandedSections(prev => ({ ...prev, [vs.title]: !(prev[vs.title] ?? false) }))}
             className="flex flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] font-bold uppercase tracking-wide text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
           >
             {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -331,7 +331,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 space-y-2 overflow-y-auto px-1 py-1">
         {renderSection('Favoritos', favoritePages, true)}
         {sections.filter(section => section.placement === 'top').map(renderFixedSection)}
-        {virtualSection && renderVirtualSection(virtualSection)}
         {renderSection('Páginas', rootPages, false, (
           <button
             type="button"
@@ -347,6 +346,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         ))}
         {sections.filter(section => section.placement === 'bottom').map(renderFixedSection)}
+        {/* Páginas IA fica por último e começa recolhida (pedido de 27/11/2026). */}
+        {virtualSection && renderVirtualSection(virtualSection)}
       </div>
 
       {/* 4. Bottom Footer: Active User & Settings */}
