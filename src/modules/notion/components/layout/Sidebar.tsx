@@ -43,6 +43,8 @@ interface SidebarProps {
   onOpenTrash: () => void;
   /** Seções fixas do GaaS, iguais para o time (ex.: Frentes). "top" vem antes de Páginas, "bottom" depois. */
   sections?: { title: string; pageIds: string[]; placement: 'top' | 'bottom'; defaultExpanded?: boolean }[];
+  /** Seção com itens que não são páginas do espaço (ex.: Páginas IA, que vêm das tabelas dos agentes). Fica depois das seções "top". */
+  virtualSection?: { title: string; items: { id: string; icon: string; title: string; count?: number; indent?: boolean }[]; activeId: string | null; onSelect: (id: string) => void };
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -64,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onImportMarkdown,
   onOpenTrash,
   sections = [],
+  virtualSection,
 }) => {
   const fixedIds = new Set(sections.flatMap((s) => s.pageIds));
   const [expandedPages, setExpandedPages] = useState<Record<string, boolean>>({});
@@ -201,6 +204,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return pages.length ? renderSection(section.title, pages, section.defaultExpanded ?? false) : null;
   };
 
+  const renderVirtualSection = (vs: NonNullable<SidebarProps['virtualSection']>) => {
+    const expanded = expandedSections[vs.title] ?? true;
+    return (
+      <div key={vs.title}>
+        <div className="flex items-center gap-1 px-1 pb-1">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpandedSections(prev => ({ ...prev, [vs.title]: !(prev[vs.title] ?? true) }))}
+            className="flex flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] font-bold uppercase tracking-wide text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
+          >
+            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            {vs.title}
+          </button>
+        </div>
+        {expanded && vs.items.map(item => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => vs.onSelect(item.id)}
+            aria-current={vs.activeId === item.id ? 'page' : undefined}
+            style={{ paddingLeft: item.indent ? 26 : 8 }}
+            className={`flex w-full items-center gap-1.5 pr-2 py-1 my-0.5 rounded-md text-left text-xs transition-colors ${
+              vs.activeId === item.id
+                ? 'bg-[var(--notion-hover)] text-[var(--notion-text)] font-semibold'
+                : 'text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)]'
+            }`}
+          >
+            {!item.indent && <span className="w-2.5" />}
+            <span className="shrink-0 text-xs" aria-hidden="true">{item.icon}</span>
+            <span className="truncate">{item.title}</span>
+            {item.count != null && <span className="ml-auto pl-1 text-[11px] tabular-nums text-[var(--notion-text-muted)]">{item.count}</span>}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   if (isCollapsed) {
     return (
       <div className="fixed left-2 top-2 z-40">
@@ -290,6 +331,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 space-y-2 overflow-y-auto px-1 py-1">
         {renderSection('Favoritos', favoritePages, true)}
         {sections.filter(section => section.placement === 'top').map(renderFixedSection)}
+        {virtualSection && renderVirtualSection(virtualSection)}
         {renderSection('Páginas', rootPages, false, (
           <button
             type="button"

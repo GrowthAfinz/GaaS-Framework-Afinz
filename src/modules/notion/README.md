@@ -9,5 +9,6 @@ O que mudou para o GaaS:
 - `gaas/tasksAdapter.ts`: a base Tarefas mostra e edita `growth_development_tasks` (Fila, agentes e skills continuam lendo essa tabela).
 - `components/database/viewEngine.tsx`: filtros, ordenação, agrupamento e propriedades visíveis salvos por visão.
 - `gaas/templates.ts`: modelos do GaaS (Spec SDD, Experimento A/B, Investigação, Aposta, Decisão, Daily).
+- `gaas/AiPages.tsx` e `gaas/aiPagesData.ts`: Páginas IA, base só leitura com as saídas dos agentes (`crm_insights`, `paid_media_insights`, `growth_investigation_analyses`, `growth_curated_proposals`). Validade por tipo (insight 30 dias, investigação 45, proposta sem validade); "Virar card" cria a Tarefa com `details.ai_page` apontando de volta para a página.
 - `gaas/GaasPanels.tsx`: briefing para os agentes e ajustes (membros vêm dos acessos aprovados).
 - Interface em PT-BR, tema e atalhos presos à raiz do módulo.
