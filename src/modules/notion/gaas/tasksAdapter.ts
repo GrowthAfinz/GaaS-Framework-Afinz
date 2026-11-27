@@ -41,6 +41,9 @@ export function notionColor(hex: string): NotionColor {
   return table.reduce((best, cur) => (dist(cur[1], rgb) < dist(best[1], rgb) ? cur : best))[0];
 }
 const dist = (a: number[], b: number[]) => a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0);
+/** Caminho de volta: cor do módulo para o hex guardado na Visão Daily (mesma tabela do notionColor). */
+const NOTION_HEX: Record<string, string> = { blue: '#0284c7', green: '#0d9488', purple: '#7c3aed', orange: '#ea580c', gray: '#64748b', red: '#dc2626', yellow: '#ca8a04', pink: '#db2777', brown: '#92400e', default: '#64748b' };
+export const hexOfNotion = (c: NotionColor): string => NOTION_HEX[c] || '#64748b';
 
 /** Propriedades da base Tarefas. As de sistema espelham colunas da tarefa; Frente e Projeto ficam no módulo. */
 export function systemProperties(initiatives: Initiative[], fronts: BusinessFront[], projects: DailyProjectRef[], campaigns: BoardCampaignRef[] = [], partners: PartnerRef[] = []): DatabaseProperty[] {

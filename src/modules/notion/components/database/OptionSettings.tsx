@@ -1,83 +1,43 @@
 import React, { useState } from 'react';
-import type { DatabaseProperty, NotionColor } from '../../types/notion';
+import { Plus } from 'lucide-react';
+import type { DatabaseProperty } from '../../types/notion';
 import { useNotionEdit } from './editContext';
+import { OptionList } from './OptionList';
 
-const colors: Record<NotionColor, string> = {
-  default: 'Padrão', gray: 'Cinza', brown: 'Marrom', orange: 'Laranja', yellow: 'Amarelo',
-  green: 'Verde', blue: 'Azul', purple: 'Roxo', pink: 'Rosa', red: 'Vermelho',
-};
-const control = 'rounded border border-[var(--notion-border)] bg-[var(--notion-card)] px-2 py-1';
-
+/** Opções no menu do cabeçalho: a mesma lista editável da célula (⋯ renomeia, troca a cor, tira; arrastar muda a ordem). */
 export function OptionSettings({ databaseId, property }: { databaseId: string; property: DatabaseProperty }) {
   const edit = useNotionEdit();
-  const [selected, setSelected] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const lock = edit.lockOf(databaseId, property.id);
+  if (!edit.editOption) return null;
   const options = property.options ?? [];
-  const index = options.findIndex(option => option.id === selected);
-  const option = options[index];
-
-  const save = async (event: React.FormEvent) => {
+  const add = async (event: React.FormEvent) => {
     event.preventDefault();
     const next = name.trim();
-    if (!next || options.some(item => item.id !== selected && item.name.toLowerCase() === next.toLowerCase())) {
-      setError('Informe um nome único.');
-      return;
-    }
-    setError('');
-    setSaving(true);
-    try {
-      if (option) edit.editOption?.(databaseId, property.id, option.id, { name: next });
-      else {
-        await edit.createOption(databaseId, property.id, next);
-        setName('');
-      }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Não foi possível salvar.');
-    } finally {
-      setSaving(false);
-    }
+    if (!next) return;
+    if (options.some(item => item.name.toLowerCase() === next.toLowerCase())) { setError('Já existe uma opção com esse nome.'); return; }
+    setError(''); setSaving(true);
+    try { await edit.createOption(databaseId, property.id, next); setName(''); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível criar.'); }
+    finally { setSaving(false); }
   };
-
-  if (!edit.editOption) return null;
-
   return (
-    <div className="mt-2 space-y-2 border-t border-[var(--notion-border)] pt-2">
-      <label className="grid gap-1">
-        {property.type === 'status' ? 'Etapas' : 'Opções'}
-        <select className={control} value={selected} onChange={event => {
-          const id = event.target.value;
-          setSelected(id);
-          setName(options.find(item => item.id === id)?.name ?? '');
-          setError('');
-        }}>
-          <option value="">Adicionar opção</option>
-          {options.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}
-        </select>
-      </label>
-      <form onSubmit={save} className="flex gap-1">
-        <input className={`${control} min-w-0 flex-1`} aria-label="Nome da opção" placeholder="Nome da opção"
-          value={name} onChange={event => setName(event.target.value)} />
-        <button className={control} type="submit" disabled={saving}>{option ? 'Salvar' : 'Adicionar'}</button>
-      </form>
-      {option && (
-        <div className="flex flex-wrap gap-1">
-          <select className={control} aria-label="Cor da opção" value={option.color}
-            onChange={event => edit.editOption?.(databaseId, property.id, option.id, { color: event.target.value as NotionColor })}>
-            {Object.entries(colors).map(([color, label]) => <option key={color} value={color}>{label}</option>)}
-          </select>
-          <button className={control} disabled={index === 0} onClick={() => edit.editOption?.(databaseId, property.id, option.id, { offset: -1 })} aria-label="Mover opção para antes">↑</button>
-          <button className={control} disabled={index === options.length - 1} onClick={() => edit.editOption?.(databaseId, property.id, option.id, { offset: 1 })} aria-label="Mover opção para depois">↓</button>
-          <button className={control} onClick={() => {
-            if (!window.confirm(`Remover “${option.name}”? Os pedidos com essa opção ficarão com o campo vazio.`)) return;
-            edit.removeOption(databaseId, property.id, option.id);
-            setSelected('');
-            setName('');
-          }}>Remover</button>
-        </div>
+    <div className="mt-2 border-t border-[var(--notion-border)] pt-2">
+      <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--notion-text-muted)]">{property.type === 'status' ? 'Etapas' : 'Opções'}</div>
+      <div className="max-h-64 overflow-y-auto">
+        <OptionList databaseId={databaseId} property={property} options={options} canDrag />
+        {!options.length && <div className="px-2 py-1 text-[var(--notion-text-muted)]">Nenhuma opção ainda.</div>}
+      </div>
+      {lock !== 'fixed' && (
+        <form onSubmit={add} className="mt-1 flex items-center gap-1 px-1">
+          <Plus size={12} className="text-[var(--notion-text-muted)]" />
+          <input className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-1 focus:border-[var(--notion-border)] focus:outline-none" aria-label="Nova opção" placeholder="Nova opção"
+            value={name} disabled={saving} onChange={event => setName(event.target.value)} onKeyDown={event => event.stopPropagation()} />
+        </form>
       )}
-      {error && <p role="alert" className="text-red-600">{error}</p>}
+      {error && <p role="alert" className="px-1 text-red-600">{error}</p>}
     </div>
   );
 }

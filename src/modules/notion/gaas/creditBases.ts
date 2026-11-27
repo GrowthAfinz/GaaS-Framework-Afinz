@@ -1,4 +1,4 @@
-import type { Block, NotionDatabase, NotionWorkspace } from '../types/notion';
+import type { Block, NotionColor, NotionDatabase, NotionWorkspace } from '../types/notion';
 import { generateId } from '../utils/id';
 
 export const CREDIT_BASES_TITLE = 'Bases de Crédito';
@@ -51,7 +51,22 @@ function isSampleTable(block?: Block) {
       r === 1 && (cell === `Data ${c + 1}` || cell === `Cell ${c + 1}`)))));
 }
 
-export function configureCreditBases(workspace: NotionWorkspace, pageId: string): NotionWorkspace {
+/**
+ * "Frente / parceiro" das Bases de Crédito usa a mesma lista de BU/parceiro da Visão Daily (daily_partners).
+ * Opção antiga que não bate com parceiro nenhum continua no fim, para a linha não perder a cor.
+ */
+export interface CreditPartner { key: string; name: string; color: NotionColor; archived?: boolean }
+export function withPartnerOptions(database: NotionDatabase, partners: CreditPartner[]): NotionDatabase {
+  if (!isCreditBases(database.id) || !partners.length) return database;
+  const live = partners.filter(p => !p.archived);
+  const known = new Set(partners.map(p => p.name.toLowerCase()));
+  return { ...database, properties: database.properties.map(p => {
+    if (p.id !== 'prop_partner') return p;
+    const legacy = (p.options || []).filter(o => !known.has(o.name.toLowerCase()));
+    return { ...p, options: [...live.map(x => ({ id: x.key, name: x.name, color: x.color })), ...legacy] };
+  }) };
+}
+export function configureCreditBases(workspace: NotionWorkspace, pageId: string, partners: CreditPartner[] = []): NotionWorkspace {
   const page = workspace.pages[pageId];
   if (!page || page.parentId || page.databaseId || page.isArchived || page.title.trim() !== CREDIT_BASES_TITLE) return workspace;
   const database = creditBasesDatabase(`db_credit_bases_${page.id}`);
@@ -63,6 +78,6 @@ export function configureCreditBases(workspace: NotionWorkspace, pageId: string)
       ...page, databaseId: database.id,
       blockIds: page.blockIds.filter(id => !sampleIds.has(id)),
     } },
-    databases: { ...workspace.databases, [database.id]: workspace.databases[database.id] || database },
+    databases: { ...workspace.databases, [database.id]: workspace.databases[database.id] || withPartnerOptions(database, partners) },
   };
 }
