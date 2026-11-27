@@ -100,6 +100,8 @@ export function buildGrowthLearningSearch(
   const params = new URLSearchParams(currentSearch);
   params.set('view', viewSlugOf(section));
   if(section !== 'vault'){params.delete('wiki_ai');params.delete('ai_objective');}
+  // A visão da Estrutura CRM (Board, Consumo, Mapeamento) só vale dentro dela.
+  if(section !== 'structure') params.delete('estrutura');
   params.set('section', section);
   params.delete('item');
   clearContextParams(params);

@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ReportLiveCard } from "../relatorio/ReportLiveCard";
+import { onTabLinkClick } from "../../services/tabNavigation";
 import {
   GROWTH_LEARNING_SECTIONS,
   GrowthLearningSection,
+  buildGrowthLearningSearch,
   type GrowthWorkspace,
   workspaceOfSection,
   openGrowthLearningSection,
@@ -162,10 +164,11 @@ export const GrowthLearningWorkspace: React.FC<
             aria-label={WORKSPACE_LABEL[workspace]}
           >
             {sections.map(({ id, label, icon: Icon }) => (
-              <button
+              // Link de verdade: clique do meio ou Ctrl+clique abre a seção numa aba nova.
+              <a
                 key={id}
-                type="button"
-                onClick={() => selectSection(id)}
+                href={`${window.location.pathname}${buildGrowthLearningSearch(id, window.location.search)}`}
+                onClick={onTabLinkClick(() => selectSection(id))}
                 aria-current={section === id ? "page" : undefined}
                 className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition-colors ${section === id ? "border-cyan-500 text-slate-950" : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900"}`}
               >
@@ -177,7 +180,7 @@ export const GrowthLearningWorkspace: React.FC<
                     {sectionCount(id)}
                   </span>
                 )}
-              </button>
+              </a>
             ))}
           </nav>
         </header>

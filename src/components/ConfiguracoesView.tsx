@@ -14,7 +14,8 @@ import { activityService, versionService } from '../services/activityService';
 import { dataService } from '../services/dataService';
 import { IntelligentFrameworkUpdate, type ImportStep } from './admin/IntelligentFrameworkUpdate';
 import { UpdateHistoryView } from './admin/UpdateHistoryView';
-import { readSettingsSection, writeSettingsSection, type SettingsSection } from './admin/settingsSections';
+import { readSettingsSection, settingsSectionHref, writeSettingsSection, type SettingsSection } from './admin/settingsSections';
+import { onTabLinkClick } from '../services/tabNavigation';
 
 const UPLOAD_FIX_VERSION = 'ENG_FIX_V3_2026-03-09';
 
@@ -574,10 +575,11 @@ export const ConfiguracoesView: React.FC = () => {
                             {group.items.map((item) => {
                                 const active = activeSection === item.id;
                                 return (
-                                    <button
+                                    // Link de verdade: clique do meio ou Ctrl+clique abre a seção numa aba nova.
+                                    <a
                                         key={item.id}
-                                        type="button"
-                                        onClick={() => setSection(item.id)}
+                                        href={settingsSectionHref(item.id)}
+                                        onClick={onTabLinkClick(() => setSection(item.id))}
                                         aria-current={active ? 'page' : undefined}
                                         title={navCollapsed ? item.label : undefined}
                                         aria-label={navCollapsed ? item.label : undefined}
@@ -587,7 +589,7 @@ export const ConfiguracoesView: React.FC = () => {
                                     >
                                         <span className={active ? 'text-cyan-700' : 'text-slate-500'}>{item.icon}</span>
                                         {!navCollapsed && <span className="truncate">{item.label}</span>}
-                                    </button>
+                                    </a>
                                 );
                             })}
                         </div>

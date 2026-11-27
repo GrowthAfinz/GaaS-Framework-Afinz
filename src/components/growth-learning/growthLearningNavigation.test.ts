@@ -54,6 +54,11 @@ describe('growth learning navigation contract', () => {
     expect(new URLSearchParams(buildGrowthLearningSectionItemSearch('investigations', 'crm-1', '')).get('view')).toBe('operacao');
     expect(new URLSearchParams(buildGrowthLearningSearch('vault', '?view=operacao&section=daily')).get('view')).toBe('learning');
   });
+  it('keeps the Estrutura CRM view only while the link stays in Estrutura CRM', () => {
+    const current = '?view=operacao&section=structure&estrutura=sfmc';
+    expect(new URLSearchParams(buildGrowthLearningSearch('structure', current)).get('estrutura')).toBe('sfmc');
+    expect(new URLSearchParams(buildGrowthLearningSearch('daily', current)).has('estrutura')).toBe(false);
+  });
   it('redirects old results links into the Wiki rather than another workspace', () => {
     expect(readGrowthLearningSection('?view=learning&section=results')).toBe('vault');
     const params=new URLSearchParams(buildResultsWikiSearch('?section=results&result_domain=crm&result_month=2026-09&item=old&bu=B2C'));

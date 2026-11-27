@@ -36,9 +36,13 @@ export const NavDropdown: React.FC<NavDropdownProps> = ({ title, items, isActive
             ref={containerRef}
             className="relative h-full flex items-center"
         >
-            <button
-                type="button"
-                onClick={() => setIsOpen((prev) => !prev)}
+            {/* O título é link para o primeiro item do grupo: o clique esquerdo só abre o menu,
+                o do meio (ou Ctrl+clique) abre essa página numa aba nova. */}
+            <a
+                href={items[0]?.href}
+                onClick={onTabLinkClick(() => setIsOpen((prev) => !prev))}
+                aria-haspopup="menu"
+                aria-expanded={isOpen}
                 style={{ fontFamily: "'Trebuchet MS', Calibri, sans-serif" }}
                 className={`
                     flex items-center gap-2 py-1.5 text-[15px] tracking-tight border-b-2 transition-colors duration-200
@@ -49,7 +53,7 @@ export const NavDropdown: React.FC<NavDropdownProps> = ({ title, items, isActive
                 `}
             >
                 {title}
-            </button>
+            </a>
 
             {/* Dropdown Menu */}
             <div
