@@ -43,17 +43,33 @@ export function BoardZoomBar({ vp, showMini, onToggleMini, children }: { vp: Vie
   );
 }
 
+/** Caixa do minimapa: largura fixa, altura acompanha o formato do quadro até o teto. */
+const MINI_W = 216, MINI_MAX_H = 140, MINI_MIN_H = 64, MINI_PAD = 10;
+
 export function BoardMiniMap({ vp, mini }: { vp: Viewport; mini: MiniState }) {
   const z = vp.view.z, c = vp.canvasRef.current;
   // O minimapa cobre o quadro e a área visível juntos: quem foi para a área livre continua se vendo no mapa.
   const vx = -vp.view.x / z, vy = -vp.view.y / z, vw = (c?.clientWidth || 0) / z, vh = (c?.clientHeight || 0) / z;
   const minX = Math.min(0, vx), minY = Math.min(0, vy), spanX = Math.max(mini.w, vx + vw) - minX, spanY = Math.max(mini.h, vy + vh) - minY;
-  const s = Math.min(200 / Math.max(1, spanX), 130 / Math.max(1, spanY)), h = Math.max(40, spanY * s);
-  const go = (e: React.PointerEvent<HTMLDivElement>) => { if (!c) return; const r = e.currentTarget.getBoundingClientRect(); const mx = toLocalPx(e.clientX - r.left) / s + minX, my = toLocalPx(e.clientY - r.top) / s + minY; vp.setView(v => ({ ...v, x: -(mx * v.z - c.clientWidth / 2), y: -(my * v.z - c.clientHeight / 2) })); };
+  const s = Math.min((MINI_W - 2 * MINI_PAD) / Math.max(1, spanX), (MINI_MAX_H - 2 * MINI_PAD) / Math.max(1, spanY));
+  const h = Math.max(MINI_MIN_H, Math.round(spanY * s + 2 * MINI_PAD));
+  // Desenho centralizado na caixa nos dois eixos: sobra igual dos dois lados.
+  const ox = (MINI_W - spanX * s) / 2 - minX * s, oy = (h - spanY * s) / 2 - minY * s;
+  const go = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!c) return;
+    const el = e.currentTarget, r = el.getBoundingClientRect();
+    const mx = (toLocalPx(e.clientX - r.left) - el.clientLeft - ox) / s, my = (toLocalPx(e.clientY - r.top) - el.clientTop - oy) / s;
+    vp.setView(v => ({ ...v, x: -(mx * v.z - c.clientWidth / 2), y: -(my * v.z - c.clientHeight / 2) }));
+  };
   return (
-    <div className="cs-mini" data-nopan style={{ height: h }} onPointerDown={e => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ponteiro sem captura */ } go(e); }} onPointerMove={e => { if (e.buttons) go(e); }}>
-      {mini.blocks.map((b, i) => <i key={i} style={{ left: (b.x - minX) * s, top: (b.y - minY) * s, width: b.w * s, height: b.c ? 3 : b.h * s, background: b.c || 'rgba(15,23,42,.10)' }} />)}
-      {c && <div className="cs-mview" style={{ left: (vx - minX) * s, top: (vy - minY) * s, width: vw * s, height: vh * s }} />}
+    <div className="cs-mini" data-nopan title="Clique ou arraste para navegar ( M esconde )" style={{ width: MINI_W, height: h }}
+      onPointerDown={e => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ponteiro sem captura */ } go(e); }} onPointerMove={e => { if (e.buttons) go(e); }}>
+      {/* Bloco com cor = painel: corpo tingido com a faixa da cor em cima. Sem cor = área neutra. */}
+      {mini.blocks.map((b, i) => (
+        <i key={i} className={b.c ? 'acc' : undefined}
+          style={{ left: b.x * s + ox, top: b.y * s + oy, width: Math.max(2, b.w * s), height: Math.max(3, b.h * s), ...(b.c ? { ['--c' as string]: b.c } : {}) }} />
+      ))}
+      {c && <div className="cs-mview" style={{ left: vx * s + ox, top: vy * s + oy, width: vw * s, height: vh * s }} />}
     </div>
   );
 }

@@ -153,14 +153,17 @@
 .cs-fora{grid-column:1/-1;border:1.5px dashed var(--cs-laneB);padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:#475569;font-size:12px}
 .cs-fora span{background:#f1f5f9;padding:2px 8px}
 
-.cs-zbar{position:absolute;right:12px;bottom:12px;z-index:5;display:flex;align-items:center;gap:2px;background:#fff;border:1px solid rgba(15,23,42,.14);box-shadow:0 6px 18px rgba(15,23,42,.14);padding:3px}
+.cs-zbar{position:absolute;left:12px;bottom:12px;z-index:5;display:flex;align-items:center;gap:2px;background:#fff;border:1px solid rgba(15,23,42,.14);box-shadow:0 6px 18px rgba(15,23,42,.14);padding:3px}
 .cs-zb{border:none;background:none;height:28px;min-width:28px;padding:0 7px;font-size:12px;color:#334155;display:inline-flex;gap:5px;align-items:center;justify-content:center;border-radius:2px}
 .cs-zb:hover{background:#f1f5f9}.cs-zb.on{background:var(--cs-accentbg);color:var(--cs-accent);font-weight:600}
 .cs-zb.pct{min-width:48px;font-weight:600;font-variant-numeric:tabular-nums}
 .cs-zb svg{width:15px;height:15px}
-.cs-mini{position:absolute;left:12px;bottom:12px;z-index:5;width:200px;background:rgba(255,255,255,.92);border:1px solid rgba(15,23,42,.14);box-shadow:0 6px 18px rgba(15,23,42,.14);cursor:pointer;overflow:hidden}
-.cs-mini i{position:absolute;display:block}
-.cs-mview{position:absolute;border:2px solid var(--cs-accent);background:rgba(14,116,144,.10);pointer-events:none}
+/* Minimapa empilhado em cima da barra de zoom, os dois no canto de baixo à esquerda. */
+.cs-mini{position:absolute;left:12px;bottom:58px;z-index:5;box-sizing:border-box;background:#f8fafc;border:1px solid rgba(15,23,42,.14);box-shadow:0 6px 18px rgba(15,23,42,.14);cursor:pointer;overflow:hidden}
+.cs-mini i{position:absolute;display:block;box-sizing:border-box;background:rgba(15,23,42,.07);border-radius:1px;pointer-events:none}
+.cs-mini i.acc{background:color-mix(in srgb,var(--c) 12%,#fff);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);border-top:3px solid var(--c)}
+/* Área visível: moldura na cor de destaque e o que está fora dela levemente apagado. */
+.cs-mview{position:absolute;box-sizing:border-box;border:1.5px solid var(--cs-accent);border-radius:1px;box-shadow:0 0 0 9999px rgba(15,23,42,.06);pointer-events:none}
 
 .cs-menu{position:fixed;z-index:60;background:#fff;border:1px solid var(--cs-line2);border-radius:4px;box-shadow:0 12px 30px rgba(15,23,42,.18);padding:6px;min-width:230px;max-height:70vh;overflow-y:auto;font-size:13px}
 .cs-menu .sec{font-size:11px;color:var(--cs-ink3);padding:6px 8px 2px;letter-spacing:.4px}
