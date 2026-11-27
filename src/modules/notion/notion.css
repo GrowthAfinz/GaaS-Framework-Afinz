@@ -254,3 +254,25 @@
 .nt-tasks .nt-cell-popover { position: fixed; overflow: auto; border: 1px solid var(--nt-line); border-radius: 6px; background: var(--notion-card); box-shadow: 0 6px 24px #18273926; }
 .nt-tasks .nt-task-board .nt-board-column.nt-lane-collapsed { align-self: flex-start; }
 .nt-tasks .nt-task-grid [aria-expanded] { flex-wrap: nowrap; }
+
+/* Tabela: acabamento reto, cabeçalho limpo, seleção e arrastar linhas (27/11/2026) */
+.nt-table-frame { border-radius: 0; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.nt-thead th { border-bottom: 1px solid var(--notion-border); letter-spacing: .1px; }
+.nt-thead th + th { border-left: 1px solid var(--notion-border); }
+.nt-tr td { border-bottom: 1px solid var(--notion-border); }
+.nt-tr td + td { border-left: 1px solid var(--notion-border); }
+.nt-tr:hover td { background: color-mix(in srgb, var(--notion-hover) 45%, transparent); }
+.nt-tr.nt-tr-on td { background: color-mix(in srgb, #0e7490 7%, var(--notion-card)); }
+.nt-lead { width: 44px; text-align: center; }
+.nt-check { width: 14px; height: 14px; accent-color: #0e7490; cursor: pointer; opacity: 0; transition: opacity .12s; }
+.nt-tr:hover .nt-check, .nt-thead th:hover .nt-check, .nt-check:focus-visible, .nt-check.on { opacity: 1; }
+.nt-row-grip { display: inline-flex; cursor: grab; color: var(--notion-text-muted); opacity: 0; transition: opacity .12s; }
+.nt-tr:hover .nt-row-grip { opacity: .8; }
+.nt-drop-before td { box-shadow: inset 0 2px 0 #0e7490; }
+.nt-drop-after td { box-shadow: inset 0 -2px 0 #0e7490; }
+@media (prefers-reduced-motion: reduce) { .nt-check, .nt-row-grip { transition: none; } }
+/* coluna de seleção fica presa junto com a coluna do nome */
+.nt-tasks .nt-task-grid .nt-lead { position: sticky; left: 0; z-index: 2; background: var(--notion-card); }
+.nt-tasks .nt-task-grid th.nt-lead { z-index: 4; background: var(--nt-panel); }
+.nt-tasks .nt-task-grid .nt-lead + .nt-pinned { left: 44px; }
+.nt-tasks .nt-task-grid .nt-tr.nt-tr-on .nt-lead, .nt-tasks .nt-task-grid .nt-tr.nt-tr-on .nt-pinned { background: color-mix(in srgb, #0e7490 7%, var(--notion-card)); }

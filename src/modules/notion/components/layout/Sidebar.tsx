@@ -13,9 +13,6 @@ import {
   ChevronsRight,
   UserCheck,
   Users,
-  Sparkles,
-  Upload,
-  Home,
   MessageSquare,
   Calendar,
   Clock,
@@ -75,7 +72,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [expandedPages, setExpandedPages] = useState<Record<string, boolean>>({});
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const mdInputRef = React.useRef<HTMLInputElement>(null);
 
   const activeUser = users.find((u) => u.id === activeUserId) || users[0];
 
@@ -100,14 +96,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div key={page.id} className="select-none">
         <div
           onClick={() => onSelectPage(page.id)}
-          style={{ paddingLeft: `${Math.max(8, depth * 12 + 8)}px` }}
-          className={`group flex items-center justify-between pr-2 py-1 my-0.5 rounded-md cursor-pointer transition-colors text-xs ${
+          style={{ paddingLeft: `${Math.max(6, depth * 14 + 6)}px` }}
+          className={`group flex items-center justify-between pr-2 py-[5px] rounded-md cursor-pointer transition-colors text-[13px] ${
             isActive
-              ? 'bg-[var(--notion-hover)] text-[var(--notion-text)] font-semibold'
-              : 'text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)]'
+              ? 'bg-[var(--notion-hover)] text-[var(--notion-text)] font-bold'
+              : 'text-[var(--notion-text)] hover:bg-[var(--notion-hover)]'
           }`}
         >
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {hasChildren ? (
               <button
                 onClick={(e) => toggleExpand(page.id, e)}
@@ -120,11 +116,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                 />
               </button>
-            ) : (
-              <span className="w-2.5" />
-            )}
+            ) : null}
 
-            {page.icon && <span className="shrink-0 text-xs" aria-hidden="true">{page.icon}</span>}
+            <span className="w-[18px] shrink-0 text-center text-sm leading-none" aria-hidden="true">{page.icon || '📄'}</span>
             <span className="truncate">{page.title || 'Sem título'}</span>
             {pageBadges?.[page.id] != null && <span className="ml-auto shrink-0 pl-1 text-[11px] tabular-nums text-[var(--notion-text-muted)] group-hover:hidden">{pageBadges[page.id]}</span>}
           </div>
@@ -186,14 +180,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const expanded = expandedSections[title] ?? defaultExpanded;
     return (
       <div key={title}>
-        <div className="flex items-center gap-1 px-1 pb-1">
+        <div className="mt-3 flex items-center gap-1 px-1 pb-0.5">
           <button
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpandedSections(prev => ({ ...prev, [title]: !(prev[title] ?? defaultExpanded) }))}
-            className="flex flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] font-bold uppercase tracking-wide text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
+            className="flex flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[10.5px] font-bold uppercase tracking-[.4px] text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"
           >
-            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
             {title}
           </button>
           {action}
@@ -212,14 +206,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const expanded = expandedSections[vs.title] ?? false;
     return (
       <div key={vs.title}>
-        <div className="flex items-center gap-1 px-1 pb-1">
+        <div className="mt-3 flex items-center gap-1 px-1 pb-0.5">
           <button
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpandedSections(prev => ({ ...prev, [vs.title]: !(prev[vs.title] ?? false) }))}
-            className="flex flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] font-bold uppercase tracking-wide text-[var(--notion-text)] hover:bg-[var(--notion-hover)]"
+            className="flex flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[10.5px] font-bold uppercase tracking-[.4px] text-[var(--notion-text-muted)] hover:text-[var(--notion-text)]"
           >
-            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            <ChevronRight size={11} className={`transition-transform ${expanded ? 'rotate-90' : ''}`} />
             {vs.title}
           </button>
         </div>
@@ -229,15 +223,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             type="button"
             onClick={() => vs.onSelect(item.id)}
             aria-current={vs.activeId === item.id ? 'page' : undefined}
-            style={{ paddingLeft: item.indent ? 26 : 8 }}
-            className={`flex w-full items-center gap-1.5 pr-2 py-1 my-0.5 rounded-md text-left text-xs transition-colors ${
+            style={{ paddingLeft: item.indent ? 24 : 6 }}
+            className={`flex w-full items-center gap-2 pr-2 py-[5px] rounded-md text-left text-[13px] transition-colors ${
               vs.activeId === item.id
-                ? 'bg-[var(--notion-hover)] text-[var(--notion-text)] font-semibold'
-                : 'text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)]'
+                ? 'bg-[var(--notion-hover)] text-[var(--notion-text)] font-bold'
+                : 'text-[var(--notion-text)] hover:bg-[var(--notion-hover)]'
             }`}
           >
-            {!item.indent && <span className="w-2.5" />}
-            <span className="shrink-0 text-xs" aria-hidden="true">{item.icon}</span>
+            <span className="w-[18px] shrink-0 text-center text-sm leading-none" aria-hidden="true">{item.icon}</span>
             <span className="truncate">{item.title}</span>
             {item.count != null && <span className="ml-auto pl-1 text-[11px] tabular-nums text-[var(--notion-text-muted)]">{item.count}</span>}
           </button>
@@ -265,14 +258,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex items-center gap-1.5 border-b border-[var(--notion-border)] p-2">
         <button
           onClick={onOpenSearch}
-          className="flex items-center justify-between min-w-0 flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--notion-border)] bg-[var(--notion-hover)]/40 hover:bg-[var(--notion-hover)] text-xs text-[var(--notion-text-muted)] transition-colors"
+          className="flex h-[30px] items-center justify-between min-w-0 flex-1 px-2 rounded-[2px] border border-[var(--notion-border)] bg-[var(--notion-card)] hover:border-[var(--notion-text-muted)] text-[13px] text-[var(--notion-text-muted)] transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <Search size={13} />
-            <span>Buscar</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Search size={13} className="shrink-0" />
+            <span className="truncate">Buscar Tarefa ou registro</span>
           </div>
-          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-[var(--notion-card)] border border-[var(--notion-border)]">
-            Ctrl+K
+          <span className="shrink-0 text-[10.5px] px-1 rounded border border-[var(--notion-border)]">
+            Ctrl K
           </span>
         </button>
         <button
@@ -286,53 +279,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* 2. Quick Icons Row (Home, Chat, Calendar, Templates) */}
-      <div className="px-2 py-1.5 space-y-0.5 text-xs">
+      {/* Atalhos: Início e Modelos (importar .md saiu da barra, 27/11/2026) */}
+      <div className="px-2 pt-2 space-y-0.5">
         <button
           onClick={() => onSelectPage(rootPages[0]?.id || '')}
-          className="flex items-center gap-2.5 w-full px-2 py-1 rounded-md text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors font-medium"
+          className={`flex items-center gap-2 w-full px-1.5 py-[5px] rounded-md text-[13px] text-[var(--notion-text)] hover:bg-[var(--notion-hover)] transition-colors ${activePageId === rootPages[0]?.id ? 'bg-[var(--notion-hover)] font-bold' : ''}`}
         >
-          <Home size={14} />
+          <span className="w-[18px] text-center text-sm leading-none" aria-hidden="true">🏠</span>
           <span>Início</span>
         </button>
-
         <button
           onClick={onOpenTemplates}
-          className="flex items-center gap-2.5 w-full px-2 py-1 rounded-md text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors font-medium"
+          className="flex items-center gap-2 w-full px-1.5 py-[5px] rounded-md text-[13px] text-[var(--notion-text)] hover:bg-[var(--notion-hover)] transition-colors"
         >
-          <Sparkles size={14} aria-hidden="true" />
+          <span className="w-[18px] text-center text-sm leading-none" aria-hidden="true">✨</span>
           <span>Modelos</span>
         </button>
-
-        <button
-          onClick={() => mdInputRef.current?.click()}
-          className="flex items-center gap-2.5 w-full px-2 py-1 rounded-md text-[var(--notion-text-muted)] hover:bg-[var(--notion-hover)] hover:text-[var(--notion-text)] transition-colors font-medium"
-        >
-          <Upload size={14} />
-          <span>Importar (.md)</span>
-        </button>
-        <input
-          ref={mdInputRef}
-          type="file"
-          accept=".md,.txt,.markdown"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                const text = event.target?.result as string;
-                if (text) onImportMarkdown(text);
-              };
-              reader.readAsText(file);
-            }
-          }}
-          className="hidden"
-        />
       </div>
 
-      <div className="h-px bg-[var(--notion-border)] mx-2 my-1" />
 
-      <div className="flex-1 space-y-2 overflow-y-auto px-1 py-1">
+      <div className="flex-1 overflow-y-auto px-2 pb-3">
         {renderSection('Favoritos', favoritePages, true)}
         {sections.filter(section => section.placement === 'top').map(renderFixedSection)}
         {renderSection('Páginas', rootPages, false, (

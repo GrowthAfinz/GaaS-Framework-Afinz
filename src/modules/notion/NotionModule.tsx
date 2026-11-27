@@ -246,6 +246,20 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     if (cancel) updateDatabaseRow(TASKS_DB, rowId, 'p_status', cancel);
   }, [deleteDatabaseRow, updateDatabaseRow]);
 
+  /** Várias linhas de uma vez (seleção na tabela): uma confirmação só. Tarefa é cancelada, nunca apagada. */
+  const deleteRows = useCallback((databaseId: string, rowIds: string[]) => {
+    if (!rowIds.length) return;
+    const n = rowIds.length;
+    if (databaseId === TASKS_DB) {
+      if (!window.confirm(`Cancelar ${n} ${n === 1 ? 'tarefa' : 'tarefas'}? Elas continuam no histórico com o status "Cancelada".`)) return;
+      const cancel = latest.current.databases[TASKS_DB].properties.find(p => p.id === 'p_status')?.options?.find(o => o.id === 'cancelada')?.name;
+      if (cancel) rowIds.forEach(id => updateDatabaseRow(TASKS_DB, id, 'p_status', cancel));
+      return;
+    }
+    if (!window.confirm(`Excluir ${n} ${n === 1 ? 'linha' : 'linhas'}? Não dá para desfazer.`)) return;
+    rowIds.forEach(id => deleteDatabaseRow(databaseId, id));
+  }, [deleteDatabaseRow, updateDatabaseRow]);
+
   /* ---------- edição de propriedades, opções e visões (criar opção grava na tela de origem) ---------- */
   const patchDb = useCallback((dbId: string, fn: (db: NotionDatabase) => NotionDatabase) =>
     patchWorkspace(prev => (prev.databases[dbId] ? { ...prev, databases: { ...prev.databases, [dbId]: fn(prev.databases[dbId]) } } : prev)), [patchWorkspace]);
@@ -636,8 +650,11 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
     const open = [...ctx.tasks.values()].filter(t => !t.parent_task_id && t.status !== 'concluida' && t.status !== 'cancelada');
     const out: Record<string, number> = {};
     for (const pg of Object.values(workspace.pages)) if (pg.databaseId === TASKS_DB && (pg.taskFronts || []).length) out[pg.id] = open.filter(t => (pg.taskFronts || []).includes(String(t.front_key || ''))).length;
+    // Tarefas | Geral: todas as frentes de negócio (sem o SDD). Bases de Crédito: pedidos na base.
+    if (workspace.pages[TASKS_PAGE]) out[TASKS_PAGE] = open.filter(t => t.front_key !== GAAS_FRONT).length;
+    for (const pg of Object.values(workspace.pages)) if (pg.title === CREDIT_BASES_TITLE && pg.databaseId && workspace.databases[pg.databaseId]) out[pg.id] = workspace.databases[pg.databaseId].rows.length;
     return out;
-  }, [ctx.tasks, workspace.pages]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ctx.tasks, workspace.pages, workspace.databases]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Registros da Visão Daily ligados a cada card (o do card e os das Sub Tarefas), para o selo "Daily" do Quadro. */
   const [dailyPulse, setDailyPulse] = useState<Map<string, DailyPulse>>(new Map());
   useEffect(() => {
@@ -706,6 +723,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
             cardFooter={taskCardFooter}
             cardHides={['p_subtarefas', 'p_prazo', ...(single ? ['p_frente'] : [])]}
             onDeleteRow={deleteRow}
+            onDeleteRows={deleteRows}
             onAddProperty={addDatabaseProperty}
             onSetView={(_db, viewId) => setViewByPage(prev => ({ ...prev, [viewKey]: viewId }))}
             onAddView={(id, name, type) => { addDatabaseView(id, name, type); setViewByPage(prev => { const { [viewKey]: _old, ...rest } = prev; return rest; }); }}
@@ -743,6 +761,7 @@ function NotionApp({ initial, ctx, seeded }: { initial: NotionWorkspace; ctx: No
           onUpdateRow={updateRow}
           onAddRow={addRow}
           onDeleteRow={deleteRow}
+            onDeleteRows={deleteRows}
           onAddProperty={addDatabaseProperty}
           onSetView={creditBases ? (id, viewId) => setViewByPage(prev => ({ ...prev, [id]: viewId })) : setDatabaseView}
           onAddView={creditBases ? (id, name, type) => {
